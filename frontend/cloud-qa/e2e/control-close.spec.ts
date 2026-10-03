@@ -79,27 +79,31 @@ test('control center queries real layers, refreshes and opens the exact active i
     }
     await visibleProof(page, info, 'stable-header-after');
   }
-  const legend = page.getByRole('list', { name: 'Tipos de elementos en el mapa', exact: true });
-  await expect(legend).toHaveCount(1); // Only the legend for the current viewport is exposed.
+  const legend = page.getByRole('group', { name: 'Capas del mapa', exact: true });
+  await expect(legend).toHaveCount(1);
+  await expect(page.getByRole('list', { name: 'Tipos de elementos en el mapa' })).toHaveCount(0);
   for (const [label, glyph] of [
     ['Generadores', 'factory'], ['Transportistas', 'truck'],
     ['Operadores', 'flask-conical'], ['Inspecciones', 'clipboard-check'],
   ]) {
-    const entry = legend.getByRole('listitem').filter({ hasText: label });
+    const entry = legend.getByRole('button', { name: label, exact: true });
     await expect(entry).toBeVisible();
     await expect(entry.locator('svg.lucide-' + glyph)).toHaveCount(1);
     await expect(entry.locator('polygon')).toHaveCount(0);
   }
   await legend.scrollIntoViewIfNeeded();
+  for (const button of await legend.getByRole('button').all()) {
+    const box = (await button.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.width).toBeGreaterThanOrEqual(44);
+  }
   const bounds = (await legend.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual((await page.evaluate(() => innerWidth)) + 1);
   if (page.viewportSize()!.width < 640) {
     const mapBounds = (await page.locator('.leaflet-container').boundingBox())!;
-    // The mobile legend must follow the map rather than obscure its markers.
-    expect(bounds.y).toBeGreaterThanOrEqual(mapBounds.y + mapBounds.height - 1);
-    expect(bounds.x).toBeGreaterThanOrEqual(mapBounds.x - 1);
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(mapBounds.x + mapBounds.width + 1);
+    // A single actionable reference precedes the map, never overlays its markers.
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(mapBounds.y + 1);
   }
   await visibleProof(page, info, 'map-legend-after');
   const layer = page.getByRole('button', { name: 'Generadores', exact: true });

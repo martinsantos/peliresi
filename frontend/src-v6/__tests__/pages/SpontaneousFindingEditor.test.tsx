@@ -44,4 +44,15 @@ describe('field capture closing safety', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     expect(mocks.saveSpontaneousFinding).toHaveBeenLastCalledWith(expect.objectContaining({ description: 'Último dato antes de salir' }));
   });
+
+  it('offers a linked actor address without replacing the observed place or the GPS', () => {
+    const initial = { ...newSpontaneousFinding('one'), location: 'Desagüe observado', latitude: -32.9, longitude: -68.8 };
+    render(<SpontaneousFindingEditor initial={initial} actors={{ GENERADOR: [{ id: 'g1', razonSocial: 'Planta', domicilio: 'Planta 123' }], OPERADOR: [], TRANSPORTISTA: [] }} onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Tipo de actor'), { target: { value: 'GENERADOR' } });
+    fireEvent.change(screen.getByLabelText('Actor'), { target: { value: 'g1' } });
+    expect(screen.getByLabelText('Ubicación o referencia')).toHaveValue('Desagüe observado');
+    fireEvent.click(screen.getByRole('button', { name: 'Usar domicilio declarado: Planta 123' }));
+    expect(screen.getByLabelText('Ubicación o referencia')).toHaveValue('Planta 123');
+    expect(mocks.protectSpontaneousText).toHaveBeenLastCalledWith(expect.objectContaining({ location: 'Planta 123', latitude: -32.9, longitude: -68.8 }));
+  });
 });

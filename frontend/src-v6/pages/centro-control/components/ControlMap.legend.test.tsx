@@ -15,7 +15,7 @@ vi.mock('react-leaflet', () => ({
 
 function renderMap(inspection?: boolean) {
   const props: React.ComponentProps<typeof ControlMap> = {
-    cc: null, layers: { generadores: true, transportistas: true, operadores: true, transito: true, inspecciones: inspection },
+    cc: null, layers: { generadores: true, transportistas: true, operadores: true, transito: true, inspecciones: inspection }, onToggleLayer: vi.fn(),
     mapZoom: 10, onZoomChange: vi.fn(), enTransitoForMap: [], selectedTripId: null,
     onSelectTrip: vi.fn(), selectedRealizadoId: null, tripPanel: 'activos', inspections: [],
     selectedInspectionId: null, onSelectInspection: vi.fn(), viajesRealizados: [],
@@ -24,47 +24,36 @@ function renderMap(inspection?: boolean) {
   return render(<MemoryRouter><ControlMap {...props} /></MemoryRouter>);
 }
 
-function show(inspection?: boolean) {
-  renderMap(inspection);
-  return screen.getAllByRole('list', { name: 'Tipos de elementos en el mapa' });
-}
-
 describe('Control map visual identity across desktop and mobile', () => {
-  it('identifies operators by their flask instead of a hexagon in both legends', () => {
-    const { container } = renderMap(true);
-    const operatorLabels = Array.from(container.querySelectorAll('span'))
-      .filter(element => ['Oper', 'Operadores'].includes(element.textContent?.trim() || ''));
-    expect(operatorLabels).toHaveLength(2);
-    for (const label of operatorLabels) {
-      expect(label.querySelector('svg.lucide-flask-conical')).not.toBeNull();
-      expect(label.querySelector('polygon')).toBeNull();
-    }
+  it('has one actionable legend, not another non-interactive reference', () => {
+    renderMap(true);
+    expect(screen.getAllByRole('group', { name: 'Capas del mapa' })).toHaveLength(1);
+    expect(screen.queryByRole('list', { name: 'Tipos de elementos en el mapa' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Operadores', exact: true })).toHaveLength(1);
   });
 
   it.each([true, false])('uses the same labelled glyphs even when the inspection layer is %s', enabled => {
-    const legends = show(enabled);
-    expect(legends).toHaveLength(2);
-    for (const legend of legends) {
-      expect(within(legend).getAllByRole('listitem')).toHaveLength(5);
+    renderMap(enabled);
+    const legend = screen.getByRole('group', { name: 'Capas del mapa' });
+      expect(within(legend).getAllByRole('button')).toHaveLength(5);
       for (const [label, glyph, color] of [
         ['Generadores', 'factory', ACTOR_COLORS.generador],
         ['Transportistas', 'truck', ACTOR_COLORS.transportista],
         ['Operadores', 'flask-conical', ACTOR_COLORS.operador],
         ['Inspecciones', 'clipboard-check', ACTOR_COLORS.inspeccion],
       ]) {
-        const item = within(legend).getByText(label).closest('[role="listitem"]')!;
+        const item = within(legend).getByRole('button', { name: label, exact: true });
         expect(item.querySelector(`svg.lucide-${glyph}`)).not.toBeNull();
-        expect(item.querySelector('[aria-hidden="true"]')).toHaveStyle({ backgroundColor: color });
+        expect(item.querySelector('[data-map-symbol]')).toHaveStyle({ backgroundColor: color });
         expect(item.querySelector('polygon')).toBeNull();
       }
-      expect(within(legend).getByText('En tránsito')).toBeInTheDocument();
-    }
+      expect(within(legend).getByRole('button', { name: 'En Tránsito', exact: true })).toBeInTheDocument();
   });
 
   it('does not advertise inspection operations where that layer is not offered', () => {
-    for (const legend of show()) {
-      expect(within(legend).getAllByRole('listitem')).toHaveLength(4);
+    renderMap();
+    const legend = screen.getByRole('group', { name: 'Capas del mapa' });
+      expect(within(legend).getAllByRole('button')).toHaveLength(4);
       expect(within(legend).queryByText('Inspecciones')).toBeNull();
-    }
   });
 });

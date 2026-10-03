@@ -240,12 +240,10 @@ export const CentroControlPage: React.FC = () => {
         datePreset={datePreset}
         fechaDesde={fechaDesde}
         fechaHasta={fechaHasta}
-        layers={layers}
         onManualRefresh={handleManualRefresh}
         onDatePreset={handleDatePreset}
         onFechaDesde={(val) => { setFechaDesde(val); setDatePreset(-1); }}
         onFechaHasta={(val) => { setFechaHasta(val); setDatePreset(-1); }}
-        onToggleLayer={toggleLayer}
       />
 
       {/* ══════ Main Content ══════ */}
@@ -266,6 +264,7 @@ export const CentroControlPage: React.FC = () => {
         <ControlMap
           cc={cc}
           layers={layers}
+          onToggleLayer={toggleLayer}
           mapZoom={mapZoom}
           onZoomChange={setMapZoom}
           enTransitoForMap={enTransitoForMap}

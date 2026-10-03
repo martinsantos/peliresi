@@ -19,6 +19,8 @@ import { InspectorSelect } from './InspectorSelect';
 import { InspectionOperationsPanel } from './InspectionOperationsPanel';
 import { useConnectivity } from '../../hooks/useConnectivity';
 import { SpontaneousFindingPanel } from './SpontaneousFindingPanel';
+import { InspectionLocationField } from './InspectionLocationField';
+import { inspectionLocationSuggestions } from './inspectionLocations';
 
 const isActorType = (value: string | null): value is InspectionActorType => value === 'GENERADOR' || value === 'TRANSPORTISTA' || value === 'OPERADOR';
 
@@ -195,7 +197,7 @@ const InspeccionesPageV2: React.FC = () => {
         {!actorInspection && <label className="text-sm font-semibold text-neutral-800 sm:col-span-2">Descripción inicial<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} maxLength={10000} placeholder="Qué se va a inspeccionar o qué ocurrió. Se puede completar en campo." className="mt-2 w-full rounded-lg border border-neutral-300 p-3 text-base font-normal" /></label>}
         <label className="min-w-0 text-sm font-semibold text-neutral-800">Fecha programada<input type="datetime-local" value={fechaProgramada} onChange={(event) => setFechaProgramada(event.target.value)} className="mt-2 h-11 w-full min-w-0 rounded-lg border border-neutral-300 px-3 font-normal" /></label>
         <label className="text-sm font-semibold text-neutral-800">Número de acta<input value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Opcional · distinto del legajo" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>
-        <label className="text-sm font-semibold text-neutral-800 sm:col-span-2">Ubicación prevista<input value={ubicacion} onChange={(event) => setUbicacion(event.target.value)} placeholder="Domicilio o referencia" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>
+        <InspectionLocationField label="Ubicación prevista" value={ubicacion} onChange={setUbicacion} disabled={createMutation.isPending} placeholder="Domicilio o referencia" className="sm:col-span-2" options={inspectionLocationSuggestions(withoutActor ? undefined : actorOptions.find(actor => String(actor.id) === actorId))} />
       </fieldset>
     </Modal>
   </div>;

@@ -44,6 +44,8 @@ import { getInspectionDossierReadiness, type InspectionDossierReadiness } from '
 import { inspectionActorRoute, inspectionDate, inspectionErrorMessage, isTrainingActNumber } from './inspectionPresentation';
 import { OfflineDictation } from './OfflineDictation';
 import { appendDictatedText } from './appendDictatedText';
+import { InspectionLocationField } from './InspectionLocationField';
+import { inspectionLocationSuggestions } from './inspectionLocations';
 
 const LABELS: Record<InspectionState, string> = { BORRADOR: 'Borrador', PLANIFICADA: 'Planificada', EN_CAMPO: 'En campo', EN_REVISION: 'En revisión', NOTIFICADA: 'Notificada', EN_DESCARGO: 'En descargo', REQUIERE_SUBSANACION: 'Requiere subsanación', CERRADA_CONFORME: 'Cerrada conforme', DERIVADA_LEGALES: 'Derivada a legales', EN_TRAMITE_LEGAL: 'En trámite legal', DERIVADA_ATM: 'Derivada a ATM', FINALIZADA: 'Finalizada', CANCELADA: 'Cancelada' };
 const COLORS: Partial<Record<InspectionState, BadgeColor>> = { BORRADOR: 'neutral', PLANIFICADA: 'info', EN_CAMPO: 'primary', EN_REVISION: 'warning', NOTIFICADA: 'info', EN_DESCARGO: 'warning', REQUIERE_SUBSANACION: 'error', CERRADA_CONFORME: 'success', DERIVADA_LEGALES: 'error', EN_TRAMITE_LEGAL: 'warning', DERIVADA_ATM: 'warning', FINALIZADA: 'success', CANCELADA: 'neutral' };
@@ -675,7 +677,7 @@ const InspeccionExpedientePage: React.FC = () => {
     <div className="grid gap-5 sm:grid-cols-2"><Meta icon={<ClipboardCheck />} label={environmentalInspection ? INSPECTION_TYPES[inspectionType].label : inspection.tipoActor ? 'Actor inspeccionado' : 'Denuncia / hallazgo'} value={actor?.razonSocial || 'Sin responsable identificado'} to={actorRoute || undefined} onNavigate={flushDraft} returnTo={location.pathname + location.search + location.hash} detail={actor?.cuit ? 'CUIT ' + actor.cuit : undefined} /><Meta icon={<UserRound />} label="Inspector" value={inspection.inspector.nombre + ' ' + (inspection.inspector.apellido || '')} /></div>
     <div className="grid gap-5 border-t border-neutral-200 pt-5 sm:grid-cols-2">
       <label className="text-sm font-semibold text-neutral-700">Número de acta<input disabled={!canEdit} value={numeroActa} onChange={(event) => setNumeroActa(event.target.value)} placeholder="Asignar número" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-normal text-neutral-900 disabled:bg-neutral-50" /></label>
-      <label className="text-sm font-semibold text-neutral-700">Ubicación<input disabled={!canEdit} value={ubicacion} onChange={(event) => setUbicacion(event.target.value)} placeholder="Dirección o referencia del lugar" className="mt-2 h-11 w-full rounded-lg border border-neutral-300 px-3 text-sm font-normal text-neutral-900 disabled:bg-neutral-50" /></label>
+      <InspectionLocationField label="Ubicación" value={ubicacion} onChange={setUbicacion} disabled={!canEdit} options={actor ? inspectionLocationSuggestions(actor, inspection.comparaciones) : []} />
     </div>
     <dl className="grid gap-4 border-t border-neutral-200 pt-5 text-sm sm:grid-cols-2"><div><dt className="text-xs text-neutral-500">Programada</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.fechaProgramada, true)}</dd></div><div><dt className="text-xs text-neutral-500">Inicio de campo</dt><dd className="mt-1 font-medium">{inspectionDate(inspection.iniciadaAt, true)}</dd></div></dl>
   </div>;

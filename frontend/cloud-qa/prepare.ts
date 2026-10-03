@@ -11,6 +11,19 @@ const fixture=await seedNightDatabase();
 const {PrismaClient}=backendRequire('@prisma/client');
 const db=new PrismaClient();
 try {
+  // Address assistance uses real catalog fields, populated only in the guarded synthetic DB.
+  await db.generador.update({ where: { id: fixture.actors.generador }, data: {
+    domicilio: 'QA Registro 100', domicilioRealCalle: 'QA Planta 200', domicilioRealLocalidad: 'Las Heras',
+    domicilioLegalCalle: 'QA Oficina 300', domicilioLegalDepto: 'Capital',
+  } });
+  await db.generador.update({ where: { id: fixture.actors.generador2 }, data: { domicilio: 'QA Otro 400' } });
+  await db.operador.update({ where: { id: fixture.actors.operador }, data: {
+    domicilioRealCalle: 'QA Tratamiento 500', domicilioRealDepto: 'Godoy Cruz',
+  } });
+  await db.sedeOperador.upsert({ where: { id: 'cloud-qa-operator-site' },
+    create: { id: 'cloud-qa-operator-site', operadorId: fixture.actors.operador, nombre: 'QA Sede norte', tipo: 'FIJO', domicilio: 'QA Acceso 600', activo: true },
+    update: { domicilio: 'QA Acceso 600', activo: true },
+  });
   const deviceManifest = await db.manifiesto.create({data:{
     numero:'2026-990001', generadorId:fixture.actors.generador,
     transportistaId:fixture.actors.transportista, operadorId:fixture.actors.operador,

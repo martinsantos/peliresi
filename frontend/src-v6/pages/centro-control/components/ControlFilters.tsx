@@ -1,14 +1,11 @@
 /**
  * CentroControl — Sticky Filters Bar
- * Date presets, LIVE badge, layer toggles, date range pickers
+ * Date presets, LIVE badge and date range pickers. Map controls live by the map.
  */
 import React from 'react';
 import {
   RefreshCw,
   Calendar,
-  Layers,
-  Eye,
-  EyeOff,
 } from 'lucide-react';
 import { DATE_PRESETS } from '../../../utils/date-presets';
 
@@ -25,12 +22,10 @@ interface ControlFiltersProps {
   datePreset: number;
   fechaDesde: string;
   fechaHasta: string;
-  layers: LayerState;
   onManualRefresh: () => void;
   onDatePreset: (days: number) => void;
   onFechaDesde: (val: string) => void;
   onFechaHasta: (val: string) => void;
-  onToggleLayer: (layer: keyof LayerState) => void;
 }
 
 export const ControlFilters: React.FC<ControlFiltersProps> = ({
@@ -38,16 +33,14 @@ export const ControlFilters: React.FC<ControlFiltersProps> = ({
   datePreset,
   fechaDesde,
   fechaHasta,
-  layers,
   onManualRefresh,
   onDatePreset,
   onFechaDesde,
   onFechaHasta,
-  onToggleLayer,
 }) => {
   return (
     <div className="relative lg:sticky lg:top-0 z-20 bg-[#FAFAF8] -mx-4 lg:-mx-8 px-4 lg:px-8 pt-2 pb-2">
-      {/* Row 1: Date presets + LIVE badge + layers + period */}
+      {/* Date presets + LIVE badge + period */}
       <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-2xl border border-neutral-100 shadow-sm">
         {/* LIVE badge + refresh */}
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200">
@@ -97,37 +90,6 @@ export const ControlFilters: React.FC<ControlFiltersProps> = ({
               className="px-2 py-1 rounded border border-neutral-200 text-neutral-600 text-xs"
             />
           </div>
-        </div>
-
-        <div className="h-5 w-px bg-neutral-200 hidden sm:block" />
-
-        {/* Layer toggles */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Layers size={16} className="text-neutral-400" />
-          {([
-            { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500' },
-            { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500' },
-            { key: 'operadores' as const, label: 'Operadores', color: 'bg-blue-500' },
-            ...(layers.inspecciones !== undefined ? [{ key: 'inspecciones' as const, label: 'Inspecciones', color: 'bg-teal-600' }] : []),
-            { key: 'transito' as const, label: 'En Tránsito', color: 'bg-red-500' },
-          ]).map(l => (
-            <button
-              type="button"
-              key={l.key}
-              aria-label={l.label}
-              aria-pressed={Boolean(layers[l.key])}
-              onClick={() => onToggleLayer(l.key)}
-              className={`min-h-11 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors active:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 border ${
-                layers[l.key]
-                  ? 'bg-white border-neutral-200 text-neutral-700 shadow-sm'
-                  : 'bg-neutral-50 border-transparent text-neutral-400'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${layers[l.key] ? l.color : 'bg-neutral-300'}`} />
-              <span>{l.label}</span>
-              {layers[l.key] ? <Eye size={12} /> : <EyeOff size={12} />}
-            </button>
-          ))}
         </div>
 
         {/* Active period indicator */}

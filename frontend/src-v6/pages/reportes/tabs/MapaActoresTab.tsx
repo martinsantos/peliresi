@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Layers, Eye, EyeOff, Download, FileDown, Printer,
+  Layers, Download, FileDown, Printer,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { useQuery } from '@tanstack/react-query';
@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
+import { MapCategorySymbol, MapLayerToggle, type MapCategory } from '../../../components/ui/MapLayerToggle';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
 import { getDepartamento, DEPARTAMENTOS_MENDOZA } from '../../../utils/mendoza-departamentos';
 import { clusterMarkers, downloadCsv } from './shared';
@@ -234,46 +235,33 @@ export default function MapaActoresTab({
               { value: '', label: 'Todos los deptos.' },
               ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d.nombre, label: d.nombre })),
             ]}
-            size="sm"
+            size="base"
             isFullWidth={false}
           />
           <span className="w-px h-5 bg-neutral-200" />
-          {([
-            { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500', activeClass: 'bg-purple-50 border-purple-300 text-purple-700 shadow-sm', count: selectedDep ? filteredGen.length : totalGen },
-            { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500', activeClass: 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm', count: selectedDep ? filteredTrans.length : totalTrans },
-            { key: 'operadoresFijos' as const, label: 'Op. Fijos', color: 'bg-blue-500', activeClass: 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm', count: selectedDep ? filteredOpFijos.length : operadoresFijos.length },
-            { key: 'operadoresInSitu' as const, label: 'Op. In Situ', color: 'bg-emerald-500', activeClass: 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm', count: selectedDep ? filteredOpInSitu.length : operadoresInSitu.length },
-            ...(canUseInspectionOperations(currentUser) ? [{ key: 'inspecciones' as const, label: 'Inspecciones', color: 'bg-teal-500', activeClass: 'bg-teal-50 border-teal-300 text-teal-800 shadow-sm', count: inspectedPlaces.length }] : []),
-          ]).map(l => (
-            <button
-              key={l.key}
-              onClick={() => toggleLayer(l.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                layers[l.key]
-                  ? l.activeClass
-                  : 'bg-neutral-50 border-transparent text-neutral-400'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${layers[l.key] ? l.color : 'bg-neutral-300'}`} />
-              <span>{l.label}</span>
-              <Badge variant="soft" color="neutral" className="text-[10px] px-1.5 py-0 ml-1">{l.count}</Badge>
-              {layers[l.key] ? <Eye size={12} /> : <EyeOff size={12} />}
-            </button>
-          ))}
+          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+            <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} count={selectedDep ? filteredGen.length : totalGen} onToggle={() => toggleLayer('generadores')} />
+            <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} count={selectedDep ? filteredTrans.length : totalTrans} onToggle={() => toggleLayer('transportistas')} />
+            <MapLayerToggle category="operador" label="Op. Fijos" pressed={layers.operadoresFijos} count={selectedDep ? filteredOpFijos.length : operadoresFijos.length} onToggle={() => toggleLayer('operadoresFijos')} />
+            <MapLayerToggle category="operador" label="Op. In Situ" pressed={layers.operadoresInSitu} count={selectedDep ? filteredOpInSitu.length : operadoresInSitu.length} onToggle={() => toggleLayer('operadoresInSitu')} />
+            {canUseInspectionOperations(currentUser) && <MapLayerToggle category="inspeccion" label="Inspecciones" pressed={layers.inspecciones} count={inspectedPlaces.length} onToggle={() => toggleLayer('inspecciones')} />}
+          </div>
           <div className="ml-auto flex items-center gap-3 text-xs text-neutral-500">
             {totalGen + totalTrans + totalOper} actores ({totalOper} operadores)
             {onToggleIncluirTodos && (
-              <label className="flex items-center gap-1.5 cursor-pointer select-none border-l border-neutral-200 pl-3">
-                <span className="text-xs font-medium text-neutral-600">Todos</span>
+              <div className="flex items-center gap-1.5 border-l border-neutral-200 pl-3">
+                <span className="text-xs font-medium text-neutral-700">Incluir sin actividad</span>
                 <button
+                  type="button"
                   role="switch"
+                  aria-label="Incluir actores sin actividad en el período"
                   aria-checked={incluirTodos}
                   onClick={() => onToggleIncluirTodos(!incluirTodos)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${incluirTodos ? 'bg-primary-500' : 'bg-neutral-300'}`}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
                 >
-                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${incluirTodos ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                  <span aria-hidden="true" className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${incluirTodos ? 'bg-primary-700' : 'bg-neutral-500'}`}><span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${incluirTodos ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} /></span>
                 </button>
-              </label>
+              </div>
             )}
           </div>
         </div>
@@ -421,7 +409,7 @@ export default function MapaActoresTab({
                 </Marker>
               ))}
 
-              {/* Operadores IN SITU — icono verde */}
+              {/* Both operator modalities share the canonical blue category icon. */}
               {layers.operadoresInSitu && (selectedDep ? filteredOpInSitu : operadoresInSitu).map((o: any, idx: number) => (
                 <Marker
                   key={`oper-insitu-${o.id}-${idx}`}
@@ -448,16 +436,6 @@ export default function MapaActoresTab({
               ))}
             </MapContainer>
 
-            {/* Legend overlay */}
-            <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Generadores</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Transportistas</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Op. Fijos</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Op. In Situ</span>
-                {canUseInspectionOperations(currentUser) && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-teal-500" /> Inspecciones</span>}
-              </div>
-            </div>
           </div>
         </div>
       </Card>
@@ -510,7 +488,7 @@ export default function MapaActoresTab({
 
         if (visibleActors.length === 0) return null;
 
-        const colorMap: Record<string, string> = { purple: 'bg-purple-500', orange: 'bg-orange-500', blue: 'bg-blue-500', emerald: 'bg-emerald-500' };
+        const categories: Record<string, MapCategory> = { purple: 'generador', orange: 'transportista', blue: 'operador', emerald: 'operador' };
         const badgeColorMap: Record<string, string> = { purple: 'text-purple-700 bg-purple-50', orange: 'text-orange-700 bg-orange-50', blue: 'text-blue-700 bg-blue-50', emerald: 'text-emerald-700 bg-emerald-50' };
 
         const handleExportCsv = () => {
@@ -582,9 +560,9 @@ export default function MapaActoresTab({
                 <button
                   key={`${a.tipo}-${a.id}-${i}`}
                   onClick={() => navigate(a.ruta)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-neutral-50 transition-colors text-left"
+                  className="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 active:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
                 >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${colorMap[a.color] || 'bg-neutral-400'}`} />
+                  <MapCategorySymbol category={categories[a.color]} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-neutral-900 truncate">{a.razonSocial}</p>
                     <p className="text-xs text-neutral-500">{a.cuit} · {a.depto}</p>

@@ -319,4 +319,19 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(await screen.findByLabelText('Ubicación', { exact: true })).toHaveValue('Ubicación validada en campo');
     expect(screen.getByTestId('comparison-editor')).not.toBeVisible();
   });
+
+  it('offers the frozen declared location rather than a newer actor address and protects the explicit choice', async () => {
+    const base = inspectionFixture({ estado: 'EN_CAMPO' });
+    const inspection = { ...base, generador: { ...base.generador!, domicilio: 'Registro actualizado 999' },
+      comparaciones: [{ ...base.comparaciones[0], codigo: 'CON-DOMICILIO', valorDeclarado: 'Registro fotografiado 100' }] };
+    renderPage(inspection);
+    fireEvent.click(await screen.findByRole('link', { name: 'Visita', exact: true }));
+    const location = await screen.findByLabelText('Ubicación', { exact: true });
+    expect(location).toHaveValue('Parque Industrial, Mendoza');
+    expect(screen.queryByRole('button', { name: /Registro actualizado 999/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Usar domicilio declarado: Registro fotografiado 100' }));
+    expect(location).toHaveValue('Registro fotografiado 100');
+    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    expect(JSON.parse(localStorage.getItem('sitrep_inspection_draft_admin-1_inspection-1') || '{}')).toMatchObject({ ubicacion: 'Registro fotografiado 100' });
+  });
 });

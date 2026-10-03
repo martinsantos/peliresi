@@ -22,6 +22,9 @@ const SVG_TRUCK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 // FlaskConical icon (Lucide) – stroke-based, matches sidebar icon
 const SVG_FLASK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16.5h10"/></svg>';
 
+// Navigation (Lucide), shared with the actionable legend, including selected trips.
+const SVG_NAVIGATION = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>';
+
 // ── Actor colors (system consistent) ──
 export const ACTOR_COLORS = {
   inspeccion: '#0f766e',
@@ -65,14 +68,14 @@ export const ACTOR_ICONS = {
   // En Tránsito: red pulsing circle with navigation arrow
   enTransito: L.divIcon({
     className: '',
-    html: `<div style="position:relative;width:24px;height:24px"><div style="position:absolute;inset:0;border-radius:50%;background:rgba(239,68,68,.3);animation:sitrep-pulse 2s ease-in-out infinite"></div><div style="position:absolute;inset:3px;border-radius:50%;background:${ACTOR_COLORS.enTransito};border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="12,2 22,22 12,17 2,22"/></svg></div></div><style>@keyframes sitrep-pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.6);opacity:0}}</style>`,
+    html: `<div style="position:relative;width:24px;height:24px"><div style="position:absolute;inset:0;border-radius:50%;background:rgba(239,68,68,.3);animation:sitrep-pulse 2s ease-in-out infinite"></div><div style="position:absolute;inset:3px;border-radius:50%;background:${ACTOR_COLORS.enTransito};border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center">${SVG_NAVIGATION}</div></div><style>@keyframes sitrep-pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.6);opacity:0}}</style>`,
     iconSize: [24, 24], iconAnchor: [12, 12],
   }),
 
   // En Tránsito selected (larger)
   enTransitoSelected: L.divIcon({
     className: '',
-    html: `<div style="position:relative;width:32px;height:32px"><div style="position:absolute;inset:0;border-radius:50%;background:rgba(239,68,68,.3);animation:sitrep-pulse 1.5s ease-in-out infinite"></div><div style="position:absolute;inset:4px;border-radius:50%;background:#dc2626;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="white" stroke="none"><polygon points="12,2 22,22 12,17 2,22"/></svg></div></div>`,
+    html: `<div style="position:relative;width:32px;height:32px"><div style="position:absolute;inset:0;border-radius:50%;background:rgba(239,68,68,.3);animation:sitrep-pulse 1.5s ease-in-out infinite"></div><div style="position:absolute;inset:4px;border-radius:50%;background:#dc2626;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center">${SVG_NAVIGATION}</div></div>`,
     iconSize: [32, 32], iconAnchor: [16, 16],
   }),
 

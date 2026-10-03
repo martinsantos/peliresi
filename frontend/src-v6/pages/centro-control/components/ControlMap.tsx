@@ -3,40 +3,19 @@
  */
 import React, { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw, Factory, Truck, FlaskConical, ClipboardCheck, Navigation } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
+import { MapLayerToggle } from '../../../components/ui/MapLayerToggle';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
 import type { CentroControlData, EnTransitoItem } from '../../../hooks/useCentroControl';
 import type { LayerState } from './ControlFilters';
 
 import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
 import { hasInspectionCoordinates, type InspectionOperation } from '../../../services/inspectionOperations.service';
-
-const mapLegendItems = [
-  { key: 'generador', label: 'Generadores', Icon: Factory },
-  { key: 'transportista', label: 'Transportistas', Icon: Truck },
-  { key: 'operador', label: 'Operadores', Icon: FlaskConical },
-  { key: 'inspeccion', label: 'Inspecciones', Icon: ClipboardCheck },
-  { key: 'enTransito', label: 'En tránsito', Icon: Navigation },
-] as const;
-
-function MapLegend({ inspectionsOffered }: { inspectionsOffered: boolean }) {
-  return <div role="list" aria-label="Tipos de elementos en el mapa" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-neutral-700">
-    {mapLegendItems.filter(item => inspectionsOffered || item.key !== 'inspeccion').map(({ key, label, Icon }) => (
-      <span key={key} role="listitem" className="flex items-center gap-2 whitespace-nowrap">
-        <span aria-hidden="true" className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center text-white ${key === 'enTransito' ? 'rounded-full' : 'rounded'}`}
-          style={{ backgroundColor: ACTOR_COLORS[key], transform: key === 'transportista' ? 'rotate(45deg)' : undefined }}>
-          <Icon size={12} strokeWidth={2.5} style={{ transform: key === 'transportista' ? 'rotate(-45deg)' : undefined }} />
-        </span>
-        {label}
-      </span>
-    ))}
-  </div>;
-}
 
 // ── Cluster helper ──
 function clusterMarkers<T extends { latitud: number; longitud: number }>(
@@ -107,6 +86,7 @@ interface ViajeRealizado {
 interface ControlMapProps {
   cc: CentroControlData | null;
   layers: LayerState;
+  onToggleLayer: (layer: keyof LayerState) => void;
   mapZoom: number;
   onZoomChange: (z: number) => void;
   enTransitoForMap: EnTransitoItem[];
@@ -127,6 +107,7 @@ interface ControlMapProps {
 export const ControlMap: React.FC<ControlMapProps> = ({
   cc,
   layers,
+  onToggleLayer,
   mapZoom,
   onZoomChange,
   enTransitoForMap,
@@ -165,9 +146,12 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               {enTransitoForMap.length} en tránsito
             </Badge>
           </div>
-          {/* Map legend */}
-          <div className="hidden sm:block">
-            <MapLegend inspectionsOffered={layers.inspecciones !== undefined} />
+          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} onToggle={() => onToggleLayer('generadores')} />
+            <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} onToggle={() => onToggleLayer('transportistas')} />
+            <MapLayerToggle category="operador" label="Operadores" pressed={layers.operadores} onToggle={() => onToggleLayer('operadores')} />
+            {layers.inspecciones !== undefined && <MapLayerToggle category="inspeccion" label="Inspecciones" pressed={layers.inspecciones} onToggle={() => onToggleLayer('inspecciones')} />}
+            <MapLayerToggle category="enTransito" label="En Tránsito" pressed={layers.transito} onToggle={() => onToggleLayer('transito')} />
           </div>
         </div>
 
@@ -371,8 +355,6 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               )}
             </MapContainer>
 
-            {/* Mobile legend */}
-
             {!cc && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-[400]">
                 <div className="flex items-center gap-2 text-sm text-neutral-500">
@@ -380,9 +362,6 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                 </div>
               </div>
             )}
-          </div>
-          <div className="sm:hidden border-t border-neutral-200 bg-white px-3 py-3">
-            <MapLegend inspectionsOffered={layers.inspecciones !== undefined} />
           </div>
         </div>
       </Card>
