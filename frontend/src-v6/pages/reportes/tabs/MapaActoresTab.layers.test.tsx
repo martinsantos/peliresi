@@ -2,26 +2,53 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import MapaActoresTab from './MapaActoresTab';
 import { ACTOR_COLORS } from '../../../utils/map-icons';
-import type { CentroControlData } from '../../../hooks/useCentroControl';
+import type { ActorTransportista, CentroControlData } from '../../../hooks/useCentroControl';
 
 vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'actor-1', rol: 'GENERADOR' } }) }));
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TileLayer: () => null, Marker: ({ children }: { children: React.ReactNode }) => <div data-testid="marker">{children}</div>,
+  TileLayer: () => null, Marker: ({ children, position }: { children: React.ReactNode; position: [number, number] }) => <div data-testid="marker" data-position={JSON.stringify(position)}>{children}</div>,
   Popup: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   useMap: () => ({ flyTo: vi.fn() }),
 }));
 
-function reportMap() {
-  const ccData = { generadores: [{ id: 'g-1', razonSocial: 'Generador del mapa', cuit: 'synthetic', categoria: 'Y1', latitud: -32.89, longitud: -68.82, cantManifiestos: 1 }], transportistas: [], operadores: [] } as unknown as CentroControlData;
+function reportMap(transportistas: ActorTransportista[] = []) {
+  const ccData = { generadores: [{ id: 'g-1', razonSocial: 'Generador del mapa', cuit: 'synthetic', categoria: 'Y1', latitud: -32.89, longitud: -68.82, cantManifiestos: 1 }], transportistas, operadores: [] } as unknown as CentroControlData;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={client}><MemoryRouter><MapaActoresTab ccData={ccData} onSelectDep={vi.fn()} periodoLabel="Prueba" /></MemoryRouter></QueryClientProvider>);
 }
 
 describe('Report map single interactive category reference', () => {
+  afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear(); });
+  it('keeps an unlocated carrier in the list but does not invent a point in Capital', () => {
+    reportMap([{ id: 'unlocated', razonSocial: 'Transporte sin coordenadas', cuit: 'synthetic', latitud: null, longitud: null, vehiculosActivos: 0, enviosEnTransito: 0 }]);
+    expect(screen.getAllByTestId('marker')).toHaveLength(1); // only the located generator
+    const actor = screen.getByRole('button', { name: /^Transporte sin coordenadas/ });
+    expect(actor).toHaveTextContent('Sin ubicación verificada');
+    expect(actor).not.toHaveTextContent('Capital');
+  });
+  it('uses the same departmental reference for marker, filtered count and list without jitter', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    reportMap([{ id: 'maipu', razonSocial: 'Transporte Maipú sin GPS', cuit: 'synthetic', domicilio: 'Ruta de prueba, Maipú', latitud: null, longitud: null, vehiculosActivos: 0, enviosEnTransito: 0 }]);
+    const marker = screen.getAllByTestId('marker').find(node => node.textContent?.includes('Transporte Maipú'));
+    expect(marker).toHaveAttribute('data-position', JSON.stringify([-32.943, -68.755]));
+    expect(marker).toHaveTextContent('Referencia departamental aproximada');
+    fireEvent.click(screen.getByRole('button', { name: 'Todos los deptos.', exact: true }));
+    fireEvent.click(screen.getByRole('option', { name: 'Maipú', exact: true }));
+    expect(screen.getByRole('button', { name: 'Transportistas', exact: true }).querySelector('[data-map-count]')).toHaveTextContent('1');
+    expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: /^Transporte Maipú sin GPS/ })).toHaveTextContent('Maipú');
+  });
+  it('counts a departmental reference shown by the active department filter', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [] })));
+    reportMap([{ id: 'maipu-count', razonSocial: 'Transporte contado', cuit: 'synthetic', domicilio: 'Ruta de prueba, Maipú', latitud: null, longitud: null, vehiculosActivos: 0, enviosEnTransito: 0 }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Todos los deptos.', exact: true }));
+    fireEvent.click(screen.getByRole('option', { name: 'Maipú', exact: true }));
+    expect(screen.getByRole('button', { name: 'Transportistas', exact: true }).querySelector('[data-map-count]')).toHaveTextContent('1');
+  });
   it('uses the canonical glyph and color, even for the in-situ operator modality', () => {
     reportMap();
     const group = screen.getByRole('group', { name: 'Capas del mapa' });

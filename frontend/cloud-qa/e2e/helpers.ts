@@ -1,5 +1,30 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
+/** A real notice must not cover the identity, tabs or the scrollable workspace. */
+export async function nonObstructingNotices(page: Page) {
+  const notice = page.getByRole('region', { name: 'Avisos del sistema', exact: true });
+  await expect(notice).toBeVisible();
+  const geometry = await notice.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const overlaps = (other: Element | null) => {
+      if (!other) return false;
+      const r = other.getBoundingClientRect();
+      return Math.min(rect.right, r.right) - Math.max(rect.left, r.left) > 1
+        && Math.min(rect.bottom, r.bottom) - Math.max(rect.top, r.top) > 1;
+    };
+    const viewport = visualViewport;
+    return {
+      headerOverlap: overlaps(document.querySelector('header')),
+      formOverlap: overlaps(document.querySelector('main')),
+      overlayPosition: ['fixed', 'absolute'].includes(getComputedStyle(element).position),
+      insideViewport: rect.top >= (viewport?.offsetTop ?? 0) - 1
+        && rect.bottom <= (viewport ? viewport.offsetTop + viewport.height : innerHeight) + 1,
+    };
+  });
+  expect(geometry).toEqual({ headerOverlap: false, formOverlap: false, overlayPosition: false, insideViewport: true });
+  await readableFixedAction(notice.getByRole('button', { name: 'Cerrar notificación' }).first(), notice);
+}
+
 /** Page overflow alone misses clipped text in fixed navigation and dialog actions. */
 export async function readableFixedAction(action: Locator, container: Locator) {
   await expect(action).toBeVisible();

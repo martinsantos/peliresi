@@ -11,6 +11,7 @@ import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { MapLayerToggle } from '../../../components/ui/MapLayerToggle';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
+import { resolveActorLocation } from '../../../utils/actorLocation';
 import type { CentroControlData, EnTransitoItem } from '../../../hooks/useCentroControl';
 import type { LayerState } from './ControlFilters';
 
@@ -125,6 +126,10 @@ export const ControlMap: React.FC<ControlMapProps> = ({
   onSelectInspection,
 }) => {
   const navigate = useNavigate();
+  const carrierLocations = useMemo(() => (cc?.transportistas || []).map(actor => ({
+    actor, location: resolveActorLocation(actor),
+  })), [cc?.transportistas]);
+  const unlocatedCarriers = carrierLocations.filter(item => !item.location.position).length;
   const inspectionFlyPoints = useMemo((): [number, number][] => {
     const selected = layers.inspecciones ? inspections.find((item) => item.id === selectedInspectionId) : undefined;
     return selected && hasInspectionCoordinates(selected) ? [[selected.latitud!, selected.longitud!]] : [];
@@ -156,6 +161,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
         </div>
 
         <div className="p-5">
+          {layers.transportistas && unlocatedCarriers > 0 && <p className="mb-3 text-sm text-neutral-700">{unlocatedCarriers} {unlocatedCarriers === 1 ? 'transportista sin ubicación verificada' : 'transportistas sin ubicación verificada'}</p>}
           <div className="h-[20rem] sm:h-[28rem] lg:h-[32rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
             <MapContainer
               fadeAnimation={false}
@@ -194,16 +200,19 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               ))}
 
               {/* Transportistas */}
-              {layers.transportistas && cc?.transportistas?.filter(t => t.latitud != null && t.longitud != null).map((t, idx) => (
+              {layers.transportistas && carrierLocations.map(({ actor: t, location }, idx) => location.position && (
                 <Marker
                   key={`trans-${t.id}-${idx}`}
-                  position={[t.latitud!, t.longitud!]}
+                  position={location.position}
                   icon={ACTOR_ICONS.transportista}
+                  title={t.razonSocial}
+                  alt={'Transportista: ' + t.razonSocial}
                 >
                   <Popup>
                     <div className="text-sm">
                       <strong className="text-orange-700">{t.razonSocial}</strong><br />
                       <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
+                      <span className="text-xs text-neutral-700">{location.label}</span><br />
                       <span className="text-xs">Vehículos: {t.vehiculosActivos}</span><br />
                       <span className="text-xs font-medium">En tránsito: {t.enviosEnTransito}</span>
                     </div>

@@ -9,13 +9,15 @@ import { ACTOR_COLORS } from '../../../utils/map-icons';
 // Units inspect presentation, not a simulated business API or browser journey.
 vi.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TileLayer: () => null, Marker: () => null, Popup: () => null, Polyline: () => null,
+  TileLayer: () => null,
+  Marker: ({ children, position }: { children: React.ReactNode; position: [number, number] }) => <div data-testid="marker" data-position={JSON.stringify(position)}>{children}</div>,
+  Popup: ({ children }: { children: React.ReactNode }) => <div>{children}</div>, Polyline: () => null,
   useMap: () => ({ on: vi.fn(), off: vi.fn(), flyTo: vi.fn(), setView: vi.fn(), flyToBounds: vi.fn() }),
 }));
 
-function renderMap(inspection?: boolean) {
+function renderMap(inspection?: boolean, cc: React.ComponentProps<typeof ControlMap>['cc'] = null) {
   const props: React.ComponentProps<typeof ControlMap> = {
-    cc: null, layers: { generadores: true, transportistas: true, operadores: true, transito: true, inspecciones: inspection }, onToggleLayer: vi.fn(),
+    cc, layers: { generadores: true, transportistas: true, operadores: true, transito: true, inspecciones: inspection }, onToggleLayer: vi.fn(),
     mapZoom: 10, onZoomChange: vi.fn(), enTransitoForMap: [], selectedTripId: null,
     onSelectTrip: vi.fn(), selectedRealizadoId: null, tripPanel: 'activos', inspections: [],
     selectedInspectionId: null, onSelectInspection: vi.fn(), viajesRealizados: [],
@@ -25,6 +27,18 @@ function renderMap(inspection?: boolean) {
 }
 
 describe('Control map visual identity across desktop and mobile', () => {
+  it('uses the same explicitly approximate carrier reference as Reportes', () => {
+    const cc = { generadores: [], operadores: [], transportistas: [{ id: 'qa-ref', razonSocial: 'Transporte de referencia', cuit: 'synthetic', latitud: null, longitud: null, domicilio: 'Ruta, Maipú', vehiculosActivos: 0, enviosEnTransito: 0 }] } as unknown as React.ComponentProps<typeof ControlMap>['cc'];
+    renderMap(false, cc);
+    expect(screen.getByTestId('marker')).toHaveAttribute('data-position', JSON.stringify([-32.943, -68.755]));
+    expect(screen.getByTestId('marker')).toHaveTextContent('Referencia departamental aproximada');
+  });
+  it('reports an unknown carrier rather than hiding the lack of location', () => {
+    const cc = { generadores: [], operadores: [], transportistas: [{ id: 'qa-none', razonSocial: 'Transporte sin coordenadas', cuit: 'synthetic', latitud: null, longitud: null, vehiculosActivos: 0, enviosEnTransito: 0 }] } as unknown as React.ComponentProps<typeof ControlMap>['cc'];
+    renderMap(false, cc);
+    expect(screen.queryByTestId('marker')).toBeNull();
+    expect(screen.getByText('1 transportista sin ubicación verificada')).toBeVisible();
+  });
   it('has one actionable legend, not another non-interactive reference', () => {
     renderMap(true);
     expect(screen.getAllByRole('group', { name: 'Capas del mapa' })).toHaveLength(1);

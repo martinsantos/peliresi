@@ -14,6 +14,7 @@ const authState = vi.hoisted(() => ({
     telefono: '',
     ubicacion: '',
     permisos: [],
+    esInspector: false,
   },
 }));
 const impersonationState = vi.hoisted(() => ({
@@ -90,6 +91,8 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="notificaciones" element={<div>Bandeja de avisos</div>} />
           <Route path="transporte/viaje/:id" element={<div data-testid="trip-content">Trip</div>} />
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
+          <Route path="inspecciones/:id" element={<div>Expediente de campo</div>} />
+          <Route path="mis-inspecciones/:id" element={<div>Inspección del actor</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -99,7 +102,7 @@ function renderMobileLayout(initialPath = '/dashboard') {
 describe('MobileLayout Android shell', () => {
   beforeEach(() => {
     localStorage.clear();
-    authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA' };
+    authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA', esInspector: false };
     impersonationState.data = null;
     impersonationState.exit.mockClear();
   });
@@ -109,6 +112,19 @@ describe('MobileLayout Android shell', () => {
 
     expect(screen.getByText('Viajes')).toBeInTheDocument();
     expect(screen.queryByText('Mis Viajes')).not.toBeInTheDocument();
+  });
+  it('uses the same operational inspector label and exposes its unchanged base role', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
+    renderMobileLayout('/inspecciones/qa-expediente');
+    const badge = screen.getByRole('banner').querySelector('[aria-label="Función actual"]');
+    expect(badge).toHaveTextContent(/^Inspector$/);
+    expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
+    expect(authState.currentUser.rol).toBe('GENERADOR');
+  });
+  it('does not reinterpret the actor own inspection route as inspector work', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
+    renderMobileLayout('/mis-inspecciones/qa-expediente');
+    expect(screen.getByRole('banner').querySelector('[aria-label="Función actual"]')).toHaveTextContent(/^Generador$/);
   });
 
   it('uses the short Avisos title so the app header retains room for role and bell', () => {

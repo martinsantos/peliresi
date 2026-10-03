@@ -5,7 +5,6 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { CheckCircle, AlertCircle, Info, X, AlertTriangle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -159,8 +158,12 @@ export const ToastContainer: React.FC = () => {
     });
   }, []);
 
-  const container = (
-    <div aria-label="Avisos del sistema" role="region" className="pointer-events-none fixed inset-x-3 top-[calc(env(safe-area-inset-top,0px)+4.5rem)] z-[9999] flex max-h-[60dvh] flex-col gap-2 overflow-y-auto sm:left-auto sm:right-4 sm:w-96">
+  if (activeToasts.length === 0) return null;
+
+  // Layouts provide an outlet outside the scrollable form. Notices occupy real
+  // space instead of covering case identity, tabs, maps or fixed field actions.
+  return (
+    <div aria-label="Avisos del sistema" role="region" className="relative flex max-h-[30dvh] shrink-0 flex-col gap-2 overflow-y-auto border-b border-neutral-200 bg-neutral-50 px-3 py-2 sm:px-4">
       {activeToasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastItem {...t} onRemove={toast.remove} />
@@ -169,7 +172,6 @@ export const ToastContainer: React.FC = () => {
     </div>
   );
 
-  return createPortal(container, document.body);
 };
 
 export default ToastContainer;

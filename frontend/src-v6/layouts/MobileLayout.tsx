@@ -58,6 +58,7 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
+import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -265,7 +266,8 @@ export const MobileLayout: React.FC = () => {
   // Returns null while loading or if no user (AuthGate will redirect to /login).
   if (isLoading || !currentUser) return null;
 
-  const config = currentUser.esInspector && location.pathname.includes('/inspecciones') ? { label: 'Inspector', color: 'text-teal-700', bgColor: 'bg-teal-700' } : roleConfig[currentUser.rol];
+  const inspectionLabel = inspectionContextLabel(currentUser, location.pathname);
+  const config = inspectionLabel ? { label: inspectionLabel, color: 'text-teal-700', bgColor: 'bg-teal-700' } : roleConfig[currentUser.rol];
 
   // Título según la ruta actual
   const getPageTitle = () => {
@@ -308,7 +310,6 @@ export const MobileLayout: React.FC = () => {
   return (
     <div data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
       <NotificacionesPoller />
-      <ToastContainer />
       {/* Demo mode banner */}
       {isDemo && (
         <div className="shrink-0 bg-amber-100 text-amber-950 text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
@@ -358,13 +359,14 @@ export const MobileLayout: React.FC = () => {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {/* Badge de rol */}
-            <span className="text-xs font-medium px-2 py-1 rounded-full bg-white/20 text-white">
+            <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="text-xs font-medium px-2 py-1 rounded-full bg-white/20 text-white">
               {config.label}
             </span>
             <NotificationBell basePath={mp('')} inverse />
           </div>
         </div>
       </header>
+      <ToastContainer />
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
       <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>

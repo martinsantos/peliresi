@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix } from './helpers';
+import { login, nonObstructingNotices, prefix } from './helpers';
 
 function health(page: Page) {
   const errors: string[] = [];
@@ -103,6 +103,11 @@ test('inspection indexes do not focus search and closing a focused control prese
   const acknowledged = await saved;
   expect(acknowledged.status()).toBe(200);
   expect((await acknowledged.json()).data.items.find((item: { id: string }) => item.id === field.id).observacion).toBe('QA observación conservada al plegar');
+  await expect(page.getByRole('banner').getByLabel('Función actual')).toHaveText('Inspector');
+  await expect(page.getByText('Cambios confirmados en el servidor', { exact: true })).toBeVisible();
+  await nonObstructingNotices(page);
+  await proof(page, info, 'inspection-save-notice-safe');
+  await page.getByRole('region', { name: 'Avisos del sistema' }).getByRole('button', { name: 'Cerrar notificación' }).last().click();
   await page.reload();
   await expect(observation).toHaveValue('QA observación conservada al plegar');
 

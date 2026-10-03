@@ -7,6 +7,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { currentNavigationItem } from '../utils/navigationSelection';
+import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
 import {
   LayoutDashboard,
@@ -136,6 +137,7 @@ export const MainLayout: React.FC = () => {
   }
 
   // Configuración de colores según rol (para header badges)
+  const inspectionLabel = inspectionContextLabel(currentUser, location.pathname);
   const roleStyles = (() => {
     switch (currentUser.rol) {
       case 'ADMIN':
@@ -198,7 +200,6 @@ export const MainLayout: React.FC = () => {
   return (
     <div data-app-shell className={`h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-12' : ''}`}>
       <NotificacionesPoller />
-      <ToastContainer />
       {/* Impersonation banner — amber bar above everything */}
       {impersonationData && (
         <ImpersonationBanner
@@ -234,7 +235,7 @@ export const MainLayout: React.FC = () => {
           <SitrepMark size={36} className="mr-3" />
           <div>
             <span className="font-bold text-lg text-white">SITREP</span>
-            <span className="text-xs font-medium ml-1 text-white/60">{currentUser.rol}</span>
+            <span title={`Rol base: ${currentUser.rol}`} className="text-xs font-medium ml-1 text-white/60">{inspectionLabel ?? currentUser.rol}</span>
           </div>
         </div>
 
@@ -445,10 +446,12 @@ export const MainLayout: React.FC = () => {
             {/* Badge de rol actual */}
             <Badge 
               variant="soft" 
-              color={roleStyles.badge}
-              className="hidden sm:inline-flex"
+              color={inspectionLabel ? 'primary' : roleStyles.badge}
+              className={inspectionLabel ? 'shrink-0' : 'hidden sm:inline-flex'}
+              aria-label="Función actual"
+              title={`Rol base: ${currentUser.rol}`}
             >
-              {currentUser.rol}
+              {inspectionLabel ?? currentUser.rol}
             </Badge>
           </div>
 
@@ -489,6 +492,7 @@ export const MainLayout: React.FC = () => {
         </header>
 
         <SWUpdateBanner />
+        <ToastContainer />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
         <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'overflow-clip px-3 py-3 lg:px-8 lg:py-4' : 'overflow-auto px-4 pb-4 lg:px-8 lg:pb-8')}>

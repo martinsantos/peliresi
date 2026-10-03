@@ -9,6 +9,7 @@ import { chromeButtonPoint, dismissObservedChromePrompts, nativeKeyboardShown, r
 import { DeadlineError, withinDeadline } from './deadline.ts';
 import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
+import { nonObstructingNotices } from './e2e/helpers.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -374,6 +375,8 @@ try{
     expect(saved.status()).toBe(200);
     const confirmed=await saved.json();
     await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toBeVisible();
+    await expect(page.getByRole('banner').getByLabel('Función actual')).toHaveText('Inspector');
+    await nonObstructingNotices(page);
     const local=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),'sitrep_inspection_draft_'+inspectorUserId+'_'+inspection.id);
     await writeFile(path.join(output,'saved-draft-acknowledgment.json'),JSON.stringify({confirmed:confirmed.data,local},null,2));
     expect(local?.observaciones).toBe('QA Android comentario conservado después de cerrar Chrome.');

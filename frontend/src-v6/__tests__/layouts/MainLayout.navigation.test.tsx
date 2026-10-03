@@ -1,8 +1,9 @@
 import {render,screen,within} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
-import {describe,it,expect,vi} from 'vitest';
+import {beforeEach,describe,it,expect,vi} from 'vitest';
 import {MainLayout} from '../../layouts/MainLayout';
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa',rol:'ADMIN',nombre:'QA',email:'qa@example.invalid',avatar:'QA',permisos:[]},isAdmin:true,isLoading:false,canAccess:()=>true,logout:vi.fn()})}));
+const authState=vi.hoisted(()=>({rol:'ADMIN',esInspector:false}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa',rol:authState.rol,esInspector:authState.esInspector,nombre:'QA',email:'qa@example.invalid',avatar:'QA',permisos:[]},isAdmin:authState.rol==='ADMIN',isLoading:false,canAccess:()=>true,logout:vi.fn()})}));
 vi.mock('../../contexts/ImpersonationContext',()=>({useImpersonation:()=>({impersonationData:null,exitImpersonation:vi.fn()})}));
 vi.mock('../../components/GlobalSearchPanel',()=>({GlobalSearchPanel:()=>null}));
 vi.mock('../../components/NotificationBell',()=>({NotificationBell:()=>null}));
@@ -15,6 +16,20 @@ vi.mock('../../components/ui/Toast',()=>({ToastContainer:()=>null}));
 vi.mock('../../components/ui/UserSwitcher',()=>({UserSwitcher:()=>null}));
 function show(path:string){render(<MemoryRouter initialEntries={[path]}><MainLayout/></MemoryRouter>);}
 describe('Sidebar: one visible current destination',()=>{
+  beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;});
+  it('identifies the inspection function without changing the base actor role',()=>{
+    authState.rol='GENERADOR';authState.esInspector=true;
+    show('/inspecciones/qa-expediente');
+    const badge=within(screen.getByRole('banner')).getByLabelText('Función actual');
+    expect(badge).toHaveTextContent(/^Inspector$/);
+    expect(badge).toHaveAttribute('title','Rol base: GENERADOR');
+    expect(authState.rol).toBe('GENERADOR');
+  });
+  it('keeps the base role outside the inspection workspace',()=>{
+    authState.rol='GENERADOR';authState.esInspector=true;
+    show('/mis-inspecciones/qa-expediente');
+    expect(within(screen.getByRole('banner')).getByLabelText('Función actual')).toHaveTextContent(/^GENERADOR$/);
+  });
   it.each([
     ['/admin/actores','Actores'],
     ['/admin/actores/generadores','Admin Generadores'],

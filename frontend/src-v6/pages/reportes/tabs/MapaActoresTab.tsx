@@ -13,6 +13,7 @@ import { Select } from '../../../components/ui/Select';
 import { MapCategorySymbol, MapLayerToggle, type MapCategory } from '../../../components/ui/MapLayerToggle';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
 import { getDepartamento, DEPARTAMENTOS_MENDOZA } from '../../../utils/mendoza-departamentos';
+import { resolveActorLocation, validCoordinates } from '../../../utils/actorLocation';
 import { clusterMarkers, downloadCsv } from './shared';
 import { exportReportePDF } from '../../../utils/exportPdf';
 import type { CentroControlData, ActorTransportista } from '../../../hooks/useCentroControl';
@@ -29,28 +30,8 @@ type ActorTransportistaExtra = ActorTransportista & {
 };
 
 // ── Geocoding helpers para transportistas sin coords ──
-
-/** Offset determinístico por ID para evitar superposición en mismo centroide */
-function hashOffset(seed: string, range: number): number {
-  const h = seed.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return ((h % 200) / 200 - 0.5) * 2 * range;
-}
-
-const MENDOZA_CAP: [number, number] = [-32.8908, -68.8272];
-
-/** Nivel 1: centroide del departamento inferido desde domicilio + jitter */
-function deptFallback(id: string, domicilio?: string): [number, number] {
-  if (domicilio) {
-    const lower = domicilio.toLowerCase();
-    const dept = DEPARTAMENTOS_MENDOZA.find(d => lower.includes(d.nombre.toLowerCase()));
-    if (dept) {
-      return [
-        dept.centro[0] + hashOffset(id, 0.018),
-        dept.centro[1] + hashOffset(id + 'lng', 0.018),
-      ];
-    }
-  }
-  return [MENDOZA_CAP[0] + hashOffset(id, 0.05), MENDOZA_CAP[1] + hashOffset(id + 'lng', 0.05)];
+function geocodeKey(actor: ActorTransportista): string {
+  return `geo_trans_v2_${actor.id}_${actor.domicilio ?? ''}`;
 }
 
 // ── Leaflet default icon fix ──
@@ -118,7 +99,7 @@ export default function MapaActoresTab({
   useEffect(() => {
     if (!ccData?.transportistas) return;
     const missing = ccData.transportistas.filter(
-      t => (t.latitud == null || t.longitud == null) && t.domicilio,
+      t => !validCoordinates([t.latitud, t.longitud]) && t.domicilio,
     );
     if (missing.length === 0) return;
 
@@ -126,9 +107,14 @@ export default function MapaActoresTab({
     const toFetch: typeof missing = [];
     const fromCache: Record<string, [number, number]> = {};
     for (const t of missing) {
-      const hit = sessionStorage.getItem(`geo_trans_${t.id}`);
+      // An old address must not overwrite newly registered coordinates.
+      const hit = sessionStorage.getItem(geocodeKey(t));
       if (hit) {
-        try { fromCache[t.id] = JSON.parse(hit); } catch { toFetch.push(t); }
+        try {
+          const position: unknown = JSON.parse(hit);
+          if (validCoordinates(position)) fromCache[geocodeKey(t)] = position;
+          else toFetch.push(t);
+        } catch { toFetch.push(t); }
       } else {
         toFetch.push(t);
       }
@@ -153,8 +139,10 @@ export default function MapaActoresTab({
           const data = await res.json();
           if (!cancelled && Array.isArray(data) && data.length > 0) {
             const pos: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-            sessionStorage.setItem(`geo_trans_${t.id}`, JSON.stringify(pos));
-            setGeocodedPos(prev => ({ ...prev, [t.id]: pos }));
+            if (validCoordinates(pos)) {
+              sessionStorage.setItem(geocodeKey(t), JSON.stringify(pos));
+              setGeocodedPos(prev => ({ ...prev, [geocodeKey(t)]: pos }));
+            }
           }
         }
       } catch { /* Nominatim falló — centroide de dpto ya visible */ }
@@ -197,7 +185,11 @@ export default function MapaActoresTab({
 
   // Filtered counts for badges
   const filteredGen = useMemo(() => filterByDep(ccData?.generadores || []), [filterByDep, ccData?.generadores]);
-  const filteredTrans = useMemo(() => filterByDep(ccData?.transportistas?.filter(t => t.latitud != null && t.longitud != null) as any[] || []), [filterByDep, ccData?.transportistas]);
+  // One resolved collection drives markers, filter badges, list and exports.
+  const resolvedTrans = useMemo(() => (ccData?.transportistas || []).map(actor => ({
+    actor, location: resolveActorLocation(actor, geocodedPos[geocodeKey(actor)]),
+  })), [ccData?.transportistas, geocodedPos]);
+  const filteredTrans = useMemo(() => resolvedTrans.filter(item => !selectedDep || item.location.department === selectedDep), [resolvedTrans, selectedDep]);
   const filteredOpFijos = useMemo(() => filterByDep(operadoresFijos as any[]), [filterByDep, operadoresFijos]);
   const filteredOpInSitu = useMemo(() => filterByDep(operadoresInSitu as any[]), [filterByDep, operadoresInSitu]);
   const filteredGenClustered = useMemo(() => {
@@ -319,29 +311,23 @@ export default function MapaActoresTab({
               ))}
 
               {/* Transportistas — coords reales > Nominatim geocoded > centroide de dpto */}
-              {layers.transportistas && ccData.transportistas?.filter(tRaw => {
-                if (!selectedDep) return true;
-                const t = tRaw as ActorTransportistaExtra;
-                const p = geocodedPos[t.id] ?? (t.latitud != null && t.longitud != null ? [t.latitud, t.longitud] as [number, number] : null) ?? deptFallback(t.id, t.domicilio);
-                return getDepartamento(p[0], p[1]) === selectedDep;
-              }).map((tRaw, idx) => {
-                const t = tRaw as ActorTransportistaExtra;
-                const pos: [number, number] =
-                  geocodedPos[t.id] ??
-                  (t.latitud != null && t.longitud != null
-                    ? [t.latitud, t.longitud] as [number, number]
-                    : null) ??
-                  deptFallback(t.id, t.domicilio);
+              {layers.transportistas && filteredTrans.map(({ actor, location }, idx) => {
+                const t = actor as ActorTransportistaExtra;
+                const pos = location.position;
+                if (!pos) return null;
                 return (
                   <Marker
                     key={`trans-${t.id}-${idx}`}
                     position={pos}
                     icon={ACTOR_ICONS.transportista}
+                    title={t.razonSocial}
+                    alt={'Transportista: ' + t.razonSocial}
                   >
                     <Popup>
                       <div className="text-sm">
                         <strong className="text-orange-700">{t.razonSocial}</strong><br />
                         <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
+                        <span className="text-xs text-neutral-700">{location.label}</span><br />
                         {t.localidad && (
                           <span className="text-xs text-neutral-500">📍 {t.localidad}</span>
                         )}
@@ -367,7 +353,7 @@ export default function MapaActoresTab({
                         <div className="flex items-center gap-3 mt-1">
                           <button
                             className="text-xs text-primary-600 hover:underline"
-                            onClick={() => onSelectDep(getDepartamento(pos[0], pos[1]))}
+                            onClick={() => location.department && onSelectDep(location.department)}
                           >
                             Ver departamento
                           </button>
@@ -464,13 +450,8 @@ export default function MapaActoresTab({
           }
         }
         if (layers.transportistas) {
-          for (const t of (ccData?.transportistas || []).filter((tRaw: any) => {
-            if (!selectedDep) return true;
-            const p = geocodedPos[tRaw.id] ?? (tRaw.latitud != null ? [tRaw.latitud, tRaw.longitud] : null) ?? deptFallback(tRaw.id, tRaw.domicilio);
-            return getDepartamento(p[0], p[1]) === selectedDep;
-          }) as any[]) {
-            const p = geocodedPos[t.id] ?? (t.latitud != null ? [t.latitud, t.longitud] : null) ?? deptFallback(t.id, t.domicilio);
-            visibleActors.push({ tipo: 'Transportista', color: 'orange', razonSocial: t.razonSocial, cuit: t.cuit, depto: getDepartamento(p[0], p[1]), detalle: `${t.vehiculosActivos || 0} veh. · ${t.enviosEnTransito || 0} en tránsito`, id: t.id, ruta: `/actores/transportistas/${t.id}` });
+          for (const { actor: t, location } of filteredTrans) {
+            visibleActors.push({ tipo: 'Transportista', color: 'orange', razonSocial: t.razonSocial, cuit: t.cuit, depto: location.department ? location.department + ' (aprox.)' : location.label, detalle: `${t.vehiculosActivos || 0} veh. · ${t.enviosEnTransito || 0} en tránsito · ${location.label}`, id: t.id, ruta: `/actores/transportistas/${t.id}` });
           }
         }
         if (layers.operadoresFijos) {
@@ -532,7 +513,7 @@ export default function MapaActoresTab({
           <Card>
             <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-neutral-900 min-w-0 truncate">
-                Actores en el mapa {selectedDep && <span className="text-primary-600">— {selectedDep}</span>}
+                Actores de las capas seleccionadas {selectedDep && <span className="text-primary-600">— {selectedDep}</span>}
               </h3>
               <div className="flex items-center gap-2 shrink-0">
                 <Badge variant="soft" color="neutral">{visibleActors.length}</Badge>
