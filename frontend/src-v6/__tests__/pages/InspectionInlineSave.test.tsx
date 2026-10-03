@@ -38,8 +38,8 @@ const fixture: Inspection = {
   comparaciones: [], evidencias: [], eventos: [],
 };
 
-function page() {
-  return <MemoryRouter initialEntries={['/inspecciones/inspection-1#checklist/DOC-01']}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>;
+function page(hash = '#checklist/DOC-01') {
+  return <MemoryRouter initialEntries={['/inspecciones/inspection-1' + hash]}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>;
 }
 const editor = () => screen.getByRole('textbox', { name: 'Observación: Documentación vigente' });
 const inline = () => within(screen.getByTestId('inspection-field-save-bar'));
@@ -53,6 +53,20 @@ describe('shared explicit save for the complete inspection draft', () => {
     vi.mocked(inspeccionService.saveDraft).mockResolvedValue({ version: 2 } as Inspection);
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('automatically protects an unsent spontaneous comment with no checklist items', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    queryMock.mockReturnValue({ data: { ...fixture, generador: null, items: [], observaciones: 'Comentario confirmado anterior.' }, isLoading: false, refetch: vi.fn() });
+    render(page('#acta'));
+    const field = await screen.findByRole('textbox', { name: 'Registro de lo observado' });
+    fireEvent.change(field, { target: { value: 'Hallazgo espontáneo todavía sin enviar.' } });
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({
+      observaciones: 'Hallazgo espontáneo todavía sin enviar.', items: [], version: 1,
+    }));
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(field).toHaveValue('Hallazgo espontáneo todavía sin enviar.');
+  });
 
   it('keeps voice dictation visible and stores the recognized comment only on this device until server save', async () => {
     let recognized!: (text: string) => void;

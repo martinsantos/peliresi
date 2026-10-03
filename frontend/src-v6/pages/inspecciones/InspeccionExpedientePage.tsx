@@ -255,10 +255,12 @@ const InspeccionExpedientePage: React.FC = () => {
     } catch { setStaleDraft({ ...draftFromInspection(inspection), items: [], comparaciones: [] }); setStorageFailed(true); }
   }, [draftOwnership.status, inspection, draftKey]);
   useEffect(() => {
-    if (!draftKey || !inspection || !items.length || staleDraft || (!canEdit && !canEditReport)) return;
+    // Spontaneous inspections can have no checklist. Their field testimony
+    // needs the same automatic device backup as an actor-bound inspection.
+    if (!draftKey || !inspection || staleDraft || (!canEdit && !canEditReport)) return;
     const timer = window.setTimeout(() => { if (currentDraftRef.current) storeDraft(currentDraftRef.current); }, 350);
     return () => window.clearTimeout(timer);
-  }, [canEdit, canEditReport, draftKey, inspection, currentFingerprint, items.length, staleDraft, storeDraft]);
+  }, [canEdit, canEditReport, draftKey, inspection, currentFingerprint, staleDraft, storeDraft]);
   useEffect(() => {
     const flush = () => { if (!staleDraft && currentDraftRef.current && (canEdit || canEditReport)) storeDraft(currentDraftRef.current); };
     const onHidden = () => { if (document.visibilityState === 'hidden') flush(); };
