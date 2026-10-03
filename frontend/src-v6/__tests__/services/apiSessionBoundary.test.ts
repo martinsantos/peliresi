@@ -1,6 +1,7 @@
 import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { api, setTokens, getAccessToken, clearTokens } from '../../services/api';
+vi.mock('../../services/sessionCheckpoint', () => ({ readSessionCheckpoint: vi.fn(), writeSessionCheckpoint: vi.fn().mockResolvedValue(undefined) }));
 
 beforeEach(() => { localStorage.clear(); setTokens('inspector-access', 'inspector-refresh'); });
 afterEach(() => vi.restoreAllMocks());

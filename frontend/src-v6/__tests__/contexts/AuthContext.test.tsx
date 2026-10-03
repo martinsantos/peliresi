@@ -54,6 +54,8 @@ vi.mock('../../services/api', () => ({
   getRefreshToken: vi.fn().mockReturnValue(null),
   setTokens: vi.fn(),
   clearTokens: vi.fn(),
+  restoreSessionCheckpoint: vi.fn().mockResolvedValue(undefined),
+  confirmSessionCheckpoint: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../services/offline-sync', () => ({
@@ -79,7 +81,7 @@ vi.mock('../../components/OnboardingWizard', () => ({
 // Import AFTER mocks are declared
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/auth.service';
-import { clearTokens, getAccessToken } from '../../services/api';
+import { clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
 import { clearSyncQueue } from '../../services/indexeddb';
 import { OFFLINE_SESSION_KEY, MAX_OFFLINE_SESSION_MS } from '../../services/offlineSession';
 import type { Usuario } from '../../types/models';
@@ -159,6 +161,32 @@ describe('AuthContext', () => {
   });
 
   afterEach(() => vi.useRealTimers());
+
+  it('does not request a profile with stale credentials before durable recovery completes', async () => {
+    localStorage.setItem('sitrep_access_token', 'old-administrator');
+    let restored!: () => void;
+    vi.mocked(restoreSessionCheckpoint).mockImplementationOnce(() => new Promise(resolve => { restored = resolve; }));
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    expect(authService.getMe).not.toHaveBeenCalled();
+    expect(screen.getByTestId('isLoading')).toHaveTextContent('true');
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    await act(async () => restored());
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    expect(authService.getMe).toHaveBeenCalledOnce();
+  });
+
+  it('refuses to display a cached account when safe session recovery fails', async () => {
+    await cacheVerifiedSession();
+    vi.mocked(authService.getMe).mockClear();
+    vi.mocked(restoreSessionCheckpoint).mockRejectedValueOnce(new Error('durable storage unavailable'));
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('authError')).toHaveTextContent('recuperar la sesión');
+    expect(authService.getMe).not.toHaveBeenCalled();
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
+  });
 
   it('starts with no user and isLoading transitions to false', async () => {
     renderWithProviders();

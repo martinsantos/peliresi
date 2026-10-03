@@ -8,7 +8,8 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { getAccessToken, getRefreshToken, setTokens, api } from '../services/api';
+import { getAccessToken, getRefreshToken, setTokensDurably, api } from '../services/api';
+import { toast } from '../components/ui/Toast';
 import { useAuth } from './AuthContext';
 import type { User } from './AuthContext';
 import { currentAppLocation, impersonationDestination, IMPERSONATION_STORAGE_KEY, safeAdminReturnPath } from '../utils/impersonationNavigation';
@@ -92,7 +93,7 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
     }));
 
     // Set the impersonated user's tokens
-    setTokens(tokens.accessToken, tokens.refreshToken);
+    await setTokensDurably(tokens.accessToken, tokens.refreshToken);
 
     // Full page reload: clears React Query cache + initAuth runs with new JWT
     window.location.href = impersonationDestination(window.location.pathname, '/dashboard');
@@ -103,13 +104,12 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!impersonationData) return;
 
     // Restore admin tokens
-    setTokens(impersonationData.adminToken, impersonationData.adminRefreshToken);
-
-    // Clear impersonation from localStorage
-    localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
-
-    // Full page reload to admin usuarios panel
-    window.location.href = safeAdminReturnPath(impersonationData.adminReturnPath, window.location.pathname);
+    void setTokensDurably(impersonationData.adminToken, impersonationData.adminRefreshToken).then(() => {
+      localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+      window.location.href = safeAdminReturnPath(impersonationData.adminReturnPath, window.location.pathname);
+    }).catch(() => {
+      toast.warning('No se confirmó el cambio de cuenta', 'Reintentá antes de continuar.');
+    });
   }, [impersonationData]);
 
   const value: ImpersonationContextType = {

@@ -400,7 +400,12 @@ try{
     await closeContext();
     await launch();
     await captureDraft('after-launch-before-navigation');
-    await page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta');
+    const [restoredProfile] = await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/auth/profile')&&r.request().method()==='GET'),
+      page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta'),
+    ]);
+    expect(restoredProfile.status()).toBe(200);
+    expect((await restoredProfile.json()).data.user.id).toBe(inspectorUserId);
     await expect(page.getByRole('banner')).toBeVisible();
     await expect(page).not.toHaveURL(/\/login$/);
     await expect(page.locator('#inspection-observations')).toHaveValue('QA Android comentario conservado después de cerrar Chrome.');
@@ -445,10 +450,13 @@ try{
     // Observe its real PATCH before navigation; do not require a redundant
     // manual save after the existing reconnect workflow already confirmed it.
     const synchronized=page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH');
-    const [server]=await Promise.all([
+    const [server, restoredProfile]=await Promise.all([
       page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id)&&r.request().method()==='GET'&&r.status()===200),
+      page.waitForResponse(r=>r.url().endsWith('/api/auth/profile')&&r.request().method()==='GET'),
       page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta'),
     ]);
+    expect(restoredProfile.status()).toBe(200);
+    expect((await restoredProfile.json()).data.user.id).toBe(inspectorUserId);
     const serverCopy=(await server.json()).data;
     expect(serverCopy.observaciones).toBe('QA Android comentario conservado después de cerrar Chrome.');
     await expect(page.locator('#inspection-observations')).toHaveValue(unsent);

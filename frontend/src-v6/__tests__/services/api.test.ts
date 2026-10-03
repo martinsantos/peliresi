@@ -2,7 +2,8 @@
  * Tests for src-v6/services/api.ts
  * Token helpers + axios instance configuration
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+vi.mock('../../services/sessionCheckpoint', () => ({ readSessionCheckpoint: vi.fn(), writeSessionCheckpoint: vi.fn().mockResolvedValue(undefined) }));
 
 // Must import AFTER setup.ts mocks are applied
 import { api, getAccessToken, getRefreshToken, setTokens, clearTokens } from '../../services/api';

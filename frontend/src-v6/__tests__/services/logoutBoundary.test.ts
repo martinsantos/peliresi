@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import axios from 'axios';
 import { api, setTokens, getAccessToken, getRefreshToken } from '../../services/api';
 import { authService } from '../../services/auth.service';
+vi.mock('../../services/sessionCheckpoint', () => ({ readSessionCheckpoint: vi.fn(), writeSessionCheckpoint: vi.fn().mockResolvedValue(undefined) }));
 
 beforeEach(() => { localStorage.clear(); setTokens('ending-access', 'ending-refresh'); });
 afterEach(() => vi.restoreAllMocks());
@@ -16,9 +17,9 @@ it('removes both local tokens before waiting for the logout server, using only t
   try {
     expect(getAccessToken()).toBeNull();
     expect(getRefreshToken()).toBeNull();
-    expect(post).toHaveBeenCalledWith('/auth/logout', undefined, expect.objectContaining({
+    await vi.waitFor(() => expect(post).toHaveBeenCalledWith('/auth/logout', undefined, expect.objectContaining({
       baseURL: '/api', headers: { Authorization: 'Bearer ending-access' }, timeout: 30000,
-    }));
+    })));
   } finally { finish(); await ended; }
 });
 

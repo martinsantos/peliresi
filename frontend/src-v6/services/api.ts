@@ -6,6 +6,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiErrorResponse, RefreshTokenResponse } from '../types/api';
 import { toast } from '../components/ui/Toast';
+import { readSessionCheckpoint, writeSessionCheckpoint, type SessionCheckpoint } from './sessionCheckpoint';
 
 const TOKEN_KEY = 'sitrep_access_token';
 const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
@@ -49,17 +50,96 @@ const writeTokens = (accessToken: string, refreshToken: string) => {
   localStorage.setItem(TOKEN_KEY, accessToken);
 };
 
+let sessionGeneration = 0;
+let checkpointQueue: Promise<void> = Promise.resolve();
+let currentCheckpoint: Promise<void> = Promise.resolve();
+const checkpoint = (value: SessionCheckpoint | null, generation = sessionGeneration, expected?: SessionCheckpoint) => {
+  const saving = checkpointQueue.then(async () => {
+    if (generation !== sessionGeneration) throw new Error('Session changed before committing');
+    if (expected) await writeSessionCheckpoint(value, expected);
+    else await writeSessionCheckpoint(value);
+    if (generation !== sessionGeneration) throw new Error('Session changed while committing');
+  });
+  // Keep the queue usable after a failed write. Awaited callers still receive
+  // the failure; synchronous invalidation paths must not leak rejections.
+  checkpointQueue = saving.catch(() => {});
+  currentCheckpoint = saving;
+  return saving;
+};
+
 export const setTokens = (accessToken: string, refreshToken: string) => {
+  ++sessionGeneration;
   localStorage.removeItem(RENEWALS_KEY);
   endRefreshSession();
+  writeTokens(accessToken, refreshToken);
+  checkpoint({ accessToken, refreshToken });
+};
+
+export const setTokensDurably = async (accessToken: string, refreshToken: string) => {
+  const generation = ++sessionGeneration;
+  localStorage.removeItem(RENEWALS_KEY);
+  endRefreshSession();
+  // Do not expose the new account's credentials while the UI still represents
+  // the previous account or storage has not acknowledged the transition.
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  await checkpoint({ accessToken, refreshToken }, generation);
+  if (generation !== sessionGeneration) throw new Error('Session changed before activation');
   writeTokens(accessToken, refreshToken);
 };
 
 export const clearTokens = () => {
+  ++sessionGeneration;
   localStorage.removeItem(RENEWALS_KEY);
   endRefreshSession();
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  checkpoint(null);
+};
+
+export const clearTokensDurably = () => {
+  clearTokens();
+  return currentCheckpoint;
+};
+export const confirmSessionCheckpoint = () => currentCheckpoint;
+
+let restoration: Promise<void> | undefined;
+export const restoreSessionCheckpoint = (): Promise<void> => {
+  if (restoration) return restoration;
+  const generation = sessionGeneration;
+  restoration = (async () => {
+    try {
+      const saved = await readSessionCheckpoint();
+      if (generation !== sessionGeneration) return;
+      localStorage.removeItem(RENEWALS_KEY);
+      endRefreshSession();
+      if (saved) writeTokens(saved.accessToken, saved.refreshToken);
+      else if (saved === null) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+      } else {
+        // Migrate an existing installation only once, never mistake a logout
+        // tombstone for a missing checkpoint.
+        const accessToken = getAccessToken();
+        const refreshToken = getRefreshToken();
+        await checkpoint(accessToken && refreshToken ? { accessToken, refreshToken } : null, generation);
+        if (!accessToken || !refreshToken) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(REFRESH_TOKEN_KEY);
+        }
+      }
+    } catch (error) {
+      if (generation !== sessionGeneration) return;
+      if (generation === sessionGeneration) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        localStorage.removeItem(RENEWALS_KEY);
+        endRefreshSession();
+      }
+      throw error;
+    }
+  })();
+  return restoration;
 };
 
 // ========================================
@@ -164,6 +244,12 @@ api.interceptors.response.use(
           if (isKnownRenewal(attempt.accessToken, getAccessToken())) return api(originalRequest);
           throw new Error('Session changed while refreshing');
         }
+        await checkpoint({ accessToken, refreshToken: newRefreshToken }, sessionGeneration,
+          { accessToken: attempt.accessToken, refreshToken });
+        if (activeRefresh !== attempt || getRefreshToken() !== refreshToken) {
+          if (isKnownRenewal(attempt.accessToken, getAccessToken())) return api(originalRequest);
+          throw new Error('Session changed while committing refresh');
+        }
         const history = readRenewals();
         const chain = history.at(-1)?.[1] === attempt.accessToken ? history : [];
         localStorage.setItem(RENEWALS_KEY, JSON.stringify([...chain, [attempt.accessToken, accessToken]].slice(-MAX_RENEWALS)));
@@ -180,7 +266,8 @@ api.interceptors.response.use(
         }
         processQueue(attempt, refreshError, null);
         // A late response from the previous session cannot erase a new login.
-        if (activeRefresh === attempt && getRefreshToken() === refreshToken) clearTokens();
+        if (activeRefresh === attempt && getRefreshToken() === refreshToken
+          && !(refreshError instanceof Error && refreshError.name === 'SessionCheckpointConflict')) clearTokens();
         // Don't hard-redirect — let React Router handle it
         // The ProtectedRoute will redirect to /login when currentUser is null
         return Promise.reject(refreshError);
@@ -203,8 +290,11 @@ api.interceptors.response.use(
 // This prevents race conditions when multiple tabs try to refresh simultaneously
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
-    if ((e.key !== TOKEN_KEY && e.key !== null) || !activeRefresh) return;
+    if (e.key !== TOKEN_KEY && e.key !== null) return;
     if (e.storageArea && e.storageArea !== localStorage) return;
+    if (e.oldValue === e.newValue && e.key !== null) return;
+    ++sessionGeneration;
+    if (!activeRefresh) return;
     const attempt = activeRefresh;
     const token = getAccessToken();
     // Storage events may arrive after a later write; inspect the current proof.

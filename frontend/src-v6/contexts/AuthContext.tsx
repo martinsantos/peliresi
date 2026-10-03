@@ -10,7 +10,7 @@ import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearUserOfflineData } from '../services/offline-sync';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
-import { getAccessToken, clearTokens } from '../services/api';
+import { getAccessToken, clearTokens, restoreSessionCheckpoint, confirmSessionCheckpoint } from '../services/api';
 import { clearOfflineSession, isOfflineNetworkError, readOfflineSession, saveOfflineSession } from '../services/offlineSession';
 import { ImpersonationProvider } from './ImpersonationContext';
 import type { Usuario } from '../types/models';
@@ -159,9 +159,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // failure. Reconnect/focus always asks the server again before renewing it.
   useEffect(() => {
     let disposed = false;
+    let sessionReady = false;
     let pendingToken: string | null = null;
     const validateSession = async () => {
-      if (sessionChanging.current) return;
+      if (!sessionReady || sessionChanging.current) return;
       const token = getAccessToken();
       if (token && pendingToken === token) return;
       const generation = ++authGeneration.current;
@@ -219,7 +220,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       qc.clear();
       reconnect();
     };
-    reconnect();
+    void restoreSessionCheckpoint().then(() => {
+      if (disposed) return;
+      sessionReady = true;
+      reconnect();
+    }).catch(() => {
+      if (disposed) return;
+      sessionReady = true;
+      clearOfflineSession();
+      setCurrentUser(null);
+      setAuthError('No pudimos recuperar la sesión de forma segura. Ingresá nuevamente.');
+      setIsLoading(false);
+    });
     window.addEventListener('online', reconnect);
     window.addEventListener('focus', reconnect);
     window.addEventListener('storage', storage);
@@ -295,8 +307,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async () => {
     sessionChanging.current = true;
     ++authGeneration.current;
-    const confirmation = authService.logout();
+    const confirmation = authService.logout().catch(() => {});
     clearTokens();
+    const localConfirmation = confirmSessionCheckpoint();
     clearOfflineSession();
     setOfflineExpiresAt(null);
     setCurrentUser(null);
@@ -316,10 +329,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     qc.clear();
     sessionChanging.current = false;
     try {
-      await confirmation;
+      await localConfirmation;
     } catch {
-      // Already signed out locally. Do not mutate a newer session here.
+      if (!getAccessToken()) setAuthError('Sesión cerrada, pero el dispositivo no confirmó el guardado. Reintentá antes de cerrar la app.');
     }
+    await confirmation;
   }, [currentUser, qc]);
 
   const dismissOnboarding = useCallback(() => {

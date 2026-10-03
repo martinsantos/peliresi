@@ -3,7 +3,7 @@
  */
 
 import axios from 'axios';
-import api, { setTokens, clearTokens, getAccessToken } from './api';
+import api, { setTokensDurably, clearTokensDurably, getAccessToken } from './api';
 import type { LoginRequest, LoginResponse, ChangePasswordRequest } from '../types/api';
 import type { Usuario } from '../types/models';
 
@@ -11,21 +11,21 @@ export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const { data } = await api.post<{ success: true; data: { user: any; tokens: { accessToken: string; refreshToken: string } } }>('/auth/login', credentials);
     const { tokens, user } = data.data;
-    setTokens(tokens.accessToken, tokens.refreshToken);
+    await setTokensDurably(tokens.accessToken, tokens.refreshToken);
     return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user };
   },
 
   async logout(): Promise<void> {
     const endingToken = getAccessToken();
-    clearTokens();
-    if (!endingToken) return;
+    const durableLogout = clearTokensDurably();
     // Logout must work locally even without a network. Use the captured ending
     // credential, never an interceptor that could pick up a subsequent login.
-    await axios.post('/auth/logout', undefined, {
+    const confirmation = endingToken ? axios.post('/auth/logout', undefined, {
       baseURL: api.defaults.baseURL,
       timeout: api.defaults.timeout,
       headers: { Authorization: `Bearer ${endingToken}` },
-    });
+    }) : Promise.resolve();
+    await Promise.all([durableLogout, confirmation]);
   },
 
   async getMe(): Promise<Usuario> {
