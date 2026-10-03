@@ -6,6 +6,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { PrismaClient } from '@prisma/client';
 import { assertNightDatabase, qaEmail, qaPassword, seedNightDatabase } from './seed-night';
+import { assertLoadRuntime } from './night-load-safety';
 
 assertNightDatabase();
 assert.equal(new URL(process.env.DATABASE_URL!).pathname, '/sitrep_night_qa_20260926');
@@ -17,13 +18,7 @@ assert.ok(path.isAbsolute(output) && /sitrep-night-20260926\.[^/]+$/.test(output
 const pids = [...new Set(execFileSync('lsof', ['-t', '-iTCP:3037', '-sTCP:LISTEN'], { encoding: 'utf8' }).trim().split(/\s+/))];
 assert.equal(pids.length, 1);
 const runtime = execFileSync('ps', ['eww', '-p', pids[0], '-o', 'command='], { encoding: 'utf8' });
-for (const flag of [
-  'DATABASE_URL=postgresql://santosma@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public',
-  'NODE_ENV=test', 'DISABLE_EMAILS=true', 'BLOCKCHAIN_ENABLED=false',
-]) assert.ok(runtime.includes(flag), `QA runtime missing safety flag: ${flag.split('=')[0]}`);
-for (const flag of ['VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'SMTP_HOST']) {
-  assert.match(runtime, new RegExp(`(?:^|\\s)${flag}=\\s`), `External channel must be disabled: ${flag}`);
-}
+assertLoadRuntime(runtime, process.env.DATABASE_URL!);
 
 const db = new PrismaClient();
 const run = randomUUID();

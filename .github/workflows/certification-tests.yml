@@ -12,6 +12,11 @@ on:
         type: boolean
         required: true
         default: true
+      load_only:
+        description: Only 50-trip load/recovery against the exact published backend; no browser or emulator
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +27,7 @@ concurrency:
 
 jobs:
   stage-original-apk:
-    if: github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && inputs.android
+    if: github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && inputs.android && !inputs.load_only
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     # GitHub requires push access to read draft releases. This short job only
@@ -74,7 +79,7 @@ jobs:
           if-no-files-found: error
   isolated-qa:
     needs: stage-original-apk
-    if: always() && github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002'
+    if: always() && github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && !inputs.load_only
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -251,3 +256,92 @@ jobs:
           path: /tmp/sitrep-night-20260926.cloud
           retention-days: 3
           compression-level: 9
+  isolated-load-only:
+    if: github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && inputs.load_only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      NODE_APP_INSTANCE: qa
+      ALLOW_SYNTHETIC_QA: '1'
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=3
+      PORT: '3037'
+      DISABLE_EMAILS: 'true'
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      JWT_SECRET: only-cloud-synthetic-qa-20261002-never-production
+      INSPECTION_TRACE_SECRET: only-cloud-inspection-qa-20261002-never-production
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      VITE_API_URL: /api
+      QA_API_URL: http://127.0.0.1:3037/api
+      QA_ARTIFACTS: /tmp/sitrep-night-20260926.cloud
+      QA_TESTED_BUILD: ${{ runner.temp }}/sitrep-load-tested-build
+      UPLOADS_DIR: /tmp/sitrep-night-20260926.cloud/uploads
+      PGUSER: qa
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Safety tests before installs or DB writes
+        run: |
+          node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+          node --experimental-strip-types --test backend/tests/integration/night-load-safety.test.ts
+          test ! -f backend/.env
+          mkdir -p "$QA_ARTIFACTS"
+      - name: Receive exact already-tested backend, no rebuild
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sitrep-tested-backend-37094888323-1
+          github-token: ${{ github.token }}
+          run-id: 37094888323
+          path: ${{ env.QA_TESTED_BUILD }}
+      - name: Install only locked backend dependencies on disposable VM
+        run: |
+          npm ci --prefix backend
+          cd backend
+          npx --no-install prisma generate
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-16 lsof
+      - name: Create synthetic PostgreSQL with three-client application pool
+        run: |
+          /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-cloud-pg" --username=qa --auth-local=trust --auth-host=trust
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=20" -w start
+          /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
+          node --experimental-strip-types frontend/cloud-qa/preflight.ts
+          cd backend
+          npx --no-install prisma db push --skip-generate
+      - name: Actual 50-trip HTTP load and recovery, no browser or emulator
+        run: node --experimental-strip-types frontend/cloud-qa/load-only.ts
+      - name: Close only owned runtime and PostgreSQL
+        if: always()
+        run: |
+          if test -f "$QA_ARTIFACTS/processes.json" && ! test -f "$QA_ARTIFACTS/closure.json"; then
+            node --experimental-strip-types frontend/cloud-qa/close.ts
+          fi
+          if test -f "$RUNNER_TEMP/sitrep-cloud-pg/postmaster.pid"; then
+            /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -m fast -w stop
+          fi
+      - name: Preserve small load evidence, not builds or dependencies
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sitrep-cloud-load-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/sitrep-night-20260926.cloud
+          retention-days: 3
+          if-no-files-found: error
