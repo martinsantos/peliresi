@@ -106,6 +106,7 @@ test('inspection indexes do not focus search and closing a focused control prese
   await expect(page.getByRole('banner').getByLabel('Función actual')).toHaveText('Inspector');
   await expect(page.getByText('Cambios confirmados en el servidor', { exact: true })).toBeVisible();
   await nonObstructingNotices(page);
+  await expect(page.getByRole('region', { name: 'Avisos del sistema' }).getByRole('status')).toHaveCount(1);
   await proof(page, info, 'inspection-save-notice-safe');
   await page.getByRole('region', { name: 'Avisos del sistema' }).getByRole('button', { name: 'Cerrar notificación' }).last().click();
   await page.reload();

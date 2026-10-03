@@ -22,6 +22,10 @@ function reportMap(transportistas: ActorTransportista[] = []) {
 }
 
 describe('Report map single interactive category reference', () => {
+  it('keeps the large layer controls in document flow instead of covering actor rows', () => {
+    reportMap();
+    expect(screen.getByRole('group', { name: 'Capas del mapa' }).closest('.sticky')).toBeNull();
+  });
   afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear(); });
   it('keeps an unlocated carrier in the list but does not invent a point in Capital', () => {
     reportMap([{ id: 'unlocated', razonSocial: 'Transporte sin coordenadas', cuit: 'synthetic', latitud: null, longitud: null, vehiculosActivos: 0, enviosEnTransito: 0 }]);

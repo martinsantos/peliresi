@@ -43,6 +43,18 @@ const notifyListeners = () => {
 
 export const toast = {
   add: (t: Omit<Toast, 'id'>) => {
+    // Success confirmations are a current-state signal, not an accumulating
+    // timeline. Never supersede errors, warnings or duration-zero notices.
+    if (t.type === 'success' && (t.duration ?? 5000) > 0) {
+      toasts = toasts.filter(item => {
+        const superseded = item.type === 'success' && (item.duration ?? 5000) > 0;
+        if (superseded) {
+          clearTimeout(expiryTimers.get(item.id));
+          expiryTimers.delete(item.id);
+        }
+        return !superseded;
+      });
+    }
     const existing = toasts.find(item => item.type === t.type && item.title === t.title && item.message === t.message);
     const id = existing?.id ?? Math.random().toString(36).slice(2, 11);
     if (existing) toasts = toasts.map(item => item.id === id ? { ...t, id } : item);

@@ -377,6 +377,7 @@ try{
     await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toBeVisible();
     await expect(page.getByRole('banner').getByLabel('Función actual')).toHaveText('Inspector');
     await nonObstructingNotices(page);
+    await expect(page.getByRole('region',{name:'Avisos del sistema'}).getByRole('status')).toHaveCount(1);
     const local=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),'sitrep_inspection_draft_'+inspectorUserId+'_'+inspection.id);
     await writeFile(path.join(output,'saved-draft-acknowledgment.json'),JSON.stringify({confirmed:confirmed.data,local},null,2));
     expect(local?.observaciones).toBe('QA Android comentario conservado después de cerrar Chrome.');

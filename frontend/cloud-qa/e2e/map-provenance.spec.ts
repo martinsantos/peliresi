@@ -21,6 +21,11 @@ test('maps preserve a real missing location instead of creating a Capital marker
   await expect(page.locator('.leaflet-marker-icon[title="QA Transporte 2"]')).toHaveCount(0);
   await expect(page.locator('.leaflet-marker-icon[title="QA Transporte 1"]')).toHaveCount(1);
   await unknown.scrollIntoViewIfNeeded();
+  expect(await unknown.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return target !== null && element.contains(target);
+  }), 'The carrier row must receive pointer input, not be covered by floating layer controls').toBe(true);
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);

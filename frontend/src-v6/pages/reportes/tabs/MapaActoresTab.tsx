@@ -214,8 +214,8 @@ export default function MapaActoresTab({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* KPI + Layer toggles + "Todos" toggle — sticky below the date filter bar */}
-      <div className="sticky top-[92px] z-10 -mx-4 lg:-mx-8 px-4 lg:px-8 pb-3 bg-[#FAFAF8]">
+      {/* Layer controls stay in flow: the expanded mobile group must not cover rows. */}
+      <div className="-mx-4 lg:-mx-8 px-4 lg:px-8 pb-3 bg-[#FAFAF8]">
         <div className="flex flex-wrap items-center gap-3 p-3.5 bg-white rounded-2xl border border-neutral-100 shadow-sm">
           <Layers size={16} className="text-neutral-400" />
           {/* Departamento filter */}

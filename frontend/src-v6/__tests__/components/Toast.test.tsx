@@ -6,6 +6,29 @@ const ids: string[] = [];
 afterEach(() => { act(() => ids.forEach(id => toast.remove(id))); ids.length = 0; vi.useRealTimers(); });
 
 describe('system notices', () => {
+  it('replaces superseded transient successes instead of consuming the field workspace', () => {
+    render(<ToastContainer />);
+    act(() => {
+      ids.push(toast.success('Inspección creada'));
+      ids.push(toast.success('Estado actualizado'));
+      ids.push(toast.success('Cambios confirmados en el servidor'));
+    });
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Cambios confirmados en el servidor');
+  });
+  it('never replaces errors, warnings or persistent confirmations with a later success', () => {
+    render(<ToastContainer />);
+    act(() => {
+      ids.push(toast.error('Adjunto no enviado'));
+      ids.push(toast.warning('Revisión pendiente'));
+      ids.push(toast.add({type:'success',title:'Confirmación que requiere cierre',duration:0}));
+      ids.push(toast.success('Guardado inicial'));
+      ids.push(toast.success('Guardado posterior'));
+    });
+    expect(screen.getAllByRole('alert')).toHaveLength(2);
+    expect(screen.getAllByRole('status')).toHaveLength(2);
+    expect(screen.getByText('Confirmación que requiere cierre')).toBeVisible();
+  });
   it('renders in the layout outlet instead of a portal covering the page', () => {
     const rendered = render(<ToastContainer />);
     act(() => { ids.push(toast.success('Confirmado por SITREP')); });
