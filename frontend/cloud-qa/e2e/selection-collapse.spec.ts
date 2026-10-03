@@ -22,7 +22,7 @@ test('shared searchable actor selection shows choices first and keeps deliberate
   const errors = health(page);
   await login(page, info);
   await page.goto(`${prefix(info)}/manifiestos/nuevo`);
-  await expect(page.getByRole('heading', { name: 'Nuevo Manifiesto', exact: true })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Nuevo Manifiesto', exact: true })).toBeVisible();
   const trigger = page.getByRole('button', { name: 'Generador *', exact: true });
   await trigger.click();
   const search = page.getByRole('textbox', { name: 'Buscar Generador *', exact: true });
@@ -142,6 +142,7 @@ test('control center closes every active header without forcing another panel op
   const active = agenda.getByRole('button', { name: /^Viajes Activos/ });
   if (await active.getAttribute('aria-expanded') !== 'true') await active.click();
   await agenda.getByPlaceholder('Buscar por número o transportista...').fill('QA filtro conservado');
+  await expect(active).toContainText('0 filtrados');
   for (const name of ['Viajes Activos', 'Viajes Realizados', 'Inspecciones']) {
     const header = agenda.getByRole('button', { name: new RegExp('^' + name) });
     if (await header.getAttribute('aria-expanded') !== 'true') await header.click();
@@ -150,6 +151,7 @@ test('control center closes every active header without forcing another panel op
     await expect(header).toHaveAttribute('aria-expanded', 'false');
     await expect(agenda.locator('button[aria-expanded="true"]')).toHaveCount(0);
     await expect(agenda.getByPlaceholder('Buscar por número o transportista...')).toHaveCount(0);
+    await expect(active).toContainText('0 filtrados');
     expect((await header.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
   await active.click();

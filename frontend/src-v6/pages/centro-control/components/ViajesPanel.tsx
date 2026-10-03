@@ -97,7 +97,7 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
           <div className="flex items-center gap-2">
             <Truck size={18} className="text-amber-600" />
             <h3 className="font-semibold text-neutral-900">Viajes Activos</h3>
-            <Badge variant="soft" color="warning">{filteredEnTransito.length}</Badge>
+            <Badge variant="soft" color="warning">{tripFilter.trim() ? `${filteredEnTransito.length} ${filteredEnTransito.length === 1 ? 'filtrado' : 'filtrados'}` : filteredEnTransito.length}</Badge>
           </div>
           <ChevronDown size={18} className={`text-neutral-400 transition-transform duration-200 ${tripPanel === 'activos' ? 'rotate-180' : ''}`} />
         </button>

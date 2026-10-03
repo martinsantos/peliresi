@@ -527,7 +527,7 @@ try{
   });
 }finally{
   try{
-    await saveResults(results.length===12);
+    await saveResults(results.length===14);
     await closeContext();
     await driverStep('close-QA-device',()=>device.close(),10000);
   }finally{await stopSystemLog();}
