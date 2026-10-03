@@ -54,7 +54,7 @@ test('separate real users hand a manifest from generator to transport to operato
     await generator.mouse.move(bounds.x + bounds.width * .4, bounds.y + bounds.height * .2, { steps: 12 });
     await generator.mouse.move(bounds.x + bounds.width * .8, bounds.y + bounds.height * .6, { steps: 12 });
     await generator.mouse.up();
-    await generator.getByRole('button', { name: 'Confirmar Firma', exact: true }).click();
+    await generator.getByRole('button', { name: 'Usar firma', exact: true }).click();
     await mutate(generator, id, 'Confirmar y Firmar', 'firmar');
     await generator.context().close();
 

@@ -43,6 +43,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   }, [penColor, lineWidth]);
 
   const isDrawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
   const getPos = (e: MouseEvent | TouchEvent) => {
     const canvas = canvasRef.current!;
@@ -71,9 +72,9 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     const { x, y } = getPos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
+    lastPointRef.current = { x, y };
     isDrawingRef.current = true;
     setIsDrawing(true);
-    setHasContent(true);
   }, [getCtx]);
 
   const draw = useCallback((e: MouseEvent | TouchEvent) => {
@@ -82,12 +83,18 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     const ctx = getCtx();
     if (!ctx) return;
     const { x, y } = getPos(e);
+    const previous = lastPointRef.current;
+    // Pressing the canvas (or a stationary move) is not a handwritten stroke.
+    if (!previous || (x === previous.x && y === previous.y)) return;
     ctx.lineTo(x, y);
     ctx.stroke();
+    lastPointRef.current = { x, y };
+    setHasContent(true);
   }, [getCtx]);
 
   const endDraw = useCallback(() => {
     isDrawingRef.current = false;
+    lastPointRef.current = null;
     setIsDrawing(false);
   }, []);
 
@@ -100,6 +107,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     canvas.addEventListener('touchstart', startDraw, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('touchcancel', endDraw);
     canvas.addEventListener('mousedown', startDraw as EventListener);
     canvas.addEventListener('mousemove', draw as EventListener);
     canvas.addEventListener('mouseup', endDraw);
@@ -108,6 +116,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
       canvas.removeEventListener('touchstart', startDraw);
       canvas.removeEventListener('touchmove', draw);
       canvas.removeEventListener('touchend', endDraw);
+      canvas.removeEventListener('touchcancel', endDraw);
       canvas.removeEventListener('mousedown', startDraw as EventListener);
       canvas.removeEventListener('mousemove', draw as EventListener);
       canvas.removeEventListener('mouseup', endDraw);
@@ -120,6 +129,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    endDraw();
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = penColor;
@@ -143,6 +153,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           ref={canvasRef}
           width={width}
           height={height}
+          aria-label="Lienzo de firma"
           className="w-full cursor-crosshair touch-none"
           style={{ aspectRatio: `${width}/${height}` }}
         />
@@ -167,7 +178,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           disabled={!hasContent}
           className="flex-1"
         >
-          Confirmar Firma
+          Usar firma
         </Button>
       </div>
     </div>

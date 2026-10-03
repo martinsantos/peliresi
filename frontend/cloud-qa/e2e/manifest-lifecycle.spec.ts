@@ -33,16 +33,40 @@ test('real manifest UI completes approval, transport, receipt, treatment and cer
   const canvas = dialog.locator('canvas');
   await canvas.scrollIntoViewIfNeeded();
   const bounds = (await canvas.boundingBox())!;
+  const useSignature = dialog.getByRole('button', { name: 'Usar firma', exact: true });
+  const approveSignature = dialog.getByRole('button', { name: 'Confirmar y Firmar', exact: true });
+  const hasInk = () => canvas.evaluate((node: HTMLCanvasElement) => {
+    const pixels = node.getContext('2d')!.getImageData(0, 0, node.width, node.height).data;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index + 3] && pixels[index] < 240 && pixels[index + 1] < 240 && pixels[index + 2] < 240) return true;
+    }
+    return false;
+  });
+  await expect(useSignature).toBeDisabled();
+  await page.mouse.click(bounds.x + bounds.width * .1, bounds.y + bounds.height * .6);
+  await expect(useSignature).toBeDisabled();
+  await expect(approveSignature).toBeDisabled();
+  // A real touch with no movement must also leave capture disabled on phones.
+  if (info.project.name !== 'web-desktop') {
+    await canvas.tap({ position: { x: bounds.width * .2, y: bounds.height * .5 } });
+    await expect(useSignature).toBeDisabled();
+    await expect(approveSignature).toBeDisabled();
+  }
+  expect(await hasInk()).toBe(false);
   await page.mouse.move(bounds.x + bounds.width * .1, bounds.y + bounds.height * .6);
   await page.mouse.down();
   for (const [x, y] of [[.25, .3], [.4, .6], [.5, .2], [.7, .7], [.85, .4]]) {
     await page.mouse.move(bounds.x + bounds.width * x, bounds.y + bounds.height * y, { steps: 5 });
   }
   await page.mouse.up();
-  await dialog.getByRole('button', { name: 'Confirmar Firma', exact: true }).click();
+  expect(await hasInk()).toBe(true);
+  await expect(useSignature).toBeEnabled();
+  await expect(approveSignature).toBeDisabled();
+  await useSignature.click();
   await expect(dialog.getByRole('img', { name: 'Firma', exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath('manifest-signature-prepared.png'), animations: 'disabled' });
   const signed = page.waitForResponse(res => res.url().endsWith(`/api/manifiestos/${record.id}/firmar`) && res.request().method() === 'POST');
-  await dialog.getByRole('button', { name: 'Confirmar y Firmar', exact: true }).click();
+  await approveSignature.click();
   const signedResponse = await signed;
   expect(signedResponse.request().postDataJSON().firma).toMatch(/^data:image\/png;base64,/);
   expect(signedResponse.status()).toBe(200);
