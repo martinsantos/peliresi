@@ -189,7 +189,15 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const panel=page.locator('.fp-window').last();await expect(panel).toBeVisible();
   // Real computed CSS, not a unit assertion against class names. Badge tint,
   // event position and future-stage labels are data, not disabled controls.
+  const panelQuantities = panel.getByText(/^Y\d+ · [\d.,]+ kg$/);
+  const feedQuantities = event.getByText(/^Y\d+ · [\d.,]+ kg$/);
+  await expect(panelQuantities.first()).toBeVisible();
+  await expect(feedQuantities.first()).toBeVisible();
   const readingTargets = [panel.getByText('CREACION', { exact: true }),
+    event.getByText('CREACION', { exact: true }),
+    event.getByText('QA Generador 1', { exact: true }),
+    ...await panelQuantities.all(),
+    ...await feedQuantities.all(),
     ...await panel.getByRole('list', { name: 'Etapas hasta este evento', exact: true }).locator('span').all(),
     page.locator('.wr-widget-content').getByText(/^1\/\d+$/).first()];
   const readingEvidence = [];

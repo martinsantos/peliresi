@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { freezeCloudPlayStore, assertStableSystemPackages, packageVersion } from './system-packages.ts';
+import { freezeCloudPlayStore, assertStableSystemPackages, packageVersion, installedPackageVersion } from './system-packages.ts';
 
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'martinsantos/peliresi',
   GITHUB_REF: 'refs/heads/codex/sitrep-cloud-qa-20261002', ALLOW_SYNTHETIC_QA: '1',
@@ -18,7 +18,8 @@ function device() {
     if (command === 'shell getprop ro.build.version.sdk') return '35';
     if (command === 'shell pm disable-user --user 0 com.android.vending') { disabled = true; return 'Package com.android.vending new state: disabled-user'; }
     if (args.includes('list')) return args.includes('-d') ? (disabled ? 'package:com.android.vending' : '') : 'package:' + pkg;
-    if (args.includes('dumpsys')) return '\n  versionCode=' + version + ' minSdk=29\n  versionName=' + version + '.0\n';
+    if (command === 'shell dumpsys package packages') return '\nPackages:\n' + ['com.android.chrome', 'com.google.android.gms']
+      .map(name => '  Package [' + name + '] (abcd):\n    versionCode=' + version + ' minSdk=29\n    versionName=' + version + '.0\n').join('\n');
     throw new Error('Unexpected ADB command: ' + command);
   };
   return { run, calls, changeVersion: () => { version = '125'; }, physical: () => { serial = 'phone123'; } };
@@ -26,6 +27,20 @@ function device() {
 test('extracts actual versions and refuses missing package data', () => {
   assert.deepEqual(packageVersion('  versionCode=124 minSdk=29\n  versionName=124.0\n'), { code: '124', name: '124.0' });
   assert.throws(() => packageVersion('Package missing'), /Missing actual/);
+});
+test('installed versions never fall through to another package or a hidden factory version', () => {
+  const dump = '\nPackages:\n  Package [com.android.chrome] (a):\n    versionCode=124\n    versionName=124.0\n' +
+    '  Package [com.other] (b):\n    versionCode=999\n    versionName=other\n' +
+    'Hidden system packages:\n  Package [com.android.chrome] (c):\n    versionCode=1\n    versionName=factory\n';
+  assert.deepEqual(installedPackageVersion(dump, 'com.android.chrome'), { code: '124', name: '124.0' });
+  assert.throws(() => installedPackageVersion(dump, 'com.google.android.gms'), /Missing installed dependency/);
+  assert.throws(() => installedPackageVersion(dump.replace('    versionName=124.0\n', ''), 'com.android.chrome'), /Missing actual/);
+  assert.throws(() => installedPackageVersion(dump.slice(dump.indexOf('Hidden system packages:')), 'com.android.chrome'), /Missing installed/);
+});
+test('version snapshots request only installed packages, never full resolver dumps per dependency', () => {
+  const d = device(); freezeCloudPlayStore(d.run, env);
+  assert.deepEqual(d.calls.filter(args => args.includes('dumpsys')),
+    Array.from({ length: 2 }, () => ['shell', 'dumpsys', 'package', 'packages']));
 });
 test('freezes only Play Store while preserving enabled Chrome/GMS and checking their versions', () => {
   const d = device(), before = freezeCloudPlayStore(d.run, env), after = assertStableSystemPackages(before, d.run, env);

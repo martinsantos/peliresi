@@ -13,11 +13,25 @@ export function packageVersion(dump: string): Version {
   assert.ok(code && name, 'Missing actual Android package version');
   return { code, name };
 }
+/** Android15 DumpHelper supports the packages section without resolver tables.
+ * Parse only installed entries, not a disabled factory copy of the same package.
+ * https://github.com/aosp-mirror/platform_frameworks_base/blob/android15-release/services/core/java/com/android/server/pm/DumpHelper.java
+ */
+export function installedPackageVersion(dump: string, pkg: string): Version {
+  const installed = dump.split(/^Packages:\s*$/m)[1]?.split(/^Hidden system packages:\s*$/m)[0];
+  assert.ok(installed, 'Missing installed Android packages section');
+  const begin = installed.indexOf('  Package [' + pkg + '] (');
+  assert.ok(begin >= 0, 'Missing installed dependency: ' + pkg);
+  const rest = installed.slice(begin);
+  const next = rest.indexOf('\n  Package [');
+  return packageVersion(next < 0 ? rest : rest.slice(0, next));
+}
 function snapshot(run: Run) {
-  return Object.fromEntries(DEPENDENCIES.map(pkg => {
+  for (const pkg of DEPENDENCIES) {
     assert.ok(run(['shell', 'pm', 'list', 'packages', '-e', '--user', '0', pkg]).trim().split('\n').includes('package:' + pkg), pkg + ' must remain enabled');
-    return [pkg, packageVersion(run(['shell', 'dumpsys', 'package', pkg]))];
-  })) as Record<typeof DEPENDENCIES[number], Version>;
+  }
+  const installed = run(['shell', 'dumpsys', 'package', 'packages']);
+  return Object.fromEntries(DEPENDENCIES.map(pkg => [pkg, installedPackageVersion(installed, pkg)])) as Record<typeof DEPENDENCIES[number], Version>;
 }
 
 /** Pin only the updater in the disposable QA VM, never GMS, Chrome or app data.

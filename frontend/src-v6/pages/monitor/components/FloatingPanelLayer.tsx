@@ -107,10 +107,9 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
           {data.residuos.slice(0, 6).map((r, i) => (
             <span
               key={i}
-              className="text-[9px] font-mono px-1.5 py-0.5 rounded-full border"
+              className="text-[10px] text-neutral-800 font-mono px-1.5 py-0.5 rounded-full border"
               style={{
                 background: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18',
-                color: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length],
                 borderColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '40',
               }}
             >
@@ -240,10 +239,9 @@ const ViajeContent: React.FC<{ data: ViajeFPData }> = ({ data }) => {
             {data.residuos.slice(0, 4).map((r, i) => (
               <span
                 key={i}
-                className="text-[9px] font-mono px-1.5 py-0.5 rounded-full border"
+                className="text-[10px] text-neutral-800 font-mono px-1.5 py-0.5 rounded-full border"
                 style={{
                   background: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18',
-                  color: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length],
                   borderColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '40',
                 }}
               >

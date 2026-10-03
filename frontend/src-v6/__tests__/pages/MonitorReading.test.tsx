@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DashboardPanels } from '../../pages/monitor/components/DashboardPanels';
 import { FloatingPanelLayer, type ManifiestoFPData } from '../../pages/monitor/components/FloatingPanelLayer';
+import { EventFeed } from '../../pages/monitor/components/EventFeed';
 
 const event: ManifiestoFPData = { timestamp: '2026-10-03T01:00:00Z', eventoTipo: 'CREACION', manifiestoNumero: 'QA-READ',
   descripcion: 'Evento sintético de lectura', generador: { razonSocial: 'QA Origen' },
@@ -15,6 +16,17 @@ function sidebar(data = event) {
   return render(<MemoryRouter><DashboardPanels mode="PLAYBACK" liveData={null} forecastData={null}
     currentEvent={data} currentEventIndex={0} totalEventCount={55} /></MemoryRouter>);
 }
+function feed(data = event) {
+  return render(<EventFeed mode="PLAYBACK" eventos={[{ ...data, id: 'read', tipo: data.eventoTipo!,
+    manifiestoNumero: data.manifiestoNumero }]} onEventClick={vi.fn()} />);
+}
+function trip(data = event) {
+  return render(<FloatingPanelLayer panels={[{ id: 'trip-read', type: 'viaje', pos: { x: 12, y: 12 }, zIndex: 1100, minimized: false,
+    data: { manifiestoId: 'trip-read', numero: data.manifiestoNumero, transportista: 'QA Transporte',
+      origen: { razonSocial: 'QA Origen', lat: null, lng: null }, destino: { razonSocial: 'QA Destino', lat: null, lng: null },
+      fechaRetiro: null, ultimaPosicion: null, ruta: [], residuos: data.residuos } }]}
+    onClose={vi.fn()} onBringToFront={vi.fn()} onMove={vi.fn()} onMinimize={vi.fn()} />);
+}
 const luminance = (rgb: number[]) => rgb.map(channel => {
   const value = channel / 255; return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
 }).reduce((total, value, i) => total + value * [.2126, .7152, .0722][i], 0);
@@ -26,9 +38,9 @@ function contrast(color: string, background: string) {
   return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
 }
 beforeEach(() => localStorage.clear()); afterEach(cleanup);
-it('event names use a readable foreground for every event tint, in both detail surfaces', () => {
+it('event names use a readable foreground for every event tint, in detail and event feed surfaces', () => {
   for (const kind of ['CREACION', 'FIRMA', 'RETIRO', 'ENTREGA', 'RECEPCION', 'TRATAMIENTO', 'CIERRE']) {
-    for (const open of [floating, sidebar]) {
+    for (const open of [floating, sidebar, feed]) {
       const view = open({ ...event, eventoTipo: kind });
       const badge = screen.getByText(kind, { exact: true });
       // Inline palette belongs to the component; the neutral foreground contract
@@ -39,6 +51,23 @@ it('event names use a readable foreground for every event tint, in both detail s
       view.unmount();
     }
   }
+});
+it('residue codes and quantities retain contrast across the visible colored tints', () => {
+  const residuos = Array.from({ length: 8 }, (_, index) => ({ codigo: `Y${index + 1}`, nombre: 'Residuo sintético', cantidad: index + 1, unidad: 'kg' }));
+  for (const [open, expectedCount] of [[floating, 6], [feed, 2], [trip, 4]] as const) {
+    const view = open({ ...event, residuos });
+    const chips = screen.getAllByText(/^Y\d+ · \d+ kg$/);
+    expect(chips.length).toBe(expectedCount);
+    for (const chip of chips) {
+      const color = chip.style.color || (chip.classList.contains('text-neutral-800') ? 'rgb(38, 38, 38)' : 'rgb(0, 0, 0)');
+      expect(contrast(color, chip.style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
+      expect(chip).toHaveClass('text-neutral-800');
+    }
+    view.unmount();
+  }
+});
+it('creation source is legible text rather than a bright category color', () => {
+  feed(); expect(screen.getByText('QA Origen', { exact: true })).toHaveClass('text-neutral-800');
 });
 it('the real event position is not rendered as faint decorative text', () => {
   sidebar(); expect(screen.getByText('1/55', { exact: true })).toHaveClass('text-neutral-600');

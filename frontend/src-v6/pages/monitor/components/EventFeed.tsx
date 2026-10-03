@@ -99,16 +99,15 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                     {formatTimeShort(ev.timestamp)}
                   </span>
                   <span
-                    className="text-[9px] uppercase px-1.5 py-0.5 rounded-sm flex items-center gap-0.5"
+                    className="text-[10px] text-neutral-800 uppercase px-1.5 py-0.5 rounded-sm flex items-center gap-0.5"
                     style={{
                       backgroundColor: color + '20',
-                      color,
                       fontWeight: 700,
                       letterSpacing: '0.02em',
                       border: `1px solid ${color}30`,
                     }}
                   >
-                    {TipoIcon && <TipoIcon size={8} strokeWidth={2.5} />}
+                    {TipoIcon && <TipoIcon size={12} strokeWidth={2.5} aria-hidden="true" />}
                     {ev.tipo}
                   </span>
                 </div>
@@ -118,7 +117,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                   <span className="text-neutral-500 text-[10px]">{ev.descripcion}</span>
                 </p>
                 {ev.tipo === 'CREACION' && ev.generador && (
-                  <p className="text-[10px] text-emerald-600 font-semibold truncate mt-0.5">
+                  <p className="text-[10px] text-neutral-800 font-semibold truncate mt-0.5">
                     {ev.generador.razonSocial}
                   </p>
                 )}
@@ -127,10 +126,9 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                     {ev.residuos.slice(0, 2).map((r, ri) => (
                       <span
                         key={ri}
-                        className="text-[9px] px-1.5 py-0.5 rounded-full border font-mono"
+                        className="text-[10px] text-neutral-800 px-1.5 py-0.5 rounded-full border font-mono"
                         style={{
                           background: RESIDUO_PALETTE[ri % RESIDUO_PALETTE.length] + '18',
-                          color: RESIDUO_PALETTE[ri % RESIDUO_PALETTE.length],
                           borderColor: RESIDUO_PALETTE[ri % RESIDUO_PALETTE.length] + '40',
                         }}
                       >
