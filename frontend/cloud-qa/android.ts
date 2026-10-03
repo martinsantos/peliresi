@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
 import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
+import { DeadlineError, withinDeadline } from './deadline.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -34,6 +35,17 @@ const intentionalClosures=new WeakSet<BrowserContext>();
 let inspectorUserId='';
 let logoutAttempt=0;
 const results:Array<{name:string;status:string;error?:string}>=[];
+const driverStages:Array<{stage:string;event:string;at:string;error?:string}>=[];
+const driverStep=async<T>(stage:string,operation:()=>Promise<T>,milliseconds=25000):Promise<T>=>{
+  const record=async(event:string,error?:string)=>{
+    driverStages.push({stage,event,at:new Date().toISOString(),error});
+    await writeFile(path.join(output,'driver-stages.json'),JSON.stringify(driverStages,null,2));
+    console.log('Android driver '+stage+': '+event);
+  };
+  await record('started');
+  try{const value=await withinDeadline(stage,milliseconds,operation);await record('completed');return value;}
+  catch(error){await record('failed',String(error));throw error;}
+};
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
   commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,failedResponses,browserLifecycle,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
@@ -43,9 +55,11 @@ const closeContext=async()=>{
   if(context)intentionalClosures.add(context);
   // Kill only this QA Chrome process first. CDP context.close() can hang while
   // an Android window changes size; no profile or session data is deleted.
-  execFileSync('adb',['shell','am','force-stop','com.android.chrome'],{timeout:5000});
+  await driverStep('force-stop-Chrome',async()=>{
+    execFileSync('adb',['shell','am','force-stop','com.android.chrome'],{timeout:5000});
+  });
   let timer:ReturnType<typeof setTimeout>|undefined;
-  try{await Promise.race([context?.close().catch(()=>{}),new Promise<void>(resolve=>{timer=setTimeout(resolve,5000);})]);}
+  try{await driverStep('detach-stopped-context',()=>Promise.race([context?.close().catch(()=>{}),new Promise<void>(resolve=>{timer=setTimeout(resolve,5000);})]));}
   finally{clearTimeout(timer);}
 };
 const settleNativeChrome=()=>dismissObservedChromePrompts(output);
@@ -100,22 +114,22 @@ const observe=(target:Page)=>{
   });
 };
 const launch=async()=>{
-  context=await device.launchBrowser({hasTouch:true,permissions:['geolocation'],
-    geolocation:{latitude:-32.89,longitude:-68.84},args:['--no-first-run','--no-default-browser-check']});
-  await context.addCookies([{name:'sitrep_qa_client',value:'127.11.20.2',url:'http://127.0.0.1:4177'}]);
+  context=await driverStep('launch-and-attach-Chrome',()=>device.launchBrowser({hasTouch:true,permissions:['geolocation'],
+    geolocation:{latitude:-32.89,longitude:-68.84},args:['--no-first-run','--no-default-browser-check']}));
+  await driverStep('set-QA-network-identity',()=>context.addCookies([{name:'sitrep_qa_client',value:'127.11.20.2',url:'http://127.0.0.1:4177'}]));
   // Restart the existing QA tab, as a user reopening the app would. Creating a
   // second copy left the old inspection mounted behind the next user session.
   const restored=context.pages().filter(candidate=>candidate.url().startsWith('http://127.0.0.1:4177/'));
   assert.ok(restored.length<=1,'The isolated single-tab app scenario must not accumulate hidden copies');
-  page=restored[0]||await context.newPage();observe(page);
+  page=restored[0]||await driverStep('open-single-QA-tab',()=>context.newPage());observe(page);
   // launchBrowser opens a native about:blank tab on every launch. Keep the
   // authenticated restart tab, close only observed blank tabs, and foreground
   // the actual QA page before mixing CDP and native OS input.
   for(const other of context.pages().filter(candidate=>candidate!==page)){
     assert.equal(other.url(),'about:blank','Never close an unknown or hidden business tab');
-    await other.close();
+    await driverStep('close-observed-blank-tab',()=>other.close());
   }
-  await page.bringToFront();
+  await driverStep('foreground-QA-tab',()=>page.bringToFront());
   assert.equal(context.pages().length,1,'Exactly one browser tab in this isolated scenario');
   const launched=context;
   context.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'context-close',expected:intentionalClosures.has(launched)}));
@@ -200,6 +214,10 @@ const check=async(name:string,task:()=>Promise<void>)=>{
     }
   }
   await saveResults();
+  // The transport remains unresolved after this deadline. Do not reuse it,
+  // continue acting on a different context or disguise incomplete work as PASS.
+  if(results.at(-1)?.status==='FAIL'&&results.at(-1)?.error?.startsWith('Android driver deadline exceeded:'))
+    throw new DeadlineError(name,25000);
 };
 let inspection:{id:string;numero:string};
 try{
@@ -394,7 +412,8 @@ try{
     expect(browserLifecycle.filter(event=>!event.expected)).toEqual([]);
   });
 }finally{
-  await saveResults(true);
-  await closeContext();await device.close();
+  await saveResults(results.length===12);
+  await closeContext();
+  await driverStep('close-QA-device',()=>device.close(),10000);
 }
 if(results.some(r=>r.status==='FAIL'))process.exitCode=1;
