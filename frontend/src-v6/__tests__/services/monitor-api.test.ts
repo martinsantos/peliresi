@@ -1,5 +1,9 @@
 import { beforeAll, beforeEach, afterEach, it, expect, vi } from 'vitest';
 import axios, { AxiosError } from 'axios';
+const checkpoint = vi.hoisted(() => ({ write: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('../../services/sessionCheckpoint', () => ({
+  readSessionCheckpoint: vi.fn(), writeSessionCheckpoint: checkpoint.write,
+}));
 
 let client: ReturnType<typeof axios.create>;
 let monitor: typeof import('../../pages/monitor/api/monitor-api');
@@ -21,8 +25,10 @@ beforeEach(() => {
   localStorage.setItem('sitrep_access_token', 'expired-access');
   localStorage.setItem('sitrep_refresh_token', 'valid-refresh');
   calls = [];
-  // Only the HTTP boundary is simulated in this unit test. The actual request
-  // and response interceptors execute; no DB, external provider or browser runs.
+  checkpoint.write.mockClear();
+  // Simulate HTTP and durable-storage boundaries; actual interceptors execute.
+  // Transaction/abort/CAS behavior is separately tested in sessionCheckpoint.
+  // No DB, external provider or browser runs in these unit tests.
   client.defaults.adapter = async config => {
     const token = String(config.headers.Authorization ?? '');
     calls.push({ url: config.url!, token });
@@ -48,6 +54,9 @@ it('refreshes a monitor request using the real nested token contract, never the 
   expect(calls.map(call => call.token)).toEqual(['Bearer expired-access', 'Bearer fresh-access']);
   expect(localStorage.getItem('sitrep_access_token')).toBe('fresh-access');
   expect(localStorage.getItem('sitrep_refresh_token')).toBe('fresh-refresh');
+  expect(checkpoint.write).toHaveBeenCalledWith(
+    { accessToken: 'fresh-access', refreshToken: 'fresh-refresh' },
+    { accessToken: 'expired-access', refreshToken: 'valid-refresh' });
 });
 
 it('serializes simultaneous monitor refreshes instead of issuing one refresh for every poll', async () => {
