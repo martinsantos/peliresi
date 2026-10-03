@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chromeButtonPoint, collectNativeWindow, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
+import { chromeButtonPoint, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
+
+test('reads explicit OS keyboard visibility rather than inferring it from DOM focus or viewport size', () => {
+  assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=true mShowRequested=true'), true);
+  assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=false mShowRequested=false'), false);
+});
+test('unknown, incomplete and ambiguous keyboard dumps cannot pass as a hidden keyboard', () => {
+  for (const dump of ['', 'mInputShown=unknown', 'mInputShown=true\nmInputShown=false', 'mInputShown=false\nmInputShown=false']) assert.throws(() => nativeKeyboardShown(dump));
+});
 
 const node = (extra = '', bounds = '[40,100][240,180]') => `<node package="com.android.chrome" text="No thanks" enabled="true" clickable="true" bounds="${bounds}" ${extra}/>`;
 const window = (nodes: string) => '<?xml version="1.0"?><hierarchy>' + nodes + '</hierarchy>';

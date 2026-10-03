@@ -21,7 +21,7 @@ import { canUseInspectionOperations } from '../../services/inspectionOperations.
 import { ControlFilters, type LayerState } from './components/ControlFilters';
 import { ControlStats } from './components/ControlStats';
 import { ControlMap } from './components/ControlMap';
-import { ViajesPanel } from './components/ViajesPanel';
+import { ViajesPanel, type TripPanel } from './components/ViajesPanel';
 
 // ── Constants ──
 const POLL_INTERVAL = 30;
@@ -35,7 +35,10 @@ export const CentroControlPage: React.FC = () => {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [selectedRealizadoId, setSelectedRealizadoId] = useState<string | null>(null);
   const [tripFilter, setTripFilter] = useState('');
-  const [tripPanel, setTripPanel] = useState<'activos' | 'realizados' | 'inspecciones'>('activos');
+  const [tripPanel, setTripPanel] = useState<TripPanel>('activos');
+  // The first response may choose a default only before the user's first action.
+  const panelInitialized = useRef(false);
+  const handleTripPanelChange = (panel: TripPanel) => { panelInitialized.current = true; setTripPanel(panel); };
 
   // ── Layer toggles ──
   const [layers, setLayers] = useState<LayerState>({
@@ -58,7 +61,7 @@ export const CentroControlPage: React.FC = () => {
 
   const inspections = useInspectionOperations({ limit: 100 });
   const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(null);
-  const selectInspection = (id: string) => { setSelectedInspectionId(id); setTripPanel('inspecciones'); setLayers((previous) => ({ ...previous, inspecciones: true })); };
+  const selectInspection = (id: string) => { panelInitialized.current = true; setSelectedInspectionId(id); setTripPanel('inspecciones'); setLayers((previous) => ({ ...previous, inspecciones: true })); };
 
   // ── API Hooks ──
   const { refetch: refetchStats } = useDashboardStats();
@@ -214,7 +217,6 @@ export const CentroControlPage: React.FC = () => {
   }, [selectedRealizadoId, viajesRealizados]);
 
   // Choose an initial panel only; polling must not override the user's selection.
-  const panelInitialized = useRef(false);
   // Auto-switch to realizados if no active trips
   useEffect(() => {
     if (!cc || panelInitialized.current) return;
@@ -288,7 +290,7 @@ export const CentroControlPage: React.FC = () => {
           tripFilter={tripFilter}
           onTripFilterChange={setTripFilter}
           tripPanel={tripPanel}
-          onTripPanelChange={setTripPanel}
+          onTripPanelChange={handleTripPanelChange}
           selectedTripId={selectedTripId}
           onSelectTrip={setSelectedTripId}
           selectedRealizadoId={selectedRealizadoId}

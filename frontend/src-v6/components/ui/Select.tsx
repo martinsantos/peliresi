@@ -125,15 +125,18 @@ export const Select: React.FC<SelectProps> = ({
     if (disabled) return;
     if (!isOpen) {
       setPosition(calcPosition());
-    }
+    } else setSearchTerm('');
     setIsOpen((prev) => !prev);
   }, [disabled, isOpen, calcPosition]);
 
   useEffect(() => {
     if (!isOpen) return;
-    if (searchable) searchRef.current?.focus({ preventScroll: true });
-    else (dropdownRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]:not(:disabled)') || dropdownRef.current?.querySelector<HTMLButtonElement>('[role="option"]:not(:disabled)'))?.focus({ preventScroll: true });
-  }, [isOpen, searchable]);
+    // Opening means choosing, not typing. Editable focus would summon the phone
+    // keyboard before the inspector has had a chance to see the options.
+    (dropdownRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]:not(:disabled)')
+      || dropdownRef.current?.querySelector<HTMLButtonElement>('[role="option"]:not(:disabled)')
+      || triggerRef.current)?.focus({ preventScroll: true });
+  }, [isOpen]);
 
   // Recalculate position on scroll/resize while open
   useEffect(() => {
@@ -162,6 +165,7 @@ export const Select: React.FC<SelectProps> = ({
       const inDropdown = dropdownRef.current?.contains(target);
       if (!inContainer && !inDropdown) {
         setIsOpen(false);
+        setSearchTerm('');
       }
     };
     document.addEventListener('mousedown', handleOutside);
@@ -208,7 +212,19 @@ export const Select: React.FC<SelectProps> = ({
       onKeyDown={(event) => {
         // Consume this before the parent dialog sees it. One Escape, one layer.
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss(); return; }
-        if (event.key === 'Tab') { setIsOpen(false); triggerRef.current?.focus({ preventScroll: true }); return; }
+        if (event.key === 'Tab') {
+          if (searchable && event.shiftKey && event.target !== searchRef.current) {
+            event.preventDefault(); event.stopPropagation();
+            searchRef.current?.focus({ preventScroll: true }); return;
+          }
+          const option = dropdownRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]:not(:disabled)')
+            || dropdownRef.current?.querySelector<HTMLButtonElement>('[role="option"]:not(:disabled)');
+          if (!event.shiftKey && event.target === searchRef.current && option) {
+            event.preventDefault(); event.stopPropagation();
+            option.focus({ preventScroll: true }); return;
+          }
+          setIsOpen(false); setSearchTerm(''); triggerRef.current?.focus({ preventScroll: true }); return;
+        }
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
         if (event.target === searchRef.current && (event.key === 'Home' || event.key === 'End')) return;
         event.preventDefault();

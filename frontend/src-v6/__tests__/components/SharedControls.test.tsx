@@ -166,4 +166,51 @@ describe('shared controls: stable and accessible interaction', () => {
     expect(screen.getByLabelText('Actor')).toHaveFocus();
     expect(screen.queryByRole('listbox')).toBeNull();
   });
+
+  it('opens searchable options without focusing an editable field and allows explicit search', () => {
+    const change = vi.fn();
+    render(<Select label="Actor" searchable value="second" options={[{ value: 'first', label: 'Primer generador' }, { value: 'second', label: 'Segundo generador' }]} onChange={change} />);
+    fireEvent.click(screen.getByLabelText('Actor'));
+    const search = screen.getByRole('textbox', { name: 'Buscar Actor' });
+    expect(search).not.toHaveFocus();
+    expect(screen.getByRole('option', { name: 'Segundo generador' })).toHaveFocus();
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+    search.focus();
+    fireEvent.change(search, { target: { value: 'Primer' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('option', { name: 'Primer generador' }));
+    expect(change).toHaveBeenCalledWith('first');
+    expect(screen.getByLabelText('Actor')).toHaveFocus();
+    fireEvent.click(screen.getByLabelText('Actor'));
+    expect(screen.getByRole('textbox', { name: 'Buscar Actor' })).toHaveValue('');
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('reaches search deliberately by Shift+Tab without escaping the surrounding dialog', () => {
+    const close = vi.fn();
+    render(<Modal isOpen title="Nueva inspección" onClose={close}><Select label="Actor" searchable options={[{ value: 'old', label: 'Inactivo', disabled: true }, { value: 'new', label: 'Generador' }]} onChange={vi.fn()} /></Modal>);
+    fireEvent.keyDown(screen.getByLabelText('Actor'), { key: 'ArrowDown' });
+    const option = screen.getByRole('option', { name: 'Generador' });
+    expect(option).toHaveFocus();
+    fireEvent.keyDown(option, { key: 'Tab', shiftKey: true });
+    const search = screen.getByRole('textbox', { name: 'Buscar Actor' });
+    expect(search).toHaveFocus();
+    fireEvent.keyDown(search, { key: 'Tab' });
+    expect(option).toHaveFocus();
+    expect(screen.getByRole('listbox')).toBeVisible();
+    fireEvent.keyDown(option, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(close).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Actor')).toHaveFocus();
+  });
+
+  it('does not fall back to editable focus when searchable options are empty or disabled', () => {
+    render(<Select label="Actor" searchable options={[{ value: 'old', label: 'Inactivo', disabled: true }]} onChange={vi.fn()} />);
+    const trigger = screen.getByLabelText('Actor');
+    trigger.focus();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('textbox', { name: 'Buscar Actor' })).not.toHaveFocus();
+    expect(trigger).toHaveFocus();
+    expect(screen.getByRole('option')).toBeDisabled();
+  });
 });

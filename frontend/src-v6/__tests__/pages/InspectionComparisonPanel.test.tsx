@@ -4,6 +4,30 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { InspectionComparisonPanel } from '../../pages/inspecciones/InspectionComparisonPanel';
 
 describe('InspectionComparisonPanel', () => {
+  it('offers declared data before search focus and keeps explicit search and deep-link closure usable', () => {
+    const comparisons = ['Documentos', 'Residuos'].map((categoria, index) => ({ id: `row-${index}`, codigo: `QA-${index}`, categoria, etiqueta: `Dato ${index}`, origen: 'actor', valorDeclarado: 'Declarado', valorObservado: 'Observado', resultado: 'DIFIERE' as const, observacion: 'Hallazgo', orden: index, evidencias: [] }));
+    render(<MemoryRouter><InspectionComparisonPanel inspectionId="qa" comparisons={comparisons} editable onChange={vi.fn()} onEvidence={vi.fn()} /></MemoryRouter>);
+    const trigger = screen.getByRole('button', { name: /^Ir a un dato declarado:/ });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const search = screen.getByRole('searchbox', { name: 'Buscar dato declarado' });
+    expect(search).not.toHaveFocus();
+    const index = screen.getByRole('navigation', { name: 'Datos declarados' });
+    expect(within(index).getAllByRole('button')).toHaveLength(2);
+    search.focus();
+    fireEvent.change(search, { target: { value: 'Residuos' } });
+    expect(within(index).getAllByRole('button')).toHaveLength(1);
+    fireEvent.click(within(index).getByRole('button', { name: /Dato 1/ }));
+    expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 1' })).toHaveValue('Observado');
+    const group = screen.getByRole('button', { name: /^Residuos\s*1\/1/ });
+    fireEvent.click(group);
+    expect(group).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('textbox', { name: 'Valor verificado: Dato 1' })).toBeNull();
+    fireEvent.click(group);
+    expect(document.getElementById('comparison-row-1')).toHaveAttribute('data-result', 'DIFIERE');
+    fireEvent.click(within(document.getElementById('comparison-row-1')!).getByRole('button', { name: 'Ver o corregir detalle' }));
+    expect(screen.getByRole('textbox', { name: 'Valor verificado: Dato 1' })).toHaveValue('Observado');
+  });
   it('opens groups independently and really collapses the selected group without losing decisions', () => {
     const comparisons = ['Documentos', 'Residuos'].map((categoria, index) => ({ id: `row-${index}`, codigo: `QA-${index}`, categoria, etiqueta: `Dato ${index}`, origen: 'actor', valorDeclarado: 'Declarado', valorObservado: 'Observado', resultado: 'DIFIERE' as const, observacion: 'Hallazgo', orden: index, evidencias: [] }));
     render(<MemoryRouter><InspectionComparisonPanel inspectionId="qa" comparisons={comparisons} editable onChange={vi.fn()} onEvidence={vi.fn()} /></MemoryRouter>);

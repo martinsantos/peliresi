@@ -6,6 +6,12 @@ import path from 'node:path';
 import { assertCloudEnvironment } from './safety.ts';
 
 type NativeNode = Record<string, string>;
+/** Refuse unknown OS dumps rather than interpreting a missing signal as hidden. */
+export function nativeKeyboardShown(dump: string): boolean {
+  const states = [...dump.matchAll(/\bmInputShown=(true|false)\b/g)];
+  assert.equal(states.length, 1, 'Require one current Android input-method visibility signal');
+  return states[0][1] === 'true';
+}
 const decode = (text: string) => text.replace(/&quot;/g, '"').replace(/&apos;/g, "'")
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 export function nativeNodes(xml: string): NativeNode[] {

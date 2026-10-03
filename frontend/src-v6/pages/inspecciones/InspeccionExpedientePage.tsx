@@ -878,12 +878,10 @@ function ChecklistJumpIndex({ items, activeId, onSelect }: { items: InspectionIt
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
   const active = items.find((item) => item.id === activeId);
   const matches = items.filter((item) => `${item.etiqueta} ${item.codigo} ${item.categoria}`.toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')));
   useEffect(() => {
     if (!open) return;
-    searchRef.current?.focus({ preventScroll: true });
     const closeOutside = (event: PointerEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) { setOpen(false); setQuery(''); }
     };
@@ -904,7 +902,7 @@ function ChecklistJumpIndex({ items, activeId, onSelect }: { items: InspectionIt
       <span className="flex min-w-0 items-center gap-2"><Search size={17} className="shrink-0 text-primary-700" aria-hidden="true" /><span className="truncate">{active?.etiqueta || 'Ir a un control'}</span></span>{open ? <ChevronUp size={17} className="shrink-0 text-neutral-500" /> : <ChevronDown size={17} className="shrink-0 text-neutral-500" />}
     </button>
     <div id="checklist-jump-index" hidden={!open} className="mt-2 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-      {open && <><label className="flex min-h-11 items-center gap-2 border-b border-neutral-200 px-3"><Search size={17} className="shrink-0 text-neutral-500" aria-hidden="true" /><span className="sr-only">Buscar control</span><input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre o código" className="min-h-11 w-full min-w-0 bg-transparent text-sm text-[#10213A] outline-none placeholder:text-neutral-500" /></label>
+      {open && <><label className="flex min-h-11 items-center gap-2 border-b border-neutral-200 px-3"><Search size={17} className="shrink-0 text-neutral-500" aria-hidden="true" /><span className="sr-only">Buscar control</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre o código" className="min-h-11 w-full min-w-0 bg-transparent text-base sm:text-sm text-[#10213A] outline-none placeholder:text-neutral-500" /></label>
         <nav aria-label="Índice de controles" className="max-h-[min(50dvh,22rem)] overflow-y-auto overscroll-contain py-1">{matches.length ? matches.map((item) => <button key={item.id} type="button" aria-current={activeId === item.id ? 'location' : undefined} onClick={() => select(item)} className={`flex min-h-12 w-full min-w-0 items-center gap-3 px-3 py-2 text-left hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-600 ${activeId === item.id ? 'bg-primary-50' : ''}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-600">{items.indexOf(item) + 1}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold leading-snug text-[#10213A]">{item.etiqueta}</span><span className="block text-xs text-neutral-600">{item.categoria} · {item.codigo}</span></span><span className={`shrink-0 text-xs font-semibold ${item.resultado === 'NO_CUMPLE' ? 'text-error-700' : item.resultado === 'CUMPLE' ? 'text-success-800' : 'text-neutral-600'}`}>{status(item)}</span></button>) : <p className="px-4 py-4 text-sm text-neutral-600">No hay controles con ese nombre.</p>}</nav></>}
     </div>
   </div>;
@@ -936,6 +934,9 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
     preserveAnchor.current = !align ? preserveInspectionAnchor(document.getElementById('control-' + (item?.id || activeItem))) : null;
     pendingScrollHash.current = item ? '#checklist/' + encodeURIComponent(item.codigo) : '#checklist';
     setExpandedItem(item?.id || '');
+    // Closing the focused mobile item must leave the headers available, not an
+    // empty focused view. Decisions and observations remain in the parent draft.
+    if (!item) setShowOverview(true);
     navigate({ pathname: location.pathname, search: location.search, hash: item ? '#checklist/' + encodeURIComponent(item.codigo) : '#checklist' }, { replace: true });
   };
   useLayoutEffect(() => {
@@ -989,7 +990,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
           const showObservation = editable || isFail || Boolean(item.observacion) || itemEvidence.length > 0 || pendingItemEvidence.length > 0;
           const expanded = activeItem === item.id;
           return <div key={item.id} id={'control-' + item.id} data-inspection-anchor={'checklist/' + item.codigo} data-result={item.resultado} style={{ scrollMarginTop: 'var(--inspection-anchor-offset, 8rem)' }} className={`mt-2 rounded-lg border border-l-4 px-3 py-1 sm:px-5 ${!showOverview && !expanded ? 'max-lg:hidden' : ''} ${isFail ? 'border-error-300 border-l-error-600 bg-error-50/30' : expanded ? 'border-primary-300 border-l-primary-700 bg-primary-50/50' : 'border-neutral-300 border-l-neutral-300 bg-white'}`}>
-            <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => { if (expanded && !showOverview && window.innerWidth < 1024) return; openControl(expanded ? undefined : item, false); }} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            <button type="button" aria-expanded={expanded} aria-controls={'control-detail-' + item.id} onClick={() => openControl(expanded ? undefined : item, false)} className="flex min-h-16 w-full items-start gap-3 rounded-lg py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
               <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${item.resultado === 'CUMPLE' ? 'bg-success-100 text-success-700' : isFail ? 'bg-error-100 text-error-700' : item.resultado === 'NO_APLICA' ? 'bg-neutral-200 text-neutral-700' : 'border border-neutral-300 bg-white text-neutral-600'}`}>{item.resultado === 'CUMPLE' ? <Check size={16} /> : isFail ? <XCircle size={16} /> : item.resultado === 'NO_APLICA' ? <CircleMinus size={16} /> : <span className="text-xs font-bold">{orderedItems.indexOf(item) + 1}</span>}</div>
               <div className="min-w-0 flex-1"><p className="text-base font-semibold leading-relaxed text-[#10213A]">{item.etiqueta}</p><div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1"><span className="text-xs font-medium text-neutral-500">{item.codigo}</span><span data-testid={'inspection-item-status-' + item.id} className={'rounded-md px-2 py-1 text-xs font-semibold ' + (item.resultado === 'PENDIENTE' ? 'bg-warning-50 text-warning-900' : isFail ? 'bg-error-50 text-error-800' : item.resultado === 'CUMPLE' ? 'bg-success-50 text-success-800' : 'bg-neutral-100 text-neutral-700')}>{itemStatus(item)}</span>{item.observacion && <span className="text-xs text-neutral-600">Observación</span>}{itemEvidence.length + pendingItemEvidence.length > 0 && <span className="text-xs text-neutral-600">{itemEvidence.length + pendingItemEvidence.length} adjuntos</span>}</div></div>
               {expanded ? <ChevronUp size={17} className="mt-1 shrink-0 text-neutral-500" /> : <ChevronDown size={17} className="mt-1 shrink-0 text-neutral-500" />}
@@ -1026,7 +1027,7 @@ function Checklist({ inspectionId, groups, items, completed, editable, setItems,
         })}
       </div>;
     })}
-    <button type="button" aria-expanded={showOverview} onClick={() => setShowOverview((value) => !value)} className="min-h-12 w-full border-t border-neutral-200 px-4 text-sm font-semibold text-primary-800 lg:hidden">{showOverview ? 'Volver al control actual' : `Ver los ${items.length} controles`}</button>
+    <button type="button" disabled={!activeItem} aria-expanded={showOverview} onClick={() => setShowOverview((value) => !value)} className="min-h-12 w-full border-t border-neutral-200 px-4 text-sm font-semibold text-primary-800 disabled:text-neutral-500 lg:hidden">{showOverview ? activeItem ? 'Volver al control actual' : 'Elegí un control para continuar' : `Ver los ${items.length} controles`}</button>
   </section>;
 }
 export function EvidenceCard({ inspection, pendingEvidence, pendingActions, editable, recording, onCamera, onFile, onAudio, onAnnul }: { inspection: NonNullable<ReturnType<typeof useInspection>['data']>; pendingEvidence: PendingInspectionEvidence[]; pendingActions?: PendingEvidenceActions; editable: boolean; recording: boolean; onCamera: () => void; onFile: () => void; onAudio: () => void; onAnnul: (evidenceId: string, reason: string) => Promise<void> }) {

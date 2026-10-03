@@ -1,11 +1,11 @@
 import { _android as android, type BrowserContext, type Page } from 'playwright';
 import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
-import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
+import { chromeButtonPoint, dismissObservedChromePrompts, nativeKeyboardShown, readNativeWindow } from './native-window.ts';
 import { DeadlineError, withinDeadline } from './deadline.ts';
 import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
@@ -66,6 +66,15 @@ const closeContext=async()=>{
   finally{clearTimeout(timer);}
 };
 const settleNativeChrome=()=>dismissObservedChromePrompts(output);
+const keyboardProof=async(shown:boolean,name:string)=>{
+  let dump='';
+  await expect.poll(async()=>{
+    dump=await new Promise<string>((resolve,reject)=>execFile('adb',['shell','dumpsys','input_method'],{timeout:5000,encoding:'utf8'},(error,stdout)=>error?reject(error):resolve(stdout)));
+    await writeFile(path.join(output,name+'-input-method.txt'),dump);
+    return nativeKeyboardShown(dump);
+  },{timeout:10000,message:'Actual OS keyboard visibility: '+name}).toBe(shown);
+  await proof(name);
+};
 const nativeButtonTap=async(name:string,evidence:string)=>{
   const button=page.getByRole('button',{name,exact:true});
   await expect(button).toBeVisible();await expect(button).toBeEnabled();
@@ -290,8 +299,37 @@ try{
       ]);
       const actual=(await received.json()).data;
       expect(actual).toBeTruthy();await expect(page.locator('body')).not.toBeEmpty();
+      if(route==='centro-control'){
+        const agenda=page.getByRole('region',{name:'Agenda y viajes',exact:true});
+        for(const name of ['Viajes Activos','Viajes Realizados','Inspecciones']){
+          const header=agenda.getByRole('button',{name:new RegExp('^'+name)});
+          if(await header.getAttribute('aria-expanded')!=='true')await header.tap();
+          await expect(agenda.locator('button[aria-expanded="true"]')).toHaveCount(1);
+          await header.tap();
+          await expect(agenda.locator('button[aria-expanded="true"]')).toHaveCount(0);
+        }
+      }
       await proof(route);
     }
+  });
+  await check('searchable-select-chooses-before-actual-Android-keyboard',async()=>{
+    await page.goto('http://127.0.0.1:4177/app/manifiestos/nuevo');
+    const trigger=page.getByRole('button',{name:'Generador *',exact:true});
+    await trigger.tap();
+    const search=page.getByRole('textbox',{name:'Buscar Generador *',exact:true});
+    await expect(page.getByRole('option',{name:/QA Generador 1/})).toBeVisible();
+    await expect(search).not.toBeFocused();
+    await keyboardProof(false,'select-open-no-keyboard');
+    await page.getByRole('option',{name:/QA Generador 1/}).tap();
+    await expect(trigger).toContainText('QA Generador 1');
+    await trigger.tap();
+    await search.tap();
+    await keyboardProof(true,'select-explicit-search-keyboard');
+    await search.fill('QA Generador 2');
+    await expect(page.getByRole('option')).toHaveCount(1);
+    await page.getByRole('option',{name:/QA Generador 2/}).tap();
+    await expect(trigger).toContainText('QA Generador 2');
+    await keyboardProof(false,'select-chosen-keyboard-dismissed');
   });
   await check('assigned-spontaneous-inspection',async()=>{
     await page.goto('http://127.0.0.1:4177/app/inspecciones');
@@ -367,6 +405,64 @@ try{
     await expect(page.locator('#inspection-observations')).toBeEnabled();
     await expect(page.getByRole('button',{name:'Saltar introducción',exact:true})).toHaveCount(0);
     await proof('restarted-inspector-record');
+  });
+  await check('inspection-indexes-and-current-control-are-closable-on-Android',async()=>{
+    await page.goto('http://127.0.0.1:4177/app/inspecciones');
+    await page.getByRole('button',{name:'Nueva inspección',exact:true}).tap();
+    const dialog=page.getByRole('dialog',{name:'Nueva inspección',exact:true});
+    await dialog.getByRole('combobox',{name:'Actor inspeccionado',exact:true}).selectOption({label:'QA Generador 1'});
+    const [response]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones')&&r.request().method()==='POST'),
+      dialog.getByRole('button',{name:'Crear expediente',exact:true}).tap(),
+    ]);
+    expect(response.status()).toBe(201);
+    const created=(await response.json()).data;
+    const [started]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+created.id+'/estado')&&r.request().method()==='POST'),
+      page.getByRole('button',{name:'Iniciar visita',exact:true}).tap(),
+    ]);
+    expect(started.status()).toBe(200);
+    await page.getByRole('navigation',{name:'Secciones del expediente'}).getByRole('link',{name:'Controles',exact:true}).tap();
+    await page.getByRole('link',{name:'En campo',exact:true}).tap();
+    await page.getByRole('button',{name:/^Ir a un control:/}).tap();
+    await expect(page.getByRole('searchbox',{name:'Buscar control',exact:true})).not.toBeFocused();
+    await keyboardProof(false,'field-index-open-no-keyboard');
+    const field=created.items[0];
+    await page.getByRole('navigation',{name:'Índice de controles',exact:true}).getByRole('button').filter({hasText:field.etiqueta}).tap();
+    const row=page.locator('[id="control-'+field.id+'"]');
+    const header=row.locator('button[aria-controls]').first();
+    const observation=row.getByRole('textbox',{name:'Observación: '+field.etiqueta,exact:true});
+    await observation.fill('QA nota Android preservada al cerrar');
+    await page.getByRole('button',{name:'Volver al control actual',exact:true}).tap();
+    await header.tap();
+    await expect(header).toHaveAttribute('aria-expanded','false');
+    await expect(observation).toHaveCount(0);
+    await expect(page.locator('#checklist button[aria-controls^="control-detail-"][aria-expanded="true"]')).toHaveCount(0);
+    await proof('field-current-control-closed');
+    await header.tap();
+    await expect(observation).toHaveValue('QA nota Android preservada al cerrar');
+    const [saved]=await Promise.all([
+      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+created.id+'/borrador')&&r.request().method()==='PATCH'),
+      nativeButtonTap('Guardar cambios','collapse-field-save'),
+    ]);
+    expect(saved.status()).toBe(200);
+    expect((await saved.json()).data.items.find((item:{id:string})=>item.id===field.id).observacion).toBe('QA nota Android preservada al cerrar');
+    await page.getByRole('link',{name:'Datos declarados',exact:true}).tap();
+    await page.getByRole('button',{name:/^Ir a un dato declarado:/}).tap();
+    const declaredSearch=page.getByRole('searchbox',{name:'Buscar dato declarado',exact:true});
+    await expect(declaredSearch).not.toBeFocused();
+    await keyboardProof(false,'declared-index-open-no-keyboard');
+    const index=page.getByRole('navigation',{name:'Datos declarados',exact:true});
+    await expect(index.getByRole('button').first()).toBeVisible();
+    await declaredSearch.tap();
+    await keyboardProof(true,'declared-explicit-search-keyboard');
+    const label=(await index.getByRole('button').first().locator('span.block.text-sm').textContent())!;
+    await declaredSearch.fill(label);
+    await index.getByRole('button').first().tap();
+    await expect(page.getByRole('textbox',{name:'Valor verificado: '+label,exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Ocultar detalle',exact:true}).tap();
+    await expect(page.getByRole('textbox',{name:'Valor verificado: '+label,exact:true})).toHaveCount(0);
+    await keyboardProof(false,'declared-choice-keyboard-dismissed');
   });
   await check('logout-removes-access-to-protected-route',async()=>{
     await logout();

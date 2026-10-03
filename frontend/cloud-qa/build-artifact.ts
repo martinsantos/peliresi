@@ -59,15 +59,15 @@ if (mode === 'freeze') {
   const http = await readJson('http-summary.json');
   assert.equal(http.passed, 52);
   assert.equal(http.failed, 0);
-  // 30 existing journeys plus three contextual journeys, across all three surfaces.
-  assert.equal(e2e.stats.expected, 99);
+  // 33 existing journeys plus three selection/collapse journeys, all three surfaces.
+  assert.equal(e2e.stats.expected, 108);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   assert.deepEqual(e2e.errors, []);
   const android = await readJson('android/result.json');
   const apk = await readJson('apk/result.json');
   assert.equal(android.completed,true,'An interrupted Android suite cannot pass the package gate');
   assert.equal(android.failed + apk.failed, 0);
-  assert.equal(android.passed, 12);
+  assert.equal(android.passed, 14);
   assert.equal(apk.passed, 4);
   const androidSystemPackages = await readJson('android-system-packages.json');
   assert.equal(androidSystemPackages.stable, true, 'Require fixed Android dependency versions');

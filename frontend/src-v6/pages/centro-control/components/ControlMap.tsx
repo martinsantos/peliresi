@@ -93,7 +93,7 @@ interface ControlMapProps {
   selectedTripId: string | null;
   onSelectTrip: (id: string | null) => void;
   selectedRealizadoId: string | null;
-  tripPanel: 'activos' | 'realizados' | 'inspecciones';
+  tripPanel: 'activos' | 'realizados' | 'inspecciones' | null;
   inspections: InspectionOperation[];
   selectedInspectionId: string | null;
   onSelectInspection: (id: string) => void;

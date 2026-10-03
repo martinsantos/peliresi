@@ -45,7 +45,6 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
   const [indexQuery, setIndexQuery] = useState('');
   const indexRef = useRef<HTMLDivElement | null>(null);
   const indexTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const indexSearchRef = useRef<HTMLInputElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const preserveAnchor = useRef<(() => void) | null>(null);
   const pendingScrollHash = useRef<string | null>(null);
@@ -90,7 +89,6 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
   };
   useEffect(() => {
     if (!indexOpen) return;
-    indexSearchRef.current?.focus({ preventScroll: true });
     const closeOnOutside = (event: PointerEvent) => {
       if (!indexRef.current?.contains(event.target as Node)) { setIndexOpen(false); setIndexQuery(''); }
     };
@@ -221,7 +219,7 @@ export function InspectionComparisonPanel({ inspectionId, comparisons, declaredD
           <label className="flex min-h-11 items-center gap-2 border-b border-neutral-200 px-3">
             <Search size={17} className="shrink-0 text-neutral-500" aria-hidden="true" />
             <span className="sr-only">Buscar dato declarado</span>
-            <input ref={indexSearchRef} type="search" value={indexQuery} onChange={(event) => setIndexQuery(event.target.value)} placeholder="Nombre, categoría o código" className="min-h-11 w-full min-w-0 bg-transparent text-sm text-[#10213A] outline-none placeholder:text-neutral-500" />
+            <input type="search" value={indexQuery} onChange={(event) => setIndexQuery(event.target.value)} placeholder="Nombre, categoría o código" className="min-h-11 w-full min-w-0 bg-transparent text-base sm:text-sm text-[#10213A] outline-none placeholder:text-neutral-500" />
           </label>
           <nav aria-label="Datos declarados" className="max-h-[min(50dvh,22rem)] overflow-y-auto overscroll-contain py-1">
             {matchingComparisons.length ? matchingComparisons.map((row) => {

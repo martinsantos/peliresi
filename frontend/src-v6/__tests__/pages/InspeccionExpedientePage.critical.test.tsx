@@ -306,6 +306,43 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(screen.queryByRole('progressbar', { name: 'Paso actual del recorrido' })).toBeNull();
   });
 
+  it('opens the checklist index without editable focus and searches only on explicit entry', async () => {
+    renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#checklist');
+    const trigger = await screen.findByRole('button', { name: /^Ir a un control:/ });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const search = screen.getByRole('searchbox', { name: 'Buscar control' });
+    expect(search).not.toHaveFocus();
+    expect(screen.getByRole('navigation', { name: 'Índice de controles' })).toBeVisible();
+    search.focus();
+    fireEvent.change(search, { target: { value: 'obligatoria' } });
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Índice de controles' })).getByRole('button', { name: /Documentación obligatoria/ }));
+    expect(screen.queryByRole('searchbox', { name: 'Buscar control' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Observación: Documentación obligatoria' })).toBeVisible();
+  });
+
+  it('closes the current mobile control in focused mode and preserves the observation when reopened', async () => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 });
+    try {
+      const base = inspectionFixture({ estado: 'EN_CAMPO' });
+      renderPage({ ...base, items: [...base.items, { ...base.items[0], id: 'item-2', codigo: 'DOC-02', etiqueta: 'Otro control', resultado: 'PENDIENTE' }] }, true, '#checklist/DOC-01');
+      const observation = await screen.findByRole('textbox', { name: 'Observación: Documentación obligatoria' });
+      fireEvent.change(observation, { target: { value: 'Nota en campo que no debe perderse' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Volver al control actual' }));
+      const header = within(document.getElementById('control-item-1')!).getByRole('button', { name: /Documentación obligatoria/ });
+      fireEvent.click(header);
+      expect(header).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('textbox', { name: 'Observación: Documentación obligatoria' })).toBeNull();
+      expect(within(document.getElementById('control-item-2')!).getByRole('button', { name: /Otro control/ })).toBeVisible();
+      fireEvent.click(header);
+      expect(screen.getByRole('textbox', { name: 'Observación: Documentación obligatoria' })).toHaveValue('Nota en campo que no debe perderse');
+      expect(header).toHaveAttribute('aria-expanded', 'true');
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    }
+  });
+
   it('flushes the field draft before step navigation and restores it when returning', async () => {
     const inspection = inspectionFixture({ estado: 'EN_CAMPO' });
     renderPage(inspection);

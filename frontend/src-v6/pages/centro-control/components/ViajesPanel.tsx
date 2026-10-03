@@ -1,7 +1,7 @@
 /**
  * CentroControl — Active/Completed Trips Accordion Panel
  */
-import React from 'react';
+import React, { useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ClipboardCheck,
@@ -30,6 +30,8 @@ interface ViajeRealizado {
   fechaEntrega: string | null;
 }
 
+export type TripPanel = 'activos' | 'realizados' | 'inspecciones' | null;
+
 interface ViajesPanelProps {
   inspections?: InspectionOperation[];
   inspectionTotal?: number;
@@ -41,8 +43,8 @@ interface ViajesPanelProps {
   viajesRealizados: ViajeRealizado[];
   tripFilter: string;
   onTripFilterChange: (val: string) => void;
-  tripPanel: 'activos' | 'realizados' | 'inspecciones';
-  onTripPanelChange: (panel: 'activos' | 'realizados' | 'inspecciones') => void;
+  tripPanel: TripPanel;
+  onTripPanelChange: (panel: TripPanel) => void;
   selectedTripId: string | null;
   onSelectTrip: (id: string | null) => void;
   selectedRealizadoId: string | null;
@@ -65,15 +67,17 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
   viajesRef,
 }) => {
   const navigate = useNavigate();
+  const panelId = useId();
+  const togglePanel = (panel: Exclude<TripPanel, null>) => onTripPanelChange(tripPanel === panel ? null : panel);
 
   return (
-    <div ref={viajesRef} className="flex flex-col gap-0 lg:sticky lg:top-[6.5rem] lg:self-start max-h-[calc(100vh-8.5rem)] overflow-hidden lg:z-10">
+    <div ref={viajesRef} role="region" aria-label="Agenda y viajes" className="flex flex-col gap-0 lg:sticky lg:top-[6.5rem] lg:self-start max-h-[calc(100vh-8.5rem)] overflow-hidden lg:z-10">
       {inspections && <Card padding="none" className={`flex flex-col ${tripPanel === 'inspecciones' ? 'flex-1 min-h-0' : ''}`}>
-        <button aria-expanded={tripPanel === 'inspecciones'} onClick={() => onTripPanelChange('inspecciones')} className="flex w-full items-center justify-between border-b border-neutral-100 p-4 text-left hover:bg-neutral-50">
+        <button type="button" aria-expanded={tripPanel === 'inspecciones'} aria-controls={panelId + '-inspecciones'} onClick={() => togglePanel('inspecciones')} className="flex min-h-12 w-full items-center justify-between border-b border-neutral-100 p-4 text-left hover:bg-neutral-50 active:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700">
           <span className="flex items-center gap-2"><ClipboardCheck size={18} className="text-teal-700" /><span className="font-semibold text-neutral-900">Inspecciones</span><Badge variant="soft" color="neutral">{inspectionError || inspectionLoading ? '—' : inspectionTotal ?? inspections.length}</Badge></span>
           <ChevronDown size={18} className={tripPanel === 'inspecciones' ? 'rotate-180 text-neutral-400' : 'text-neutral-400'} />
         </button>
-        {tripPanel === 'inspecciones' && <div className="min-h-0 flex-1 divide-y divide-neutral-100 overflow-y-auto">
+        {tripPanel === 'inspecciones' && <div id={panelId + '-inspecciones'} className="min-h-0 flex-1 divide-y divide-neutral-100 overflow-y-auto">
           <p className="px-4 py-2 text-xs text-neutral-500">Agenda activa · lugares de visita, no ubicación del inspector</p>
           {inspectionError && <p role="status" className="p-3 text-sm text-amber-800">No se pudo actualizar la agenda.</p>}
           {inspectionLoading ? <p className="p-4 text-sm text-neutral-500">Cargando agenda…</p> : inspections.length === 0 && !inspectionError ? <p className="p-4 text-sm text-neutral-500">Sin inspecciones activas</p> : inspections.map((row) => <div key={row.id} className={selectedInspectionId === row.id ? 'bg-teal-50 p-3' : 'p-3 hover:bg-neutral-50'}>
@@ -86,8 +90,9 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
       {/* Viajes Activos accordion */}
       <Card padding="none" className={`flex flex-col ${tripPanel === 'activos' ? 'flex-1 min-h-0' : ''}`}>
         <button
-          onClick={() => onTripPanelChange(tripPanel === 'activos' ? 'realizados' : 'activos')}
-          className="flex items-center justify-between p-4 border-b border-neutral-100 w-full text-left hover:bg-neutral-50 transition-colors"
+          type="button" aria-expanded={tripPanel === 'activos'} aria-controls={panelId + '-activos'}
+          onClick={() => togglePanel('activos')}
+          className="flex min-h-12 items-center justify-between p-4 border-b border-neutral-100 w-full text-left hover:bg-neutral-50 active:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700 transition-colors"
         >
           <div className="flex items-center gap-2">
             <Truck size={18} className="text-amber-600" />
@@ -97,7 +102,7 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
           <ChevronDown size={18} className={`text-neutral-400 transition-transform duration-200 ${tripPanel === 'activos' ? 'rotate-180' : ''}`} />
         </button>
         {tripPanel === 'activos' && (
-          <>
+          <div id={panelId + '-activos'} className="flex min-h-0 flex-1 flex-col">
             <div className="p-3 border-b border-neutral-100">
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -157,15 +162,16 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </Card>
 
       {/* Viajes Realizados accordion */}
       <Card padding="none" className={`flex flex-col ${tripPanel === 'realizados' ? 'flex-1 min-h-0' : ''} mt-[-1px]`}>
         <button
-          onClick={() => onTripPanelChange(tripPanel === 'realizados' ? 'activos' : 'realizados')}
-          className="flex items-center justify-between p-4 border-b border-neutral-100 w-full text-left hover:bg-neutral-50 transition-colors"
+          type="button" aria-expanded={tripPanel === 'realizados'} aria-controls={panelId + '-realizados'}
+          onClick={() => togglePanel('realizados')}
+          className="flex min-h-12 items-center justify-between p-4 border-b border-neutral-100 w-full text-left hover:bg-neutral-50 active:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700 transition-colors"
         >
           <div className="flex items-center gap-2">
             <CheckCircle2 size={18} className="text-emerald-600" />
@@ -175,7 +181,7 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
           <ChevronDown size={18} className={`text-neutral-400 transition-transform duration-200 ${tripPanel === 'realizados' ? 'rotate-180' : ''}`} />
         </button>
         {tripPanel === 'realizados' && (
-          <div className="divide-y divide-neutral-100 flex-1 min-h-0 overflow-y-auto">
+          <div id={panelId + '-realizados'} className="divide-y divide-neutral-100 flex-1 min-h-0 overflow-y-auto">
             {viajesRealizados.map((m: any) => {
               const isSelected = m.id === selectedRealizadoId;
               return (
