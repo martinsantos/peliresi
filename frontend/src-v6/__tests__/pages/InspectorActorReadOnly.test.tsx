@@ -55,8 +55,12 @@ describe('inspector actor consultation', () => {
   it('preserves administrative editing for the authorized role', () => {
     mock.role = 'ADMIN_GENERADOR'; open(true);
     fireEvent.click(screen.getByRole('tab', { name: 'DDJJ y Documentos' }));
-    expect(screen.getByRole('button', { name: 'Registrar DDJJ' })).toBeInTheDocument();
+    const register = screen.getByRole('button', { name: 'Registrar DDJJ' });
+    expect(register).toHaveClass('min-h-11');
+    expect(register).not.toHaveClass('sm:min-h-9');
     expect(screen.getByText(/Arrastra un archivo/)).toBeInTheDocument();
+    fireEvent.click(register);
+    expect(screen.getByRole('heading', { name: 'Registrar DDJJ' })).toBeInTheDocument();
   });
   it('downloads in read-only consultation through the authenticated service, not an unauthenticated popup', async () => {
     open(true);
