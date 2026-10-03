@@ -152,7 +152,7 @@ function App() {
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} allowInspector />}>
+        <Route element={<ProtectedRoute actorRead="TRANSPORTISTA" />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>
@@ -189,28 +189,28 @@ function App() {
         </Route>
 
         {/* Inspector consultation only; creation/editing remain in admin guards. */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} allowInspector />}>
+        <Route element={<ProtectedRoute actorRead="GENERADOR" />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
           </Route>
         </Route>
 
         {/* Inspector consultation only; creation/editing remain in admin guards. */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} allowInspector />}>
+        <Route element={<ProtectedRoute actorRead="OPERADOR" />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
           </Route>
         </Route>
 
         {/* Inspector consultation only; creation/editing remain in admin guards. */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} allowInspector />}>
+        <Route element={<ProtectedRoute actorRead="GENERADOR" />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
           </Route>
         </Route>
 
         {/* Inspector consultation only; creation/editing remain in admin guards. */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} allowInspector />}>
+        <Route element={<ProtectedRoute actorRead="OPERADOR" />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
           </Route>
@@ -300,7 +300,7 @@ function App() {
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} allowInspector />}>
+        <Route element={<ProtectedRoute actorRead="TRANSPORTISTA" />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>

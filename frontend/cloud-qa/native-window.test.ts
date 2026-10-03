@@ -63,7 +63,7 @@ test('fresh native dump yields to other driver work and reads only after complet
   const dump = new Promise<void>(resolve => { finish = resolve; });
   const result = collectNativeWindow(async (args, timeout) => {
     calls.push({args, timeout});
-    if (args[1] === 'uiautomator') { await dump; return 'UI hierarchy dumped'; }
+    if (args[1] === 'uiautomator') { await dump; return 'UI hierchary dumped to: /data/local/tmp/sitrep-cloud-qa-window.xml\n'; }
     return window(node());
   });
   await new Promise<void>(resolve => setImmediate(resolve));
@@ -83,7 +83,17 @@ test('failed native dump is never retried or replaced with an older XML file', a
 test('failed or incomplete native XML read is not accepted as an empty passing window', async () => {
   await assert.rejects(collectNativeWindow(async args => {
     if (args[1] === 'cat') throw new Error('read disconnected');
-    return 'dumped';
+    return 'UI hierchary dumped to: /data/local/tmp/sitrep-cloud-qa-window.xml';
   }), /read disconnected/);
-  await assert.rejects(collectNativeWindow(async args => args[1] === 'cat' ? '<hierarchy><node/>' : 'dumped'));
+  await assert.rejects(collectNativeWindow(async args => args[1] === 'cat' ? '<hierarchy><node/>' : 'UI hierchary dumped to: /data/local/tmp/sitrep-cloud-qa-window.xml'));
+});
+
+test('zero-exit native errors cannot reuse a complete but stale previous window', async () => {
+  for (const message of ['ERROR: could not get idle state.', '', 'UI hierchary dumped to: /another/window.xml']) {
+    const calls: string[][] = [];
+    await assert.rejects(collectNativeWindow(async args => {
+      calls.push(args); return args[1] === 'cat' ? window(node()) : message;
+    }), /Native UI dump did not confirm/);
+    assert.equal(calls.length, 1, 'Never read the previous file after a failed fresh dump');
+  }
 });

@@ -1,4 +1,5 @@
 import type { User, UserRole } from '../contexts/AuthContext';
+import { actorDetailFromPath, canReadActorDetail } from './actorReadAccess';
 
 const ALL_ADMIN_ROLES: UserRole[] = [
   'ADMIN',
@@ -31,6 +32,9 @@ export function canAccessMobilePath(user: User, path: string): boolean {
   if (path === '/inspecciones' || path.startsWith('/inspecciones/')) {
     return user.esInspector === true || hasRole(user, ALL_ADMIN_ROLES);
   }
+
+  const actor = actorDetailFromPath(path);
+  if (actor) return canReadActorDetail(user, actor.type, actor.id);
 
   if (startsWithAny(path, ['/admin/usuarios', '/admin/actores'])) {
     if (path === '/admin/actores') return user.rol === 'ADMIN';

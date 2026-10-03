@@ -8,6 +8,7 @@ import { assertCloudDatabase } from './safety.ts';
 import { chromeButtonPoint, dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
 import { DeadlineError, withinDeadline } from './deadline.ts';
 import { renewAndroidConnection } from './android-connection.ts';
+import { startSystemLog } from './system-log.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -236,6 +237,7 @@ const check=async(name:string,task:()=>Promise<void>)=>{
     throw new Error('Android driver connection lost after '+name+'; remaining cases not executed');
 };
 let inspection:{id:string;numero:string};
+const stopSystemLog=await startSystemLog(output);
 try{
   await launch();
   await check('real-os-and-admin-session',async()=>{
@@ -428,8 +430,10 @@ try{
     expect(browserLifecycle.filter(event=>!event.expected)).toEqual([]);
   });
 }finally{
-  await saveResults(results.length===12);
-  await closeContext();
-  await driverStep('close-QA-device',()=>device.close(),10000);
+  try{
+    await saveResults(results.length===12);
+    await closeContext();
+    await driverStep('close-QA-device',()=>device.close(),10000);
+  }finally{await stopSystemLog();}
 }
 if(results.some(r=>r.status==='FAIL'))process.exitCode=1;

@@ -9,7 +9,7 @@ import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   FileText,
-  User,
+  Factory,
   Truck,
   FlaskConical,
   Weight,
@@ -49,7 +49,9 @@ import {
   useRegistrarIncidente,
   useRevertirEstado,
 } from '../../hooks/useManifiestos';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, type User } from '../../contexts/AuthContext';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { canReadActorDetail, type ActorReadType } from '../../utils/actorReadAccess';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { formatDateTime, formatEstado, formatCuit } from '../../utils/formatters';
 import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
@@ -57,6 +59,33 @@ import type { Manifiesto } from '../../types/models';
 import { EstadoManifiesto } from '../../types/models';
 import ManifiestoTimeline from './components/ManifiestoTimeline';
 import ManifiestoActions from './components/ManifiestoActions';
+
+const ACTOR_SUMMARY = {
+  GENERADOR: { label: 'Generador', Icon: Factory, icon: 'bg-purple-50 text-purple-600', interactive: 'hover:bg-purple-50/50' },
+  TRANSPORTISTA: { label: 'Transportista', Icon: Truck, icon: 'bg-orange-50 text-orange-600', interactive: 'hover:bg-orange-50/50' },
+  OPERADOR: { label: 'Operador', Icon: FlaskConical, icon: 'bg-blue-50 text-blue-600', interactive: 'hover:bg-blue-50/50' },
+};
+
+function ActorSummary({ type, actorId, user, name, detail, to, returnTo }: {
+  type: ActorReadType; actorId?: string; user: User | null; name: string; detail: string; to: string; returnTo: string;
+}) {
+  const { label, Icon, icon, interactive } = ACTOR_SUMMARY[type];
+  const readable = canReadActorDetail(user, type, actorId);
+  const content = <>
+    <span className={`shrink-0 rounded-lg p-2 ${icon}`}><Icon size={20} aria-hidden="true" /></span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-sm text-neutral-500">{label}</span>
+      <span className="block break-words font-medium text-neutral-900">{name}</span>
+      <span className="block break-words text-sm text-neutral-600">{detail}</span>
+    </span>
+    {readable && <ExternalLink size={14} aria-hidden="true" className="mt-1 shrink-0 text-neutral-500" />}
+  </>;
+  const base = 'flex min-h-11 items-start gap-3 rounded-lg p-2';
+  return readable ? <Link to={to} state={{ actorReturn: returnTo }} aria-label={`Abrir ficha de ${label.toLowerCase()}: ${name}`}
+    className={`${base} !no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 ${interactive}`}>
+    {content}
+  </Link> : <div className={base}>{content}</div>;
+}
 
 function getEstadoBadgeColor(estado: EstadoManifiesto): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
   switch (estado) {
@@ -76,6 +105,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const isApp = location.pathname.startsWith('/app');
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
@@ -407,35 +437,15 @@ const ManifiestoDetailPage: React.FC = () => {
             <CardHeader title="Información general" icon={<FileText size={20} />} />
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div
-                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-purple-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.generadorId && navigate(`/admin/actores/generadores/${m.generadorId}`)}
-                >
-                  <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
-                    <User size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-neutral-500">Generador</p>
-                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-purple-700' : ''}`}>{m.generador?.razonSocial || '-'}</p>
-                    <p className="text-sm text-neutral-600">CUIT: {m.generador?.cuit ? formatCuit(m.generador.cuit) : '-'}</p>
-                  </div>
-                  {isAdmin && m.generadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-purple-400 mt-1 shrink-0" />}
-                </div>
+                <ActorSummary type="GENERADOR" actorId={m.generadorId} user={currentUser}
+                  name={m.generador?.razonSocial || '-'} detail={`CUIT: ${m.generador?.cuit ? formatCuit(m.generador.cuit) : '-'}`}
+                  to={mp(`/admin/actores/generadores/${encodeURIComponent(m.generadorId || '')}`)}
+                  returnTo={location.pathname + location.search + location.hash} />
                 {m.transportistaId ? (
-                  <div
-                    className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-orange-50/50 group' : ''}`}
-                    onClick={() => isAdmin && m.transportistaId && navigate(`/admin/actores/transportistas/${m.transportistaId}`)}
-                  >
-                    <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-                      <Truck size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-neutral-500">Transportista</p>
-                      <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-orange-700' : ''}`}>{m.transportista?.razonSocial || '-'}</p>
-                      <p className="text-sm text-neutral-600">Hab: {m.transportista?.numeroHabilitacion || '-'}</p>
-                    </div>
-                    {isAdmin && m.transportistaId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-orange-400 mt-1 shrink-0" />}
-                  </div>
+                  <ActorSummary type="TRANSPORTISTA" actorId={m.transportistaId} user={currentUser}
+                    name={m.transportista?.razonSocial || '-'} detail={`Hab: ${m.transportista?.numeroHabilitacion || '-'}`}
+                    to={mp(`/admin/actores/transportistas/${encodeURIComponent(m.transportistaId)}`)}
+                    returnTo={location.pathname + location.search + location.hash} />
                 ) : (
                   <div className="flex items-start gap-3 p-2 -m-2 rounded-lg">
                     <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
@@ -448,20 +458,10 @@ const ManifiestoDetailPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                <div
-                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-blue-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.operadorId && navigate(`/admin/actores/operadores/${m.operadorId}`)}
-                >
-                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                    <FlaskConical size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-neutral-500">Operador</p>
-                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-blue-700' : ''}`}>{m.operador?.razonSocial || '-'}</p>
-                    <p className="text-sm text-neutral-600">Hab: {m.operador?.numeroHabilitacion || '-'}</p>
-                  </div>
-                  {isAdmin && m.operadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-blue-400 mt-1 shrink-0" />}
-                </div>
+                <ActorSummary type="OPERADOR" actorId={m.operadorId} user={currentUser}
+                  name={m.operador?.razonSocial || '-'} detail={`Hab: ${m.operador?.numeroHabilitacion || '-'}`}
+                  to={mp(`/admin/actores/operadores/${encodeURIComponent(m.operadorId || '')}`)}
+                  returnTo={location.pathname + location.search + location.hash} />
               </div>
             </CardContent>
           </Card>

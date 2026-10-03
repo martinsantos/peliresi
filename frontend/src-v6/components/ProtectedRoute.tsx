@@ -5,14 +5,17 @@
  */
 
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type UserRole } from '../contexts/AuthContext';
+import { actorDetailFromPath, canReadActorDetail, type ActorReadType } from '../utils/actorReadAccess';
 
 interface ProtectedRouteProps {
   /** Optional list of roles allowed to access the route */
   roles?: UserRole[];
   /** Read-only actor detail routes may also be consulted by designated inspectors. */
   allowInspector?: boolean;
+  /** Exact actor consultation; administrative actions keep their own guards. */
+  actorRead?: ActorReadType;
   /** Where to redirect unauthenticated users (default: /login) */
   redirectTo?: string;
 }
@@ -20,6 +23,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   roles,
   allowInspector = false,
+  actorRead,
   redirectTo = '/login',
 }) => {
   const { currentUser, isLoading, isRestricted } = useAuth();
@@ -49,7 +53,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Authenticated but role not allowed -> access denied
-  if (roles && roles.length > 0 && !roles.includes(currentUser.rol) && !(allowInspector && currentUser.esInspector)) {
+  const actor = actorRead ? actorDetailFromPath(location.pathname) : null;
+  const actorDenied = actorRead && (!actor || actor.type !== actorRead || !canReadActorDetail(currentUser, actorRead, actor.id));
+  if (actorDenied || (roles && roles.length > 0 && !roles.includes(currentUser.rol) && !(allowInspector && currentUser.esInspector))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
         <div className="flex flex-col items-center gap-4 text-center max-w-md px-6">
@@ -63,12 +69,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             No tienes permisos para acceder a esta seccion. Tu rol actual es{' '}
             <span className="font-medium">{currentUser.rol}</span>.
           </p>
-          <a
-            href="/dashboard"
+          <Link
+            to={location.pathname.startsWith('/mobile/') ? '/mobile/dashboard' : '/dashboard'}
             className="mt-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
           >
             Volver al Dashboard
-          </a>
+          </Link>
         </div>
       </div>
     );

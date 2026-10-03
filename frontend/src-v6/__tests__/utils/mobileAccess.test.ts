@@ -14,6 +14,7 @@ function user(rol: UserRole, esInspector = false): User {
     ubicacion: '',
     permisos: [],
     esInspector,
+    actorId: rol === 'TRANSPORTISTA' ? 't-1' : undefined,
   };
 }
 
@@ -46,6 +47,7 @@ describe('canAccessMobilePath', () => {
 
   it('allows a transportista to open a detail but not the admin list/editor', () => {
     expect(canAccessMobilePath(user('TRANSPORTISTA'), '/admin/actores/transportistas/t-1')).toBe(true);
+    expect(canAccessMobilePath(user('TRANSPORTISTA'), '/admin/actores/transportistas/t-2')).toBe(false);
     expect(canAccessMobilePath(user('TRANSPORTISTA'), '/admin/actores/transportistas')).toBe(false);
     expect(canAccessMobilePath(user('TRANSPORTISTA'), '/admin/actores/transportistas/nuevo')).toBe(false);
     expect(canAccessMobilePath(user('TRANSPORTISTA'), '/admin/actores/transportistas/t-1/editar')).toBe(false);

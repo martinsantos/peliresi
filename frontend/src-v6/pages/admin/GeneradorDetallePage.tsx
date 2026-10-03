@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
@@ -140,6 +141,7 @@ const GeneradorDetallePage: React.FC = () => {
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
   const canEdit = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_GENERADOR';
+  const showInspections = Boolean(actorInspectionAccess(currentUser, 'GENERADOR', id));
   // Removed isMobile — React Router handles basename
 
   const [pagoModal, setPagoModal] = useState<{ open: boolean; editing?: PagoTEF }>({ open: false });
@@ -170,8 +172,7 @@ const GeneradorDetallePage: React.FC = () => {
     fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
   } : null;
 
-  const returnTo = (location.state as { inspectionReturn?: string } | null)?.inspectionReturn;
-  const backPath = returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : mp(canEdit ? '/admin/actores/generadores' : '/inspecciones');
+  const backPath = actorReturnPath(location.state, mp(canEdit ? '/admin/actores/generadores' : '/dashboard'));
 
   if (isLoading) {
     return (
@@ -363,7 +364,7 @@ const GeneradorDetallePage: React.FC = () => {
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>
           <Tab id="fiscal" icon={<DollarSign size={16} />}>Situacion Fiscal</Tab>
           <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ y Documentos</Tab>
-          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
+          {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -641,9 +642,9 @@ const GeneradorDetallePage: React.FC = () => {
         </TabPanel>
 
         {/* ===== Tab 5: Trazabilidad ===== */}
-        <TabPanel id="inspecciones">
+        {showInspections && <TabPanel id="inspecciones">
           <ActorInspectionsPanel actorType="GENERADOR" actorId={id || ''} actorName={generador.razonSocial} />
-        </TabPanel>
+        </TabPanel>}
 
         <TabPanel id="historial">
           <TrazabilidadTimeline

@@ -47,6 +47,8 @@ import {
   useDeleteChofer,
 } from '../../hooks/useActores';
 import { useAuth } from '../../contexts/AuthContext';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
 import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
@@ -59,7 +61,9 @@ const TransportistaDetallePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   // Removed isMobile — React Router handles basename
-  const { isAdmin } = useAuth();
+  const { isAdmin, currentUser } = useAuth();
+  const mp = useMobilePrefix();
+  const showInspections = Boolean(actorInspectionAccess(currentUser, 'TRANSPORTISTA', id));
 
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
   const [showChoferModal, setShowChoferModal] = useState(false);
@@ -147,8 +151,7 @@ const TransportistaDetallePage: React.FC = () => {
     return choferSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  const returnTo = (location.state as { inspectionReturn?: string } | null)?.inspectionReturn;
-  const backPath = returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/admin/actores/transportistas';
+  const backPath = actorReturnPath(location.state, mp(isAdmin || currentUser?.rol === 'ADMIN_TRANSPORTISTA' ? '/admin/actores/transportistas' : '/dashboard'));
 
   const openCreateVehiculo = () => {
     if (!isAdmin) return;
@@ -380,7 +383,7 @@ const TransportistaDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>
-          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
+          {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -718,9 +721,9 @@ const TransportistaDetallePage: React.FC = () => {
         </TabPanel>
 
         {/* Tab: Trazabilidad */}
-        <TabPanel id="inspecciones">
+        {showInspections && <TabPanel id="inspecciones">
           <ActorInspectionsPanel actorType="TRANSPORTISTA" actorId={id || ''} actorName={transportista.nombre} />
-        </TabPanel>
+        </TabPanel>}
 
         <TabPanel id="historial">
           <TrazabilidadTimeline

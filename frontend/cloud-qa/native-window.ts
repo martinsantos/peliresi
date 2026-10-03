@@ -47,7 +47,9 @@ const execute = promisify(execFile);
 export async function collectNativeWindow(run: NativeCommand): Promise<string> {
   const file = '/data/local/tmp/sitrep-cloud-qa-window.xml';
   try {
-    await run(['shell', 'uiautomator', 'dump', file], 20000);
+    const message = await run(['shell', 'uiautomator', 'dump', file], 20000);
+    assert.ok(message.includes('UI hierchary dumped to: ' + file) && !message.includes('ERROR:'),
+      'Native UI dump did not confirm a fresh window: ' + message.trim());
   } catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string };
     throw new Error('Native UI dump failed: ' + failure.message + '\n' + (failure.stdout || '') + (failure.stderr || ''));
