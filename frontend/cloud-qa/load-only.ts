@@ -23,7 +23,7 @@ for (const key of ['containsDependencies', 'containsEnvironment', 'containsUploa
 const sha = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
 const archive = path.join(artifact, 'tested-backend.tar.gz');
 assert.equal(sha(archive), meta.archiveSha256);
-// Fetch depth2 contains this QA-only child and the precise published parent.
+// Bounded history must contain the published parent plus the QA-only fixes.
 assert.equal(execFileSync('git', ['diff', '--name-only', meta.commit, 'HEAD', '--',
   'backend/src', 'backend/package.json', 'backend/package-lock.json', 'backend/prisma'],
 { cwd: root, encoding: 'utf8' }).trim(), '', 'Never load-test a different backend and call it the published product');
