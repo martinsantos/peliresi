@@ -441,6 +441,10 @@ try{
       throw error;
     }finally{await closeContext();}
     await launch();
+    // Reopening online intentionally synchronizes a recovered dirty draft.
+    // Observe its real PATCH before navigation; do not require a redundant
+    // manual save after the existing reconnect workflow already confirmed it.
+    const synchronized=page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH');
     const [server]=await Promise.all([
       page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id)&&r.request().method()==='GET'&&r.status()===200),
       page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta'),
@@ -453,13 +457,16 @@ try{
     const local=await page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null'),key);
     await writeFile(path.join(output,'unsent-field-recovery.json'),JSON.stringify({server:serverCopy.observaciones,local:local?.observaciones},null,2));
     await proof('unsent-field-comment-recovered');
-    const [saved]=await Promise.all([
-      page.waitForResponse(r=>r.url().endsWith('/api/inspecciones/'+inspection.id+'/borrador')&&r.request().method()==='PATCH'),
-      nativeButtonTap('Guardar cambios','sync-recovered-field-comment'),
-    ]);
+    const saved=await synchronized;
     expect(saved.status()).toBe(200);
-    expect((await saved.json()).data.observaciones).toBe(unsent);
-    await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toBeVisible();
+    const acknowledgment=(await saved.json()).data;
+    expect(acknowledgment.observaciones).toBe(unsent);
+    await expect(page.getByTestId('inspection-field-save-bar')).toContainText('Guardado en SITREP');
+    await expect(page.getByRole('button',{name:'Guardar cambios',exact:true})).toBeDisabled();
+    await writeFile(path.join(output,'unsent-field-sync-acknowledgment.json'),JSON.stringify({
+      status:saved.status(),version:acknowledgment.version,observaciones:acknowledgment.observaciones,
+    },null,2));
+    await proof('unsent-field-comment-server-confirmed');
   });
   await check('inspection-indexes-and-current-control-are-closable-on-Android',async()=>{
     await page.goto('http://127.0.0.1:4177/app/inspecciones');
