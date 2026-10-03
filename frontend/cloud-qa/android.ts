@@ -308,12 +308,25 @@ try{
   });
   await check('process-restart-keeps-real-session-and-record',async()=>{
     assert.ok(inspection?.id);
+    const stages:Array<{stage:string;at:string;url:string;tabs:string[];draft:unknown}>=[];
+    const captureDraft=async(stage:string)=>{
+      const draft=page.url().startsWith('http://127.0.0.1:4177/')
+        ? await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),
+          'sitrep_inspection_draft_'+inspectorUserId+'_'+inspection.id) : null;
+      stages.push({stage,at:new Date().toISOString(),url:page.url(),tabs:context.pages().map(tab=>tab.url()),draft});
+      await writeFile(path.join(output,'restart-draft-stages.json'),JSON.stringify(stages,null,2));
+    };
+    // Observe only the scoped QA draft; no tokens, storage injection, artificial
+    // waiting for Chrome's disk commit or hidden removal of a conflict.
+    await captureDraft('before-force-stop');
     await closeContext();
     await launch();
+    await captureDraft('after-launch-before-navigation');
     await page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta');
     await expect(page.getByRole('banner')).toBeVisible();
     await expect(page).not.toHaveURL(/\/login$/);
     await expect(page.locator('#inspection-observations')).toHaveValue('QA Android comentario conservado después de cerrar Chrome.');
+    await captureDraft('reopened-record');
     await expect(page.getByText('Hay un borrador anterior sin conciliar',{exact:true})).toHaveCount(0);
     await expect(page.locator('#inspection-observations')).toBeEnabled();
     await expect(page.getByRole('button',{name:'Saltar introducción',exact:true})).toHaveCount(0);

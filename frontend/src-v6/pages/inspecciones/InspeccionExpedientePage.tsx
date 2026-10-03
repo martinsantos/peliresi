@@ -102,6 +102,14 @@ function reconcileStoredDraft(value: unknown, server: Draft): { draft: Draft; co
   // Partial legacy drafts and any real field difference still require consent.
   const alreadySaved = completeShape && typeof source.version === 'number'
     && source.version < server.version && draftConflicts(server, draft).length === 0;
+  // Android can stop Chrome before a later localStorage commit reaches disk.
+  // A complete old snapshot with no edits relative to its recorded server base
+  // is not an unsent draft. Use the current server copy, never its old fields.
+  // Legacy/partial copies, future versions and any real edit still fail closed.
+  const unchangedSnapshot = completeShape && typeof source.version === 'number'
+    && Number.isInteger(source.version) && source.version > 0 && source.version < server.version
+    && typeof source.baseFingerprint === 'string' && source.baseFingerprint === draftFingerprint(draft);
+  if (unchangedSnapshot) return { draft: server, compatible: true };
   const compatible = completeShape && (source.version === server.version || alreadySaved);
   if (alreadySaved) draft.version = server.version;
   return { draft, compatible };
@@ -187,7 +195,9 @@ const InspeccionExpedientePage: React.FC = () => {
     if (!canWriteDraft()) return false;
     if (!draftKey) { setStorageFailed(true); return false; }
     try {
-      localStorage.setItem(draftKey, JSON.stringify(draft));
+      // Persist provenance together with the fields, not in a second key that
+      // could reach disk at a different time or belong to another inspection.
+      localStorage.setItem(draftKey, JSON.stringify({ ...draft, baseFingerprint: serverFingerprintRef.current }));
       setLocalFingerprint(draftFingerprint(draft));
       setStorageFailed(false);
       return true;
