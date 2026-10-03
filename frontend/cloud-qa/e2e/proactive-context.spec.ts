@@ -71,7 +71,11 @@ test('proactive context offers explicit locations and one actionable reference p
   await expect(layers).toHaveCount(1);
   await layers.scrollIntoViewIfNeeded();
   await readableMapLayers(layers);
-  await expect(page.getByText('Generadores', { exact: true })).toHaveCount(1);
+  // Report navigation and map filtering are different tasks. Both have this label;
+  // a third, passive map legend would still violate the unique-reference contract.
+  await expect(page.getByRole('navigation', { name: 'Tipos de reporte' }).getByRole('button', { name: 'Generadores', exact: true })).toHaveCount(1);
+  await expect(layers.getByRole('button', { name: 'Generadores', exact: true })).toHaveCount(1);
+  await expect(page.getByText('Generadores', { exact: true })).toHaveCount(2);
   for (const [label, glyph, symbol] of [['Generadores', 'factory', 'generador'], ['Transportistas', 'truck', 'transportista'], ['Op. Fijos', 'flask-conical', 'operador'], ['Op. In Situ', 'flask-conical', 'operador'], ['Inspecciones', 'clipboard-check', 'inspeccion']]) {
     const button = layers.getByRole('button', { name: label, exact: true });
     await expect(button).toHaveAttribute('aria-pressed', 'true');

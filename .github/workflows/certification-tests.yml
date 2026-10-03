@@ -203,6 +203,8 @@ jobs:
             /tmp/sitrep-night-20260926.cloud/e2e.json
             /tmp/sitrep-night-20260926.cloud/http.log
             /tmp/sitrep-night-20260926.cloud/e2e/**/monitor-*.png
+            /tmp/sitrep-night-20260926.cloud/e2e/proactive-context-*/**/*.png
+            /tmp/sitrep-night-20260926.cloud/e2e/proactive-context-*/**/error-context.md
             /tmp/sitrep-night-20260926.cloud/backend-unit.json
             /tmp/sitrep-night-20260926.cloud/frontend-unit.json
           retention-days: 3
