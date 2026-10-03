@@ -3,13 +3,31 @@ const checkpoint = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
 vi.mock('../../services/sessionCheckpoint', () => ({ readSessionCheckpoint: checkpoint.read, writeSessionCheckpoint: checkpoint.write }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { warning: vi.fn() } }));
 beforeEach(() => { vi.resetModules(); localStorage.clear(); checkpoint.read.mockReset(); checkpoint.write.mockReset().mockResolvedValue(undefined); });
+const token = (id: string, iat: number) => `header.${btoa(JSON.stringify({ id, iat, exp: iat + 3600 }))}.signature`;
 
 it('restores the acknowledged inspector instead of a stale administrator localStorage commit', async () => {
-  localStorage.setItem('sitrep_access_token', 'old-admin'); localStorage.setItem('sitrep_refresh_token', 'old-admin-refresh');
-  checkpoint.read.mockResolvedValue({ accessToken: 'inspector', refreshToken: 'inspector-refresh' });
+  localStorage.setItem('sitrep_access_token', token('admin', 10)); localStorage.setItem('sitrep_refresh_token', 'old-admin-refresh');
+  checkpoint.read.mockResolvedValue({ accessToken: token('inspector', 20), refreshToken: 'inspector-refresh' });
   const api = await import('../../services/api');
   await api.restoreSessionCheckpoint();
-  expect(api.getAccessToken()).toBe('inspector'); expect(api.getRefreshToken()).toBe('inspector-refresh');
+  expect(api.getAccessToken()).toBe(token('inspector', 20)); expect(api.getRefreshToken()).toBe('inspector-refresh');
+});
+
+it.each([20, 10])('never restores the administrator over a newer or ambiguous legacy login (iat %s)', async issued => {
+  localStorage.setItem('sitrep_access_token', token('inspector', issued));
+  localStorage.setItem('sitrep_refresh_token', 'new-inspector-refresh');
+  checkpoint.read.mockResolvedValue({ accessToken: token('admin', 10), refreshToken: 'old-admin-refresh' });
+  const api = await import('../../services/api');
+  await expect(api.restoreSessionCheckpoint()).rejects.toThrow('Session');
+  expect(api.getAccessToken()).toBeNull();
+  expect(checkpoint.write).toHaveBeenCalledWith(null);
+});
+
+it('an unversioned legacy logout must not resurrect a durable administrator', async () => {
+  checkpoint.read.mockResolvedValue({ accessToken: token('admin', 10), refreshToken: 'old-admin-refresh' });
+  const api = await import('../../services/api');
+  await expect(api.restoreSessionCheckpoint()).rejects.toThrow('Session');
+  expect(api.getAccessToken()).toBeNull(); expect(checkpoint.write).toHaveBeenCalledWith(null);
 });
 
 it('an acknowledged logout cannot resurrect the administrator from stale localStorage', async () => {

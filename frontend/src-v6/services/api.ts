@@ -104,6 +104,16 @@ export const clearTokensDurably = () => {
 export const confirmSessionCheckpoint = () => currentCheckpoint;
 
 let restoration: Promise<void> | undefined;
+const issuedAt = (token: string): number | null => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3 || !parts.every(Boolean)) return null;
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const claims = JSON.parse(atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, '=')));
+    return typeof claims.id === 'string' && claims.id.length > 0
+      && Number.isFinite(claims.iat) && claims.iat >= 0 ? claims.iat : null;
+  } catch { return null; }
+};
 export const restoreSessionCheckpoint = (): Promise<void> => {
   if (restoration) return restoration;
   const generation = sessionGeneration;
@@ -111,6 +121,19 @@ export const restoreSessionCheckpoint = (): Promise<void> => {
     try {
       const saved = await readSessionCheckpoint();
       if (generation !== sessionGeneration) return;
+      if (saved && getAccessToken() !== saved.accessToken) {
+        const localIssuedAt = issuedAt(getAccessToken() || '');
+        const savedIssuedAt = issuedAt(saved.accessToken);
+        // A legacy tab can still write or clear localStorage without updating
+        // IndexedDB. Only an unambiguously OLDER local token is a rollback we
+        // may recover. Newer, same-second, absent or malformed credentials fail
+        // closed, not silently back to the previous account. Decoding claims
+        // never authorizes anything; the restored JWT still needs getMe.
+        if (localIssuedAt === null || savedIssuedAt === null || localIssuedAt >= savedIssuedAt) {
+          await checkpoint(null, generation);
+          throw new Error('Session recovery conflict; sign in again');
+        }
+      }
       localStorage.removeItem(RENEWALS_KEY);
       endRefreshSession();
       if (saved) writeTokens(saved.accessToken, saved.refreshToken);
