@@ -287,7 +287,6 @@ jobs:
       VITE_API_URL: /api
       QA_API_URL: http://127.0.0.1:3037/api
       QA_ARTIFACTS: /tmp/sitrep-night-20260926.cloud
-      QA_TESTED_BUILD: ${{ runner.temp }}/sitrep-load-tested-build
       UPLOADS_DIR: /tmp/sitrep-night-20260926.cloud/uploads
       PGUSER: qa
     steps:
@@ -310,7 +309,7 @@ jobs:
           name: sitrep-tested-backend-37094888323-1
           github-token: ${{ github.token }}
           run-id: 37094888323
-          path: ${{ env.QA_TESTED_BUILD }}
+          path: ${{ runner.temp }}/sitrep-load-tested-build
       - name: Install only locked backend dependencies on disposable VM
         run: |
           npm ci --prefix backend
@@ -327,6 +326,8 @@ jobs:
           cd backend
           npx --no-install prisma db push --skip-generate
       - name: Actual 50-trip HTTP load and recovery, no browser or emulator
+        env:
+          QA_TESTED_BUILD: ${{ runner.temp }}/sitrep-load-tested-build
         run: node --experimental-strip-types frontend/cloud-qa/load-only.ts
       - name: Close only owned runtime and PostgreSQL
         if: always()
