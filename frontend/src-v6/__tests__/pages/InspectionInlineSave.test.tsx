@@ -8,6 +8,8 @@ import { toast } from '../../components/ui/Toast';
 import { startLocalDictation } from '../../services/localDictation';
 
 const queryMock = vi.hoisted(() => vi.fn());
+const checkpoint = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
+vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: checkpoint.read, writeInspectionFieldCheckpoint: checkpoint.write }));
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'inspector-1', rol: 'ADMIN' } }) }));
 vi.mock('../../hooks/useInspecciones', () => ({
@@ -39,7 +41,7 @@ const fixture: Inspection = {
 };
 
 function page(hash = '#checklist/DOC-01') {
-  return <MemoryRouter initialEntries={['/inspecciones/inspection-1' + hash]}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>;
+  return <MemoryRouter initialEntries={['/inspecciones/inspection-1' + hash]}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /><Route path="/inspecciones" element={<h1>Listado de inspecciones</h1>} /></Routes></MemoryRouter>;
 }
 const editor = () => screen.getByRole('textbox', { name: 'Observación: Documentación vigente' });
 const inline = () => within(screen.getByTestId('inspection-field-save-bar'));
@@ -47,12 +49,68 @@ const inline = () => within(screen.getByTestId('inspection-field-save-bar'));
 describe('shared explicit save for the complete inspection draft', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    checkpoint.read.mockResolvedValue(undefined); checkpoint.write.mockResolvedValue(undefined);
     localStorage.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     queryMock.mockReturnValue({ data: fixture, isLoading: false, refetch: vi.fn().mockResolvedValue({ data: fixture }) });
     vi.mocked(inspeccionService.saveDraft).mockResolvedValue({ version: 2 } as Inspection);
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('waits for a durable local copy before leaving, without claiming a server save', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    let confirm!: () => void;
+    checkpoint.write.mockImplementation(() => new Promise<void>(resolve => { confirm = resolve; }));
+    render(page());
+    const field = await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' });
+    fireEvent.change(field, { target: { value: 'Trabajo que no debe perderse al salir' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir de la inspección' }));
+    expect(screen.queryByRole('heading', { name: 'Listado de inspecciones' })).not.toBeInTheDocument();
+    expect(inline().getByText('Confirmando copia en este dispositivo…')).toBeInTheDocument();
+    expect(inline().queryByText('Guardando cambios en el servidor…')).not.toBeInTheDocument();
+    await act(async () => { confirm(); });
+    expect(await screen.findByRole('heading', { name: 'Listado de inspecciones' })).toBeInTheDocument();
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('stays in the form if leaving cannot confirm the device copy', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    checkpoint.write.mockRejectedValue(new Error('disk transaction aborted'));
+    render(page());
+    const field = await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' });
+    fireEvent.change(field, { target: { value: 'Conservar abierto hasta resolver' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar y salir de la inspección' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No se pudo proteger el borrador', expect.any(String)));
+    expect(field).toHaveValue('Conservar abierto hasta resolver');
+    expect(screen.queryByRole('heading', { name: 'Listado de inspecciones' })).not.toBeInTheDocument();
+  });
+
+  it('does not claim a confirmed local copy before the durable transaction finishes', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    let confirm!: () => void;
+    checkpoint.write.mockImplementation(() => new Promise<void>(resolve => { confirm = resolve; }));
+    render(page());
+    const field = await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' });
+    fireEvent.change(field, { target: { value: 'Texto todavía pendiente de commit' } });
+    fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(inline().queryByText(/Solo en este dispositivo/)).not.toBeInTheDocument();
+    await act(async () => { confirm(); });
+    expect(toast.info).toHaveBeenCalledWith('Guardado solo en este dispositivo', expect.any(String));
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('keeps field work intact and refuses a false local ACK when the durable write aborts', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    checkpoint.write.mockRejectedValue(new Error('transaction aborted'));
+    render(page());
+    const field = await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' });
+    fireEvent.change(field, { target: { value: 'Texto no confirmado en disco' } });
+    fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('No se pudo guardar', expect.stringContaining('solo en memoria')));
+    expect(toast.info).not.toHaveBeenCalled(); expect(toast.success).not.toHaveBeenCalled();
+    expect(field).toHaveValue('Texto no confirmado en disco');
+  });
 
   it('automatically protects an unsent spontaneous comment with no checklist items', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
@@ -103,7 +161,7 @@ describe('shared explicit save for the complete inspection draft', () => {
     render(page());
     fireEvent.change(await screen.findByRole('textbox', { name: 'Observación: Documentación vigente' }), { target: { value: 'Comentario sin señal.' } });
     fireEvent.click(inline().getByRole('button', { name: 'Guardar cambios' }));
-    expect(inline().getByText(/Solo en este dispositivo/)).toBeInTheDocument();
+    await waitFor(() => expect(inline().getByText(/Solo en este dispositivo/)).toBeInTheDocument());
     expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem(key) || '{}').items[0].observacion).toBe('Comentario sin señal.');
@@ -189,7 +247,7 @@ describe('shared explicit save for the complete inspection draft', () => {
     await act(async () => resolveSave({ version: 4 } as Inspection));
     expect(editor()).toHaveValue('Trabajo posterior.');
     expect(inline().queryByText('Guardado en servidor.')).not.toBeInTheDocument();
-    expect(inline().getByText(/Solo en este dispositivo/)).toBeInTheDocument();
+    await waitFor(() => expect(inline().getByText(/Solo en este dispositivo/)).toBeInTheDocument());
     expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({ version: 4, items: [{ observacion: 'Trabajo posterior.' }] });
   });
 });

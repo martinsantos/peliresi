@@ -426,6 +426,10 @@ try{
       // Await the application's observable local persistence, not an artificial
       // delay for Chrome to commit its profile to disk. No storage injection.
       await expect.poll(()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null')?.observaciones,key)).toBe(unsent);
+      // A localStorage renderer value is not a durable ACK. Require the actual
+      // application save status after its strict transaction, without injecting
+      // storage or adding a delay to favor Chrome's profile flush.
+      await expect(page.getByTestId('inspection-field-save-bar')).toContainText('Solo en este dispositivo');
       await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toHaveCount(0);
       await proof('unsent-field-comment-local');
     }catch(error){

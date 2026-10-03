@@ -46,6 +46,7 @@ import { OfflineDictation } from './OfflineDictation';
 import { appendDictatedText } from './appendDictatedText';
 import { InspectionLocationField } from './InspectionLocationField';
 import { inspectionLocationSuggestions } from './inspectionLocations';
+import { readInspectionFieldCheckpoint, writeInspectionFieldCheckpoint } from '../../services/inspectionFieldCheckpoint';
 
 const LABELS: Record<InspectionState, string> = { BORRADOR: 'Borrador', PLANIFICADA: 'Planificada', EN_CAMPO: 'En campo', EN_REVISION: 'En revisión', NOTIFICADA: 'Notificada', EN_DESCARGO: 'En descargo', REQUIERE_SUBSANACION: 'Requiere subsanación', CERRADA_CONFORME: 'Cerrada conforme', DERIVADA_LEGALES: 'Derivada a legales', EN_TRAMITE_LEGAL: 'En trámite legal', DERIVADA_ATM: 'Derivada a ATM', FINALIZADA: 'Finalizada', CANCELADA: 'Cancelada' };
 const COLORS: Partial<Record<InspectionState, BadgeColor>> = { BORRADOR: 'neutral', PLANIFICADA: 'info', EN_CAMPO: 'primary', EN_REVISION: 'warning', NOTIFICADA: 'info', EN_DESCARGO: 'warning', REQUIERE_SUBSANACION: 'error', CERRADA_CONFORME: 'success', DERIVADA_LEGALES: 'error', EN_TRAMITE_LEGAL: 'warning', DERIVADA_ATM: 'warning', FINALIZADA: 'success', CANCELADA: 'neutral' };
@@ -155,17 +156,22 @@ const InspeccionExpedientePage: React.FC = () => {
   const [pendingEvidenceReadFailed, setPendingEvidenceReadFailed] = useState(true);
   const [staleDraft, setStaleDraft] = useState<Draft | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [leavingDraft, setLeavingDraft] = useState(false);
   const [serverFingerprint, setServerFingerprint] = useState('');
   const serverFingerprintRef = useRef('');
   serverFingerprintRef.current = serverFingerprint;
   const [localFingerprint, setLocalFingerprint] = useState('');
   const [storageFailed, setStorageFailed] = useState(false);
+  const [draftReadyKey, setDraftReadyKey] = useState('');
+  const [draftReadAttempt, setDraftReadAttempt] = useState(0);
+  const checkpointSequenceRef = useRef(0);
+  const checkpointTimeRef = useRef(0);
+  const checkpointConfirmationRef = useRef<Promise<boolean>>(Promise.resolve(false));
   const [saveFailed, setSaveFailed] = useState(false);
   const savingDraftRef = useRef(false);
   const confirmedVersionRef = useRef(0);
   const hydratedCaseRef = useRef('');
-  const hasOwnedDraftRef = useRef(false);
-  const ownedDraftKeyRef = useRef('');
+  const loadedDraftScopeRef = useRef('');
   const recoveredDraftNeedsSyncRef = useRef(false);
   const previousOnlineRef = useRef(isOnline);
   const currentDraftRef = useRef<Draft | null>(null);
@@ -188,8 +194,11 @@ const InspeccionExpedientePage: React.FC = () => {
   const reportEditAllowed = Boolean(inspection && (fieldEditAllowed || (inspection.estado === 'EN_REVISION' && (isAdmin || isAssignedInspector))));
   const draftOwnership = useInspectionDraftOwnership(draftKey, fieldEditAllowed || reportEditAllowed);
   const canWriteDraft = draftOwnership.canWrite;
-  const canEdit = fieldEditAllowed && draftOwnership.status === 'owned';
-  const canEditReport = reportEditAllowed && draftOwnership.status === 'owned';
+  const hydrationKey = `${draftKey}:${inspection?.id || ''}:${inspection?.version || 0}:${draftOwnership.status}`;
+  const readyKey = `${draftKey}:${inspection?.id || ''}:${draftOwnership.status}`;
+  const draftReady = draftReadyKey === readyKey;
+  const canEdit = fieldEditAllowed && draftOwnership.status === 'owned' && draftReady;
+  const canEditReport = reportEditAllowed && draftOwnership.status === 'owned' && draftReady;
   const currentDraft: Draft | null = inspection ? { version: Math.max(inspection.version, confirmedVersionRef.current), observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparaciones: comparisons } : null;
   currentDraftRef.current = currentDraft;
   const currentFingerprint = currentDraft ? draftFingerprint(currentDraft) : '';
@@ -199,61 +208,90 @@ const InspeccionExpedientePage: React.FC = () => {
     try {
       // Persist provenance together with the fields, not in a second key that
       // could reach disk at a different time or belong to another inspection.
-      localStorage.setItem(draftKey, JSON.stringify({ ...draft, baseFingerprint: serverFingerprintRef.current }));
-      setLocalFingerprint(draftFingerprint(draft));
-      setStorageFailed(false);
+      checkpointTimeRef.current = Math.max(Date.now(), checkpointTimeRef.current + 1);
+      const raw = JSON.stringify({ ...draft, baseFingerprint: serverFingerprintRef.current, checkpointAt: checkpointTimeRef.current });
+      localStorage.setItem(draftKey, raw);
+      const sequence = ++checkpointSequenceRef.current;
+      const scope = evidenceScopeRef.current;
+      checkpointConfirmationRef.current = writeInspectionFieldCheckpoint(draftKey, raw).then(() => {
+        if (evidenceScopeRef.current === scope && checkpointSequenceRef.current === sequence) {
+          setLocalFingerprint(draftFingerprint(draft)); setStorageFailed(false);
+        }
+        return true;
+      }).catch(() => {
+        if (evidenceScopeRef.current === scope && checkpointSequenceRef.current === sequence) setStorageFailed(true);
+        return false;
+      });
       return true;
-    } catch { setStorageFailed(true); return false; }
+    } catch { setStorageFailed(true); checkpointConfirmationRef.current = Promise.resolve(false); return false; }
   }, [canWriteDraft, draftKey]);
 
   useEffect(() => { const on = () => setIsOnline(true); const off = () => setIsOnline(false); window.addEventListener('online', on); window.addEventListener('offline', off); return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); }; }, []);
   useEffect(() => {
     if (!inspection || savingDraftRef.current || syncingRef.current || transitionInFlight.current) return;
-    const hydrationKey = `${draftKey}:${inspection.id}:${inspection.version}`;
+    if (draftOwnership.status !== 'owned') loadedDraftScopeRef.current = '';
     // Query refetches can replace the object without advancing its version.
     // Never apply that same server snapshot over unsaved field edits.
     if (hydratedCaseRef.current === hydrationKey) return;
-    hydratedCaseRef.current = hydrationKey;
+    let active = true;
+    const hydrate = async () => {
     const draft = draftFromInspection(inspection);
+    try {
+    const continuing = loadedDraftScopeRef.current === draftKey && draftOwnership.status === 'owned';
+    const durable = !continuing && draftKey ? await readInspectionFieldCheckpoint(draftKey) : undefined;
+    if (!active) return;
+    const latest = currentDraftRef.current;
+    const inMemory = continuing && latest && draftFingerprint(latest) !== serverFingerprintRef.current
+      ? JSON.stringify({ ...latest, version: confirmedVersionRef.current, baseFingerprint: serverFingerprintRef.current }) : null;
     recoveredDraftNeedsSyncRef.current = false;
     confirmedVersionRef.current = inspection.version;
     setServerFingerprint(draftFingerprint(draft));
     setStaleDraft(null);
-    if (draftKey) try {
-      const raw = localStorage.getItem(draftKey);
+    if (draftKey) {
+      const journal = localStorage.getItem(draftKey);
+      let raw = inMemory || (durable === undefined ? journal : durable);
+      if (durable && journal && durable !== journal) {
+        const committed = JSON.parse(durable), recent = JSON.parse(journal);
+        // A renderer journal may contain keystrokes newer than its last durable
+        // commit. An older Chrome disk journal must never replace that commit.
+        if (typeof recent.checkpointAt === 'number' && typeof committed.checkpointAt === 'number'
+          && recent.checkpointAt > committed.checkpointAt) raw = journal;
+        else if (typeof recent.checkpointAt !== 'number') {
+          const legacy = reconcileStoredDraft(recent, draft);
+          if (!legacy.compatible || draftConflicts(draft, legacy.draft).length > 0) setStaleDraft(legacy.draft);
+        }
+      }
+      if (!continuing && raw && raw !== durable) {
+        await writeInspectionFieldCheckpoint(draftKey, raw);
+        if (!active) return;
+      }
       if (raw !== null) {
+        if (raw === undefined) throw new Error('Copia local inválida');
         const stored = reconcileStoredDraft(JSON.parse(raw), draft);
+        const timestamp = JSON.parse(raw).checkpointAt;
+        if (typeof timestamp === 'number' && Number.isFinite(timestamp)) checkpointTimeRef.current = Math.max(checkpointTimeRef.current, timestamp);
         if (stored.compatible) {
-          recoveredDraftNeedsSyncRef.current = draftFingerprint(stored.draft) !== draftFingerprint(draft);
+          recoveredDraftNeedsSyncRef.current = !continuing && draftFingerprint(stored.draft) !== draftFingerprint(draft);
           Object.assign(draft, stored.draft);
+          if (!continuing) setLocalFingerprint(draftFingerprint(stored.draft));
         } else {
           // Incompatible/older shape stays available for explicit recovery.
           setStaleDraft(stored.draft);
         }
       }
-    } catch { setStaleDraft({ ...draft, items: [], comparaciones: [] }); setStorageFailed(true); }
+    }
     setItems(draft.items); setComparisons(draft.comparaciones); setObservaciones(draft.observaciones); setNumeroActa(draft.numeroActa); setUbicacion(draft.ubicacion); setPlazoRespuestaAt(draft.plazoRespuestaAt); setDatosActa(draft.datosActa); setInformeTecnico(draft.informeTecnico);
+    hydratedCaseRef.current = hydrationKey;
+    if (draftOwnership.status === 'owned') loadedDraftScopeRef.current = draftKey;
+    setStorageFailed(false); setDraftReadyKey(readyKey);
+    } catch { if (active) { hydratedCaseRef.current = ''; setStorageFailed(true); setDraftReadyKey(''); } }
+    };
+    void hydrate();
+    return () => { active = false; };
     // Ownership can move from checking to owned after the inspector starts
     // typing. That status change must never rehydrate stale server values over
     // the in-progress field draft.
-  }, [inspection, draftKey]);
-  useEffect(() => {
-    if (ownedDraftKeyRef.current !== draftKey) { ownedDraftKeyRef.current = draftKey; hasOwnedDraftRef.current = false; }
-    if (draftOwnership.status !== 'owned' || hasOwnedDraftRef.current || !inspection || !draftKey) return;
-    hasOwnedDraftRef.current = true;
-    // A read-only tab may have loaded an older device copy while the owner
-    // continued working. On first ownership, take the latest protected copy.
-    try {
-      const raw = localStorage.getItem(draftKey);
-      if (raw === null) return;
-      const saved = reconcileStoredDraft(JSON.parse(raw), draftFromInspection(inspection));
-      if (!saved.compatible) { setStaleDraft(saved.draft); return; }
-      setItems(saved.draft.items); setComparisons(saved.draft.comparaciones); setObservaciones(saved.draft.observaciones);
-      setNumeroActa(saved.draft.numeroActa); setUbicacion(saved.draft.ubicacion); setPlazoRespuestaAt(saved.draft.plazoRespuestaAt);
-      setDatosActa(saved.draft.datosActa); setInformeTecnico(saved.draft.informeTecnico);
-      setLocalFingerprint(draftFingerprint(saved.draft));
-    } catch { setStaleDraft({ ...draftFromInspection(inspection), items: [], comparaciones: [] }); setStorageFailed(true); }
-  }, [draftOwnership.status, inspection, draftKey]);
+  }, [inspection, draftKey, hydrationKey, readyKey, draftOwnership.status, draftReadAttempt, savingDraft, syncingEvidence, changingStage, leavingDraft]);
   useEffect(() => {
     // Spontaneous inspections can have no checklist. Their field testimony
     // needs the same automatic device backup as an actor-bound inspection.
@@ -348,7 +386,7 @@ const InspeccionExpedientePage: React.FC = () => {
     syncingRef.current = true; setSyncingEvidence(true);
     try {
     const entries = await listPendingInspectionEvidence(id, String(currentUser.id));
-    const hasStoredDraft = Boolean(currentDraftRef.current?.items.length && serverFingerprintRef.current && draftFingerprint(currentDraftRef.current) !== serverFingerprintRef.current);
+    const hasStoredDraft = Boolean(currentDraftRef.current && serverFingerprintRef.current && draftFingerprint(currentDraftRef.current) !== serverFingerprintRef.current);
     if (!entries.length && !hasStoredDraft) return;
     let synchronized = 0;
       if (hasStoredDraft) {
@@ -390,9 +428,10 @@ const InspeccionExpedientePage: React.FC = () => {
 
   const save = async (fromSync = false): Promise<boolean> => {
     const submitted = currentDraftRef.current;
-    if (!submitted || !canWriteDraft() || staleDraft || savingDraftRef.current || (!fromSync && (syncingRef.current || transitionInFlight.current))) return false;
-    const locallyProtected = storeDraft(submitted);
+    if (!submitted || !draftReady || !canWriteDraft() || staleDraft || savingDraftRef.current || (!fromSync && (syncingRef.current || transitionInFlight.current))) return false;
+    const journaled = storeDraft(submitted);
     if (!isOnline || !navigator.onLine) {
+      const locallyProtected = journaled && await checkpointConfirmationRef.current;
       if (locallyProtected) toast.info('Guardado solo en este dispositivo', 'El servidor aún no lo recibió. Se reintentará al recuperar conexión.');
       else toast.error('No se pudo guardar', 'Sin conexión y sin almacenamiento disponible. No cierre esta pantalla: el comentario sigue solo en memoria.');
       return false;
@@ -417,7 +456,7 @@ const InspeccionExpedientePage: React.FC = () => {
     } catch (error: unknown) {
       if (!canWriteDraft() || evidenceScopeRef.current !== evidenceScope) return false;
       setSaveFailed(true);
-      const protectedNow = currentDraftRef.current ? storeDraft(currentDraftRef.current) : false;
+      const protectedNow = currentDraftRef.current ? storeDraft(currentDraftRef.current) && await checkpointConfirmationRef.current : false;
       toast.error('No se confirmó el guardado', inspectionErrorMessage(error, protectedNow ? 'Los cambios están solo en este dispositivo. Reintente antes de finalizar.' : 'No cierre la pantalla: no hay una copia local confirmada.'));
       // A lost response or another device may have advanced the version. Keep
       // the draft and require reconciliation rather than silently overwriting.
@@ -443,7 +482,10 @@ const InspeccionExpedientePage: React.FC = () => {
       await transitionMutation.mutateAsync({ next, version: confirmedVersionRef.current });
       // The field snapshot stays recoverable until the transition is confirmed.
       // A failed transition never removes the only local copy.
-      if (canWriteDraft() && draftKey) localStorage.removeItem(draftKey);
+      if (canWriteDraft() && draftKey) {
+        try { await writeInspectionFieldCheckpoint(draftKey, null); localStorage.removeItem(draftKey); }
+        catch { toast.warning('Copia local pendiente de cerrar', 'El servidor confirmó el cambio de etapa; no se pudo retirar la copia de este dispositivo.'); }
+      }
       toast.success('Estado actualizado', next === 'NOTIFICADA' ? 'Expediente aprobado; no se envió correo externo.' : LABELS[next]);
       return true;
     } catch (error: unknown) { toast.error('Acción rechazada', inspectionErrorMessage(error, 'No se pudo cambiar el estado.')); return false; }
@@ -612,14 +654,17 @@ const InspeccionExpedientePage: React.FC = () => {
     toast.warning('Conflicto conciliado', selected.size ? `${selected.size} cambios del dispositivo quedaron listos para revisar y guardar.` : 'Se mantuvo la versión del servidor.');
   };
 
-  const discardStaleDraft = () => {
+  const discardStaleDraft = async () => {
     if (!canWriteDraft()) return;
-    if (draftKey) localStorage.removeItem(draftKey);
+    try { if (draftKey) { await writeInspectionFieldCheckpoint(draftKey, null); localStorage.removeItem(draftKey); } }
+    catch { toast.error('No se confirmó el descarte local', 'El borrador sigue disponible. Reintentá sin cerrar esta pantalla.'); return; }
     setStaleDraft(null);
     toast.info('Borrador anterior descartado', 'Se conserva la versión actualmente registrada en el servidor.');
   };
 
-  if (query.isLoading) return <p className="p-8 text-center text-sm text-neutral-500">Cargando expediente…</p>;
+  const scopeReady = inspection && draftReadyKey.startsWith(`${draftKey}:${inspection.id}:`);
+  if (query.isLoading || (inspection && !scopeReady && !storageFailed)) return <p className="p-8 text-center text-sm text-neutral-500">Cargando expediente y copia local…</p>;
+  if (inspection && !draftReady && storageFailed) return <Card role="alert" className="mx-auto max-w-xl p-6"><h2 className="text-lg font-bold text-neutral-900">No se pudo verificar la copia local</h2><p className="mt-2 text-sm text-neutral-600">No se reemplazó tu trabajo con la versión del servidor. Reintentá la lectura antes de editar.</p><div className="mt-5 flex flex-wrap gap-2"><Button onClick={() => { setStorageFailed(false); setDraftReadAttempt(value => value + 1); }}>Reintentar copia local</Button><Button variant="outline" onClick={() => navigate((mobile ? '/mobile' : '') + '/inspecciones')}>Volver al listado</Button></div></Card>;
   if (query.isError) {
     const status = isAxiosError(query.error) ? query.error.response?.status : undefined;
     const offlineMissing = isOfflineNetworkError(query.error);
@@ -659,6 +704,8 @@ const InspeccionExpedientePage: React.FC = () => {
   };
   const saveStatus: DraftSaveStatus = guided && draftOwnership.status !== 'owned'
     ? { tone: 'neutral', message: draftOwnership.status === 'blocked' ? 'Solo consulta: otra pestaña tiene el borrador.' : draftOwnership.status === 'checking' ? 'Comprobando disponibilidad del borrador…' : 'Edición no disponible en este navegador.' }
+    : leavingDraft
+    ? { tone: 'neutral', message: 'Confirmando copia en este dispositivo…' }
     : savingDraft
     ? { tone: 'neutral', message: 'Guardando cambios en el servidor…' }
     : staleDraft
@@ -672,7 +719,7 @@ const InspeccionExpedientePage: React.FC = () => {
             : localFingerprint === currentFingerprint
               ? { tone: 'warning', message: 'Solo en este dispositivo · falta guardar en servidor.' }
               : { tone: 'warning', message: 'Falta guardar en servidor.' };
-  const saveDisabled = !canWriteDraft() || Boolean(staleDraft) || syncingEvidence || changingStage;
+  const saveDisabled = !draftReady || !canWriteDraft() || Boolean(staleDraft) || syncingEvidence || changingStage || leavingDraft;
   const draftInspection = { ...inspection, items, comparaciones: comparisons, informeTecnico, datosActa, numeroActa, ubicacion, observaciones };
   const context = <div className="space-y-6">
     <InspectionOrganizationPanel key={`${inspection.id}:${inspection.version}`} onPendingChange={setOrganizationPending} inspection={inspection} admin={isAdmin} backPath={`${mobile ? '/mobile' : ''}/inspecciones`} disabled={!isOnline || currentFingerprint !== serverFingerprint || Boolean(staleDraft) || pendingEvidence.length > 0 || recording || savingDraft || syncingEvidence || !canWriteDraft()} />
@@ -736,12 +783,21 @@ const InspeccionExpedientePage: React.FC = () => {
     : pendingEvidence.length ? `${pendingEvidence.length} capturas por enviar${!isOnline ? ' · sin conexión' : ''}`
       : !isOnline ? 'Sin conexión · podés seguir registrando.'
         : '';
-  const pauseFieldWork = () => {
-    if (recording || dictating || uploadingItemId || syncingEvidence || savingDraft || changingStage || pendingEvidenceReadFailed) return;
+  const pauseFieldWork = async () => {
+    if (recording || dictating || uploadingItemId || syncingEvidence || savingDraftRef.current || changingStage || pendingEvidenceReadFailed) return;
     if (organizationPending && !window.confirm('Los cambios de organización todavía no están guardados. ¿Salir sin confirmarlos? Los datos de campo se conservan por separado.')) return;
-    if (!staleDraft && currentDraftRef.current && canWriteDraft() && !storeDraft(currentDraftRef.current)) {
-      toast.error('No se pudo proteger el borrador', 'Conservá esta pantalla abierta y guardá con conexión.');
-      return;
+    if (!staleDraft && currentDraftRef.current && canWriteDraft()) {
+      const departing = draftFingerprint(currentDraftRef.current);
+      const journaled = storeDraft(currentDraftRef.current);
+      savingDraftRef.current = true; setLeavingDraft(true);
+      let protectedCopy: boolean;
+      try { protectedCopy = journaled && await checkpointConfirmationRef.current; }
+      finally { savingDraftRef.current = false; setLeavingDraft(false); }
+      if (!canWriteDraft() || evidenceScopeRef.current !== evidenceScope) return;
+      if (!protectedCopy) { toast.error('No se pudo proteger el borrador', 'Conservá esta pantalla abierta y guardá con conexión.'); return; }
+      if (currentDraftRef.current && draftFingerprint(currentDraftRef.current) !== departing) {
+        toast.info('Hay cambios posteriores', 'Terminá de registrar el comentario y volvé a guardar y salir.'); return;
+      }
     }
     // A quick exit can beat the scroll observer. Record the actual open control
     // synchronously, including a control that has just stopped being pending.
@@ -802,7 +858,7 @@ const InspeccionExpedientePage: React.FC = () => {
       <div data-testid="inspection-field-save-bar" className="flex min-w-0 items-center gap-2 sm:gap-4">
         <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-1 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
         <Button aria-label={canEdit ? 'Guardar cambios' : 'Guardar informe'} className="shrink-0 max-sm:px-3" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onClick={() => { void save(); }}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{canEdit ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
-        <Button variant="ghost" title="Salir y retomar" className="h-11 w-11 shrink-0 px-0 sm:w-auto sm:px-3" aria-label="Guardar y salir de la inspección" leftIcon={<ArrowLeft size={18} />} disabled={recording || dictating || uploadingItemId !== null || syncingEvidence || savingDraft || changingStage || pendingEvidenceReadFailed} onClick={pauseFieldWork}><span className="hidden sm:inline">Salir y retomar</span></Button>
+        <Button variant="ghost" title="Salir y retomar" className="h-11 w-11 shrink-0 px-0 sm:w-auto sm:px-3" aria-label="Guardar y salir de la inspección" leftIcon={<ArrowLeft size={18} />} disabled={!draftReady || recording || dictating || uploadingItemId !== null || syncingEvidence || savingDraft || leavingDraft || changingStage || pendingEvidenceReadFailed} onClick={pauseFieldWork}><span className="hidden sm:inline">Salir y retomar</span></Button>
       </div> : undefined} /></fieldset>
     <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept={INSPECTION_PHOTO_ACCEPT} capture="environment" className="hidden" onChange={uploadFromInput} />
     <input ref={fileRef} aria-label="Adjuntar archivo general" type="file" accept={INSPECTION_EVIDENCE_ACCEPT} className="hidden" onChange={uploadFromInput} />

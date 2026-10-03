@@ -6,6 +6,8 @@ import type { Inspection } from '../../types/inspection';
 import Page from '../../pages/inspecciones/InspeccionExpedientePage';
 
 const service = vi.hoisted(() => ({ get: vi.fn(), saveDraft: vi.fn(), transition: vi.fn() }));
+const checkpoint = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
+vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: checkpoint.read, writeInspectionFieldCheckpoint: checkpoint.write }));
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }));
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'qa-inspector', rol: 'GENERADOR', esInspector: true, nombre: 'QA inspector' } }),
@@ -80,6 +82,7 @@ async function reopen(tree: ReturnType<typeof mount>, durableCopy: string) {
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); installLocks(); server = fixture();
+  checkpoint.read.mockResolvedValue(undefined); checkpoint.write.mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   service.get.mockImplementation(async () => structuredClone(server));
   service.saveDraft.mockImplementation(async (_id, payload) => {
@@ -101,6 +104,69 @@ afterEach(async () => {
 });
 
 describe('inspection process restart with real asynchronous draft ownership', () => {
+  it.each([false, true])('does not discard unproven legacy edits alongside a durable snapshot (edited=%s)', async edited => {
+    const tree = mount(); await editor(); fireEvent(window, new Event('pagehide'));
+    const journal = JSON.parse(localStorage.getItem(key)!);
+    delete journal.checkpointAt;
+    if (edited) journal.observaciones = 'Edición de un cliente anterior';
+    server = { ...server, version: 2, observaciones: 'Servidor actual confirmado' };
+    checkpoint.read.mockResolvedValue(JSON.stringify({ ...journal, version: 2, observaciones: server.observaciones, checkpointAt: Date.now() + 1 }));
+    await reopen(tree, JSON.stringify(journal));
+    if (edited) expect(await screen.findByText('Hay un borrador anterior sin conciliar')).toBeVisible();
+    else {
+      expect(await editor()).toHaveValue('Servidor actual confirmado');
+      expect(screen.queryByText('Hay un borrador anterior sin conciliar')).not.toBeInTheDocument();
+    }
+    expect(service.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('synchronizes a recovered spontaneous testimony with no checklist when connectivity returns', async () => {
+    server.items = [];
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    mount();
+    const field = await editor();
+    fireEvent.change(field, { target: { value: 'Hallazgo espontáneo sin checklist ni ACK' } });
+    fireEvent(window, new Event('pagehide'));
+    await waitFor(() => expect(checkpoint.write).toHaveBeenCalled());
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    fireEvent(window, new Event('online'));
+    await waitFor(() => expect(service.saveDraft).toHaveBeenCalled());
+    expect(server.observaciones).toBe('Hallazgo espontáneo sin checklist ni ACK');
+    expect(server.items).toEqual([]);
+  });
+
+  it('does not expose an older server editor when the durable copy cannot be read, and can retry', async () => {
+    checkpoint.read.mockRejectedValue(new Error('storage unavailable'));
+    mount();
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo verificar la copia local');
+    expect(screen.queryByLabelText('Descripción de la denuncia o hallazgo')).not.toBeInTheDocument();
+    expect(service.saveDraft).not.toHaveBeenCalled();
+    checkpoint.read.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar copia local' }));
+    expect(await editor()).toHaveValue('Descripción inicial QA');
+  });
+
+  it('does not resurrect an explicitly discarded draft from an older localStorage disk journal', async () => {
+    const tree = mount(); await editor(); fireEvent(window, new Event('pagehide'));
+    const oldJournal = localStorage.getItem(key)!;
+    checkpoint.read.mockResolvedValue(null);
+    await reopen(tree, JSON.stringify({ ...JSON.parse(oldJournal), observaciones: 'Texto descartado' }));
+    expect(await editor()).toHaveValue('Descripción inicial QA');
+    expect(service.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('recovers the confirmed device copy when Android restores an older localStorage journal', async () => {
+    const tree = mount(); await editor(); fireEvent(window, new Event('pagehide'));
+    const oldJournal = localStorage.getItem(key)!;
+    const latest = { ...JSON.parse(oldJournal), observaciones: 'Hallazgo nuevo sin ACK del servidor' };
+    checkpoint.read.mockResolvedValue(JSON.stringify(latest));
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    await reopen(tree, oldJournal);
+    expect(await editor()).toHaveValue(latest.observaciones);
+    expect(server.observaciones).toBe('Descripción inicial QA');
+    expect(service.saveDraft).not.toHaveBeenCalled();
+  });
+
   it('uses the current server copy when force-stop restores an unchanged old snapshot', async () => {
     const tree = mount(); await editor();
     fireEvent(window, new Event('pagehide'));

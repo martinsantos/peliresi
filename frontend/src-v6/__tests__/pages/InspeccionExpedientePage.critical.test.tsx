@@ -6,6 +6,7 @@ import type { Inspection, InspectionTechnicalReport } from '../../types/inspecti
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
 
 const useInspectionMock = vi.hoisted(() => vi.fn());
+vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined), writeInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined) }));
 const listPendingEvidenceMock = vi.hoisted(() => vi.fn());
 const transitionMock = vi.hoisted(() => vi.fn());
 const draftOwnershipMock = vi.hoisted(() => vi.fn());

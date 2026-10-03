@@ -8,6 +8,7 @@ import { toast } from '../../components/ui/Toast';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
 
 const useInspectionMock = vi.hoisted(() => vi.fn());
+vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined), writeInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined) }));
 const canWrite = () => true;
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN', nombre: 'Admin' } }) }));
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite }) }));
@@ -60,7 +61,7 @@ async function renderRecorder(dirty = false) {
     <Route path="/mobile/inspecciones" element={<h1>Inspecciones disponibles</h1>} />
   </Routes></MemoryRouter>);
   if (dirty) fireEvent.change(await screen.findByLabelText('Registro de lo observado'), { target: { value: 'Hallazgo conservado tras el error de audio' } });
-  fireEvent.click(screen.getByRole('link', { name: 'Fotos y archivos', exact: true }));
+  fireEvent.click(await screen.findByRole('link', { name: 'Fotos y archivos', exact: true }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar y salir de la inspección' })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Grabar audio', exact: true }));
   expect(await screen.findByText('Grabando audio de campo')).toBeInTheDocument();
