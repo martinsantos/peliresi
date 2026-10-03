@@ -417,11 +417,28 @@ try{
     await context.setOffline(true);
     try{
       await page.locator('#inspection-observations').fill(unsent);
+      await expect(page.locator('#inspection-observations')).toHaveValue(unsent);
       // Await the application's observable local persistence, not an artificial
       // delay for Chrome to commit its profile to disk. No storage injection.
       await expect.poll(()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'null')?.observaciones,key)).toBe(unsent);
       await expect(page.getByText('Cambios confirmados en el servidor',{exact:true})).toHaveCount(0);
       await proof('unsent-field-comment-local');
+    }catch(error){
+      // Capture the live app before force-stop: a dead browser cannot explain
+      // why a local draft was absent. Read only this synthetic case's drafts,
+      // never credentials or other users' storage.
+      const state=await page.evaluate(({key,id})=>({
+        expectedKey:key,url:location.href,online:navigator.onLine,
+        visible:document.visibilityState,
+        field:{value:(document.querySelector('#inspection-observations') as HTMLTextAreaElement)?.value,
+          disabled:(document.querySelector('#inspection-observations') as HTMLTextAreaElement)?.disabled},
+        draftKeys:Object.keys(localStorage).filter(k=>k.startsWith('sitrep_inspection_draft_')&&k.endsWith('_'+id))
+          .map(k=>({key:k,draft:JSON.parse(localStorage.getItem(k)||'null')})),
+        feedback:Array.from(document.querySelectorAll('[role="alert"], [data-testid="inspection-field-save-bar"]')).map(el=>el.textContent),
+      }),{key,id:inspection.id});
+      await writeFile(path.join(output,'unsent-field-live-failure.json'),JSON.stringify(state,null,2));
+      await proof('unsent-field-live-failure');
+      throw error;
     }finally{await closeContext();}
     await launch();
     const [server]=await Promise.all([
