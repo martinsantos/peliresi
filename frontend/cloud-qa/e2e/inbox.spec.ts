@@ -24,6 +24,8 @@ test('operator opens a persisted proactive follow-up in the existing inbox witho
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('Revisar pesaje y tratamiento · Abrir manifiesto');
   const action = row.getByRole('button', { name: 'Abrir aviso: Seguimiento de manifiesto', exact: true });
+  await action.scrollIntoViewIfNeeded();
+  await expect(action).toBeInViewport({ ratio: 1 });
   expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('operator-proactive-followup.png'), animations: 'disabled' });
