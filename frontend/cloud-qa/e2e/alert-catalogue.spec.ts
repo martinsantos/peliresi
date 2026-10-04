@@ -146,7 +146,7 @@ test('expiry includes operator and two vehicle owners, concurrent retries dedupl
     try {
       const own = await context.newPage(); observe(own, errors); await login(own, info, 'operador'); await own.goto(prefix(info) + '/notificaciones');
       await own.getByRole('button', { name: 'Abrir aviso: ' + name, exact: true }).first().click(); await expect(own).toHaveURL(/\/mi-perfil$/);
-      await expect(own.getByRole('heading', { name: 'Mi Perfil', exact: true })).toBeVisible();
+      await expect(own.getByRole('heading', { name: 'Mi Perfil', level: 2, exact: true })).toBeVisible();
       await own.screenshot({ path: info.outputPath('catalogue-owner-profile.png'), animations: 'disabled' });
     } finally { await context.close(); }
     await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(Date.now() + 400 * 86400000) } });
