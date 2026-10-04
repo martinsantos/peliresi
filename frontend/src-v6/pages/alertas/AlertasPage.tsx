@@ -54,6 +54,8 @@ interface AlertaLocal {
   estadoActual?: string;
   evento?: string;
   estado: string;
+  notas?: string;
+  fechaResolucion?: string;
 }
 
 // ─── Visual config ────────────────────────────────────────────────────────────
@@ -358,6 +360,8 @@ export const AlertasPage: React.FC = () => {
           estadoActual: a.manifiesto?.estado,
           evento,
           estado,
+          notas: a.notas || undefined,
+          fechaResolucion: a.fechaResolucion || undefined,
         };
       });
   }, [isAnyAdmin, apiAlertas, apiNotifs]);
@@ -637,7 +641,6 @@ export const AlertasPage: React.FC = () => {
                         group relative bg-white rounded-xl border border-neutral-100 border-l-4 ${cfg.border}
                         flex items-start gap-3 px-4 py-3
                         transition-all hover:shadow-sm
-                        ${!alerta.leida ? '' : 'opacity-60'}
                       `}
                     >
                       {/* Icon */}
@@ -668,6 +671,7 @@ export const AlertasPage: React.FC = () => {
                             </div>
                             <p className="text-sm text-neutral-600 leading-snug">{alerta.mensaje}</p>
                             {isAnyAdmin && alerta.estadoActual && <p className="mt-1 text-xs text-neutral-600">Estado actual del manifiesto: {alerta.estadoActual.replaceAll('_', ' ').toLowerCase()}. El caso conserva la situación registrada al detectarlo.</p>}
+                            {isAnyAdmin && alerta.notas && <div className="mt-2 border-l-2 border-neutral-300 pl-3 text-sm text-neutral-700"><p className="font-medium">Última decisión{alerta.fechaResolucion ? ` · ${new Date(alerta.fechaResolucion).toLocaleString('es-AR')}` : ''}</p><p className="whitespace-pre-wrap break-words">{alerta.notas}</p></div>}
                           </div>
                           {/* Time + delete */}
                           <div className="flex items-center gap-2 shrink-0">

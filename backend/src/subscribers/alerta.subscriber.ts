@@ -65,8 +65,15 @@ async function dispararReglasAlerta(
     if (!matches) continue;
 
     const duplicateSince = new Date(Date.now() - 30 * 60 * 1000);
+    // Expirations have no manifest. Rule/null alone collapses different subjects.
+    // Existing event snapshots are JSON.stringify output: include the complete
+    // escaped key/value tokens, not an ID substring, and preserve the old window.
+    const expiryIdentity = eventoAlerta === 'VENCIMIENTO' && !manifiestoId
+      ? ['entidad', 'entidadId', 'vencimiento'].map(key => ({ datos: { contains: JSON.stringify({ [key]: datos[key] }).slice(1, -1) } }))
+      : [];
     const duplicate = await prisma.alertaGenerada.findFirst({
-      where: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, createdAt: { gte: duplicateSince } },
+      where: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, createdAt: { gte: duplicateSince },
+        ...(expiryIdentity.length ? { AND: expiryIdentity } : {}) },
       select: { id: true },
     });
     if (duplicate) continue;

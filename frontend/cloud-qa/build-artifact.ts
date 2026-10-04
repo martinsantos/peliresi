@@ -59,6 +59,10 @@ if (mode === 'freeze') {
   const http = await readJson('http-summary.json');
   assert.equal(http.passed, 53);
   assert.equal(http.failed, 0);
+  const expiry = await readJson('expiry-identity.json');
+  assert.equal(expiry.commit, process.env.GITHUB_SHA);
+  assert.equal(expiry.passed, 2); assert.equal(expiry.failed, 0);
+  assert.equal(expiry.compiledSubscriber, true); assert.equal(expiry.externalProvidersDisabled, true);
   // Existing journeys plus configured rule/case/inbox/resolution on all three surfaces.
   assert.equal(e2e.stats.expected, 117);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);

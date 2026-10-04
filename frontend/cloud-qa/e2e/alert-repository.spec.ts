@@ -26,7 +26,7 @@ test('configured rule -> read-only simulation -> persistent case -> operator not
     await page.getByRole('tab', { name: /Reglas/ }).click();
     await page.getByRole('button', { name: 'Nueva Regla', exact: true }).click();
     let dialog = page.getByRole('dialog', { name: 'Nueva Regla', exact: true });
-    await dialog.getByRole('combobox', { name: 'Tipo de regla', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Tipo de regla', exact: true }).click();
     await page.getByRole('option', { name: 'Manifiesto pendiente de tratamiento o cierre', exact: true }).click();
     await dialog.getByLabel('Nombre', { exact: true }).fill(name);
     await dialog.getByLabel('Días desde la recepción', { exact: true }).fill('15');
@@ -81,7 +81,10 @@ test('configured rule -> read-only simulation -> persistent case -> operator not
 
     const adminContext = await browser.newContext(options);
     try {
-      const admin = await adminContext.newPage(); await login(admin, info); await admin.goto(prefix(info) + '/alertas');
+      const admin = await adminContext.newPage(); await login(admin, info);
+      const initialCases = admin.waitForResponse(r => r.url().includes('/api/alertas?') && r.request().method() === 'GET');
+      await admin.goto(prefix(info) + '/alertas'); expect((await initialCases).status()).toBe(200);
+      await expect(admin.getByRole('article').first()).toBeVisible();
       const row = admin.getByRole('article', { name: 'Caso: ' + name + ' · ' + manifest.numero, exact: true });
       for (let i = 0; i < 25 && await row.count() === 0; i++) {
         const loaded = admin.waitForResponse(r => r.url().includes('/api/alertas?') && r.request().method() === 'GET');
@@ -92,7 +95,7 @@ test('configured rule -> read-only simulation -> persistent case -> operator not
       const manage = admin.getByRole('dialog', { name: 'Gestionar caso', exact: true });
       await manage.getByRole('button', { name: 'Guardar estado', exact: true }).click();
       await expect(manage.getByRole('alert')).toContainText('Registrá el motivo');
-      await manage.getByRole('combobox', { name: 'Estado del caso', exact: true }).click();
+      await manage.getByRole('button', { name: 'Estado del caso', exact: true }).click();
       await admin.getByRole('option', { name: 'Resuelta', exact: true }).click();
       await manage.getByLabel('Motivo del cambio').fill('QA: evidencia revisada, caso sintético resuelto');
       await readableFixedAction(manage.getByRole('button', { name: 'Guardar estado', exact: true }), manage);
@@ -100,6 +103,8 @@ test('configured rule -> read-only simulation -> persistent case -> operator not
       const resolution = admin.waitForResponse(r => r.url().endsWith('/api/alertas/' + caseId + '/resolver') && r.request().method() === 'PUT');
       await manage.getByRole('button', { name: 'Guardar estado', exact: true }).click(); expect((await resolution).status()).toBe(200);
       await expect(row).toContainText('Resuelta');
+      await expect(row).toContainText('QA: evidencia revisada, caso sintético resuelto');
+      await admin.screenshot({ path: info.outputPath('alert-resolved-case.png'), animations: 'disabled' });
       const snapshot = await db.alertaGenerada.findUniqueOrThrow({ where: { id: caseId } });
       expect(snapshot).toMatchObject({ estado: 'RESUELTA', resueltaPor: fixture.users.admin, notas: 'QA: evidencia revisada, caso sintético resuelto' });
       await evaluate(admin);

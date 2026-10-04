@@ -41,6 +41,12 @@ it('does not present an API failure as an empty repository', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar');
   expect(screen.queryByText('No hay alertas para los filtros seleccionados')).toBeNull();
 });
+it('shows the persisted decision reason on a resolved case without fading its readable content', async () => {
+  service.listAlertas.mockResolvedValue({ items: [{ ...caseRow, estado: 'RESUELTA', notas: 'Inspección confirmó cierre de tarea', fechaResolucion: '2026-10-04T12:00:00Z' }], total: 1, page: 1, limit: 10, totalPages: 1 });
+  setup();
+  expect(await screen.findByText(/Inspección confirmó cierre de tarea/)).toBeVisible();
+  expect(screen.getByRole('article').className).not.toContain('opacity-60');
+});
 it('sector administrators have no rule-write or evaluation controls', async () => {
   auth.isAdmin = false; setup(); await screen.findByRole('button', { name: 'Gestionar caso' });
   expect(screen.queryByRole('button', { name: 'Evaluar seguimiento ahora' })).toBeNull();

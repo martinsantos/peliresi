@@ -184,6 +184,8 @@ jobs:
         run: |
           cd backend
           npx --no-install ts-node tests/integration/night-http.ts > "$QA_ARTIFACTS/http.log" 2>&1
+      - name: Actual compiled expiry subscriber and isolated PostgreSQL identity checks
+        run: node --experimental-strip-types frontend/cloud-qa/alert-expiry-integration.ts
       - name: Actual web and app E2E, one browser worker, no fake auth
         env:
           QA_CONTEXT_ONLY: ${{ inputs.context_only }}
