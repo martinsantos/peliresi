@@ -69,6 +69,10 @@ function mount() {
 async function editor() {
   const input = await screen.findByLabelText('Descripción de la denuncia o hallazgo');
   await waitFor(() => expect(input).toBeEnabled());
+  // A synchronous DOM assertion can observe the enabled commit before React
+  // finishes its passive effects. Commit the real pagehide listener before
+  // simulating termination; do not wait for the 350ms automatic backup instead.
+  await act(async () => { await Promise.resolve(); });
   return input;
 }
 async function reopen(tree: ReturnType<typeof mount>, durableCopy: string) {

@@ -58,6 +58,10 @@ interface AlertaLocal {
 
 // ─── Visual config ────────────────────────────────────────────────────────────
 
+const estadoLabels: Record<string, string> = {
+  PENDIENTE: 'Pendiente', EN_REVISION: 'En revisión', RESUELTA: 'Resuelta', DESCARTADA: 'Descartada',
+};
+
 const tipoConfig = {
   critical: {
     icon: AlertCircle,
@@ -647,7 +651,7 @@ export const AlertasPage: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                               <span className="text-sm font-semibold text-neutral-800">{alerta.titulo}</span>
-                              {isAnyAdmin ? <Badge variant="soft" color={alerta.leida ? 'neutral' : 'warning'} size="sm">{{ PENDIENTE: 'Pendiente', EN_REVISION: 'En revisión', RESUELTA: 'Resuelta', DESCARTADA: 'Descartada' }[alerta.estado] || alerta.estado}</Badge> : !alerta.leida && (
+                              {isAnyAdmin ? <Badge variant="soft" color={alerta.leida ? 'neutral' : 'warning'} size="sm">{estadoLabels[alerta.estado] || alerta.estado}</Badge> : !alerta.leida && (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-100 text-primary-700 uppercase tracking-wide">
                                   Nueva
                                 </span>
@@ -924,6 +928,7 @@ export const AlertasPage: React.FC = () => {
             <Input label="Días desde la recepción" type="number" min={0} max={365} step={1} value={followupDays} onChange={event => { setPreview(null); setReglaForm(prev => ({ ...prev, condicion: JSON.stringify({ tipo: 'seguimiento_cierre', diasRecepcion: { gte: Number(event.target.value) } }) })); }} />
             <p className="text-sm text-neutral-600">Umbral operativo, no vencimiento legal. Se revisa diariamente a las 08:00 de Mendoza. Cero incluye todos los recibidos o en tratamiento.</p>
             <Button variant="outline" disabled={previewPending} onClick={async () => {
+              if (followupDays === null) return;
               const condition = reglaForm.condicion; setPreviewPending(true);
               try { setPreview({ condition, result: await alertaService.simularSeguimiento(followupDays) }); }
               catch { toast.error('No se pudo simular', 'Verificá los días y reintentá. No se crearon casos ni avisos.'); }
