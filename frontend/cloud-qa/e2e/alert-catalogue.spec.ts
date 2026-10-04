@@ -124,7 +124,8 @@ test('expiry includes operator and two vehicle owners, concurrent retries dedupl
     expect(await db.$queryRawUnsafe('SELECT current_database() AS name, inet_server_port() AS port, host(inet_server_addr()) AS address')).toEqual([{ name: 'sitrep_night_qa_20260926', port: 55440, address: '127.0.0.1' }]);
     const operator = await db.operador.findUniqueOrThrow({ where: { id: fixture.actors.operador } });
     restore.push(() => db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: operator.vencimientoHabilitacion } }));
-    await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(Date.now() - 86400000) } });
+    const recordedExpiry = new Date(Date.now() - 86400000);
+    await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: recordedExpiry } });
     const vehicles = [];
     for (const actor of [fixture.actors.transportista, fixture.actors.transportista2]) {
       const vehicle = await db.vehiculo.findFirstOrThrow({ where: { transportistaId: actor, activo: true } }); vehicles.push(vehicle);
@@ -160,11 +161,19 @@ test('expiry includes operator and two vehicle owners, concurrent retries dedupl
       const own = await context.newPage(); observe(own, errors); await login(own, info, 'operador'); await own.goto(prefix(info) + '/notificaciones');
       await own.getByRole('button', { name: 'Abrir aviso: ' + name, exact: true }).first().click(); await expect(own).toHaveURL(/\/mi-perfil$/);
       await expect(own.getByRole('heading', { name: 'Mi Perfil', level: 2, exact: true })).toBeVisible();
-      await expect(own.getByText(operator.razonSocial, { exact: true })).toBeVisible();
-      await expect(own.getByText(operator.cuit, { exact: true })).toBeVisible();
-      await expect(own.getByText('Fecha de habilitación registrada', { exact: true })).toBeVisible();
+      // Scope to the actual actor fields: the company also appears in the
+      // session sidebar and personal sector, neither proves this fetch worked.
+      const socialField = own.getByText('Razon Social', { exact: true }).locator('..').locator('..');
+      await expect(socialField.getByText(operator.razonSocial, { exact: true })).toBeVisible();
+      const cuitField = own.getByText('CUIT', { exact: true }).locator('..').locator('..');
+      await expect(cuitField.getByText(operator.cuit, { exact: true })).toBeVisible();
+      const dateField = own.getByText('Fecha de habilitación registrada', { exact: true }).locator('..');
+      const recordedDate = `${recordedExpiry.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false })} (Mendoza)`;
+      await expect(dateField.getByText(recordedDate, { exact: true })).toBeVisible();
       expect(await own.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
       await own.screenshot({ path: info.outputPath('catalogue-owner-profile.png'), animations: 'disabled' });
+      await dateField.scrollIntoViewIfNeeded();
+      await own.screenshot({ path: info.outputPath('catalogue-owner-profile-date.png'), animations: 'disabled' });
     } finally { await context.close(); }
     await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(Date.now() + 400 * 86400000) } });
     expect((await request(page, '/alertas/catalogo/evaluar', 'POST')).status()).toBe(200);
