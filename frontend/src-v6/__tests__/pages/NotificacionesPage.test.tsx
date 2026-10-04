@@ -39,6 +39,29 @@ describe('notification inbox states and interaction', () => {
     expect(screen.queryByText('Seguimiento finalizado · Ver historial')).toBeNull();
   });
 
+  it('preserves the configured follow-up name in visible text and its opening action', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice,
+      titulo: 'Revisión de tratamiento pendiente', manifiestoId: 'qa-manifest',
+      datos: JSON.stringify({ tipo: 'seguimiento_cierre', version: 1, casoId: 'case' }),
+      manifiesto: { numero: 'QA', estado: 'RECIBIDO' },
+    }] });
+    setup('/app/notificaciones');
+    expect(await screen.findByText('Revisión de tratamiento pendiente')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Revisión de tratamiento pendiente', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/manifiestos/qa-manifest');
+  });
+
+  it('keeps a useful default title for a legacy unnamed follow-up', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice,
+      titulo: '  ', manifiestoId: 'qa-manifest',
+      datos: JSON.stringify({ tipo: 'seguimiento_cierre', version: 1 }),
+      manifiesto: { numero: 'QA', estado: 'RECIBIDO' },
+    }] });
+    setup();
+    expect(await screen.findByRole('button', { name: 'Abrir aviso: Seguimiento de manifiesto', exact: true })).toBeVisible();
+    expect(screen.getByText('Seguimiento de manifiesto')).toBeVisible();
+  });
+
   it('keeps a closed follow-up as history rather than a current pending task and opens its actual manifest', async () => {
     service.list.mockResolvedValue({ ...response, items: [{ ...notice,
       titulo: 'Seguimiento de manifiesto', mensaje: 'QA seguimiento recibido hace 3 días', manifiestoId: 'qa-manifest',

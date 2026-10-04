@@ -124,6 +124,9 @@ const NotificacionesPage: React.FC = () => {
         <ul aria-label="Avisos" className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 bg-white">
           {items.map(notice => {
             const followup = notificationFollowup(notice);
+            // A configurable rule has an identity. Do not replace its saved
+            // name with a generic title; retain the fallback for legacy data.
+            const title = followup ? notice.titulo?.trim() || 'Seguimiento de manifiesto' : notice.titulo;
             const path = resolveNotificationPath(notice, mp(''));
             const linked = path !== mp('/notificaciones');
             const Content = linked ? 'button' : 'div';
@@ -132,11 +135,11 @@ const NotificacionesPage: React.FC = () => {
             const Icon = warning ? AlertTriangle : path.includes('/inspecciones/') ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
             return (
               <li key={notice.id} className={notice.leida ? '' : 'bg-primary-50/40'}>
-                <Content type={linked ? 'button' : undefined} aria-label={linked ? 'Abrir aviso: ' + (followup ? 'Seguimiento de manifiesto' : notice.titulo) : undefined} onClick={linked ? () => open(notice) : undefined}
+                <Content type={linked ? 'button' : undefined} aria-label={linked ? 'Abrir aviso: ' + title : undefined} onClick={linked ? () => open(notice) : undefined}
                   className={'flex w-full items-start gap-3 p-4 text-left text-neutral-900 ' + (linked ? 'transition-colors hover:bg-primary-50 active:bg-primary-100 focus-visible:outline-offset-[-2px] ' + focus : '')}>
                   <Icon size={20} aria-hidden="true" className={'mt-1 shrink-0 ' + (warning ? 'text-warning-800' : 'text-primary-800')} />
                   <span className="min-w-0 flex-1">
-                    <span className={'block break-words text-base leading-snug ' + (notice.leida ? 'font-medium' : 'font-semibold')}>{followup ? 'Seguimiento de manifiesto' : notice.titulo}</span>
+                    <span className={'block break-words text-base leading-snug ' + (notice.leida ? 'font-medium' : 'font-semibold')}>{title}</span>
                     {!notice.leida && <span className="mt-1 block text-xs font-semibold text-primary-800">Sin leer</span>}
                     {(notice.prioridad === 'ALTA' || notice.prioridad === 'URGENTE') && (
                       <Badge variant="soft" color="error" className="mt-1">{notice.prioridad === 'URGENTE' ? 'Urgente' : 'Prioridad alta'}</Badge>
