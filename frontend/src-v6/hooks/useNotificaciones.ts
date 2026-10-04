@@ -17,6 +17,9 @@ export function useNotificaciones(filters?: NotificacionFilters) {
   return useQuery({
     queryKey: KEYS.list(filters),
     queryFn: () => notificacionService.list(filters),
+    // Returning from a workflow must recheck its state, even within the global
+    // one-minute cache window. Offline still retains the last available record.
+    staleTime: 0,
   });
 }
 

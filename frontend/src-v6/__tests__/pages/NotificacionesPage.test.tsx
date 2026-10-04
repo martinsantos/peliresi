@@ -14,7 +14,7 @@ function Location() {
   return <><span data-testid="location">{href}</span><button onClick={() => navigate(-1)}>Test atrás</button></>;
 }
 function setup(path = '/notificaciones') {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 }, mutations: { retry: false } } });
   render(<QueryClientProvider client={client}><MemoryRouter basename={path.startsWith('/app/') ? '/app' : '/'} initialEntries={[path]}><NotificacionesPage /><Location /></MemoryRouter></QueryClientProvider>);
   return client;
 }
@@ -22,6 +22,12 @@ describe('notification inbox states and interaction', () => {
   beforeEach(() => {
     service.list.mockReset().mockResolvedValue(response);
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
+  });
+  it('does not reuse a supposedly fresh minute-old workflow state when reopening the inbox', async () => {
+    const client = setup();
+    await screen.findByText(notice.titulo);
+    const query = client.getQueryCache().find({ queryKey: ['notificaciones', 'list'], exact: false });
+    expect(query?.isStale()).toBe(true);
   });
 
   it('keeps a closed follow-up as history rather than a current pending task and opens its actual manifest', async () => {

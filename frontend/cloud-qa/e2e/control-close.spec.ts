@@ -35,6 +35,19 @@ async function visibleProof(page: Page, info: TestInfo, name: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 }
 
+async function separatedPlaybackControls(page: Page) {
+  const collisions = await page.locator('.wr-timeline-actions').evaluate(element => {
+    const controls = Array.from(element.querySelectorAll('button, input[type="range"]'))
+      .map(el => ({ name: el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent,
+        rect: el.getBoundingClientRect() })).filter(item => item.rect.width > 0 && item.rect.height > 0);
+    return controls.flatMap((left, i) => controls.slice(i + 1).filter(right =>
+      Math.min(left.rect.right, right.rect.right) - Math.max(left.rect.left, right.rect.left) > 1 &&
+      Math.min(left.rect.bottom, right.rect.bottom) - Math.max(left.rect.top, right.rect.top) > 1)
+      .map(right => [left.name, right.name]));
+  });
+  expect(collisions, 'Playback range/buttons must not overlap, including daily Auto').toEqual([]);
+}
+
 test('control center queries real layers, refreshes and opens the exact active inspection', async ({ page }, info) => {
   await login(page, info);
   const errors = health(page);
@@ -185,6 +198,7 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const timelineData = (await timelineResponse.json()).data;
   expect(timelineData.eventos.length).toBeGreaterThan(0);
   await expect(page.getByText('Creados', { exact: true })).toBeVisible();
+  await separatedPlaybackControls(page);
   const currentEvent=page.getByRole('button',{name:'Abrir detalle del evento actual'});
   await expect(currentEvent).toBeVisible();
   expect((await currentEvent.boundingBox())!.height).toBeLessThanOrEqual(56);
@@ -278,6 +292,7 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await page.getByRole('button', { name: 'Pausar historial', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reproducir historial', exact: true })).toBeVisible();
   await expect(period).toHaveText('Últimos 30 días');
+  await separatedPlaybackControls(page);
   await period.click(); await page.getByRole('option', { name: 'Últimos 30 días', exact: true }).press('Escape');
   await expect(page.getByRole('listbox')).toHaveCount(0);
   await expect(header.getByRole('button', { name: 'Historial', exact: true })).toBeVisible();

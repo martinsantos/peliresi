@@ -98,6 +98,10 @@
   .wr-summary > div { min-width: 0; }
   .wr-summary-separator { display: none; }
   .wr-timeline-actions { flex-wrap: wrap; flex-basis: 100%; gap: 8px; }
+  /* Own row: the range's minimum width must never protrude across Auto/speed. */
+  .wr-progress-control { flex-basis: 100%; order: 1; min-height: 44px; }
+  .wr-progress-control .wr-scrubber,
+  .wr-cinema .wr-progress-control .wr-scrubber { height: 44px; background: transparent; }
   .wr-layout-header { position: sticky; top: 0; }
   .wr-layout-sidebar { min-height: auto; overflow: visible; border-right: 0; }
   .wr-dashboard { height: auto; overflow: visible; }
