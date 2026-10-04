@@ -450,6 +450,7 @@ export interface CreateReglaAlertaRequest {
   evento: string;
   condicion: string;
   destinatarios: string;
+  activa?: boolean;
 }
 
 export interface AlertaFilters {
@@ -457,6 +458,8 @@ export interface AlertaFilters {
   reglaId?: string;
   page?: number;
   limit?: number;
+  evento?: string;
+  fechaDesde?: string;
 }
 
 // ========================================

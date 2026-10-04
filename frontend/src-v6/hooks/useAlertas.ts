@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { alertaService } from '../services/alerta.service';
 import type { AlertaFilters, CreateReglaAlertaRequest } from '../types/api';
+import type { EstadoAlerta } from '../types/models';
 
 const KEYS = {
   reglas: ['alertas', 'reglas'] as const,
@@ -12,11 +13,12 @@ const KEYS = {
   anomalias: (manifiestoId?: string) => ['alertas', 'anomalias', manifiestoId] as const,
 };
 
-export function useReglasAlerta() {
+export function useReglasAlerta(enabled = true) {
   return useQuery({
     queryKey: KEYS.reglas,
     queryFn: () => alertaService.listReglas(),
     staleTime: 60_000,
+    enabled,
   });
 }
 
@@ -40,10 +42,17 @@ export function useAlertas(filters?: AlertaFilters, enabled = true) {
 export function useResolverAlerta() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, notas }: { id: string; notas?: string }) =>
-      alertaService.resolverAlerta(id, notas),
+    mutationFn: ({ id, notas, estado }: { id: string; notas: string; estado: EstadoAlerta }) =>
+      alertaService.resolverAlerta(id, notas, estado),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alertas'] }),
   });
+}
+
+export function useEvaluarSeguimiento() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: () => alertaService.evaluarSeguimiento(), onSuccess: async () => {
+    await Promise.all([qc.invalidateQueries({ queryKey: ['alertas'] }), qc.invalidateQueries({ queryKey: ['notificaciones'] })]);
+  } });
 }
 
 export function useUpdateReglaAlerta() {

@@ -29,6 +29,15 @@ describe('notification inbox states and interaction', () => {
     const query = client.getQueryCache().find({ queryKey: ['notificaciones', 'list'], exact: false });
     expect(query?.isStale()).toBe(true);
   });
+  it('uses the current linked case resolution without claiming the manifest itself was closed', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice,
+      titulo: 'Seguimiento de manifiesto', manifiestoId: 'qa-manifest', seguimientoEstado: 'RESUELTA',
+      datos: JSON.stringify({ tipo: 'seguimiento_cierre', version: 1, casoId: 'case' }),
+      manifiesto: { numero: 'QA', estado: 'RECIBIDO' },
+    }] });
+    setup(); expect(await screen.findByText('Caso resuelto · Ver manifiesto e historial')).toBeVisible();
+    expect(screen.queryByText('Seguimiento finalizado · Ver historial')).toBeNull();
+  });
 
   it('keeps a closed follow-up as history rather than a current pending task and opens its actual manifest', async () => {
     service.list.mockResolvedValue({ ...response, items: [{ ...notice,

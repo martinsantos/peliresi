@@ -355,6 +355,7 @@ export interface TratamientoAutorizado {
 }
 
 export interface Notificacion {
+  seguimientoEstado?: EstadoAlerta | null;
   id: string;
   usuarioId: string;
   tipo: TipoNotificacion;

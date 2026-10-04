@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
+import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { domainEvents } from '../services/domainEvent.service';
 import { AppError } from '../middlewares/errorHandler';
 import { normalizeAlertCondition } from '../services/alertRuleCondition.service';
+import { validateFollowupRule, alertResolution, FOLLOWUP_RULE_ID, followupDays } from '../services/alertFollowupPolicy.service';
+import { ejecutarSeguimientoCierre, simularSeguimientoCierre } from '../jobs/seguimientoCierre.job';
 
 const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR']);
 function normalizeAlertRecipients(raw: unknown): string {
@@ -53,11 +55,26 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
             prisma.notificacion.count({ where }),
             prisma.notificacion.count({ where: { usuarioId, leida: false } })
         ]);
+        const linked = notificaciones.flatMap(notice => {
+            try {
+                const data = JSON.parse(notice.datos || 'null');
+                return data?.tipo === 'seguimiento_cierre' && data.version === 1 && typeof data.casoId === 'string' && notice.manifiestoId
+                    ? [{ id: data.casoId as string, manifiestoId: notice.manifiestoId, noticeId: notice.id }] : [];
+            } catch { return []; }
+        });
+        // Only linked cases for manifests already in this user's own notice page.
+        // One bounded batch; never expose the administrative case list to actors.
+        const cases = linked.length ? await prisma.alertaGenerada.findMany({
+            where: { OR: linked.map(({ id, manifiestoId }) => ({ id, manifiestoId })) }, select: { id: true, estado: true },
+        }) : [];
+        const stateByCase = new Map(cases.map(item => [item.id, item.estado]));
+        const caseByNotice = new Map(linked.map(item => [item.noticeId, item.id]));
 
         res.json({
             success: true,
             data: {
-                notificaciones,
+                notificaciones: notificaciones.map(notice => ({ ...notice,
+                    seguimientoEstado: stateByCase.get(caseByNotice.get(notice.id) || '') ?? null })),
                 total,
                 noLeidas,
                 pagina: Math.floor(parseInt(offset as string) / limitNum) + 1,
@@ -141,12 +158,14 @@ export const getReglasAlerta = async (req: Request, res: Response, next: NextFun
 export const crearReglaAlerta = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const usuarioId = (req as AuthRequest).user!.id;
-        const { nombre, descripcion, evento, condicion, destinatarios } = req.body;
+        const { nombre, descripcion, evento, condicion, destinatarios, activa = true } = req.body;
+        if (!Object.values(EventoAlerta).includes(evento) || typeof activa !== 'boolean' || typeof nombre !== 'string' || !nombre.trim()) throw new AppError('Nombre, evento y estado de regla inválidos', 400);
 
         let condicionStr: string;
         try { condicionStr = normalizeAlertCondition(condicion); }
         catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
         const destinatariosStr = normalizeAlertRecipients(destinatarios);
+        validateFollowupRule(evento, condicionStr, destinatariosStr);
 
         const regla = await prisma.reglaAlerta.create({
             data: {
@@ -155,7 +174,8 @@ export const crearReglaAlerta = async (req: Request, res: Response, next: NextFu
                 evento: evento as EventoAlerta,
                 condicion: condicionStr,
                 destinatarios: destinatariosStr,
-                creadoPorId: usuarioId
+                creadoPorId: usuarioId,
+                activa
             }
         });
 
@@ -178,6 +198,12 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
             catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
         }
         const destinatariosStr = destinatarios === undefined ? undefined : normalizeAlertRecipients(destinatarios);
+        const current = await prisma.reglaAlerta.findUnique({ where: { id } });
+        if (!current) throw new AppError('Regla no encontrada', 404);
+        if (evento !== undefined && !Object.values(EventoAlerta).includes(evento)) throw new AppError('Evento inválido', 400);
+        if (activa !== undefined && typeof activa !== 'boolean') throw new AppError('Estado de regla inválido', 400);
+        validateFollowupRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
+        if (id === FOLLOWUP_RULE_ID && followupDays(condicionStr ?? current.condicion) === null) throw new AppError('La regla de seguimiento existente sólo puede configurarse o desactivarse', 400);
 
         const regla = await prisma.reglaAlerta.update({
             where: { id },
@@ -201,7 +227,8 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
 export const eliminarReglaAlerta = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-
+        if (id === FOLLOWUP_RULE_ID) throw new AppError('Desactive el seguimiento para conservar su configuración e historial', 409);
+        if (await prisma.alertaGenerada.count({ where: { reglaId: id } })) throw new AppError('Esta regla tiene casos históricos; desactívela para conservar la trazabilidad', 409);
         await prisma.reglaAlerta.delete({ where: { id } });
 
         res.json({ success: true, message: 'Regla eliminada' });
@@ -215,18 +242,33 @@ export const eliminarReglaAlerta = async (req: Request, res: Response, next: Nex
 // Obtener alertas generadas
 export const getAlertasGeneradas = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { estado, limit = 50, offset = 0 } = req.query;
-        const alertasLimit = Math.min(500, Math.max(1, parseInt(limit as string)));
-
-        const where: any = {};
-        if (estado) where.estado = estado;
+        const { estado, evento, reglaId, fechaDesde, limit = 50, page = 1, offset } = req.query;
+        const alertasLimit = Math.min(500, Math.max(1, Number(limit)));
+        const skip = offset === undefined ? (Number(page) - 1) * alertasLimit : Number(offset);
+        if (!Number.isInteger(alertasLimit) || !Number.isInteger(skip) || skip < 0) throw new AppError('Paginación inválida', 400);
+        const where: Prisma.AlertaGeneradaWhereInput = {};
+        if (estado) {
+            const states = String(estado).split(',');
+            if (states.some(state => !Object.values(EstadoAlerta).includes(state as EstadoAlerta))) throw new AppError('Estado de caso inválido', 400);
+            where.estado = { in: states as EstadoAlerta[] };
+        }
+        if (evento) {
+            if (!Object.values(EventoAlerta).includes(evento as EventoAlerta)) throw new AppError('Evento inválido', 400);
+            where.regla = { evento: evento as EventoAlerta };
+        }
+        if (reglaId) where.reglaId = String(reglaId);
+        if (fechaDesde) {
+            const date = new Date(String(fechaDesde));
+            if (!Number.isFinite(date.getTime())) throw new AppError('Fecha inválida', 400);
+            where.createdAt = { gte: date };
+        }
 
         const [alertas, total] = await Promise.all([
             prisma.alertaGenerada.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
                 take: alertasLimit,
-                skip: parseInt(offset as string),
+                skip,
                 include: {
                     regla: { select: { nombre: true, evento: true } },
                     manifiesto: { select: { numero: true, estado: true } }
@@ -240,8 +282,9 @@ export const getAlertasGeneradas = async (req: Request, res: Response, next: Nex
             data: {
                 alertas,
                 total,
-                pagina: Math.floor(parseInt(offset as string) / alertasLimit) + 1,
-                totalPaginas: Math.ceil(total / alertasLimit)
+                pagina: Math.floor(skip / alertasLimit) + 1,
+                limit: alertasLimit,
+                totalPaginas: Math.max(1, Math.ceil(total / alertasLimit))
             }
         });
     } catch (error) {
@@ -258,18 +301,23 @@ export const resolverAlerta = async (req: Request, res: Response, next: NextFunc
 
         const alerta = await prisma.alertaGenerada.update({
             where: { id },
-            data: {
-                estado: estado as EstadoAlerta,
-                notas,
-                resueltaPor: usuarioId,
-                fechaResolucion: new Date()
-            }
+            data: alertResolution(estado, notas, usuarioId)
         });
 
         res.json({ success: true, data: alerta });
     } catch (error) {
         next(error);
     }
+};
+
+export const simularSeguimientoAlerta = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await simularSeguimientoCierre(req.body.diasRecepcion) }); }
+    catch (error) { next(error); }
+};
+
+export const evaluarSeguimientoAlerta = async (_req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: { avisosActualizados: await ejecutarSeguimientoCierre(), canal: 'interno' } }); }
+    catch (error) { next(error); }
 };
 
 // ============ DETECCION DE ANOMALIAS GPS ============

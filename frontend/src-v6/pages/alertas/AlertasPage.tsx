@@ -2,7 +2,7 @@
  * SITREP v6 - Alertas Page
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -13,7 +13,6 @@ import {
   Check,
   AlertCircle,
   Info,
-  X,
   Loader2,
   Settings,
   Plus,
@@ -25,7 +24,7 @@ import {
   ChevronRight,
   Calendar,
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/CardV2';
+import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
@@ -34,10 +33,11 @@ import { Table, type Column } from '../../components/ui/Table';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
-import { useAlertas, useResolverAlerta, useReglasAlerta, useCreateReglaAlerta, useUpdateReglaAlerta, useDeleteReglaAlerta } from '../../hooks/useAlertas';
+import { useAlertas, useResolverAlerta, useReglasAlerta, useCreateReglaAlerta, useUpdateReglaAlerta, useDeleteReglaAlerta, useEvaluarSeguimiento } from '../../hooks/useAlertas';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas } from '../../hooks/useNotificaciones';
 import { useAuth } from '../../contexts/AuthContext';
-import { alertaService } from '../../services/alerta.service';
+import { alertaService, type FollowupPreview } from '../../services/alerta.service';
+import { EstadoAlerta } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -51,6 +51,7 @@ interface AlertaLocal {
   leida: boolean;
   manifiestoId?: string;
   manifiestoNumero?: string;
+  estadoActual?: string;
   evento?: string;
   estado: string;
 }
@@ -275,9 +276,16 @@ function periodStart(period: string): Date | null {
 export const AlertasPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin, isAnyAdmin } = useAuth();
+  const [periodo, setPeriodo] = useState<string>('30d');
+  const [filtroEvento, setFiltroEvento] = useState<string>('');
+  const [filtroLeidas, setFiltroLeidas] = useState<string>('todas');
+  const [page, setPage] = useState(1);
+  const since = useMemo(() => periodStart(periodo)?.toISOString(), [periodo]);
 
   // Any admin role: alertas generadas por reglas | Non-admin: notificaciones del usuario
-  const { data: apiAlertas, isLoading: isLoadingAlertas, isError: isErrorAlertas } = useAlertas(undefined, isAnyAdmin);
+  const { data: apiAlertas, isLoading: isLoadingAlertas, isError: isErrorAlertas, refetch: refetchAlertas } = useAlertas({ page, limit: PAGE_SIZE,
+    evento: filtroEvento || undefined, fechaDesde: since,
+    estado: filtroLeidas === 'no-leidas' ? 'PENDIENTE,EN_REVISION' : filtroLeidas === 'leidas' ? 'RESUELTA,DESCARTADA' : undefined }, isAnyAdmin);
   const { data: apiNotifs, isLoading: isLoadingNotifs, isError: isErrorNotifs } = useNotificaciones(undefined);
   const isLoading = isAnyAdmin ? isLoadingAlertas : isLoadingNotifs;
   const isError = isAnyAdmin ? isErrorAlertas : isErrorNotifs;
@@ -285,10 +293,11 @@ export const AlertasPage: React.FC = () => {
   const marcarLeidaMutation = useMarcarLeida();
   const marcarTodasLeidasMutation = useMarcarTodasLeidas();
 
-  const { data: reglas } = useReglasAlerta();
+  const { data: reglas } = useReglasAlerta(isAnyAdmin);
   const createRegla = useCreateReglaAlerta();
   const updateRegla = useUpdateReglaAlerta();
   const deleteRegla = useDeleteReglaAlerta();
+  const evaluarSeguimiento = useEvaluarSeguimiento();
 
   const [activeTab, setActiveTab] = useState('alertas');
   const [showReglaModal, setShowReglaModal] = useState(false);
@@ -296,17 +305,14 @@ export const AlertasPage: React.FC = () => {
   const [deletingRegla, setDeletingRegla] = useState<any | null>(null);
   const [reglaForm, setReglaForm] = useState(defaultReglaForm);
 
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
-
-  // Filters
-  const [periodo, setPeriodo] = useState<string>('30d');
-  const [filtroEvento, setFiltroEvento] = useState<string>('');
-  const [filtroLeidas, setFiltroLeidas] = useState<string>('todas');
-  const [showClearModal, setShowClearModal] = useState(false);
-
-  // Pagination
-  const [page, setPage] = useState(1);
+  const [caseToManage, setCaseToManage] = useState<AlertaLocal | null>(null);
+  const [caseState, setCaseState] = useState(EstadoAlerta.EN_REVISION);
+  const [caseReason, setCaseReason] = useState('');
+  const [caseError, setCaseError] = useState('');
+  const [preview, setPreview] = useState<{ condition: string; result: FollowupPreview } | null>(null);
+  const [previewPending, setPreviewPending] = useState(false);
+  let followupDays: number | null = null;
+  try { const condition = JSON.parse(reglaForm.condicion); if (condition.tipo === 'seguimiento_cierre') followupDays = condition.diasRecepcion?.gte ?? 0; } catch { /* advanced condition validated on save */ }
 
   const alertas: AlertaLocal[] = useMemo(() => {
     if (!isAnyAdmin) {
@@ -317,7 +323,6 @@ export const AlertasPage: React.FC = () => {
           || (apiNotifs as { notificaciones?: unknown[] })?.notificaciones
           || [];
       return notifs
-        .filter((n: any) => !deletedIds.has(n.id))
         .map((n: any) => ({
           id: n.id,
           tipo: getTipoFromNotifTipo(n.tipo),
@@ -334,26 +339,27 @@ export const AlertasPage: React.FC = () => {
     // Admin: alertas generadas by rules
     const items = Array.isArray(apiAlertas?.items) ? apiAlertas.items : [];
     return items
-      .filter((a: any) => !deletedIds.has(a.id))
       .map((a: any) => {
         const evento = a.regla?.evento;
-        const estado = resolvedIds.has(a.id) ? 'RESUELTA' : (a.estado || 'PENDIENTE');
+        const estado = a.estado || 'PENDIENTE';
         return {
           id: a.id,
           tipo: getTipoFromEvento(evento, estado),
           titulo: a.regla?.nombre || 'Alerta',
           mensaje: parseMensaje(a.datos, a.regla?.evento),
           fecha: a.createdAt,
-          leida: estado !== 'PENDIENTE',
+          leida: estado === 'RESUELTA' || estado === 'DESCARTADA',
           manifiestoId: a.manifiestoId || a.manifiesto?.id,
           manifiestoNumero: a.manifiesto?.numero,
+          estadoActual: a.manifiesto?.estado,
           evento,
           estado,
         };
       });
-  }, [isAnyAdmin, apiAlertas, apiNotifs, deletedIds, resolvedIds]);
+  }, [isAnyAdmin, apiAlertas, apiNotifs]);
 
   const alertasFiltradas = useMemo(() => {
+    if (isAnyAdmin) return alertas;
     const since = periodStart(periodo);
     return alertas.filter(a => {
       if (since && new Date(a.fecha) < since) return false;
@@ -362,12 +368,15 @@ export const AlertasPage: React.FC = () => {
       if (filtroLeidas === 'leidas' && !a.leida) return false;
       return true;
     });
-  }, [alertas, periodo, filtroEvento, filtroLeidas]);
+  }, [isAnyAdmin, alertas, periodo, filtroEvento, filtroLeidas]);
 
   // Reset page when filters change
-  const totalPages = Math.max(1, Math.ceil(alertasFiltradas.length / PAGE_SIZE));
+  const totalPages = isAnyAdmin ? apiAlertas?.totalPages || 1 : Math.max(1, Math.ceil(alertasFiltradas.length / PAGE_SIZE));
+  useEffect(() => {
+    if (isAnyAdmin && apiAlertas?.page === page && page > totalPages) setPage(totalPages);
+  }, [isAnyAdmin, apiAlertas?.page, page, totalPages]);
   const currentPage = Math.min(page, totalPages);
-  const alertasPagina = alertasFiltradas.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const alertasPagina = isAnyAdmin ? alertasFiltradas : alertasFiltradas.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const grupos = groupByDay(alertasPagina);
 
   const noLeidasCount = alertas.filter(a => !a.leida).length;
@@ -380,52 +389,18 @@ export const AlertasPage: React.FC = () => {
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const marcarComoLeida = (id: string) => {
-    if (!isAnyAdmin) {
       marcarLeidaMutation.mutate(id, {
         onSuccess: () => {
-          setResolvedIds(prev => new Set(prev).add(id));
           toast.success('Leida', 'Notificacion marcada como leida');
         },
       });
-      return;
-    }
-    resolverMutation.mutate(
-      { id, notas: 'Marcada como leida' },
-      {
-        onSuccess: () => {
-          setResolvedIds(prev => new Set(prev).add(id));
-          toast.success('Alerta resuelta', 'La alerta fue marcada como leida');
-        },
-        onError: () => {
-          setResolvedIds(prev => new Set(prev).add(id));
-          toast.error('Error', 'No se pudo marcar la alerta');
-        },
-      }
-    );
   };
-
-  const marcarTodasComoLeidas = () => {
-    alertas.filter(a => !a.leida).forEach(a => {
-      resolverMutation.mutate(
-        { id: a.id, notas: 'Marcada como leida (batch)' },
-        { onSuccess: () => setResolvedIds(prev => new Set(prev).add(a.id)) }
-      );
+  const saveCase = () => {
+    if (!caseToManage || !caseReason.trim()) { setCaseError('Registrá el motivo antes de guardar.'); return; }
+    resolverMutation.mutate({ id: caseToManage.id, estado: caseState, notas: caseReason }, {
+      onSuccess: () => { setCaseToManage(null); toast.success('Estado del caso actualizado'); },
+      onError: () => setCaseError('No se pudo guardar. El caso mantiene su estado anterior; podés reintentar.'),
     });
-    toast.success('Listo', 'Todas las alertas fueron marcadas como leídas');
-  };
-
-  const eliminarAlerta = (id: string) => {
-    alertaService.resolverAlerta(id, 'Eliminada por usuario').then(() => {
-      setDeletedIds(prev => new Set(prev).add(id));
-    }).catch(() => {
-      setDeletedIds(prev => new Set(prev).add(id));
-    });
-  };
-
-  const limpiarTodas = () => {
-    setDeletedIds(new Set(alertas.map(a => a.id)));
-    setShowClearModal(false);
-    toast.success('Alertas limpiadas', 'Se eliminaron todas las alertas');
   };
 
   // ─── Reglas handlers ───────────────────────────────────────────────────────
@@ -433,11 +408,13 @@ export const AlertasPage: React.FC = () => {
   const openCreateRegla = () => {
     setEditingRegla(null);
     setReglaForm(defaultReglaForm);
+    setPreview(null);
     setShowReglaModal(true);
   };
 
   const openEditRegla = (regla: any) => {
     setEditingRegla(regla);
+    setPreview(null);
     let destList: string[] = [];
     try {
       const parsed = JSON.parse(regla.destinatarios || '[]');
@@ -560,8 +537,8 @@ export const AlertasPage: React.FC = () => {
       align: 'right',
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="sm" onClick={() => openEditRegla(r)}><Edit size={14} /></Button>
-          <Button variant="ghost" size="sm" className="text-error-500" onClick={() => setDeletingRegla(r)}><Trash2 size={14} /></Button>
+          {isAdmin && <><Button variant="ghost" aria-label={`Editar regla: ${r.nombre}`} onClick={() => openEditRegla(r)}><Edit size={14} /></Button>
+          {r.id !== 'seguimiento_cierre_v1' && <Button variant="ghost" aria-label={`Eliminar regla: ${r.nombre}`} className="text-error-500" onClick={() => setDeletingRegla(r)}><Trash2 size={14} /></Button>}</>}
         </div>
       ),
     },
@@ -612,19 +589,19 @@ export const AlertasPage: React.FC = () => {
           options={[
             { value: 'todas', label: 'Todas' },
             { value: 'no-leidas', label: 'Pendientes' },
-            { value: 'leidas', label: 'Leídas' },
+            { value: 'leidas', label: isAnyAdmin ? 'Resueltas / descartadas' : 'Leídas' },
           ]}
           size="sm"
           isFullWidth={false}
         />
 
         <span className="ml-auto text-xs text-neutral-400">
-          {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? 's' : ''}
+          {isAnyAdmin ? apiAlertas?.total ?? 0 : alertasFiltradas.length} {isAnyAdmin ? 'casos' : 'avisos'}
         </span>
       </div>
 
       {/* List */}
-      {alertasFiltradas.length === 0 ? (
+      {isLoading ? <p role="status">Cargando alertas…</p> : isError ? <div role="alert" className="rounded-lg border border-error-200 p-4"><p>No se pudieron cargar las alertas. No es una lista vacía.</p><Button variant="outline" onClick={() => { if (isAnyAdmin) void refetchAlertas(); else window.location.reload(); }}>Reintentar</Button></div> : alertasFiltradas.length === 0 ? (
         <div className="py-16 flex flex-col items-center gap-3 text-center">
           <div className="w-14 h-14 rounded-full bg-neutral-100 flex items-center justify-center">
             <Bell size={26} className="text-neutral-300" />
@@ -649,8 +626,9 @@ export const AlertasPage: React.FC = () => {
                   const cfg = tipoConfig[alerta.tipo];
                   const Icon = cfg.icon;
                   return (
-                    <div
+                    <article
                       key={alerta.id}
+                      aria-label={`Caso: ${alerta.titulo} · ${alerta.manifiestoNumero || alerta.id}`}
                       className={`
                         group relative bg-white rounded-xl border border-neutral-100 border-l-4 ${cfg.border}
                         flex items-start gap-3 px-4 py-3
@@ -669,7 +647,7 @@ export const AlertasPage: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                               <span className="text-sm font-semibold text-neutral-800">{alerta.titulo}</span>
-                              {!alerta.leida && (
+                              {isAnyAdmin ? <Badge variant="soft" color={alerta.leida ? 'neutral' : 'warning'} size="sm">{{ PENDIENTE: 'Pendiente', EN_REVISION: 'En revisión', RESUELTA: 'Resuelta', DESCARTADA: 'Descartada' }[alerta.estado] || alerta.estado}</Badge> : !alerta.leida && (
                                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-primary-100 text-primary-700 uppercase tracking-wide">
                                   Nueva
                                 </span>
@@ -685,6 +663,7 @@ export const AlertasPage: React.FC = () => {
                               )}
                             </div>
                             <p className="text-sm text-neutral-600 leading-snug">{alerta.mensaje}</p>
+                            {isAnyAdmin && alerta.estadoActual && <p className="mt-1 text-xs text-neutral-600">Estado actual del manifiesto: {alerta.estadoActual.replaceAll('_', ' ').toLowerCase()}. El caso conserva la situación registrada al detectarlo.</p>}
                           </div>
                           {/* Time + delete */}
                           <div className="flex items-center gap-2 shrink-0">
@@ -692,42 +671,35 @@ export const AlertasPage: React.FC = () => {
                               <Clock size={11} />
                               {formatRelativeTime(alerta.fecha)}
                             </span>
-                            <button
-                              onClick={() => eliminarAlerta(alerta.id)}
-                              className="p-1 rounded hover:bg-neutral-100 text-neutral-300 hover:text-neutral-500"
-                              title="Eliminar"
-                            >
-                              <X size={13} />
-                            </button>
                           </div>
                         </div>
 
                         {/* Actions row */}
-                        {(alerta.manifiestoId || !alerta.leida) && (
-                          <div className="flex items-center gap-2 mt-2">
+                        {(alerta.manifiestoId || !alerta.leida || isAnyAdmin) && (
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
                             {alerta.manifiestoId && (
-                              <button
+                              <Button variant="outline"
                                 onClick={() => navigate(`/manifiestos/${alerta.manifiestoId}`)}
                                 className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-primary-600 transition-colors"
                               >
                                 <ExternalLink size={12} />
                                 Ver manifiesto
-                              </button>
+                              </Button>
                             )}
-                            {!alerta.leida && (
-                              <button
+                            {isAnyAdmin ? <Button variant="outline" onClick={() => { setCaseToManage(alerta); setCaseState(alerta.estado as EstadoAlerta); setCaseReason(''); setCaseError(''); }}>Gestionar caso</Button> : !alerta.leida && (
+                              <Button variant="ghost"
                                 onClick={() => marcarComoLeida(alerta.id)}
-                                disabled={resolverMutation.isPending}
+                                disabled={marcarLeidaMutation.isPending}
                                 className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-success-600 transition-colors"
                               >
                                 <Check size={12} />
                                 Marcar leída
-                              </button>
+                              </Button>
                             )}
                           </div>
                         )}
                       </div>
-                    </div>
+                    </article>
                   );
                 })}
               </div>
@@ -746,6 +718,7 @@ export const AlertasPage: React.FC = () => {
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
+              aria-label="Página anterior de alertas"
               className="p-1.5 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft size={15} />
@@ -773,6 +746,7 @@ export const AlertasPage: React.FC = () => {
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
+              aria-label="Siguiente página de alertas"
               className="p-1.5 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight size={15} />
@@ -791,9 +765,9 @@ export const AlertasPage: React.FC = () => {
         <p className="text-sm text-neutral-500">
           {Array.isArray(reglas) ? reglas.length : 0} reglas configuradas
         </p>
-        <Button variant="primary" size="sm" leftIcon={<Plus size={15} />} onClick={openCreateRegla}>
+        {isAdmin && <Button variant="primary" leftIcon={<Plus size={15} />} onClick={openCreateRegla}>
           Nueva Regla
-        </Button>
+        </Button>}
       </div>
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
@@ -806,6 +780,7 @@ export const AlertasPage: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-neutral-500 mt-1">{r.evento || r.tipo}</p>
+            {isAdmin && <Button variant="outline" aria-label={`Editar regla: ${r.nombre}`} className="mt-2" onClick={() => openEditRegla(r)}>Editar regla</Button>}
           </div>
         ))}
       </div>
@@ -834,7 +809,7 @@ export const AlertasPage: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
               <Bell size={20} className="text-primary-600" />
             </div>
-            {noLeidasCount > 0 && (
+            {!isAnyAdmin && noLeidasCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                 {noLeidasCount > 99 ? '99+' : noLeidasCount}
               </span>
@@ -848,30 +823,22 @@ export const AlertasPage: React.FC = () => {
                   <Loader2 size={12} className="animate-spin" /> Cargando…
                 </span>
               ) : (
-                `${noLeidasCount} pendiente${noLeidasCount !== 1 ? 's' : ''} · ${alertas.length} total${alertas.length !== 1 ? 'es' : ''}`
+                isAnyAdmin ? 'Casos detectados y reglas. Leer un aviso no resuelve un caso.' : `${noLeidasCount} sin leer en esta lista`
               )}
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
+          {!isAnyAdmin && <Button
             variant="outline"
             size="sm"
             leftIcon={<Check size={15} />}
-            onClick={marcarTodasComoLeidas}
+            onClick={() => marcarTodasLeidasMutation.mutate(undefined, { onSuccess: () => toast.success('Avisos marcados como leídos'), onError: () => toast.error('No se pudo guardar el cambio') })}
             disabled={noLeidasCount === 0}
           >
             Marcar todas
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Trash2 size={15} />}
-            onClick={() => setShowClearModal(true)}
-            disabled={alertas.length === 0}
-          >
-            Limpiar
-          </Button>
+          </Button>}
+          {isAdmin && <Button variant="outline" disabled={evaluarSeguimiento.isPending} onClick={() => evaluarSeguimiento.mutate(undefined, { onSuccess: result => toast.success('Seguimiento evaluado', `${result.avisosActualizados} avisos internos actualizados. Sin correo ni push.`), onError: () => toast.error('No se completó la evaluación', 'Puede haber un resultado parcial. Reintentá; no se duplican avisos.') })}>Evaluar seguimiento ahora</Button>}
         </div>
       </div>
 
@@ -893,17 +860,13 @@ export const AlertasPage: React.FC = () => {
         alertasContent
       )}
 
-      {/* Confirm clear */}
-      <ConfirmModal
-        isOpen={showClearModal}
-        onClose={() => setShowClearModal(false)}
-        onConfirm={limpiarTodas}
-        title="Limpiar todas las alertas"
-        description="¿Estás seguro de que deseas eliminar todas las alertas? Esta acción no se puede deshacer."
-        confirmText="Sí, limpiar"
-        cancelText="Cancelar"
-        variant="danger"
-      />
+      <Modal isOpen={!!caseToManage} onClose={() => setCaseToManage(null)} title="Gestionar caso" isBusy={resolverMutation.isPending} footer={<div className="flex justify-end gap-2"><Button variant="outline" disabled={resolverMutation.isPending} onClick={() => setCaseToManage(null)}>Cancelar</Button><Button onClick={saveCase} disabled={resolverMutation.isPending}>Guardar estado</Button></div>}>
+        <div className="space-y-4"><p className="text-sm text-neutral-700">{caseToManage?.titulo} · {caseToManage?.manifiestoNumero}</p>
+          <Select label="Estado del caso" value={caseState} options={[{ value: 'PENDIENTE', label: 'Pendiente' }, { value: 'EN_REVISION', label: 'En revisión' }, { value: 'RESUELTA', label: 'Resuelta' }, { value: 'DESCARTADA', label: 'Descartada' }]} onChange={value => setCaseState(value as EstadoAlerta)} />
+          <label className="block text-sm font-medium text-neutral-700">Motivo del cambio<textarea className="mt-1 w-full rounded-lg border border-neutral-300 p-3 text-base sm:text-sm" rows={3} maxLength={2000} value={caseReason} onChange={event => setCaseReason(event.target.value)} /></label>
+          {caseError && <p role="alert" className="text-sm text-error-700">{caseError}</p>}
+        </div>
+      </Modal>
 
       {/* Modal crear/editar regla — con scroll interno */}
       <Modal
@@ -911,8 +874,17 @@ export const AlertasPage: React.FC = () => {
         onClose={() => setShowReglaModal(false)}
         title={editingRegla ? 'Editar Regla' : 'Nueva Regla'}
         size="base"
+        isBusy={createRegla.isPending || updateRegla.isPending}
+        footer={<div className="flex justify-end gap-2"><Button variant="outline" disabled={createRegla.isPending || updateRegla.isPending} onClick={() => setShowReglaModal(false)}>Cancelar</Button><Button onClick={handleSaveRegla} disabled={createRegla.isPending || updateRegla.isPending}>{editingRegla ? 'Guardar cambios' : 'Crear regla'}</Button></div>}
       >
         <div className="overflow-y-auto max-h-[calc(100vh-200px)] pr-1 space-y-4">
+          <Select label="Tipo de regla" value={followupDays !== null ? 'seguimiento' : 'evento'} disabled={editingRegla?.id === 'seguimiento_cierre_v1'} options={[
+            { value: 'evento', label: 'Evento del workflow' },
+            { value: 'seguimiento', label: 'Manifiesto pendiente de tratamiento o cierre' },
+            { value: 'ddjj', label: 'DDJJ · requiere calendario aprobado', disabled: true },
+            { value: 'tef', label: 'TEF · requiere obligación y saldo conciliados', disabled: true },
+            { value: 'ocr', label: 'Recibos OCR · requiere extracción verificable', disabled: true },
+          ]} onChange={value => { setPreview(null); setReglaForm(prev => value === 'seguimiento' ? { ...prev, nombre: prev.nombre || 'Seguimiento de manifiesto', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"seguimiento_cierre","diasRecepcion":{"gte":0}}', destinatarios: ['OPERADOR'], emails: '', activa: false } : { ...prev, condicion: '{}', evento: '', destinatarios: [], emails: '' }); }} />
           <Input
             label="Nombre"
             placeholder="Nombre de la regla"
@@ -929,7 +901,7 @@ export const AlertasPage: React.FC = () => {
               rows={2}
             />
           </div>
-          <Select
+          {followupDays === null ? <><Select
             label="Evento"
             placeholder="Seleccionar evento…"
             options={EVENTO_OPTIONS}
@@ -938,10 +910,7 @@ export const AlertasPage: React.FC = () => {
           />
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Cuándo se activa</label>
-            <select value={CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion) ? reglaForm.condicion : '__custom__'} onChange={(event) => event.target.value !== '__custom__' && setReglaForm((prev) => ({ ...prev, condicion: event.target.value }))} className="mb-2 h-11 w-full rounded-lg border border-neutral-200 bg-white px-3 text-sm focus:border-primary-500 focus:outline-none">
-              {(CONDITION_PRESETS[reglaForm.evento] || [{ label: 'Cualquier evento', value: '{}' }]).map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
-              <option value="__custom__">Condición avanzada personalizada</option>
-            </select>
+            <Select value={CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion) ? reglaForm.condicion : '__custom__'} onChange={value => value !== '__custom__' && setReglaForm(prev => ({ ...prev, condicion: value }))} options={[...(CONDITION_PRESETS[reglaForm.evento] || [{ label: 'Cualquier evento', value: '{}' }]), { value: '__custom__', label: 'Condición avanzada personalizada' }]} />
             <details open={!CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion)} className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"><summary className="cursor-pointer text-xs font-bold text-neutral-700">JSON avanzado</summary><p className="mt-2 text-xs leading-relaxed text-neutral-500">Operadores admitidos: eq, neq, gt, gte, lt, lte, in y contains. Esta condición se valida y se evalúa en cada evento.</p>
             <textarea
               className="mt-2 w-full px-3 py-2 rounded-lg border border-neutral-200 bg-white text-sm font-mono focus:border-primary-500 focus:outline-none resize-none"
@@ -951,7 +920,21 @@ export const AlertasPage: React.FC = () => {
               rows={2}
             />
             </details>
-          </div>
+          </div></> : <div className="space-y-3">
+            <Input label="Días desde la recepción" type="number" min={0} max={365} step={1} value={followupDays} onChange={event => { setPreview(null); setReglaForm(prev => ({ ...prev, condicion: JSON.stringify({ tipo: 'seguimiento_cierre', diasRecepcion: { gte: Number(event.target.value) } }) })); }} />
+            <p className="text-sm text-neutral-600">Umbral operativo, no vencimiento legal. Se revisa diariamente a las 08:00 de Mendoza. Cero incluye todos los recibidos o en tratamiento.</p>
+            <Button variant="outline" disabled={previewPending} onClick={async () => {
+              const condition = reglaForm.condicion; setPreviewPending(true);
+              try { setPreview({ condition, result: await alertaService.simularSeguimiento(followupDays) }); }
+              catch { toast.error('No se pudo simular', 'Verificá los días y reintentá. No se crearon casos ni avisos.'); }
+              finally { setPreviewPending(false); }
+            }}>Simular sin enviar</Button>
+            {preview?.condition === reglaForm.condicion && <div role="status" className="rounded-lg border border-neutral-200 p-3 text-sm">
+              <p>{preview.result.total} manifiestos coinciden con la condición. Sin crear casos ni avisos.</p>
+              <ul className="mt-2 space-y-1">{preview.result.ejemplos.map(example => <li key={example.id}><button type="button" className="min-h-11 text-primary-700 underline underline-offset-2" onClick={() => navigate(`/manifiestos/${example.id}`)}>{example.numero} · {example.estado === 'RECIBIDO' ? 'Recibido' : 'En tratamiento'}</button></li>)}</ul>
+              {preview.result.total > preview.result.ejemplos.length && <p className="mt-2 text-neutral-600">Muestra de {preview.result.ejemplos.length} casos; total contado en servidor.</p>}
+            </div>}
+          </div>}
 
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -960,7 +943,7 @@ export const AlertasPage: React.FC = () => {
             </label>
             <p className="mb-2 text-xs leading-relaxed text-neutral-500">Los roles de actor notifican sólo a la parte involucrada en el manifiesto; no a todo el padrón.</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {ROLES_DESTINATARIOS.map(rol => (
+              {ROLES_DESTINATARIOS.filter(rol => followupDays === null || ['OPERADOR', 'ADMIN', 'ADMIN_OPERADOR'].includes(rol.value)).map(rol => (
                 <label key={rol.value} className="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors">
                   <input
                     type="checkbox"
@@ -977,7 +960,7 @@ export const AlertasPage: React.FC = () => {
             </div>
           </div>
 
-          <div>
+          {followupDays === null && <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">
               <Mail size={13} className="inline mr-1 -mt-0.5 text-neutral-400" />
               Emails adicionales
@@ -990,7 +973,7 @@ export const AlertasPage: React.FC = () => {
               rows={2}
             />
             <p className="text-xs text-neutral-400 mt-1">Requiere Postfix configurado en el servidor</p>
-          </div>
+          </div>}
 
           <label className="flex items-center gap-2 cursor-pointer py-1">
             <input
@@ -1002,18 +985,6 @@ export const AlertasPage: React.FC = () => {
             <span className="text-sm text-neutral-700">Regla activa</span>
           </label>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
-            <Button variant="outline" size="sm" onClick={() => setShowReglaModal(false)}>Cancelar</Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSaveRegla}
-              disabled={createRegla.isPending || updateRegla.isPending}
-            >
-              {(createRegla.isPending || updateRegla.isPending) && <Loader2 size={13} className="animate-spin mr-1" />}
-              {editingRegla ? 'Guardar cambios' : 'Crear regla'}
-            </Button>
-          </div>
         </div>
       </Modal>
 

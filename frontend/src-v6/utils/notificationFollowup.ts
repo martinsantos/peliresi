@@ -6,6 +6,8 @@ export function notificationFollowup(notice: Notificacion): string | null {
   try { data = JSON.parse(notice.datos || 'null'); }
   catch { return null; }
   if (!data || data.tipo !== 'seguimiento_cierre' || data.version !== 1) return null;
+  if (notice.seguimientoEstado === 'RESUELTA') return 'Caso resuelto · Ver manifiesto e historial';
+  if (notice.seguimientoEstado === 'DESCARTADA') return 'Caso descartado · Ver manifiesto e historial';
   const state = notice.manifiesto?.estado;
   if (!state) return 'Consultar el estado actual del manifiesto';
   if (state === 'TRATADO' || state === 'CANCELADO') return 'Seguimiento finalizado · Ver historial';

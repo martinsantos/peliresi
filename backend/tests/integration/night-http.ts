@@ -69,6 +69,29 @@ async function main() {
     const json = await request(null, '/auth/refresh-token', 'POST', { refreshToken: sessions.generador.refreshToken });
     assert.ok(json.data.tokens?.accessToken || json.data.accessToken);
   });
+  await check('alertas / read-only preview, explicit case state and rule-write permissions', async () => {
+    const before = { cases: await db.alertaGenerada.count(), notices: await db.notificacion.count() };
+    const preview = await request('admin', '/alertas/seguimiento/simular', 'POST', { diasRecepcion: 15 });
+    assert.equal(preview.data.escribeDatos, false); assert.equal(preview.data.canal, 'interno');
+    assert.deepEqual({ cases: await db.alertaGenerada.count(), notices: await db.notificacion.count() }, before);
+    await request('admin', '/alertas/seguimiento/simular', 'POST', { diasRecepcion: -1 }, 400);
+    for (const user of ['operador', 'generador', 'lector-operadores', 'inspector']) {
+      await request(user, '/alertas/seguimiento/simular', 'POST', { diasRecepcion: 15 }, 403);
+      await request(user, '/alertas/seguimiento/evaluar', 'POST', {}, 403);
+    }
+    const ruleInput = { nombre: 'QA inactiva ' + run, evento: 'TIEMPO_EXCESIVO', condicion: { tipo: 'seguimiento_cierre', diasRecepcion: { gte: 15 } }, destinatarios: ['OPERADOR'], activa: false };
+    await request('admin', '/alertas/reglas', 'POST', { ...ruleInput, destinatarios: ['GENERADOR'] }, 400);
+    const rule = (await request('admin', '/alertas/reglas', 'POST', ruleInput, 201)).data;
+    assert.equal(rule.activa, false); assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id } }), 0);
+    const caseRow = await db.alertaGenerada.findFirstOrThrow({ where: { reglaId: 'seguimiento_cierre_v1' } });
+    await request('admin', `/alertas/${caseRow.id}/resolver`, 'PUT', { notas: 'Leída no es resuelta' }, 400);
+    assert.deepEqual(await db.alertaGenerada.findUniqueOrThrow({ where: { id: caseRow.id } }), caseRow);
+    await request('operador', `/alertas/${caseRow.id}/resolver`, 'PUT', { estado: 'RESUELTA', notas: 'No autorizado' }, 403);
+    await request('admin', '/alertas?estado=DESCONOCIDO', 'GET', undefined, 400);
+    const paginated = await request('admin', '/alertas?limit=1&page=2&estado=PENDIENTE,EN_REVISION');
+    assert.equal(paginated.data.pagina, 2); assert.equal(paginated.data.limit, 1);
+    await request('admin', '/alertas/reglas/seguimiento_cierre_v1', 'DELETE', undefined, 409);
+  });
 
   const actorRoutes: Record<string, string[]> = {
     generador: ['', '/pagos', '/ddjj', '/documentos', '/historial'],

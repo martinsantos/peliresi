@@ -5,6 +5,7 @@ import { emailService } from '../services/email.service';
 import { notificationService } from '../controllers/notification.controller';
 import { DomainEvent } from '../services/domainEvent.service';
 import { matchesAlertCondition } from '../services/alertRuleCondition.service';
+import { followupDays } from '../services/alertFollowupPolicy.service';
 
 /** Mapeo DomainEvent.type → EventoAlerta (para búsqueda de ReglaAlerta) */
 const EVENTO_ALERTA_MAP: Partial<Record<DomainEvent['type'], EventoAlerta>> = {
@@ -53,7 +54,10 @@ async function dispararReglasAlerta(
 
   for (const regla of reglas) {
     let matches = false;
-    try { matches = matchesAlertCondition(regla.condicion, datos); }
+    try {
+      if (followupDays(regla.condicion) !== null) continue;
+      matches = matchesAlertCondition(regla.condicion, datos);
+    }
     catch (error) {
       logger.error({ reglaId: regla.id, error: error instanceof Error ? error.message : String(error) }, 'Invalid alert rule condition');
       continue;

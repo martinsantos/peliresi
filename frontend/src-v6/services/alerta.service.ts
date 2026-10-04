@@ -5,6 +5,15 @@
 import api from './api';
 import type { ReglaAlerta, AlertaGenerada, AnomaliaTransporte } from '../types/models';
 import type { CreateReglaAlertaRequest, AlertaFilters, PaginatedData } from '../types/api';
+import type { EstadoAlerta } from '../types/models';
+
+export interface FollowupPreview {
+  total: number;
+  ejemplos: Array<{ id: string; numero: string; estado: string; fechaRecepcion: string | null }>;
+  evaluadoAt: string;
+  escribeDatos: false;
+  canal: 'interno';
+}
 
 export const alertaService = {
   // Reglas
@@ -41,13 +50,23 @@ export const alertaService = {
       items: raw.alertas || [],
       total: raw.total || 0,
       page: raw.pagina || 1,
-      limit: 10,
+      limit: raw.limit || 50,
       totalPages: raw.totalPaginas || 1,
     };
   },
 
-  async resolverAlerta(id: string, notas?: string): Promise<AlertaGenerada> {
-    const { data } = await api.put(`/alertas/${id}/resolver`, { notas });
+  async resolverAlerta(id: string, notas: string, estado: EstadoAlerta): Promise<AlertaGenerada> {
+    const { data } = await api.put(`/alertas/${id}/resolver`, { notas, estado });
+    return data.data;
+  },
+
+  async simularSeguimiento(diasRecepcion: number): Promise<FollowupPreview> {
+    const { data } = await api.post('/alertas/seguimiento/simular', { diasRecepcion });
+    return data.data;
+  },
+
+  async evaluarSeguimiento(): Promise<{ avisosActualizados: number; canal: 'interno' }> {
+    const { data } = await api.post('/alertas/seguimiento/evaluar');
     return data.data;
   },
 
