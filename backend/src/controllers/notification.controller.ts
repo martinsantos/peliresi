@@ -7,8 +7,10 @@ import { AppError } from '../middlewares/errorHandler';
 import { normalizeAlertCondition } from '../services/alertRuleCondition.service';
 import { validateFollowupRule, alertResolution, FOLLOWUP_RULE_ID, followupDays } from '../services/alertFollowupPolicy.service';
 import { ejecutarSeguimientoCierre, simularSeguimientoCierre } from '../jobs/seguimientoCierre.job';
+import { catalogueCondition, validateCatalogueRule, CATALOGUE_MARKER } from '../services/alertCataloguePolicy.service';
+import { ejecutarCatalogo, simularCatalogo } from '../jobs/alertCatalogue.job';
 
-const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR']);
+const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'INSPECCIONADO', 'INSPECTOR_ASIGNADO']);
 function normalizeAlertRecipients(raw: unknown): string {
     let parsed = raw;
     if (typeof raw === 'string') {
@@ -58,6 +60,9 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
         const linked = notificaciones.flatMap(notice => {
             try {
                 const data = JSON.parse(notice.datos || 'null');
+                if (data?.familia === 'catalogo_verificable' && data.version === 1 && typeof data.casoId === 'string') {
+                    return [{ id: data.casoId as string, manifiestoId: null, noticeId: notice.id }];
+                }
                 return data?.tipo === 'seguimiento_cierre' && data.version === 1 && typeof data.casoId === 'string' && notice.manifiestoId
                     ? [{ id: data.casoId as string, manifiestoId: notice.manifiestoId, noticeId: notice.id }] : [];
             } catch { return []; }
@@ -166,6 +171,7 @@ export const crearReglaAlerta = async (req: Request, res: Response, next: NextFu
         catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
         const destinatariosStr = normalizeAlertRecipients(destinatarios);
         validateFollowupRule(evento, condicionStr, destinatariosStr);
+        validateCatalogueRule(evento, condicionStr, destinatariosStr);
 
         const regla = await prisma.reglaAlerta.create({
             data: {
@@ -203,6 +209,9 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
         if (evento !== undefined && !Object.values(EventoAlerta).includes(evento)) throw new AppError('Evento inválido', 400);
         if (activa !== undefined && typeof activa !== 'boolean') throw new AppError('Estado de regla inválido', 400);
         validateFollowupRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
+        validateCatalogueRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
+        if (catalogueCondition(current.condicion)?.tipo !== catalogueCondition(condicionStr ?? current.condicion)?.tipo &&
+            await prisma.alertaGenerada.count({ where: { reglaId: id } })) throw new AppError('Una regla con casos históricos no puede cambiar de familia; desactívela y cree otra', 409);
         if (id === FOLLOWUP_RULE_ID && followupDays(condicionStr ?? current.condicion) === null) throw new AppError('La regla de seguimiento existente sólo puede configurarse o desactivarse', 400);
 
         const regla = await prisma.reglaAlerta.update({
@@ -247,6 +256,11 @@ export const getAlertasGeneradas = async (req: Request, res: Response, next: Nex
         const skip = offset === undefined ? (Number(page) - 1) * alertasLimit : Number(offset);
         if (!Number.isInteger(alertasLimit) || !Number.isInteger(skip) || skip < 0) throw new AppError('Paginación inválida', 400);
         const where: Prisma.AlertaGeneradaWhereInput = {};
+        const role = (req as AuthRequest).user?.rol;
+        if (role?.startsWith('ADMIN_')) where.AND = [{ OR: [
+            { NOT: { datos: { contains: CATALOGUE_MARKER } } },
+            { datos: { contains: JSON.stringify({ tipoActor: role.slice(6) }).slice(1, -1) } },
+        ] }];
         if (estado) {
             const states = String(estado).split(',');
             if (states.some(state => !Object.values(EstadoAlerta).includes(state as EstadoAlerta))) throw new AppError('Estado de caso inválido', 400);
@@ -299,6 +313,12 @@ export const resolverAlerta = async (req: Request, res: Response, next: NextFunc
         const { estado, notas } = req.body;
         const usuarioId = (req as AuthRequest).user!.id;
 
+        const role = (req as AuthRequest).user!.rol;
+        if (role?.startsWith('ADMIN_')) {
+            const item = await prisma.alertaGenerada.findUnique({ where: { id } });
+            if (!item) throw new AppError('Caso no encontrado', 404);
+            if (item.datos.includes(CATALOGUE_MARKER) && JSON.parse(item.datos).tipoActor !== role.slice(6)) throw new AppError('Caso fuera de su ámbito', 403);
+        }
         const alerta = await prisma.alertaGenerada.update({
             where: { id },
             data: alertResolution(estado, notas, usuarioId)
@@ -317,6 +337,20 @@ export const simularSeguimientoAlerta = async (req: Request, res: Response, next
 
 export const evaluarSeguimientoAlerta = async (_req: Request, res: Response, next: NextFunction) => {
     try { res.json({ success: true, data: { avisosActualizados: await ejecutarSeguimientoCierre(), canal: 'interno' } }); }
+    catch (error) { next(error); }
+};
+
+export const simularCatalogoAlerta = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        let raw: string;
+        try { raw = normalizeAlertCondition(req.body.condicion); if (!catalogueCondition(raw)) throw new AppError('Familia no admitida', 400); }
+        catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
+        res.json({ success: true, data: await simularCatalogo(raw) });
+    } catch (error) { next(error); }
+};
+
+export const evaluarCatalogoAlerta = async (_req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: { avisosActualizados: await ejecutarCatalogo(), canal: 'interno' } }); }
     catch (error) { next(error); }
 };
 

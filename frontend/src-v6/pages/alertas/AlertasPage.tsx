@@ -36,7 +36,9 @@ import { toast } from '../../components/ui/Toast';
 import { useAlertas, useResolverAlerta, useReglasAlerta, useCreateReglaAlerta, useUpdateReglaAlerta, useDeleteReglaAlerta, useEvaluarSeguimiento } from '../../hooks/useAlertas';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas } from '../../hooks/useNotificaciones';
 import { useAuth } from '../../contexts/AuthContext';
-import { alertaService, type FollowupPreview } from '../../services/alerta.service';
+import { alertaService, type FollowupPreview, type CataloguePreview } from '../../services/alerta.service';
+import { cataloguePath } from '../../utils/alertCatalogue';
+import { notificationFollowup } from '../../utils/notificationFollowup';
 import { EstadoAlerta } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 
@@ -56,6 +58,8 @@ interface AlertaLocal {
   estado: string;
   notas?: string;
   fechaResolucion?: string;
+  destino?: string;
+  seguimiento?: string;
 }
 
 // ─── Visual config ────────────────────────────────────────────────────────────
@@ -221,6 +225,8 @@ const ROLES_DESTINATARIOS = [
   { value: 'GENERADOR', label: 'Generador involucrado' },
   { value: 'TRANSPORTISTA', label: 'Transportista involucrado' },
   { value: 'OPERADOR', label: 'Operador involucrado' },
+  { value: 'INSPECCIONADO', label: 'Actor vinculado al expediente' },
+  { value: 'INSPECTOR_ASIGNADO', label: 'Inspector asignado al expediente' },
 ];
 
 const CONDITION_PRESETS: Record<string, Array<{ label: string; value: string }>> = {
@@ -299,11 +305,12 @@ export const AlertasPage: React.FC = () => {
   const marcarLeidaMutation = useMarcarLeida();
   const marcarTodasLeidasMutation = useMarcarTodasLeidas();
 
-  const { data: reglas } = useReglasAlerta(isAnyAdmin);
+  const { data: reglas, isError: reglasError, isPending: reglasPending, refetch: refetchReglas } = useReglasAlerta(isAnyAdmin);
   const createRegla = useCreateReglaAlerta();
   const updateRegla = useUpdateReglaAlerta();
   const deleteRegla = useDeleteReglaAlerta();
   const evaluarSeguimiento = useEvaluarSeguimiento();
+  const evaluarCatalogo = useEvaluarSeguimiento(true);
 
   const [activeTab, setActiveTab] = useState('alertas');
   const [showReglaModal, setShowReglaModal] = useState(false);
@@ -315,10 +322,15 @@ export const AlertasPage: React.FC = () => {
   const [caseState, setCaseState] = useState(EstadoAlerta.EN_REVISION);
   const [caseReason, setCaseReason] = useState('');
   const [caseError, setCaseError] = useState('');
-  const [preview, setPreview] = useState<{ condition: string; result: FollowupPreview } | null>(null);
+  const [preview, setPreview] = useState<{ condition: string; result: FollowupPreview | CataloguePreview } | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
   let followupDays: number | null = null;
   try { const condition = JSON.parse(reglaForm.condicion); if (condition.tipo === 'seguimiento_cierre') followupDays = condition.diasRecepcion?.gte ?? 0; } catch { /* advanced condition validated on save */ }
+  let catalogue: { tipo: string; anticipacionDias?: number; entidades?: string[] } | null = null;
+  try { const value = JSON.parse(reglaForm.condicion); if (['requerimiento_inspeccion', 'vencimiento_documental'].includes(value.tipo)) catalogue = value; } catch { /* validated on save */ }
+  const ruleKind = catalogue?.tipo || (followupDays !== null ? 'seguimiento' : 'evento');
+  const recipientsAllowed = catalogue?.tipo === 'requerimiento_inspeccion' ? ['INSPECCIONADO', 'INSPECTOR_ASIGNADO', 'ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']
+    : catalogue ? ['TRANSPORTISTA', 'OPERADOR', 'ADMIN', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] : followupDays !== null ? ['OPERADOR', 'ADMIN', 'ADMIN_OPERADOR'] : ROLES_DESTINATARIOS.filter(role => !role.value.startsWith('INSPEC')).map(role => role.value);
 
   const alertas: AlertaLocal[] = useMemo(() => {
     if (!isAnyAdmin) {
@@ -340,6 +352,8 @@ export const AlertasPage: React.FC = () => {
           manifiestoNumero: undefined,
           evento: n.tipo,
           estado: n.leida ? 'RESUELTA' : 'PENDIENTE',
+          destino: cataloguePath(n.datos, true) || undefined,
+          seguimiento: notificationFollowup(n) || undefined,
         }));
     }
     // Admin: alertas generadas by rules
@@ -362,6 +376,7 @@ export const AlertasPage: React.FC = () => {
           estado,
           notas: a.notas || undefined,
           fechaResolucion: a.fechaResolucion || undefined,
+          destino: cataloguePath(a.datos) || undefined,
         };
       });
   }, [isAnyAdmin, apiAlertas, apiNotifs]);
@@ -670,6 +685,7 @@ export const AlertasPage: React.FC = () => {
                               )}
                             </div>
                             <p className="text-sm text-neutral-600 leading-snug">{alerta.mensaje}</p>
+                            {alerta.seguimiento && <p className="mt-1 text-sm font-medium text-primary-800">{alerta.seguimiento}</p>}
                             {isAnyAdmin && alerta.estadoActual && <p className="mt-1 text-xs text-neutral-600">Estado actual del manifiesto: {alerta.estadoActual.replaceAll('_', ' ').toLowerCase()}. El caso conserva la situación registrada al detectarlo.</p>}
                             {isAnyAdmin && alerta.notas && <div className="mt-2 border-l-2 border-neutral-300 pl-3 text-sm text-neutral-700"><p className="font-medium">Última decisión{alerta.fechaResolucion ? ` · ${new Date(alerta.fechaResolucion).toLocaleString('es-AR')}` : ''}</p><p className="whitespace-pre-wrap break-words">{alerta.notas}</p></div>}
                           </div>
@@ -683,8 +699,9 @@ export const AlertasPage: React.FC = () => {
                         </div>
 
                         {/* Actions row */}
-                        {(alerta.manifiestoId || !alerta.leida || isAnyAdmin) && (
+                        {(alerta.destino || alerta.manifiestoId || !alerta.leida || isAnyAdmin) && (
                           <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {alerta.destino && <Button variant="outline" leftIcon={<ExternalLink size={12} />} onClick={() => navigate(alerta.destino!)}>Abrir origen</Button>}
                             {alerta.manifiestoId && (
                               <Button variant="outline"
                                 onClick={() => navigate(`/manifiestos/${alerta.manifiestoId}`)}
@@ -771,12 +788,13 @@ export const AlertasPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-neutral-500">
-          {Array.isArray(reglas) ? reglas.length : 0} reglas configuradas
+          {reglasError ? 'No se pudieron cargar las reglas' : reglasPending ? 'Cargando reglas…' : `${Array.isArray(reglas) ? reglas.length : 0} reglas configuradas`}
         </p>
         {isAdmin && <Button variant="primary" leftIcon={<Plus size={15} />} onClick={openCreateRegla}>
           Nueva Regla
         </Button>}
       </div>
+      {reglasError && <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-error-800"><p>No se puede confirmar la configuración. No equivale a cero reglas.</p><Button variant="outline" onClick={() => refetchReglas()}>Reintentar reglas</Button></div>}
       {/* Mobile cards */}
       <div className="md:hidden space-y-2">
         {(Array.isArray(reglas) ? reglas : []).map((r: any) => (
@@ -793,7 +811,7 @@ export const AlertasPage: React.FC = () => {
         ))}
       </div>
       {/* Desktop table */}
-      <Card className="hidden md:block">
+      <Card className={`hidden md:block ${reglasError || reglasPending ? 'hidden md:hidden' : ''}`}>
         <Table
           data={Array.isArray(reglas) ? reglas : []}
           columns={reglasColumns}
@@ -847,6 +865,7 @@ export const AlertasPage: React.FC = () => {
             Marcar todas
           </Button>}
           {isAdmin && <Button variant="outline" disabled={evaluarSeguimiento.isPending} onClick={() => evaluarSeguimiento.mutate(undefined, { onSuccess: result => toast.success('Seguimiento evaluado', `${result.avisosActualizados} avisos internos actualizados. Sin correo ni push.`), onError: () => toast.error('No se completó la evaluación', 'Puede haber un resultado parcial. Reintentá; no se duplican avisos.') })}>Evaluar seguimiento ahora</Button>}
+          {isAdmin && <Button variant="outline" disabled={evaluarCatalogo.isPending} onClick={() => evaluarCatalogo.mutate(undefined, { onSuccess: result => toast.success('Catálogo evaluado', `${result.avisosActualizados} avisos internos actualizados. Sin correo ni push.`), onError: () => toast.error('No se completó el catálogo', 'Puede haber un resultado parcial. Reintentá; las identidades de caso se conservan.') })}>Evaluar inspecciones y vencimientos</Button>}
         </div>
       </div>
 
@@ -886,13 +905,18 @@ export const AlertasPage: React.FC = () => {
         footer={<div className="flex justify-end gap-2"><Button variant="outline" disabled={createRegla.isPending || updateRegla.isPending} onClick={() => setShowReglaModal(false)}>Cancelar</Button><Button onClick={handleSaveRegla} disabled={createRegla.isPending || updateRegla.isPending}>{editingRegla ? 'Guardar cambios' : 'Crear regla'}</Button></div>}
       >
         <div className="overflow-y-auto max-h-[calc(100vh-200px)] pr-1 space-y-4">
-          <Select label="Tipo de regla" value={followupDays !== null ? 'seguimiento' : 'evento'} disabled={editingRegla?.id === 'seguimiento_cierre_v1'} options={[
+          <Select label="Tipo de regla" value={ruleKind} disabled={editingRegla?.id === 'seguimiento_cierre_v1'} options={[
             { value: 'evento', label: 'Evento del workflow' },
             { value: 'seguimiento', label: 'Manifiesto pendiente de tratamiento o cierre' },
+            { value: 'requerimiento_inspeccion', label: 'Inspección · requerimiento sin respuesta' },
+            { value: 'vencimiento_documental', label: 'Habilitaciones y licencias · vigencia' },
             { value: 'ddjj', label: 'DDJJ · requiere calendario aprobado', disabled: true },
             { value: 'tef', label: 'TEF · requiere obligación y saldo conciliados', disabled: true },
             { value: 'ocr', label: 'Recibos OCR · requiere extracción verificable', disabled: true },
-          ]} onChange={value => { setPreview(null); setReglaForm(prev => value === 'seguimiento' ? { ...prev, nombre: prev.nombre || 'Seguimiento de manifiesto', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"seguimiento_cierre","diasRecepcion":{"gte":0}}', destinatarios: ['OPERADOR'], emails: '', activa: false } : { ...prev, condicion: '{}', evento: '', destinatarios: [], emails: '' }); }} />
+          ]} onChange={value => { setPreview(null); setReglaForm(prev => value === 'seguimiento' ? { ...prev, nombre: prev.nombre || 'Seguimiento de manifiesto', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"seguimiento_cierre","diasRecepcion":{"gte":0}}', destinatarios: ['OPERADOR'], emails: '', activa: false }
+            : value === 'requerimiento_inspeccion' ? { ...prev, evento: 'TIEMPO_EXCESIVO', condicion: JSON.stringify({ tipo: value }), destinatarios: ['INSPECCIONADO', 'INSPECTOR_ASIGNADO'], emails: '', activa: false }
+            : value === 'vencimiento_documental' ? { ...prev, evento: 'VENCIMIENTO', condicion: JSON.stringify({ tipo: value, anticipacionDias: 30, entidades: ['TRANSPORTISTA', 'OPERADOR', 'VEHICULO', 'CHOFER'] }), destinatarios: ['TRANSPORTISTA', 'OPERADOR'], emails: '', activa: false }
+            : { ...prev, condicion: '{}', evento: '', destinatarios: [], emails: '' }); }} />
           <Input
             label="Nombre"
             placeholder="Nombre de la regla"
@@ -909,7 +933,7 @@ export const AlertasPage: React.FC = () => {
               rows={2}
             />
           </div>
-          {followupDays === null ? <><Select
+          {followupDays === null && !catalogue ? <><Select
             label="Evento"
             placeholder="Seleccionar evento…"
             options={EVENTO_OPTIONS}
@@ -929,18 +953,22 @@ export const AlertasPage: React.FC = () => {
             />
             </details>
           </div></> : <div className="space-y-3">
-            <Input label="Días desde la recepción" type="number" min={0} max={365} step={1} value={followupDays} onChange={event => { setPreview(null); setReglaForm(prev => ({ ...prev, condicion: JSON.stringify({ tipo: 'seguimiento_cierre', diasRecepcion: { gte: Number(event.target.value) } }) })); }} />
-            <p className="text-sm text-neutral-600">Umbral operativo, no vencimiento legal. Se revisa diariamente a las 08:00 de Mendoza. Cero incluye todos los recibidos o en tratamiento.</p>
+            {!catalogue ? <><Input label="Días desde la recepción" type="number" min={0} max={365} step={1} value={followupDays ?? 0} onChange={event => { setPreview(null); setReglaForm(prev => ({ ...prev, condicion: JSON.stringify({ tipo: 'seguimiento_cierre', diasRecepcion: { gte: Number(event.target.value) } }) })); }} />
+            <p className="text-sm text-neutral-600">Umbral operativo, no vencimiento legal. Se revisa diariamente a las 08:00 de Mendoza. Cero incluye todos los recibidos o en tratamiento.</p></>
+              : catalogue.tipo === 'requerimiento_inspeccion' ? <p className="text-sm text-neutral-700">Usa el plazo registrado de cada requerimiento. Leer, responder a otro pedido o una respuesta de la autoridad no lo contestan. Una respuesta vinculada detiene el aviso de ausencia, sin aceptar la subsanación.</p>
+              : <><Input label="Días de anticipación" type="number" min={0} max={365} step={1} value={catalogue.anticipacionDias ?? 30} onChange={event => { setPreview(null); setReglaForm(prev => ({ ...prev, condicion: JSON.stringify({ ...JSON.parse(prev.condicion), anticipacionDias: Number(event.target.value) }) })); }} />
+                <fieldset className="space-y-2"><legend className="text-sm font-medium text-neutral-700">Fuentes con fecha registrada</legend>{[['TRANSPORTISTA', 'Transportistas'], ['OPERADOR', 'Operadores'], ['VEHICULO', 'Vehículos'], ['CHOFER', 'Conductores']].map(([value, label]) => <label key={value} className="flex min-h-11 items-center gap-3 rounded-lg border border-neutral-200 px-3"><input type="checkbox" checked={catalogue?.entidades?.includes(value) || false} onChange={event => { setPreview(null); setReglaForm(prev => { const current = JSON.parse(prev.condicion); return { ...prev, condicion: JSON.stringify({ ...current, entidades: event.target.checked ? [...current.entidades, value] : current.entidades.filter((entity: string) => entity !== value) }) }; }); }} />{label}</label>)}</fieldset><p className="text-sm text-neutral-600">Incluye vencidos. Cero incluye sólo fechas alcanzadas. Sin fecha no se inventa vencimiento; una renovación conserva el caso anterior.</p></>}
+            {catalogue && <p className="text-xs text-neutral-600">Evaluación diaria a las 08:05 de Mendoza. Sólo bandeja interna web/app.</p>}
             <Button variant="outline" disabled={previewPending} onClick={async () => {
-              if (followupDays === null) return;
+              if (followupDays === null && !catalogue) return;
               const condition = reglaForm.condicion; setPreviewPending(true);
-              try { setPreview({ condition, result: await alertaService.simularSeguimiento(followupDays) }); }
+              try { setPreview({ condition, result: catalogue ? await alertaService.simularCatalogo(condition) : await alertaService.simularSeguimiento(followupDays!) }); }
               catch { toast.error('No se pudo simular', 'Verificá los días y reintentá. No se crearon casos ni avisos.'); }
               finally { setPreviewPending(false); }
             }}>Simular sin enviar</Button>
             {preview?.condition === reglaForm.condicion && <div role="status" className="rounded-lg border border-neutral-200 p-3 text-sm">
-              <p>{preview.result.total} manifiestos coinciden con la condición. Sin crear casos ni avisos.</p>
-              <ul className="mt-2 space-y-1">{preview.result.ejemplos.map(example => <li key={example.id}><button type="button" className="min-h-11 text-primary-700 underline underline-offset-2" onClick={() => navigate(`/manifiestos/${example.id}`)}>{example.numero} · {example.estado === 'RECIBIDO' ? 'Recibido' : 'En tratamiento'}</button></li>)}</ul>
+              <p>{preview.result.total} {catalogue ? 'objetos' : 'manifiestos'} coinciden con la condición. Sin crear casos ni avisos.</p>
+              <ul className="mt-2 space-y-1">{preview.result.ejemplos.map(example => <li key={('entidad' in example ? example.entidad : '') + example.id}>{catalogue ? <span className="block py-2 break-words">{example.numero} · {example.estado.replaceAll('_', ' ').toLowerCase()}{'vencimiento' in example ? ` · ${new Date(example.vencimiento).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' })}` : ''}</span> : <button type="button" className="min-h-11 text-primary-700 underline underline-offset-2" onClick={() => navigate(`/manifiestos/${example.id}`)}>{example.numero} · {example.estado === 'RECIBIDO' ? 'Recibido' : 'En tratamiento'}</button>}</li>)}</ul>
               {preview.result.total > preview.result.ejemplos.length && <p className="mt-2 text-neutral-600">Muestra de {preview.result.ejemplos.length} casos; total contado en servidor.</p>}
             </div>}
           </div>}
@@ -950,9 +978,9 @@ export const AlertasPage: React.FC = () => {
               <Users size={13} className="inline mr-1 -mt-0.5 text-neutral-400" />
               Destinatarios
             </label>
-            <p className="mb-2 text-xs leading-relaxed text-neutral-500">Los roles de actor notifican sólo a la parte involucrada en el manifiesto; no a todo el padrón.</p>
+            <p className="mb-2 text-xs leading-relaxed text-neutral-600">Sólo el actor involucrado, inspector asignado o administración del ámbito elegido; nunca todo el padrón. Reglas distintas pueden generar casos distintos sobre el mismo objeto.</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {ROLES_DESTINATARIOS.filter(rol => followupDays === null || ['OPERADOR', 'ADMIN', 'ADMIN_OPERADOR'].includes(rol.value)).map(rol => (
+              {ROLES_DESTINATARIOS.filter(rol => recipientsAllowed.includes(rol.value)).map(rol => (
                 <label key={rol.value} className="flex items-center gap-2.5 cursor-pointer p-2.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors">
                   <input
                     type="checkbox"
@@ -969,7 +997,7 @@ export const AlertasPage: React.FC = () => {
             </div>
           </div>
 
-          {followupDays === null && <div>
+          {followupDays === null && !catalogue && <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">
               <Mail size={13} className="inline mr-1 -mt-0.5 text-neutral-400" />
               Emails adicionales

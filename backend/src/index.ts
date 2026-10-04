@@ -29,6 +29,7 @@ import { iniciarVencimientoJob } from './jobs/vencimiento.job';
 import { iniciarBlockchainJob } from './jobs/blockchain.job';
 import { iniciarRecordatorioJob } from './jobs/recordatorio.job';
 import { iniciarSeguimientoCierreJob } from './jobs/seguimientoCierre.job';
+import { iniciarAlertCatalogueJob } from './jobs/alertCatalogue.job';
 import blockchainRoutes from './routes/blockchain.routes';
 import renovacionRoutes from './routes/renovacion.routes';
 import solicitudRoutes from './routes/solicitud.routes';
@@ -255,6 +256,7 @@ iniciarVencimientoJob();
 iniciarBlockchainJob();
 iniciarRecordatorioJob();
 iniciarSeguimientoCierreJob();
+iniciarAlertCatalogueJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;

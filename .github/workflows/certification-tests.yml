@@ -199,7 +199,7 @@ jobs:
           cd frontend
           test "$QA_ALERT_ONLY" != 'true' || test "$QA_CONTEXT_ONLY" != 'true'
           if test "$QA_ALERT_ONLY" = 'true'; then
-            npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/alert-repository.spec.ts
+            npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/alert-repository.spec.ts cloud-qa/e2e/alert-catalogue.spec.ts
           elif test "$QA_CONTEXT_ONLY" = 'true'; then
             npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/proactive-context.spec.ts
           else
@@ -216,6 +216,8 @@ jobs:
             /tmp/sitrep-night-20260926.cloud/expiry-identity.json
             /tmp/sitrep-night-20260926.cloud/e2e/alert-repository-*/**/*.png
             /tmp/sitrep-night-20260926.cloud/e2e/alert-repository-*/**/error-context.md
+            /tmp/sitrep-night-20260926.cloud/e2e/alert-catalogue-*/**/*.png
+            /tmp/sitrep-night-20260926.cloud/e2e/alert-catalogue-*/**/error-context.md
             /tmp/sitrep-night-20260926.cloud/e2e/**/monitor-*.png
             /tmp/sitrep-night-20260926.cloud/e2e/proactive-context-*/**/*.png
             /tmp/sitrep-night-20260926.cloud/e2e/proactive-context-*/**/error-context.md

@@ -6,6 +6,7 @@ import { notificationService } from '../controllers/notification.controller';
 import { DomainEvent } from '../services/domainEvent.service';
 import { matchesAlertCondition } from '../services/alertRuleCondition.service';
 import { followupDays } from '../services/alertFollowupPolicy.service';
+import { catalogueCondition } from '../services/alertCataloguePolicy.service';
 
 /** Mapeo DomainEvent.type → EventoAlerta (para búsqueda de ReglaAlerta) */
 const EVENTO_ALERTA_MAP: Partial<Record<DomainEvent['type'], EventoAlerta>> = {
@@ -56,6 +57,7 @@ async function dispararReglasAlerta(
     let matches = false;
     try {
       if (followupDays(regla.condicion) !== null) continue;
+      if (catalogueCondition(regla.condicion) !== null) continue;
       matches = matchesAlertCondition(regla.condicion, datos);
     }
     catch (error) {

@@ -14,6 +14,9 @@ export interface FollowupPreview {
   escribeDatos: false;
   canal: 'interno';
 }
+export interface CataloguePreview extends Omit<FollowupPreview, 'ejemplos'> {
+  ejemplos: Array<{ id: string; numero: string; estado: string; entidad: string; vencimiento: string }>;
+}
 
 export const alertaService = {
   // Reglas
@@ -67,6 +70,16 @@ export const alertaService = {
 
   async evaluarSeguimiento(): Promise<{ avisosActualizados: number; canal: 'interno' }> {
     const { data } = await api.post('/alertas/seguimiento/evaluar');
+    return data.data;
+  },
+
+  async simularCatalogo(condicion: string): Promise<CataloguePreview> {
+    const { data } = await api.post('/alertas/catalogo/simular', { condicion });
+    return data.data;
+  },
+
+  async evaluarCatalogo(): Promise<{ avisosActualizados: number; canal: 'interno' }> {
+    const { data } = await api.post('/alertas/catalogo/evaluar');
     return data.data;
   },
 

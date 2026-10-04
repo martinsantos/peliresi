@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import AlertasPage from '../../pages/alertas/AlertasPage';
-const service = vi.hoisted(() => ({ listAlertas: vi.fn(), listReglas: vi.fn(), resolverAlerta: vi.fn(), createRegla: vi.fn(), updateRegla: vi.fn(), deleteRegla: vi.fn(), evaluarSeguimiento: vi.fn(), simularSeguimiento: vi.fn() }));
+const service = vi.hoisted(() => ({ listAlertas: vi.fn(), listReglas: vi.fn(), resolverAlerta: vi.fn(), createRegla: vi.fn(), updateRegla: vi.fn(), deleteRegla: vi.fn(), evaluarSeguimiento: vi.fn(), simularSeguimiento: vi.fn(), evaluarCatalogo: vi.fn(), simularCatalogo: vi.fn() }));
 const auth = vi.hoisted(() => ({ isAdmin: true, isAnyAdmin: true }));
 vi.mock('../../services/alerta.service', () => ({ alertaService: service }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth }));
@@ -12,6 +12,24 @@ const caseRow = { id: 'case', estado: 'PENDIENTE', createdAt: new Date().toISOSt
 function setup() {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })}><MemoryRouter><AlertasPage /></MemoryRouter></QueryClientProvider>);
 }
+it('does not disguise failed rule loading as zero configured rules', async () => {
+  service.listReglas.mockRejectedValue(new Error('offline')); setup();
+  fireEvent.click(screen.getByRole('tab', { name: /Reglas/ }));
+  expect(await screen.findByText('No se puede confirmar la configuración. No equivale a cero reglas.')).toBeVisible();
+  expect(screen.queryByText('0 reglas configuradas')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Reintentar reglas' })).toBeVisible();
+});
+it('inspection rule is initially inactive, has exact recipients, no invented days and no external emails', async () => {
+  setup(); fireEvent.click(screen.getByRole('tab', { name: /Reglas/ })); fireEvent.click(screen.getByRole('button', { name: 'Nueva Regla', exact: true }));
+  const dialog = screen.getByRole('dialog', { name: 'Nueva Regla', exact: true });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Tipo de regla', exact: true }));
+  fireEvent.click(screen.getByRole('option', { name: 'Inspección · requerimiento sin respuesta', exact: true }));
+  expect(within(dialog).getByLabelText('Regla activa')).not.toBeChecked();
+  expect(within(dialog).getByText('INSPECCIONADO', { exact: true })).toBeVisible();
+  expect(within(dialog).getByText('INSPECTOR_ASIGNADO', { exact: true })).toBeVisible();
+  expect(within(dialog).queryByLabelText('Días desde la recepción')).toBeNull();
+  expect(within(dialog).queryByText('Emails adicionales')).toBeNull();
+});
 beforeEach(() => {
   vi.clearAllMocks(); auth.isAdmin = true; auth.isAnyAdmin = true;
   service.listAlertas.mockResolvedValue({ items: [caseRow], total: 110, page: 1, limit: 10, totalPages: 11 });

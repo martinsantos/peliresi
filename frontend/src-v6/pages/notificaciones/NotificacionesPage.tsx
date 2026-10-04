@@ -132,7 +132,7 @@ const NotificacionesPage: React.FC = () => {
             const Content = linked ? 'button' : 'div';
             const warning = /RECHAZ|INCIDENTE|ANOMALIA|VENCIMIENTO|ALERTA/.test(notice.tipo);
             const success = /TRATADO|RECIBIDO/.test(notice.tipo);
-            const Icon = warning ? AlertTriangle : path.includes('/inspecciones/') ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
+            const Icon = warning ? AlertTriangle : /\/(?:mis-)?inspecciones\//.test(path) ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
             return (
               <li key={notice.id} className={notice.leida ? '' : 'bg-primary-50/40'}>
                 <Content type={linked ? 'button' : undefined} aria-label={linked ? 'Abrir aviso: ' + title : undefined} onClick={linked ? () => open(notice) : undefined}

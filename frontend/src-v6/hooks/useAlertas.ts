@@ -48,9 +48,9 @@ export function useResolverAlerta() {
   });
 }
 
-export function useEvaluarSeguimiento() {
+export function useEvaluarSeguimiento(catalogue = false) {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: () => alertaService.evaluarSeguimiento(), onSuccess: async () => {
+  return useMutation({ mutationFn: () => catalogue ? alertaService.evaluarCatalogo() : alertaService.evaluarSeguimiento(), onSuccess: async () => {
     await Promise.all([qc.invalidateQueries({ queryKey: ['alertas'] }), qc.invalidateQueries({ queryKey: ['notificaciones'] })]);
   } });
 }

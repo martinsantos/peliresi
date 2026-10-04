@@ -1,4 +1,5 @@
 import type { Notificacion } from '../types/models';
+import { cataloguePath } from './alertCatalogue';
 
 function parseNotificationData(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
@@ -21,6 +22,8 @@ function withBasePath(path: string, basePath: string): string {
 
 export function resolveNotificationPath(notificacion: Notificacion, basePath = ''): string {
   const data = parseNotificationData(notificacion.datos);
+  const target = cataloguePath(notificacion.datos, true);
+  if (target) return withBasePath(target, basePath);
   const explicitPath = typeof data.url === 'string'
     ? data.url
     : typeof data.ruta === 'string'
