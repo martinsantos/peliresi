@@ -23,7 +23,7 @@ function requestSource(record: RequestRecord | null, now: Date): Source | null {
     facts: { familia: 'catalogo_verificable', version: 1, tipo: 'requerimiento_inspeccion', entidad: 'REQUERIMIENTO', entidadId: record.id,
       vencimiento: record.plazoRespuestaAt!.toISOString(), tipoActor: inspection.tipoActor, actorId: actor?.id ?? null,
       inspeccionId: inspection.id, numero: inspection.numero, estadoDetectado: 'SIN_RESPUESTA',
-      descripcion: `${inspection.numero} · ${record.asunto}. Plazo registrado: ${record.plazoRespuestaAt!.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' })}. Sin respuesta del inspeccionado vinculada a este requerimiento. Responder no equivale a subsanación aceptada.` } };
+      descripcion: `${inspection.numero} · ${record.asunto}. Plazo registrado: ${record.plazoRespuestaAt!.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false })} (Mendoza). Sin respuesta del inspeccionado vinculada a este requerimiento. Responder no equivale a subsanación aceptada.` } };
 }
 
 async function expirySource(tx: Prisma.TransactionClient, entity: ExpiryEntity, id: string, days: number, now: Date): Promise<Source | null> {
@@ -45,7 +45,7 @@ async function expirySource(tx: Prisma.TransactionClient, entity: ExpiryEntity, 
   if (situation === 'FUERA_DE_ALCANCE') return null;
   return { ownerId: owner.usuarioId, facts: { familia: 'catalogo_verificable', version: 1, tipo: 'vencimiento_documental', entidad: entity, entidadId: id,
     vencimiento: date!.toISOString(), tipoActor: category, actorId: owner.id, numero: name, estadoDetectado: situation,
-    descripcion: `${name} · ${entity === 'CHOFER' ? 'Licencia' : 'Habilitación'}: fecha registrada ${date!.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' })}. ${situation === 'VENCIDO' ? 'Fecha registrada alcanzada; revisar vigencia y renovación.' : 'Próxima a vencer; revisar renovación.'} No determina una sanción automáticamente.` } };
+    descripcion: `${name} · ${entity === 'CHOFER' ? 'Licencia' : 'Habilitación'}: fecha registrada ${date!.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false })} (Mendoza). ${situation === 'VENCIDO' ? 'Fecha registrada alcanzada; revisar vigencia y renovación.' : 'Próxima a vencer; revisar renovación.'} No determina una sanción automáticamente.` } };
 }
 
 function caseId(ruleId: string, facts: Facts): string {

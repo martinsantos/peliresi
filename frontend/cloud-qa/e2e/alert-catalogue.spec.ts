@@ -23,8 +23,12 @@ async function createRule(page: Page, info: TestInfo, kind: string, name: string
   const simulate = page.waitForResponse(r => r.url().endsWith('/api/alertas/catalogo/simular'));
   await dialog.getByRole('button', { name: 'Simular sin enviar', exact: true }).click();
   const preview = await simulate; expect(preview.status()).toBe(200);
-  expect((await preview.json()).data).toMatchObject({ escribeDatos: false, canal: 'interno' });
+  const previewData = (await preview.json()).data;
+  expect(previewData).toMatchObject({ escribeDatos: false, canal: 'interno' });
   await expect(dialog.getByText(/objetos coinciden con la condición/)).toBeVisible();
+  for (const item of previewData.ejemplos) {
+    expect(await dialog.textContent()).toContain(new Date(item.vencimiento).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false }) + ' (Mendoza)');
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('catalogue-preview.png'), animations: 'disabled' });
   await dialog.getByLabel('Regla activa', { exact: true }).check();

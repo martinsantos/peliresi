@@ -32,6 +32,11 @@ it('simulation does not create rules, cases or notices', async () => {
   expect(await simularCatalogo(rule.condicion, now)).toMatchObject({ total: 1, escribeDatos: false });
   expect(m.transaction).not.toHaveBeenCalled(); expect(m.upsert).not.toHaveBeenCalled(); expect(m.notice).not.toHaveBeenCalled();
 });
+it('displays afternoon deadlines in unambiguous 24-hour Mendoza time', async () => {
+  m.request.mockResolvedValue({ ...request, plazoRespuestaAt: new Date('2026-10-03T22:30:00Z') });
+  await ejecutarCatalogo(now);
+  expect(m.notice.mock.calls[0][0].create.mensaje).toContain('19:30:00 (Mendoza)');
+});
 it('retries preserve case snapshot, decision and notification read state', async () => {
   await ejecutarCatalogo(now); await ejecutarCatalogo(new Date('2026-10-05T12:00:00Z'));
   expect(m.upsert.mock.calls[0][0].where).toEqual(m.upsert.mock.calls[1][0].where);
