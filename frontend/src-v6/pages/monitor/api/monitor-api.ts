@@ -9,6 +9,7 @@ import monitorApi from '../../../services/api';
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 export interface TimelineEvent {
+  id?: string;
   timestamp: string;
   type: 'EVENTO' | 'GPS';
   eventoTipo?: string;
@@ -52,6 +53,7 @@ export interface ActorPosition {
 }
 
 export interface TimelineResponse {
+  paginacion?: { pagina: number; siguiente: number | null };
   eventos: TimelineEvent[];
   actores: {
     generadores: ActorPosition[];
@@ -59,6 +61,9 @@ export interface TimelineResponse {
     operadores: ActorPosition[];
   };
   resumen: {
+    incompleto?: boolean;
+    eventosRecortados?: boolean;
+    gpsRecortados?: boolean;
     totalEventos: number;
     totalManifiestos: number;
     totalGpsPoints: number;
@@ -139,9 +144,34 @@ export interface ForecastResponse {
   }[];
 }
 
-export async function fetchTimeline(fecha: string, dias = 1): Promise<TimelineResponse> {
-  const { data } = await monitorApi.get('/centro-control/timeline', { params: { fecha, dias } });
-  return data.data;
+export async function fetchTimeline(fecha: string, dias = 1, signal?: AbortSignal): Promise<TimelineResponse> {
+  let result: TimelineResponse | undefined;
+  const seen = new Set<string>();
+  const corte = new Date().toISOString();
+  for (let pagina = 1; pagina <= 100; pagina++) {
+    const { data } = await monitorApi.get('/centro-control/timeline', { params: { fecha, dias, pagina, corte }, signal });
+    const batch = data.data as TimelineResponse;
+    if (!result) result = { ...batch, eventos: [], resumen: { ...batch.resumen } };
+    for (const event of batch.eventos) {
+      if (event.id && seen.has(event.id)) continue;
+      if (event.id) seen.add(event.id);
+      result.eventos.push(event);
+    }
+    // A phone must not allocate an unbounded month of GPS. Never turn this
+    // safety boundary into a partial movie labelled as the complete period.
+    if (result.eventos.length > 25000) throw new Error('El historial supera 25.000 registros. Elegí un período más corto para reproducirlo.');
+    if (!batch.paginacion?.siguiente) {
+      if (batch.resumen.incompleto) throw new Error('El servidor devolvió un historial incompleto. Elegí un período más corto.');
+      result.eventos.sort((a, b) => a.timestamp.localeCompare(b.timestamp) || (a.id || '').localeCompare(b.id || ''));
+      result.paginacion = { pagina, siguiente: null };
+      result.resumen = { ...result.resumen, incompleto: false, eventosRecortados: false, gpsRecortados: false,
+        totalEventos: result.eventos.length, totalGpsPoints: result.eventos.filter(e => e.type === 'GPS').length,
+        primeraActividad: result.eventos[0]?.timestamp ?? null, ultimaActividad: result.eventos.at(-1)?.timestamp ?? null };
+      return result;
+    }
+    if (batch.paginacion.siguiente !== pagina + 1) throw new Error('La paginación del historial no avanzó. Volvé a cargar el período.');
+  }
+  throw new Error('El historial es demasiado grande. Elegí un período más corto.');
 }
 
 export async function fetchMonitorLive(): Promise<MonitorLiveResponse> {

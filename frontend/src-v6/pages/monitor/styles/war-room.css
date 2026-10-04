@@ -50,6 +50,7 @@
 .wr-layout-sidebar { grid-area: sidebar; min-height: 0; overflow-y: auto; z-index: 5; border-right: 1px solid #d4d4d4; }
 .wr-layout-map     { grid-area: map; min-height: 0; position: relative; }
 .wr-layout-bottom  { grid-area: bottom; z-index: 10; }
+.wr-timeline-actions { flex-wrap: wrap; }
 
 /* A phone cannot fit the desktop's 320px sidebar and its single-row toolbar.
    Keep the same data and controls, with a full-width map and scrollable panels. */
@@ -113,7 +114,7 @@
   border-radius: 8px;
 }
 
-.wr-layout button:focus-visible, .wr-layout a:focus-visible, .wr-layout input:focus-visible {
+.wr-layout button:focus-visible, .wr-layout a:focus-visible, .wr-layout input:focus-visible, .wr-layout select:focus-visible {
   outline: 2px solid #0D8A4F; outline-offset: 2px;
 }
 .wr-header button:focus-visible { outline-color: #fff; }

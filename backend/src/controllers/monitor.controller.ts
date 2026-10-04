@@ -16,25 +16,35 @@ const prisma = new PrismaClient();
 
 export async function getTimeline(req: Request, res: Response) {
   try {
-    const { fecha, dias = '1' } = req.query;
+    const { fecha, dias = '1', pagina = '1', corte } = req.query;
 
     if (!fecha || typeof fecha !== 'string') {
       return res.status(400).json({ success: false, message: 'Param fecha es requerido (ISO date)' });
     }
 
-    const diasNum = Math.min(Math.max(parseInt(dias as string) || 1, 1), 7);
-    const desde = new Date(fecha);
-    desde.setHours(0, 0, 0, 0);
-    const hasta = new Date(desde);
-    hasta.setDate(hasta.getDate() + diasNum);
-    hasta.setHours(23, 59, 59, 999);
+    const diasNum = Number(dias), page = Number(pagina);
+    const calendar = new Date(fecha + 'T00:00:00Z');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !Number.isFinite(calendar.getTime())
+      || calendar.toISOString().slice(0, 10) !== fecha || !Number.isInteger(diasNum) || diasNum < 1 || diasNum > 30
+      || !Number.isInteger(page) || page < 1 || page > 100) {
+      return res.status(400).json({ success: false, message: 'Seleccione una fecha válida y un período de 1 a 30 días.' });
+    }
+    const desde = new Date(fecha + 'T00:00:00-03:00');
+    const periodEnd = desde.getTime() + diasNum * 86400000;
+    if (corte !== undefined && (typeof corte !== 'string' || !Number.isFinite(Date.parse(corte)))) {
+      return res.status(400).json({ success: false, message: 'El corte temporal del historial no es válido.' });
+    }
+    // Every page in a client request shares the same cutoff; newly generated
+    // observations cannot shift offsets while that period is being downloaded.
+    const hasta = new Date(corte === undefined ? periodEnd : Math.min(periodEnd, Date.parse(corte as string)));
 
     // Fetch eventos + GPS en paralelo
-    const [eventos, gpsPoints, manifiestos] = await Promise.all([
+    const [eventRows, gpsRows, manifiestos] = await Promise.all([
       prisma.eventoManifiesto.findMany({
-        where: { createdAt: { gte: desde, lte: hasta } },
-        orderBy: { createdAt: 'asc' },
-        take: 3000,
+        where: { createdAt: { gte: desde, lt: hasta } },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * 3000,
+        take: 3001,
         select: {
           id: true,
           manifiestoId: true,
@@ -68,34 +78,37 @@ export async function getTimeline(req: Request, res: Response) {
           },
         },
       }),
-      // GPS downsampled: skip every other point for playback
+      // Page real GPS observations; never silently discard the rest of a month.
       prisma.$queryRawUnsafe<any[]>(`
         SELECT t.id, t."manifiestoId", t.latitud, t.longitud, t.velocidad, t.direccion, t.timestamp,
                m.numero as "manifiestoNumero"
         FROM tracking_gps t
         JOIN manifiestos m ON m.id = t."manifiestoId"
-        WHERE t.timestamp >= $1 AND t.timestamp <= $2
-        ORDER BY t.timestamp ASC
-        LIMIT 2000
-      `, desde, hasta),
+        WHERE t.timestamp >= $1 AND t.timestamp < $2
+        ORDER BY t.timestamp ASC, t.id ASC
+        LIMIT 2001 OFFSET $3
+      `, desde, hasta, (page - 1) * 2000),
       // Get unique manifiestos in the range for context
       prisma.manifiesto.findMany({
         where: {
           OR: [
-            { createdAt: { gte: desde, lte: hasta } },
-            { fechaRetiro: { gte: desde, lte: hasta } },
-            { fechaCierre: { gte: desde, lte: hasta } },
+            { createdAt: { gte: desde, lt: hasta } },
+            { fechaRetiro: { gte: desde, lt: hasta } },
+            { fechaCierre: { gte: desde, lt: hasta } },
           ],
         },
         select: { id: true, numero: true },
       }),
     ]);
 
+    const eventos = eventRows.slice(0, 3000), gpsPoints = gpsRows.slice(0, 2000);
+    const eventosRecortados = eventRows.length > 3000, gpsRecortados = gpsRows.length > 2000;
     // Build unified timeline
     const timeline: any[] = [];
 
     for (const ev of eventos) {
       timeline.push({
+        id: 'EVENTO:' + ev.id,
         timestamp: ev.createdAt.toISOString(),
         type: 'EVENTO',
         eventoTipo: ev.tipo,
@@ -145,6 +158,7 @@ export async function getTimeline(req: Request, res: Response) {
 
     for (const gp of gpsPoints) {
       timeline.push({
+        id: 'GPS:' + gp.id,
         timestamp: gp.timestamp instanceof Date ? gp.timestamp.toISOString() : gp.timestamp,
         type: 'GPS',
         manifiestoId: gp.manifiestoId,
@@ -179,6 +193,7 @@ export async function getTimeline(req: Request, res: Response) {
     res.json({
       success: true,
       data: {
+        paginacion: { pagina: page, siguiente: eventosRecortados || gpsRecortados ? page + 1 : null },
         eventos: timeline,
         actores: {
           generadores: generadores.map(g => ({ id: g.id, razonSocial: g.razonSocial, lat: g.latitud, lng: g.longitud })),
@@ -186,6 +201,9 @@ export async function getTimeline(req: Request, res: Response) {
           operadores: operadores.map(o => ({ id: o.id, razonSocial: o.razonSocial, lat: o.latitud, lng: o.longitud })),
         },
         resumen: {
+          incompleto: eventosRecortados || gpsRecortados,
+          eventosRecortados,
+          gpsRecortados,
           totalEventos: timeline.length,
           totalManifiestos: manifiestos.length,
           totalGpsPoints: gpsPoints.length,

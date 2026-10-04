@@ -1,15 +1,16 @@
 /**
  * Monitor Formatters — Self-contained formatting utilities
  */
+import { recentPeriod } from './playback-period';
 
 export function formatTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return d.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 export function formatTimeShort(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatDate(date: Date | string): string {
@@ -40,8 +41,7 @@ export function formatRelative(date: Date | string): string {
   return `hace ${days}d`;
 }
 
-/** ISO date string for today (YYYY-MM-DD) in LOCAL timezone */
+/** Civil date in Mendoza, independently of the viewer's timezone. */
 export function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return recentPeriod(1);
 }

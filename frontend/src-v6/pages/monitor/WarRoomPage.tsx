@@ -23,6 +23,7 @@ import { EventFeed } from './components/EventFeed';
 import { FloatingPanelLayer, useFloatingPanels } from './components/FloatingPanelLayer';
 import { TimelineControls } from './components/TimelineControls';
 import { formatTimeShort, todayISO } from './utils/formatters';
+import { recentPeriod } from './utils/playback-period';
 import type { EnTransitoItem } from './api/monitor-api';
 import { fetchActiveDays, fetchTimeline } from './api/monitor-api';
 import './styles/war-room.css';
@@ -47,7 +48,7 @@ const WarRoomPage: React.FC = () => {
 
   // Data hooks — only enabled for their respective modes
   const liveData = useWarRoomData(mode === 'LIVE');
-  const timelineData = useMonitorTimeline(playbackDate, playbackDias);
+  const timelineData = useMonitorTimeline(playbackDate, playbackDias, mode === 'PLAYBACK');
   const forecastData = useForecast(7, mode === 'FORECAST');
   const [online, setOnline] = useState(navigator.onLine);
   const [now, setNow] = useState(Date.now());
@@ -76,7 +77,7 @@ const WarRoomPage: React.FC = () => {
   useQuery({
     queryKey: ['monitor-timeline', nextDayForPrefetch, playbackDias],
     queryFn: () => fetchTimeline(nextDayForPrefetch!, playbackDias),
-    enabled: mode === 'PLAYBACK' && !!nextDayForPrefetch,
+    enabled: mode === 'PLAYBACK' && playbackDias === 1 && !!nextDayForPrefetch,
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
   });
@@ -139,6 +140,7 @@ const WarRoomPage: React.FC = () => {
     if (
       mode === 'PLAYBACK' &&
       autoContinue &&
+      playbackDias === 1 &&
       !playback.isPlaying &&
       playback.progress >= 0.99 &&
       playbackDate &&
@@ -153,7 +155,7 @@ const WarRoomPage: React.FC = () => {
         setPlaybackDate(nextDay);
       }
     }
-  }, [mode, autoContinue, playback.isPlaying, playback.progress, playbackDate, activeDays]);
+  }, [mode, autoContinue, playbackDias, playback.isPlaying, playback.progress, playbackDate, activeDays]);
 
 
 
@@ -209,16 +211,25 @@ const WarRoomPage: React.FC = () => {
   // Switch to PLAYBACK mode with today's date
   const handleSwitchToPlayback = useCallback((date?: string) => {
     const d = date || todayISO();
+    setPlaybackDias(1);
     setPlaybackDate(d);
     setMode('PLAYBACK');
   }, []);
 
   // Handle date change in playback
   const handleDateChange = useCallback((d: string) => {
+    setPlaybackDias(1);
     setPlaybackDate(d);
     playback.reset();
     setMode('PLAYBACK');
   }, [playback]);
+
+  const handlePeriodChange = (days: number) => {
+    playback.reset();
+    setPlaybackDias(days);
+    setPlaybackDate(recentPeriod(days));
+    setModeRaw('PLAYBACK');
+  };
 
   // Resolve actors for the map — always show actors even if timeline hasn't loaded yet
   const actores = mode === 'PLAYBACK' ? timelineData.data?.actores || liveData.data?.actores || null : liveData.data?.actores || null;
@@ -385,6 +396,7 @@ const WarRoomPage: React.FC = () => {
         <div className="wr-data-status flex items-center justify-between gap-2 px-4 border-b border-neutral-200 bg-white text-neutral-700">
           <p role="status" className={`text-xs ${dataStatus === 'Sin actualizar' || !online ? 'text-amber-800 font-semibold' : ''}`}>
             {dataStatus}{selectedQuery.dataUpdatedAt ? ` · última respuesta ${formatTimeShort(new Date(selectedQuery.dataUpdatedAt).toISOString())}` : ''}
+            {mode === 'PLAYBACK' && timelineData.isError && ` · ${timelineData.error.message}`}
           </p>
           <button type="button" aria-label="Actualizar datos del Monitor" disabled={!online || selectedQuery.isFetching} onClick={()=>void selectedQuery.refetch()} className="min-h-11 text-xs font-semibold text-[#1B5E3C] px-2 rounded hover:bg-neutral-100 disabled:opacity-50">Actualizar</button>
         </div>
@@ -459,6 +471,8 @@ const WarRoomPage: React.FC = () => {
           mode={mode}
           liveData={liveData.data || null}
           playbackDate={playbackDate}
+          playbackDias={playbackDias}
+          onPeriodChange={handlePeriodChange}
           onDateChange={handleDateChange}
           onSwitchToPlayback={handleSwitchToPlayback}
           timelineData={timelineData.data || null}

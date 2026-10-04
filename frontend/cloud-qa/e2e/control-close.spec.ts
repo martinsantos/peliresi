@@ -259,6 +259,23 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const observedManifests=new Set(timelineData.eventos.filter((e:{type:string;eventoTipo:string})=>e.type==='EVENTO'&&stateEvents.has(e.eventoTipo)).map((e:{manifiestoId:string})=>e.manifiestoId));
   await expect(page.getByText('En historial',{exact:true}).locator('..').locator('p').first()).toHaveText(new Intl.NumberFormat('es-AR').format(observedManifests.size));
   await visibleProof(page, info, 'monitor-playback');
+  const monthResponse = page.waitForResponse(r => {
+    const url = new URL(r.url());
+    return url.pathname === '/api/centro-control/timeline' && url.searchParams.get('dias') === '30';
+  });
+  await page.getByRole('combobox', { name: 'Período de reproducción' }).selectOption('30');
+  const month = await monthResponse;
+  expect(month.status()).toBe(200);
+  const monthData = (await month.json()).data;
+  expect(monthData.eventos.some((event: { id?: string; timestamp: string }) =>
+    event.id === 'GPS:cloud-qa-monitor-20-days' && Date.parse(event.timestamp) < Date.now() - 7 * 86400000)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Pausar historial', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Pausar historial', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Reproducir historial', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Período de reproducción' })).toHaveValue('30');
+  await slider.focus(); await slider.press('End');
+  await expect(slider).toHaveValue('1000');
+  await visibleProof(page, info, 'monitor-last-30-days-paused');
   const forecast = page.waitForResponse(r => r.url().includes('/api/centro-control/forecast'));
   await header.getByRole('button', { name: 'Pendientes', exact: true }).click();
   const forecastResponse = await forecast;

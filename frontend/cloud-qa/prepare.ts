@@ -60,6 +60,16 @@ try {
         cantidadRecibida:i+1,unidad:['kg','lt','tn'][i%3],estado:'SOLIDO'}]}},
     update:{},
   });
+  // A real persisted observation older than seven days proves the restored month
+  // is not merely a new selector over the former seven-day API cap.
+  const historicalTimestamp = new Date(Date.now() - 20 * 86400000);
+  await db.manifiesto.update({ where: { id: 'cloud-qa-report-0' }, data: {
+    createdAt: historicalTimestamp, fechaRetiro: historicalTimestamp,
+  } });
+  await db.trackingGPS.create({ data: { id: 'cloud-qa-monitor-20-days',
+    manifiestoId: 'cloud-qa-report-0', latitud: -32.8895, longitud: -68.8458,
+    timestamp: historicalTimestamp,
+  } });
   await writeFile(path.join(output,'fixture.json'),JSON.stringify({
     ...fixture,deviceManifest:{id:deviceManifest.id,numero:deviceManifest.numero},database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
     externalDelivery:false,syntheticReportRecords:155},null,2));

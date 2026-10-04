@@ -10,6 +10,7 @@ import { Play, Pause, Calendar, FileText, Truck, Weight, MapPin, TrendingUp, Rot
 import type { MonitorMode } from '../WarRoomPage';
 import type { ForecastResponse, MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
 import { formatNumber, formatTimeShort } from '../utils/formatters';
+import { periodEnd } from '../utils/playback-period';
 
 type PlaybackSpeed = 'fast' | 'normal' | 'slow';
 
@@ -34,6 +35,8 @@ interface Props {
   mode: MonitorMode;
   liveData: MonitorLiveResponse | null;
   playbackDate: string | null;
+  playbackDias?: number;
+  onPeriodChange?: (days: number) => void;
   onDateChange: (date: string) => void;
   onSwitchToPlayback: (date?: string) => void;
   timelineData: TimelineResponse | null;
@@ -62,7 +65,7 @@ const SPEED_LABELS: Record<PlaybackSpeed, string> = {
 const SPEED_ORDER: PlaybackSpeed[] = ['fast', 'normal', 'slow'];
 
 export const TimelineControls: React.FC<Props> = ({
-  mode, liveData, playbackDate, onDateChange, onSwitchToPlayback, timelineData, isLoading, playback,
+  mode, liveData, playbackDate, playbackDias = 1, onPeriodChange, onDateChange, onSwitchToPlayback, timelineData, isLoading, playback,
   autoContinue, onAutoContinueToggle, activeDays, currentHour, forecastData, liveCurrent = false,
 }) => {
   // Smart date navigation — find prev/next active day relative to current playbackDate
@@ -165,8 +168,15 @@ export const TimelineControls: React.FC<Props> = ({
 
         {mode === 'PLAYBACK' && (
           <>
+            {onPeriodChange && <label className="flex items-center gap-2 text-sm font-semibold text-[#1B5E3C]">
+              <Calendar size={18} aria-hidden="true" />
+              <select aria-label="Período de reproducción" value={playbackDias} onChange={e => onPeriodChange(Number(e.target.value))} className="min-h-11 rounded-lg border border-neutral-400 bg-white px-3 text-base text-neutral-900 focus-visible:ring-2 focus-visible:ring-primary-600">
+                <option value={1}>Un día</option><option value={7}>Últimos 7 días</option><option value={30}>Últimos 30 días</option>
+              </select>
+            </label>}
+            {playbackDias > 1 && playbackDate && <span className="text-sm font-semibold tabular-nums text-neutral-800">{formatDateFull(playbackDate)} — {formatDateFull(periodEnd(playbackDate, playbackDias))}</span>}
             {/* Date navigator — only active days */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            {playbackDias === 1 && <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={goToPrevDay}
                 aria-label="Día activo anterior"
@@ -186,7 +196,7 @@ export const TimelineControls: React.FC<Props> = ({
               >
                 <ChevronRight size={14} />
               </button>
-            </div>
+            </div>}
 
             {isLoading && (
               <span className="text-xs text-neutral-400 flex-shrink-0">Cargando...</span>
@@ -197,10 +207,12 @@ export const TimelineControls: React.FC<Props> = ({
                 {/* Play/Pause button */}
                 <button
                   onClick={playback.isPlaying ? playback.pause : playback.play}
+                  aria-label={playback.isPlaying ? 'Pausar historial' : 'Reproducir historial'}
+                  disabled={playback.totalEventCount === 0}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors flex-shrink-0 shadow-md ${
                     playback.isPlaying
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                      ? 'bg-[#1B5E3C] hover:bg-[#14482e] text-white'
+                      : 'bg-[#0D8A4F] hover:bg-[#096c3d] text-white disabled:opacity-50'
                   }`}
                   title={playback.isPlaying ? 'Pausar (Espacio)' : 'Reproducir (Espacio)'}
                 >
@@ -230,13 +242,13 @@ export const TimelineControls: React.FC<Props> = ({
 
                 {/* Event counter — prominent */}
                 <span className="text-xs font-bold text-neutral-700 tabular-nums font-mono">
-                  {playback.currentEventIndex + 1} / {playback.totalEventCount}
+                  {playback.totalEventCount ? playback.currentEventIndex + 1 : 0} / {playback.totalEventCount}
                 </span>
 
                 {/* Current event timestamp + indicador hora día/noche */}
                 {playback.currentEventTimestamp && (
                   <span className="text-[11px] font-mono text-neutral-500 tabular-nums flex-shrink-0">
-                    {formatTimeShort(playback.currentEventTimestamp)}
+                  {playbackDias > 1 && `${new Date(playback.currentEventTimestamp).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza', day: '2-digit', month: 'short' })} · `}{formatTimeShort(playback.currentEventTimestamp)}
                   </span>
                 )}
                 {currentHour !== undefined && (() => {
@@ -291,7 +303,7 @@ export const TimelineControls: React.FC<Props> = ({
                 )}
 
                 {/* Auto-continue toggle */}
-                {onAutoContinueToggle && (
+                {onAutoContinueToggle && playbackDias === 1 && (
                   <button
                     onClick={onAutoContinueToggle}
                     className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors flex-shrink-0 ${
@@ -308,6 +320,7 @@ export const TimelineControls: React.FC<Props> = ({
                 )}
               </>
             )}
+            {!isLoading && timelineData?.eventos.length === 0 && <span className="text-sm text-neutral-700">Sin movimientos registrados en este período.</span>}
           </>
         )}
 
