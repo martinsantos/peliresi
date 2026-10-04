@@ -23,7 +23,7 @@ on:
         required: true
         default: false
       alert_only:
-        description: Only the three alert repository journeys; never packages or certifies a complete candidate
+        description: Only alert repository and catalogue journeys; never packages or certifies a complete candidate
         type: boolean
         required: true
         default: false
