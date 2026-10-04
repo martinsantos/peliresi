@@ -19,6 +19,7 @@ async function createRule(page: Page, info: TestInfo, kind: string, name: string
   await page.getByRole('option', { name: kind, exact: true }).click();
   await dialog.getByLabel('Nombre', { exact: true }).fill(name);
   await expect(dialog.getByLabel('Regla activa', { exact: true })).not.toBeChecked();
+  expect(await dialog.getByRole('checkbox').evaluateAll(inputs => [...new Set(inputs.map(input => getComputedStyle(input).accentColor))])).toEqual(['rgb(11, 120, 68)']);
   const simulate = page.waitForResponse(r => r.url().endsWith('/api/alertas/catalogo/simular'));
   await dialog.getByRole('button', { name: 'Simular sin enviar', exact: true }).click();
   const preview = await simulate; expect(preview.status()).toBe(200);

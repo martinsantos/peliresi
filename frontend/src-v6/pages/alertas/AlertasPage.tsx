@@ -957,7 +957,7 @@ export const AlertasPage: React.FC = () => {
             <p className="text-sm text-neutral-600">Umbral operativo, no vencimiento legal. Se revisa diariamente a las 08:00 de Mendoza. Cero incluye todos los recibidos o en tratamiento.</p></>
               : catalogue.tipo === 'requerimiento_inspeccion' ? <p className="text-sm text-neutral-700">Usa el plazo registrado de cada requerimiento. Leer, responder a otro pedido o una respuesta de la autoridad no lo contestan. Una respuesta vinculada detiene el aviso de ausencia, sin aceptar la subsanación.</p>
               : <><Input label="Días de anticipación" type="number" min={0} max={365} step={1} value={catalogue.anticipacionDias ?? 30} onChange={event => { setPreview(null); setReglaForm(prev => ({ ...prev, condicion: JSON.stringify({ ...JSON.parse(prev.condicion), anticipacionDias: Number(event.target.value) }) })); }} />
-                <fieldset className="space-y-2"><legend className="text-sm font-medium text-neutral-700">Fuentes con fecha registrada</legend>{[['TRANSPORTISTA', 'Transportistas'], ['OPERADOR', 'Operadores'], ['VEHICULO', 'Vehículos'], ['CHOFER', 'Conductores']].map(([value, label]) => <label key={value} className="flex min-h-11 items-center gap-3 rounded-lg border border-neutral-200 px-3"><input type="checkbox" checked={catalogue?.entidades?.includes(value) || false} onChange={event => { setPreview(null); setReglaForm(prev => { const current = JSON.parse(prev.condicion); return { ...prev, condicion: JSON.stringify({ ...current, entidades: event.target.checked ? [...current.entidades, value] : current.entidades.filter((entity: string) => entity !== value) }) }; }); }} />{label}</label>)}</fieldset><p className="text-sm text-neutral-600">Incluye vencidos. Cero incluye sólo fechas alcanzadas. Sin fecha no se inventa vencimiento; una renovación conserva el caso anterior.</p></>}
+                <fieldset className="space-y-2"><legend className="text-sm font-medium text-neutral-700">Fuentes con fecha registrada</legend>{[['TRANSPORTISTA', 'Transportistas'], ['OPERADOR', 'Operadores'], ['VEHICULO', 'Vehículos'], ['CHOFER', 'Conductores']].map(([value, label]) => <label key={value} className="flex min-h-11 items-center gap-3 rounded-lg border border-neutral-200 px-3"><input type="checkbox" className="h-4 w-4 accent-primary-600" checked={catalogue?.entidades?.includes(value) || false} onChange={event => { setPreview(null); setReglaForm(prev => { const current = JSON.parse(prev.condicion); return { ...prev, condicion: JSON.stringify({ ...current, entidades: event.target.checked ? [...current.entidades, value] : current.entidades.filter((entity: string) => entity !== value) }) }; }); }} />{label}</label>)}</fieldset><p className="text-sm text-neutral-600">Incluye vencidos. Cero incluye sólo fechas alcanzadas. Sin fecha no se inventa vencimiento; una renovación conserva el caso anterior.</p></>}
             {catalogue && <p className="text-xs text-neutral-600">Evaluación diaria a las 08:05 de Mendoza. Sólo bandeja interna web/app.</p>}
             <Button variant="outline" disabled={previewPending} onClick={async () => {
               if (followupDays === null && !catalogue) return;
@@ -986,7 +986,7 @@ export const AlertasPage: React.FC = () => {
                     type="checkbox"
                     checked={reglaForm.destinatarios.includes(rol.value)}
                     onChange={() => toggleDestRole(rol.value)}
-                    className="w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                    className="w-4 h-4 rounded border-neutral-300 text-primary-600 accent-primary-600 focus:ring-primary-500"
                   />
                   <div>
                     <p className="text-xs font-semibold text-neutral-800">{rol.value}</p>
@@ -1017,7 +1017,7 @@ export const AlertasPage: React.FC = () => {
               type="checkbox"
               checked={reglaForm.activa}
               onChange={(e) => setReglaForm(prev => ({ ...prev, activa: e.target.checked }))}
-              className="w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+              className="w-4 h-4 rounded border-neutral-300 text-primary-600 accent-primary-600 focus:ring-primary-500"
             />
             <span className="text-sm text-neutral-700">Regla activa</span>
           </label>
