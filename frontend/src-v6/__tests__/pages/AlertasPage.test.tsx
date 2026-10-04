@@ -58,3 +58,20 @@ it('actors do not query administrative rules and cannot resolve global cases', a
   expect(service.listReglas).not.toHaveBeenCalled(); expect(service.listAlertas).not.toHaveBeenCalled();
   expect(screen.queryByRole('button', { name: 'Gestionar caso' })).toBeNull();
 });
+it('selects the shared rule button, simulates without saving, and creates follow-up inactive', async () => {
+  service.simularSeguimiento.mockResolvedValue({ total: 1, ejemplos: [], evaluadoAt: '2026-10-04T12:00:00Z', escribeDatos: false, canal: 'interno' });
+  service.createRegla.mockResolvedValue({ id: 'qa-rule', activa: false });
+  setup(); await screen.findByRole('button', { name: 'Gestionar caso' });
+  fireEvent.click(screen.getByRole('tab', { name: /Reglas/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Nueva Regla' }));
+  const dialog = screen.getByRole('dialog', { name: 'Nueva Regla' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Tipo de regla', exact: true }));
+  fireEvent.click(screen.getByRole('option', { name: 'Manifiesto pendiente de tratamiento o cierre', exact: true }));
+  expect(within(dialog).getByLabelText('Regla activa')).not.toBeChecked();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Simular sin enviar' }));
+  expect(await within(dialog).findByRole('status')).toHaveTextContent('Sin crear casos ni avisos');
+  expect(service.simularSeguimiento).toHaveBeenCalledWith(0);
+  expect(service.createRegla).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Crear regla' }));
+  await waitFor(() => expect(service.createRegla).toHaveBeenCalledWith(expect.objectContaining({ activa: false, destinatarios: '["OPERADOR"]' })));
+});
