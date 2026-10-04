@@ -61,6 +61,17 @@ it('operator expiry uses its own owner, includes already overdue sources and no 
   expect(JSON.parse(m.notice.mock.calls[0][0].create.datos)).toMatchObject({ estadoDetectado: 'VENCIDO', actorId: 'obj', destino: 'perfil' });
   expect(m.requests).not.toHaveBeenCalled();
 });
+it('calendar scan and notice retain the last valid Mendoza day without premature expiry', async () => {
+  m.rules.mockResolvedValue([{ ...rule, evento: 'VENCIMIENTO', condicion: '{"tipo":"vencimiento_documental","anticipacionDias":0,"entidades":["OPERADOR"]}', destinatarios: '["OPERADOR"]' }]);
+  m.actor.mockResolvedValue({ id: 'obj', activo: true, usuarioId: 'operator', usuario: { activo: true }, razonSocial: 'QA operador', vencimientoHabilitacion: new Date('2026-10-10T00:00:00Z') });
+  await ejecutarCatalogo(new Date('2026-10-11T02:59:59.999Z'));
+  expect(m.actors.mock.calls[0][0].where.vencimientoHabilitacion).toEqual({ lt: new Date('2026-10-11T00:00:00Z') });
+  expect(JSON.parse(m.notice.mock.calls[0][0].create.datos).estadoDetectado).toBe('PROXIMO');
+  expect(m.notice.mock.calls[0][0].create.mensaje).toContain('10/10/2026, hasta finalizar ese día en Mendoza');
+  await ejecutarCatalogo(new Date('2026-10-11T03:00:00Z'));
+  expect(JSON.parse(m.notice.mock.calls[1][0].create.datos).estadoDetectado).toBe('VENCIDO');
+  expect(m.upsert.mock.calls[0][0].where.id).toBe(m.upsert.mock.calls[1][0].where.id);
+});
 it('renewal resolves the former case without changing its source or creating daily duplicates', async () => {
   m.rules.mockResolvedValue([{ ...rule, evento: 'VENCIMIENTO', condicion: '{"tipo":"vencimiento_documental","anticipacionDias":30,"entidades":["OPERADOR"]}', destinatarios: '["OPERADOR"]' }]);
   await ejecutarCatalogo(now); const old = m.upsert.mock.calls[0][0].create; m.cases.mockResolvedValue([old]);

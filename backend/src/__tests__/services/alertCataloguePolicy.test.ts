@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { catalogueCondition, validateCatalogueRule, requirementSituation, expirySituation } from '../../services/alertCataloguePolicy.service';
+import { catalogueCondition, validateCatalogueRule, requirementSituation, expirySituation, expiryHorizonEnd, formatDocumentExpiry } from '../../services/alertCataloguePolicy.service';
 it('recognizes only explicit supported families, not general event criteria', () => {
   expect(catalogueCondition('{}')).toBeNull();
   expect(catalogueCondition('{"tipo":"requerimiento_inspeccion"}')).toEqual({ tipo: 'requerimiento_inspeccion' });
@@ -39,4 +39,26 @@ it('explicit expiry includes overdue dates and the inclusive anticipation bounda
   expect(expirySituation(new Date(now.getTime() + 31 * 86400000), true, 30, now)).toBe('FUERA_DE_ALCANCE');
   expect(expirySituation(null, true, 30, now)).toBe('FUERA_DE_ALCANCE');
   expect(expirySituation(due, false, 30, now)).toBe('FUERA_DE_ALCANCE');
+});
+it.each([
+  ['2026-10-10T02:59:59.999Z', 'PROXIMO'], // still 09/10 in Mendoza
+  ['2026-10-10T03:00:00.000Z', 'PROXIMO'],
+  ['2026-10-11T02:59:59.999Z', 'PROXIMO'], // final millisecond of 10/10
+  ['2026-10-11T03:00:00.000Z', 'VENCIDO'],
+])('date-only 10/10 remains valid through its entire Mendoza day at %s', (instant, expected) => {
+  expect(expirySituation(new Date('2026-10-10T00:00:00Z'), true, 1, new Date(instant))).toBe(expected);
+});
+it('zero anticipation includes today, not tomorrow or early expiry', () => {
+  const evening = new Date('2026-10-11T02:00:00Z'); // 10/10 23:00 Mendoza
+  expect(expirySituation(new Date('2026-10-10T00:00:00Z'), true, 0, evening)).toBe('PROXIMO');
+  expect(expirySituation(new Date('2026-10-11T00:00:00Z'), true, 0, evening)).toBe('FUERA_DE_ALCANCE');
+  expect(expiryHorizonEnd(evening, 0).toISOString()).toBe('2026-10-11T00:00:00.000Z');
+});
+it('calendar horizon includes the last selected date and crosses year end', () => {
+  expect(expiryHorizonEnd(new Date('2027-01-01T02:00:00Z'), 1).toISOString()).toBe('2027-01-02T00:00:00.000Z');
+  expect(expiryHorizonEnd(new Date('2028-02-28T12:00:00Z'), 1).toISOString()).toBe('2028-03-01T00:00:00.000Z');
+});
+it('document date display preserves the selected calendar day, never the previous evening', () => {
+  expect(formatDocumentExpiry(new Date('2026-10-10T00:00:00Z'))).toBe('10/10/2026');
+  expect(expirySituation(new Date('invalid'), true, 30, now)).toBe('FUERA_DE_ALCANCE');
 });

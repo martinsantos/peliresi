@@ -20,11 +20,22 @@ beforeEach(() => {
     return { data: { success: true, data: { [key]: actor(url.split('/').at(-1)!) } } };
   });
 });
-it('reads the actual nested operator response and explicit 24-hour expiry, not empty fields', async () => {
+it('reads the actual nested operator response and calendar expiry, not empty or shifted fields', async () => {
   setup(); expect(await screen.findByText('QA establecimiento op-1')).toBeVisible();
   expect(screen.getByText('99-00000001-0')).toBeVisible();
-  expect(screen.getByText(/19:30:00 \(Mendoza\)/)).toBeVisible();
+  expect(screen.getByText('03/10/2026')).toBeVisible();
+  expect(screen.getByText('Vigencia hasta finalizar ese día en Mendoza.')).toBeVisible();
   expect(m.get).toHaveBeenCalledWith('/actores/operadores/op-1');
+});
+it('retains a date-only 10/10 instead of showing the previous day at 21:00', async () => {
+  m.get.mockResolvedValue({ data: { success: true, data: { operador: { ...actor('op-1'), vencimientoHabilitacion: '2026-10-10T00:00:00.000Z' } } } });
+  setup(); expect(await screen.findByText('10/10/2026')).toBeVisible();
+  expect(screen.queryByText(/9\/10\/2026/)).toBeNull();
+});
+it('does not invent a date or validity when the operator has none recorded', async () => {
+  m.get.mockResolvedValue({ data: { success: true, data: { operador: { ...actor('op-1'), vencimientoHabilitacion: null } } } });
+  setup(); expect(await screen.findByText('No informada')).toBeVisible();
+  expect(screen.queryByText('Vigencia hasta finalizar ese día en Mendoza.')).toBeNull();
 });
 it('uses the generator response without querying another category', async () => {
   m.user = { ...m.user, rol: 'GENERADOR', actorId: 'g-1' }; setup();

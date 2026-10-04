@@ -104,10 +104,20 @@ async function main() {
     const operator = await db.operador.findUniqueOrThrow({ where: { id: fixture.actors.operador } });
     let ruleId: string | undefined;
     try {
-      await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(Date.now() - 86400000) } });
       const before = { cases: await db.alertaGenerada.count(), notices: await db.notificacion.count() };
+      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+      const part = (type: string) => Number(parts.find(value => value.type === type)!.value);
+      const today = Date.UTC(part('year'), part('month') - 1, part('day'));
+      await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(today) } });
+      const lastValidDay = await request('admin', '/alertas/catalogo/simular', 'POST', { condicion: condition });
+      assert.equal(lastValidDay.data.total, 1);
+      assert.equal(lastValidDay.data.ejemplos[0].estado, 'PROXIMO', 'Today remains valid until the entire Mendoza day ends');
+      await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(today + 86400000) } });
+      assert.equal((await request('admin', '/alertas/catalogo/simular', 'POST', { condicion: condition })).data.total, 0, 'Zero anticipation excludes tomorrow');
+      await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(today - 86400000) } });
       const preview = await request('admin', '/alertas/catalogo/simular', 'POST', { condicion: condition });
       assert.equal(preview.data.total, 1); assert.equal(preview.data.escribeDatos, false);
+      assert.equal(preview.data.ejemplos[0].estado, 'VENCIDO');
       assert.deepEqual({ cases: await db.alertaGenerada.count(), notices: await db.notificacion.count() }, before);
       const input = { nombre: 'QA vigencia HTTP ' + run, evento: 'VENCIMIENTO', condicion: condition, destinatarios: ['OPERADOR'], activa: false };
       await request('admin', '/alertas/reglas', 'POST', { ...input, destinatarios: ['email:qa@example.invalid'] }, 400);

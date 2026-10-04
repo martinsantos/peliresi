@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test, expect, devices, type Page, type TestInfo } from '@playwright/test';
 import { login, prefix } from './helpers';
+import { formatActorCalendarDate } from '../../src-v6/utils/actorCalendarDate';
 const backendRequire = createRequire(new URL('../../../backend/package.json', import.meta.url));
 const { PrismaClient } = backendRequire('@prisma/client');
 const { buildInspectionExchangeDigests } = backendRequire('./dist/services/inspectionExchange.service.js');
@@ -27,7 +28,10 @@ async function createRule(page: Page, info: TestInfo, kind: string, name: string
   expect(previewData).toMatchObject({ escribeDatos: false, canal: 'interno' });
   await expect(dialog.getByText(/objetos coinciden con la condición/)).toBeVisible();
   for (const item of previewData.ejemplos) {
-    expect(await dialog.textContent()).toContain(new Date(item.vencimiento).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false }) + ' (Mendoza)');
+    const display = kind === 'Habilitaciones y licencias · vigencia'
+      ? formatActorCalendarDate(item.vencimiento) + ' (hasta finalizar ese día en Mendoza)'
+      : new Date(item.vencimiento).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false }) + ' (Mendoza)';
+    expect(await dialog.textContent()).toContain(display);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('catalogue-preview.png'), animations: 'disabled' });
@@ -168,8 +172,9 @@ test('expiry includes operator and two vehicle owners, concurrent retries dedupl
       const cuitField = own.getByText('CUIT', { exact: true }).locator('..').locator('..');
       await expect(cuitField.getByText(operator.cuit, { exact: true })).toBeVisible();
       const dateField = own.getByText('Fecha de habilitación registrada', { exact: true }).locator('..');
-      const recordedDate = `${recordedExpiry.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false })} (Mendoza)`;
+      const recordedDate = formatActorCalendarDate(recordedExpiry);
       await expect(dateField.getByText(recordedDate, { exact: true })).toBeVisible();
+      await expect(dateField.getByText('Vigencia hasta finalizar ese día en Mendoza.', { exact: true })).toBeVisible();
       expect(await own.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
       await own.screenshot({ path: info.outputPath('catalogue-owner-profile.png'), animations: 'disabled' });
       await dateField.scrollIntoViewIfNeeded();

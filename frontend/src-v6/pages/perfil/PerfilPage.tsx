@@ -26,6 +26,7 @@ import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { usuarioService } from '../../services/usuario.service';
 import { useGenerador, useOperador } from '../../hooks/useActores';
+import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 
 
 const PerfilPage: React.FC = () => {
@@ -159,7 +160,8 @@ const PerfilPage: React.FC = () => {
               </div>
               {isOperador && <div className="p-3 bg-neutral-50 rounded-xl">
                 <p className="text-xs font-medium uppercase text-neutral-600 mb-1">Fecha de habilitación registrada</p>
-                <p className="font-medium text-neutral-900">{actorData.vencimientoHabilitacion ? `${new Date(actorData.vencimientoHabilitacion).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false })} (Mendoza)` : 'No informada'}</p>
+                <p className="font-medium text-neutral-900">{actorData.vencimientoHabilitacion ? formatActorCalendarDate(actorData.vencimientoHabilitacion) : 'No informada'}</p>
+                {actorData.vencimientoHabilitacion && <p className="text-xs text-neutral-600 mt-1">Vigencia hasta finalizar ese día en Mendoza.</p>}
               </div>}
             </div>
           </CardContent>

@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { createHash } from 'node:crypto';
 import { Prisma, Rol, type ReglaAlerta } from '@prisma/client';
 import prisma from '../lib/prisma';
-import { catalogueCondition, validateCatalogueRule, requirementSituation, expirySituation, CATALOGUE_MARKER, type CatalogueCondition, type ExpiryEntity } from '../services/alertCataloguePolicy.service';
+import { catalogueCondition, validateCatalogueRule, requirementSituation, expirySituation, expiryHorizonEnd, formatDocumentExpiry, CATALOGUE_MARKER, type CatalogueCondition, type ExpiryEntity } from '../services/alertCataloguePolicy.service';
 import { exchangePartyForUser } from '../services/inspectionExchange.service';
 
 const requirementInclude = {
@@ -45,7 +45,7 @@ async function expirySource(tx: Prisma.TransactionClient, entity: ExpiryEntity, 
   if (situation === 'FUERA_DE_ALCANCE') return null;
   return { ownerId: owner.usuarioId, facts: { familia: 'catalogo_verificable', version: 1, tipo: 'vencimiento_documental', entidad: entity, entidadId: id,
     vencimiento: date!.toISOString(), tipoActor: category, actorId: owner.id, numero: name, estadoDetectado: situation,
-    descripcion: `${name} · ${entity === 'CHOFER' ? 'Licencia' : 'Habilitación'}: fecha registrada ${date!.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false })} (Mendoza). ${situation === 'VENCIDO' ? 'Fecha registrada alcanzada; revisar vigencia y renovación.' : 'Próxima a vencer; revisar renovación.'} No determina una sanción automáticamente.` } };
+    descripcion: `${name} · ${entity === 'CHOFER' ? 'Licencia' : 'Habilitación'}: fecha límite registrada ${formatDocumentExpiry(date!)}, hasta finalizar ese día en Mendoza. ${situation === 'VENCIDO' ? 'Fecha registrada superada; revisar vigencia y renovación.' : 'Próxima a vencer; revisar renovación.'} No determina una sanción automáticamente.` } };
 }
 
 function caseId(ruleId: string, facts: Facts): string {
@@ -73,7 +73,7 @@ async function sources(condition: CatalogueCondition, now: Date, visit: (source:
       let cursor: string | undefined;
       for (;;) {
         const page = { select: { id: true }, take: 100, orderBy: { id: 'asc' as const }, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) };
-        const date = { lte: new Date(now.getTime() + condition.anticipacionDias * 86400000) };
+        const date = { lt: expiryHorizonEnd(now, condition.anticipacionDias) };
         const batch = entity === 'TRANSPORTISTA' ? await prisma.transportista.findMany({ ...page, where: { activo: true, vencimientoHabilitacion: date } })
           : entity === 'OPERADOR' ? await prisma.operador.findMany({ ...page, where: { activo: true, vencimientoHabilitacion: date } })
           : entity === 'VEHICULO' ? await prisma.vehiculo.findMany({ ...page, where: { activo: true, vencimiento: date } })

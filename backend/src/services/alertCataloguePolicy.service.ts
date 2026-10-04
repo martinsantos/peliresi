@@ -43,7 +43,23 @@ export function requirementSituation(request: RequestFacts | null, now: Date): '
   return request.respuestas.some(reply => reply.parte === 'INSPECCIONADO' && ['RESPUESTA', 'DESCARGO', 'SUBSANACION'].includes(reply.tipo)) ? 'RESPONDIDO' : 'PENDIENTE';
 }
 
+const mendozaDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: '2-digit', day: '2-digit' });
+const documentDay = new Intl.DateTimeFormat('es-AR', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' });
+function todayCalendar(now: Date): number {
+  const parts = mendozaDay.formatToParts(now);
+  const number = (type: string) => Number(parts.find(part => part.type === type)!.value);
+  return Date.UTC(number('year'), number('month') - 1, number('day'));
+}
+// Date-only actor forms persist their selected calendar day in UTC. Do not
+// reinterpret midnight UTC as 21:00 on the previous day in Mendoza.
+export function expiryHorizonEnd(now: Date, days: number): Date {
+  return new Date(todayCalendar(now) + (days + 1) * 86400000);
+}
+export function formatDocumentExpiry(date: Date): string { return documentDay.format(date); }
 export function expirySituation(date: Date | null, active: boolean, days: number, now: Date): 'VENCIDO' | 'PROXIMO' | 'FUERA_DE_ALCANCE' {
-  if (!active || !date || !Number.isFinite(date.getTime()) || date.getTime() > now.getTime() + days * 86400000) return 'FUERA_DE_ALCANCE';
-  return date <= now ? 'VENCIDO' : 'PROXIMO';
+  if (!active || !date || !Number.isFinite(date.getTime())) return 'FUERA_DE_ALCANCE';
+  const day = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const today = todayCalendar(now);
+  if (day > today + days * 86400000) return 'FUERA_DE_ALCANCE';
+  return day < today ? 'VENCIDO' : 'PROXIMO';
 }
