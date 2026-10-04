@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { assertCloudDatabase, backendRequire } from './safety.ts';
+import { assertCloudDatabase, backendRequire, root } from './safety.ts';
+import assert from 'node:assert/strict';
 import { loadSeed } from './load-seed.ts';
 
 await assertCloudDatabase();
@@ -70,8 +71,23 @@ try {
     manifiestoId: 'cloud-qa-report-0', latitud: -32.8895, longitud: -68.8458,
     timestamp: historicalTimestamp,
   } });
+  const followup = await db.manifiesto.create({ data: {
+    numero: 'QA-FOLLOWUP-00001', generadorId: fixture.actors.generador,
+    transportistaId: fixture.actors.transportista, operadorId: fixture.actors.operador,
+    creadoPorId: fixture.users.admin, estado: 'RECIBIDO', isDemoData: true, modalidad: 'FIJO',
+    fechaRecepcion: new Date(Date.now() - 3 * 86400000),
+    residuos: { create: [{ tipoResiduoId: fixture.wastes[0], cantidad: 10, cantidadRecibida: 10, unidad: 'kg', estado: 'SOLIDO' }] },
+  } });
+  // Actual server evaluator, not a fabricated API response or browser notice.
+  const { ejecutarSeguimientoCierre } = backendRequire(path.join(root, 'backend/src/jobs/seguimientoCierre.job.ts'));
+  await ejecutarSeguimientoCierre();
+  await ejecutarSeguimientoCierre();
+  const operator = await db.operador.findUniqueOrThrow({ where: { id: fixture.actors.operador } });
+  const notices = await db.notificacion.findMany({ where: { manifiestoId: followup.id } });
+  assert.equal(notices.length, 1, 'Retry must not duplicate the internal follow-up');
+  assert.equal(notices[0].usuarioId, operator.usuarioId);
   await writeFile(path.join(output,'fixture.json'),JSON.stringify({
-    ...fixture,deviceManifest:{id:deviceManifest.id,numero:deviceManifest.numero},database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
+    ...fixture,followup:{id:followup.id,numero:followup.numero},deviceManifest:{id:deviceManifest.id,numero:deviceManifest.numero},database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
     externalDelivery:false,syntheticReportRecords:155},null,2));
 }finally{await db.$disconnect();}
 console.log('Synthetic cloud fixture ready; no production data or credentials');

@@ -1,4 +1,10 @@
-# Avisos proactivos: propuesta operativa, no funcionalidad publicada
+# Avisos proactivos: primer tramo candidato y plan operativo
+
+## Primer tramo implementado, pendiente de certificación y publicación
+
+`seguimientoCierre.job.ts` evalúa diariamente a las 08:00 de Mendoza los manifiestos RECIBIDO/EN_TRATAMIENTO. Crea un aviso interno NORMAL para el operador responsable activo, con fecha de evaluación, tiempo real desde recepción y enlace al manifiesto. No califica mora ni infracción. La clave objeto+destinatario+estado+versión evita avisos nuevos en cada repetición y conserva la lectura. Se pagina en lotes de 100 y solo programa el proceso designado del clúster, sin barrido al arrancar.
+
+La bandeja existente de web/app distingue el registro histórico de la acción correspondiente al estado actual retornado por la API. Leer no completa trabajo; TRATADO/CANCELADO muestran seguimiento finalizado. Un cambio concurrente posterior a la lectura del evaluador puede dejar un aviso histórico, por lo que no se certifica exclusión transaccional del cierre concurrente. No se invocan proveedores de correo/push. Esta entrega no implementa escalamiento, posposición auditada, DDJJ, conciliación TEF ni un contador nuevo de pendientes.
 
 ## Objetivo
 
@@ -45,4 +51,4 @@ Primera tanda: seguimiento de cierre y reparto al responsable usando tiempos rea
 
 Pruebas: frontera exacta del umbral y zona horaria Mendoza; cambio/cancelación durante evaluación; dos trabajadores simultáneos; reintentos sin duplicados; dato faltante/unidad incompatible; permisos cruzados; leído no resuelto; cierre elimina pendiente; auditoría de descarte; app offline y reconexión; enlace al objeto existente; contador conciliado con bandeja; cero envíos externos. E2E con cuentas sintéticas y objetos reales de QA, sin interceptar API de negocio.
 
-Pendiente de decisión antes de automatizar: plazos operativos por estado/modalidad, calendario DDJJ y tolerancias/fórmulas TEF del período. No se han activado nuevas reglas ni canales por este documento.
+Pendiente de decisión antes de automatizar esas clasificaciones: plazos operativos por estado/modalidad, calendario DDJJ y tolerancias/fórmulas TEF del período. No se activan canales externos por este documento.

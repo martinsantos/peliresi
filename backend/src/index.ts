@@ -28,6 +28,7 @@ import { eventoManifiestoSubscriber } from './subscribers/eventoManifiesto.subsc
 import { iniciarVencimientoJob } from './jobs/vencimiento.job';
 import { iniciarBlockchainJob } from './jobs/blockchain.job';
 import { iniciarRecordatorioJob } from './jobs/recordatorio.job';
+import { iniciarSeguimientoCierreJob } from './jobs/seguimientoCierre.job';
 import blockchainRoutes from './routes/blockchain.routes';
 import renovacionRoutes from './routes/renovacion.routes';
 import solicitudRoutes from './routes/solicitud.routes';
@@ -253,6 +254,7 @@ domainEvents.subscribe(alertaSubscriber);
 iniciarVencimientoJob();
 iniciarBlockchainJob();
 iniciarRecordatorioJob();
+iniciarSeguimientoCierreJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;

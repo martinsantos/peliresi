@@ -1,9 +1,37 @@
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { test, expect, devices } from '@playwright/test';
 import { login, prefix } from './helpers';
 const require = createRequire(new URL('../../../backend/package.json', import.meta.url));
 const { PrismaClient } = require('@prisma/client');
 const databaseUrl = process.env.DATABASE_URL!;
+
+test('operator opens a persisted proactive follow-up in the existing inbox without external delivery', async ({ page }, info) => {
+  const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'fixture.json'), 'utf8'));
+  await login(page, info, 'operador');
+  await page.goto(prefix(info) + '/notificaciones');
+  const row = page.getByRole('list', { name: 'Avisos', exact: true }).locator(':scope > li').filter({ hasText: fixture.followup.numero });
+  await expect(page.getByRole('list', { name: 'Avisos', exact: true })).toBeVisible();
+  for (let i = 0; i < 10 && await row.count() === 0; i++) {
+    const next = page.getByRole('button', { name: 'Siguiente página', exact: true });
+    if (await next.isDisabled()) break;
+    const loaded = page.waitForResponse(r => r.url().includes('/api/notificaciones?') && r.request().method() === 'GET');
+    await next.click();
+    expect((await loaded).status()).toBe(200);
+    await expect(page.getByRole('list', { name: 'Avisos', exact: true })).toBeVisible();
+  }
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('Revisar pesaje y tratamiento · Abrir manifiesto');
+  const action = row.getByRole('button', { name: 'Abrir aviso: Seguimiento de manifiesto', exact: true });
+  expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: info.outputPath('operator-proactive-followup.png'), animations: 'disabled' });
+  await action.click();
+  await expect(page).toHaveURL(new RegExp(prefix(info) + '/manifiestos/' + fixture.followup.id + '$'));
+  await expect(page.locator('main')).toContainText(fixture.followup.numero);
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+});
 
 test('real assignment -> bell -> paginated inbox -> keyboard -> exact dossier -> persisted read', async ({ page, browser }, info) => {
   const errors: string[] = [];

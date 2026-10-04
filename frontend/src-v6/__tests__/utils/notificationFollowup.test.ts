@@ -1,0 +1,10 @@
+import { expect, it } from 'vitest';
+import { notificationFollowup } from '../../utils/notificationFollowup';
+import { EstadoManifiesto, type Notificacion } from '../../types/models';
+const notice = (state?: EstadoManifiesto): Notificacion => ({ datos: JSON.stringify({ tipo: 'seguimiento_cierre', version: 1, estadoDetectado: 'RECIBIDO' }), leida: true, manifiesto: state ? { numero: 'QA', estado: state } : null } as Notificacion);
+it('reading does not resolve a pending workflow', () => expect(notificationFollowup(notice(EstadoManifiesto.RECIBIDO))).toContain('Revisar pesaje'));
+it('uses current treatment state rather than the older detection', () => expect(notificationFollowup(notice(EstadoManifiesto.EN_TRATAMIENTO))).toContain('Revisar tratamiento y cierre'));
+it.each([EstadoManifiesto.TRATADO, EstadoManifiesto.CANCELADO])('does not call a terminal manifest pending: %s', state => expect(notificationFollowup(notice(state))).toContain('finalizado'));
+it('missing live state is unknown, not completed or overdue', () => expect(notificationFollowup(notice())).toBe('Consultar el estado actual del manifiesto'));
+it('other current states do not invent a task', () => expect(notificationFollowup(notice(EstadoManifiesto.APROBADO))).toContain('Estado actualizado'));
+it.each([null, 'invalid', 'null', '{}', '{"tipo":"seguimiento_cierre","version":2}'])('ignores unrelated or malformed metadata: %s', datos => expect(notificationFollowup({ ...notice(), datos })).toBeNull());

@@ -263,7 +263,12 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
     const url = new URL(r.url());
     return url.pathname === '/api/centro-control/timeline' && url.searchParams.get('dias') === '30';
   });
-  await page.getByRole('combobox', { name: 'Período de reproducción' }).selectOption('30');
+  const period = page.getByRole('button', { name: 'Período de reproducción' });
+  await period.click();
+  await expect(page.getByRole('listbox', { name: 'Período de reproducción' })).toBeVisible();
+  await expect(page.getByRole('textbox')).toHaveCount(0);
+  await visibleProof(page, info, 'monitor-period-shared-open');
+  await page.getByRole('option', { name: 'Últimos 30 días', exact: true }).click();
   const month = await monthResponse;
   expect(month.status()).toBe(200);
   const monthData = (await month.json()).data;
@@ -272,7 +277,10 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await expect(page.getByRole('button', { name: 'Pausar historial', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Pausar historial', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reproducir historial', exact: true })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Período de reproducción' })).toHaveValue('30');
+  await expect(period).toHaveText('Últimos 30 días');
+  await period.click(); await page.getByRole('option', { name: 'Últimos 30 días', exact: true }).press('Escape');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await expect(header.getByRole('button', { name: 'Historial', exact: true })).toBeVisible();
   await slider.focus(); await slider.press('End');
   await expect(slider).toHaveValue('1000');
   await visibleProof(page, info, 'monitor-last-30-days-paused');

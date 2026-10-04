@@ -24,6 +24,18 @@ describe('notification inbox states and interaction', () => {
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
   });
 
+  it('keeps a closed follow-up as history rather than a current pending task and opens its actual manifest', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice,
+      titulo: 'Seguimiento de manifiesto', mensaje: 'QA seguimiento recibido hace 3 días', manifiestoId: 'qa-manifest',
+      datos: JSON.stringify({ tipo: 'seguimiento_cierre', version: 1, estadoDetectado: 'RECIBIDO' }),
+      manifiesto: { numero: 'QA', estado: 'TRATADO' },
+    }] });
+    setup('/app/notificaciones');
+    expect(await screen.findByText('Seguimiento finalizado · Ver historial')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Seguimiento de manifiesto', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/manifiestos/qa-manifest');
+  });
+
   it('does not promise an opening destination for a general notice without a linked record', async () => {
     service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Aviso general', datos: null }] });
     setup();

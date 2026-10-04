@@ -11,6 +11,7 @@ import type { MonitorMode } from '../WarRoomPage';
 import type { ForecastResponse, MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
 import { formatNumber, formatTimeShort } from '../utils/formatters';
 import { periodEnd } from '../utils/playback-period';
+import { Select } from '../../../components/ui/Select';
 
 type PlaybackSpeed = 'fast' | 'normal' | 'slow';
 
@@ -168,12 +169,11 @@ export const TimelineControls: React.FC<Props> = ({
 
         {mode === 'PLAYBACK' && (
           <>
-            {onPeriodChange && <label className="flex items-center gap-2 text-sm font-semibold text-[#1B5E3C]">
+            {onPeriodChange && <div className="flex items-center gap-2 text-sm font-semibold text-[#1B5E3C]">
               <Calendar size={18} aria-hidden="true" />
-              <select aria-label="Período de reproducción" value={playbackDias} onChange={e => onPeriodChange(Number(e.target.value))} className="min-h-11 rounded-lg border border-neutral-400 bg-white px-3 text-base text-neutral-900 focus-visible:ring-2 focus-visible:ring-primary-600">
-                <option value={1}>Un día</option><option value={7}>Últimos 7 días</option><option value={30}>Últimos 30 días</option>
-              </select>
-            </label>}
+              <div className="w-48"><Select placeholder="Período de reproducción" value={String(playbackDias)} onChange={value => onPeriodChange(Number(value))}
+                options={[{ value: '1', label: 'Un día' }, { value: '7', label: 'Últimos 7 días' }, { value: '30', label: 'Últimos 30 días' }]} /></div>
+            </div>}
             {playbackDias > 1 && playbackDate && <span className="text-sm font-semibold tabular-nums text-neutral-800">{formatDateFull(playbackDate)} — {formatDateFull(periodEnd(playbackDate, playbackDias))}</span>}
             {/* Date navigator — only active days */}
             {playbackDias === 1 && <div className="flex items-center gap-1 flex-shrink-0">

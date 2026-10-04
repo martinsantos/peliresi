@@ -362,6 +362,7 @@ export interface Notificacion {
   mensaje: string;
   datos: string | null;
   manifiestoId: string | null;
+  manifiesto?: { numero: string; estado: EstadoManifiesto } | null;
   leida: boolean;
   fechaLeida: string | null;
   prioridad: PrioridadNotificacion;
