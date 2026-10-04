@@ -119,6 +119,7 @@ async function main() {
       const item = await db.alertaGenerada.findFirstOrThrow({ where: { reglaId: rule.id } });
       const notice = await db.notificacion.findFirstOrThrow({ where: { datos: { contains: JSON.stringify({ casoId: item.id }).slice(1, -1) } } });
       assert.equal(notice.usuarioId, fixture.users.operador);
+      assert.ok(notice.datos, 'The configured catalogue notice must retain its typed source facts');
       assert.equal(JSON.parse(notice.datos).destino, 'perfil');
       await request('jefe-generadores', `/alertas/${item.id}/resolver`, 'PUT', { estado: 'RESUELTA', notas: 'Fuera de ámbito' }, 403);
       assert.equal((await db.alertaGenerada.findUniqueOrThrow({ where: { id: item.id } })).estado, 'PENDIENTE');
