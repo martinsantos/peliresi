@@ -141,12 +141,29 @@ test('expiry includes operator and two vehicle owners, concurrent retries dedupl
       const item = cases.filter((item: any) => JSON.parse(item.datos).entidadId === vehicles[i].id && JSON.parse(item.datos).entidad === 'VEHICULO'); expect(item).toHaveLength(1);
       const notices = await db.notificacion.findMany({ where: { datos: { contains: JSON.stringify({ casoId: item[0].id }).slice(1, -1) } } });
       expect(notices).toHaveLength(1); expect(notices[0].usuarioId).toBe(fixture.users[i === 0 ? 'transportista' : 'transportista2']);
+      const owner = await db.transportista.findUniqueOrThrow({ where: { id: vehicles[i].transportistaId } });
+      const ownerContext = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.name === 'web-desktop' ? { width: 1440, height: 900 } : { width: 360, height: 800 }, baseURL: 'http://127.0.0.1:4177' });
+      try {
+        const ownVehicle = await ownerContext.newPage(); observe(ownVehicle, errors);
+        await login(ownVehicle, info, i === 0 ? 'transportista' : 'transportista2');
+        await ownVehicle.goto(prefix(info) + '/notificaciones');
+        await ownVehicle.getByRole('button', { name: 'Abrir aviso: ' + name, exact: true }).first().click();
+        await expect(ownVehicle).toHaveURL(new RegExp('/admin/actores/transportistas/' + owner.id));
+        await expect(ownVehicle.getByRole('heading', { name: owner.razonSocial, exact: true })).toBeVisible();
+        await ownVehicle.getByRole('tab', { name: 'Flota y Conductores', exact: true }).click();
+        await expect(ownVehicle.getByText(vehicles[i].patente, { exact: true })).toBeVisible();
+        await ownVehicle.screenshot({ path: info.outputPath(`catalogue-vehicle-owner-${i}.png`), animations: 'disabled' });
+      } finally { await ownerContext.close(); }
     }
     const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.name === 'web-desktop' ? { width: 1440, height: 900 } : { width: 360, height: 800 }, baseURL: 'http://127.0.0.1:4177' });
     try {
       const own = await context.newPage(); observe(own, errors); await login(own, info, 'operador'); await own.goto(prefix(info) + '/notificaciones');
       await own.getByRole('button', { name: 'Abrir aviso: ' + name, exact: true }).first().click(); await expect(own).toHaveURL(/\/mi-perfil$/);
       await expect(own.getByRole('heading', { name: 'Mi Perfil', level: 2, exact: true })).toBeVisible();
+      await expect(own.getByText(operator.razonSocial, { exact: true })).toBeVisible();
+      await expect(own.getByText(operator.cuit, { exact: true })).toBeVisible();
+      await expect(own.getByText('Fecha de habilitación registrada', { exact: true })).toBeVisible();
+      expect(await own.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
       await own.screenshot({ path: info.outputPath('catalogue-owner-profile.png'), animations: 'disabled' });
     } finally { await context.close(); }
     await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(Date.now() + 400 * 86400000) } });

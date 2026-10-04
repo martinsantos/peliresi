@@ -25,13 +25,18 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { usuarioService } from '../../services/usuario.service';
-import api from '../../services/api';
+import { useGenerador, useOperador } from '../../hooks/useActores';
 
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, isGenerador, isOperador } = useAuth();
-  const [actorData, setActorData] = useState<Record<string, any> | null>(null);
+  // Reuse the actor queries that normalize the API's {generador}/{operador}
+  // envelope. Keys follow identity changes instead of retaining the prior actor.
+  const generador = useGenerador(isGenerador ? currentUser?.actorId || '' : '');
+  const operador = useOperador(isOperador ? currentUser?.actorId || '' : '');
+  const actorQuery = isGenerador ? generador : operador;
+  const actorData: Record<string, any> | undefined = (isGenerador || isOperador) ? actorQuery.data : undefined;
   const [user, setUser] = useState({
     nombre: '',
     email: '',
@@ -57,16 +62,6 @@ const PerfilPage: React.FC = () => {
       });
     }
   }, [currentUser]);
-
-  // Fetch actor data for GENERADOR/OPERADOR
-  useEffect(() => {
-    if (currentUser?.actorId && (isGenerador || isOperador)) {
-      const tipo = isGenerador ? 'generadores' : 'operadores';
-      api.get(`/actores/${tipo}/${currentUser.actorId}`)
-        .then(res => setActorData(res.data.data))
-        .catch(() => { /* silently ignore */ });
-    }
-  }, [currentUser?.actorId, isGenerador, isOperador]);
 
   const guardarCambios = async () => {
     setGuardando(true);
@@ -95,10 +90,13 @@ const PerfilPage: React.FC = () => {
       </div>
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}
-      {(isGenerador || isOperador) && actorData && (
+      {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isLoading && <p role="status">Cargando datos de tu establecimiento…</p>}
+      {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isError && <div role="alert" className="rounded-lg border border-error-200 p-4"><p>No se pudieron cargar los datos de tu establecimiento.</p><Button variant="outline" onClick={() => void actorQuery.refetch()}>Reintentar datos del establecimiento</Button></div>}
+      {(isGenerador || isOperador) && actorData && !actorQuery.isError && (
         <Card>
           <CardHeader
             title="Datos de mi Establecimiento"
+            className="flex-col sm:flex-row"
             icon={<Building2 size={18} />}
             action={
               <Button
@@ -159,6 +157,10 @@ const PerfilPage: React.FC = () => {
                   {(isGenerador ? actorData.numeroInscripcion : actorData.numeroHabilitacion) || '-'}
                 </p>
               </div>
+              {isOperador && <div className="p-3 bg-neutral-50 rounded-xl">
+                <p className="text-xs font-medium uppercase text-neutral-600 mb-1">Fecha de habilitación registrada</p>
+                <p className="font-medium text-neutral-900">{actorData.vencimientoHabilitacion ? `${new Date(actorData.vencimientoHabilitacion).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', hour12: false })} (Mendoza)` : 'No informada'}</p>
+              </div>}
             </div>
           </CardContent>
         </Card>

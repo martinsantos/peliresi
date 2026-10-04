@@ -9,7 +9,12 @@ export function cataloguePath(raw: string | null | undefined, recipient = false)
       return `/${recipient && data.destino === 'participacion' ? 'mis-inspecciones' : 'inspecciones'}/${data.inspeccionId}`;
     }
     if (data.tipo === 'vencimiento_documental') {
-      if (recipient && data.destino === 'perfil') return '/mi-perfil';
+      if (recipient && data.destino === 'perfil') {
+        if (!safe(data.actorId)) return null;
+        if (data.tipoActor === 'OPERADOR') return '/mi-perfil';
+        if (data.tipoActor === 'TRANSPORTISTA') return `/admin/actores/transportistas/${data.actorId}`;
+        return null;
+      }
       if (recipient && data.destino !== 'actor') return null;
       if (safe(data.actorId) && ['TRANSPORTISTA', 'OPERADOR'].includes(data.tipoActor)) {
         return `/admin/actores/${data.tipoActor === 'TRANSPORTISTA' ? 'transportistas' : 'operadores'}/${data.actorId}`;
