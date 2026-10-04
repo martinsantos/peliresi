@@ -67,8 +67,13 @@ test('inspection deadline -> configured case -> exact actor/inspector notice -> 
       const response = page.waitForResponse(r => r.url().endsWith('/api/alertas/catalogo/evaluar'));
       await page.getByRole('button', { name: 'Evaluar inspecciones y vencimientos', exact: true }).click(); expect((await response).status()).toBe(200);
     }
-    const cases = await db.alertaGenerada.findMany({ where: { reglaId: rule.id } }); expect(cases).toHaveLength(2);
-    const notices = await db.notificacion.findMany({ where: { datos: { contains: JSON.stringify({ reglaId: rule.id }).slice(1, -1) } } });
+    // Evaluations intentionally consider ALL pending sources. Earlier surface
+    // journeys retain their history; assert the two sources of this inspection.
+    const sourceToken = JSON.stringify({ inspeccionId: inspection.id }).slice(1, -1);
+    const caseWhere = { reglaId: rule.id, datos: { contains: sourceToken } };
+    const noticeWhere = { AND: [{ datos: { contains: JSON.stringify({ reglaId: rule.id }).slice(1, -1) } }, { datos: { contains: sourceToken } }] };
+    const cases = await db.alertaGenerada.findMany({ where: caseWhere }); expect(cases).toHaveLength(2);
+    const notices = await db.notificacion.findMany({ where: noticeWhere });
     expect(notices).toHaveLength(4); expect(new Set(notices.map((n: any) => n.usuarioId))).toEqual(new Set([fixture.users.generador, fixture.users.inspector]));
     const options = { ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.name === 'web-desktop' ? { width: 1440, height: 900 } : { width: 360, height: 800 }, baseURL: 'http://127.0.0.1:4177' };
     const actorContext = await browser.newContext(options);
@@ -85,11 +90,11 @@ test('inspection deadline -> configured case -> exact actor/inspector notice -> 
       await actor.screenshot({ path: info.outputPath('catalogue-linked-response.png'), animations: 'disabled' });
     } finally { await actorContext.close(); }
     const evaluation = await request(page, '/alertas/catalogo/evaluar', 'POST'); expect(evaluation.status()).toBe(200);
-    const after = await db.alertaGenerada.findMany({ where: { reglaId: rule.id } });
+    const after = await db.alertaGenerada.findMany({ where: caseWhere });
     expect(after.filter((item: any) => item.estado === 'RESUELTA')).toHaveLength(1);
     expect(after.filter((item: any) => item.estado === 'PENDIENTE')).toHaveLength(1);
     expect((await db.inspeccion.findUniqueOrThrow({ where: { id: inspection.id } })).estado).toBe('EN_DESCARGO');
-    expect(await db.notificacion.count({ where: { datos: { contains: JSON.stringify({ reglaId: rule.id }).slice(1, -1) } } })).toBe(4);
+    expect(await db.notificacion.count({ where: noticeWhere })).toBe(4);
     const inspectorContext = await browser.newContext(options);
     try {
       const inspector = await inspectorContext.newPage(); observe(inspector, errors); await login(inspector, info, 'inspector');

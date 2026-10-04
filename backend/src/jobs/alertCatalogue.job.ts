@@ -132,7 +132,10 @@ export async function ejecutarCatalogo(now = new Date()): Promise<number> {
       if (!await ruleStillEnabled(tx, rule)) return;
       const source = await currentSource(tx, scanned.facts, condition, now); if (!source) return;
       const { facts } = source; const id = caseId(rule.id, facts);
-      const record = await tx.alertaGenerada.upsert({ where: { id }, create: { id, reglaId: rule.id, datos: JSON.stringify({ ...facts, evaluadoAt: now.toISOString() }) }, update: {} });
+      // A scalar no-op update enables PostgreSQL's atomic ON CONFLICT upsert.
+      // An empty update makes Prisma select then insert, which races across workers.
+      // Never rewrite the original facts, creation date or administrative decision.
+      const record = await tx.alertaGenerada.upsert({ where: { id }, create: { id, reglaId: rule.id, datos: JSON.stringify({ ...facts, evaluadoAt: now.toISOString() }) }, update: { id } });
       if (['RESUELTA', 'DESCARTADA'].includes(record.estado)) return;
       const ids = new Set<string>();
       if (source.ownerId && (roles.includes('INSPECCIONADO') || roles.includes(facts.tipoActor || ''))) ids.add(source.ownerId);

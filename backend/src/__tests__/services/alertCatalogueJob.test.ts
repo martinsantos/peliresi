@@ -35,7 +35,7 @@ it('simulation does not create rules, cases or notices', async () => {
 it('retries preserve case snapshot, decision and notification read state', async () => {
   await ejecutarCatalogo(now); await ejecutarCatalogo(new Date('2026-10-05T12:00:00Z'));
   expect(m.upsert.mock.calls[0][0].where).toEqual(m.upsert.mock.calls[1][0].where);
-  expect(m.upsert.mock.calls[1][0].update).toEqual({});
+  expect(m.upsert.mock.calls[1][0].update).toEqual({ id: m.upsert.mock.calls[1][0].where.id });
   expect(m.notice.mock.calls[3][0].update).not.toHaveProperty('leida');
 });
 it.each(['RESUELTA', 'DESCARTADA'])('never renotifies a %s case', async estado => {
