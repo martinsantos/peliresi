@@ -18,3 +18,6 @@ it.each(['../../admin', 'https://evil.invalid', 'id?token=x', 'id#section'])('do
 it('malformed or future-version snapshots have no invented destination', () => {
   expect(cataloguePath('invalid')).toBeNull(); expect(cataloguePath('{"familia":"catalogo_verificable","version":2}')).toBeNull();
 });
+it('a malformed catalogue notice cannot fall back to an arbitrary URL or authority surface', () => {
+  expect(resolveNotificationPath({ datos: raw({ tipo: 'requerimiento_inspeccion', inspeccionId: 'req', url: '/admin/usuarios' }) } as never, '/app')).toBe('/app/notificaciones');
+});

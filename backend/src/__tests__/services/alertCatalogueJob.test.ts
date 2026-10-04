@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const m = vi.hoisted(() => ({ rules: vi.fn(), requests: vi.fn(), request: vi.fn(), actors: vi.fn(), actor: vi.fn(), cases: vi.fn(), upsert: vi.fn(), reconcile: vi.fn(), notice: vi.fn(), admins: vi.fn(), transaction: vi.fn(), cron: vi.fn() }));
+const m = vi.hoisted(() => ({ rules: vi.fn(), currentRule: vi.fn(), requests: vi.fn(), request: vi.fn(), actors: vi.fn(), actor: vi.fn(), cases: vi.fn(), upsert: vi.fn(), reconcile: vi.fn(), notice: vi.fn(), admins: vi.fn(), transaction: vi.fn(), cron: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   reglaAlerta: { findMany: m.rules }, intercambioInspeccion: { findMany: m.requests, findUnique: m.request },
   transportista: { findMany: m.actors, findUnique: m.actor }, operador: { findMany: m.actors, findUnique: m.actor },
@@ -15,9 +15,10 @@ const request = { id: 'req', tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', destinat
     inspector: { id: 'inspector', rol: 'GENERADOR', esInspector: true, activo: true }, generador: { id: 'g1', activo: true, usuario: { id: 'owner', activo: true } } } };
 beforeEach(() => {
   vi.clearAllMocks(); m.rules.mockResolvedValue([rule]); m.requests.mockResolvedValue([{ id: 'req' }]); m.request.mockResolvedValue(request);
+  m.currentRule.mockImplementation(async () => ({ ...(await m.rules())[0], activa: true }));
   m.cases.mockResolvedValue([]); m.upsert.mockResolvedValue({ estado: 'PENDIENTE' }); m.admins.mockResolvedValue([{ id: 'sector' }]);
   m.actors.mockResolvedValue([{ id: 'obj' }]); m.actor.mockResolvedValue({ id: 'obj', activo: true, usuarioId: 'operator', usuario: { activo: true }, razonSocial: 'QA operador', vencimientoHabilitacion: new Date('2026-10-01T12:00:00Z') });
-  m.transaction.mockImplementation(fn => fn({ intercambioInspeccion: { findUnique: m.request }, operador: { findUnique: m.actor }, transportista: { findUnique: m.actor }, vehiculo: { findUnique: m.actor }, chofer: { findUnique: m.actor },
+  m.transaction.mockImplementation(fn => fn({ reglaAlerta: { findUnique: m.currentRule }, intercambioInspeccion: { findUnique: m.request }, operador: { findUnique: m.actor }, transportista: { findUnique: m.actor }, vehiculo: { findUnique: m.actor }, chofer: { findUnique: m.actor },
     alertaGenerada: { upsert: m.upsert, updateMany: m.reconcile }, notificacion: { upsert: m.notice }, usuario: { findMany: m.admins } }));
 });
 it('notifies only the linked actor, assigned inspector and selected matching administration', async () => {
@@ -63,6 +64,17 @@ it('renewal resolves the former case without changing its source or creating dai
 });
 it('database failure propagates, never claiming an empty or successful evaluation', async () => {
   m.notice.mockRejectedValueOnce(new Error('storage failed')); await expect(ejecutarCatalogo(now)).rejects.toThrow('storage failed');
+});
+it('deactivating a rule during its scan stops new cases/notices', async () => {
+  m.currentRule.mockResolvedValue({ ...rule, activa: false });
+  expect(await ejecutarCatalogo(now)).toBe(0); expect(m.upsert).not.toHaveBeenCalled(); expect(m.notice).not.toHaveBeenCalled();
+});
+it('preview counts past the first page but retains only twenty examples', async () => {
+  m.requests.mockResolvedValueOnce(Array.from({ length: 100 }, (_, index) => ({ id: 'req' + index }))).mockResolvedValueOnce([{ id: 'req100' }]);
+  m.request.mockImplementation(async ({ where }) => ({ ...request, id: where.id }));
+  const preview = await simularCatalogo(rule.condicion, now);
+  expect(preview.total).toBe(101); expect(preview.ejemplos).toHaveLength(20);
+  expect(m.requests.mock.calls[1][0]).toMatchObject({ cursor: { id: 'req99' }, skip: 1, take: 100 });
 });
 it('skips inactive rules and schedules only once on the designated instance, not on startup', async () => {
   m.rules.mockResolvedValue([]); expect(await ejecutarCatalogo(now)).toBe(0); expect(m.requests).not.toHaveBeenCalled();

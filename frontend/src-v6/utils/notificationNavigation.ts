@@ -23,7 +23,7 @@ function withBasePath(path: string, basePath: string): string {
 export function resolveNotificationPath(notificacion: Notificacion, basePath = ''): string {
   const data = parseNotificationData(notificacion.datos);
   const target = cataloguePath(notificacion.datos, true);
-  if (target) return withBasePath(target, basePath);
+  if (data.familia === 'catalogo_verificable') return withBasePath(target || '/notificaciones', basePath);
   const explicitPath = typeof data.url === 'string'
     ? data.url
     : typeof data.ruta === 'string'

@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { createHash } from 'node:crypto';
-import { Prisma, Rol } from '@prisma/client';
+import { Prisma, Rol, type ReglaAlerta } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { catalogueCondition, validateCatalogueRule, requirementSituation, expirySituation, CATALOGUE_MARKER, type CatalogueCondition, type ExpiryEntity } from '../services/alertCataloguePolicy.service';
 import { exchangePartyForUser } from '../services/inspectionExchange.service';
@@ -92,6 +92,11 @@ async function currentSource(tx: Prisma.TransactionClient, facts: Facts, conditi
     : condition.entidades.includes(facts.entidad as ExpiryEntity) ? expirySource(tx, facts.entidad as ExpiryEntity, facts.entidadId, condition.anticipacionDias, now) : null;
 }
 
+async function ruleStillEnabled(tx: Prisma.TransactionClient, rule: ReglaAlerta): Promise<boolean> {
+  const current = await tx.reglaAlerta.findUnique({ where: { id: rule.id }, select: { activa: true, evento: true, condicion: true, destinatarios: true } });
+  return Boolean(current?.activa && current.evento === rule.evento && current.condicion === rule.condicion && current.destinatarios === rule.destinatarios);
+}
+
 export async function simularCatalogo(raw: string, now = new Date()) {
   const condition = catalogueCondition(raw);
   if (!condition) throw new Error('Familia no admitida');
@@ -113,6 +118,7 @@ export async function ejecutarCatalogo(now = new Date()): Promise<number> {
       const cases = await prisma.alertaGenerada.findMany({ where: { reglaId: rule.id, estado: { in: ['PENDIENTE', 'EN_REVISION'] }, datos: { contains: CATALOGUE_MARKER } },
         take: 100, orderBy: { id: 'asc' }, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) });
       for (const item of cases) await prisma.$transaction(async tx => {
+        if (!await ruleStillEnabled(tx, rule)) return;
         const facts = JSON.parse(item.datos) as Facts;
         const source = await currentSource(tx, facts, condition, now);
         if (!source || caseId(rule.id, source.facts) !== item.id) await tx.alertaGenerada.updateMany({ where: { id: item.id, estado: { in: ['PENDIENTE', 'EN_REVISION'] } },
@@ -123,6 +129,7 @@ export async function ejecutarCatalogo(now = new Date()): Promise<number> {
       cursor = cases[cases.length - 1].id;
     }
     await sources(condition, now, async scanned => { await prisma.$transaction(async tx => {
+      if (!await ruleStillEnabled(tx, rule)) return;
       const source = await currentSource(tx, scanned.facts, condition, now); if (!source) return;
       const { facts } = source; const id = caseId(rule.id, facts);
       const record = await tx.alertaGenerada.upsert({ where: { id }, create: { id, reglaId: rule.id, datos: JSON.stringify({ ...facts, evaluadoAt: now.toISOString() }) }, update: {} });

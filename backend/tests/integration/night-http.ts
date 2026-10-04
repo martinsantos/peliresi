@@ -93,6 +93,53 @@ async function main() {
     await request('admin', '/alertas/reglas/seguimiento_cierre_v1', 'DELETE', undefined, 409);
   });
 
+  await check('alert catalogue / preview isolation, exact operator, sector boundary and immutable history', async () => {
+    const condition = { tipo: 'vencimiento_documental', anticipacionDias: 0, entidades: ['OPERADOR'] };
+    for (const user of ['generador', 'operador', 'inspector', 'lector-operadores']) {
+      await request(user, '/alertas/catalogo/simular', 'POST', { condicion: condition }, 403);
+      await request(user, '/alertas/catalogo/evaluar', 'POST', {}, 403);
+    }
+    await request('admin', '/alertas/catalogo/simular', 'POST', { condicion: { ...condition, anticipacionDias: -1 } }, 400);
+    await request('admin', '/alertas/catalogo/simular', 'POST', { condicion: { tipo: 'ddjj' } }, 400);
+    const operator = await db.operador.findUniqueOrThrow({ where: { id: fixture.actors.operador } });
+    let ruleId: string | undefined;
+    try {
+      await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: new Date(Date.now() - 86400000) } });
+      const before = { cases: await db.alertaGenerada.count(), notices: await db.notificacion.count() };
+      const preview = await request('admin', '/alertas/catalogo/simular', 'POST', { condicion: condition });
+      assert.equal(preview.data.total, 1); assert.equal(preview.data.escribeDatos, false);
+      assert.deepEqual({ cases: await db.alertaGenerada.count(), notices: await db.notificacion.count() }, before);
+      const input = { nombre: 'QA vigencia HTTP ' + run, evento: 'VENCIMIENTO', condicion: condition, destinatarios: ['OPERADOR'], activa: false };
+      await request('admin', '/alertas/reglas', 'POST', { ...input, destinatarios: ['email:qa@example.invalid'] }, 400);
+      const rule = (await request('admin', '/alertas/reglas', 'POST', input, 201)).data; ruleId = rule.id;
+      await request('admin', '/alertas/catalogo/evaluar', 'POST', {});
+      assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id } }), 0);
+      await request('admin', `/alertas/reglas/${rule.id}`, 'PUT', { activa: true });
+      await request('admin', '/alertas/catalogo/evaluar', 'POST', {});
+      const item = await db.alertaGenerada.findFirstOrThrow({ where: { reglaId: rule.id } });
+      const notice = await db.notificacion.findFirstOrThrow({ where: { datos: { contains: JSON.stringify({ casoId: item.id }).slice(1, -1) } } });
+      assert.equal(notice.usuarioId, fixture.users.operador);
+      assert.equal(JSON.parse(notice.datos).destino, 'perfil');
+      await request('jefe-generadores', `/alertas/${item.id}/resolver`, 'PUT', { estado: 'RESUELTA', notas: 'Fuera de ámbito' }, 403);
+      assert.equal((await db.alertaGenerada.findUniqueOrThrow({ where: { id: item.id } })).estado, 'PENDIENTE');
+      const foreignList = await request('jefe-generadores', `/alertas?reglaId=${rule.id}`);
+      assert.equal(foreignList.data.total, 0);
+      await request('operador', `/notificaciones/${notice.id}/leida`, 'PUT', {});
+      assert.equal((await db.alertaGenerada.findUniqueOrThrow({ where: { id: item.id } })).estado, 'PENDIENTE');
+      await request('admin', `/alertas/reglas/${rule.id}`, 'PUT', { evento: 'TIEMPO_EXCESIVO', condicion: { tipo: 'requerimiento_inspeccion' }, destinatarios: ['INSPECCIONADO'] }, 409);
+      await request('jefe-operadores', `/alertas/${item.id}/resolver`, 'PUT', { estado: 'RESUELTA', notas: 'QA revisión sintética registrada' });
+      await request('admin', '/alertas/catalogo/evaluar', 'POST', {});
+      assert.equal(await db.notificacion.count({ where: { id: notice.id } }), 1);
+      const inbox = await request('operador', '/notificaciones?limit=100');
+      assert.equal(inbox.data.notificaciones.find((row: { id: string }) => row.id === notice.id).seguimientoEstado, 'RESUELTA');
+      assert.equal((await db.alertaGenerada.findUniqueOrThrow({ where: { id: item.id } })).datos, item.datos);
+      await request('admin', `/alertas/reglas/${rule.id}`, 'DELETE', undefined, 409);
+    } finally {
+      if (ruleId) await db.reglaAlerta.update({ where: { id: ruleId }, data: { activa: false } });
+      await db.operador.update({ where: { id: operator.id }, data: { vencimientoHabilitacion: operator.vencimientoHabilitacion } });
+    }
+  });
+
   const actorRoutes: Record<string, string[]> = {
     generador: ['', '/pagos', '/ddjj', '/documentos', '/historial'],
     transportista: ['', '/historial'],

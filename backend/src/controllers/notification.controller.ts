@@ -57,7 +57,7 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
             prisma.notificacion.count({ where }),
             prisma.notificacion.count({ where: { usuarioId, leida: false } })
         ]);
-        const linked = notificaciones.flatMap(notice => {
+        const linked = notificaciones.flatMap<{ id: string; manifiestoId: string | null; noticeId: string }>(notice => {
             try {
                 const data = JSON.parse(notice.datos || 'null');
                 if (data?.familia === 'catalogo_verificable' && data.version === 1 && typeof data.casoId === 'string') {
