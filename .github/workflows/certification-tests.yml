@@ -89,7 +89,7 @@ jobs:
           if-no-files-found: error
   isolated-qa:
     needs: stage-original-apk
-    if: always() && github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && !inputs.load_only
+    if: always() && !cancelled() && github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && !inputs.load_only
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
