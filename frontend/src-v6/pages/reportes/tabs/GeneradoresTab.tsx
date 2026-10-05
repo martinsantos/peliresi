@@ -177,10 +177,10 @@ export default function GeneradoresTab({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-600 to-purple-700" />
-        <KpiCard icon={Package} label="Categorias" value={uniqueCategories} color="from-indigo-600 to-indigo-700" sub="tipos" />
-        <KpiCard icon={MapPin} label="Departamentos" value={byDep.filter(d => d.name !== 'Sin departamento').length} color="from-violet-600 to-violet-700" sub="con presencia" />
-        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s: number, g: any) => s + g.cantManifiestos, 0)} color="from-emerald-600 to-emerald-700" sub={isDateFiltered ? 'en periodo' : 'generados'} />
+        <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-700 to-purple-800" />
+        <KpiCard icon={Package} label="Categorias" value={uniqueCategories} color="from-indigo-700 to-indigo-800" sub="tipos" />
+        <KpiCard icon={MapPin} label="Departamentos" value={byDep.filter(d => d.name !== 'Sin departamento').length} color="from-violet-700 to-violet-800" sub="con presencia" />
+        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s: number, g: any) => s + g.cantManifiestos, 0)} color="from-emerald-700 to-emerald-800" sub={isDateFiltered ? 'en periodo' : 'generados'} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

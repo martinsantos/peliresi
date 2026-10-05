@@ -1,5 +1,94 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## PREVALENTE 19:45 UTC — QA88 cerrada; candidato siguiente listo para otro gate
+
+QA88/fuente4392875 COMPLETED FAILURE sólo por los dos tooltip de Departamento:
+169/171E2E PASS2FAIL0skip/flaky;485BE+1.027FEunitPASS0FAIL0pending;
+tres builds/54HTTP/2SQL/3calendario/5territorialPASS. Android **15/15PASS,
+completed:true**; APK original4/4PASS sólo anónimo/sólo lectura. Runtime y HTTP
+sin errores, consolaoffline esperada. CleanupSUCCESS19:36:30.784UTC runtime5699/
+server5700 y PostgreSQL detenidos. ZIPfinal único128.016.938bytes externo
+`visual-surface-run88-final.zip`,artifact11368195793; resumen no duplicado.
+
+Se revisaron seis originales88: reinicio Android, recoveryretry, Reportes7 al
+final, Control, Blockchain y popupG. Total47 originales85–88 personalmente,
+NO toda superficie/roles/estados. Header móvil no rompe su marco; popupG SIGUE
+clipping vertical, todavía fuera del contrato horizontal de88. El tooltip de
+Departamento es visible como tinta de serie. Su tabla además tenía Gen.verde,
+incoherente con gráfico/mapa purple; se corrige también tabla/modal a las mismas
+constantes ACTOR_COLORS, conservando geometría y datos. Nuevos contratos primero
+5PASS2FAIL; conjunto final51/51focalPASS0FAIL0pending,
+`/private/tmp/sitrep-next-visual-focal-v3-20261005.json` (heap256/worker1).
+E2E siguiente verifica referencia Gen.visible con CSSreal, sin dato ficticio.
+
+Android88 tiene journal40eventos sin overflow ni tokens. Reinicio preserva
+checkpoint inspector más reciente aunque localStorage vuelve a admin antiguo;
+la recuperación autorizada verifica perfil real. Reinicio offline y logout
+también aprobaron. No afirmar arreglado87: no hubo cambio de auth y88 tenía
+capturaXML lenta previa al cierre. El siguiente QA sólo capturaXML después de
+recuperar, repite los quince casos sin esa espera y conserva todos los guards.
+No inyectar sesión ni reingresar para esconder un fallo.
+
+Próximo: commit/push acotado + única VM full/unit/Android después del cierre88,
+sin exclusiones ni umbral reducido. Popupvertical/KPI/tooltip/referencias nuevos
+NO forman parte del render aprobado parcialmente en88. Producción permanece
+intacta; publicador protegido bloqueado, sin vía alternativa. Hardware físico,
+APK exacto autenticado, Safari, ruido, batería y GPSbackground pendientes.
+
+## PREVALENTE 19:35 UTC — web QA88 leída; Android en ejecución
+
+Fuente4392875 en [QA88](https://github.com/martinsantos/peliresi/actions/runs/37360643612):
+**485BE +1.027FE unit PASS0FAIL0pending;169/171E2E PASS2FAIL0skip/flaky**.
+54HTTP/2SQL/3calendario/5territorialPASS. Duración E2E1.092.242,347ms.
+Resumen11367074313 leído por streaming, sin guardar otro ZIP o resumen duplicado.
+Android sigue activo; resultado/cleanup final aún pendientes. No solapar otra VM.
+
+Los dos fallos conservados son el MISMO tooltip de Departamento en responsive y
+app, no la leyenda fija: naranja de serie `rgb(234,88,12)` en nombres/valores de
+14px sobre blanco, contraste3,5595 frente al umbral4,5 intacto. No se excluye.
+ChartTooltip compartido se corrige en el árbol siguiente con texto neutral700
+y color de serie sólo en un punto alineado; nombres completos, ceros, valores,
+color/fill y ausencia de serie conservados. No fabricar color o tooltip vacío.
+Antes2PASS1FAIL; conjunto final49/49 focal PASS0FAIL0pending en
+`/private/tmp/sitrep-next-visual-focal-v2-20261005.json`, heap256/worker1.
+Esta corrección, popup vertical y KPI NO pertenecen al SHA probado en88; esperan
+otro gate remoto serial después del cierre. No auth/producción/envíos modificados.
+
+## PREVALENTE 19:29 UTC — QA88 activa; candidato siguiente no incluido
+
+[QA88](https://github.com/martinsantos/peliresi/actions/runs/37360643612) prueba
+`4392875c2a33c75ad04d2dad7c0e1434edac5bfc`, full/unit/Android serial, iniciada
+19:03:44UTC después del cleanup87. Sigue en E2E; cantidades definitivas sin leer.
+No solapar otra VM, desplegar ni confundir sus resultados con el árbol siguiente.
+
+La revisión personal de tres popup app87 reveló clipping VERTICAL: título del
+generador fuera del mapa, datos T/O bajo su borde/atribución. El control sólo
+horizontal era insuficiente; no se declara ese render aprobado. Cuatro capturas
+adicionales de inicio Reportes muestran transparencia de labels/alcances de KPI.
+Acumulado41 originales85/86/87 revisados, NO toda superficie/roles/scroll.
+
+Siguiente candidato local, separado del SHA88:
+
+- MonitorPopupBounds ajusta maxHeight por altura del mapa visible, marco del
+  popup, cabecera y margen de atribución. Una suscripción con cleanup, sin timer
+  o polling; contenido enfocable con scroll nativo de teclado, no paneo del mapa.
+  E2E conserva ancho y añade altura, cierre no cubierto y End/Home hasta el final.
+- KpiCard deja labels y alcance en blanco opaco, consumidores Reportes conservan
+  familias de color con fondos700/800. Generador de Tratados pasa de blue a su
+  purple/Factory canónico. Números, unidades, ceros, filtros y datos no cambian.
+  E2E añade color computado/opacidad reales; NO certifica el gradiente por clases.
+- Diagnóstico Android QA mueve XML nativo a después de recuperación/fallo;
+  no añade una espera previa al cierre que pudiera favorecer flush. Metadata
+  readonly preservada, sin cambio de auth/guards ni reingreso que oculte fallo.
+
+Antes: popup3PASS1FAIL, KPI1PASS2FAIL, ReportText4PASS1FAIL. Después46/46
+focales PASS0FAIL0pending en `/private/tmp/sitrep-next-visual-focal-20261005.json`,
+worker1/heap256MB y sólo unit, sin backend/DB/proveedores reales. Navegador,
+gradientes, geometría final y Android pendientes de nuevo gate serial tras88.
+No se instalan dependencias ni se ejecutan browsers/builds/emuladores locales.
+Login azul/sistema verde/marca conservados. Publicación protegida bloqueada,
+sin ejecución alternativa; no envíos ni producción/datos reales modificados.
+
 ## PREVALENTE 19:03 UTC — QA87 final fallida; candidato siguiente sin desplegar
 
 [QA87](https://github.com/martinsantos/peliresi/actions/runs/37354471948),

@@ -52,10 +52,10 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={FileText} label="Total Manifiestos" value={resumen.totalManifiestos || 0} color="from-emerald-600 to-emerald-700" />
-        <KpiCard icon={Package} label="Residuos de esta página" value={formatReportQuantities(manifiestosList)} valueClassName="text-xl sm:text-3xl break-words" color="from-blue-600 to-blue-700" />
-        <KpiCard icon={Activity} label="Estados presentes" value={Object.keys(porEstado).length} color="from-indigo-600 to-indigo-700" sub="tipos de estado" />
-        <KpiCard icon={TrendingUp} label="Tipos de esta página" value={Object.keys(porTipoResiduo).length} color="from-amber-600 to-amber-700" sub="categorías" />
+        <KpiCard icon={FileText} label="Total Manifiestos" value={resumen.totalManifiestos || 0} color="from-emerald-700 to-emerald-800" />
+        <KpiCard icon={Package} label="Residuos de esta página" value={formatReportQuantities(manifiestosList)} valueClassName="text-xl sm:text-3xl break-words" color="from-blue-700 to-blue-800" />
+        <KpiCard icon={Activity} label="Estados presentes" value={Object.keys(porEstado).length} color="from-indigo-700 to-indigo-800" sub="tipos de estado" />
+        <KpiCard icon={TrendingUp} label="Tipos de esta página" value={Object.keys(porTipoResiduo).length} color="from-amber-700 to-amber-800" sub="categorías" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

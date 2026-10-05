@@ -183,17 +183,17 @@ export default function OperadoresTab({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={FlaskConical} label="Total Operadores" value={operadores.length} color="from-blue-600 to-blue-700" />
-        <KpiCard icon={Layers} label="Categorias" value={byCategoria.length} color="from-purple-600 to-purple-700" sub="tipos" />
+        <KpiCard icon={FlaskConical} label="Total Operadores" value={operadores.length} color="from-blue-700 to-blue-800" />
+        <KpiCard icon={Layers} label="Categorias" value={byCategoria.length} color="from-purple-700 to-purple-800" sub="tipos" />
         {isDateFiltered ? (
           <>
-            <KpiCard icon={FileCheck} label="Recibidos" value={totalRecibidos} color="from-cyan-600 to-cyan-700" sub="en periodo" />
-            <KpiCard icon={FileCheck} label="Tratados" value={totalTratados} color="from-emerald-600 to-emerald-700" sub="en periodo" />
+            <KpiCard icon={FileCheck} label="Recibidos" value={totalRecibidos} color="from-cyan-700 to-cyan-800" sub="en periodo" />
+            <KpiCard icon={FileCheck} label="Tratados" value={totalTratados} color="from-emerald-700 to-emerald-800" sub="en periodo" />
           </>
         ) : (
           <>
-            <KpiCard icon={FileCheck} label="Tratamientos" value={totalTratamientos} color="from-emerald-600 to-emerald-700" sub="autorizados" />
-            <KpiCard icon={MapPin} label="Planta Fija" value={byTipo.find(x => x.name === 'Planta Fija')?.value || 0} color="from-cyan-600 to-cyan-700" sub="plantas fijas" />
+            <KpiCard icon={FileCheck} label="Tratamientos" value={totalTratamientos} color="from-emerald-700 to-emerald-800" sub="autorizados" />
+            <KpiCard icon={MapPin} label="Planta Fija" value={byTipo.find(x => x.name === 'Planta Fija')?.value || 0} color="from-cyan-700 to-cyan-800" sub="plantas fijas" />
           </>
         )}
       </div>

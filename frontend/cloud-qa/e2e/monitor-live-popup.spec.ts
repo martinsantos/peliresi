@@ -44,10 +44,37 @@ test('live map details retain real actor identity, readable content and a reacha
       const box = el.getBoundingClientRect(), map = el.closest('.leaflet-container')!.getBoundingClientRect();
       return box.left >= Math.max(0, map.left) - 1 && box.right <= Math.min(innerWidth, map.right) + 1;
     })).toBe(true);
+    // The older width-only contract missed clipped headings and data under
+    // the 240px mobile map's bottom controls. A passing popup must fit BOTH
+    // axes of the visible map, not merely exist in Leaflet's DOM.
+    await expect.poll(() => popup.evaluate(el => {
+      const box = el.getBoundingClientRect(), map = el.closest('.leaflet-container')!.getBoundingClientRect();
+      const header = el.closest('.wr-layout')!.querySelector('.wr-layout-header')!.getBoundingClientRect();
+      const visibleTop = Math.max(0, map.top, header.bottom);
+      return box.top >= visibleTop - 1 && box.bottom <= Math.min(innerHeight, map.bottom) + 1;
+    }), { message: 'Complete popup frame inside the visible map, without hidden title or bottom data' }).toBe(true);
     const close = popup.locator('.leaflet-popup-close-button');
     const geometry = await close.boundingBox();
     expect(geometry!.width).toBeGreaterThanOrEqual(44);
     expect(geometry!.height).toBeGreaterThanOrEqual(44);
+    expect(await close.evaluate(el => {
+      const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return el === hit || el.contains(hit);
+    }), 'Dismissal must not be covered by the sticky header or bottom controls').toBe(true);
+    const content = popup.locator('.leaflet-popup-content');
+    await expect(content).toHaveAttribute('tabindex', '0');
+    const before = await content.evaluate(el => ({ client: el.clientHeight, total: el.scrollHeight, start: el.scrollTop }));
+    if (before.total > before.client) {
+      await content.focus(); await content.press('End');
+      await expect.poll(() => content.evaluate(el => el.scrollTop + el.clientHeight >= el.scrollHeight - 1)).toBe(true);
+      expect(await body.evaluate(el => {
+        const tail = el.lastElementChild!.getBoundingClientRect(), frame = el.closest('.leaflet-popup-content')!.getBoundingClientRect();
+        return tail.bottom <= frame.bottom + 1;
+      }), 'Last data row remains reachable through normal keyboard scrolling').toBe(true);
+      await page.screenshot({ path: info.outputPath(`monitor-popup-${category}-end.png`), animations: 'disabled', scale: 'css' });
+      await content.press('Home');
+      await expect.poll(() => content.evaluate(el => el.scrollTop)).toBe(0);
+    }
     records.push(await body.evaluate((el, category) => ({ category, text: el.textContent, style: { width: getComputedStyle(el).width, font: getComputedStyle(el).fontFamily }, bounds: el.getBoundingClientRect().toJSON() }), category));
     await page.screenshot({ path: info.outputPath(`monitor-popup-${category}.png`), animations: 'disabled', scale: 'css' });
     await close.click();

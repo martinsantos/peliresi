@@ -57,10 +57,10 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Truck} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-orange-600 to-orange-700" />
-        <KpiCard icon={Truck} label="Viajes de esta página" value={resumen.totalViajes || 0} color="from-blue-600 to-blue-700" />
-        <KpiCard icon={Activity} label="En Tránsito" value={resumen.viajesActivos || 0} color="from-amber-600 to-amber-700" sub="Esta página" />
-        <KpiCard icon={TrendingUp} label="Tasa Promedio" value={`${avgTasa.toFixed(1)}%`} color="from-emerald-600 to-emerald-700" sub="Esta página" />
+        <KpiCard icon={Truck} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-orange-700 to-orange-800" />
+        <KpiCard icon={Truck} label="Viajes de esta página" value={resumen.totalViajes || 0} color="from-blue-700 to-blue-800" />
+        <KpiCard icon={Activity} label="En Tránsito" value={resumen.viajesActivos || 0} color="from-amber-700 to-amber-800" sub="Esta página" />
+        <KpiCard icon={TrendingUp} label="Tasa Promedio" value={`${avgTasa.toFixed(1)}%`} color="from-emerald-700 to-emerald-800" sub="Esta página" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

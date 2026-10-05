@@ -17,8 +17,8 @@ export function KpiCard({ label, value, icon: Icon, color, sub, valueClassName }
           </div>
         </div>
         <p className={`${valueClassName || 'text-3xl'} font-extrabold text-white tracking-tight`}>{value}</p>
-        <p className="text-sm text-white/80 font-medium mt-1">{label}</p>
-        {sub && <p className="text-xs text-white/60 mt-0.5">{sub}</p>}
+        <p className="text-sm text-white font-medium mt-1">{label}</p>
+        {sub && <p className="text-xs text-white mt-0.5">{sub}</p>}
       </div>
     </div>
   );

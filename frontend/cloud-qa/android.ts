@@ -405,7 +405,10 @@ try{
         ? await page.evaluate(()=>(window as Window & {__sitrepQaSessionEvidence?:unknown[]}).__sitrepQaSessionEvidence||null) : null;
       stages.push({stage,at:new Date().toISOString(),url:page.url(),tabs:context.pages().map(tab=>tab.url()),draft,session});
       await writeFile(path.join(output,'restart-draft-stages.json'),JSON.stringify({stages,sessionEvidence,sessionEvidenceOverflow},null,2));
-      await writeFile(path.join(output,'restart-'+stage+'-native.xml'),await readNativeWindow());
+      // Native UI dumps are useful AFTER recovery succeeds/fails. Do not add
+      // a slow diagnostic at the force-stop boundary or favor Chrome's flush.
+      if(stage==='after-real-recovery-attempt'||stage==='reopened-record')
+        await writeFile(path.join(output,'restart-'+stage+'-native.xml'),await readNativeWindow());
     };
     // Observe only the scoped QA draft; no tokens, storage injection, artificial
     // waiting for Chrome's disk commit or hidden removal of a conflict.

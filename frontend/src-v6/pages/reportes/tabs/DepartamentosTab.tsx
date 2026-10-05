@@ -199,17 +199,17 @@ export function DepartamentoDetalleModal({
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 sm:px-6 py-4 bg-neutral-50/50">
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-neutral-100">
-            <span className="w-3 h-3 rounded-full bg-green-500" />
+            <span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ backgroundColor: ACTOR_COLORS.generador }} />
             <span className="text-sm font-semibold text-neutral-900">{generadores.length}</span>
             <span className="text-xs text-neutral-500">Generadores</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-neutral-100">
-            <span className="w-3 h-3 rounded-full bg-orange-500" />
+            <span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ backgroundColor: ACTOR_COLORS.transportista }} />
             <span className="text-sm font-semibold text-neutral-900">{transportistas.length}</span>
             <span className="text-xs text-neutral-500">Transportistas</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-neutral-100">
-            <span className="w-3 h-3 rounded-full bg-blue-500" />
+            <span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ backgroundColor: ACTOR_COLORS.operador }} />
             <span className="text-sm font-semibold text-neutral-900">{operadores.length}</span>
             <span className="text-xs text-neutral-500">Operadores</span>
           </div>
@@ -393,10 +393,10 @@ export default function DepartamentosTab({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={MapPin} label="Departamentos" value={depStats.length} color="from-violet-600 to-violet-700" sub="con actividad" />
-        <KpiCard icon={Factory} label="Generadores" value={totalGen} color="from-purple-600 to-purple-700" />
-        <KpiCard icon={Truck} label="Transportistas" value={totalTrans} color="from-orange-600 to-orange-700" />
-        <KpiCard icon={FlaskConical} label="Operadores" value={totalOper} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={MapPin} label="Departamentos" value={depStats.length} color="from-violet-700 to-violet-800" sub="con actividad" />
+        <KpiCard icon={Factory} label="Generadores" value={totalGen} color="from-purple-700 to-purple-800" />
+        <KpiCard icon={Truck} label="Transportistas" value={totalTrans} color="from-orange-700 to-orange-800" />
+        <KpiCard icon={FlaskConical} label="Operadores" value={totalOper} color="from-blue-700 to-blue-800" />
       </div>
 
       {/* Department filter */}
@@ -495,13 +495,13 @@ export default function DepartamentosTab({
                   <tr>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Departamento</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">
-                      <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Gen.</span>
+                      <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ backgroundColor: ACTOR_COLORS.generador }} /> Gen.</span>
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center hidden md:table-cell">
-                      <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> Trans.</span>
+                      <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ backgroundColor: ACTOR_COLORS.transportista }} /> Trans.</span>
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center hidden md:table-cell">
-                      <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Oper.</span>
+                      <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ backgroundColor: ACTOR_COLORS.operador }} /> Oper.</span>
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">Total</th>
                     <th className="px-4 py-3 w-8"></th>

@@ -459,6 +459,10 @@
 
 
 /* Popup dismissal has the same touch target in live and history modes. */
+.wr-layout-map .leaflet-popup-content:focus-visible {
+  outline: 2px solid #1b5e3c;
+  outline-offset: -2px;
+}
 .wr-layout-map .leaflet-container a.leaflet-popup-close-button {
   width: 44px;
   height: 44px;

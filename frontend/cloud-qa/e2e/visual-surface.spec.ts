@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { createSpontaneousInspection, login, prefix, readablePageHeading } from './helpers';
+import { ACTOR_COLORS } from '../../src-v6/utils/actor-identity';
 
 /** Evidence is scoped to a route, role, viewport and state, never "all UI passed". */
 type Surface = { name: string; route: string; state?: string; expectedFailure?: boolean; viewportPosition?: 'start' | 'end' };
@@ -220,9 +221,35 @@ test('visual inventory: real report tabs, selected state and reachable bottom co
     await expect(navigation.locator('[aria-pressed="true"]')).toHaveCount(1);
     await page.evaluate(() => { window.scrollTo(0, 0); document.querySelectorAll('main').forEach(el => { el.scrollTop = 0; }); });
     await capture(page, info, { name: `report-${index}-start`, route: '/reportes', state: label.trim(), viewportPosition: 'start' }, false);
+    if (index >= 1 && index <= 7) {
+      const metrics = page.locator('.bg-gradient-to-br:has(p.font-extrabold)');
+      await expect(metrics).toHaveCount([0, 4, 3, 4, 4, 4, 4, 4][index]);
+      const captions = await metrics.locator('p.font-medium,p.text-xs').evaluateAll(elements => elements.map(el => ({
+        text: el.textContent?.trim(), color: getComputedStyle(el).color,
+        opacity: getComputedStyle(el).opacity,
+        backgroundImage: getComputedStyle(el.closest('.bg-gradient-to-br')!).backgroundImage,
+      })));
+      expect(captions.length).toBeGreaterThanOrEqual(await metrics.count());
+      for (const caption of captions) {
+        expect(caption.text).toBeTruthy();
+        expect(caption.color, 'Metric caption is fully opaque, including its scope').toBe('rgb(255, 255, 255)');
+        expect(caption.opacity).toBe('1');
+      }
+      // This verifies rendered foreground transparency, NOT the gradient's
+      // final contrast. The generic inventory keeps that composition pending.
+      await info.attach(`report-${index}-metric-caption-contract`, {
+        body: JSON.stringify({ captions, gradientContrastMeasured: false }), contentType: 'application/json',
+      });
+    }
     // Scroll the actual shell, not the window alone: /app has a contained main.
     await page.evaluate(() => { document.querySelectorAll('main').forEach(el => { el.scrollTop = el.scrollHeight; }); window.scrollTo(0, document.documentElement.scrollHeight); });
     await capture(page, info, { name: `report-${index}-end`, route: '/reportes', state: label.trim(), viewportPosition: 'end' }, false);
+    if (index === 7) {
+      const generatorKey = page.getByRole('columnheader', { name: 'Gen.', exact: true }).locator('span[aria-hidden="true"]');
+      await expect(generatorKey).toBeVisible();
+      const rgb = ACTOR_COLORS.generador.slice(1).match(/../g)!.map(channel => parseInt(channel, 16)).join(', ');
+      await expect(generatorKey).toHaveCSS('background-color', `rgb(${rgb})`);
+    }
   }
 });
 

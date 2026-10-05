@@ -5,7 +5,9 @@ import type { ReactNode } from 'react';
 import ManifiestosTab from '../../pages/reportes/tabs/ManifiestosTab';
 import TransporteTab from '../../pages/reportes/tabs/TransporteTab';
 import TratamientosTab from '../../pages/reportes/tabs/TratamientosTab';
-import DepartamentosTab from '../../pages/reportes/tabs/DepartamentosTab';
+import DepartamentosTab, { DepartamentoDetalleModal } from '../../pages/reportes/tabs/DepartamentosTab';
+import TratadosTab from '../../pages/reportes/tabs/TratadosTab';
+import { ACTOR_COLORS } from '../../utils/actor-identity';
 
 // Only chart layout is a double. The actual labels, rows, category definitions
 // and computed values render unchanged; browser QA separately measures CSS.
@@ -55,7 +57,30 @@ it('department actor metrics retain canonical generator and operator identity', 
   render(<MemoryRouter><DepartamentosTab ccData={{ generadores: [], transportistas: [], operadores: [] } as never} onSelectDep={vi.fn()} periodoLabel="QA" /></MemoryRouter>);
   const generator = screen.getByText('Generadores', { selector: 'p', exact: true }).closest('.bg-gradient-to-br')!;
   const operator = screen.getByText('Operadores', { selector: 'p', exact: true }).closest('.bg-gradient-to-br')!;
-  expect(generator).toHaveClass('from-purple-600');
+  expect(generator).toHaveClass('from-purple-700', 'to-purple-800');
   expect(generator.querySelector('svg.lucide-factory')).toBeInTheDocument();
   expect(operator.querySelector('svg.lucide-flask-conical')).toBeInTheDocument();
+});
+
+it('treated report references the generator with its canonical category instead of operator blue', () => {
+  render(<MemoryRouter><TratadosTab {...props} data={{ detalle: [], porGenerador: {} }} /></MemoryRouter>);
+  const generator = screen.getByText('Generadores de esta página', { selector: 'p', exact: true }).closest('.bg-gradient-to-br')!;
+  expect(generator).toHaveClass('from-purple-700', 'to-purple-800');
+  expect(generator.querySelector('svg.lucide-factory')).toBeInTheDocument();
+});
+
+it('department table keys match the actual canonical actor series, not a green generator', () => {
+  render(<MemoryRouter><DepartamentosTab ccData={{ generadores: [{ id: 'qa-g', latitud: -32.8895, longitud: -68.8458 }], transportistas: [], operadores: [] } as never} onSelectDep={vi.fn()} periodoLabel="QA" /></MemoryRouter>);
+  for (const [label, color] of [['Gen.', ACTOR_COLORS.generador], ['Trans.', ACTOR_COLORS.transportista], ['Oper.', ACTOR_COLORS.operador]]) {
+    const key = screen.getByRole('columnheader', { name: label, exact: true }).querySelector('span.rounded-full');
+    expect(key).toHaveStyle({ backgroundColor: color });
+  }
+});
+
+it('department detail keys use the same actor identity as the table and chart', () => {
+  render(<MemoryRouter><DepartamentoDetalleModal departamento="Capital" generadores={[]} transportistas={[]} operadores={[]} periodoLabel="QA" onClose={vi.fn()} /></MemoryRouter>);
+  for (const [label, color] of [['Generadores', ACTOR_COLORS.generador], ['Transportistas', ACTOR_COLORS.transportista], ['Operadores', ACTOR_COLORS.operador]]) {
+    const key = screen.getByText(label, { selector: 'span', exact: true }).parentElement!.querySelector('span.rounded-full');
+    expect(key).toHaveStyle({ backgroundColor: color });
+  }
 });

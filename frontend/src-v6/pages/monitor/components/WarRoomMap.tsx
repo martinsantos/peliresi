@@ -20,6 +20,7 @@ import {
 import { EVENT_COLORS } from '../utils/war-room-icons';
 import { ACTOR_ICONS } from '../../../utils/map-icons';
 import { MapCategorySymbol, type MapCategory } from '../../../components/ui/MapLayerToggle';
+import { MonitorPopupBounds } from './MonitorPopupBounds';
 
 // Keep the Monitor on the same keyless base map already used by SITREP's
 // other map views. The former CARTO endpoint now paints API KEY REQUIRED.
@@ -272,6 +273,7 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
   return (
     <div className="relative w-full h-full">
     <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false}>
+      {mode === 'LIVE' && <MonitorPopupBounds />}
       {mode === 'LIVE' && <InspectionMapLayer items={inspections} />}
       <TileLayer url={MAP_TILES} attribution={ATTRIBUTION} />
 

@@ -191,10 +191,10 @@ export default function TratamientosTab({
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={FlaskConical} label="Métodos de Tratamiento" value={STATS_TRATAMIENTOS.totalMetodos} color="from-emerald-600 to-emerald-700" />
-        <KpiCard icon={Layers} label="Categorías" value={STATS_TRATAMIENTOS.totalCategorias} color="from-blue-600 to-blue-700" />
-        <KpiCard icon={FlaskConical} label="Operadores" value={STATS_TRATAMIENTOS.totalOperadores} color="from-blue-600 to-blue-700" sub="habilitados" />
-        <KpiCard icon={AlertTriangle} label="Riesgo Crítico" value={STATS_TRATAMIENTOS.metodosCriticos} color="from-red-600 to-red-700" sub="solo 1 operador" />
+        <KpiCard icon={FlaskConical} label="Métodos de Tratamiento" value={STATS_TRATAMIENTOS.totalMetodos} color="from-emerald-700 to-emerald-800" />
+        <KpiCard icon={Layers} label="Categorías" value={STATS_TRATAMIENTOS.totalCategorias} color="from-blue-700 to-blue-800" />
+        <KpiCard icon={FlaskConical} label="Operadores" value={STATS_TRATAMIENTOS.totalOperadores} color="from-blue-700 to-blue-800" sub="habilitados" />
+        <KpiCard icon={AlertTriangle} label="Riesgo Crítico" value={STATS_TRATAMIENTOS.metodosCriticos} color="from-red-700 to-red-800" sub="solo 1 operador" />
       </div>
 
       {/* Charts: 2 columns */}
