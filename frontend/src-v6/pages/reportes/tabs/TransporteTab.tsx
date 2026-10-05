@@ -9,6 +9,7 @@ import {
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
+import { CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { ChartLegendLabel } from '../../../components/charts/ChartLegendLabel';
 import { KpiCard } from '../../../components/charts/KpiCard';
 
@@ -71,8 +72,8 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
               <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} stroke="#94a3b8" />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={110} stroke="#94a3b8" />
                   <Tooltip content={<ChartTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 12 }} formatter={ChartLegendLabel} />
                   <Bar dataKey="completados" name="Completados" stackId="a" fill="#0D8A4F" radius={[0, 0, 0, 0]} barSize={22} />

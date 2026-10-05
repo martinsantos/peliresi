@@ -39,6 +39,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
     };
     const findings: Array<Record<string, unknown>> = [];
     let measured = 0;
+    let measuredSvgTextNodes = 0;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node: Node | null;
     while ((node = walker.nextNode())) {
@@ -63,10 +64,14 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
         if (layer[3] === 1) break;
       }
       const style = styles[0];
-      const foreground = color(style.color);
+      // SVG text is painted with fill, NOT the HTML color inherited by tspan.
+      // Checking color alone made pale chart axes look compliant in QA89.
+      const foregroundProperty = element.namespaceURI === 'http://www.w3.org/2000/svg' ? 'fill' : 'color';
+      const foregroundCss = style[foregroundProperty];
+      const foreground = color(foregroundCss);
       const disabled = !!element.closest(':disabled,[aria-disabled="true"]');
       const record = { text: text.slice(0, 140), tag: element.tagName, className: element.getAttribute('class'),
-        foreground: style.color, fontSize: style.fontSize, fontWeight: style.fontWeight, disabled,
+        foreground: foregroundCss, foregroundProperty, fontSize: style.fontSize, fontWeight: style.fontWeight, disabled,
         bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } };
       if (unsupported || !foreground) { findings.push({ ...record, kind: 'contrast-unmeasured', reason: 'image/gradient/opacity/filter or unsupported color' }); continue; }
       let background: Color = [255, 255, 255, 1];
@@ -77,6 +82,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
       const size = parseFloat(style.fontSize);
       const threshold = size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700) ? 3 : 4.5;
       measured++;
+      if (foregroundProperty === 'fill') measuredSvgTextNodes++;
       if (ratio < threshold) findings.push({ ...record, kind: disabled ? 'disabled-contrast-review' : 'contrast-candidate', background, ratio, threshold });
     }
     const icons = Array.from(document.querySelectorAll('svg[class*="lucide"]')).flatMap(element => {
@@ -90,7 +96,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
       scroll: { windowY: scrollY, main: Array.from(document.querySelectorAll('main')).map(el => ({ top: el.scrollTop, height: el.clientHeight, contentHeight: el.scrollHeight })) },
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       title: document.title, headings: Array.from(document.querySelectorAll('h1,h2,h3')).map(e => e.textContent?.trim()),
-      measuredTextNodes: measured, findings, icons };
+      measuredTextNodes: measured, measuredSvgTextNodes, findings, icons };
   });
   await page.screenshot({ path: info.outputPath(`${surface.name}.png`), animations: 'disabled', scale: 'css' });
   await info.attach(surface.name, { body: JSON.stringify({ ...surface, ...measurement, headerTitle, errors,
@@ -104,6 +110,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
   // the evidence as pending rather than being silently treated as compliant.
   expect.soft(measurement.findings.filter(f => f.kind === 'contrast-candidate'), surface.name + ' enabled text contrast').toEqual([]);
   if (!surface.expectedFailure) expect.soft(await page.locator('body').innerText(), surface.name + ' unexpected dead end').not.toMatch(/Página no encontrada|Error al cargar/);
+  return measurement;
 }
 
 test('visual inventory: public entry, recovery and explicit error states', async ({ page }, info) => {
@@ -129,6 +136,22 @@ test('visual inventory: public entry, recovery and explicit error states', async
       await expect(page.getByRole('heading', { name: 'Recuperar contraseña' }).filter({ visible: true })).toBeVisible();
       await capture(page, info, surface, false);
     } else await capture(page, info, surface);
+    if (surface.name === 'public-register') {
+      const heading = page.getByRole('heading', { name: 'Crear cuenta en SITREP', exact: true });
+      const spacing = await heading.evaluate(element => {
+        const frame = element.closest('main.auth-form-panel');
+        if (!frame) return null;
+        const bounds = frame.getBoundingClientRect();
+        const formBounds = element.parentElement!.getBoundingClientRect();
+        return { left: formBounds.left - bounds.left, right: bounds.right - formBounds.right,
+          insideViewport: formBounds.left >= 0 && formBounds.right <= innerWidth };
+      });
+      expect(spacing, 'Registration keeps the actual institutional form frame in app and web').not.toBeNull();
+      expect(spacing!.left).toBeGreaterThanOrEqual(16);
+      expect(spacing!.right).toBeGreaterThanOrEqual(16);
+      expect(spacing!.insideViewport).toBe(true);
+      await info.attach('registration-frame-spacing', { body: JSON.stringify({ spacing, accountCreated: false }), contentType: 'application/json' });
+    }
   });
 });
 
@@ -166,7 +189,59 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
     { name: 'scanner', route: prefix(info) ? '/escaner-qr' : '/mobile/escaner-qr', state: 'browser camera capability, not physical Android proof' },
     { name: 'statistics', route: prefix(info) ? '/estadisticas' : '/mobile/estadisticas' },
   ];
-  for (const surface of surfaces) await test.step(surface.name, () => capture(page, info, surface));
+  for (const surface of surfaces) await test.step(surface.name, async () => {
+    await capture(page, info, surface);
+    if (['generators', 'operators', 'transporters'].includes(surface.name)) {
+      const summary = page.getByRole('group', { name: 'Resumen de registros', exact: true });
+      await expect(summary).toBeVisible();
+      const cards = await summary.evaluate(element => Array.from(element.children).map(card => {
+        const [value, label] = card.querySelectorAll('p');
+        const style = getComputedStyle(label);
+        const bounds = label.getBoundingClientRect();
+        const cardBounds = card.getBoundingClientRect();
+        return { value: value.textContent?.trim(), label: label.textContent?.trim(),
+          whiteSpace: style.whiteSpace, overflow: label.scrollWidth - label.clientWidth,
+          padding: getComputedStyle(card).padding, insideCard: bounds.left >= cardBounds.left && bounds.right <= cardBounds.right,
+        };
+      }));
+      expect(cards).toHaveLength(4);
+      for (const card of cards) {
+        expect(card.label).toBeTruthy();
+        expect(card.value).toBeTruthy(); // Zero is data too; never replace it with an empty placeholder.
+        expect(card.whiteSpace).toBe('normal');
+        expect(card.overflow, card.label + ' must be readable in its actual card').toBeLessThanOrEqual(1);
+        expect(card.insideCard, card.label + ' must not leave its own surface').toBe(true);
+        expect(card.padding, 'Only CardContent owns padding, not both layers').toBe('0px');
+      }
+      if (surface.name === 'generators') {
+        expect(cards.map(card => card.label).join(' ')).toMatch(/TEF sin pago \d{4}.*DDJJ pendiente \d{4}/);
+      } else {
+        expect(cards.map(card => card.label)).toContain('Activos · esta página');
+        expect(cards.map(card => card.label)).toContain('Inactivos · esta página');
+      }
+      await info.attach(surface.name + '-summary-readability', { body: JSON.stringify(cards), contentType: 'application/json' });
+    }
+    if (surface.name === 'control') {
+      const today = await page.evaluate(() => new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date()));
+      const ranges = [];
+      for (const [days, label] of [[30, '30 días'], [1, 'Hoy'], [7, '7 días'], [30, '30 días']] as const) {
+        const button = page.getByRole('button', { name: label, exact: true });
+        if (ranges.length) await button.click();
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
+        const badge = page.getByText(/^\d{4}-\d{2}-\d{2} — \d{4}-\d{2}-\d{2}$/);
+        await expect(badge).toBeVisible();
+        const [desde, hasta] = (await badge.innerText()).split(' — ');
+        expect(hasta).toBe(today);
+        expect((Date.parse(hasta + 'T00:00:00Z') - Date.parse(desde + 'T00:00:00Z')) / 86400000 + 1,
+          label + ' includes the selected end day exactly once').toBe(days);
+        ranges.push({ days, desde, hasta });
+      }
+      await info.attach('control-inclusive-calendar-periods', { body: JSON.stringify({ ranges,
+        backendInstantBoundaryValidated: false, businessAPIIntercepted: false }), contentType: 'application/json' });
+    }
+  });
   const inspection = await createSpontaneousInspection(page, info);
   // Discover the actual available sections rather than guessing a hash that
   // silently falls back to Visita. A spontaneous inspection has no declaration.
@@ -249,6 +324,12 @@ test('visual inventory: real report tabs, selected state and reachable bottom co
       await expect(generatorKey).toBeVisible();
       const rgb = ACTOR_COLORS.generador.slice(1).match(/../g)!.map(channel => parseInt(channel, 16)).join(', ');
       await expect(generatorKey).toHaveCSS('background-color', `rgb(${rgb})`);
+      const axis = page.locator('.recharts-cartesian-axis-tick-value').first();
+      await axis.scrollIntoViewIfNeeded();
+      await expect(axis).toBeVisible();
+      await expect(axis).toHaveCSS('fill', 'rgb(71, 85, 105)');
+      const painted = await capture(page, info, { name: 'report-7-svg-axes', route: '/reportes', state: 'Departamento · actual painted SVG text' }, false);
+      expect(painted.measuredSvgTextNodes, 'The audit must measure visible SVG fill, not only surrounding HTML').toBeGreaterThan(0);
     }
   }
 });

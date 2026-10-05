@@ -26,6 +26,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
+import { CRUDSummary } from '../../components/crud/CRUDSummary';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -585,63 +586,15 @@ const TransportistasPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Truck size={20} className="text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
-                <p className="text-sm text-neutral-600">Total Transportistas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <CheckCircle size={20} className="text-success-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.activos}</p>
-                <p className="text-sm text-neutral-600">Activos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning-100 rounded-lg">
-                <AlertTriangle size={20} className="text-warning-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.inactivos}</p>
-                <p className="text-sm text-neutral-600">Inactivos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Clock size={20} className="text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.porVencer}</p>
-                <p className="text-sm text-neutral-600">Vencen en 30 días</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <CRUDSummary stats={[
+        { label: 'Total Transportistas', value: stats.total, icon: <Truck size={20} className="text-orange-600" />, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+        { label: 'Activos · esta página', value: stats.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+        { label: 'Inactivos · esta página', value: stats.inactivos, icon: <AlertTriangle size={20} className="text-warning-600" />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
+        { label: 'Vencen en 30 días · esta página', value: stats.porVencer, icon: <Clock size={20} className="text-orange-600" />, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+      ]} />
 
       {/* Filters */}
-      <Card>
+      <Card padding="none">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">

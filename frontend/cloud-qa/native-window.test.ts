@@ -88,6 +88,21 @@ test('failed native dump is never retried or replaced with an older XML file', a
   await assert.rejects(collectNativeWindow(async () => { calls++; throw new Error('device offline'); }), /Native UI dump failed: device offline/);
   assert.equal(calls, 1);
 });
+test('a success-looking message with nonzero exit remains a failure with diagnostic evidence', async () => {
+  const calls: string[][] = [];
+  const error = Object.assign(new Error('Command failed: adb shell uiautomator dump'), {
+    code: 255, signal: null, killed: false,
+    stdout: 'UI hierchary dumped to: /data/local/tmp/sitrep-cloud-qa-window.xml\n', stderr: '',
+  });
+  await assert.rejects(collectNativeWindow(async args => { calls.push(args); throw error; }), failure => {
+    assert.match(String(failure), /"code":255/);
+    assert.match(String(failure), /"killed":false/);
+    assert.match(String(failure), /"elapsedMs":\d+/);
+    assert.match(String(failure), /UI hierchary dumped to:/);
+    return true;
+  });
+  assert.equal(calls.length, 1, 'Never read a possibly stale XML or retry a failed command');
+});
 test('failed or incomplete native XML read is not accepted as an empty passing window', async () => {
   await assert.rejects(collectNativeWindow(async args => {
     if (args[1] === 'cat') throw new Error('read disconnected');

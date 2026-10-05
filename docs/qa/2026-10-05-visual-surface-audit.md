@@ -1,5 +1,62 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## PREVALENTE — QA89 cerrada; siguiente candidato de UI, todavía no publicado
+
+[QA89](https://github.com/martinsantos/peliresi/actions/runs/37365558562) probó
+`173abf62f920ddcf5fe9f30066cd903307103d7a`: **485 backend + 1.037 frontend unit;
+171/171 E2E**, sin omitidos ni flaky. Tres builds, 54 HTTP, dos SQL, tres
+calendario y cinco permisos territoriales aprobaron. Android terminó **13/15**:
+la primera lectura nativa falló con salida no exitosa de `uiautomator`, pese a
+imprimir una confirmación; el último control exige que ese caso inicial haya
+aprobado. Ambos fallos se conservan. No están determinados el código/signal de
+salida ni la causa raíz. No aceptar stdout como éxito, reintentar a escondidas,
+leer XML anterior ni suavizar la expectativa de sesión. Se añade exclusivamente
+diagnóstico de código, signal, killed y duración para la siguiente tanda.
+
+Los otros trece casos Android aprobaron, incluidos reinicio de sesión/registro,
+recuperación de comentario no enviado, asignación/aviso al inspector, GPS y cola
+offline. No hubo runtime errors, respuestas API fallidas ni cierres inesperados;
+la consola sólo registró la desconexión intencional. APK original **4/4** sólo
+instalación, firma, inicio y reinicio anónimos/sólo lectura; NO APK autenticado.
+Cleanup SUCCESS **20:27:35.848 UTC**: runtime5879, server5880 y PostgreSQL
+detenidos. ZIP final único en SDTERA: `visual-surface-run89-final.zip`,
+artifact11370155501, 118.242.373 bytes. No VM solapada, despliegue ni envíos.
+
+Revisión personal: 70 originales85–88 y tres89 (fallo nativo con bienvenida
+visible, popupG al final, Reportes/Departamento al final). No son 73 pantallas
+distintas ni todos los estados de UI. La captura89 de Departamento reveló un
+hueco del inventario: SVG pinta el texto con `fill`, no con `color` HTML. El
+recolector siguiente mide ambas propiedades según el namespace y deja las
+composiciones no resueltas pendientes, sin rebajar contraste. Siete contratos
+de ejes primero fallaron; se corrigen los siete Reportes y Control con una tinta
+compartida, sin recolorear series, cambiar datos, geometría ni tamaños.
+
+Después del cleanup89, el candidato SIGUIENTE añade:
+
+- Resúmenes CRUD compartidos: etiquetas completas, ceros preservados, un único
+  dueño del padding y alcance de página explícito para conteos T/O.
+- Períodos inclusivos de días civiles Mendoza compartidos en Control/Reportes/
+  Monitor: 30 fechas, no31. El filtro sin límite `Ver Todos` se conserva.
+- `/app/registro` dentro del AuthLayout institucional existente, sin modificar
+  campos, validación, permisos, credenciales ni API de registro.
+- Contratos E2E renderizados de resumen, período, margen de registro y pintura
+  SVG; siguen 171 recorridos completos, sin interceptar API ni inyectar sesión.
+
+Antes: fechas/resumen 2PASS12FAIL; Control3PASS2FAIL; registro3PASS1FAIL;
+ejes7PASS7FAIL. Después: **88 focales FE PASS**, cero omitidos/fallos, en tres
+JSON `sitrep-ui-followup-{focal,monitor-focal,calendar-focal}-20261005.json` en
+`/private/tmp`, heap256MB/worker1. Driver puro16/16PASS, sin ADB/emulador local,
+incluida prueba que una confirmación con exit255 sigue siendo FAIL. Las cifras
+1.061FE/485BE son sólo EXPECTATIVAS de la próxima VM, no evidencia actual.
+
+Este candidato no pertenece al SHA89 ni tiene todavía gate remoto/render
+aprobado. Backend y auth de producto permanecen sin cambios. Los posibles bordes
+horarios de Control y unidades en su agregado backend necesitan reproducción
+independiente; no quedan certificados por arreglar presets frontend. También
+quedan gradientes/APCA, vistas/estados no revisados, APK exacto autenticado,
+teléfonos físicos, Safari, micrófono/ruido/batería/GPS segundo plano y publicación
+protegida. No GO global ni100% por conteos de pruebas.
+
 ## PREVALENTE 19:45 UTC — QA88 cerrada; candidato siguiente listo para otro gate
 
 QA88/fuente4392875 COMPLETED FAILURE sólo por los dos tooltip de Departamento:

@@ -13,6 +13,7 @@ describe('App public recovery retains the same institutional form frame as web',
     ['/recuperar', 'Recuperar contraseña'],
     ['/reset-password?token=unit-only-no-request', 'Nueva contraseña'],
     ['/reset-password', 'Recuperar contraseña'],
+    ['/registro', 'Crear cuenta en SITREP'],
   ])('frames the actual %s form without starting an account request', async (route, heading) => {
     render(<MemoryRouter initialEntries={[route]}><AppMobile /></MemoryRouter>);
     const title = await screen.findByRole('heading', { name: heading });

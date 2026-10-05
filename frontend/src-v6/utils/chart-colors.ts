@@ -3,6 +3,9 @@
  * Note: distinct from ESTADO_COLORS in constants.ts which uses Tailwind classes for badges.
  */
 
+/** Small chart text on white surfaces; separate from decorative grid strokes. */
+export const CHART_TEXT_COLOR = '#475569';
+
 export const ESTADO_CHART_COLORS: Record<string, string> = {
   BORRADOR: '#94A3B8',
   APROBADO: '#6366F1',

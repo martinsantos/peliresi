@@ -128,8 +128,8 @@ function AppMobile() {
           <Route path="/l/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
-          <Route path="/registro" element={<RegistroPage />} />
           <Route element={<AuthLayout />}>
+            <Route path="/registro" element={<RegistroPage />} />
             <Route path="/recuperar" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Route>

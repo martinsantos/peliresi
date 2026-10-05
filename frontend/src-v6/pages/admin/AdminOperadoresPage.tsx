@@ -141,9 +141,9 @@ const AdminOperadoresPage: React.FC = () => {
 
   const statCards: CRUDStatCard[] = [
     { label: 'Total Operadores', value: statsData.total, icon: <FlaskConical size={20} className="text-blue-700" />, iconBg: 'bg-blue-100', iconColor: 'text-blue-700' },
-    { label: 'Activos', value: statsData.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
-    { label: 'Inactivos', value: statsData.inactivos, icon: <AlertTriangle size={20} className="text-warning-600" />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
-    { label: 'Filtrados', value: statsData.filtrados, icon: <Search size={20} className="text-info-600" />, iconBg: 'bg-info-100', iconColor: 'text-info-600' },
+    { label: 'Activos · esta página', value: statsData.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+    { label: 'Inactivos · esta página', value: statsData.inactivos, icon: <AlertTriangle size={20} className="text-warning-600" />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
+    { label: 'Filtrados · esta página', value: statsData.filtrados, icon: <Search size={20} className="text-info-600" />, iconBg: 'bg-info-100', iconColor: 'text-info-600' },
   ];
 
   // ── Filters ──

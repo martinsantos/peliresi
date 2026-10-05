@@ -23,7 +23,7 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
-import { ESTADO_CHART_COLORS } from '../../../utils/chart-colors';
+import { CHART_TEXT_COLOR, ESTADO_CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import type { CentroControlData } from '../../../hooks/useCentroControl';
@@ -234,7 +234,7 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
                         <stop offset="95%" stopColor="#0D8A4F" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="fecha" tick={{ fontSize: 9 }} stroke="#94a3b8" interval="preserveStartEnd" />
+                    <XAxis dataKey="fecha" tick={{ fontSize: 9, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" interval="preserveStartEnd" />
                     <YAxis hide />
                     <Tooltip content={<ChartTooltip />} />
                     <Area type="monotone" dataKey="cantidad" name="manifiestos" stroke="#0D8A4F" fill="url(#sparkGrad)" strokeWidth={2} />
@@ -326,8 +326,8 @@ export const ControlStats: React.FC<ControlStatsProps> = ({
                 <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={80} initialDimension={{ width: 100, height: 80 }}>
                   <BarChart data={sparklineData} margin={{ left: 5, right: 20, top: 5, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="fecha" tick={{ fontSize: 10 }} stroke="#94a3b8" interval="preserveStartEnd" />
-                    <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                    <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" interval="preserveStartEnd" />
+                    <YAxis tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
                     <Tooltip content={<ChartTooltip />} />
                     <Bar dataKey="cantidad" name="manifiestos" fill="#0D8A4F" radius={[4, 4, 0, 0]} barSize={16} />
                   </BarChart>

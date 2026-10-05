@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CentroControlPage } from '../../pages/centro-control/CentroControlPage';
 
 const centro = vi.hoisted(() => vi.fn());
@@ -21,9 +21,26 @@ const activeData = { enTransito: [{ manifiestoId: 'qa-trip', numero: 'QA-VIAJE',
 const page = <MemoryRouter><CentroControlPage /></MemoryRouter>;
 
 describe('Centro de Control respects explicit panel choices across responses', () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.clearAllMocks();
     auth.mockReturnValue({ currentUser: { id: 'qa-admin', rol: 'ADMIN' }, isAdmin: true, isTransportista: false });
+  });
+
+  it('starts with exactly 30 calendar days including today, not 31', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-05T12:00:00Z'));
+    centro.mockReturnValue({ data: activeData, refetch: refresh });
+    render(page);
+    expect(centro).toHaveBeenCalledWith(expect.objectContaining({ fechaDesde: '2026-09-06', fechaHasta: '2026-10-05' }));
+  });
+
+  it('initializes both bounds to the Mendoza calendar when UTC is already the next day', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2027-01-01T01:00:00Z'));
+    centro.mockReturnValue({ data: activeData, refetch: refresh });
+    render(page);
+    expect(centro).toHaveBeenCalledWith(expect.objectContaining({ fechaDesde: '2026-12-02', fechaHasta: '2026-12-31' }));
   });
 
   it('shows global operational trips to a different transporter without offering private document access', () => {

@@ -52,13 +52,19 @@ const execute = promisify(execFile);
 /** Collect one fresh dump without blocking CDP and the Android ADB poll. */
 export async function collectNativeWindow(run: NativeCommand): Promise<string> {
   const file = '/data/local/tmp/sitrep-cloud-qa-window.xml';
+  const started = Date.now();
   try {
     const message = await run(['shell', 'uiautomator', 'dump', file], 20000);
     assert.ok(message.includes('UI hierchary dumped to: ' + file) && !message.includes('ERROR:'),
       'Native UI dump did not confirm a fresh window: ' + message.trim());
   } catch (error) {
-    const failure = error as Error & { stdout?: string; stderr?: string };
-    throw new Error('Native UI dump failed: ' + failure.message + '\n' + (failure.stdout || '') + (failure.stderr || ''));
+    const failure = error as Error & { stdout?: string; stderr?: string; code?: string | number; signal?: string; killed?: boolean };
+    // Run89 emitted a dump acknowledgement but exited unsuccessfully. Keep the
+    // strict failure and record why; stdout alone never authorizes an XML read.
+    const diagnostic = { code: failure.code ?? null, signal: failure.signal ?? null,
+      killed: failure.killed ?? false, elapsedMs: Date.now() - started };
+    throw new Error('Native UI dump failed: ' + failure.message + '\nNative command diagnostic: '
+      + JSON.stringify(diagnostic) + '\n' + (failure.stdout || '') + (failure.stderr || ''));
   }
   const xml = await run(['shell', 'cat', file], 5000);
   nativeNodes(xml);

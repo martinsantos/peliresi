@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
-import { CHART_COLORS } from '../../../utils/chart-colors';
+import { CHART_COLORS, CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import { useOperadores } from '../../../hooks/useActores';
@@ -222,8 +222,8 @@ export default function OperadoresTab({
                   margin={{ left: 10, right: 20, top: 5, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} stroke="#94a3b8" />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={120} stroke="#94a3b8" />
                   <Tooltip formatter={(value: any, name: any, props: any) => [value, props.payload.fullName || name]} />
                   <Bar dataKey="value" name="Operadores" fill="#3B82F6" radius={[0, 8, 8, 0]} barSize={22} />
                 </BarChart>

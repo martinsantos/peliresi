@@ -8,7 +8,7 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
-import { CHART_COLORS } from '../../../utils/chart-colors';
+import { CHART_COLORS, CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
@@ -200,8 +200,8 @@ export default function GeneradoresTab({
               <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={byDep} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} stroke="#94a3b8" />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={110} stroke="#94a3b8" />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="value" name="Generadores" fill="#7C3AED" radius={[0, 8, 8, 0]} barSize={22} />
                 </BarChart>

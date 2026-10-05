@@ -11,6 +11,7 @@ import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
+import { CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { ReportResidueBreakdown } from './ReportResidueBreakdown';
 
@@ -66,8 +67,8 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
               <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={generadorData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} stroke="#94a3b8" />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={120} stroke="#94a3b8" />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="manifiestos" name="manifiestos" fill="#0D8A4F" radius={[0, 8, 8, 0]} barSize={24} />
                 </BarChart>

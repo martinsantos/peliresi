@@ -17,6 +17,7 @@ import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
 import { KpiCard } from '../../../components/charts/KpiCard';
+import { CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import { downloadCsv } from '../../../utils/exportCsv';
 import { exportReportePDF } from '../../../utils/exportPdf';
@@ -220,8 +221,8 @@ export default function TratamientosTab({
                 margin={{ left: 10, right: 20, top: 5, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} stroke="#94a3b8" />
+                <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={120} stroke="#94a3b8" />
                 <Tooltip />
                 <Bar dataKey="value" name="Métodos" radius={[0, 8, 8, 0]} barSize={28}>
                   {byRisk.map((entry, i) => (
@@ -241,8 +242,8 @@ export default function TratamientosTab({
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={corrienteCoverage} margin={{ left: 5, right: 20, top: 5, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+              <YAxis tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
               <Tooltip />
               <Bar dataKey="value" name="Métodos" fill="#0D8A4F" radius={[6, 6, 0, 0]} barSize={24} />
             </BarChart>

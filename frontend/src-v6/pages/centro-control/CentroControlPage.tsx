@@ -51,10 +51,8 @@ export const CentroControlPage: React.FC = () => {
 
   // ── Date range (default: 30 días) ──
   const [datePreset, setDatePreset] = useState(30);
-  const [fechaDesde, setFechaDesde] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0];
-  });
-  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dateRange, setDateRange] = useState(() => computeDateRange(30));
+  const { desde: fechaDesde, hasta: fechaHasta } = dateRange;
 
   // ── Map zoom ──
   const [mapZoom, setMapZoom] = useState(10);
@@ -114,9 +112,7 @@ export const CentroControlPage: React.FC = () => {
 
   const handleDatePreset = useCallback((days: number) => {
     setDatePreset(days);
-    const range = computeDateRange(days);
-    setFechaDesde(range.desde);
-    setFechaHasta(range.hasta);
+    setDateRange(computeDateRange(days));
   }, []);
 
   const toggleLayer = useCallback((layer: keyof LayerState) => {
@@ -239,8 +235,8 @@ export const CentroControlPage: React.FC = () => {
         fechaHasta={fechaHasta}
         onManualRefresh={handleManualRefresh}
         onDatePreset={handleDatePreset}
-        onFechaDesde={(val) => { setFechaDesde(val); setDatePreset(-1); }}
-        onFechaHasta={(val) => { setFechaHasta(val); setDatePreset(-1); }}
+        onFechaDesde={(val) => { setDateRange(previous => ({ ...previous, desde: val })); setDatePreset(-1); }}
+        onFechaHasta={(val) => { setDateRange(previous => ({ ...previous, hasta: val })); setDatePreset(-1); }}
       />
 
       {/* ══════ Main Content ══════ */}

@@ -15,6 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Card, CardContent } from '../ui/CardV2';
+import { CRUDSummary } from './CRUDSummary';
 import { Button } from '../ui/ButtonV2';
 import { SearchInput } from '../ui/SearchInput';
 import { Table, Pagination } from '../ui/Table';
@@ -186,29 +187,13 @@ export function GenericCRUDPage<T extends Record<string, any>>(props: GenericCRU
 
       {/* ── Stats ── */}
       {stats && stats.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
-          {stats.map((stat, idx) => (
-            <Card key={idx}>
-              <CardContent className="p-2.5 sm:p-4">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className={`p-1.5 sm:p-2 ${stat.iconBg} rounded-lg shrink-0`}>
-                    {stat.icon}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-lg sm:text-2xl font-bold text-neutral-900">{stat.value}</p>
-                    <p className="text-xs sm:text-sm text-neutral-600 truncate">{stat.label}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <CRUDSummary stats={stats} />
       )}
 
       {renderAfterStats?.()}
 
       {/* ── Filters ── */}
-      <Card>
+      <Card padding="none">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-start gap-3">
             <div className="min-w-0 flex-[1_1_18rem]">
