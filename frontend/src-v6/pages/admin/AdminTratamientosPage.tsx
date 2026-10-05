@@ -36,6 +36,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
+import { CRUDSummary } from '../../components/crud/CRUDSummary';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
@@ -322,53 +323,12 @@ const AutorizacionesTab: React.FC<{ operadoresList: any[] }> = ({ operadoresList
 
   return (
     <div className="space-y-4 mt-4">
-      {/* Stats Cards - Spectacular Design */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4 border-l-4 border-l-primary-500">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
-              <ShieldCheck size={24} className="text-primary-600" />
-            </div>
-            <div>
-              <p className="text-xs text-neutral-500 uppercase tracking-wider">Total Autorizaciones</p>
-              <p className="text-3xl font-bold text-neutral-900">{allTratamientos.length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-l-4 border-l-green-500">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-              <CheckCircle2 size={24} className="text-green-600" />
-            </div>
-            <div>
-              <p className="text-xs text-neutral-500 uppercase tracking-wider">Activas</p>
-              <p className="text-3xl font-bold text-green-700">{allTratamientos.filter(t => t.activo).length}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-l-4 border-l-blue-500">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-              <FlaskConical size={24} className="text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-neutral-500 uppercase tracking-wider">Operadores</p>
-              <p className="text-3xl font-bold text-neutral-900">{new Set(allTratamientos.map(t => t.operadorId)).size}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-l-4 border-l-amber-500">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-              <AlertTriangle size={24} className="text-amber-600" />
-            </div>
-            <div>
-              <p className="text-xs text-neutral-500 uppercase tracking-wider">Inactivas</p>
-              <p className="text-3xl font-bold text-amber-700">{allTratamientos.filter(t => !t.activo).length}</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+      <CRUDSummary stats={[
+        { label: 'Total Autorizaciones', value: allTratamientos.length, icon: <ShieldCheck size={20} />, iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
+        { label: 'Activas', value: allTratamientos.filter(t => t.activo).length, icon: <CheckCircle2 size={20} />, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
+        { label: 'Operadores', value: new Set(allTratamientos.map(t => t.operadorId)).size, icon: <FlaskConical size={20} />, iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
+        { label: 'Inactivas', value: allTratamientos.filter(t => !t.activo).length, icon: <AlertTriangle size={20} />, iconBg: 'bg-amber-100', iconColor: 'text-amber-600' },
+      ]} />
 
       {/* Filters + Actions */}
       <Card padding="base" className="shadow-sm">

@@ -1,5 +1,52 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## PREVALENTE 21:11 UTC — QA90 cancelada sin ejecutar; cuatro hallazgos consolidados
+
+[QA90](https://github.com/martinsantos/peliresi/actions/runs/37371709531),
+fuente `72d7a1886d2a6c4bfd0c4b2258f2a98f26c47f3b`, terminó CANCELLED a las
+20:59:02 UTC tras permanecer en cola sin runner. Ambos jobs cancelados tienen
+`steps: []`: no servicios QA iniciados ni resultado nuevo. No cuenta como PASS.
+Se canceló exclusivamente esta tanda para consolidar defectos observados en
+capturas89 antes de otra tanda completa; ninguna otra tarea cancelada.
+
+Revisión personal acumulada: **97 originales** (70 de85–88 y27 de89), no97
+pantallas distintas ni100% del producto. En app89 se observaron:
+
+- Actores: etiquetas fuera de su tarjeta, doble padding y navegación por div
+  sin enlace nativo. Se conserva cada destino, prefijo móvil y total API;
+  etiquetas completas, padding único, enlaces con foco/hover/active.
+- Carga Masiva: identidad de categorías incompatible con mapas, tarjeta con
+  cursor accionable pero sin acción. Ahora reutiliza el símbolo de mapa y deja
+  accionable sólo el botón real. Rutas, versiones y descarga de CSV conservadas.
+- Residuos: los cinco indicadores pierden casi toda su etiqueta en teléfono.
+  Se usa el resumen compartido, conservando cinco columnas escritorio, cinco
+  cálculos actuales y las acciones/filtros del catálogo.
+- Autorizaciones de Tratamientos: «Total Autorizaciones» sale de su tarjeta.
+  El resumen compartido conserva los cuatro cálculos y referencias semánticas;
+  no modifica permisos, autorizaciones ni formularios de alta/edición.
+
+Antes, `WorkspaceReadability`: **3PASS9FAIL**. Después **12/12PASS**, incluidos
+los tres downloads contra proveedor simulado; ningún upload/envío/API real.
+Focal ampliado **71PASS0FAIL0pending**, heap256MB/worker1, JSON
+`/private/tmp/sitrep-workspaces-focal-20261005.json` (ocho archivos ejecutados).
+Pruebas E2E existentes ampliadas con geometría de texto dentro de cada tarjeta,
+cinco resúmenes de residuos, enlaces por teclado y símbolos de plantillas.
+Siguen171 recorridos, sin interceptar API de negocio ni inyectar sesiones.
+Complemento mapas/Monitor/KPI/tooltip **38/38PASS** en diez archivos distintos,
+JSON `sitrep-workspaces-map-monitor-focal-20261005.json`: **109 focales FE**
+únicos en ambas tandas, sin fallos ni pendientes. Los18 del primer después son
+un subconjunto, no se suman. Dependencias compartidas FE/BE siguen como symlinks.
+La próxima suite completa espera1.073FE/485BE; no son resultados medidos aún.
+
+**Render del candidato siguiente pendiente**: la suite focal no certifica
+geometría real, Android ni toda UI. QA89 sigue FAILURE13/15Android. Diagnóstico
+nativo estricto de72d7a18 conserva el fallo no exitoso; no es una reparación de
+causa raíz ni una aprobación de sesión. No desplegado, no automatizaciones ni
+agentes, no navegador/Docker/DB/API/emulador/build/install local. Publicador
+protegido no ejecutado/eludido. Backend y autenticación de producto intactos;
+gradientes/APCA, APK exacto autenticado, hardware/Safari/batería/ruido/background
+y conciliación real de producción siguen pendientes.
+
 ## PREVALENTE — QA89 cerrada; siguiente candidato de UI, todavía no publicado
 
 [QA89](https://github.com/martinsantos/peliresi/actions/runs/37365558562) probó

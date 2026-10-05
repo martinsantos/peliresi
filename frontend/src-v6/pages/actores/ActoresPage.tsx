@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import {
   Users,
@@ -505,60 +505,57 @@ export const ActoresPage: React.FC = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card
-            className="bg-purple-50 border-purple-200 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group"
-            onClick={() => navigate(mp('/admin/actores/generadores'))}
-          >
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg group-hover:scale-110 transition-transform">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+          <Link to={mp('/admin/actores/generadores')} className="block min-w-0 rounded-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
+          <Card padding="none" className="h-full bg-purple-50 border-purple-200 hover:shadow-md hover:border-purple-300 active:bg-purple-100 transition-colors">
+            <CardContent className="p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg shrink-0">
                 <Factory size={20} className="text-purple-600" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm text-purple-700">Generadores</p>
-                <p className="text-2xl font-bold text-purple-900">{generadoresCount}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm leading-5 text-purple-700 whitespace-normal break-words">Generadores</p>
+                <p className="text-lg sm:text-2xl font-bold text-purple-900 break-words">{generadoresCount}</p>
               </div>
-              <ChevronRight size={16} className="text-purple-400" />
+              <ChevronRight size={16} className="shrink-0 self-center text-purple-700" aria-hidden="true" />
             </CardContent>
           </Card>
-          <Card
-            className="bg-orange-50 border-orange-200 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer group"
-            onClick={() => navigate(mp('/admin/actores/transportistas'))}
-          >
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg group-hover:scale-110 transition-transform">
+          </Link>
+          <Link to={mp('/admin/actores/transportistas')} className="block min-w-0 rounded-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
+          <Card padding="none" className="h-full bg-orange-50 border-orange-200 hover:shadow-md hover:border-orange-300 active:bg-orange-100 transition-colors">
+            <CardContent className="p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg shrink-0">
                 <Truck size={20} className="text-orange-600" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm text-orange-700">Transportistas</p>
-                <p className="text-2xl font-bold text-orange-900">{transportistasCount}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm leading-5 text-orange-700 whitespace-normal break-words">Transportistas</p>
+                <p className="text-lg sm:text-2xl font-bold text-orange-900 break-words">{transportistasCount}</p>
               </div>
-              <ChevronRight size={16} className="text-orange-400" />
+              <ChevronRight size={16} className="shrink-0 self-center text-orange-700" aria-hidden="true" />
             </CardContent>
           </Card>
-          <Card
-            className="bg-blue-50 border-blue-200 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
-            onClick={() => navigate(mp('/admin/actores/operadores'))}
-          >
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg group-hover:scale-110 transition-transform">
+          </Link>
+          <Link to={mp('/admin/actores/operadores')} className="block min-w-0 rounded-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">
+          <Card padding="none" className="h-full bg-blue-50 border-blue-200 hover:shadow-md hover:border-blue-300 active:bg-blue-100 transition-colors">
+            <CardContent className="p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg shrink-0">
                 <FlaskConical size={20} className="text-blue-600" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm text-blue-700">Operadores</p>
-                <p className="text-2xl font-bold text-blue-900">{operadoresCount}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm leading-5 text-blue-700 whitespace-normal break-words">Operadores</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-900 break-words">{operadoresCount}</p>
               </div>
-              <ChevronRight size={16} className="text-blue-400" />
+              <ChevronRight size={16} className="shrink-0 self-center text-blue-700" aria-hidden="true" />
             </CardContent>
           </Card>
-          <Card className="bg-neutral-50 border-neutral-200">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-neutral-100 rounded-lg">
+          </Link>
+          <Card padding="none" className="bg-neutral-50 border-neutral-200">
+            <CardContent className="p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-neutral-100 rounded-lg shrink-0">
                 <Users size={20} className="text-neutral-600" />
               </div>
-              <div>
-                <p className="text-sm text-neutral-700">Total</p>
-                <p className="text-2xl font-bold text-neutral-900">{totalCount}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm leading-5 text-neutral-700 whitespace-normal break-words">Total</p>
+                <p className="text-lg sm:text-2xl font-bold text-neutral-900 break-words">{totalCount}</p>
               </div>
             </CardContent>
           </Card>

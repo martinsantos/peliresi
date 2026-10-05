@@ -27,6 +27,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
+import { CRUDSummary } from '../../components/crud/CRUDSummary';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -602,74 +603,13 @@ export const AdminResiduosPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-info-100 rounded-lg">
-                <FlaskConical size={20} className="text-info-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{statsTotal}</p>
-                <p className="text-sm text-neutral-600 truncate">Total Tipos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-error-100 rounded-lg">
-                <AlertTriangle size={20} className="text-error-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{statsPeligrosos}</p>
-                <p className="text-sm text-neutral-600 truncate">Peligrosos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <Leaf size={20} className="text-success-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{statsNoPeligrosos}</p>
-                <p className="text-sm text-neutral-600 truncate">No Peligrosos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning-100 rounded-lg">
-                <Flame size={20} className="text-warning-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{corrientesActivas}</p>
-                <p className="text-sm text-neutral-600 truncate">Corrientes Y</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <FileText size={20} className="text-primary-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{totalManifiestos}</p>
-                <p className="text-sm text-neutral-600 truncate">Manifiestos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <CRUDSummary desktopColumns={5} stats={[
+        { label: 'Total Tipos', value: statsTotal, icon: <FlaskConical size={20} />, iconBg: 'bg-info-100', iconColor: 'text-info-600' },
+        { label: 'Peligrosos', value: statsPeligrosos, icon: <AlertTriangle size={20} />, iconBg: 'bg-error-100', iconColor: 'text-error-600' },
+        { label: 'No Peligrosos', value: statsNoPeligrosos, icon: <Leaf size={20} />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+        { label: 'Corrientes Y', value: corrientesActivas, icon: <Flame size={20} />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
+        { label: 'Manifiestos', value: totalManifiestos, icon: <FileText size={20} />, iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
+      ]} />
 
       {/* Filters */}
       <Card>

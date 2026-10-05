@@ -191,7 +191,7 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
   ];
   for (const surface of surfaces) await test.step(surface.name, async () => {
     await capture(page, info, surface);
-    if (['generators', 'operators', 'transporters'].includes(surface.name)) {
+    if (['generators', 'operators', 'transporters', 'wastes', 'treatments'].includes(surface.name)) {
       const summary = page.getByRole('group', { name: 'Resumen de registros', exact: true });
       await expect(summary).toBeVisible();
       const cards = await summary.evaluate(element => Array.from(element.children).map(card => {
@@ -199,27 +199,79 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
         const style = getComputedStyle(label);
         const bounds = label.getBoundingClientRect();
         const cardBounds = card.getBoundingClientRect();
+        const range = document.createRange(); range.selectNodeContents(label);
+        const textBounds = Array.from(range.getClientRects());
         return { value: value.textContent?.trim(), label: label.textContent?.trim(),
           whiteSpace: style.whiteSpace, overflow: label.scrollWidth - label.clientWidth,
           padding: getComputedStyle(card).padding, insideCard: bounds.left >= cardBounds.left && bounds.right <= cardBounds.right,
+          textInsideCard: textBounds.every(r => r.left >= cardBounds.left - 1 && r.right <= cardBounds.right + 1
+            && r.top >= cardBounds.top - 1 && r.bottom <= cardBounds.bottom + 1),
         };
       }));
-      expect(cards).toHaveLength(4);
+      expect(cards).toHaveLength(surface.name === 'wastes' ? 5 : 4);
       for (const card of cards) {
         expect(card.label).toBeTruthy();
         expect(card.value).toBeTruthy(); // Zero is data too; never replace it with an empty placeholder.
         expect(card.whiteSpace).toBe('normal');
         expect(card.overflow, card.label + ' must be readable in its actual card').toBeLessThanOrEqual(1);
         expect(card.insideCard, card.label + ' must not leave its own surface').toBe(true);
+        expect(card.textInsideCard, card.label + ' actual text must remain in its own surface').toBe(true);
         expect(card.padding, 'Only CardContent owns padding, not both layers').toBe('0px');
       }
       if (surface.name === 'generators') {
         expect(cards.map(card => card.label).join(' ')).toMatch(/TEF sin pago \d{4}.*DDJJ pendiente \d{4}/);
-      } else {
+      } else if (['operators', 'transporters'].includes(surface.name)) {
         expect(cards.map(card => card.label)).toContain('Activos · esta página');
         expect(cards.map(card => card.label)).toContain('Inactivos · esta página');
       }
       await info.attach(surface.name + '-summary-readability', { body: JSON.stringify(cards), contentType: 'application/json' });
+    }
+    if (surface.name === 'actors') {
+      const cards = [];
+      for (const [label, route] of [['Generadores', 'generadores'], ['Transportistas', 'transportistas'], ['Operadores', 'operadores']] as const) {
+        const link = page.getByRole('link', { name: new RegExp('^' + label + ' \\d+$') });
+        await expect(link).toHaveAttribute('href', prefix(info) + '/admin/actores/' + route);
+        const geometry = await link.evaluate(element => {
+          const card = element.firstElementChild!;
+          const label = card.querySelector('p')!;
+          const bounds = card.getBoundingClientRect();
+          const range = document.createRange(); range.selectNodeContents(label);
+          const texts = Array.from(range.getClientRects());
+          return { label: label.textContent, value: card.querySelectorAll('p')[1].textContent,
+            padding: getComputedStyle(card).padding, whiteSpace: getComputedStyle(label).whiteSpace,
+            textInsideCard: texts.every(r => r.left >= bounds.left - 1 && r.right <= bounds.right + 1
+              && r.top >= bounds.top - 1 && r.bottom <= bounds.bottom + 1),
+            horizontalOverflow: label.scrollWidth - label.clientWidth };
+        });
+        expect(geometry).toMatchObject({ padding: '0px', whiteSpace: 'normal', textInsideCard: true });
+        expect(geometry.horizontalOverflow).toBeLessThanOrEqual(1);
+        await link.focus();
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(new RegExp('/admin/actores/' + route + '$'));
+        await readablePageHeading(page);
+        cards.push({ ...geometry, keyboardDestination: await page.url() });
+        await page.goto(prefix(info) + surface.route);
+        await expect(page.getByRole('link', { name: /^Generadores \d+$/ })).toBeVisible();
+      }
+      await info.attach('actor-category-native-links', { body: JSON.stringify({ cards, businessAPIIntercepted: false }), contentType: 'application/json' });
+    }
+    if (surface.name === 'bulk-upload') {
+      const symbols = [];
+      for (const [category, glyph] of [['generador', 'factory'], ['transportista', 'truck'], ['operador', 'flask-conical']] as const) {
+        const symbol = page.locator(`[data-map-symbol="${category}"]`);
+        await expect(symbol).toBeVisible();
+        await expect(symbol.locator(`svg.lucide-${glyph}`)).toBeVisible();
+        const appearance = await symbol.evaluate(element => ({
+          category: element.getAttribute('data-map-symbol'),
+          color: (element.querySelector('[data-map-symbol-background]') as HTMLElement).style.backgroundColor,
+          cursor: getComputedStyle(element.closest('.rounded-\\[12px\\]')!).cursor,
+        }));
+        const color = ACTOR_COLORS[category].match(/\w\w/g)!.map(hex => parseInt(hex, 16));
+        expect(appearance.color).toBe(`rgb(${color.join(', ')})`);
+        expect(appearance.cursor, 'Only the actual download button looks actionable').not.toBe('pointer');
+        symbols.push(appearance);
+      }
+      await info.attach('bulk-template-category-identity', { body: JSON.stringify({ symbols, uploadTriggered: false }), contentType: 'application/json' });
     }
     if (surface.name === 'control') {
       const today = await page.evaluate(() => new Intl.DateTimeFormat('sv-SE', {

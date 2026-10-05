@@ -22,6 +22,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { Select } from '../../components/ui/Select';
+import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 import api from '../../services/api';
 
 // Type for upload results
@@ -39,10 +40,10 @@ interface CargaResultado {
 
 // Template types for download — match backend routes in notification.routes.ts
 const TEMPLATE_TYPES = [
-  { tipo: 'generadores', label: 'Generadores', version: 'v2.0', color: 'primary', bgColor: 'bg-primary-100', textColor: 'text-primary-600' },
-  { tipo: 'transportistas', label: 'Transportistas', version: 'v1.5', color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600' },
-  { tipo: 'operadores', label: 'Operadores', version: 'v1.0', color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
-];
+  { tipo: 'generadores', label: 'Generadores', version: 'v2.0', category: 'generador' },
+  { tipo: 'transportistas', label: 'Transportistas', version: 'v1.5', category: 'transportista' },
+  { tipo: 'operadores', label: 'Operadores', version: 'v1.0', category: 'operador' },
+] as const;
 
 const CargaMasivaPage: React.FC = () => {
   const [dragActive, setDragActive] = useState(false);
@@ -191,14 +192,12 @@ const CargaMasivaPage: React.FC = () => {
       {/* Plantillas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TEMPLATE_TYPES.map(tmpl => (
-          <Card key={tmpl.tipo} className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4">
+          <Card key={tmpl.tipo} padding="none">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className={`p-2 ${tmpl.bgColor} rounded-lg`}>
-                  <FileSpreadsheet size={20} className={tmpl.textColor} />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-neutral-900">{tmpl.label}</h4>
+                <MapCategorySymbol category={tmpl.category} />
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-neutral-900 break-words">{tmpl.label}</h4>
                   <p className="text-xs text-neutral-500">Template {tmpl.version}</p>
                 </div>
               </div>

@@ -2,8 +2,8 @@ import type { CRUDStatCard } from './GenericCRUDPage.types';
 import { Card, CardContent } from '../ui/CardV2';
 
 /** Read-only summaries retain their complete label, value and scope on phones. */
-export function CRUDSummary({ stats }: { stats: readonly CRUDStatCard[] }) {
-  return <div role="group" aria-label="Resumen de registros" className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+export function CRUDSummary({ stats, desktopColumns = 4 }: { stats: readonly CRUDStatCard[]; desktopColumns?: 4 | 5 }) {
+  return <div role="group" aria-label="Resumen de registros" className={`grid grid-cols-2 ${desktopColumns === 5 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-2 sm:gap-4`}>
     {stats.map((stat, index) => <Card key={index} padding="none">
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-start gap-2 sm:gap-3">
