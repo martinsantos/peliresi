@@ -18,11 +18,14 @@ const results: { name: string; status: string; error?: string }[] = [];
 let fatalError: string | undefined;
 const sessions: Record<string, string> = {};
 const actors = ['generador', 'transportista', 'operador'];
-const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Mendoza',
-  year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const cutoff = new Date();
+// The timeline API's fecha is the FIRST civil day, not the last one. Preserve
+// the real 20-day-old observation inside the same complete 30-day period.
+const historyStart = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Mendoza',
+  year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(cutoff.getTime() - 29 * 86400000));
 const routes = ['/centro-control/actividad', '/centro-control/monitor-live',
   '/centro-control/active-days', '/centro-control/forecast',
-  '/centro-control/timeline?fecha=' + today + '&dias=30&corte=' + encodeURIComponent(new Date().toISOString())];
+  '/centro-control/timeline?fecha=' + historyStart + '&dias=30&corte=' + encodeURIComponent(cutoff.toISOString())];
 type IdRow = { id: string };
 type Trip = { manifiestoId: string };
 type Activity = { generadores: IdRow[]; transportistas: IdRow[]; operadores: IdRow[]; enTransito: Trip[] };
@@ -60,6 +63,8 @@ try {
   const adminLive = await call<Live>(sessions.admin, routes[1]);
   const adminDays = await call<{ days: string[] }>(sessions.admin, routes[2]);
   const adminForecast = await call<{ pendienteRetiro: Trip[]; pendienteTratamiento: Trip[] }>(sessions.admin, routes[3]);
+  const adminTimeline = await call<Timeline>(sessions.admin, routes[4]);
+  assert.ok(adminTimeline.eventos.some(event => event.id === 'GPS:cloud-qa-monitor-20-days'), 'Synthetic month contains the persisted historical observation');
   const ids = (rows: Trip[]) => rows.map(row => row.manifiestoId).sort();
   for (const actor of actors) await check(actor + ': real actor session receives global operational data', async () => {
     const token = sessions[actor + '2'];
@@ -80,20 +85,25 @@ try {
     assert.deepEqual(ids(forecast.pendienteTratamiento), ids(adminForecast.pendienteTratamiento));
     const timeline = await call<Timeline>(token, routes[4]);
     assert.ok(timeline.eventos.some(event => event.id === 'GPS:cloud-qa-monitor-20-days'), 'Global playback includes a persisted foreign observation');
+    assert.deepEqual(timeline.eventos.map(event => event.id).sort(), adminTimeline.eventos.map(event => event.id).sort());
   });
   await check('global consultation does not grant foreign fichas, manifest access or mutations', async () => {
     const beforeTrip = await db.manifiesto.findUniqueOrThrow({ where: { id: fixture.deviceManifest.id } });
+    const beforeEvents = await db.eventoManifiesto.count({ where: { manifiestoId: fixture.deviceManifest.id } });
     for (const actor of actors) {
       const token = sessions[actor + '2'];
       const table = actor === 'generador' ? 'generadores' : actor === 'operador' ? 'operadores' : 'transportistas';
       await call(token, '/actores/' + table + '/' + fixture.actors[actor], 403);
       await call(token, '/actores/' + table + '/' + fixture.actors[actor], 403, 'PUT', { razonSocial: 'QA forbidden change' });
-      await call(token, '/manifiestos/' + fixture.deviceManifest.id, 403);
-      await call(token, '/manifiestos/' + fixture.deviceManifest.id + '/cancelar', 403, 'POST', { motivo: 'QA forbidden cancellation' });
+      // Foreign manifests deliberately return 404 rather than revealing their
+      // existence. Cancel also enforces its role gate before the actor scope.
+      await call(token, '/manifiestos/' + fixture.deviceManifest.id, 404);
+      await call(token, '/manifiestos/' + fixture.deviceManifest.id + '/cancelar', actor === 'generador' ? 404 : 403, 'POST', { motivo: 'QA forbidden cancellation' });
       const record = await db[actor].findUniqueOrThrow({ where: { id: fixture.actors[actor] } });
       assert.equal(record.razonSocial, actor === 'transportista' ? 'QA Transporte 1' : actor === 'generador' ? 'QA Generador 1' : 'QA Operador 1');
     }
     assert.deepEqual(await db.manifiesto.findUniqueOrThrow({ where: { id: fixture.deviceManifest.id } }), beforeTrip);
+    assert.equal(await db.eventoManifiesto.count({ where: { manifiestoId: fixture.deviceManifest.id } }), beforeEvents);
   });
 } catch (error) {
   fatalError = error instanceof Error ? error.message : String(error);

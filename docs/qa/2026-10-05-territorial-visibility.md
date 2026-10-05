@@ -6,6 +6,15 @@ Esto exige sesión válida y no restringida. No habilita acceso público, lectur
 fichas ajenas, documentos privados, edición, cancelación o toma de viajes ajenos.
 La autenticación protege la API: ocultar un enlace en la UI no reemplaza ese control.
 
+Primer ensayo focal72 (`37294733008`, SHAe52a91a) cerrado con fallo del test nuevo:
+472BE/962FE unit,54HTTP,2SQL y3calendario PASS; nuevo territorial1PASS/4FAIL,
+E2E no ejecutado. La prueba pidió un período hacia adelante y esperó403 donde
+el contrato de manifiestos ajenos es404 sin datos. Corregidos sólo el inicio
+civil del mes y las expectativas exactas por endpoint/rol; se exige presencia
+de GPS histórico, igualdad con ADMIN y ningún cambio de documento o eventos.
+No son cuatro defectos de producto probados ni un E2E aprobado. Evidencia original
+preservada en SDTERA; cierre10:15:59.546UTC y cleanupSUCCESS antes de repetir.
+
 Antecedente integral aprobado: run37253916790 / commit26a3a23, 472 backend y
 962 frontend unit, 54 grupos HTTP, 2 SQL, 3 HTTP de calendario, 126 E2E,
 15 Android Chrome autenticados QA y 4 APK originales públicos. Esos últimos
