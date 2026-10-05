@@ -25,6 +25,16 @@ import { EVENT_COLORS } from '../utils/war-room-icons';
 
 const RESIDUO_PALETTE = ['#059669', '#7c3aed', '#dc2626', '#d97706', '#2563eb', '#0891b2', '#be185d', '#65a30d'];
 
+/** A global operational row must not advertise a private, forbidden destination. */
+function PendingManifest({ id, numero, canViewDetail, className, children }: {
+  id: string; numero: string; canViewDetail?: boolean; className: string; children: React.ReactNode;
+}) {
+  return canViewDetail === true
+    ? <Link to={'/manifiestos/' + id} aria-label={'Abrir manifiesto ' + numero}
+        className={className + ' hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700'}>{children}</Link>
+    : <div role="group" aria-label={'Vista operativa ' + numero} className={className}><div className="min-w-0 flex-1">{children}<p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p></div></div>;
+}
+
 const ESTADO_COLORS: Record<string, { base: string; dark: string }> = {
   BORRADOR:       { base: '#94a3b8', dark: '#64748b' },
   APROBADO:       { base: '#22c55e', dark: '#16a34a' },
@@ -520,7 +530,7 @@ export const DashboardPanels: React.FC<Props> = ({
               {forecastData.pendienteRetiro.length === 0
                 ? <p className="text-[11px] text-neutral-400 italic text-center py-1">Sin retiros pendientes</p>
                 : forecastData.pendienteRetiro.slice(0, 8).map(m => (
-                  <Link key={m.manifiestoId} to={'/manifiestos/'+m.manifiestoId} aria-label={'Abrir manifiesto '+m.numero} className="block min-h-11 mb-2 p-2 rounded border border-amber-200 bg-amber-50/50 hover:bg-amber-100">
+                  <PendingManifest key={m.manifiestoId} id={m.manifiestoId} numero={m.numero} canViewDetail={m.canViewDetail} className="block min-h-11 mb-2 p-2 rounded border border-amber-200 bg-amber-50/50">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono font-bold text-xs text-neutral-800">{m.numero}</span>
                       <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{m.diasEspera}d</span>
@@ -530,9 +540,9 @@ export const DashboardPanels: React.FC<Props> = ({
                       <span className="mx-1 text-neutral-400">→</span>
                       <span className="font-semibold text-blue-600">{m.operador}</span>
                     </div>
-                  </Link>
+                  </PendingManifest>
                 ))}
-              {forecastData.pendienteRetiro.length>8 && <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=APROBADO">Ver todos los retiros pendientes</Link>}
+              {forecastData.pendienteRetiro.length>8 && <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=APROBADO">Abrir listado de retiros</Link>}
             </div>
             <div className="wr-panel p-3">
               <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -541,7 +551,7 @@ export const DashboardPanels: React.FC<Props> = ({
               {forecastData.pendienteTratamiento.length === 0
                 ? <p className="text-[11px] text-neutral-400 italic text-center py-1">Sin tratamientos pendientes</p>
                 : forecastData.pendienteTratamiento.slice(0, 8).map(m => (
-                  <Link key={m.manifiestoId} to={'/manifiestos/'+m.manifiestoId} aria-label={'Abrir manifiesto '+m.numero} className="min-h-11 mb-1.5 flex items-center gap-2 rounded px-1 hover:bg-purple-50">
+                  <PendingManifest key={m.manifiestoId} id={m.manifiestoId} numero={m.numero} canViewDetail={m.canViewDetail} className="min-h-11 mb-1.5 flex items-center gap-2 rounded px-1">
                     <div className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: m.estado === 'EN_TRATAMIENTO' ? '#a855f7' : '#8b5cf6' }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -550,7 +560,7 @@ export const DashboardPanels: React.FC<Props> = ({
                       </div>
                       <div className="text-[10px] text-neutral-500 truncate">{m.operador}</div>
                     </div>
-                  </Link>
+                  </PendingManifest>
                 ))}
               {forecastData.pendienteTratamiento.length>8 && <div className="flex flex-wrap gap-x-4">
                 <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=RECIBIDO">Ver recibidos</Link>

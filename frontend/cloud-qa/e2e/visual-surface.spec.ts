@@ -11,11 +11,15 @@ async function capture(page: Page, info: TestInfo, surface: Surface) {
   const onError = (error: Error) => errors.push(error.message);
   page.on('pageerror', onError);
   await page.goto(prefix(info) + surface.route);
-  await expect(page.locator('body')).not.toBeEmpty();
-  await expect.poll(() => page.locator('body').innerText(), { timeout: 15000 }).not.toMatch(/^\s*(Cargando[.\s…]*)?$/);
+  // Initial HTML, auth and lazy-route fallbacks are NOT page evidence. The
+  // baseline exposed false-green screenshots of "Cargando SITREP...".
+  await expect(page.locator('#root').locator('h1,h2,form,header,.wr-layout').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.getByText(/^Cargando(?:\s.*|[.\s…]*)$/).filter({ visible: true })).toHaveCount(0, { timeout: 20000 });
+  await expect(page.locator('[class*="animate-spin"]:visible')).toHaveCount(0, { timeout: 20000 });
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   // Wait for actual pending queries, not an arbitrary delay or fake response.
   await expect.poll(() => page.locator('[aria-busy="true"]').count(), { timeout: 15000 }).toBe(0);
+  await page.evaluate(() => document.fonts.ready);
   const measurement = await page.evaluate(() => {
     type Color = [number, number, number, number];
     const color = (css: string): Color | null => {
@@ -79,13 +83,14 @@ async function capture(page: Page, info: TestInfo, surface: Surface) {
       title: document.title, headings: Array.from(document.querySelectorAll('h1,h2,h3')).map(e => e.textContent?.trim()),
       measuredTextNodes: measured, findings, icons };
   });
-  await page.screenshot({ path: info.outputPath(`${surface.name}.png`), animations: 'disabled' });
+  await page.screenshot({ path: info.outputPath(`${surface.name}.png`), animations: 'disabled', scale: 'css' });
   await info.attach(surface.name, { body: JSON.stringify({ ...surface, ...measurement, errors,
     captureScope: 'first viewport; not all scroll positions or interaction states', businessAPIIntercepted: false,
     physicalAndroid: false, visuallyReviewed: false }, null, 2), contentType: 'application/json' });
   page.off('pageerror', onError);
   expect.soft(errors, surface.name + ' unhandled exceptions').toEqual([]);
   expect.soft(measurement.overflow, surface.name + ' document overflow').toBeLessThanOrEqual(1);
+  expect.soft(measurement.measuredTextNodes + measurement.findings.length, surface.name + ' actual visible content was measured').toBeGreaterThan(3);
   if (!surface.expectedFailure) expect.soft(await page.locator('body').innerText(), surface.name + ' unexpected dead end').not.toMatch(/Página no encontrada|Error al cargar/);
 }
 
@@ -139,6 +144,8 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
     { name: 'vehicles', route: '/admin/vehiculos' }, { name: 'wastes', route: '/admin/residuos' },
     { name: 'treatments', route: '/admin/tratamientos' }, { name: 'blockchain', route: '/admin/blockchain' },
     { name: 'audit', route: '/admin/auditoria' }, { name: 'bulk-upload', route: '/admin/carga-masiva' },
+    { name: 'scanner', route: prefix(info) ? '/escaner-qr' : '/mobile/escaner-qr', state: 'browser camera capability, not physical Android proof' },
+    { name: 'statistics', route: prefix(info) ? '/estadisticas' : '/mobile/estadisticas' },
   ];
   for (const surface of surfaces) await test.step(surface.name, () => capture(page, info, surface));
   const inspection = await createSpontaneousInspection(page, info);

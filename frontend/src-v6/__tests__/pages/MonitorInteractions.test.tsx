@@ -49,12 +49,22 @@ describe('Monitor: controles operativos y datos sin simulación',()=>{
   });
   it('los retiros y tratamientos pendientes permiten abrir su manifiesto exacto',()=>{
     const data={...forecast,
-      pendienteRetiro:[{manifiestoId:'qa-retiro',numero:'QA-RET',generador:'QA Origen',operador:'QA Destino',diasEspera:2}],
-      pendienteTratamiento:[{manifiestoId:'qa-tratamiento',numero:'QA-TRAT',operador:'QA Destino',estado:'RECIBIDO',diasEnEspera:1}],
+      pendienteRetiro:[{manifiestoId:'qa-retiro',numero:'QA-RET',generador:'QA Origen',operador:'QA Destino',diasEspera:2,canViewDetail:true}],
+      pendienteTratamiento:[{manifiestoId:'qa-tratamiento',numero:'QA-TRAT',operador:'QA Destino',estado:'RECIBIDO',diasEnEspera:1,canViewDetail:true}],
     } as ForecastResponse;
     render(<MemoryRouter><DashboardPanels mode="FORECAST" liveData={null} forecastData={data}/></MemoryRouter>);
     expect(screen.getByRole('link',{name:'Abrir manifiesto QA-RET'})).toHaveAttribute('href','/manifiestos/qa-retiro');
     expect(screen.getByRole('link',{name:'Abrir manifiesto QA-TRAT'})).toHaveAttribute('href','/manifiestos/qa-tratamiento');
+  });
+  it.each([false,undefined])('preserva pendientes globales sin enlaces a expedientes ajenos: %s',canViewDetail=>{
+    const data={...forecast,
+      pendienteRetiro:[{manifiestoId:'qa-retiro',numero:'QA-RET',generador:'QA Origen',operador:'QA Destino',diasEspera:2,canViewDetail}],
+      pendienteTratamiento:[{manifiestoId:'qa-tratamiento',numero:'QA-TRAT',operador:'QA Destino',estado:'RECIBIDO',diasEnEspera:1,canViewDetail}],
+    } as ForecastResponse;
+    render(<MemoryRouter><DashboardPanels mode="FORECAST" liveData={null} forecastData={data}/></MemoryRouter>);
+    expect(screen.getByText('QA-RET')).toBeVisible();expect(screen.getByText('QA-TRAT')).toBeVisible();
+    expect(screen.queryByRole('link',{name:/Abrir manifiesto/})).toBeNull();
+    expect(screen.getAllByText('Vista operativa · expediente restringido')).toHaveLength(2);
   });
   it('abre un evento con teclado sin depender de un div clickeable',async()=>{
     const onEventClick=vi.fn();const user=userEvent.setup();

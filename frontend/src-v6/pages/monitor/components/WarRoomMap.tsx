@@ -18,6 +18,7 @@ import {
   createOperadorIcon,
 } from '../utils/war-room-icons';
 import { EVENT_COLORS } from '../utils/war-room-icons';
+import { ACTOR_ICONS } from '../../../utils/map-icons';
 
 // Keep the Monitor on the same keyless base map already used by SITREP's
 // other map views. The former CARTO endpoint now paints API KEY REQUIRED.
@@ -26,25 +27,16 @@ const ATTRIBUTION = '&copy; OpenStreetMap contributors';
 const MENDOZA_CENTER: [number, number] = [-32.9287, -68.8535];
 const MAX_GENERADORES = 50;
 
-const TRUCK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>`;
-
-function makeTruckIcon(): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: `<div style="position:relative;width:48px;height:48px;"><div style="position:absolute;inset:-8px;border-radius:50%;border:3px solid #EF4444;opacity:0.5;animation:wr-ring-pulse 1.5s ease-out infinite;"></div><div style="position:absolute;inset:-16px;border-radius:50%;border:2px solid #EF4444;opacity:0.3;animation:wr-ring-pulse 2s ease-out infinite 0.5s;"></div><div style="width:48px;height:48px;background:#DC2626;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px 4px rgba(239,68,68,0.6),0 4px 12px rgba(0,0,0,0.4);border:3px solid #fff;">${TRUCK_SVG}</div></div>`,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-  });
-}
-
-function makeTooltipIcon(text: string): L.DivIcon {
-  // All content is hardcoded strings from our own system — not user input
-  return L.divIcon({
-    className: '',
-    html: `<div style="background:rgba(0,0,0,0.88);color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;font-family:monospace;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);pointer-events:none;">${text}</div>`,
-    iconSize: [180, 50],
-    iconAnchor: [-30, 25],
-  });
+function tripPopup(id: string, points: number): HTMLElement {
+  const content = document.createElement('div');
+  content.style.cssText = 'color:#262626;font:13px/1.5 Inter,system-ui,sans-serif;overflow-wrap:anywhere';
+  const heading = document.createElement('strong');
+  heading.textContent = 'EN TRÁNSITO';
+  heading.style.cssText = 'display:block;color:#b91c1c';
+  const detail = document.createElement('div');
+  detail.textContent = `${id.slice(0, 10).toUpperCase()} · ${points} puntos GPS`;
+  content.append(heading, detail);
+  return content;
 }
 
 // ─── PlaybackCamera — pan suave solo si el evento está fuera del viewport ────
@@ -69,7 +61,7 @@ function PlaybackCamera({ currentEvent }: { currentEvent: { lat: number; lng: nu
   return null;
 }
 
-// ─── Imperative layer: truck markers + trails degradados + floating tooltips ──
+// One selectable marker per trip; details open on demand, never competing labels.
 function PlaybackLayer({ trips }: {
   trips: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
 }) {
@@ -77,8 +69,6 @@ function PlaybackLayer({ trips }: {
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   // Trail: múltiples segmentos por trip (gradiente de opacidad)
   const polylinesRef = useRef<Map<string, L.Polyline[]>>(new Map());
-  const tooltipsRef = useRef<Map<string, L.Marker>>(new Map());
-  const truckIconRef = useRef(makeTruckIcon());
 
   useEffect(() => {
     const currentIds = new Set(trips.keys());
@@ -88,18 +78,20 @@ function PlaybackLayer({ trips }: {
     polylinesRef.current.forEach((segs, id) => {
       if (!currentIds.has(id)) { segs.forEach(p => map.removeLayer(p)); polylinesRef.current.delete(id); }
     });
-    tooltipsRef.current.forEach((t, id) => { if (!currentIds.has(id)) { map.removeLayer(t); tooltipsRef.current.delete(id); } });
 
     trips.forEach((trip, id) => {
       const pos: L.LatLngExpression = [trip.lat, trip.lng];
-      const shortId = id.slice(0, 10).toUpperCase();
 
       // Truck marker
       let marker = markersRef.current.get(id);
       if (marker) {
         marker.setLatLng(pos);
+        marker.setPopupContent(tripPopup(id, trip.trail.length));
       } else {
-        marker = L.marker(pos, { icon: truckIconRef.current, zIndexOffset: 3000 }).addTo(map);
+        marker = L.marker(pos, { icon: ACTOR_ICONS.enTransitoSelected, zIndexOffset: 3000,
+          keyboard: true, title: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase(),
+          alt: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase() })
+          .bindPopup(tripPopup(id, trip.trail.length), { minWidth: 160, maxWidth: 240, autoPan: true }).addTo(map);
         markersRef.current.set(id, marker);
       }
 
@@ -123,16 +115,6 @@ function PlaybackLayer({ trips }: {
       }
       polylinesRef.current.set(id, newSegs);
 
-      // Floating tooltip
-      const tooltipContent = `<span style="font-weight:800;color:#EF4444;">EN TRÁNSITO</span> ${shortId} <span style="color:#9ca3af;">${trail.length}pts</span>`;
-      let tt = tooltipsRef.current.get(id);
-      if (tt) {
-        tt.setLatLng(pos);
-        tt.setIcon(makeTooltipIcon(tooltipContent));
-      } else {
-        tt = L.marker(pos, { icon: makeTooltipIcon(tooltipContent), zIndexOffset: 4000, interactive: false }).addTo(map);
-        tooltipsRef.current.set(id, tt);
-      }
     });
   }, [trips, map]);
 
@@ -141,17 +123,16 @@ function PlaybackLayer({ trips }: {
     return () => {
       markersRef.current.forEach(m => map.removeLayer(m));
       polylinesRef.current.forEach(segs => segs.forEach(p => map.removeLayer(p)));
-      tooltipsRef.current.forEach(t => map.removeLayer(t));
       markersRef.current.clear();
       polylinesRef.current.clear();
-      tooltipsRef.current.clear();
     };
   }, [map]);
 
   return null;
 }
 
-// ─── EventFlash — expanding circle + momentary popup with event info ─────────
+// Event details already live in the selectable current-event control and feed.
+// Keep only the territorial flash, and cancel owned animation work on reset/exit.
 // Tracks shown events by ID. Clears shownRef when events list shrinks (new day).
 function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo: string; id: string; numero?: string; desc?: string }> }) {
   const map = useMap();
@@ -159,7 +140,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
   const shownIdsRef = useRef<string[]>([]);
   const shownSetRef = useRef<Set<string>>(new Set());
   const prevCountRef = useRef(0);
-  const pendingTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const pendingFramesRef = useRef<Set<number>>(new Set());
   const pendingMarkersRef = useRef<Set<L.Layer>>(new Set());
 
   // Clear state when events list shrinks (new day / reset)
@@ -169,8 +150,8 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
       shownSetRef.current.clear();
       pendingMarkersRef.current.forEach(m => map.removeLayer(m));
       pendingMarkersRef.current.clear();
-      pendingTimersRef.current.forEach(t => clearTimeout(t));
-      pendingTimersRef.current.clear();
+      pendingFramesRef.current.forEach(frame => cancelAnimationFrame(frame));
+      pendingFramesRef.current.clear();
     }
     prevCountRef.current = events.length;
   }, [events.length, map]);
@@ -194,63 +175,37 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
       pendingMarkersRef.current.add(circle);
 
       let frame = 0;
+      const scheduleFrame = () => {
+        const handle = requestAnimationFrame(() => {
+          pendingFramesRef.current.delete(handle);
+          animateCircle();
+        });
+        pendingFramesRef.current.add(handle);
+      };
       const animateCircle = () => {
+        if (!pendingMarkersRef.current.has(circle)) return;
         frame++;
         circle.setRadius(20 + frame * 2);
         circle.setStyle({ opacity: Math.max(0, 0.8 - frame * 0.04), fillOpacity: Math.max(0, 0.4 - frame * 0.02) });
         if (frame < 25) {
-          requestAnimationFrame(animateCircle);
+          scheduleFrame();
         } else {
           map.removeLayer(circle);
           pendingMarkersRef.current.delete(circle);
         }
       };
-      requestAnimationFrame(animateCircle);
-
-      // Momentary info popup — shows for 3 seconds then removes
-      const label = ev.tipo === 'RETIRO' ? 'RETIRO' : ev.tipo === 'ENTREGA' ? 'ENTREGA'
-        : ev.tipo === 'RECEPCION' ? 'RECEPCIÓN' : ev.tipo === 'TRATAMIENTO' ? 'TRATAMIENTO'
-        : ev.tipo === 'CIERRE' ? 'CIERRE' : ev.tipo === 'FIRMA' ? 'FIRMA'
-        : ev.tipo === 'CREACION' ? 'NUEVO' : ev.tipo === 'INCIDENTE' ? 'INCIDENTE' : ev.tipo;
-
-      const popupIcon = L.divIcon({
-        className: '',
-        html: `<div style="
-          background:${color};color:#fff;padding:6px 12px;border-radius:6px;
-          font-size:11px;font-weight:800;letter-spacing:0.04em;
-          white-space:nowrap;box-shadow:0 4px 16px ${color}80,0 2px 8px rgba(0,0,0,0.3);
-          font-family:system-ui,sans-serif;pointer-events:none;
-          animation:wr-popup-appear 0.3s ease-out;
-          text-transform:uppercase;
-        ">
-          <span style="margin-right:4px;">${ev.tipo === 'CREACION' ? '✦' : ev.tipo === 'INCIDENTE' ? '⚠' : '●'}</span>
-          ${label}${ev.numero ? ' — ' + ev.numero : ''}
-        </div>`,
-        iconSize: [200, 30],
-        iconAnchor: [100, 50],
-      });
-
-      const popup = L.marker([ev.lat, ev.lng], { icon: popupIcon, zIndexOffset: 5000, interactive: false }).addTo(map);
-      pendingMarkersRef.current.add(popup);
-
-      // Remove after 3 seconds
-      const timer = setTimeout(() => {
-        map.removeLayer(popup);
-        pendingMarkersRef.current.delete(popup);
-        pendingTimersRef.current.delete(timer);
-      }, 3000);
-      pendingTimersRef.current.add(timer);
+      scheduleFrame();
     }
     // (FIFO eviction above — no hard-clear needed)
   }, [events, map]);
 
-  // Cleanup on unmount — remove all pending markers and clear timers
+  // Cleanup on unmount — no detached map animations survive navigation.
   useEffect(() => {
     return () => {
       pendingMarkersRef.current.forEach(m => map.removeLayer(m));
       pendingMarkersRef.current.clear();
-      pendingTimersRef.current.forEach(t => clearTimeout(t));
-      pendingTimersRef.current.clear();
+      pendingFramesRef.current.forEach(frame => cancelAnimationFrame(frame));
+      pendingFramesRef.current.clear();
     };
   }, [map]);
 
@@ -295,11 +250,7 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
       .map(e => ({ lat: e.lat, lng: e.lng, tipo: e.tipo, id: e.id, numero: e.numero }));
   }, [playbackEvents]);
 
-  const prominentIcon = useMemo(() => L.divIcon({
-    className: '',
-    html: `<div style="position:relative;width:44px;height:44px;"><div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #EF4444;opacity:0.5;animation:wr-ring-pulse 2s ease-out infinite;"></div><div style="width:44px;height:44px;background:#EF4444;border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px 2px rgba(239,68,68,0.5),0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;">${TRUCK_SVG}</div></div>`,
-    iconSize: [44, 44], iconAnchor: [22, 22], popupAnchor: [0, -24],
-  }), []);
+  const prominentIcon = ACTOR_ICONS.enTransitoSelected;
 
   return (
     <div className="relative w-full h-full">

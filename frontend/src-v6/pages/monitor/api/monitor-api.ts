@@ -119,6 +119,7 @@ export interface MonitorLiveResponse {
 export interface ForecastResponse {
   pendienteRetiro: {
     manifiestoId: string;
+    canViewDetail?: boolean;
     numero: string;
     generador: string;
     operador: string;
@@ -130,6 +131,7 @@ export interface ForecastResponse {
   }[];
   pendienteTratamiento: {
     manifiestoId: string;
+    canViewDetail?: boolean;
     numero: string;
     operador: string;
     estado: string;

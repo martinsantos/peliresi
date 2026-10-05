@@ -10,6 +10,8 @@
  */
 
 import L from 'leaflet';
+import { ACTOR_COLORS } from './actor-identity';
+export { ACTOR_COLORS } from './actor-identity';
 
 // ── SVG paths from Lucide icons (24×24 viewBox, stroke-based) ──
 
@@ -26,16 +28,6 @@ const SVG_FLASK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" s
 const SVG_NAVIGATION = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>';
 
 // ── Actor colors (system consistent) ──
-export const ACTOR_COLORS = {
-  inspeccion: '#0f766e',
-  generador: '#7c3aed',   // purple (matches system)
-  transportista: '#ea580c', // orange
-  operador: '#2563eb',     // blue
-  enTransito: '#ef4444',   // red
-  gpsStart: '#22c55e',     // green
-  gpsEnd: '#ef4444',       // red
-};
-
 // ── Actor marker icons ──
 
 export const ACTOR_ICONS = {

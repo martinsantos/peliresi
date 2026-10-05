@@ -46,6 +46,22 @@ for (const user of ['generador2', 'operador2', 'transportista2']) {
     // This record belongs entirely to actor1, not the logged-in actor2.
     await expect(panel.getByText(fixture.deviceManifest.numero, { exact: true })).toBeVisible();
     await expect(panel.getByText(fixture.deviceManifest.numero, { exact: true })).toHaveCount(1);
+    const selection = panel.getByRole('button', { name: 'Seleccionar viaje ' + fixture.deviceManifest.numero, exact: true });
+    await selection.click();
+    await expect(selection).toHaveAttribute('aria-expanded', 'true');
+    await expect(panel.getByRole('button', { name: 'Ver detalle del viaje', exact: true })).toHaveCount(0);
+    await expect(panel.getByText('Vista operativa · expediente restringido', { exact: true })).toBeVisible();
+    await selection.click();
+    await expect(selection).toHaveAttribute('aria-expanded', 'false');
+    const forecastResponse = page.waitForResponse(response => response.url().includes('/api/centro-control/forecast') && response.status() === 200);
+    await page.goto(`${prefix(info)}/monitor`);
+    await page.locator('.wr-layout-header').getByRole('button', { name: 'Pendientes', exact: true }).click();
+    const forecast = (await (await forecastResponse).json()).data;
+    expect(forecast.pendienteTratamiento.length).toBeGreaterThan(0);
+    const foreignPending = page.getByRole('group', { name: 'Vista operativa ' + fixture.followup.numero, exact: true });
+    await expect(foreignPending).toBeVisible();
+    await expect(foreignPending.getByRole('link')).toHaveCount(0);
+    await expect(foreignPending.getByText('Vista operativa · expediente restringido', { exact: true })).toBeVisible();
     await expect(page.locator('vite-error-overlay')).toHaveCount(0);
     expect(errors).toEqual([]);
     expect(writes).toEqual([]);

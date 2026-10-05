@@ -8,6 +8,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { parseDateParam } from '../utils/dateRange';
+import { canAccessManifiesto } from '../utils/roleFilter';
 
 /**
  * GET /api/centro-control/actividad
@@ -206,6 +207,9 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
         select: {
           id: true,
           numero: true,
+          generadorId: true,
+          transportistaId: true,
+          operadorId: true,
           transportista: {
             select: { razonSocial: true },
           },
@@ -232,6 +236,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       result.enTransito = enTransito.map(m => ({
         manifiestoId: m.id,
         numero: m.numero,
+        // Global operation is not permission to open a private dossier.
+        canViewDetail: !!req.user && canAccessManifiesto(req.user, m),
         transportista: m.transportista?.razonSocial ?? null,
         origen: m.generador?.razonSocial ?? null,
         origenLatLng: m.generador?.latitud && m.generador?.longitud

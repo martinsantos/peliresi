@@ -121,24 +121,27 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
                 return (
                   <div
                     key={m.manifiestoId}
-                    className={`p-3 flex items-start gap-3 cursor-pointer transition-colors ${
+                    className={`p-3 flex items-start gap-3 transition-colors ${
                       isSelected
                         ? 'bg-primary-50 border-l-4 border-l-primary-500'
                         : 'row-hover border-l-4 border-l-transparent'
                     }`}
-                    onClick={() => onSelectTrip(isSelected ? null : m.manifiestoId)}
                   >
                     <div className={`w-3 h-3 rounded-full bg-red-500 flex-shrink-0 mt-1.5 ${isSelected ? '' : 'animate-pulse'}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-mono font-semibold text-neutral-900">{m.numero}</p>
-                      <div className="mt-1 space-y-0.5">
-                        <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-green-700">ORIGEN:</span> {m.origen}</p>
-                        <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-amber-700">TRANSPORTE:</span> {m.transportista}</p>
-                        <p className="text-xs text-neutral-500 truncate"><span className="font-semibold text-blue-700">OPERADOR:</span> {m.destino}</p>
-                      </div>
-                      {isSelected && (
+                      <button type="button" aria-label={'Seleccionar viaje ' + m.numero} aria-expanded={isSelected}
+                        className="block min-h-11 w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
+                        onClick={() => onSelectTrip(isSelected ? null : m.manifiestoId)}>
+                      <span className="block text-sm font-mono font-semibold text-neutral-900">{m.numero}</span>
+                      <span className="mt-1 block space-y-0.5">
+                        <span className="block text-xs text-neutral-600 truncate"><span className="font-semibold text-purple-700">ORIGEN:</span> {m.origen}</span>
+                        <span className="block text-xs text-neutral-600 truncate"><span className="font-semibold text-orange-700">TRANSPORTE:</span> {m.transportista}</span>
+                        <span className="block text-xs text-neutral-600 truncate"><span className="font-semibold text-blue-700">OPERADOR:</span> {m.destino}</span>
+                      </span>
+                      </button>
+                      {isSelected && m.canViewDetail === true && (
                         <button
-                          className="mt-2 w-full text-center text-xs font-semibold text-primary-700 bg-primary-100 hover:bg-primary-200 rounded-lg py-1.5 transition-colors"
+                          className="mt-2 min-h-11 w-full text-center text-xs font-semibold text-primary-800 bg-primary-100 hover:bg-primary-200 active:bg-primary-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 rounded-lg py-1.5 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/manifiestos/${m.manifiestoId}`);
@@ -147,6 +150,7 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
                           Ver detalle del viaje
                         </button>
                       )}
+                      {isSelected && m.canViewDetail !== true && <p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p>}
                     </div>
                     {m.ultimaPosicion?.velocidad != null && (
                       <span className="text-xs font-medium text-neutral-500 flex-shrink-0">

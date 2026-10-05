@@ -52,6 +52,7 @@ import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAcc
 import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
+import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 
 const EMPTY_VEHICULO = { patente: '', marca: '', modelo: '', anio: new Date().getFullYear(), capacidad: 0, numeroHabilitacion: '', vencimiento: '' };
 const EMPTY_CHOFER = { nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '', telefono: '' };
@@ -343,10 +344,7 @@ const TransportistaDetallePage: React.FC = () => {
           Volver
         </Button>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-secondary-100 rounded-xl flex items-center justify-center shrink-0">
-            <Truck size={24} className="text-secondary-600 sm:hidden" />
-            <Truck size={28} className="text-secondary-600 hidden sm:block" />
-          </div>
+          <MapCategorySymbol category="transportista" size="hero" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{transportista.nombre}</h2>
@@ -435,7 +433,7 @@ const TransportistaDetallePage: React.FC = () => {
                       <Calendar size={16} className="text-neutral-400 shrink-0" />
                       <div>
                         <p className="text-neutral-500">Vencimiento habilitación</p>
-                        <p className="font-medium text-neutral-900">{transportista.vencimientoHab}</p>
+                        <p className="font-medium text-neutral-900">{formatActorCalendarDate(transportista.vencimientoHab)}</p>
                       </div>
                     </div>
                   )}

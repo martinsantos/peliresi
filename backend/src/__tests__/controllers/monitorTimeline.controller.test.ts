@@ -6,8 +6,27 @@ vi.mock('@prisma/client', () => ({ PrismaClient: class {
   generador = { findMany: db.actors }; transportista = { findMany: db.actors }; operador = { findMany: db.actors };
   $queryRawUnsafe = db.gps;
 } }));
-import { getActiveDays, getTimeline } from '../../controllers/monitor.controller';
+import { getActiveDays, getTimeline, getForecast } from '../../controllers/monitor.controller';
 beforeEach(() => { vi.clearAllMocks(); for (const f of Object.values(db)) f.mockResolvedValue([]); });
+it.each([
+  [{rol:'TRANSPORTISTA',transportista:{id:'owner'}},true],
+  [{rol:'TRANSPORTISTA',transportista:{id:'other'}},false],
+  [{rol:'ADMIN'},true],
+  [{rol:'GENERADOR',esInspector:true},true],
+  [{rol:'GENERADOR'},false],
+])('global pending data separates private navigation from operational reads: %j',async(user,allowed)=>{
+  const manifest={id:'qa',numero:'QA-1',estado:'RECIBIDO',generadorId:'gen',transportistaId:'owner',operadorId:'oper',createdAt:new Date(),fechaRecepcion:new Date(),fechaEstimadaRetiro:null,
+    generador:{razonSocial:'QA G',latitud:null,longitud:null},transportista:{razonSocial:'QA T'},operador:{razonSocial:'QA O',latitud:null,longitud:null}};
+  db.manifests.mockResolvedValue([manifest]);
+  const res={status:vi.fn(),json:vi.fn()};res.status.mockReturnValue(res);
+  await getForecast({query:{},user} as never,res as never);
+  expect(res.status).not.toHaveBeenCalled();
+  for(const key of ['pendienteRetiro','pendienteTratamiento']){
+    expect(res.json.mock.calls[0][0].data[key]).toEqual([expect.objectContaining({manifiestoId:'qa',canViewDetail:allowed})]);
+    expect(res.json.mock.calls[0][0].data[key][0]).not.toHaveProperty('transportistaId');
+  }
+  for(const [query] of db.manifests.mock.calls)expect(query.select).toMatchObject({generadorId:true,transportistaId:true,operadorId:true});
+});
 const run = async (query: object) => {
   const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
   await getTimeline({ query } as any, res as any); return res;

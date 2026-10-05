@@ -8,10 +8,23 @@ import type { EnTransitoItem } from '../../hooks/useCentroControl';
 function Panel({ trips = [], initialFilter = '' }: { trips?: EnTransitoItem[]; initialFilter?: string } = {}) {
   const [panel, setPanel] = useState<'activos' | 'realizados' | 'inspecciones' | null>('activos');
   const [filter, setFilter] = useState(initialFilter);
-  return <ViajesPanel inspections={[]} filteredEnTransito={trips} viajesRealizados={[]} tripFilter={filter} onTripFilterChange={setFilter} tripPanel={panel} onTripPanelChange={setPanel} selectedTripId={null} onSelectTrip={vi.fn()} selectedRealizadoId={null} onSelectRealizado={vi.fn()} viajesRef={{ current: null }} />;
+  const [selected, setSelected] = useState<string | null>(null);
+  return <ViajesPanel inspections={[]} filteredEnTransito={trips} viajesRealizados={[]} tripFilter={filter} onTripFilterChange={setFilter} tripPanel={panel} onTripPanelChange={setPanel} selectedTripId={selected} onSelectTrip={setSelected} selectedRealizadoId={null} onSelectRealizado={vi.fn()} viajesRef={{ current: null }} />;
 }
 
 describe('Centro de Control collapsible trip panels', () => {
+  it.each([undefined, false, true])('only offers document navigation for an explicit server permission (%s)', (canViewDetail) => {
+    const trip = { manifiestoId: 'qa-trip', numero: 'QA Viaje', transportista: 'QA Transporte', origen: 'QA Origen', destino: 'QA Destino', origenLatLng: null, destinoLatLng: null, ultimaPosicion: null, ruta: [], canViewDetail };
+    render(<MemoryRouter><Panel trips={[trip]} /></MemoryRouter>);
+    const selection = screen.getByRole('button', { name: 'Seleccionar viaje QA Viaje' });
+    fireEvent.click(selection);
+    expect(selection).toHaveAttribute('aria-expanded', 'true');
+    expect(!!screen.queryByRole('button', { name: 'Ver detalle del viaje' })).toBe(canViewDetail === true);
+    expect(!!screen.queryByText('Vista operativa · expediente restringido')).toBe(canViewDetail !== true);
+    fireEvent.click(selection);
+    expect(selection).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'Ver detalle del viaje' })).toBeNull();
+  });
   it.each(['Viajes Activos', 'Viajes Realizados', 'Inspecciones'])('can close %s without opening another panel', (name) => {
     render(<MemoryRouter><Panel /></MemoryRouter>);
     const header = screen.getByRole('button', { name: new RegExp('^' + name) });

@@ -27,7 +27,7 @@ import { ViajesPanel, type TripPanel } from './components/ViajesPanel';
 const POLL_INTERVAL = 30;
 
 export const CentroControlPage: React.FC = () => {
-  const { currentUser, isAdmin, isTransportista } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
 
   const [countdown, setCountdown] = useState(POLL_INTERVAL);
 
@@ -138,26 +138,21 @@ export const CentroControlPage: React.FC = () => {
     }));
   }, [alertasData]);
 
-  // ── Filtered trips (TRANSPORTISTA sees only own trips) ──
-  const userTransportista = isTransportista ? (currentUser?.sector || '') : '';
+  // Global authenticated consultation; private destinations use server permissions.
   const filteredEnTransito = useMemo(() => {
     if (!cc?.enTransito) return [];
-    let items = cc.enTransito;
-    if (userTransportista) {
-      items = items.filter(m => m.transportista === userTransportista);
-    }
+    const items = cc.enTransito;
     if (!tripFilter.trim()) return items;
     const q = tripFilter.toLowerCase();
     return items.filter(m =>
-      m.numero.toLowerCase().includes(q) || m.transportista.toLowerCase().includes(q)
+      m.numero.toLowerCase().includes(q) || (m.transportista || '').toLowerCase().includes(q)
     );
-  }, [cc?.enTransito, tripFilter, userTransportista]);
+  }, [cc?.enTransito, tripFilter]);
 
   const enTransitoForMap = useMemo(() => {
     if (!cc?.enTransito) return [];
-    if (!userTransportista) return cc.enTransito;
-    return cc.enTransito.filter(m => m.transportista === userTransportista);
-  }, [cc?.enTransito, userTransportista]);
+    return cc.enTransito;
+  }, [cc?.enTransito]);
 
   // ── Trip fly-to points ──
   const activeTripFlyPoints = useMemo((): [number, number][] => {

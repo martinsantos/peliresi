@@ -1,21 +1,22 @@
 import React, { useId } from 'react';
 import { Check, ClipboardCheck, EyeOff, Factory, FlaskConical, Navigation, Truck } from 'lucide-react';
-import { ACTOR_COLORS } from '../../utils/map-icons';
+import { ACTOR_COLORS } from '../../utils/actor-identity';
 
 export type MapCategory = 'generador' | 'transportista' | 'operador' | 'inspeccion' | 'enTransito';
 const glyphs = { generador: Factory, transportista: Truck, operador: FlaskConical, inspeccion: ClipboardCheck, enTransito: Navigation };
 
 /** The control is also the legend: same glyph, color and shape as its map marker. */
-export function MapCategorySymbol({ category }: { category: MapCategory }) {
+export function MapCategorySymbol({ category, size = 'control' }: { category: MapCategory; size?: 'control' | 'hero' }) {
   const Icon = glyphs[category];
   const diamond = category === 'transportista';
+  const hero = size === 'hero';
   // Reserve the diamond's full rotated footprint; only the background rotates.
   // All glyphs share the same grid center and remain independent of text baselines.
-  return <span data-map-symbol={category} aria-hidden="true" className="isolate inline-grid h-9 w-9 shrink-0 place-items-center">
+  return <span data-map-symbol={category} aria-hidden="true" className={`isolate inline-grid shrink-0 place-items-center ${hero ? 'h-14 w-14' : 'h-9 w-9'}`}>
     <span data-map-symbol-background
-      className={`col-start-1 row-start-1 h-6 w-6 ${category === 'enTransito' ? 'rounded-full' : 'rounded'}`}
+      className={`col-start-1 row-start-1 ${hero ? 'h-10 w-10' : 'h-6 w-6'} ${category === 'enTransito' ? 'rounded-full' : 'rounded'}`}
       style={{ backgroundColor: ACTOR_COLORS[category], transform: diamond ? 'rotate(45deg)' : undefined }} />
-    <Icon size={14} strokeWidth={2.5} className="relative z-[1] col-start-1 row-start-1 block shrink-0 text-white" />
+    <Icon size={hero ? 24 : 14} strokeWidth={2.5} className="relative z-[1] col-start-1 row-start-1 block shrink-0 text-white" />
   </span>;
 }
 

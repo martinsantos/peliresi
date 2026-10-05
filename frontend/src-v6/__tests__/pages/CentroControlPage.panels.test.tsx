@@ -6,7 +6,8 @@ import { CentroControlPage } from '../../pages/centro-control/CentroControlPage'
 
 const centro = vi.hoisted(() => vi.fn());
 const refresh = vi.hoisted(() => vi.fn());
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-admin', rol: 'ADMIN' }, isAdmin: true, isTransportista: false }) }));
+const auth = vi.hoisted(() => vi.fn());
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: auth }));
 vi.mock('../../hooks/useCentroControl', () => ({ useCentroControl: centro }));
 vi.mock('../../hooks/useDashboard', () => ({ useDashboardStats: () => ({ refetch: refresh }) }));
 vi.mock('../../hooks/useManifiestos', () => ({ useManifiestos: () => ({ data: { items: [] } }) }));
@@ -20,7 +21,20 @@ const activeData = { enTransito: [{ manifiestoId: 'qa-trip', numero: 'QA-VIAJE',
 const page = <MemoryRouter><CentroControlPage /></MemoryRouter>;
 
 describe('Centro de Control respects explicit panel choices across responses', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    auth.mockReturnValue({ currentUser: { id: 'qa-admin', rol: 'ADMIN' }, isAdmin: true, isTransportista: false });
+  });
+
+  it('shows global operational trips to a different transporter without offering private document access', () => {
+    auth.mockReturnValue({ currentUser: { id: 'qa-other', rol: 'TRANSPORTISTA', sector: 'Otra empresa' }, isAdmin: false, isTransportista: true });
+    centro.mockReturnValue({ data: activeData, refetch: refresh });
+    render(page);
+    expect(screen.getByText('QA-VIAJE')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Seleccionar viaje QA-VIAJE' }));
+    expect(screen.queryByRole('button', { name: 'Ver detalle del viaje' })).toBeNull();
+    expect(screen.getByText('Vista operativa · expediente restringido')).toBeVisible();
+  });
 
   it('does not reopen a panel closed by the user when the first data response arrives', () => {
     centro.mockReturnValue({ data: null, refetch: refresh });

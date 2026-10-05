@@ -9,6 +9,8 @@
 
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import type { AuthRequest } from '../middlewares/auth.middleware';
+import { canAccessManifiesto } from '../utils/roleFilter';
 
 const prisma = new PrismaClient();
 
@@ -473,7 +475,7 @@ export async function getMonitorLive(req: Request, res: Response) {
 
 // ─── Forecast ─────────────────────────────────────────────────────────────────
 
-export async function getForecast(req: Request, res: Response) {
+export async function getForecast(req: AuthRequest, res: Response) {
   try {
     const dias = Math.min(Math.max(parseInt(req.query.dias as string) || 7, 1), 30);
     const hasta = new Date();
@@ -487,6 +489,9 @@ export async function getForecast(req: Request, res: Response) {
         numero: true,
         fechaEstimadaRetiro: true,
         createdAt: true,
+        generadorId: true,
+        transportistaId: true,
+        operadorId: true,
         generador: { select: { razonSocial: true, latitud: true, longitud: true } },
         operador: { select: { razonSocial: true, latitud: true, longitud: true } },
         transportista: { select: { razonSocial: true } },
@@ -502,6 +507,9 @@ export async function getForecast(req: Request, res: Response) {
         numero: true,
         estado: true,
         fechaRecepcion: true,
+        generadorId: true,
+        transportistaId: true,
+        operadorId: true,
         operador: { select: { razonSocial: true, latitud: true, longitud: true } },
       },
       orderBy: { fechaRecepcion: 'asc' },
@@ -533,6 +541,7 @@ export async function getForecast(req: Request, res: Response) {
       data: {
         pendienteRetiro: pendienteRetiro.map(m => ({
           manifiestoId: m.id,
+          canViewDetail: !!req.user && canAccessManifiesto(req.user, m),
           numero: m.numero,
           generador: m.generador.razonSocial,
           operador: m.operador.razonSocial,
@@ -544,6 +553,7 @@ export async function getForecast(req: Request, res: Response) {
         })),
         pendienteTratamiento: pendienteTratamiento.map(m => ({
           manifiestoId: m.id,
+          canViewDetail: !!req.user && canAccessManifiesto(req.user, m),
           numero: m.numero,
           operador: m.operador.razonSocial,
           estado: m.estado,

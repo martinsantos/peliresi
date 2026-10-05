@@ -4,7 +4,7 @@ import path from 'node:path';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
 
 // Policy confirmed on 05/10: global operational consultation requires a real
-// full-access session. It does not grant foreign dossier or mutation access.
+// authenticated session. It does not grant foreign dossier or mutation access.
 await assertCloudDatabase();
 const base = process.env.QA_API_URL;
 assert.equal(base, 'http://127.0.0.1:3037/api');
@@ -27,7 +27,7 @@ const routes = ['/centro-control/actividad', '/centro-control/monitor-live',
   '/centro-control/active-days', '/centro-control/forecast',
   '/centro-control/timeline?fecha=' + historyStart + '&dias=30&corte=' + encodeURIComponent(cutoff.toISOString())];
 type IdRow = { id: string };
-type Trip = { manifiestoId: string };
+type Trip = { manifiestoId: string; canViewDetail?: boolean };
 type Activity = { generadores: IdRow[]; transportistas: IdRow[]; operadores: IdRow[]; enTransito: Trip[] };
 type Live = { actores: Pick<Activity, 'generadores' | 'transportistas' | 'operadores'>; enTransito: Trip[]; estadisticas: { total: number } };
 type Timeline = { eventos: { id: string; manifiestoId: string }[] };
@@ -47,7 +47,7 @@ async function check(name: string, task: () => Promise<void>) {
   catch (error) { results.push({ name, status: 'FAIL', error: error instanceof Error ? error.message : String(error) }); }
 }
 try {
-  for (const [index, user] of ['admin', ...actors.map(actor => actor + '2')].entries()) {
+  for (const [index, user] of ['admin', ...actors, ...actors.map(actor => actor + '2')].entries()) {
     const response = await fetch(base + '/auth/login', { method: 'POST', headers: {
       'Content-Type': 'application/json', 'X-Forwarded-For': '127.10.2.' + (index + 1),
     }, body: JSON.stringify({ email: user + '@night-qa.invalid', password: 'OnlyLocal-NightQA-2026!' }) });
@@ -60,6 +60,7 @@ try {
     for (const route of routes) for (const token of [null, 'invalid-qa-token']) await call(token, route, 401);
   });
   const adminActivity = await call<Activity>(sessions.admin, routes[0]);
+  assert.ok(adminActivity.enTransito.every(trip => trip.canViewDetail === true), 'Staff document access must be explicit');
   const adminLive = await call<Live>(sessions.admin, routes[1]);
   const adminDays = await call<{ days: string[] }>(sessions.admin, routes[2]);
   const adminForecast = await call<{ pendienteRetiro: Trip[]; pendienteTratamiento: Trip[] }>(sessions.admin, routes[3]);
@@ -76,11 +77,19 @@ try {
       assert.deepEqual(activity[key].map(row => row.id).sort(), adminActivity[key].map(row => row.id).sort());
     }
     assert.ok(activity.enTransito.some(trip => trip.manifiestoId === fixture.deviceManifest.id));
+    assert.equal(activity.enTransito.find(trip => trip.manifiestoId === fixture.deviceManifest.id)?.canViewDetail, false, 'Foreign trip remains selectable without a private detail destination');
+    const ownActivity = await call<Activity>(sessions[actor], routes[0]);
+    assert.equal(ownActivity.enTransito.find(trip => trip.manifiestoId === fixture.deviceManifest.id)?.canViewDetail, true, 'Participating actor keeps its actual manifest access');
     assert.ok(live.enTransito.some(trip => trip.manifiestoId === fixture.deviceManifest.id));
     assert.deepEqual(ids(activity.enTransito), ids(adminActivity.enTransito));
     assert.equal(live.estadisticas.total, adminLive.estadisticas.total);
     assert.deepEqual(await call(token, routes[2]), adminDays);
     const forecast = await call<typeof adminForecast>(token, routes[3]);
+    for (const group of ['pendienteRetiro', 'pendienteTratamiento'] as const) {
+      assert.ok(forecast[group].every(trip => typeof trip.canViewDetail === 'boolean'), 'Every destination carries its actual access decision');
+      assert.ok(adminForecast[group].every(trip => trip.canViewDetail === true), 'Staff pending rows keep their permitted navigation');
+    }
+    assert.equal(forecast.pendienteTratamiento.find(trip => trip.manifiestoId === fixture.followup.id)?.canViewDetail, false, 'Known foreign pending record must not offer private navigation');
     assert.deepEqual(ids(forecast.pendienteRetiro), ids(adminForecast.pendienteRetiro));
     assert.deepEqual(ids(forecast.pendienteTratamiento), ids(adminForecast.pendienteTratamiento));
     const timeline = await call<Timeline>(token, routes[4]);

@@ -258,7 +258,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#b45309' }}>TRANSPORTE:</strong> {m.transportista}</span>
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#1d4ed8' }}>OPERADOR:</strong> {m.destino}</span>
                           </div>
-                          <a
+                          {m.canViewDetail === true ? <a
                             href="#"
                             onClick={(e) => {
                               e.preventDefault();
@@ -267,7 +267,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                             style={{ color: '#0D8A4F', fontWeight: 600, fontSize: '12px', display: 'block', marginTop: '6px' }}
                           >
                             Ver detalle
-                          </a>
+                          </a> : <p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p>}
                         </div>
                       </Popup>
                     </Marker>

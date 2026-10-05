@@ -44,6 +44,8 @@ export interface ActorOperador {
 
 export interface EnTransitoItem {
   manifiestoId: string;
+  /** Explicit server permission; absent on an older backend means no detail CTA. */
+  canViewDetail?: boolean;
   numero: string;
   transportista: string;
   origen: string;

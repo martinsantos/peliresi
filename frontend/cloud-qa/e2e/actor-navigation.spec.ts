@@ -46,6 +46,17 @@ for (const user of ['admin', 'inspector', 'lector-generadores', 'generador', 'op
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(new RegExp(`${prefix(info)}/admin/actores/${actor.path}/${fixture.actors[actor.key]}$`));
       await expect(page.getByRole('heading', { name: actor.name, exact: true })).toBeVisible();
+      if (actor.key !== 'generador') {
+        const symbol = page.locator(`[data-map-symbol="${actor.key}"]`).first();
+        await expect(symbol.locator(`svg.lucide-${actor.icon}`)).toHaveCount(1);
+        await expect(symbol.locator('[data-map-symbol-background]')).toHaveCSS('background-color', actor.key === 'transportista' ? 'rgb(234, 88, 12)' : 'rgb(37, 99, 235)');
+        const geometry = await symbol.evaluate(element => {
+          const frame = element.querySelector('[data-map-symbol-background]')!.getBoundingClientRect();
+          const icon = element.querySelector('svg')!.getBoundingClientRect();
+          return { dx: Math.abs(frame.x + frame.width / 2 - icon.x - icon.width / 2), dy: Math.abs(frame.y + frame.height / 2 - icon.y - icon.height / 2) };
+        });
+        expect(geometry.dx).toBeLessThanOrEqual(.5); expect(geometry.dy).toBeLessThanOrEqual(.5);
+      }
       if (user !== 'admin' && !(user === 'lector-generadores' && actor.key === 'generador')) {
         await expect(page.getByRole('button', { name: /^Editar|^Renovar/ })).toHaveCount(0);
         if (actor.key === 'generador') {
@@ -82,4 +93,3 @@ test('ordinary actor cannot mount a foreign ficha or call its API', async ({ pag
   expect(calls).toEqual([]);
   await page.screenshot({ path: info.outputPath('foreign-actor-not-mounted.png'), animations: 'disabled' });
 });
-

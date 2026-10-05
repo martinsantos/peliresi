@@ -43,6 +43,7 @@ import { CORRIENTES_Y } from '../../data/corrientes-y';
 import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
+import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 
 /** Local view-model that extends Operador with UI-specific derived fields */
 interface OperadorViewModel extends Operador {
@@ -150,10 +151,7 @@ const OperadorDetallePage: React.FC = () => {
           Volver
         </Button>
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
-            <FlaskConical size={24} className="text-primary-600 sm:hidden" />
-            <FlaskConical size={28} className="text-primary-600 hidden sm:block" />
-          </div>
+          <MapCategorySymbol category="operador" size="hero" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap min-w-0">
               <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{operador.nombre}</h2>
