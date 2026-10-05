@@ -12,6 +12,8 @@ Run [37244338496](https://github.com/martinsantos/peliresi/actions/runs/37244338
 
 ## Cambios de esta tanda
 
+La ejecución integral del commit `24d3273` detectó una inconsistencia real: `active-days` agrupaba en UTC y el historial consultaba días de Mendoza. Las tres superficies recibieron HTTP 200 con cero eventos al elegir una fecha UTC que todavía no había empezado en Mendoza. No se aprobó esa ejecución ni se cambió la aserción para aceptar el vacío. La reparación alinea el calendario del selector con el de reproducción, devuelve fechas civiles sin reinterpretarlas e incluye días con GPS registrado aunque no haya evento nuevo. Tres unit y tres comprobaciones de HTTP/PostgreSQL real cubren la frontera 02:59:59.999/03:00 UTC y el día con sólo GPS. Requiere un nuevo gate integral del commit exacto; no se atribuye su aprobación al antecedente.
+
 - Guía buscable y accesible desde el Centro de Ayuda: configurar reglas, simular sin enviar, activar/evaluar, verificar aviso del responsable y gestionar el caso con motivo. Diferencia lectura, resolución, actuación de origen y formalidad legal.
 - Directorio actualizado con las tres familias implementadas y los límites de DDJJ/TEF/OCR/mensajes sin plazo; vigencia documental hasta fin del día en Mendoza.
 - Siete capturas originales, sin edición, con datos sintéticos y procedencia/hash en `docs/manual/capture-provenance.json`. Identificadas como QA, catálogo pendiente de publicación al 04/10/2026. No incluyen cuentas ni expedientes reales.

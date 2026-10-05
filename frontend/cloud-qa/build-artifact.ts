@@ -58,6 +58,11 @@ if (mode === 'freeze') {
   assert.equal(expiry.commit, process.env.GITHUB_SHA);
   assert.equal(expiry.passed, 2); assert.equal(expiry.failed, 0);
   assert.equal(expiry.compiledSubscriber, true); assert.equal(expiry.externalProvidersDisabled, true);
+  const calendar = await readJson('monitor-calendar.json');
+  assert.equal(calendar.commit, process.env.GITHUB_SHA);
+  assert.equal(calendar.passed, 3); assert.equal(calendar.failed, 0);
+  assert.equal(calendar.compiledApi, true); assert.equal(calendar.realLogin, true);
+  assert.equal(calendar.externalProvidersDisabled, true);
   // Existing journeys plus inspection deadlines/linked replies and owner-specific
   // expiry/renewal, each exercised on desktop, responsive web and /app.
   assert.equal(e2e.stats.expected, 126);

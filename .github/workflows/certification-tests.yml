@@ -192,6 +192,8 @@ jobs:
           npx --no-install ts-node tests/integration/night-http.ts > "$QA_ARTIFACTS/http.log" 2>&1
       - name: Actual compiled expiry subscriber and isolated PostgreSQL identity checks
         run: node --experimental-strip-types frontend/cloud-qa/alert-expiry-integration.ts
+      - name: Real Monitor calendar and midnight HTTP regression checks
+        run: node --experimental-strip-types frontend/cloud-qa/monitor-calendar-integration.ts
       - name: Actual web and app E2E, one browser worker, no fake auth
         env:
           QA_CONTEXT_ONLY: ${{ inputs.context_only }}
@@ -215,6 +217,9 @@ jobs:
             /tmp/sitrep-night-20260926.cloud/e2e.json
             /tmp/sitrep-night-20260926.cloud/http.log
             /tmp/sitrep-night-20260926.cloud/expiry-identity.json
+            /tmp/sitrep-night-20260926.cloud/monitor-calendar.json
+            /tmp/sitrep-night-20260926.cloud/e2e/manual-*/**/*.png
+            /tmp/sitrep-night-20260926.cloud/e2e/control-close-*/**/test-failed-1.png
             /tmp/sitrep-night-20260926.cloud/e2e/alert-repository-*/**/*.png
             /tmp/sitrep-night-20260926.cloud/e2e/alert-repository-*/**/error-context.md
             /tmp/sitrep-night-20260926.cloud/e2e/alert-catalogue-*/**/*.png

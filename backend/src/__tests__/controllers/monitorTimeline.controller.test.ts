@@ -6,7 +6,7 @@ vi.mock('@prisma/client', () => ({ PrismaClient: class {
   generador = { findMany: db.actors }; transportista = { findMany: db.actors }; operador = { findMany: db.actors };
   $queryRawUnsafe = db.gps;
 } }));
-import { getTimeline } from '../../controllers/monitor.controller';
+import { getActiveDays, getTimeline } from '../../controllers/monitor.controller';
 beforeEach(() => { vi.clearAllMocks(); for (const f of Object.values(db)) f.mockResolvedValue([]); });
 const run = async (query: object) => {
   const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
@@ -43,4 +43,31 @@ it('uses the identical cutoff for observations on later pages of a running month
 it('rejects an invalid cutoff without querying the database', async () => {
   const res = await run({ fecha: '2026-10-04', corte: 'junk' });
   expect(res.status).toHaveBeenCalledWith(400); expect(db.events).not.toHaveBeenCalled();
+});
+it('active days use the same Mendoza calendar as playback, including observations with only GPS', async () => {
+  db.gps.mockResolvedValue([{ fecha: '2026-10-04' }, { fecha: '2026-10-05' }]);
+  const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
+  await getActiveDays({} as any, res as any);
+  const [sql, cutoff] = db.gps.mock.calls[0];
+  expect(sql.match(/AT TIME ZONE 'UTC' AT TIME ZONE 'America\/Argentina\/Mendoza'/g)).toHaveLength(3);
+  for (const table of ['manifiestos', 'eventos_manifiesto', 'tracking_gps']) expect(sql).toContain('FROM ' + table);
+  expect(sql).not.toContain('DATE("createdAt")');
+  expect(cutoff).toBeInstanceOf(Date);
+  expect(res.json).toHaveBeenCalledWith({ success: true, data: { days: ['2026-10-04', '2026-10-05'] } });
+  expect(res.status).not.toHaveBeenCalled();
+});
+it('an empty active calendar stays empty, without inventing days or activity', async () => {
+  const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
+  await getActiveDays({} as any, res as any);
+  expect(res.json).toHaveBeenCalledWith({ success: true, data: { days: [] } });
+});
+it('active calendar query failure is explicit rather than a successful empty history', async () => {
+  db.gps.mockRejectedValue(new Error('QA unavailable'));
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const res = { status: vi.fn(), json: vi.fn() }; res.status.mockReturnValue(res);
+    await getActiveDays({} as any, res as any);
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Error al obtener días activos' });
+  } finally { log.mockRestore(); }
 });

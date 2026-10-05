@@ -146,11 +146,15 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const errors = health(page);
   await page.goto(`${prefix(info)}/centro-control`);
   const live = page.waitForResponse(r => r.url().includes('/api/centro-control/monitor-live'), { timeout: 15_000 });
+  const calendar = page.waitForResponse(r => r.url().includes('/api/centro-control/active-days'));
   await page.goto(`${prefix(info)}/monitor`);
   await expect(page).toHaveURL(new RegExp(`${prefix(info)}/monitor$`));
   const liveResponse = await live;
   expect(liveResponse.status()).toBe(200);
   const liveData = (await liveResponse.json()).data;
+  const calendarResponse = await calendar;
+  expect(calendarResponse.status()).toBe(200);
+  const activeDays: string[] = (await calendarResponse.json()).data.days;
   expect(Number.isFinite(liveData.estadisticas.total)).toBe(true);
   const mappedCarriers=liveData.actores.transportistas.filter((actor:{lat:number;lng:number})=>actor.lat&&actor.lng);
   expect(mappedCarriers.length).toBeGreaterThan(0);
@@ -196,6 +200,10 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   const timelineResponse = await timeline;
   expect(timelineResponse.status()).toBe(200);
   const timelineData = (await timelineResponse.json()).data;
+  const selectedDate = new URL(timelineResponse.url()).searchParams.get('fecha');
+  expect(activeDays).toContain(selectedDate);
+  await info.attach('monitor-calendar-selection', { body: JSON.stringify({ activeDays, selectedDate,
+    events: timelineData.eventos.map((event: { id: string; timestamp: string }) => ({ id: event.id, timestamp: event.timestamp })) }), contentType: 'application/json' });
   expect(timelineData.eventos.length).toBeGreaterThan(0);
   await expect(page.getByText('Creados', { exact: true })).toBeVisible();
   await separatedPlaybackControls(page);

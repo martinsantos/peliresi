@@ -563,25 +563,29 @@ export async function getForecast(req: Request, res: Response) {
 
 export async function getActiveDays(req: Request, res: Response) {
   try {
-    // Get all days with manifiestos or events in the last 180 days
+    // Prisma stores these instants in UTC timestamp-without-time-zone columns.
+    // Use the same civil days as getTimeline, not the server/session calendar:
+    // 02:30 UTC still belongs to the previous day in Mendoza.
     const hace180d = new Date();
     hace180d.setDate(hace180d.getDate() - 180);
 
-    const rows = await prisma.$queryRawUnsafe<{ fecha: Date }[]>(`
-      SELECT DISTINCT DATE("createdAt") as fecha
+    const rows = await prisma.$queryRawUnsafe<{ fecha: string }[]>(`
+      SELECT DISTINCT DATE("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Mendoza')::text as fecha
       FROM manifiestos
       WHERE "createdAt" >= $1
       UNION
-      SELECT DISTINCT DATE("createdAt") as fecha
+      SELECT DISTINCT DATE("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Mendoza')::text as fecha
       FROM eventos_manifiesto
       WHERE "createdAt" >= $1
+      UNION
+      SELECT DISTINCT DATE(timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/Argentina/Mendoza')::text as fecha
+      FROM tracking_gps
+      WHERE timestamp >= $1
       ORDER BY fecha ASC
     `, hace180d);
 
-    const days = rows.map(r => {
-      const d = r.fecha instanceof Date ? r.fecha : new Date(r.fecha);
-      return d.toISOString().split('T')[0];
-    });
+    // SQL returns date-only text; reparsing it as a local Date shifts the day.
+    const days = rows.map(r => r.fecha);
 
     res.json({ success: true, data: { days } });
   } catch (error: any) {
