@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { createSpontaneousInspection, login, prefix } from './helpers';
+import { createSpontaneousInspection, login, prefix, readablePageHeading } from './helpers';
 
 /** Evidence is scoped to a route, role, viewport and state, never "all UI passed". */
-type Surface = { name: string; route: string; state?: string; expectedFailure?: boolean };
+type Surface = { name: string; route: string; state?: string; expectedFailure?: boolean; viewportPosition?: 'start' | 'end' };
 
 async function capture(page: Page, info: TestInfo, surface: Surface, navigate = true) {
   const errors: string[] = [];
@@ -20,6 +20,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
   // Wait for actual pending queries, not an arbitrary delay or fake response.
   await expect.poll(() => page.locator('[aria-busy="true"]').count(), { timeout: 15000 }).toBe(0);
   await page.evaluate(() => document.fonts.ready);
+  const headerTitle = await readablePageHeading(page);
   const measurement = await page.evaluate(() => {
     type Color = [number, number, number, number];
     const color = (css: string): Color | null => {
@@ -85,13 +86,14 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
         parentBackground: getComputedStyle(element.parentElement!).backgroundColor, nearby: element.parentElement?.textContent?.trim().slice(0, 100) }];
     });
     return { url: location.href, viewport: { width: innerWidth, height: innerHeight },
+      scroll: { windowY: scrollY, main: Array.from(document.querySelectorAll('main')).map(el => ({ top: el.scrollTop, height: el.clientHeight, contentHeight: el.scrollHeight })) },
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       title: document.title, headings: Array.from(document.querySelectorAll('h1,h2,h3')).map(e => e.textContent?.trim()),
       measuredTextNodes: measured, findings, icons };
   });
   await page.screenshot({ path: info.outputPath(`${surface.name}.png`), animations: 'disabled', scale: 'css' });
-  await info.attach(surface.name, { body: JSON.stringify({ ...surface, ...measurement, errors,
-    captureScope: 'first viewport; not all scroll positions or interaction states', businessAPIIntercepted: false,
+  await info.attach(surface.name, { body: JSON.stringify({ ...surface, ...measurement, headerTitle, errors,
+    captureScope: surface.viewportPosition ? `current viewport at ${surface.viewportPosition}; not all intermediate scroll positions or interaction states` : 'first viewport; not all scroll positions or interaction states', businessAPIIntercepted: false,
     physicalAndroid: false, visuallyReviewed: false }, null, 2), contentType: 'application/json' });
   page.off('pageerror', onError);
   expect.soft(errors, surface.name + ' unhandled exceptions').toEqual([]);
@@ -201,6 +203,27 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
   await info.attach('registered-route-inventory', { body: JSON.stringify({ routes, captured: surfaces, inspectedSections,
     pending: 'aliases, additional roles, full scroll positions, hover/focus/disabled/loading/error/modals unless separately exercised; physical APK and hardware',
     businessAPIIntercepted: false, role: 'ADMIN', viewport: page.viewportSize() }, null, 2), contentType: 'application/json' });
+});
+
+test('visual inventory: real report tabs, selected state and reachable bottom content', async ({ page }, info) => {
+  test.setTimeout(240000);
+  await login(page, info);
+  await page.goto(prefix(info) + '/reportes');
+  const navigation = page.getByRole('navigation', { name: 'Tipos de reporte', exact: true });
+  await expect(navigation).toBeVisible();
+  const tabs = await navigation.getByRole('button').allTextContents();
+  expect(tabs.map(label => label.trim())).toEqual(['Inspecciones', 'Manifiestos', 'Residuos Tratados', 'Transporte', 'Generadores', 'Operadores', 'Tratamientos', 'Departamentos', 'Mapa de Actores']);
+  for (const [index, label] of tabs.entries()) {
+    const tab = navigation.getByRole('button', { name: label.trim(), exact: true });
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+    await expect(navigation.locator('[aria-pressed="true"]')).toHaveCount(1);
+    await page.evaluate(() => { window.scrollTo(0, 0); document.querySelectorAll('main').forEach(el => { el.scrollTop = 0; }); });
+    await capture(page, info, { name: `report-${index}-start`, route: '/reportes', state: label.trim(), viewportPosition: 'start' }, false);
+    // Scroll the actual shell, not the window alone: /app has a contained main.
+    await page.evaluate(() => { document.querySelectorAll('main').forEach(el => { el.scrollTop = el.scrollHeight; }); window.scrollTo(0, document.documentElement.scrollHeight); });
+    await capture(page, info, { name: `report-${index}-end`, route: '/reportes', state: label.trim(), viewportPosition: 'end' }, false);
+  }
 });
 
 for (const user of ['generador', 'transportista', 'operador', 'inspector', 'lector-generadores']) {

@@ -80,7 +80,7 @@ test('control center queries real layers, refreshes and opens the exact active i
     const headerBox = (await header.boundingBox())!;
     const titleBox = (await title.boundingBox())!;
     expect(headerBox.height).toBe(64);
-    await expect(title).toHaveCSS('white-space', 'nowrap');
+    await expect(title).toHaveCSS('white-space', page.viewportSize()!.width < 640 ? 'normal' : 'nowrap');
     expect(titleBox.y).toBeGreaterThanOrEqual(headerBox.y);
     expect(titleBox.y + titleBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
     for (const button of await header.getByRole('button').all()) {

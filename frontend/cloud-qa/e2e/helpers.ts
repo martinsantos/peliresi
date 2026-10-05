@@ -1,5 +1,23 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 
+/** Tooltip/accessible name alone does not prove that a page title is readable. */
+export async function readablePageHeading(page: Page) {
+  const heading = page.locator('header h1:visible').first();
+  if (await heading.count() === 0) return { applicable: false, reason: 'No shell H1 on this surface; custom/public headings require their own evidence' };
+  const geometry = await heading.evaluate(element => {
+    const frame = element.closest('header')!.getBoundingClientRect();
+    const bounds = element.getBoundingClientRect();
+    const range = document.createRange(); range.selectNodeContents(element);
+    const text = [...range.getClientRects()].filter(r => r.width > 0).map(r => ({ x: r.x, y: r.y, right: r.right, bottom: r.bottom }));
+    return { applicable: true, label: element.textContent, height: frame.height, text,
+      insideHeader: text.every(r => r.x >= frame.left - 1 && r.right <= frame.right + 1 && r.y >= frame.top - 1 && r.bottom <= frame.bottom + 1),
+      insideTitle: text.every(r => r.x >= bounds.left - 1 && r.right <= bounds.right + 1 && r.y >= bounds.top - 1 && r.bottom <= bounds.bottom + 1),
+      insideViewport: text.every(r => r.x >= -1 && r.right <= innerWidth + 1) };
+  });
+  expect(geometry, `Complete visible shell title: ${geometry.label}`).toMatchObject({ insideHeader: true, insideTitle: true, insideViewport: true });
+  return geometry;
+}
+
 /** A real notice must not cover the identity, tabs or the scrollable workspace. */
 export async function nonObstructingNotices(page: Page) {
   const notice = page.getByRole('region', { name: 'Avisos del sistema', exact: true });

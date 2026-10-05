@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
-import { login, prefix, readableMapLayers } from './helpers';
+import { login, prefix, readableMapLayers, readablePageHeading } from './helpers';
 
 /** Measure rendered SVG frames in the background's local axes, including diamonds. */
 async function symbolGeometry(symbols: Locator) {
@@ -80,6 +80,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
 
   if (info.project.name !== 'web-desktop') {
     await page.setViewportSize({ width: 320, height: 800 });
+    await readablePageHeading(page);
     await layers.scrollIntoViewIfNeeded();
     rowMeasurements.control320 = await readableMapLayers(layers);
     measurements.control320 = await symbolGeometry(layers.locator('[data-map-symbol]'));
@@ -98,6 +99,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await reportLayers.screenshot({ path: info.outputPath('report-map-controls.png'), animations: 'disabled' });
   if (info.project.name !== 'web-desktop') {
     await page.setViewportSize({ width: 320, height: 800 });
+    await readablePageHeading(page);
     await reportLayers.scrollIntoViewIfNeeded();
     rowMeasurements.reports320 = await readableMapLayers(reportLayers);
     measurements.reports320 = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));

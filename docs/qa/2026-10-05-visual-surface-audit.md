@@ -58,7 +58,57 @@ composición pueda medirse, conserva los gradientes/imágenes no resueltos como
 pendientes y verifica explícitamente `/reset-password` → `/recuperar` con
 formulario real. No baja umbrales ni elimina candidatos para pasar.
 
-Próximo: una ejecución completa cloud serial con unit, HTTP, E2E y Android OS;
+La ejecución completa siguiente es
+[QA86](https://github.com/martinsantos/peliresi/actions/runs/37349612780), fuente
+`559956d916392721f0e694eee54491b788fda2a2`, unit/Android/full. El JSON E2E ya
+mostró **159/162 PASS, tres fallos, cero skips/flaky**: las tres superficies
+detectan el mismo enlace de alta pública `Inicia sesion`, color de marca500
+sobre blanco, **4,406758691742224:1** frente a 4,5 requerido. El resto del
+inventario no detectó candidatos habilitados medibles por ese algoritmo. Eso
+no aprueba gradientes, áreas fuera de viewport ni todos los estados. Android
+aprobó su paso a las 18:11:08 UTC, igual que el cierre de procesos propios y
+PostgreSQL. Unit crudos: **485 BE y1.000 FE PASS, cero FAIL/pending**.
+QA86 terminó FAILURE por esos tres E2E, no por Android. El alcance exacto
+Android se verifica con sus JSON y no equivale a prueba física del APK del
+usuario. No hubo despliegue ni paquete publicable aprobado.
+
+Se revisaron catorce PNG85 adicionales (23 en total): Alertas, Avisos, nuevo
+manifiesto, Reportes, editar generador, usuarios, selector de sesión y perfil
+app; altas/ediciones de operador/transporte app; generadores/Reportes escritorio.
+Los originales muestran cabeceras cortadas; los KPI de Reportes con gradiente
+son composición **no medida** y requieren revisión específica, no aprobación
+por este algoritmo. La tabla de generadores no muestra la antigua columna
+vacía enorme, pero esta captura con tres actores no prueba todos los anchos/datos.
+
+Mientras QA86 conserva su commit inmutable, se prepara un siguiente candidato
+local separado: popup LIVE G/T/O/viaje compartido con símbolo canónico, ancho
+acotado, metadatos oscuros, dirección completa, nombres de marcador accesibles
+y cierre44px. Tres nuevos unit fallaron antes; después pasaron, junto a los
+dos contratos de historial. Títulos del shell responsive/app ahora permiten
+envoltura sin ellipsis; app comparte altura64px con web y conserva marca/rol.
+Cuatro contratos fallaron antes (30 anteriores verdes); luego 39 focales
+incluyendo popup/historial aprobaron. Unit no certifica CSS ni la ausencia
+de clipping. El E2E candidato mide ancho/cierre y conserva datos de API reales;
+el inventario comprueba rectángulos de texto de H1, no sólo su tooltip. La
+antigua expectativa nowrap sigue en escritorio; en móvil se fortalece por
+título completo dentro del marco, sin rebajar el control de altura.
+
+Tras QA86 se añadió un contrato rojo para cada alta pública G/T/O: enlace
+legible, foco visible y retorno a ingreso sin crear cuenta. Tres FAIL antes,
+tres PASS al pasar sólo ese enlace a primary700/hover800. No se toca login
+institucional, API de solicitud, cuentas ni numeración. El último focal
+combinado pasó40 pruebas; los dos contratos de historial pasaron en ejecución
+separada (42 comprobaciones diferentes en total, no una suite completa).
+
+El siguiente gate agrega apertura/cierre de los cuatro popups LIVE con API
+real, lectura de título en320px y recorrido de las nueve pestañas de Reportes,
+con captura/medición al inicio y al final del contenedor real. Se registran
+offsets y alturas; no se hace pasar primer viewport por contenido completo.
+Los nuevos casos no se excluyen si descubren defectos. Ningún recibo del
+candidato local se declara renderizado antes de la nueva VM serial.
+
+Próximo: terminar QA86 y cerrar sus recursos; revisar crudos/PNG/Android,
+corregir fallos nuevos antes de despachar una única tanda del candidato siguiente;
 revisar sus PNG/recibos, corregir nuevos fallos y después popups móviles de
 Monitor, títulos truncados, estados/modal/scroll/tab de Reportes pendientes.
 Android OS autenticado QA y APK original anónimo son alcances distintos;

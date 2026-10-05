@@ -441,7 +441,7 @@ export const MainLayout: React.FC = () => {
             >
               <Menu size={20} />
             </Button>
-            <h1 title={currentPage} className="min-w-0 truncate text-base sm:text-xl font-semibold text-neutral-900">{currentPage}</h1>
+            <h1 title={currentPage} className="min-w-0 whitespace-normal break-words text-base leading-5 sm:truncate sm:text-xl sm:leading-normal font-semibold text-neutral-900">{currentPage}</h1>
             
             {/* Badge de rol actual */}
             <Badge 

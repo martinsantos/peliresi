@@ -458,6 +458,21 @@
 }
 
 
+/* Popup dismissal has the same touch target in live and history modes. */
+.wr-layout-map .leaflet-container a.leaflet-popup-close-button {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+}
+.wr-layout-map .leaflet-container a.leaflet-popup-close-button:hover { color: #171717; }
+.wr-layout-map .leaflet-container a.leaflet-popup-close-button:focus-visible {
+  outline: 2px solid #1b5e3c;
+  outline-offset: -3px;
+}
+
 /* ==========================================================================
    9. Cinema Mode Overrides
    ========================================================================== */

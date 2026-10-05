@@ -203,7 +203,7 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
 
           <p className="text-xs text-neutral-400 text-center mt-2">
             Ya tenes cuenta?{' '}
-            <button onClick={() => navigate('/login')} className="text-[#0D8A4F] font-medium hover:underline">
+            <button onClick={() => navigate('/login')} className="text-primary-700 font-medium hover:text-primary-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2">
               Inicia sesion
             </button>
           </p>

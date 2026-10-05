@@ -171,6 +171,17 @@ describe('MobileLayout Android shell', () => {
     expect(screen.getByRole('banner')).not.toHaveTextContent('Notificaciones');
   });
 
+  it('keeps a complete long page title and sector role in a stable header frame', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'ADMIN_GENERADOR' };
+    renderMobileLayout('/manifiestos/nuevo');
+    const header = screen.getByRole('banner');
+    expect(header.querySelector('h1')).toHaveClass('whitespace-normal', 'break-words');
+    expect(header.querySelector('h1')).not.toHaveClass('truncate');
+    expect(header.firstElementChild).toHaveClass('h-16');
+    expect(header.querySelector('[aria-label="Función actual"]')).toHaveTextContent('Adm. Generadores');
+    expect(header.querySelector('[aria-label="Función actual"]')).toHaveClass('max-w-24', 'break-words');
+  });
+
   it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('keeps active navigation green for %s without changing the role', role => {
     authState.currentUser = { ...authState.currentUser, rol: role };
     renderMobileLayout('/notificaciones');
