@@ -29,7 +29,7 @@ export function MapLayerToggle({ category, label, pressed, count, onToggle }: {
   const countId = useId();
   return <button type="button" aria-label={label} aria-pressed={pressed} aria-describedby={count === undefined ? undefined : countId}
     onClick={onToggle}
-    className={`flex min-h-12 min-w-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs font-semibold text-neutral-800 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 ${pressed ? 'border-primary-400 bg-primary-50 hover:bg-primary-100 active:bg-primary-200' : 'border-neutral-300 bg-white hover:bg-neutral-100 active:bg-neutral-200'}`}>
+    className={`flex min-h-12 min-w-0 items-center gap-1.5 rounded-lg border px-1.5 py-2 text-left text-xs font-semibold text-neutral-800 transition-colors sm:gap-2 sm:px-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 ${pressed ? 'border-primary-400 bg-primary-50 hover:bg-primary-100 active:bg-primary-200' : 'border-neutral-300 bg-white hover:bg-neutral-100 active:bg-neutral-200'}`}>
     <MapCategorySymbol category={category} />
     <span className="min-w-0 flex-1">
       <span data-map-label className="block sm:inline">{label}</span>

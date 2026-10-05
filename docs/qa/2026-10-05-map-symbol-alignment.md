@@ -30,6 +30,13 @@ fondo sin elevarse sobre mapas, menús o paneles. No se añaden efectos, timers,
 peticiones ni dependencias. El riesgo de ensanchar controles y filas exige
 verificación renderizada de los textos largos en móvil.
 
+La primera captura del ajuste detectó que «Transportistas» invadía el padding
+derecho, aunque el texto seguía dentro del botón y la comprobación antigua
+aprobaba. En móvil se compactan el gap y padding horizontal usando tokens
+existentes (6 px); escritorio conserva 8 px de gap y 10 px de padding.
+El control conserva su altura táctil y la caja del símbolo. El helper ahora
+exige texto dentro del área de contenido descontando bordes y padding.
+
 ## Pruebas
 
 - Cinco unit nuevas verifican decoración oculta a lectores de pantalla, color,
@@ -51,9 +58,25 @@ verificación renderizada de los textos largos en móvil.
 
 ## Resultados
 
-Pendientes de recibos de la VM y revisión de las capturas originales.
-El primer run de referencia es 74 / `37298970767`, fuente `30d968f` sin cambios
-de producto. No publicar cifras aprobadas, GO o despliegue desde este borrador.
+Referencia74 / `37298970767`, fuente `30d968f` sin cambios de producto:
+472BE/962FE unit, tres builds, 54HTTP, 2SQL, 3calendario y 5territorial PASS.
+Focal18PASS/6FAIL/0flaky/0skip. Tres fallos territoriales preexistentes y tres
+timeouts del montaje al esperar red para queries frescas; no tres bugs nuevos.
+Trace original confirma centros exactos, SVG14px y padding3px/0,100508px.
+No se alcanzaron las aserciones finales del nuevo recorrido. Capturas antes
+conservadas; cleanupSUCCESS/cierre11:01:48.093UTC.
+
+Iteración75 / `37300415275`, fuente `76bd89e`: 472BE/967FE unit, tres builds y
+los mismos gruposHTTP/SQL PASS. Focal18PASS/6FAIL/0flaky/0skip. Las tres nuevas
+fallas son un selector ambiguo entre la fila nativa y el marcador Leaflet con
+el mismo nombre; se alcanzaron los filtros y la ocultación/restauración real
+del marcador, pero no las aserciones finales. No presentarlas como tres bugs
+de la app ni tres recorridos completos aprobados. Capturas Centro/Reportes
+mostraron padding SVG mejorado y el problema móvil del texto descrito arriba.
+CleanupSUCCESS/cierre11:10:29.312UTC.
+
+Próxima validación: mismo recorrido con selector acotado al símbolo de la fila,
+helper más estricto y ajuste horizontal móvil. Resultado final aún pendiente.
 
 ## Límite de entrega
 

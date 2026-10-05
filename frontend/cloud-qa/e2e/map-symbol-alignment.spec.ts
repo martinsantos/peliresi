@@ -51,6 +51,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await readableMapLayers(layers);
   measurements.control = await symbolGeometry(layers.locator('[data-map-symbol]'));
   await page.screenshot({ path: info.outputPath('control-map-symbols.png'), animations: 'disabled' });
+  await layers.screenshot({ path: info.outputPath('control-map-controls.png'), animations: 'disabled' });
   for (const [label, key] of [['Generadores', 'generadores'], ['Transportistas', 'transportistas'], ['Operadores', 'operadores'], ['En Tránsito', 'transito']]) {
     const toggle = layers.getByRole('button', { name: label, exact: true });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
@@ -84,6 +85,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await readableMapLayers(reportLayers);
   measurements.reports = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));
   await page.screenshot({ path: info.outputPath('report-map-symbols.png'), animations: 'disabled' });
+  await reportLayers.screenshot({ path: info.outputPath('report-map-controls.png'), animations: 'disabled' });
   const carrier = reportLayers.getByRole('button', { name: 'Transportistas', exact: true });
   const marker = page.locator('.leaflet-marker-icon[title="QA Transporte 1"]');
   await expect(marker).toHaveCount(1);
@@ -94,7 +96,9 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await carrier.press('Space');
   await expect(carrier).toHaveAttribute('aria-pressed', 'true');
   await expect(marker).toHaveCount(1);
-  const actor = page.getByRole('button', { name: /^QA Transporte 1/ });
+  const actor = page.getByRole('button', { name: /^QA Transporte 1/ })
+    .filter({ has: page.locator('[data-map-symbol="transportista"]') });
+  await expect(actor).toHaveCount(1);
   await actor.scrollIntoViewIfNeeded();
   measurements.rows = await symbolGeometry(page.locator('[data-map-symbol]').filter({ has: page.locator('svg.lucide-truck') }));
   await page.screenshot({ path: info.outputPath('report-actor-symbols.png'), animations: 'disabled' });
