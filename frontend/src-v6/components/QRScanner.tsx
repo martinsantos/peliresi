@@ -371,7 +371,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 stopStream();
                 onClose();
               }}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-white bg-white text-neutral-900 hover:border-white hover:bg-neutral-100 hover:text-neutral-900 active:border-white active:bg-neutral-200 focus-visible:outline-white"
             >
               Volver
             </Button>
@@ -396,7 +396,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   stopStream();
                   onClose();
                 }}
-                className="border-white/20 text-white hover:bg-white/10"
+                className="border-white bg-white text-neutral-900 hover:border-white hover:bg-neutral-100 hover:text-neutral-900 active:border-white active:bg-neutral-200 focus-visible:outline-white"
               >
                 Cancelar
               </Button>

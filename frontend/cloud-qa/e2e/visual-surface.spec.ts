@@ -414,6 +414,14 @@ for (const user of ['generador', 'transportista', 'operador', 'inspector', 'lect
       await capture(page, info, { name: `${user}-${name}`, route, state: user });
       if (user === 'inspector') {
         const badge = page.locator('header [aria-label="Función actual"]');
+        if (name === 'monitor') {
+          // Monitor intentionally has a standalone full-screen shell. Verify
+          // that shell and the actual return, not a nonexistent account badge.
+          await expect(badge).toHaveCount(0);
+          await expect(page.getByRole('group', { name: 'Modo del Monitor', exact: true })).toBeVisible();
+          await page.getByRole('button', { name: 'Cerrar (Esc)', exact: true }).click();
+          await expect(page).toHaveURL(new RegExp(`${prefix(info)}/centro-control$`));
+        }
         await expect(badge).toHaveText('Inspector');
         await expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
       }
@@ -461,8 +469,18 @@ for (const user of ['generador', 'transportista', 'operador', 'inspector', 'lect
       await expect(categoryButton.locator('svg.lucide-check')).toBeVisible();
       await expect(page).toHaveURL(/\/app\/actores$/);
       const name = { generador: 'QA Generador 1', transportista: 'QA Transporte 1', operador: 'QA Operador 1' }[category]!;
-      await page.getByText(name, { exact: true }).filter({ visible: true }).first().click();
+      const consultation = page.getByRole('button', { name: `Vista rápida de ${name}`, exact: true }).filter({ visible: true }).first();
+      await consultation.scrollIntoViewIfNeeded();
+      await expect(consultation.getByText(name, { exact: true })).toBeVisible();
+      await readableWholeWords(consultation.getByText(name, { exact: true }));
+      await consultation.click();
       const detail = page.getByRole('dialog', { name: 'Detalle del Actor', exact: true });
+      await expect(detail).toBeVisible();
+      await detail.getByRole('button', { name: 'Cerrar', exact: true }).click();
+      await expect(detail).toHaveCount(0);
+      await consultation.focus();
+      await expect(consultation).toBeFocused();
+      await page.keyboard.press('Enter');
       await expect(detail).toBeVisible();
       await detail.getByRole('button', { name: 'Ver detalle completo', exact: true }).click();
       const path = { generador: 'generadores', transportista: 'transportistas', operador: 'operadores' }[category]!;

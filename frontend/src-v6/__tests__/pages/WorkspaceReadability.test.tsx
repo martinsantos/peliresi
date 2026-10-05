@@ -59,6 +59,21 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Actor workspaces retain readable native navigation', () => {
+  it('keeps the entire mobile actor identity above wrapping status badges and opens a native consultation button', () => {
+    qa.user.rol = 'TRANSPORTISTA';
+    qa.transportistas = [{ id: 'qa-own', razonSocial: 'QA Transporte 1', cuit: '99-10000001-0' }];
+    render(<MemoryRouter initialEntries={['/actores']}><ActoresPage /></MemoryRouter>);
+    const consult = screen.getAllByRole('button', { name: 'Vista rápida de QA Transporte 1', exact: true })[0];
+    expect(consult).toHaveClass('w-full', 'text-left', 'focus-visible:outline-2');
+    const identity = within(consult).getByText('QA Transporte 1', { exact: true });
+    expect(identity).toHaveClass('whitespace-normal', 'break-words');
+    expect(identity.parentElement).toHaveClass('min-w-0', 'flex-1');
+    const status = within(consult).getByText('Activo', { exact: true });
+    expect(status.parentElement).toHaveClass('flex-wrap');
+    expect(status.parentElement?.parentElement).toBe(identity.parentElement);
+    fireEvent.click(consult);
+    expect(screen.getByRole('dialog', { name: 'Detalle del Actor', exact: true })).toBeVisible();
+  });
   it.each([
     ['Generadores', 'generadores', '33'], ['Transportistas', 'transportistas', '4'], ['Operadores', 'operadores', '5'],
   ])('%s is a native app link with the real API total and complete caption', (label, route, count) => {

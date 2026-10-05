@@ -26,6 +26,17 @@ beforeEach(() => {
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
 
+it.each([['NotFoundError', 'Volver'], ['NotReadableError', 'Cancelar']])('keeps the escape button readable on the dark scanner after %s', async (name, label) => {
+  getUserMedia.mockRejectedValue(new DOMException('QA unavailable camera', name));
+  const close = vi.fn();
+  render(<QRScanner onScan={vi.fn()} onClose={close} />);
+  const back = await screen.findByRole('button', { name: label, exact: true });
+  expect(back).toHaveClass('bg-white', 'text-neutral-900', 'hover:text-neutral-900');
+  expect(back).not.toHaveClass('text-white');
+  fireEvent.click(back);
+  expect(close).toHaveBeenCalledOnce();
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

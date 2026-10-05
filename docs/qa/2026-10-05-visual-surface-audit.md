@@ -1,5 +1,53 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## PREVALENTE 05/10/2026 23:22 UTC — QA92 fallida, reparaciones siguientes verificadas en focal
+
+[QA92](https://github.com/martinsantos/peliresi/actions/runs/37382728904), fuente
+`8c8daf05d77dc3f7057b20c0c1318e2143e289bc`, terminó FAILURE23:06:25UTC.
+Crudos finales: **485BE +1.086FE unit PASS**, cero fallos/omitidos; **166/171
+E2E PASS,5FAIL**, cero skipped/flaky/suite errors. Tres fallos son una
+expectativa errónea nueva de badge en Monitor fullscreen; otro reproduce
+cabecera de Control fuera del marco fijo a320px; el transportista no logra
+abrir su identidad móvil. Tres builds/54HTTP/2SQL/3calendario/5territorial PASS.
+Android `completed:false`,13PASS1FAIL: se perdió el transporte durante captura
+del escáner, `adb: device offline`; último caso de salud NO ejecutado. Log de
+sistema terminó255 y su cola de2MB es incompleta; no demuestra crash de Chrome
+ni causa raíz. APKoriginal4/4 sólo anónimo, no candidato autenticado.
+Packaging/release NO ejecutados. Cleanup SUCCESS y PG apagado23:06:18.213UTC;
+ninguna VM QA activa. ZIP final único144.498.802bytes,artifact11379405962,
+SHA256 `3c76d82c83d6cfab1483aeb2adb421d18dee7491c1d14618477fd79d5de1c96a`,
+externo `tmp/sitrep-go-evidence-20261003/visual-surface-run92-final.zip`.
+
+Cuatro PNG92 originales revisados: fallo/overviewT, Control320 y escáner
+Android nativo. Acumulado141 archivosPNG observados, NO141 pantallas únicas
+ni100%. La captura prueba también texto blanco sobre blanco en «Volver» y
+nombreT comprimido a ancho cero por etiquetas en la misma fila.
+
+| Antes observado | Reparación siguiente | Comprobación |
+| --- | --- | --- |
+| Rol lateral comprime título320px | Rol bajo el título, misma altura64px/marca/campana | Marco unit +geometría320 real pendiente |
+| IdentidadT desaparece, tarjeta sin teclado | Nombre a ancho disponible; etiquetas bajo CUIT; botón nativo completo sin botones anidados | Lectura/consulta unit; click yEnter E2E siguientes |
+| Volver/Cancelar blanco sobre blanco | Fondo blanco y texto neutral900 en todos sus estados | Dos ramas unit; CSS real/escape Android siguientes |
+| Prueba pide badge en Monitor autónomo | Exige shell real sin badge, cerrar y retornar al contextoInspector intacto | E2E siguiente; no cambia productoMonitor/permisos |
+
+Antes focal válido51PASS4FAIL; se precisó «Cancelar» en la rama de error
+(no se cambió esa acción). Después55/55PASS; ampliado único **149/149PASS**
+en13archivos,0pending, heap256MB/worker1, JSON
+`/private/tmp/sitrep-qa92-repair-focal.json`.55 es subconjunto, no se suma.
+Contrato puro16/16PASS, heap128MB/concurrencia1; no ADB local/proveedores.
+Próximo full espera1.089FE/485BE y171E2E, NO resultado aprobado todavía.
+DiagnósticoAndroid sólo añade inventarioADB/PID readonly; sin reconnect,
+reintento oculto, reset de perfil ni excluir el fallo92.
+
+Producción, backend de producto, auth, marcas/colores, API/permisos, datos
+reales y symlinks preservados. No Docker/browser/DB/API/emulador/build/install
+locales, automatizaciones ni agentes. Próximo commit/push explícito, comprobar
+SHA remoto DESPUÉS de completarpush, única VMfull serial; candidato congelado
+hasta resultado/cleanup. Publicador protegido no ejecutado/eludido. ASRreal
+Vosk/modelo compartido, gradientes/APCA/estados no vistos, APKexacto autenticado,
+física/Safari/ruido/batería/background/conciliaciónproducción siguen pendientes.
+**Abierto / NO GO global / NO desplegado / sin claim100%.**
+
 ## PREVALENTE 22:26 UTC — QA91 cerrada; candidato siguiente, sin publicación
 
 [QA91](https://github.com/martinsantos/peliresi/actions/runs/37374618151),

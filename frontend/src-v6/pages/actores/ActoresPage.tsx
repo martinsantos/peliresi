@@ -586,32 +586,32 @@ export const ActoresPage: React.FC = () => {
                 return (
                   <Card
                     key={`m-${actor.tipo}-${actor.id}`}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => verDetalle(actor)}
+                    padding="none"
                   >
-                    <CardContent className="p-4">
+                    <button
+                      type="button"
+                      aria-label={`Vista rápida de ${actor.razonSocial}`}
+                      className="w-full rounded-[12px] p-4 text-left transition-colors hover:bg-primary-50 active:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700"
+                      onClick={() => verDetalle(actor)}
+                    >
                       <div className="flex items-start gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-${config.color}-100`}>
                           <Icon size={18} className={`text-${config.color}-600`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-neutral-900 truncate">{actor.razonSocial}</p>
-                              <p className="text-xs text-neutral-500 font-mono">{actor.cuit}</p>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Badge variant="soft" color={config.color} className="text-xs">{config.label}</Badge>
-                              <Badge variant="soft" color={isActivo ? 'success' : 'neutral'} className="text-xs">
-                                {isActivo ? 'Activo' : 'Inactivo'}
-                              </Badge>
-                            </div>
+                          <p className="whitespace-normal break-words font-semibold text-neutral-900">{actor.razonSocial}</p>
+                          <p className="text-xs text-neutral-500 font-mono">{actor.cuit}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <Badge variant="soft" color={config.color} className="text-xs">{config.label}</Badge>
+                            <Badge variant="soft" color={isActivo ? 'success' : 'neutral'} className="text-xs">
+                              {isActivo ? 'Activo' : 'Inactivo'}
+                            </Badge>
                           </div>
                           {(actor.email || actor.telefono) && (
-                            <div className="flex items-center gap-3 mt-2 text-xs text-neutral-500">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-neutral-500">
                               {actor.email && (
-                                <span className="flex items-center gap-1 truncate">
-                                  <Mail size={12} /> {actor.email}
+                                <span className="flex min-w-0 items-start gap-1 break-all">
+                                  <Mail size={12} className="shrink-0 mt-0.5" /> {actor.email}
                                 </span>
                               )}
                               {actor.telefono && (
@@ -624,7 +624,7 @@ export const ActoresPage: React.FC = () => {
                         </div>
                         <ChevronRight size={16} className="text-neutral-300 shrink-0 mt-2" />
                       </div>
-                    </CardContent>
+                    </button>
                   </Card>
                 );
               })}

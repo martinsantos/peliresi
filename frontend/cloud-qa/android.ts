@@ -10,7 +10,7 @@ import { DeadlineError, withinDeadline } from './deadline.ts';
 import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
 import { beginSessionEvidence } from './session-evidence.ts';
-import { nonObstructingNotices } from './e2e/helpers.ts';
+import { nonObstructingNotices, readableWholeWords } from './e2e/helpers.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -236,6 +236,8 @@ const check=async(name:string,task:()=>Promise<void>)=>{
     // Retain OS evidence even when CDP has already disconnected. Do not turn
     // a browser crash into a passing check or reset its recorded failure.
     for(const [suffix,args]of [
+      ['adb-devices.txt',['devices','-l']],
+      ['chrome-pids.txt',['shell','pidof','com.android.chrome']],
       ['chrome-exits.txt',['shell','dumpsys','activity','exit-info','com.android.chrome']],
       ['chrome-memory.txt',['shell','dumpsys','meminfo','com.android.chrome']],
       ['chrome-system-log.txt',['logcat','-d','-t','400','-v','brief','ActivityManager:I','AndroidRuntime:E','chromium:E','*:S']],
@@ -604,8 +606,16 @@ try{
     // This emulator explicitly has camera-back/front none. Decoder success is
     // tested separately with a synthetic optical stream in browser E2E.
     await expect(page.getByText('No se detecto ninguna camara en este dispositivo.',{exact:true})).toBeVisible();
+    const back=page.getByRole('button',{name:'Volver',exact:true});
+    await readableWholeWords(back);
+    await expect(back).toHaveCSS('background-color','rgb(255, 255, 255)');
+    await expect(back.locator('span').last()).toHaveCSS('color','rgb(18, 26, 38)');
+    // Read-only diagnostic, no reconnect/retry: QA92 lost its ADB transport
+    // during this capture. A later PASS must not erase that incomplete run.
+    await writeFile(path.join(output,'scanner-adb-before-capture.txt'),
+      execFileSync('adb',['devices','-l'],{encoding:'utf8',timeout:5000}));
     await proof('scanner-without-hardware');
-    await page.getByRole('button',{name:'Cerrar escaner',exact:true}).tap();
+    await back.tap();
     await expect(page).not.toHaveURL(/escaner-qr$/);
   });
   await check('javascript-health',async()=>{

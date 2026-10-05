@@ -191,7 +191,10 @@ describe('MobileLayout Android shell', () => {
     expect(header.querySelector('h1')).not.toHaveClass('truncate');
     expect(header.firstElementChild).toHaveClass('h-16');
     expect(header.querySelector('[aria-label="Función actual"]')).toHaveTextContent('Adm. Generadores');
-    expect(header.querySelector('[aria-label="Función actual"]')).toHaveClass('w-min', 'break-normal');
+    const badge = header.querySelector('[aria-label="Función actual"]');
+    expect(badge).toHaveClass('w-fit', 'max-w-full', 'break-normal');
+    expect(badge?.parentElement).toBe(header.querySelector('h1')?.parentElement);
+    expect(badge?.parentElement).toHaveClass('min-w-0', 'flex-1', 'flex-col');
     expect(header.querySelector('[aria-label="Función actual"]')).not.toHaveClass('break-words', 'max-w-24');
   });
 

@@ -345,7 +345,7 @@ export const MobileLayout: React.FC = () => {
 
       {/* Header */}
       <header className="sticky top-0 z-40 shrink-0 sidebar-polished safe-area-top">
-        <div className="flex items-center justify-between h-16 px-4 safe-top">
+        <div className="flex items-center justify-between gap-2 h-16 px-4 safe-top">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <button
               onClick={() => setIsMenuOpen(true)}
@@ -355,13 +355,14 @@ export const MobileLayout: React.FC = () => {
               <Menu size={24} />
             </button>
             <SitrepMark size={24} />
-            <h1 className="min-w-0 flex-1 whitespace-normal break-words text-base font-bold leading-5 text-white">{getPageTitle()}</h1>
+            <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+              <h1 className="min-w-0 whitespace-normal break-words text-base font-bold leading-5 text-white">{getPageTitle()}</h1>
+              <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="w-fit max-w-full whitespace-normal break-normal text-xs leading-4 font-medium px-2 py-0.5 rounded-full bg-white/20 text-white">
+                {config.label}
+              </span>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {/* Badge de rol */}
-            <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="w-min whitespace-normal break-normal text-center text-xs leading-4 font-medium px-2 py-1 rounded-full bg-white/20 text-white">
-              {config.label}
-            </span>
             <NotificationBell basePath={mp('')} inverse />
           </div>
         </div>
