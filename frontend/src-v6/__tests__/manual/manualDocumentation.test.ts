@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
-import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
-const manual = fileURLToPath(new URL('../../../../docs/manual/', import.meta.url));
+// Vitest's jsdom module URL is HTTP, not a filesystem file: URL must not locate this static source.
+const manual = path.resolve(process.cwd(), '../docs/manual') + path.sep;
 type Step = { title: string; body: string[]; image?: string; caption?: string; alt?: string; expected: string };
 type Guide = { id: string; profile: string; safety?: string; steps: Step[] };
 const context = { window: {} as { SITREP_HELP?: { profiles: Array<{ id: string }>; guides: Guide[] } } };
