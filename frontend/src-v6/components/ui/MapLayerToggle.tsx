@@ -9,10 +9,13 @@ const glyphs = { generador: Factory, transportista: Truck, operador: FlaskConica
 export function MapCategorySymbol({ category }: { category: MapCategory }) {
   const Icon = glyphs[category];
   const diamond = category === 'transportista';
-  return <span data-map-symbol={category} aria-hidden="true"
-    className={`inline-flex h-5 w-5 shrink-0 items-center justify-center text-white ${category === 'enTransito' ? 'rounded-full' : 'rounded'}`}
-    style={{ backgroundColor: ACTOR_COLORS[category], transform: diamond ? 'rotate(45deg)' : undefined }}>
-    <Icon size={14} strokeWidth={2.5} style={{ transform: diamond ? 'rotate(-45deg)' : undefined }} />
+  // Reserve the diamond's full rotated footprint; only the background rotates.
+  // All glyphs share the same grid center and remain independent of text baselines.
+  return <span data-map-symbol={category} aria-hidden="true" className="isolate inline-grid h-9 w-9 shrink-0 place-items-center">
+    <span data-map-symbol-background
+      className={`col-start-1 row-start-1 h-6 w-6 ${category === 'enTransito' ? 'rounded-full' : 'rounded'}`}
+      style={{ backgroundColor: ACTOR_COLORS[category], transform: diamond ? 'rotate(45deg)' : undefined }} />
+    <Icon size={14} strokeWidth={2.5} className="relative z-[1] col-start-1 row-start-1 block shrink-0 text-white" />
   </span>;
 }
 

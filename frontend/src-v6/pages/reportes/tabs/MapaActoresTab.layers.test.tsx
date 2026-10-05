@@ -65,7 +65,7 @@ describe('Report map single interactive category reference', () => {
       const button = within(group).getByRole('button', { name: label });
       expect(button).toHaveAttribute('aria-pressed', 'true');
       expect(button.querySelector(`svg.lucide-${glyph}`)).not.toBeNull();
-      expect(button.querySelector('[data-map-symbol]')).toHaveStyle({ backgroundColor: color });
+      expect(button.querySelector('[data-map-symbol-background]')).toHaveStyle({ backgroundColor: color });
     }
     expect(within(group).queryByRole('button', { name: 'Inspecciones' })).not.toBeInTheDocument();
     expect(screen.getAllByText('Generadores', { exact: true })).toHaveLength(1);

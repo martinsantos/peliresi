@@ -36,7 +36,7 @@ describe('Actionable map legend', () => {
     const toggle = map(true);
     const button = screen.getByRole('button', { name });
     expect(button.querySelector(`svg.lucide-${glyph}`)).not.toBeNull();
-    expect(button.querySelector('[data-map-symbol]')).toHaveStyle({ backgroundColor: color });
+    expect(button.querySelector('[data-map-symbol-background]')).toHaveStyle({ backgroundColor: color });
     expect(button).toHaveAttribute('aria-pressed', String(key !== 'operadores'));
     fireEvent.click(button);
     expect(toggle).toHaveBeenCalledExactlyOnceWith(key);

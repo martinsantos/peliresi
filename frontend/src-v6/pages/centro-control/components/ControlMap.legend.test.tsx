@@ -58,7 +58,7 @@ describe('Control map visual identity across desktop and mobile', () => {
       ]) {
         const item = within(legend).getByRole('button', { name: label });
         expect(item.querySelector(`svg.lucide-${glyph}`)).not.toBeNull();
-        expect(item.querySelector('[data-map-symbol]')).toHaveStyle({ backgroundColor: color });
+        expect(item.querySelector('[data-map-symbol-background]')).toHaveStyle({ backgroundColor: color });
         expect(item.querySelector('polygon')).toBeNull();
       }
       expect(within(legend).getByRole('button', { name: 'En Tránsito' })).toBeInTheDocument();

@@ -8,7 +8,8 @@ async function symbolGeometry(symbols: Locator) {
     const glyph = element.querySelector('svg')!;
     const box = background.getBoundingClientRect();
     const icon = glyph.getBoundingClientRect();
-    const inverse = new DOMMatrix(getComputedStyle(background).transform).inverse();
+    const transform = getComputedStyle(background).transform;
+    const inverse = new DOMMatrix(transform === 'none' ? undefined : transform).inverse();
     const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
     const corners = [[icon.left, icon.top], [icon.right, icon.top], [icon.left, icon.bottom], [icon.right, icon.bottom]]
       .map(([x, y]) => new DOMPoint(x - center.x, y - center.y).matrixTransform(inverse));
@@ -20,6 +21,7 @@ async function symbolGeometry(symbols: Locator) {
       dy: Math.abs(icon.y + icon.height / 2 - center.y),
       padding: Math.min(...corners.flatMap(point => [localWidth / 2 - Math.abs(point.x), localHeight / 2 - Math.abs(point.y)])),
       width: icon.width, height: icon.height,
+      stroke: getComputedStyle(glyph).stroke,
       color: getComputedStyle(background).backgroundColor,
       slotContainsBackground: (() => {
         const slot = element.getBoundingClientRect();
@@ -42,6 +44,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await login(page, info);
   await page.goto(`${prefix(info)}/centro-control`);
   await expect(page.getByRole('heading', { name: 'Mapa de Actividad', exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath('control-first-viewport.png'), animations: 'disabled' });
   const layers = page.getByRole('group', { name: 'Capas del mapa', exact: true });
   await expect(layers).toHaveCount(1);
   await layers.scrollIntoViewIfNeeded();
@@ -59,6 +62,10 @@ test('map symbols stay centered, padded and actionable in every shared map contr
           && (url.searchParams.get('capas') || '').split(',').includes(key) === pressed;
       });
       await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-pressed', String(pressed));
+      // Returning to a fresh query may use its cache. Exercise the real refresh
+      // control instead of mistaking that legitimate cache for a missing request.
+      await page.getByTitle('Actualizar ahora', { exact: true }).click();
       await activity;
       await expect(toggle).toHaveAttribute('aria-pressed', String(pressed));
       await readableMapLayers(layers);
@@ -104,6 +111,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
       expect.soft(symbol.width, name + ' glyph width').toBeCloseTo(14, 0);
       expect.soft(symbol.height, name + ' glyph height').toBeCloseTo(14, 0);
       expect.soft(symbol.color, name + ' institutional category color').toBe(colors[symbol.category!]);
+      expect.soft(symbol.stroke, name + ' visible foreground').toBe('rgb(255, 255, 255)');
     }
   }
   await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
