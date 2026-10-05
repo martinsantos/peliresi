@@ -231,7 +231,7 @@ export default function MapaActoresTab({
             isFullWidth={false}
           />
           <span className="w-px h-5 bg-neutral-200" />
-          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,8.75rem),1fr))] gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} count={selectedDep ? filteredGen.length : totalGen} onToggle={() => toggleLayer('generadores')} />
             <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} count={selectedDep ? filteredTrans.length : totalTrans} onToggle={() => toggleLayer('transportistas')} />
             <MapLayerToggle category="operador" label="Op. Fijos" pressed={layers.operadoresFijos} count={selectedDep ? filteredOpFijos.length : operadoresFijos.length} onToggle={() => toggleLayer('operadoresFijos')} />

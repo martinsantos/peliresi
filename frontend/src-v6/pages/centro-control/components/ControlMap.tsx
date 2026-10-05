@@ -151,7 +151,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               {enTransitoForMap.length} en tránsito
             </Badge>
           </div>
-          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,8.75rem),1fr))] gap-2 sm:flex sm:flex-wrap">
             <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} onToggle={() => onToggleLayer('generadores')} />
             <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} onToggle={() => onToggleLayer('transportistas')} />
             <MapLayerToggle category="operador" label="Operadores" pressed={layers.operadores} onToggle={() => onToggleLayer('operadores')} />

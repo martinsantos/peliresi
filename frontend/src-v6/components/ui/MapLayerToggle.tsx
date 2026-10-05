@@ -32,7 +32,7 @@ export function MapLayerToggle({ category, label, pressed, count, onToggle }: {
     className={`flex min-h-12 min-w-0 items-center gap-1 rounded-lg border px-1 py-2 text-left text-xs font-semibold text-neutral-800 transition-colors sm:gap-2 sm:px-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 ${pressed ? 'border-primary-400 bg-primary-50 hover:bg-primary-100 active:bg-primary-200' : 'border-neutral-300 bg-white hover:bg-neutral-100 active:bg-neutral-200'}`}>
     <MapCategorySymbol category={category} />
     <span className="min-w-0 flex-1">
-      <span data-map-label className="block break-words sm:inline sm:break-normal">{label}</span>
+      <span data-map-label className="block sm:inline">{label}</span>
       <span className="mt-0.5 flex min-h-4 items-center justify-between gap-1 sm:ml-2 sm:mt-0 sm:inline-flex">
         {count !== undefined && <span id={countId} data-map-count className="font-normal tabular-nums text-neutral-600">({count})</span>}
         <span data-map-state className="ml-auto shrink-0">{pressed ? <Check size={13} aria-hidden="true" className="text-primary-800" /> : <EyeOff size={13} aria-hidden="true" className="text-neutral-600" />}</span>

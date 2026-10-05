@@ -35,8 +35,12 @@ derecho, aunque el texto seguía dentro del botón y la comprobación antigua
 aprobaba. En móvil se compactan el gap y padding horizontal usando tokens
 existentes. El ajuste de 6 px no alcanzó: QA76 reprodujo invasión del padding
 en las dos superficies móviles. La segunda iteración usa 4 px de gap/padding
-horizontal y permite envolver palabras en pantallas muy estrechas, sin
-truncarlas. Escritorio conserva 8 px de gap y 10 px de padding.
+horizontal. QA77 aprobó geometría/acciones, pero su captura de 320 px mostró
+palabras partidas; no se aprueba ese resultado visual. La tercera iteración
+elimina esa partición y usa columnas automáticas de mínimo 8,75rem, acotadas al
+ancho disponible: dos cuando caben, una cuando no. Escritorio conserva el
+flex existente, 8 px de gap y 10 px de padding. La altura adicional en
+pantallas estrechas es un tradeoff explícito para preservar las etiquetas.
 El control conserva su altura táctil y la caja del símbolo. El helper ahora
 exige texto dentro del área de contenido descontando bordes y padding.
 
@@ -48,6 +52,7 @@ exige texto dentro del área de contenido descontando bordes y padding.
   estados, roles y callbacks; sólo buscan el color en el nuevo elemento fondo.
 - Un recorrido Playwright por cada superficie mide centro, padding transformado,
   espacio reservado, color, trazo, tamaño, legibilidad y estabilidad al alternar.
+  El helper exige además etiquetas completas en una línea, sin palabras partidas.
   Recorre Centro de Control → las cuatro capas → Reportes → teclado para ocultar
   y restaurar un marcador real → fila de transportista.
 - La caché legítima de React Query se respeta: se usa la acción real Actualizar
@@ -92,8 +97,20 @@ la segunda corrección horizontal. ZIP final único39.520.931bytes en el disco
 externo, sin descargar el resumen adicional. CleanupSUCCESS y cierre
 11:25:36.197UTC detuvieron runtime5767/server5768.
 
-Próxima validación: mismo focal con padding/gap4px, ajuste de palabras y los
-dos tamaños móviles, sin rebajar umbrales. Resultado final aún pendiente.
+Iteración77 / `37306298373`, fuente `f788e81`:472BE/967FE unit PASS,
+tres builds PASS,54HTTP/2SQL/3calendario/5territorial PASS. Focal21PASS/3FAIL,
+0flaky/0skip,163882ms. Los tres recorridos nuevos aprobaron; sólo fallan T2.
+Geometría Control/Reportes/filas/320px: dx/dy≤0,000016px, SVG14px, padding5px
+y mínimo2,100496px en rombo, colores y trazo correctos, fondo contenido.
+Sin errores/warnings de consola en los tres recorridos. Las capturas360px
+son legibles y centradas, pero320px parte cuatro etiquetas en dos líneas.
+Se conserva esa evidencia; no es un GO visual aunque no recorte palabras.
+ZIPfinal único32.211.904bytes,13PNG seleccionados, no websummary extra.
+CleanupSUCCESS/cierre12:06:27.853UTC detuvo runtime5776/server5777.
+
+Próxima validación: mismo focal con columnas adaptativas y exigencia de una
+línea para las etiquetas de categoría a320/360px, sin rebajar umbrales.
+Resultado final aún pendiente.
 
 ## Límite de entrega
 
