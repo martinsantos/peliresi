@@ -9,6 +9,7 @@ import {
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Button } from '../../../components/ui/ButtonV2';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
+import { ChartLegendLabel } from '../../../components/charts/ChartLegendLabel';
 import { KpiCard } from '../../../components/charts/KpiCard';
 
 export default function TransporteTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
@@ -56,7 +57,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Truck} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-violet-600 to-violet-700" />
+        <KpiCard icon={Truck} label="Transportistas" value={resumen.totalTransportistas || 0} color="from-orange-600 to-orange-700" />
         <KpiCard icon={Truck} label="Viajes de esta página" value={resumen.totalViajes || 0} color="from-blue-600 to-blue-700" />
         <KpiCard icon={Activity} label="En Tránsito" value={resumen.viajesActivos || 0} color="from-amber-600 to-amber-700" sub="Esta página" />
         <KpiCard icon={TrendingUp} label="Tasa Promedio" value={`${avgTasa.toFixed(1)}%`} color="from-emerald-600 to-emerald-700" sub="Esta página" />
@@ -73,7 +74,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                   <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} stroke="#94a3b8" />
                   <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} formatter={ChartLegendLabel} />
                   <Bar dataKey="completados" name="Completados" stackId="a" fill="#0D8A4F" radius={[0, 0, 0, 0]} barSize={22} />
                   <Bar dataKey="enTransito" name="En Tránsito" stackId="a" fill="#F59E0B" radius={[0, 8, 8, 0]} barSize={22} />
                 </BarChart>
@@ -157,8 +158,8 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                         key={i} to={t.transportistaId ? `/admin/actores/transportistas/${t.transportistaId}` : undefined}>
                         <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate" title={t.transportista}>{t.transportista}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-neutral-900">{t.totalViajes}</td>
-                        <td className="px-4 py-3 text-sm text-emerald-600 font-semibold">{t.completados}</td>
-                        <td className="px-4 py-3 text-sm text-amber-600 hidden md:table-cell">{t.enTransito}</td>
+                        <td className="px-4 py-3 text-sm text-emerald-700 font-semibold">{t.completados}</td>
+                        <td className="px-4 py-3 text-sm text-amber-800 hidden md:table-cell">{t.enTransito}</td>
                         <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell">{t.vehiculosRegistrados}</td>
                         <td className="px-4 py-3 text-sm text-neutral-600 hidden lg:table-cell">{t.choferesRegistrados}</td>
                         <td className="px-4 py-3 hidden md:table-cell">
@@ -169,7 +170,7 @@ export default function TransporteTab({ data, periodo, onExportPDF }: { data: an
                                 backgroundColor: tasa >= 80 ? '#0D8A4F' : tasa >= 50 ? '#F59E0B' : '#EF4444',
                               }} />
                             </div>
-                            <span className="text-xs font-semibold" style={{ color: tasa >= 80 ? '#0D8A4F' : tasa >= 50 ? '#F59E0B' : '#EF4444' }}>
+                            <span className="text-xs font-semibold text-neutral-700">
                               {t.tasaCompletitud}
                             </span>
                           </div>

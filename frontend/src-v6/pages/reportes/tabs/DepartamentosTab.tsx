@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  MapPin, Truck, Factory, Package, Calendar, Filter, ChevronRight,
+  MapPin, Truck, Factory, FlaskConical, Calendar, Filter, ChevronRight,
   Search, X, Download, Printer, FileDown,
 } from 'lucide-react';
 import {
@@ -13,6 +13,7 @@ import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
+import { ChartLegendLabel } from '../../../components/charts/ChartLegendLabel';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { ACTOR_COLORS } from '../../../utils/map-icons';
 import { agruparPorDepartamento } from '../../../utils/mendoza-departamentos';
@@ -103,13 +104,13 @@ export function DepartamentoDetalleModal({
   }, [allActors, tipoFilter, searchQuery, categoriaFilter]);
 
   const tipoColor: Record<string, string> = {
-    generador: 'text-green-700 bg-green-50',
+    generador: 'text-purple-700 bg-purple-50',
     transportista: 'text-orange-700 bg-orange-50',
     operador: 'text-blue-700 bg-blue-50',
   };
 
   const tipoDot: Record<string, string> = {
-    generador: 'bg-green-500',
+    generador: 'bg-purple-500',
     transportista: 'bg-orange-500',
     operador: 'bg-blue-500',
   };
@@ -393,9 +394,9 @@ export default function DepartamentosTab({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard icon={MapPin} label="Departamentos" value={depStats.length} color="from-violet-600 to-violet-700" sub="con actividad" />
-        <KpiCard icon={Factory} label="Generadores" value={totalGen} color="from-green-600 to-green-700" />
+        <KpiCard icon={Factory} label="Generadores" value={totalGen} color="from-purple-600 to-purple-700" />
         <KpiCard icon={Truck} label="Transportistas" value={totalTrans} color="from-orange-600 to-orange-700" />
-        <KpiCard icon={Package} label="Operadores" value={totalOper} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={FlaskConical} label="Operadores" value={totalOper} color="from-blue-600 to-blue-700" />
       </div>
 
       {/* Department filter */}
@@ -438,7 +439,7 @@ export default function DepartamentosTab({
                 <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} stroke="#94a3b8" />
                 <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} formatter={ChartLegendLabel} />
                 <Bar
                   dataKey="generadores"
                   name="Generadores"
@@ -514,8 +515,8 @@ export default function DepartamentosTab({
                       onClick={() => onSelectDep(d.departamento)}
                     >
                       <td className="px-4 py-3 text-sm font-medium text-neutral-900">{d.departamento}</td>
-                      <td className="px-4 py-3 text-sm text-green-600 font-semibold text-center">{d.generadores}</td>
-                      <td className="px-4 py-3 text-sm text-orange-600 font-semibold text-center hidden md:table-cell">{d.transportistas}</td>
+                      <td className="px-4 py-3 text-sm text-purple-700 font-semibold text-center">{d.generadores}</td>
+                      <td className="px-4 py-3 text-sm text-orange-700 font-semibold text-center hidden md:table-cell">{d.transportistas}</td>
                       <td className="px-4 py-3 text-sm text-blue-600 font-semibold text-center hidden md:table-cell">{d.operadores}</td>
                       <td className="px-4 py-3 text-sm font-bold text-neutral-900 text-center">{d.total}</td>
                       <td className="px-4 py-3">

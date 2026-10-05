@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Mail, Hash, CheckCircle2, AlertCircle } from 'lucide-react';
 import { authService } from '../../services/auth.service';
@@ -9,9 +9,12 @@ const ForgotPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     setError(null);
     setLoading(true);
     try {
@@ -20,13 +23,14 @@ const ForgotPasswordPage: React.FC = () => {
     } catch {
       setError('Ocurrió un error. Intentá de nuevo.');
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
 
   return (
     <div className="w-full max-w-sm animate-fade-in-up">
-      <Link to="/login" className="inline-flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-800 mb-6">
+      <Link to="/login" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-800 mb-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
         <ArrowLeft size={16} /> Volver al login
       </Link>
 
@@ -44,34 +48,38 @@ const ForgotPasswordPage: React.FC = () => {
           <p className="text-sm text-neutral-500 mb-6">Ingresá tu email o CUIT y te enviaremos un enlace</p>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
+            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
               <AlertCircle size={16} className="flex-shrink-0" />
               {error}
             </div>
           )}
 
           <div className="flex gap-2 mb-4">
-            <button onClick={() => setMode('email')} className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${mode === 'email' ? 'bg-[#1B5E3C] text-white border-[#1B5E3C]' : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+            <button type="button" aria-pressed={mode === 'email'} onClick={() => setMode('email')} className={`min-h-11 flex-1 py-2 text-sm font-medium rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${mode === 'email' ? 'bg-[#1B5E3C] text-white border-[#1B5E3C]' : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
               Email
             </button>
-            <button onClick={() => setMode('cuit')} className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${mode === 'cuit' ? 'bg-[#1B5E3C] text-white border-[#1B5E3C]' : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
+            <button type="button" aria-pressed={mode === 'cuit'} onClick={() => setMode('cuit')} className={`min-h-11 flex-1 py-2 text-sm font-medium rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${mode === 'cuit' ? 'bg-[#1B5E3C] text-white border-[#1B5E3C]' : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'}`}>
               CUIT
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <label htmlFor="recovery-identifier" className="block text-sm font-medium text-neutral-700">{mode === 'email' ? 'Email' : 'CUIT'}</label>
             <div className="relative">
               {mode === 'email' ? <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" /> : <Hash size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />}
               <input
+                id="recovery-identifier"
                 required
                 type={mode === 'email' ? 'email' : 'text'}
+                inputMode={mode === 'email' ? 'email' : 'numeric'}
+                autoComplete={mode === 'email' ? 'email' : 'off'}
                 value={value}
                 onChange={e => setValue(e.target.value)}
                 placeholder={mode === 'email' ? 'tu@email.com' : '20-12345678-9'}
                 className="w-full h-11 pl-9 pr-3 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none"
               />
             </div>
-            <button type="submit" disabled={loading} className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-50">
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Enviar enlace'}
             </button>
           </form>

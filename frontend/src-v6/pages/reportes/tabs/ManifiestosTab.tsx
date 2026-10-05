@@ -122,9 +122,8 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                     <ReportRow key={i} to={m.id ? `/manifiestos/${m.id}` : undefined}>
                       <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-primary-600">{m.numero}</td>
                       <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full" style={{
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full text-neutral-700" style={{
                           backgroundColor: (ESTADO_CHART_COLORS[m.estado] || '#94A3B8') + '18',
-                          color: ESTADO_CHART_COLORS[m.estado] || '#94A3B8',
                         }}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ESTADO_CHART_COLORS[m.estado] || '#94A3B8' }} />
                           {m.estado?.replace(/_/g, ' ')}

@@ -9,6 +9,7 @@ import { chromeButtonPoint, dismissObservedChromePrompts, nativeKeyboardShown, r
 import { DeadlineError, withinDeadline } from './deadline.ts';
 import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
+import { beginSessionEvidence } from './session-evidence.ts';
 import { nonObstructingNotices } from './e2e/helpers.ts';
 
 await assertCloudDatabase();
@@ -40,6 +41,8 @@ let logoutAttempt=0;
 let launches=0;
 const results:Array<{name:string;status:string;error?:string}>=[];
 const driverStages:Array<{stage:string;event:string;at:string;error?:string}>=[];
+const sessionEvidence:Array<{launch:number;metadata:unknown}>=[];
+let sessionEvidenceOverflow=false;
 const driverStep=async<T>(stage:string,operation:()=>Promise<T>,milliseconds=25000):Promise<T>=>{
   const record=async(event:string,error?:string)=>{
     driverStages.push({stage,event,at:new Date().toISOString(),error});
@@ -52,6 +55,7 @@ const driverStep=async<T>(stage:string,operation:()=>Promise<T>,milliseconds=250
 };
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
   commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,failedResponses,browserLifecycle,
+  sessionEvidence,sessionEvidenceOverflow,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
 },null,2));
@@ -137,6 +141,12 @@ const launch=async()=>{
   context=await driverStep('launch-and-attach-Chrome',()=>device.launchBrowser({hasTouch:true,permissions:['geolocation'],
     geolocation:{latitude:-32.89,longitude:-68.84},args:['--no-first-run','--no-default-browser-check']}));
   launches++;
+  const launchNumber=launches;
+  await context.exposeBinding('sitrepQaRecordSessionEvidence',(_source,metadata:unknown)=>{
+    if(sessionEvidence.length>=256){sessionEvidenceOverflow=true;return;}
+    sessionEvidence.push({launch:launchNumber,metadata});
+  });
+  await context.addInitScript(beginSessionEvidence);
   await driverStep('set-QA-network-identity',()=>context.addCookies([{name:'sitrep_qa_client',value:'127.11.20.2',url:'http://127.0.0.1:4177'}]));
   // Restart the existing QA tab, as a user reopening the app would. Creating a
   // second copy left the old inspection mounted behind the next user session.
@@ -386,13 +396,16 @@ try{
   });
   await check('process-restart-keeps-real-session-and-record',async()=>{
     assert.ok(inspection?.id);
-    const stages:Array<{stage:string;at:string;url:string;tabs:string[];draft:unknown}>=[];
+    const stages:Array<{stage:string;at:string;url:string;tabs:string[];draft:unknown;session:unknown}>=[];
     const captureDraft=async(stage:string)=>{
       const draft=page.url().startsWith('http://127.0.0.1:4177/')
         ? await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),
           'sitrep_inspection_draft_'+inspectorUserId+'_'+inspection.id) : null;
-      stages.push({stage,at:new Date().toISOString(),url:page.url(),tabs:context.pages().map(tab=>tab.url()),draft});
-      await writeFile(path.join(output,'restart-draft-stages.json'),JSON.stringify(stages,null,2));
+      const session=page.url().startsWith('http://127.0.0.1:4177/')
+        ? await page.evaluate(()=>(window as Window & {__sitrepQaSessionEvidence?:unknown[]}).__sitrepQaSessionEvidence||null) : null;
+      stages.push({stage,at:new Date().toISOString(),url:page.url(),tabs:context.pages().map(tab=>tab.url()),draft,session});
+      await writeFile(path.join(output,'restart-draft-stages.json'),JSON.stringify({stages,sessionEvidence,sessionEvidenceOverflow},null,2));
+      await writeFile(path.join(output,'restart-'+stage+'-native.xml'),await readNativeWindow());
     };
     // Observe only the scoped QA draft; no tokens, storage injection, artificial
     // waiting for Chrome's disk commit or hidden removal of a conflict.
@@ -400,10 +413,13 @@ try{
     await closeContext();
     await launch();
     await captureDraft('after-launch-before-navigation');
-    const [restoredProfile] = await Promise.all([
-      page.waitForResponse(r=>r.url().endsWith('/api/auth/profile')&&r.request().method()==='GET'),
-      page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta'),
-    ]);
+    let restoredProfile;
+    try {
+      [restoredProfile] = await Promise.all([
+        page.waitForResponse(r=>r.url().endsWith('/api/auth/profile')&&r.request().method()==='GET'),
+        page.goto('http://127.0.0.1:4177/app/inspecciones/'+inspection.id+'#acta'),
+      ]);
+    } finally { await captureDraft('after-real-recovery-attempt'); }
     expect(restoredProfile.status()).toBe(200);
     expect((await restoredProfile.json()).data.user.id).toBe(inspectorUserId);
     await expect(page.getByRole('banner')).toBeVisible();

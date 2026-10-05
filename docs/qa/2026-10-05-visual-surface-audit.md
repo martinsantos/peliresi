@@ -1,5 +1,70 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## PREVALENTE 19:03 UTC — QA87 final fallida; candidato siguiente sin desplegar
+
+[QA87](https://github.com/martinsantos/peliresi/actions/runs/37354471948),
+fuente exacta `bb38ef6daf62aec635a744be638e267b0417dc98`, terminó FAILURE:
+**485 BE + 1.007 FE unit PASS; 159/168 E2E PASS, nueve FAIL, cero skip/flaky**.
+Tres builds, 54 HTTP, dos SQL, tres calendario y cinco territorial PASS.
+Cleanup SUCCESS18:45:14.932UTC detuvo runtime5665/server5666 y PostgreSQL.
+No queda una VM anterior ejecutando ni se desplegó este candidato fallido.
+
+Los nueve E2E se mantienen como fallos registrados, no se excluyen:
+
+- Tres regresiones reales responsive: títulos Centro de Control320px,
+  Certificación Blockchain y cabecera Inspector que intercepta el click de
+  Denuncia/hallazgo. PNG originales muestran letras apiladas fuera del marco64px.
+- Tres del nuevo recorrido de popup: G/T/O abren, retienen identidad y cierran;
+  no existe marcador de tránsito porque el manifiesto sintético de dispositivo
+  aún carece de GPS antes de Android. Se corrige exclusivamente el seed aislado
+  con posición explícita, no se inventa una posición en el producto.
+- Tres inventarios de Reportes detectan94 ocurrencias de contraste insuficiente
+  en cuatro pestañas: estados de manifiesto, cifras/leyendas de transporte,
+  categorías de tratamiento y cifras/leyenda por departamento. Son repeticiones
+  entre viewport/rol, no94 defectos independientes. Se conserva umbral4,5.
+
+Android87: **7 PASS + 2 FAIL, completed:false**. Tras cierre forzado no vuelve
+el perfil del inspector y aparece login; el caso de comentario offline depende
+de esa sesión y tampoco se completa. Los seis controles posteriores NO se
+ejecutaron y no se certifican. El comentario confirmado antes del cierre sigue
+en el servidor. `runtimeErrors`, respuestas HTTP fallidas y errores de consola
+vacíos no aprueban recuperación. APK original **4/4 PASS** únicamente anónimo/
+sólo lectura; sesiones reales QA Chrome no son APK autenticado del usuario.
+
+ZIP final único `SDTERA/.../peliresi/tmp/sitrep-go-evidence-20261003/visual-surface-run87-final.zip`,
+183.453.505bytes. Resumen leído por streaming, no otra copia. Se revisaron cinco
+PNG87 originales: los dos fallos de cabecera, tratamientos app al final,
+transporte escritorio al final y login Android tras pérdida de sesión.
+Acumulado34 PNG85/86/87 revisados personalmente; NO todas las pantallas.
+
+El árbol local siguiente, separado de87, contiene estas correcciones:
+
+| Reproducción | Corrección candidata | Prueba focal final |
+| --- | --- | --- |
+| Recuperación app sin marco y controles sin label/estado/foco/error anunciado; submit duplicado | AuthLayout existente sólo recuperar/reset, controles44px, label, aria-pressed/alert y guard ref liberado en finally | 21/21 PASS, incluidos reset, rutas mobile y reclamo; JSON recovery-reset-all-focal |
+| Cuenta ocupa ancho desktop en320px; título/función quedan sin espacio | Trigger cuenta44px con nombre accesible; menú acotado; título y función agrupados móvil sin eliminar acciones | 17/17 PASS, cuenta/cabecera; falta geometría de VM nueva |
+| Colores de series usados como tinta pequeña en Reportes | Tinta neutral700, cifras semánticas700/800, leyenda compartida; mantiene series/tintes/datos. Generador purple/Factory y Operador blue/Flask canónicos por departamento | 26/26 PASS con tablas reales; falta contraste CSS de VM nueva |
+
+Los contratos nuevos primero fallaron antes de modificar producto. Los errores
+intermedios de selector/callback cleanup en el harness se conservaron y corrigieron
+sin debilitar expectativas de negocio. No hubo nueva suite completa local:
+worker1/heap256MB, DB/proveedores simulados únicamente en unit.
+
+Recuperación Android no se altera por suposición ni se relajan los guards que
+impiden restaurar un administrador sobre un logout/login legado ambiguo.
+Se añade diagnóstico QA de sólo lectura, restringido al origen127.0.0.1:4177,
+con presencia/id/iat y estado del checkpoint, jamás tokens/refresh/passwords.
+Lee antes de módulos y conserva metadatos entre redirect; no inyecta sesiones,
+escribe almacenamiento, espera flush ni reingresa para disimular el fallo.
+27 focales de evidencia/durabilidad/límites PASS. Una nueva VM serial full/
+unit/Android debe repetir todos los gates y conservar cualquier fallo.
+
+Persisten composiciones de gradiente/imagen/opacity no medidas, estados y scroll
+intermedio no revisados, hardware físico/APK instalado exacto/Safari/ruido/
+batería/GPS en segundo plano. No100%, perfección, GO global ni despliegue.
+Publicador protegido permanece bloqueado: no fue ejecutado por otra vía.
+Lo inferior es historia de tandas anteriores, no el estado actual.
+
 ## Estado actual: en ejecución, sin aprobación global
 
 El usuario pidió continuar la revisión y corregir los defectos verificables en
@@ -68,9 +133,16 @@ inventario no detectó candidatos habilitados medibles por ese algoritmo. Eso
 no aprueba gradientes, áreas fuera de viewport ni todos los estados. Android
 aprobó su paso a las 18:11:08 UTC, igual que el cierre de procesos propios y
 PostgreSQL. Unit crudos: **485 BE y1.000 FE PASS, cero FAIL/pending**.
-QA86 terminó FAILURE por esos tres E2E, no por Android. El alcance exacto
-Android se verifica con sus JSON y no equivale a prueba física del APK del
-usuario. No hubo despliegue ni paquete publicable aprobado.
+QA86 terminó FAILURE por esos tres E2E, no por Android. Sus JSON confirman
+**15/15 Android PASS**: sesiones reales, cambio de usuario, operación territorial,
+selector antes de teclado, asignación/aviso/inspección, reinicio, borrador
+offline/ACK, cierre de acordeones, logout, GPS emulado y cola offline,
+salida recuperable sin cámara, salud JS. `runtimeErrors` y respuestas fallidas
+inesperadas están vacíos; se conserva el error de red esperado durante offline.
+El APK original aprobó **4/4 controles** de instalación, apertura anónima/TLS/
+marca, reinicio y guard de sólo lectura, sin escrituras intentadas ni errores
+de página. Autenticación QA Chrome en Android no acredita autenticación del
+APK humano ni hardware físico. No hubo despliegue ni paquete publicable aprobado.
 
 Se revisaron catorce PNG85 adicionales (23 en total): Alertas, Avisos, nuevo
 manifiesto, Reportes, editar generador, usuarios, selector de sesión y perfil
@@ -107,10 +179,41 @@ offsets y alturas; no se hace pasar primer viewport por contenido completo.
 Los nuevos casos no se excluyen si descubren defectos. Ningún recibo del
 candidato local se declara renderizado antes de la nueva VM serial.
 
-Próximo: terminar QA86 y cerrar sus recursos; revisar crudos/PNG/Android,
-corregir fallos nuevos antes de despachar una única tanda del candidato siguiente;
-revisar sus PNG/recibos, corregir nuevos fallos y después popups móviles de
-Monitor, títulos truncados, estados/modal/scroll/tab de Reportes pendientes.
+QA86 ya cerró recursos: runtime5777/server5778 y PostgreSQL a las18:11:08UTC.
+Su ZIP final único ocupa108.148.430bytes en el disco externo; el resumen se
+leyó por streaming, no se guardó otra copia. Contiene207recibos,
+3.061textos medidos y4.098ocurrencias no medidas; los nueve candidatos son
+repeticiones del enlace mencionado. Se revisaron seis PNG86 originales:
+recuperación, revisión de inspección, certificación app y sesión/alta/GPS
+en Android. No equivale a207pantallas inspeccionadas personalmente.
+
+El candidato siguiente se subió como `bb38ef6daf62aec635a744be638e267b0417dc98`.
+[QA87](https://github.com/martinsantos/peliresi/actions/runs/37354471948)
+corre full/unit/Android en una sola VM desde18:14:39UTC. A las18:35UTC está
+en E2E sin paso previo fallido; resultados definitivos pendientes. No se
+desplegó ni se iniciará otra VM antes de cierre y revisión de crudos.
+
+## Candidato local posterior: recuperación móvil sólida
+
+La captura86 `/app/reset-password` ya muestra recuperación, pero sin margen
+exterior: el router app no usaba el AuthLayout de la web. Tres nuevos unit
+fallaron antes; se envuelven exclusivamente recuperar/reset en el marco
+institucional existente, no login/registro/reclamo ni permisos. Los controles
+de recuperación carecían de label asociada, estado elegido semántico y error
+anunciado; dos submit antes del render generaban dos llamadas. Tres unit
+nuevos fallaron antes. Se agregan label/id, modo44px/aria-pressed/foco, rolealert
+y guard ref con desbloqueo finally, sin modificar payload ni proveedores.
+
+El focal final pasó18/18, ceroFAIL/pending, worker1/heap256MB. Un intento
+intermedio17/1 fue un hook que devolvía la función mock y Vitest la ejecutaba
+como cleanup; se corrigió el harness con llaves, no producto para aprobar.
+JSON local `/private/tmp/sitrep-recovery-controls-frame-after-v2-20261005.json`.
+Un nuevo E2E candidato exige margen renderizado, acción44px, modo real,
+offline/retry contra API y correo sintético inexistente/no enumeración. Aún
+NO se ejecutó ni se mezcló con87; no es render aprobado ni producción.
+
+Próximo: revisar crudos/PNG/Android87, corregir nuevos fallos junto a este
+candidato local y repetir gates afectados/completos antes de considerar GO.
 Android OS autenticado QA y APK original anónimo son alcances distintos;
 teléfono físico/APK del usuario/ruido/batería/segundo plano siguen pendientes.
 

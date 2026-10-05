@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { authService } from '../../services/auth.service';
@@ -12,6 +12,7 @@ const ResetPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   if (!token) {
     return <Navigate to="/recuperar" replace />;
@@ -19,7 +20,9 @@ const ResetPasswordPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inFlight.current) return;
     if (password !== confirm) { setError('Las contraseñas no coinciden'); return; }
+    inFlight.current = true;
     setError(null);
     setLoading(true);
     try {
@@ -28,6 +31,7 @@ const ResetPasswordPage: React.FC = () => {
     } catch (err: any) {
       setError(err?.response?.data?.message || 'El enlace es inválido o expiró.');
     } finally {
+      inFlight.current = false;
       setLoading(false);
     }
   };
@@ -51,7 +55,7 @@ const ResetPasswordPage: React.FC = () => {
           <p className="text-sm text-neutral-500 mb-6">Ingresá tu nueva contraseña</p>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
+            <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-sm text-red-700">
               <AlertCircle size={16} className="flex-shrink-0" />
               {error}
             </div>
@@ -75,7 +79,7 @@ const ResetPasswordPage: React.FC = () => {
                 <input id="reset-confirm-password" autoComplete="new-password" required type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repetí la contraseña" className="w-full h-11 pl-9 pr-3 border border-neutral-200 rounded-xl text-sm focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none" />
               </div>
             </div>
-            <button type="submit" disabled={loading} className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full h-11 bg-[#1B5E3C] hover:bg-[#164D32] text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-50">
               {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Restablecer contraseña'}
             </button>
           </form>

@@ -441,18 +441,20 @@ export const MainLayout: React.FC = () => {
             >
               <Menu size={20} />
             </Button>
-            <h1 title={currentPage} className="min-w-0 whitespace-normal break-words text-base leading-5 sm:truncate sm:text-xl sm:leading-normal font-semibold text-neutral-900">{currentPage}</h1>
-            
-            {/* Badge de rol actual */}
-            <Badge 
-              variant="soft" 
-              color={inspectionLabel ? 'primary' : roleStyles.badge}
-              className={inspectionLabel ? 'shrink-0' : 'hidden sm:inline-flex'}
-              aria-label="Función actual"
-              title={`Rol base: ${currentUser.rol}`}
-            >
-              {inspectionLabel ?? currentUser.rol}
-            </Badge>
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 sm:flex-row sm:items-center sm:justify-start sm:gap-4">
+              <h1 title={currentPage} className="min-w-0 whitespace-normal break-words text-base leading-5 sm:truncate sm:text-xl sm:leading-normal font-semibold text-neutral-900">{currentPage}</h1>
+
+              {/* Badge de rol actual */}
+              <Badge
+                variant="soft"
+                color={inspectionLabel ? 'primary' : roleStyles.badge}
+                className={inspectionLabel ? 'max-w-full self-start whitespace-normal break-words py-0.5 sm:py-1 sm:shrink-0 sm:self-auto' : 'hidden sm:inline-flex'}
+                aria-label="Función actual"
+                title={`Rol base: ${currentUser.rol}`}
+              >
+                {inspectionLabel ?? currentUser.rol}
+              </Badge>
+            </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-3">

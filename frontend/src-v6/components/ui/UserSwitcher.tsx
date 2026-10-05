@@ -129,8 +129,10 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
         <button
           onClick={() => setIsOpen(!isOpen)}
           disabled={isSwitching}
+          aria-label={`Opciones de cuenta de ${currentUser.nombre}`}
+          aria-expanded={isOpen}
           className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-xl transition-all',
+            'flex h-11 w-11 shrink-0 items-center justify-center gap-0 rounded-xl transition-colors sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2',
             'border-2 hover:shadow-md',
             currentConfig.bgColor,
             currentConfig.borderColor,
@@ -152,7 +154,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
               {currentConfig.label}
             </p>
           </div>
-          <ChevronDown size={16} className={cn('ml-1', currentConfig.color)} />
+          <ChevronDown size={16} className={cn('hidden sm:block ml-1', currentConfig.color)} />
         </button>
 
         {isOpen && (
@@ -161,7 +163,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
               className="fixed inset-0 z-40"
               onClick={() => setIsOpen(false)}
             />
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-4 border border-neutral-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+            <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-4 border border-neutral-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
               {/* Header */}
               <div className={cn('p-4 border-b', currentConfig.bgColor, currentConfig.borderColor)}>
                 <p className="text-xs font-semibold uppercase tracking-wider opacity-70">

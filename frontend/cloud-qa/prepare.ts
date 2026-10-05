@@ -36,6 +36,13 @@ try {
     fechaRetiro:new Date(), observaciones:'QA Android GPS y lector QR; datos completamente sintéticos',
     residuos:{create:[{tipoResiduoId:fixture.wastes[0],cantidad:10,unidad:'kg',estado:'SOLIDO'}]},
   }});
+  // LIVE popup checks need a genuinely persisted observation. The earlier
+  // fixture had no GPS until the later Android phase, so no marker was correct.
+  // Coordinates are explicit synthetic inputs, not a UI/API fallback location.
+  await db.trackingGPS.create({ data: { id: 'cloud-qa-live-current',
+    manifiestoId: deviceManifest.id, latitud: -32.8895, longitud: -68.8458,
+    velocidad: 0, timestamp: new Date(),
+  } });
   // The PDF emits this JSON shape. Only optical input is synthetic: jsQR,
   // navigation, real login and the business API remain unmodified during E2E.
   const payload=JSON.stringify({numero:deviceManifest.numero,id:deviceManifest.id,timestamp:new Date().toISOString()});

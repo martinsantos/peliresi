@@ -309,8 +309,8 @@ export default function TratamientosTab({
                       <td className="px-4 py-3">
                         {cat && (
                           <span
-                            className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded"
-                            style={{ backgroundColor: `${CAT_CHART_COLORS[cat.id]}15`, color: CAT_CHART_COLORS[cat.id] }}
+                            className="inline-block px-2 py-0.5 text-xs font-semibold rounded text-neutral-700"
+                            style={{ backgroundColor: `${CAT_CHART_COLORS[cat.id]}15` }}
                           >
                             {cat.nombre}
                           </span>

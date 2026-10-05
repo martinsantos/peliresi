@@ -9,6 +9,7 @@ import React, { Suspense } from 'react';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
+import { AuthLayout } from './layouts/AuthLayout';
 import { canAccessMobilePath } from './utils/mobileAccess';
 import { postLoginDestination } from './utils/authRedirect';
 
@@ -128,8 +129,10 @@ function AppMobile() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
           <Route path="/registro" element={<RegistroPage />} />
-          <Route path="/recuperar" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route element={<AuthLayout />}>
+            <Route path="/recuperar" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          </Route>
 
           {/* Same authenticated, full-screen Monitor as the web, without a second mobile shell. */}
           <Route path="/monitor" element={<WarRoomPage />} />
