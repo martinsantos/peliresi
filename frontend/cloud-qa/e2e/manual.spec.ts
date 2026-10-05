@@ -46,7 +46,8 @@ test('packaged manual: home -> real alert tutorial -> captured sources -> mobile
   await page.getByRole('navigation', { name: 'Pasos de la guía' }).getByRole('link', { name: /Comprobar el origen y los límites/ }).click();
   await expect(page).toHaveURL(/#paso-7-comprobar-el-origen-y-los-limites$/);
   const finalStep = page.locator('.guide-step').last();
-  await expect(finalStep.getByRole('heading', { name: 'Comprobar el origen y los límites' })).toBeVisible();
+  const finalHeading = finalStep.getByRole('heading', { name: 'Comprobar el origen y los límites' });
+  await expect(finalHeading).toBeInViewport({ ratio: 1 });
   await expect(finalStep).toContainText('todavía no son reglas operativas');
   if (info.project.name !== 'web-desktop') await expect(page.getByRole('button', { name: /Índice del tutorial/ })).toHaveAttribute('aria-expanded', 'false');
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
@@ -54,6 +55,7 @@ test('packaged manual: home -> real alert tutorial -> captured sources -> mobile
   await page.reload();
   await expect(page.locator('#tutorialTitle')).toHaveText('Configurar alertas y seguir sus avisos');
   await expect(page.locator('#tutorialIndex a[aria-current="step"]')).toContainText('Comprobar el origen y los límites');
+  await expect(finalHeading).toBeInViewport({ ratio: 1 });
   expect(businessRequests).toEqual([]);
   await info.attach('manual-console-health', { body: JSON.stringify(errors), contentType: 'application/json' });
   expect(errors).toEqual([]);
