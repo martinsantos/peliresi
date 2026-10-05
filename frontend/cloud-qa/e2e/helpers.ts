@@ -59,6 +59,7 @@ export async function readableFixedAction(action: Locator, container: Locator) {
 
 /** Real text geometry, not just a page-overflow check: long names/counts must not collide. */
 export async function readableMapLayers(group: Locator) {
+  const measurements = [];
   for (const button of await group.getByRole('button').all()) {
     const result = await button.evaluate(element => {
       const bounds = element.getBoundingClientRect();
@@ -75,15 +76,28 @@ export async function readableMapLayers(group: Locator) {
       label.selectNodeContents(element.querySelector('[data-map-label]')!);
       const singleLineLabel = label.getClientRects().length === 1;
       const state = element.querySelector('[data-map-state]')!.getBoundingClientRect();
+      const labelBox = element.querySelector('[data-map-label]')!.getBoundingClientRect();
+      const symbolBox = element.querySelector('[data-map-symbol] svg')!.getBoundingClientRect();
+      const stateBox = element.querySelector('[data-map-state] svg')!.getBoundingClientRect();
+      const middle = (rect: DOMRect) => rect.top + rect.height / 2;
+      const alignment = { symbolLabel: Math.abs(middle(symbolBox) - middle(labelBox)),
+        stateLabel: Math.abs(middle(stateBox) - middle(labelBox)) };
+      const ordered = symbolBox.right <= labelBox.left && labelBox.right <= stateBox.left;
+      const statePadded = stateBox.left >= content.left - 1 && stateBox.right <= content.right + 1
+        && stateBox.top >= content.top - 1 && stateBox.bottom <= content.bottom + 1;
       const collides = pieces.some(rect => Math.min(rect.right, state.right) - Math.max(rect.left, state.left) > 1 && Math.min(rect.bottom, state.bottom) - Math.max(rect.top, state.top) > 1);
       const contained = pieces.every(rect => rect.left >= bounds.left && rect.right <= bounds.right + 1 && rect.top >= bounds.top && rect.bottom <= bounds.bottom + 1);
       const padded = pieces.every(rect => rect.left >= content.left - 1 && rect.right <= content.right + 1 && rect.top >= content.top - 1 && rect.bottom <= content.bottom + 1);
-      return { name: element.getAttribute('aria-label'), collides, contained, padded, singleLineLabel, height: bounds.height,
+      return { name: element.getAttribute('aria-label'), collides, contained, padded, singleLineLabel, ordered, statePadded, alignment, height: bounds.height,
         content, texts: pieces };
     });
-    expect(result, `Readable map control: ${result.name}, ${JSON.stringify({ content: result.content, texts: result.texts })}`).toMatchObject({ collides: false, contained: true, padded: true, singleLineLabel: true });
+    expect(result, `Readable map control: ${result.name}, ${JSON.stringify({ content: result.content, texts: result.texts, alignment: result.alignment })}`).toMatchObject({ collides: false, contained: true, padded: true, singleLineLabel: true, ordered: true, statePadded: true });
+    expect(result.alignment.symbolLabel, `${result.name}: category icon and label share one row`).toBeLessThanOrEqual(1);
+    expect(result.alignment.stateLabel, `${result.name}: check/hidden indicator and label share one row`).toBeLessThanOrEqual(1);
     expect(result.height).toBeGreaterThanOrEqual(44);
+    measurements.push(result);
   }
+  return measurements;
 }
 
 export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';

@@ -38,4 +38,27 @@ describe('Map controls and marker identity', () => {
     fireEvent.click(button);
     expect(toggle).toHaveBeenCalledOnce();
   });
+
+  it('preserves the label and real count when switching the separate state indicator', () => {
+    const toggle = vi.fn();
+    const props = { category: 'transportista' as const, label: 'Transportistas', count: 12, onToggle: toggle };
+    const { rerender } = render(<MapLayerToggle {...props} pressed={false} />);
+    const button = screen.getByRole('button', { name: 'Transportistas' });
+    const label = button.querySelector('[data-map-label]')!;
+    const text = label.parentElement!;
+    const state = button.querySelector('[data-map-state]')!;
+    expect(text.querySelector('[data-map-count]')).toHaveTextContent('(12)');
+    expect(text.contains(state)).toBe(false);
+    expect(state.parentElement).toBe(button);
+    expect(button).toHaveAccessibleDescription('(12)');
+    expect(state.querySelector('svg.lucide-eye-off')).not.toBeNull();
+    rerender(<MapLayerToggle {...props} pressed />);
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button).toHaveAccessibleDescription('(12)');
+    expect(label).toHaveTextContent('Transportistas');
+    expect(state.querySelector('svg.lucide-check')).not.toBeNull();
+    expect(state.querySelector('svg.lucide-eye-off')).toBeNull();
+    fireEvent.click(button);
+    expect(toggle).toHaveBeenCalledOnce();
+  });
 });

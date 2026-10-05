@@ -41,6 +41,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
     if (message.type() === 'warning') warnings.push(message.text());
   });
   const measurements: Record<string, Awaited<ReturnType<typeof symbolGeometry>>> = {};
+  const rowMeasurements: Record<string, Awaited<ReturnType<typeof readableMapLayers>>> = {};
   await login(page, info);
   await page.goto(`${prefix(info)}/centro-control`);
   await expect(page.getByRole('heading', { name: 'Mapa de Actividad', exact: true })).toBeVisible();
@@ -48,7 +49,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   const layers = page.getByRole('group', { name: 'Capas del mapa', exact: true });
   await expect(layers).toHaveCount(1);
   await layers.scrollIntoViewIfNeeded();
-  await readableMapLayers(layers);
+  rowMeasurements.control = await readableMapLayers(layers);
   measurements.control = await symbolGeometry(layers.locator('[data-map-symbol]'));
   await page.screenshot({ path: info.outputPath('control-map-symbols.png'), animations: 'disabled' });
   await layers.screenshot({ path: info.outputPath('control-map-controls.png'), animations: 'disabled' });
@@ -69,7 +70,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
       await page.getByTitle('Actualizar ahora', { exact: true }).click();
       await activity;
       await expect(toggle).toHaveAttribute('aria-pressed', String(pressed));
-      await readableMapLayers(layers);
+      rowMeasurements[`control-${key}-${pressed}`] = await readableMapLayers(layers);
       measurements[`control-${key}-${pressed}`] = await symbolGeometry(toggle.locator('[data-map-symbol]'));
       const next = (await toggle.boundingBox())!;
       expect.soft(Math.abs(next.width - old!.width), 'A map toggle must not jump when its state changes').toBeLessThanOrEqual(.5);
@@ -80,7 +81,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   if (info.project.name !== 'web-desktop') {
     await page.setViewportSize({ width: 320, height: 800 });
     await layers.scrollIntoViewIfNeeded();
-    await readableMapLayers(layers);
+    rowMeasurements.control320 = await readableMapLayers(layers);
     measurements.control320 = await symbolGeometry(layers.locator('[data-map-symbol]'));
     await layers.screenshot({ path: info.outputPath('control-map-controls-320.png'), animations: 'disabled' });
     await page.setViewportSize({ width: 360, height: 800 });
@@ -91,14 +92,14 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await expect(page.locator('.leaflet-container')).toBeVisible();
   const reportLayers = page.getByRole('group', { name: 'Capas del mapa', exact: true });
   await reportLayers.scrollIntoViewIfNeeded();
-  await readableMapLayers(reportLayers);
+  rowMeasurements.reports = await readableMapLayers(reportLayers);
   measurements.reports = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));
   await page.screenshot({ path: info.outputPath('report-map-symbols.png'), animations: 'disabled' });
   await reportLayers.screenshot({ path: info.outputPath('report-map-controls.png'), animations: 'disabled' });
   if (info.project.name !== 'web-desktop') {
     await page.setViewportSize({ width: 320, height: 800 });
     await reportLayers.scrollIntoViewIfNeeded();
-    await readableMapLayers(reportLayers);
+    rowMeasurements.reports320 = await readableMapLayers(reportLayers);
     measurements.reports320 = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));
     await reportLayers.screenshot({ path: info.outputPath('report-map-controls-320.png'), animations: 'disabled' });
     await page.setViewportSize({ width: 360, height: 800 });
@@ -110,9 +111,11 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await carrier.press('Space');
   await expect(carrier).toHaveAttribute('aria-pressed', 'false');
   await expect(marker).toHaveCount(0);
+  rowMeasurements.reportsHidden = await readableMapLayers(reportLayers);
   await carrier.press('Space');
   await expect(carrier).toHaveAttribute('aria-pressed', 'true');
   await expect(marker).toHaveCount(1);
+  rowMeasurements.reportsRestored = await readableMapLayers(reportLayers);
   const actor = page.getByRole('button', { name: /^QA Transporte 1/ })
     .filter({ has: page.locator('[data-map-symbol="transportista"]') });
   await expect(actor).toHaveCount(1);
@@ -135,7 +138,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
       expect.soft(symbol.stroke, name + ' visible foreground').toBe('rgb(255, 255, 255)');
     }
   }
-  await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
+  await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, rowMeasurements, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
