@@ -127,11 +127,15 @@ const VerificarManifiestoPage: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-lg border border-neutral-200 max-w-lg w-full overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-5 text-white">
-          <div className="flex items-center gap-3 mb-1">
-            <Shield className="w-6 h-6 opacity-80" />
-            <span className="text-sm font-medium opacity-80">SITREP — Verificación de Manifiesto</span>
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-white" aria-hidden="true">
+              <Shield size={20} className="block" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-sm font-medium leading-6 text-white/90">SITREP — Verificación de Manifiesto</span>
+              <h1 className="mt-1 break-words text-2xl font-bold font-mono tracking-wide text-white">{data.numero}</h1>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold font-mono tracking-wide">{data.numero}</h1>
         </div>
 
         {/* Estado */}

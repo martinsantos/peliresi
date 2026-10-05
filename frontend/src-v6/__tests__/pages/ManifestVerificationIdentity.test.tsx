@@ -21,7 +21,9 @@ it('keeps the canonical actor identity next to the actual public manifest data',
   render(<MemoryRouter initialEntries={['/manifiestos/verificar/2026-990001']}>
     <Routes><Route path="/manifiestos/verificar/:numero" element={<VerificarManifiestoPage />} /></Routes>
   </MemoryRouter>);
-  await screen.findByRole('heading', { name: '2026-990001', exact: true });
+  const heading = await screen.findByRole('heading', { name: '2026-990001', exact: true });
+  expect(heading).toHaveClass('text-white');
+  expect(heading.parentElement).toContainElement(screen.getByText('SITREP — Verificación de Manifiesto'));
   expect(axios.get).toHaveBeenCalledWith(expect.stringMatching(/\/manifiestos\/verificar\/2026-990001$/));
   for (const [label, name, glyph] of [
     ['Generador', 'QA Generador 1', 'factory'],

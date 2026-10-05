@@ -145,7 +145,17 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   const verification = await verified;
   expect(verification.status()).toBe(200);
   const verifiedRecord = (await verification.json()).data.manifiesto;
-  await expect(page.getByRole('heading', { name: verifiedRecord.numero, exact: true })).toBeVisible();
+  const publicHeading = page.getByRole('heading', { name: verifiedRecord.numero, exact: true });
+  await expect(publicHeading).toBeVisible();
+  await expect.poll(() => publicHeading.evaluate(element => getComputedStyle(element).color), 'The manifest number must render white on its green header').toBe('rgb(255, 255, 255)');
+  const publicHeader = await publicHeading.evaluate(element => {
+    const caption = element.parentElement!.querySelector('span')!;
+    const headingBox = element.getBoundingClientRect();
+    const captionBox = caption.getBoundingClientRect();
+    return { color: getComputedStyle(element).color, columnOffset: Math.abs(headingBox.left - captionBox.left), separated: headingBox.top >= captionBox.bottom, text: element.textContent };
+  });
+  expect(publicHeader.columnOffset, 'Public header caption and document number share one text column').toBeLessThanOrEqual(.5);
+  expect(publicHeader.separated, 'The document number must not overlap its caption').toBe(true);
   for (const [label, actor, glyph] of [
     ['Generador', 'generador', 'factory'],
     ['Transportista', 'transportista', 'truck'],
@@ -158,7 +168,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
     await expect(row.getByRole('link')).toHaveCount(0);
   }
   await page.screenshot({ path: info.outputPath('public-manifest-actor-icons.png'), animations: 'disabled' });
-  await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, rowMeasurements, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
+  await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, rowMeasurements, publicHeader, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
