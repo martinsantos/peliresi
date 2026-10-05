@@ -1,0 +1,16 @@
+{
+  "run": "37244338496",
+  "commit": "9152045651627edb2bed06264532e2ddf75c56c5",
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "files": [
+    { "file": "desktop/alerts_simulation_qa.png", "sha256": "8db1550dd7edb6c3573e699647532a6f81f2dbb63b389c455a28db8a72228c41", "width": 1440, "height": 900 },
+    { "file": "desktop/alerts_requirement_qa.png", "sha256": "73ed440f74248c17e67f4b2e7ad1d050829ad5fd28a4380e3cd4f7c2464c141c", "width": 1440, "height": 900 },
+    { "file": "desktop/alerts_expiry_qa.png", "sha256": "24c41ef0f846cbad03d1164c381fcb0e5ff07a0d0d535dc77f6cc2e69ada7897", "width": 1440, "height": 900 },
+    { "file": "mobile/alerts_owner_notice_qa.png", "sha256": "55da837d62184ae073bfe73dd5fd4bea27ce6d6692faa907312a2945a47a9dd4", "width": 945, "height": 2100 },
+    { "file": "mobile/alerts_resolved_case_qa.png", "sha256": "05d3b7d427f854ffff075f62643eaa7aec0a9b668d84ec5dc5989914ea1ec077", "width": 945, "height": 2100 },
+    { "file": "mobile/alerts_inspector_origin_qa.png", "sha256": "9904cbc3d01bb9f84b241dc331648912fa4e9f6bdd7108a5f45b53f4b8609534", "width": 945, "height": 2100 },
+    { "file": "mobile/alerts_owner_calendar_qa.png", "sha256": "0da7429f01288690d940c406586b13df81ef018cf94fd71dac10b395f301b39b", "width": 945, "height": 2100 }
+  ]
+}

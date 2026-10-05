@@ -1440,7 +1440,32 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <tr><td><strong>Activa</strong></td><td>Interruptor para activar/desactivar la regla sin eliminarla</td></tr>
 </tbody>
 </table>
-<p>Cuando una regla se dispara, se crea un registro en <code>AlertaGenerada</code> vinculado al manifiesto y a la regla que la origino. Las alertas pueden ser resueltas manualmente por el administrador via <code>PUT /api/alertas/:id/resolver</code>.</p>
+<p>Una alerta conserva su regla y la situación detectada. Leer o eliminar el aviso personal no resuelve el caso ni elimina esa evidencia. La autoridad habilitada gestiona el estado con motivo; resolver el caso no cambia el estado del manifiesto o de la inspección.</p>
+
+<h4 id="alertas-catalogo">Catálogo proactivo: reglas, casos y avisos</h4>
+<div class="callout callout-warning"><strong>Estado de esta novedad al 04/10/2026:</strong> validada en QA y pendiente de publicación. Las capturas de este apartado son reales, con datos sintéticos; no prueban que el catálogo esté habilitado en tu instalación. <a href="tutorial.html?guide=administrador-alertas-proactivas">Abrir la guía paso a paso</a>.</div>
+<table>
+<thead><tr><th>Familia</th><th>Fuente y criterio</th><th>Acción útil</th></tr></thead>
+<tbody>
+<tr><td>Manifiesto pendiente de tratamiento o cierre</td><td>Recibido o En tratamiento, según la fecha de recepción. Días configurables: umbral operativo, no vencimiento legal. Cero incluye todos esos estados, identificando fechas ausentes.</td><td>El operador involucrado abre su manifiesto para revisar pesaje y registrar la acción permitida.</td></tr>
+<tr><td>Inspección · requerimiento sin respuesta</td><td>Plazo real del requerimiento de la autoridad al inspeccionado en etapas habilitadas. Leer, responder otro pedido o una actuación de la autoridad no cuentan como respuesta.</td><td>El inspeccionado abre su expediente; inspector asignado y autoridad competente acceden según permisos. Una respuesta vinculada detiene la ausencia, sin certificar conformidad ni subsanación.</td></tr>
+<tr><td>Habilitaciones y licencias · vigencia</td><td>Fechas registradas de transportistas, operadores, vehículos y conductores. Anticipación de 0 a 365 días. Sin fecha no se inventa vencimiento.</td><td>El propietario revisa su ficha o Flota y Conductores. Una fecha sin hora permanece vigente hasta finalizar ese día en Mendoza: 10/10 vence desde el 11.</td></tr>
+</tbody>
+</table>
+<ol>
+<li>Abrir <strong>Alertas → Reglas → Nueva Regla</strong> y elegir familia, condición y destinatarios autorizados.</li>
+<li>Usar <strong>Simular sin enviar</strong>: cantidad real y hasta 20 ejemplos, sin crear regla, casos ni avisos.</li>
+<li>Guardar la regla, inicialmente inactiva. Revisarla y activarla deliberadamente. <strong>Evaluar seguimiento ahora</strong> procesa manifiestos; <strong>Evaluar inspecciones y vencimientos</strong> procesa las otras familias. También se evalúan diariamente a las 08:00 y 08:05 de Mendoza, respectivamente.</li>
+<li>Verificar el aviso en la campana o <strong>Avisos</strong> de la app del destinatario exacto. No se distribuye al padrón completo. El catálogo usa sólo la bandeja interna web/app: no activa correo ni push.</li>
+<li>La autoridad usa <strong>Gestionar caso</strong>: Pendiente, En revisión, Resuelta o Descartada, con motivo obligatorio. La lectura del aviso es independiente.</li>
+</ol>
+<p>La evaluación repetida conserva un caso por regla, fuente, fecha y responsable; reglas distintas pueden generar casos distintos sobre el mismo objeto. Respuesta vinculada, renovación documental o cambio terminal se concilian sin borrar la situación inicial. Desactivar conserva los casos anteriores. La última decisión visible no equivale a un historial legal inmutable de todas las decisiones.</p>
+<div class="cu-screenshot-duo">
+  <div class="cu-screenshot"><a href="screenshots/desktop/alerts_simulation_qa.png" target="_blank" rel="noopener"><img src="screenshots/desktop/alerts_simulation_qa.png" alt="QA: simulación sin enviar y umbral de manifiestos pendientes" loading="lazy" width="1440" height="900"></a><div class="cu-screenshot-caption">Captura real de QA 67, datos sintéticos: simular no crea casos.</div></div>
+  <div class="cu-screenshot-mobile"><a href="screenshots/mobile/alerts_owner_notice_qa.png" target="_blank" rel="noopener"><img src="screenshots/mobile/alerts_owner_notice_qa.png" alt="QA app: aviso propio del operador con acceso al manifiesto" loading="lazy" width="945" height="2100"></a><div class="cu-screenshot-mobile-caption">Captura real de QA 67, datos sintéticos: aviso del responsable.</div></div>
+</div>
+<p><strong>Más capturas verificadas:</strong> <a href="screenshots/desktop/alerts_requirement_qa.png">requerimiento sin respuesta</a>, <a href="screenshots/desktop/alerts_expiry_qa.png">fuentes y anticipación documental</a>, <a href="screenshots/mobile/alerts_inspector_origin_qa.png">expediente abierto por el inspector</a>, <a href="screenshots/mobile/alerts_resolved_case_qa.png">caso resuelto con motivo</a> y <a href="screenshots/mobile/alerts_owner_calendar_qa.png">fecha de la ficha propia y vigencia territorial</a>.</p>
+<p><strong>No habilitadas todavía:</strong> DDJJ, TEF/TF, OCR de recibos y mensajes sin plazo. Requieren calendario, obligación y conciliación, extracción verificable por campo o vínculo de respuesta, según el caso. No se presume deuda, incumplimiento ni infracción a partir de un campo ausente.</p>
 </section>
 
 <section id="mod-blockchain" data-role="all">

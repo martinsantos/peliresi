@@ -107,6 +107,7 @@
     });
 
     var popularIds = [
+      'administrador-alertas-proactivas',
       'inspector-completar-inspeccion',
       'generador-crear-manifiesto',
       'transportista-confirmar-retiro',
@@ -316,7 +317,7 @@
       section.innerHTML = '<p class="step-kicker">Paso ' + (index + 1) + ' de ' + guide.steps.length + '</p>' +
         '<div class="step-title-row"><h2>' + escapeHTML(step.title) + '</h2><button class="copy-step-link" type="button" data-copy-step="' + index + '"><span class="material-symbols-rounded" aria-hidden="true">link</span>Copiar enlace a este paso</button></div>' +
         '<ol class="step-instructions">' + step.body.map(function (instruction) { return '<li><span>' + escapeHTML(instruction) + '</span></li>'; }).join('') + '</ol>' +
-        (step.image ? '<figure class="guide-image-wrap' + (step.image.indexOf('/mobile/') >= 0 ? ' is-mobile-capture' : ' is-desktop-capture') + '"><a class="guide-image-link" href="' + escapeHTML(step.image) + '" target="_blank" rel="noopener" aria-label="Abrir captura a tamaño completo"><img class="guide-image" src="' + escapeHTML(step.image) + '" width="1600" height="900" loading="lazy" alt="' + escapeHTML(step.alt) + '"></a><figcaption class="guide-image-caption">' + (step.image.indexOf('inspection_') >= 0 ? 'Simulación de capacitación con datos de prueba' : 'Captura de SITREP') + ' · Tocá para verla completa.</figcaption></figure>' : '') +
+        (step.image ? '<figure class="guide-image-wrap' + (step.image.indexOf('/mobile/') >= 0 ? ' is-mobile-capture' : ' is-desktop-capture') + '"><a class="guide-image-link" href="' + escapeHTML(step.image) + '" target="_blank" rel="noopener" aria-label="Abrir captura a tamaño completo"><img class="guide-image" src="' + escapeHTML(step.image) + '" width="1600" height="900" loading="lazy" alt="' + escapeHTML(step.alt) + '"></a><figcaption class="guide-image-caption">' + escapeHTML(step.caption || (step.image.indexOf('inspection_') >= 0 ? 'Simulación de capacitación con datos de prueba' : 'Captura de SITREP')) + ' · Tocá para verla completa.</figcaption></figure>' : '') +
         '<div class="expected-result"><span class="material-symbols-rounded" aria-hidden="true">check</span><div><strong>Resultado esperado</strong><p>' + escapeHTML(step.expected) + '</p></div></div>';
       stepsRoot.appendChild(section);
       stepSections.push(section);

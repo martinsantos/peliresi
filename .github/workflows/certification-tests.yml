@@ -119,7 +119,7 @@ jobs:
       UPLOADS_DIR: /tmp/sitrep-night-20260926.cloud/uploads
       QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
       QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
-      QA_MANUAL_ROOT: ${{ github.workspace }}/docs/manual
+      QA_MANUAL_ROOT: ${{ github.workspace }}/frontend/dist/manual
       PGUSER: qa
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -136,6 +136,7 @@ jobs:
           node --experimental-strip-types --test frontend/cloud-qa/android-connection.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/system-log.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/system-packages.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/manual-build.test.ts
           test ! -f backend/.env
           test ! -f frontend/.env
           mkdir -p "$QA_ARTIFACTS"

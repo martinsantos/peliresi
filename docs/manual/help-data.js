@@ -2,6 +2,7 @@
   'use strict';
 
   var S = 'screenshots/';
+  var QA_ALERTS = 'Captura real de QA · Datos sintéticos · Catálogo pendiente de publicación al 04/10/2026';
 
   window.SITREP_HELP = {
     profiles: [
@@ -15,10 +16,29 @@
 
     guides: [
       {
+        id: 'administrador-alertas-proactivas',
+        profile: 'administrador',
+        title: 'Configurar alertas y seguir sus avisos',
+        summary: 'Simulá reglas con fuentes reales, elegí destinatarios y gestioná casos sin confundir lectura con resolución.',
+        duration: '6 min',
+        icon: 'notifications_active',
+        keywords: ['alertas', 'avisos', 'reglas', 'vencimientos', 'habilitación', 'licencia', 'inspección', 'requerimiento', 'respuesta', 'DDJJ', 'TEF', 'OCR'],
+        safety: 'Catálogo validado en QA, pendiente de publicación al 04/10/2026. Las capturas usan datos sintéticos. Simular no envía ni crea casos; evaluar reglas activas sí genera casos y avisos internos. No activa correo ni push.',
+        steps: [
+          { title: 'Abrir Reglas y simular sin enviar', body: ['En Alertas → Reglas → Nueva Regla, elegí una familia, su nombre y los destinatarios permitidos.', 'Usá Simular sin enviar: muestra la cantidad real y hasta 20 ejemplos. No crea la regla, casos ni avisos. Las reglas nuevas se crean inactivas.'], image: S + 'desktop/alerts_simulation_qa.png', caption: QA_ALERTS, alt: 'QA: simulación de manifiestos pendientes sin enviar avisos', expected: 'Podés revisar la fuente y el alcance antes de guardar o activar.' },
+          { title: 'Seguir manifiestos recibidos', body: ['Manifiesto pendiente de tratamiento o cierre usa estados Recibido o En tratamiento y la fecha de recepción registrada.', 'Los días son un umbral operativo, no un vencimiento legal. Cero incluye todos los recibidos o en tratamiento; una fecha ausente se identifica, no se inventa.'], image: S + 'desktop/alerts_simulation_qa.png', caption: QA_ALERTS, alt: 'QA: umbral operativo desde la recepción de un manifiesto', expected: 'La alerta identifica el manifiesto que necesita una acción permitida.' },
+          { title: 'Detectar requerimientos sin respuesta', body: ['Inspección · requerimiento sin respuesta usa el plazo real del requerimiento de la autoridad dirigido al inspeccionado.', 'Leer, responder a otro pedido o una actuación de la autoridad no lo contesta. Una respuesta, descargo o subsanación vinculada detiene el aviso de ausencia, aunque sea tardía; no significa aceptación legal ni conformidad.'], image: S + 'desktop/alerts_requirement_qa.png', caption: QA_ALERTS, alt: 'QA: plazos de requerimientos e inspecciones sin respuesta relacionada', expected: 'Se sigue cada pedido concreto y se conserva la evidencia original.' },
+          { title: 'Revisar habilitaciones y licencias', body: ['Elegí anticipación entre 0 y 365 días y las fuentes con fecha registrada: transportistas, operadores, vehículos y conductores. Sin fecha no se presume vencimiento.', 'Una fecha sin hora, por ejemplo 10/10, permanece vigente hasta finalizar el 10 en Mendoza y está vencida desde el 11. Con cero días se incluye hoy y las fechas pasadas.'], image: S + 'desktop/alerts_expiry_qa.png', caption: QA_ALERTS, alt: 'QA: fuentes y anticipación configurables de vigencia documental', expected: 'La fecha mostrada coincide con la registrada y no vence antes de terminar ese día.' },
+          { title: 'Activar y verificar la llegada del aviso', body: ['Revisá y activá la regla deliberadamente. Evaluar seguimiento ahora procesa reglas activas de manifiestos; Evaluar inspecciones y vencimientos procesa las otras dos familias. También hay evaluación diaria a las 08:00 y 08:05 de Mendoza, respectivamente.', 'El responsable abre su campana o Avisos en la app. Sólo reciben el actor involucrado, inspector asignado habilitado o administración competente, según la regla; nunca todo el padrón. El aviso abre el manifiesto, expediente o ficha propia. No se envía correo ni push desde este catálogo.'], image: S + 'mobile/alerts_owner_notice_qa.png', caption: QA_ALERTS, alt: 'QA app: aviso interno del operador con acceso al manifiesto propio', expected: 'El destinatario exacto puede abrir el origen; una regla inactiva no produce casos.' },
+          { title: 'Resolver el caso, no sólo leer el aviso', body: ['La autoridad habilitada usa Gestionar caso: Pendiente, En revisión, Resuelta o Descartada, con motivo obligatorio. Marcar leída cambia sólo la lectura del aviso.', 'La evaluación concilia fuentes que ya cambiaron, manteniendo la situación inicial. Resolver un caso no cierra un manifiesto ni aprueba una inspección. Se conserva la última decisión; no es un historial legal inmutable de todas las decisiones.'], image: S + 'mobile/alerts_resolved_case_qa.png', caption: QA_ALERTS, alt: 'QA app: caso resuelto con motivo y situación original preservados', expected: 'Estado y motivo persisten, sin cambiar la formalidad del objeto de origen.' },
+          { title: 'Comprobar el origen y los límites', body: ['El inspector abre el expediente asignado desde el aviso; el operador consulta su perfil, y el transportista su ficha y Flota y Conductores para avisos de vehículos o licencias.', 'Reglas distintas pueden generar casos distintos sobre el mismo objeto. Desactivar preserva los casos anteriores. DDJJ, TEF/TF, OCR de recibos y mensajes sin plazo requieren fuentes y criterios aprobados: todavía no son reglas operativas del catálogo.'], image: S + 'mobile/alerts_inspector_origin_qa.png', caption: QA_ALERTS, alt: 'QA app: inspector accede al expediente real del aviso, con datos sintéticos', expected: 'Cada aviso tiene una fuente comprobable y no acusa una infracción por suposición.' }
+        ]
+      },
+      {
         id: 'inspector-completar-inspeccion',
         profile: 'inspector',
         title: 'Completar una inspección en campo',
-        summary: 'Seguí los siete pasos, documentá cada hallazgo y verificá el guardado de fotos y comentarios.',
+        summary: 'Prepará la visita, contrastá en campo y verificá el guardado de cada foto y comentario.',
         duration: '8 min',
         icon: 'fact_check',
         keywords: ['inspección', 'inspector', 'checklist', 'acta', 'informe técnico', 'foto', 'evidencia', 'sin conexión', 'descargo'],

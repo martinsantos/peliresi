@@ -1,21 +1,16 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { copyFile, lstat, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { lstat, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudEnvironment, root } from './safety.ts';
+import { synchronizeManual } from './manual-build.ts';
 
 assertCloudEnvironment();
 const output = process.env.QA_ARTIFACTS!;
 const mode = process.argv[2];
 assert.ok(['freeze', 'package'].includes(mode));
-const manualSource = path.join(root, 'docs/manual/directorio.html');
-const manualBuild = path.join(root, 'frontend/dist/manual/directorio.html');
-if (mode === 'freeze') {
-  await mkdir(path.dirname(manualBuild), { recursive: true });
-  await copyFile(manualSource, manualBuild);
-}
-assert.deepEqual(await readFile(manualBuild), await readFile(manualSource), 'Package the same manual served during QA, without replacing its other assets');
+await synchronizeManual(path.join(root, 'docs/manual'), path.join(root, 'frontend/dist/manual'), mode === 'freeze');
 type Item = { file: string; sha256: string };
 async function inventory(directory: string, prefix: string): Promise<Item[]> {
   const items: Item[] = [];
@@ -65,7 +60,7 @@ if (mode === 'freeze') {
   assert.equal(expiry.compiledSubscriber, true); assert.equal(expiry.externalProvidersDisabled, true);
   // Existing journeys plus inspection deadlines/linked replies and owner-specific
   // expiry/renewal, each exercised on desktop, responsive web and /app.
-  assert.equal(e2e.stats.expected, 123);
+  assert.equal(e2e.stats.expected, 126);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   assert.deepEqual(e2e.errors, []);
   const android = await readJson('android/result.json');
