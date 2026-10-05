@@ -108,9 +108,86 @@ Se conserva esa evidencia; no es un GO visual aunque no recorte palabras.
 ZIPfinal único32.211.904bytes,13PNG seleccionados, no websummary extra.
 CleanupSUCCESS/cierre12:06:27.853UTC detuvo runtime5776/server5777.
 
-Próxima validación: mismo focal con columnas adaptativas y exigencia de una
-línea para las etiquetas de categoría a320/360px, sin rebajar umbrales.
-Resultado final aún pendiente.
+### Resultado final QA78
+
+Fuente probada exacta `2d62c9609eb2989bb10c51377dc7f1f906c091a9`,
+[ejecución37308100305](https://github.com/martinsantos/peliresi/actions/runs/37308100305).
+Los cambios documentales y las cuatro capturas añadidas posteriormente no
+son una segunda ejecución de producto. La rama es `codex/sitrep-cloud-qa-20261002`.
+
+| Grupo | Resultado medido |
+| --- | --- |
+| Unit backend, DB desconectada | 472PASS / 0FAIL / 0pending |
+| Unit frontend | 967PASS / 0FAIL / 0pending |
+| Compilaciones backend/web/app | 3PASS |
+| Grupos HTTP reales | 54PASS / 0FAIL |
+| Subscriber compilado/PostgreSQL | 2PASS / 0FAIL |
+| Calendario de Monitor HTTP | 3PASS / 0FAIL |
+| Permisos territoriales HTTP | 5PASS / 0FAIL |
+| E2E focal completo de esta tanda | 21PASS / 3FAIL / 0flaky / 0skip |
+| Nuevos recorridos de geometría/interacción | 3PASS / 0FAIL |
+| Android/APK y paquete de promoción | No ejecutados |
+
+El focal duró163790,504ms. Los tres fallos conservados corresponden al mismo
+defecto territorial preexistente: transportista2 recibe por API el viaje global
+`2026-990001`, pero «Agenda y viajes» lo oculta en las tres superficies.
+No son fallos nuevos del símbolo ni una aprobación global de la aplicación.
+El workflow completo terminó FAILURE y no generó paquete de promoción.
+La suite completa de141E2E no se ha ejecutado sobre esta corrección; este
+subconjunto de24 no la reemplaza.
+
+### Verificación renderizada y visual
+
+Entorno aislado `http://127.0.0.1:4177`, rutas `/centro-control`, `/reportes`
+y sus equivalentes `/app/`, login real de cuenta sintética. Escritorio1440×900;
+responsive yappweb360×800, con casos adicionales320×800 en ambas.
+Playwright existente en GitHub, worker1/retries0; ninguna API de negocio
+interceptada ni sesión ficticia. El prefijo `/app/` no equivale al APK instalado.
+
+| Comprobación en los tres nuevos recorridos | Estado |
+| --- | --- |
+| Identidad SITREP y contenido significativo, no página vacía | PASS |
+| Sin overlay de compilación ni desbordamiento horizontal final | PASS |
+| Consola del recorrido, errores y warnings | 0 / 0 |
+| Padding/centrado/color/glifo/espacio reservado | PASS |
+| Etiquetas completas en una línea y contenido dentro del padding | PASS,320/360px incluidos |
+| Activar/desactivar cuatro capas con respuesta HTTP real y tamaño estable | PASS |
+| Teclado oculta/restaura un marcador real de transportista en Reportes | PASS |
+| Revisión humana del agente de13PNG originales seleccionados | Realizada; filtros centrados y legibles |
+
+Se midieron83marcosSVG entre las tres superficies y los diferentes estados;
+no son83pantallas ni83íconos únicos. SVG14×14px, trazo blanco, fondo dentro
+de la reserva en todos los casos. Desviación máxima de centro en cualquiera
+de los ejes0,0000153px; padding de cuadros/círculo5px, mínimo en rombo
+2,100496px. Son medidas del marcoSVG, no del contorno óptico de cada trazo.
+
+La inspección de capturas corrigió dos problemas que un test anterior dejaba
+pasar: invasión del padding por el texto y partición de palabras a320px.
+Ahora360px conserva dos columnas y320px pasa a una. Aumenta la altura de la
+botonera muy estrecha; las etiquetas permanecen completas y el scroll normal
+del documento se conserva. Reportes y sus filas usan el mismo símbolo;
+Monitor reutiliza marcadores compartidos, pero no esta botonera.
+
+### Comando y evidencia
+
+```sh
+gh workflow run certification-tests.yml --repo martinsantos/peliresi \
+  --ref codex/sitrep-cloud-qa-20261002 \
+  -f unit=true -f android=false -f load_only=false \
+  -f context_only=true -f alert_only=false
+```
+
+No repetir este comando por inercia: es el registro de la tanda terminada.
+Crudos finales en el ZIP único externo `map-symbol-run78-final.zip`,
+artifact11344648446,31.957.920bytes. No se descargaron el resumen adicional
+de16,75MB, builds ni dependencias. Las cuatro capturas del informe son copias
+byte por byte de las capturas nativas del navegador, sin edición de imagen.
+El conjunto original seleccionado conserva13PNG y las tandas fallidas previas.
+
+Closure12:22:44.026UTC detuvo runtime5745/server5746; cleanupPostgreSQL SUCCESS,
+workflow COMPLETED. Proveedores externos deshabilitados; no envíos, datos
+reales, despliegue, servicios o configuración de producción modificados.
+No quedan procesos QA locales ni otra VM despachada por esta tarea.
 
 ## Límite de entrega
 
@@ -121,3 +198,21 @@ superposiciones de etiquetas del Historial de Monitor no se certifican aquí.
 
 Lección del incidente: comprobar legibilidad y existencia de glifos no verifica
 su padding ni su huella rotada. Medir ambos en el navegador y revisar capturas.
+
+## Capturas originales QA78
+
+Escritorio, Centro de Control:
+
+![Centro de Control escritorio](map-symbols-20261005/control-desktop.png)
+
+Responsive360px, Centro de Control:
+
+![Centro de Control responsive360px](map-symbols-20261005/control-responsive-360.png)
+
+Appweb360px, Reportes:
+
+![Reportes appweb360px](map-symbols-20261005/reports-app-360.png)
+
+Appweb320px, etiquetas completas en una columna:
+
+![Centro de Control appweb320px](map-symbols-20261005/control-app-320.png)
