@@ -206,7 +206,7 @@ jobs:
           if test "$QA_ALERT_ONLY" = 'true'; then
             npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/alert-repository.spec.ts cloud-qa/e2e/alert-catalogue.spec.ts
           elif test "$QA_CONTEXT_ONLY" = 'true'; then
-            npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/proactive-context.spec.ts cloud-qa/e2e/global-operation.spec.ts
+            npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/proactive-context.spec.ts cloud-qa/e2e/global-operation.spec.ts cloud-qa/e2e/map-symbol-alignment.spec.ts
           else
             npx --no-install playwright test --config cloud-qa/playwright.config.ts
           fi

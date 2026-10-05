@@ -70,7 +70,7 @@ if (mode === 'freeze') {
   assert.equal(territorial.externalProvidersDisabled, true);
   // Existing journeys plus inspection deadlines/linked replies and owner-specific
   // expiry/renewal, each exercised on desktop, responsive web and /app.
-  assert.equal(e2e.stats.expected, 138);
+  assert.equal(e2e.stats.expected, 141);
   assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   assert.deepEqual(e2e.errors, []);
   const android = await readJson('android/result.json');
