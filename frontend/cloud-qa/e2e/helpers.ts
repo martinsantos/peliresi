@@ -75,9 +75,10 @@ export async function readableMapLayers(group: Locator) {
       const collides = pieces.some(rect => Math.min(rect.right, state.right) - Math.max(rect.left, state.left) > 1 && Math.min(rect.bottom, state.bottom) - Math.max(rect.top, state.top) > 1);
       const contained = pieces.every(rect => rect.left >= bounds.left && rect.right <= bounds.right + 1 && rect.top >= bounds.top && rect.bottom <= bounds.bottom + 1);
       const padded = pieces.every(rect => rect.left >= content.left - 1 && rect.right <= content.right + 1 && rect.top >= content.top - 1 && rect.bottom <= content.bottom + 1);
-      return { name: element.getAttribute('aria-label'), collides, contained, padded, height: bounds.height };
+      return { name: element.getAttribute('aria-label'), collides, contained, padded, height: bounds.height,
+        content, texts: pieces };
     });
-    expect(result, `Readable map control: ${result.name}`).toMatchObject({ collides: false, contained: true, padded: true });
+    expect(result, `Readable map control: ${result.name}, ${JSON.stringify({ content: result.content, texts: result.texts })}`).toMatchObject({ collides: false, contained: true, padded: true });
     expect(result.height).toBeGreaterThanOrEqual(44);
   }
 }

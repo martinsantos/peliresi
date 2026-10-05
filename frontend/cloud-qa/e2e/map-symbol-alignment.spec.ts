@@ -77,6 +77,15 @@ test('map symbols stay centered, padded and actionable in every shared map contr
     }
   }
 
+  if (info.project.name !== 'web-desktop') {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await layers.scrollIntoViewIfNeeded();
+    await readableMapLayers(layers);
+    measurements.control320 = await symbolGeometry(layers.locator('[data-map-symbol]'));
+    await layers.screenshot({ path: info.outputPath('control-map-controls-320.png'), animations: 'disabled' });
+    await page.setViewportSize({ width: 360, height: 800 });
+  }
+
   await page.goto(`${prefix(info)}/reportes`);
   await page.getByRole('navigation', { name: 'Tipos de reporte' }).getByRole('button', { name: 'Mapa de Actores', exact: true }).click();
   await expect(page.locator('.leaflet-container')).toBeVisible();
@@ -86,6 +95,14 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   measurements.reports = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));
   await page.screenshot({ path: info.outputPath('report-map-symbols.png'), animations: 'disabled' });
   await reportLayers.screenshot({ path: info.outputPath('report-map-controls.png'), animations: 'disabled' });
+  if (info.project.name !== 'web-desktop') {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await reportLayers.scrollIntoViewIfNeeded();
+    await readableMapLayers(reportLayers);
+    measurements.reports320 = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));
+    await reportLayers.screenshot({ path: info.outputPath('report-map-controls-320.png'), animations: 'disabled' });
+    await page.setViewportSize({ width: 360, height: 800 });
+  }
   const carrier = reportLayers.getByRole('button', { name: 'Transportistas', exact: true });
   const marker = page.locator('.leaflet-marker-icon[title="QA Transporte 1"]');
   await expect(marker).toHaveCount(1);

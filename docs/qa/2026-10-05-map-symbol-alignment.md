@@ -33,7 +33,10 @@ verificación renderizada de los textos largos en móvil.
 La primera captura del ajuste detectó que «Transportistas» invadía el padding
 derecho, aunque el texto seguía dentro del botón y la comprobación antigua
 aprobaba. En móvil se compactan el gap y padding horizontal usando tokens
-existentes (6 px); escritorio conserva 8 px de gap y 10 px de padding.
+existentes. El ajuste de 6 px no alcanzó: QA76 reprodujo invasión del padding
+en las dos superficies móviles. La segunda iteración usa 4 px de gap/padding
+horizontal y permite envolver palabras en pantallas muy estrechas, sin
+truncarlas. Escritorio conserva 8 px de gap y 10 px de padding.
 El control conserva su altura táctil y la caja del símbolo. El helper ahora
 exige texto dentro del área de contenido descontando bordes y padding.
 
@@ -50,6 +53,8 @@ exige texto dentro del área de contenido descontando bordes y padding.
 - La caché legítima de React Query se respeta: se usa la acción real Actualizar
   ahora para exigir una respuesta HTTP actual con las capas seleccionadas.
 - Tres superficies: escritorio 1440×900, responsive 360×800, `/app/` 360×800.
+  Se añaden comprobaciones de contenido, símbolos y capturas a 320×800 en
+  ambos recorridos móviles, restaurando después el tamaño de 360 px.
   Playwright existente, una VM GitHub, worker1/retries0. Browser plugin not available.
   Sin navegador, Docker, API, DB ni emulador Android locales.
 - Los tres fallos territoriales transportista del informe anterior permanecen
@@ -75,8 +80,20 @@ de la app ni tres recorridos completos aprobados. Capturas Centro/Reportes
 mostraron padding SVG mejorado y el problema móvil del texto descrito arriba.
 CleanupSUCCESS/cierre11:10:29.312UTC.
 
-Próxima validación: mismo recorrido con selector acotado al símbolo de la fila,
-helper más estricto y ajuste horizontal móvil. Resultado final aún pendiente.
+Iteración76 / `37301878627`, fuente `87b227b`:472BE/967FE unit PASS,
+tres builds PASS,54HTTP/2SQL/3calendario/5territorial PASS. Focal17PASS/7FAIL,
+0flaky/0skip. El nuevo recorrido de escritorio completó mediciones: centros
+dx≤0,000016px/dy0, padding5px/2,100497px, glyph14px y colores correctos,
+fondo dentro de la reserva, sin errores ni warnings de consola. Cuatro fallos
+son la misma invasión del padding de «Transportistas» móvil, tanto en el nuevo
+recorrido como en la prueba contextual existente; los otros tres son T2.
+No es aprobación móvil. Captura fresca y test estricto conservados antes de
+la segunda corrección horizontal. ZIP final único39.520.931bytes en el disco
+externo, sin descargar el resumen adicional. CleanupSUCCESS y cierre
+11:25:36.197UTC detuvieron runtime5767/server5768.
+
+Próxima validación: mismo focal con padding/gap4px, ajuste de palabras y los
+dos tamaños móviles, sin rebajar umbrales. Resultado final aún pendiente.
 
 ## Límite de entrega
 
