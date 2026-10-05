@@ -3,7 +3,14 @@ import { login, prefix } from './helpers';
 
 test('real manifest UI completes approval, transport, receipt, treatment and certificate', async ({ page }, info) => {
   await login(page, info);
-  await page.goto(`${prefix(info)}/manifiestos/nuevo`);
+  if (info.project.name === 'app') {
+    await page.goto(`${prefix(info)}/manifiestos`);
+    await page.getByRole('button', { name: 'Nuevo manifiesto', exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/manifiestos\/nuevo$/);
+    await expect(page.getByRole('button', { name: 'Nuevo manifiesto', exact: true })).toHaveCount(0);
+  } else {
+    await page.goto(`${prefix(info)}/manifiestos/nuevo`);
+  }
   const choose = async (label: string, value: RegExp) => {
     await page.getByRole('button', { name: label, exact: true }).click();
     await page.getByRole('option', { name: value }).click();
@@ -96,10 +103,21 @@ test('real manifest UI completes approval, transport, receipt, treatment and cer
   expect((await closed).status()).toBe(200);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
+  if (info.project.name === 'app') {
+    await expect(page.getByRole('button', { name: 'Nuevo manifiesto', exact: true })).toHaveCount(0);
+  }
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Descargar Certificado', exact: true }).click();
   const download = await downloaded;
   expect(await download.failure()).toBeNull();
   await download.saveAs(info.outputPath('manifest-certificate.pdf'));
   await page.screenshot({ path: info.outputPath('manifest-completed.png'), animations: 'disabled' });
+  const actorLink = page.getByRole('link', { name: 'Abrir ficha de transportista: QA Transporte 1', exact: true });
+  await actorLink.scrollIntoViewIfNeeded();
+  // Hit the actor's own trailing icon, not just its text: this area was covered by the app FAB.
+  const linkBox = (await actorLink.boundingBox())!;
+  await actorLink.click({ position: { x: linkBox.width - 10, y: 12 } });
+  await expect(page).toHaveURL(new RegExp(`${prefix(info)}/admin/actores/transportistas/${record.transportistaId}$`));
+  await expect(page.getByRole('heading', { name: 'QA Transporte 1', exact: true })).toBeVisible();
+  await page.screenshot({ path: info.outputPath('manifest-actor-detail.png'), animations: 'disabled' });
 });

@@ -303,8 +303,8 @@ export const MobileLayout: React.FC = () => {
     return 'SITREP';
   };
 
-  // Determinar si mostrar FAB
-  const showFab = location.pathname.includes('/manifiestos') && !location.pathname.includes('/nuevo') && (isAdmin || isGenerador);
+  // Create belongs to the list, not over the current record's fields or actor links.
+  const showFab = /^\/(?:app\/)?manifiestos\/?$/.test(location.pathname) && (isAdmin || isGenerador);
   const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
 
   return (

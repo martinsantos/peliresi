@@ -33,7 +33,7 @@ vi.mock('../../contexts/AuthContext', () => ({
     switchUser: vi.fn(),
     logout: vi.fn(),
     isAdmin: authState.currentUser.rol === 'ADMIN',
-    isGenerador: false,
+    isGenerador: authState.currentUser.rol === 'GENERADOR',
     isTransportista: authState.currentUser.rol === 'TRANSPORTISTA',
     isOperador: false,
     isLoading: false,
@@ -89,6 +89,9 @@ function renderMobileLayout(initialPath = '/dashboard') {
         <Route path="/" element={<MobileLayout />}>
           <Route path="dashboard" element={<div data-testid="dashboard-content">Dashboard</div>} />
           <Route path="notificaciones" element={<div>Bandeja de avisos</div>} />
+          <Route path="manifiestos" element={<div>Listado de manifiestos</div>} />
+          <Route path="manifiestos/nuevo" element={<div>Formulario de nuevo manifiesto</div>} />
+          <Route path="manifiestos/:id" element={<div>Detalle del manifiesto</div>} />
           <Route path="transporte/viaje/:id" element={<div data-testid="trip-content">Trip</div>} />
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
           <Route path="inspecciones/:id" element={<div>Expediente de campo</div>} />
@@ -112,6 +115,25 @@ describe('MobileLayout Android shell', () => {
 
     expect(screen.getByText('Viajes')).toBeInTheDocument();
     expect(screen.queryByText('Mis Viajes')).not.toBeInTheDocument();
+  });
+
+  it.each(['ADMIN', 'GENERADOR'])('keeps the list create action working for %s', role => {
+    authState.currentUser = { ...authState.currentUser, rol: role };
+    renderMobileLayout('/manifiestos');
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo manifiesto', exact: true }));
+    expect(screen.getByText('Formulario de nuevo manifiesto')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nuevo manifiesto', exact: true })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['ADMIN', '/manifiestos/qa-record'],
+    ['GENERADOR', '/manifiestos/qa-record'],
+    ['ADMIN', '/manifiestos/nuevo'],
+    ['GENERADOR', '/manifiestos/nuevo'],
+  ])('does not overlay %s work with a create action on %s', (role, path) => {
+    authState.currentUser = { ...authState.currentUser, rol: role };
+    renderMobileLayout(path);
+    expect(screen.queryByRole('button', { name: 'Nuevo manifiesto', exact: true })).not.toBeInTheDocument();
   });
   it('uses the same operational inspector label and exposes its unchanged base role', () => {
     authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
