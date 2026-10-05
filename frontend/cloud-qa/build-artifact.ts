@@ -5,6 +5,7 @@ import { lstat, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudEnvironment, root } from './safety.ts';
 import { synchronizeManual } from './manual-build.ts';
+import { assertFullE2EEvidence } from './e2e-evidence.ts';
 
 assertCloudEnvironment();
 const output = process.env.QA_ARTIFACTS!;
@@ -68,11 +69,7 @@ if (mode === 'freeze') {
   assert.equal(territorial.passed, 5); assert.equal(territorial.failed, 0);
   assert.equal(territorial.compiledApi, true); assert.equal(territorial.realLogin, true);
   assert.equal(territorial.externalProvidersDisabled, true);
-  // Existing journeys plus inspection deadlines/linked replies and owner-specific
-  // expiry/renewal, each exercised on desktop, responsive web and /app.
-  assert.equal(e2e.stats.expected, 141);
-  assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
-  assert.deepEqual(e2e.errors, []);
+  assertFullE2EEvidence(e2e);
   const android = await readJson('android/result.json');
   const apk = await readJson('apk/result.json');
   assert.equal(android.completed,true,'An interrupted Android suite cannot pass the package gate');

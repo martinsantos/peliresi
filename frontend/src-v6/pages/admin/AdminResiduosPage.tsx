@@ -10,7 +10,6 @@ import {
   FlaskConical,
   AlertTriangle,
   Leaf,
-  Beaker,
   Download,
   FileDown,
   Loader2,
@@ -441,17 +440,15 @@ export const AdminResiduosPage: React.FC = () => {
       sortable: true,
       render: (row: ResiduoDisplay) => (
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          <div role="img" aria-label={row.tipo} className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
             row.peligrosidad === 'alta' ? 'bg-error-100' :
-            row.peligrosidad === 'media' ? 'bg-warning-100' :
+            row.tipo === 'Peligroso' ? 'bg-warning-100' :
             'bg-success-100'
           }`}>
-            {row.peligrosidad === 'alta' ? (
-              <AlertTriangle size={20} className="text-error-600" />
-            ) : row.peligrosidad === 'media' ? (
-              <Beaker size={20} className="text-warning-600" />
+            {row.tipo === 'Peligroso' ? (
+              <AlertTriangle size={20} aria-hidden="true" className={row.peligrosidad === 'alta' ? 'text-error-700' : 'text-warning-700'} />
             ) : (
-              <Leaf size={20} className="text-success-600" />
+              <Leaf size={20} aria-hidden="true" className="text-success-700" />
             )}
           </div>
           <div className="min-w-0">
@@ -488,7 +485,7 @@ export const AdminResiduosPage: React.FC = () => {
           ninguna: 'success',
         };
         return (
-          <Badge variant="soft" color={colors[row.peligrosidad]}>
+          <Badge variant="soft" color={colors[row.peligrosidad.toLowerCase()] || (row.tipo === 'Peligroso' ? 'warning' : 'success')}>
             {row.peligrosidad.charAt(0).toUpperCase() + row.peligrosidad.slice(1)}
           </Badge>
         );

@@ -89,6 +89,9 @@ function renderMobileLayout(initialPath = '/dashboard') {
       <Routes>
         <Route path="/" element={<MobileLayout />}>
           <Route path="dashboard" element={<div data-testid="dashboard-content">Dashboard</div>} />
+          <Route path="centro-control" element={<div>Centro de Control</div>} />
+          <Route path="monitor" element={<div>Monitor</div>} />
+          <Route path="actores" element={<div>Consulta de actores</div>} />
           <Route path="notificaciones" element={<div>Bandeja de avisos</div>} />
           <Route path="manifiestos" element={<div>Listado de manifiestos</div>} />
           <Route path="manifiestos/nuevo" element={<div>Formulario de nuevo manifiesto</div>} />
@@ -165,6 +168,15 @@ describe('MobileLayout Android shell', () => {
     expect(screen.getByRole('banner').querySelector('[aria-label="Función actual"]')).toHaveTextContent(/^Generador$/);
   });
 
+  it.each(['/dashboard', '/centro-control', '/monitor', '/actores'])('identifies inspection work on %s without changing the base role', path => {
+    authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
+    renderMobileLayout(path);
+    const badge = screen.getByRole('banner').querySelector('[aria-label="Función actual"]');
+    expect(badge).toHaveTextContent(/^Inspector$/);
+    expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
+    expect(authState.currentUser.rol).toBe('GENERADOR');
+  });
+
   it('uses the short Avisos title so the app header retains room for role and bell', () => {
     renderMobileLayout('/notificaciones');
     expect(screen.getByRole('banner')).toHaveTextContent('Avisos');
@@ -179,7 +191,8 @@ describe('MobileLayout Android shell', () => {
     expect(header.querySelector('h1')).not.toHaveClass('truncate');
     expect(header.firstElementChild).toHaveClass('h-16');
     expect(header.querySelector('[aria-label="Función actual"]')).toHaveTextContent('Adm. Generadores');
-    expect(header.querySelector('[aria-label="Función actual"]')).toHaveClass('max-w-24', 'break-words');
+    expect(header.querySelector('[aria-label="Función actual"]')).toHaveClass('w-min', 'break-normal');
+    expect(header.querySelector('[aria-label="Función actual"]')).not.toHaveClass('break-words', 'max-w-24');
   });
 
   it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('keeps active navigation green for %s without changing the role', role => {

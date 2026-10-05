@@ -359,7 +359,7 @@ export const MobileLayout: React.FC = () => {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {/* Badge de rol */}
-            <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="max-w-24 whitespace-normal break-words text-center text-xs font-medium px-2 py-1 rounded-full bg-white/20 text-white">
+            <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="w-min whitespace-normal break-normal text-center text-xs leading-4 font-medium px-2 py-1 rounded-full bg-white/20 text-white">
               {config.label}
             </span>
             <NotificationBell basePath={mp('')} inverse />

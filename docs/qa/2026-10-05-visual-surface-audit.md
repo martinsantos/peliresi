@@ -1,5 +1,63 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## PREVALENTE 22:26 UTC — QA91 cerrada; candidato siguiente, sin publicación
+
+[QA91](https://github.com/martinsantos/peliresi/actions/runs/37374618151),
+fuente `c821aa405b273ad17816a266ee7055309dfdd79d`, terminó **FAILURE**:
+el empaquetador todavía exigía141 E2E frente a171 casos reales.
+No se generó una release aprobada. Los resultados crudos del producto son:
+**485 backend +1.073 frontend unit;171/171 E2E** (57 por superficie), sin
+fallos, omitidos ni flaky; tres builds,54 HTTP,2 SQL,3 calendario y5
+territorial aprobaron. Android `completed:true`, **15/15 PASS**, sin runtime
+errors ni respuestas API fallidas. APK original **4/4** sólo instalación,
+firma, login y reinicio anónimos: NO APK autenticado del candidato.
+Cleanup SUCCESS21:51:38.291UTC detuvo runtime5939/server5940; PostgreSQL
+confirmó parada21:51:38.403UTC. No otra VM activa ni servicios QA locales.
+ZIP final único118.119.239bytes,artifact11372319304, en SDTERA
+`tmp/sitrep-go-evidence-20261003/visual-surface-run91-final.zip`.
+
+Revisados personalmente12 PNG originales91: seis Actores/Residuos/Tratamientos/
+Carga Masiva, dos Android y cuatro Reportes7/Control. Acumulado **125 archivos
+PNG observados**, NO125 pantallas distintas ni100% del producto. El contrato
+anterior permitía palabras partidas aun dentro de su tarjeta: «Transportis»/
+«tas», «Operadore»/«s» y el rol sectorial. El inspector aparecía como Generador
+en Home/Control por etiqueta contextual incompleta, no por cambio de sesión.
+Residuos TOXICO seguían con hoja verde aunque su tipo computado es Peligroso.
+Las capturas nativas muestran también un aviso de instalación de Chrome,
+no UI de producto; la captura de comentario recuperado ocurre después del
+ACK real. No se atribuyó a ambas imágenes un falso fallo de guardado.
+
+El candidato SIGUIENTE conserva API, clasificación legal, conteos y marca:
+
+| Antes observado | Corrección | Contrato de comprobación |
+| --- | --- | --- |
+| Categoría/rol cortados dentro de palabras | Texto de categoría en ancho completo; rol min-content sin corte interno | Geometría DOM de cada palabra y320px real |
+| Inspector identificado como Generador en vistas operativas | Etiqueta funcional Inspector en rutas compartidas; rol base intacto | Header real y tooltip de rol base |
+| Hoja verde para TOXICO | Símbolo Peligroso con tinta oscura, sin inventar nivel alta | Declaración original+símbolo real, sin hoja |
+| Crear/borrar ofrecidos donde la API los niega | Acciones sólo para ADMIN/sector propio; consulta según permisos existentes | Roles reales, abrir/volver, cero escrituras en consulta |
+| Lápiz llevaba a ficha; filtro mostraba flecha de navegación | Abrir ficha identificado como consulta; filtro/tilde separados de enlace | Nombre accesible, símbolo, URL y selección real |
+| Packaging aún exigía141 | Exige171 casos efectivos,57 por superficie, sin reintentos ni omitidos | Ocho pruebas del contrato y crudo91 validado |
+
+Antes nuevo contrato de lectura/rol/residuo:30PASS9FAIL; permisos:
+14PASS7FAIL; símbolo de filtros:17PASS4FAIL. Un selector de prueba usó un
+alias Lucide en vez de la clase SVG real; se corrigió a la clase instalada,
+manteniendo la expectativa semántica. Último focal único **116PASS0FAIL0pending**
+en10 archivos, heap256MB/worker1, JSON
+`/private/tmp/sitrep-final-candidate-focal-v2-20261005.json`.
+Contrato puro de evidencia **8/8 PASS**, heap128MB, sin red/proveedores.
+Los63,39,104 y12 anteriores son subconjuntos, no se suman a116.
+Las cifras esperadas1.086FE/485BE NO son aún resultados del candidato.
+
+La nueva tanda completa será única y serial tras commit/push. Requiere
+gates completos, render y cleanup antes de otro cambio. Sin navegador,
+Docker, DB, API, emulador, build ni instalación local; dependencias compartidas
+siguen como symlinks. Sin automatizaciones/agentes, envíos ni datos reales.
+Producción no modificada y publicador protegido no ejecutado/eludido.
+Gradientes/APCA, estados no vistos, APK exacto autenticado, hardware/Safari,
+ruido/batería/background y conciliación de producción siguen pendientes.
+Posibles límites backend de fecha/unidades necesitan reproducción independiente;
+NO modificados para favorecer tests. **No GO global, perfección ni100%.**
+
 ## PREVALENTE 21:11 UTC — QA90 cancelada sin ejecutar; cuatro hallazgos consolidados
 
 [QA90](https://github.com/martinsantos/peliresi/actions/runs/37371709531),

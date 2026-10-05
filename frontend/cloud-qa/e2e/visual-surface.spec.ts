@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { createSpontaneousInspection, login, prefix, readablePageHeading } from './helpers';
+import { createSpontaneousInspection, login, prefix, readablePageHeading, readableWholeWords } from './helpers';
 import { ACTOR_COLORS } from '../../src-v6/utils/actor-identity';
 
 /** Evidence is scoped to a route, role, viewport and state, never "all UI passed". */
@@ -22,6 +22,8 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
   await expect.poll(() => page.locator('[aria-busy="true"]').count(), { timeout: 15000 }).toBe(0);
   await page.evaluate(() => document.fonts.ready);
   const headerTitle = await readablePageHeading(page);
+  const roleBadge = page.locator('header [aria-label="Función actual"]:visible');
+  const roleReading = await roleBadge.count() ? await readableWholeWords(roleBadge) : null;
   const measurement = await page.evaluate(() => {
     type Color = [number, number, number, number];
     const color = (css: string): Color | null => {
@@ -99,7 +101,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface, navigate = 
       measuredTextNodes: measured, measuredSvgTextNodes, findings, icons };
   });
   await page.screenshot({ path: info.outputPath(`${surface.name}.png`), animations: 'disabled', scale: 'css' });
-  await info.attach(surface.name, { body: JSON.stringify({ ...surface, ...measurement, headerTitle, errors,
+  await info.attach(surface.name, { body: JSON.stringify({ ...surface, ...measurement, headerTitle, roleReading, errors,
     captureScope: surface.viewportPosition ? `current viewport at ${surface.viewportPosition}; not all intermediate scroll positions or interaction states` : 'first viewport; not all scroll positions or interaction states', businessAPIIntercepted: false,
     physicalAndroid: false, visuallyReviewed: false }, null, 2), contentType: 'application/json' });
   page.off('pageerror', onError);
@@ -233,11 +235,11 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
         await expect(link).toHaveAttribute('href', prefix(info) + '/admin/actores/' + route);
         const geometry = await link.evaluate(element => {
           const card = element.firstElementChild!;
-          const label = card.querySelector('p')!;
+          const label = card.querySelector('[data-actor-summary-label]')!;
           const bounds = card.getBoundingClientRect();
           const range = document.createRange(); range.selectNodeContents(label);
           const texts = Array.from(range.getClientRects());
-          return { label: label.textContent, value: card.querySelectorAll('p')[1].textContent,
+          return { label: label.textContent, value: card.querySelector('[data-actor-summary-value]')!.textContent,
             padding: getComputedStyle(card).padding, whiteSpace: getComputedStyle(label).whiteSpace,
             textInsideCard: texts.every(r => r.left >= bounds.left - 1 && r.right <= bounds.right + 1
               && r.top >= bounds.top - 1 && r.bottom <= bounds.bottom + 1),
@@ -245,15 +247,33 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
         });
         expect(geometry).toMatchObject({ padding: '0px', whiteSpace: 'normal', textInsideCard: true });
         expect(geometry.horizontalOverflow).toBeLessThanOrEqual(1);
+        const words = await readableWholeWords(link.locator('[data-actor-summary-label]'));
         await link.focus();
         await page.keyboard.press('Enter');
         await expect(page).toHaveURL(new RegExp('/admin/actores/' + route + '$'));
         await readablePageHeading(page);
-        cards.push({ ...geometry, keyboardDestination: await page.url() });
+        cards.push({ ...geometry, words, keyboardDestination: await page.url() });
         await page.goto(prefix(info) + surface.route);
         await expect(page.getByRole('link', { name: /^Generadores \d+$/ })).toBeVisible();
       }
+      if (prefix(info)) {
+        const original = page.viewportSize()!;
+        await page.setViewportSize({ width: 320, height: original.height });
+        for (const caption of await page.locator('[data-actor-summary-label]').all()) await readableWholeWords(caption);
+        await readablePageHeading(page);
+        await page.screenshot({ path: info.outputPath('actor-category-320.png'), animations: 'disabled', scale: 'css' });
+        await page.setViewportSize(original);
+      }
       await info.attach('actor-category-native-links', { body: JSON.stringify({ cards, businessAPIIntercepted: false }), contentType: 'application/json' });
+    }
+    if (surface.name === 'wastes' && page.viewportSize()!.width >= 768) {
+      const row = page.getByRole('row').filter({ has: page.getByText('TOXICO', { exact: true }) }).first();
+      const symbol = row.getByRole('img', { name: 'Peligroso', exact: true });
+      await expect(symbol).toBeVisible();
+      await expect(symbol.locator('svg.lucide-triangle-alert')).toBeVisible();
+      await expect(row.locator('svg.lucide-leaf')).toHaveCount(0);
+      await info.attach('waste-declared-identity', { body: JSON.stringify({ declaration: await row.getByText('TOXICO', { exact: true }).innerText(),
+        accessibleIdentity: await symbol.getAttribute('aria-label'), classificationChanged: false }), contentType: 'application/json' });
     }
     if (surface.name === 'bulk-upload') {
       const symbols = [];
@@ -392,6 +412,68 @@ for (const user of ['generador', 'transportista', 'operador', 'inspector', 'lect
     await login(page, info, user);
     for (const [name, route] of [['dashboard', '/dashboard'], ['control', '/centro-control'], ['monitor', '/monitor']]) {
       await capture(page, info, { name: `${user}-${name}`, route, state: user });
+      if (user === 'inspector') {
+        const badge = page.locator('header [aria-label="Función actual"]');
+        await expect(badge).toHaveText('Inspector');
+        await expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
+      }
+      if (prefix(info) && name === 'control' && ['inspector', 'lector-generadores'].includes(user)) {
+        const original = page.viewportSize()!;
+        await page.setViewportSize({ width: 320, height: original.height });
+        await readableWholeWords(page.locator('header [aria-label="Función actual"]'));
+        await readablePageHeading(page);
+        await page.screenshot({ path: info.outputPath(`${user}-control-320.png`), animations: 'disabled', scale: 'css' });
+        await page.setViewportSize(original);
+      }
+    }
+    if (prefix(info)) {
+      const writes: string[] = [];
+      const denied: string[] = [];
+      const onRequest = (request: import('@playwright/test').Request) => {
+        if (new URL(request.url()).pathname.startsWith('/api/actores/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) writes.push(request.method());
+      };
+      const onResponse = (response: import('@playwright/test').Response) => {
+        if (new URL(response.url()).pathname.startsWith('/api/actores/') && response.status() >= 400) denied.push(`${response.status()} ${new URL(response.url()).pathname}`);
+      };
+      page.on('request', onRequest); page.on('response', onResponse);
+      await capture(page, info, { name: `${user}-actor-overview`, route: '/actores', state: 'real consultation; no actor mutation' });
+      const create = page.getByRole('button', { name: 'Nuevo Actor', exact: true });
+      if (user === 'lector-generadores') {
+        await expect(create).toBeVisible();
+        await create.click();
+        const dialog = page.getByRole('dialog', { name: 'Nuevo Actor', exact: true });
+        await dialog.getByLabel('Tipo de Actor', { exact: true }).click();
+        await expect(page.getByRole('option')).toHaveCount(1);
+        await expect(page.getByRole('option', { name: 'Generador', exact: true })).toHaveAttribute('aria-selected', 'true');
+        await page.getByRole('option', { name: 'Generador', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+      } else {
+        await expect(create).toHaveCount(0);
+        await expect(page.getByRole('button', { name: /^Eliminar / })).toHaveCount(0);
+      }
+      const category = user === 'lector-generadores' ? 'operador' : user === 'inspector' ? 'generador' : user;
+      const categoryLabel = { generador: 'Generadores', transportista: 'Transportistas', operador: 'Operadores' }[category]!;
+      const categoryButton = page.getByRole('button', { name: new RegExp(`^${categoryLabel} \\d+$`) });
+      await expect(categoryButton.locator('svg.lucide-funnel')).toBeVisible();
+      await expect(categoryButton.locator('svg.lucide-chevron-right')).toHaveCount(0);
+      await categoryButton.click();
+      await expect(categoryButton).toHaveAttribute('aria-pressed', 'true');
+      await expect(categoryButton.locator('svg.lucide-check')).toBeVisible();
+      await expect(page).toHaveURL(/\/app\/actores$/);
+      const name = { generador: 'QA Generador 1', transportista: 'QA Transporte 1', operador: 'QA Operador 1' }[category]!;
+      await page.getByText(name, { exact: true }).filter({ visible: true }).first().click();
+      const detail = page.getByRole('dialog', { name: 'Detalle del Actor', exact: true });
+      await expect(detail).toBeVisible();
+      await detail.getByRole('button', { name: 'Ver detalle completo', exact: true }).click();
+      const path = { generador: 'generadores', transportista: 'transportistas', operador: 'operadores' }[category]!;
+      await expect(page).toHaveURL(new RegExp(`/app/admin/actores/${path}/[^/]+$`));
+      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Volver', exact: true }).first().click();
+      await expect(page).toHaveURL(/\/app\/actores$/);
+      await info.attach('actor-overview-permission-affordances', { body: JSON.stringify({ user, category, writes, denied,
+        consultationReturnedToOrigin: true, businessAPIIntercepted: false }), contentType: 'application/json' });
+      expect(writes).toEqual([]); expect(denied).toEqual([]);
+      page.off('request', onRequest); page.off('response', onResponse);
     }
   });
 }

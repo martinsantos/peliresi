@@ -18,6 +18,31 @@ export async function readablePageHeading(page: Page) {
   return geometry;
 }
 
+/** Staying inside a box is insufficient if the category or role is broken mid-word. */
+export async function readableWholeWords(label: Locator) {
+  await expect(label).toBeVisible();
+  const result = await label.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    const words: Array<{ word: string; lines: number; inside: boolean }> = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      for (const match of (node.textContent || '').matchAll(/\S+/gu)) {
+        const range = document.createRange();
+        range.setStart(node, match.index!); range.setEnd(node, match.index! + match[0].length);
+        const rects = [...range.getClientRects()].filter(rect => rect.width > 0);
+        words.push({ word: match[0], lines: new Set(rects.map(rect => Math.round(rect.y * 10))).size,
+          inside: rects.every(rect => rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1
+            && rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1) });
+      }
+    }
+    return { label: element.textContent, words, width: bounds.width, height: bounds.height };
+  });
+  expect(result.words.length, 'Require rendered words, not an empty accessible name').toBeGreaterThan(0);
+  for (const word of result.words) expect(word, `Complete readable word: ${word.word}`).toMatchObject({ lines: 1, inside: true });
+  return result;
+}
+
 /** A real notice must not cover the identity, tabs or the scrollable workspace. */
 export async function nonObstructingNotices(page: Page) {
   const notice = page.getByRole('region', { name: 'Avisos del sistema', exact: true });
