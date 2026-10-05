@@ -21,6 +21,7 @@ const impersonationState = vi.hoisted(() => ({
   data: null as null | { impersonatedUser: { nombre: string } },
   exit: vi.fn(),
 }));
+const notices = vi.hoisted(() => ({ unread: 0 }));
 
 vi.mock('../../contexts/ImpersonationContext', () => ({
   useImpersonation: () => ({ impersonationData: impersonationState.data, exitImpersonation: impersonationState.exit }),
@@ -50,7 +51,7 @@ vi.mock('../../hooks/useOfflineSync', () => ({
 }));
 
 vi.mock('../../hooks/useNotificaciones', () => ({
-  useNotificacionesNoLeidas: vi.fn(() => ({ data: 0 })),
+  useNotificacionesNoLeidas: vi.fn(() => ({ data: notices.unread })),
 }));
 
 vi.mock('../../components/NotificationBell', () => ({
@@ -108,6 +109,7 @@ describe('MobileLayout Android shell', () => {
     authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA', esInspector: false };
     impersonationState.data = null;
     impersonationState.exit.mockClear();
+    notices.unread = 0;
   });
 
   it('uses a short transportista bottom navigation label', () => {
@@ -115,6 +117,20 @@ describe('MobileLayout Android shell', () => {
 
     expect(screen.getByText('Viajes')).toBeInTheDocument();
     expect(screen.queryByText('Mis Viajes')).not.toBeInTheDocument();
+  });
+
+  it('keeps the small bottom-navigation unread counter readable', () => {
+    notices.unread = 14;
+    renderMobileLayout('/dashboard');
+    expect(screen.getByText('9+', { exact: true })).toHaveClass('bg-error-700', 'text-white');
+    expect(screen.getByRole('link', { name: /Avisos/ })).toHaveAttribute('href', '/notificaciones');
+  });
+
+  it('uses the same readable unread token in the expanded menu without changing its count', () => {
+    notices.unread = 14;
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    expect(screen.getByText('14', { exact: true })).toHaveClass('bg-error-700', 'text-white');
   });
 
   it.each(['ADMIN', 'GENERADOR'])('keeps the list create action working for %s', role => {

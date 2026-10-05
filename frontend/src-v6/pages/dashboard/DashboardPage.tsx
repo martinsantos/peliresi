@@ -389,7 +389,7 @@ const TransportistaDashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className="font-bold text-success-800">Viaje en Curso</p>
-                      <p className="text-sm text-success-600">#{trip.numero || trip.id?.slice(0, 8)}</p>
+                      <p className="text-sm text-success-700">#{trip.numero || trip.id?.slice(0, 8)}</p>
                     </div>
                   </div>
                   <Badge variant="soft" color="success">EN TRÁNSITO</Badge>
@@ -419,7 +419,7 @@ const TransportistaDashboard: React.FC = () => {
                     <p className="font-bold text-warning-800">
                       {pendingTrips.length} viaje{pendingTrips.length > 1 ? 's' : ''} asignado{pendingTrips.length > 1 ? 's' : ''}
                     </p>
-                    <p className="text-sm text-warning-600">Pendientes de retiro</p>
+                    <p className="text-sm text-warning-700">Pendientes de retiro</p>
                   </div>
                 </div>
                 <div className="space-y-2">

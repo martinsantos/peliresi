@@ -148,7 +148,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
             <p className={cn('text-sm font-semibold', currentConfig.color)}>
               {currentUser.nombre}
             </p>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-neutral-700">
               {currentConfig.label}
             </p>
           </div>

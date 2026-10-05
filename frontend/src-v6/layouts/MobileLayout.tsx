@@ -103,7 +103,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) =
       <div className="relative">
         {icon}
         {badge ? (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-error-700 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
             {badge > 9 ? '9+' : badge}
           </span>
         ) : null}
@@ -608,7 +608,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick }) 
       {icon}
       <span className="flex-1 font-medium">{label}</span>
       {badge && (
-        <span className="px-2 py-0.5 bg-error-500 text-white text-xs font-bold rounded-full">
+        <span className="px-2 py-0.5 bg-error-700 text-white text-xs font-bold rounded-full">
           {badge}
         </span>
       )}

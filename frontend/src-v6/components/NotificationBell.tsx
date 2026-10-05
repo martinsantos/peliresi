@@ -183,7 +183,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       >
         <Bell size={20} />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-error-700 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

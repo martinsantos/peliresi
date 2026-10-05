@@ -6,14 +6,14 @@ import { createSpontaneousInspection, login, prefix } from './helpers';
 /** Evidence is scoped to a route, role, viewport and state, never "all UI passed". */
 type Surface = { name: string; route: string; state?: string; expectedFailure?: boolean };
 
-async function capture(page: Page, info: TestInfo, surface: Surface) {
+async function capture(page: Page, info: TestInfo, surface: Surface, navigate = true) {
   const errors: string[] = [];
   const onError = (error: Error) => errors.push(error.message);
   page.on('pageerror', onError);
-  await page.goto(prefix(info) + surface.route);
+  if (navigate) await page.goto(prefix(info) + surface.route);
   // Initial HTML, auth and lazy-route fallbacks are NOT page evidence. The
   // baseline exposed false-green screenshots of "Cargando SITREP...".
-  await expect(page.locator('#root').locator('h1,h2,form,header,.wr-layout').first()).toBeVisible({ timeout: 20000 });
+  await expect(page.locator('#root').locator('h1:visible,h2:visible,h3:visible,form:visible,header:visible,.wr-layout:visible').first()).toBeVisible({ timeout: 20000 });
   await expect(page.getByText(/^Cargando(?:\s.*|[.\s…]*)$/).filter({ visible: true })).toHaveCount(0, { timeout: 20000 });
   await expect(page.locator('[class*="animate-spin"]:visible')).toHaveCount(0, { timeout: 20000 });
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
@@ -24,7 +24,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface) {
     type Color = [number, number, number, number];
     const color = (css: string): Color | null => {
       const numbers = css.match(/[\d.]+/g)?.map(Number);
-      return numbers && numbers.length >= 3 ? [numbers[0], numbers[1], numbers[2], numbers[3] ?? 1] : null;
+      return css.startsWith('rgb') && numbers && numbers.length >= 3 ? [numbers[0], numbers[1], numbers[2], numbers[3] ?? 1] : null;
     };
     const over = (front: Color, back: Color): Color => {
       const alpha = front[3] + back[3] * (1 - front[3]);
@@ -50,7 +50,16 @@ async function capture(page: Page, info: TestInfo, surface: Surface) {
       for (let ancestor: Element | null = element; ancestor; ancestor = ancestor.parentElement) chain.push(ancestor);
       const styles = chain.map(e => getComputedStyle(e));
       if (styles.some(s => s.visibility !== 'visible' || s.display === 'none' || Number(s.opacity) === 0)) continue;
-      const unsupported = styles.some(s => s.backgroundImage !== 'none' || Number(s.opacity) !== 1 || s.mixBlendMode !== 'normal' || s.filter !== 'none');
+      // An opaque child background hides a gradient/image behind it. Opacity,
+      // filters and blending still affect descendants even across that boundary.
+      let unsupported = styles.some(s => Number(s.opacity) !== 1 || s.mixBlendMode !== 'normal' || s.filter !== 'none');
+      const layers: Color[] = [];
+      for (const s of styles) {
+        const layer = color(s.backgroundColor);
+        if (s.backgroundImage !== 'none' || !layer) { unsupported = true; break; }
+        layers.push(layer);
+        if (layer[3] === 1) break;
+      }
       const style = styles[0];
       const foreground = color(style.color);
       const disabled = !!element.closest(':disabled,[aria-disabled="true"]');
@@ -59,10 +68,7 @@ async function capture(page: Page, info: TestInfo, surface: Surface) {
         bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } };
       if (unsupported || !foreground) { findings.push({ ...record, kind: 'contrast-unmeasured', reason: 'image/gradient/opacity/filter or unsupported color' }); continue; }
       let background: Color = [255, 255, 255, 1];
-      for (const s of [...styles].reverse()) {
-        const layer = color(s.backgroundColor);
-        if (layer) background = over(layer, background);
-      }
+      for (const layer of layers.reverse()) background = over(layer, background);
       const ink = over(foreground, background);
       const values = [luminance(ink), luminance(background)].sort((a, b) => b - a);
       const ratio = (values[0] + .05) / (values[1] + .05);
@@ -91,6 +97,9 @@ async function capture(page: Page, info: TestInfo, surface: Surface) {
   expect.soft(errors, surface.name + ' unhandled exceptions').toEqual([]);
   expect.soft(measurement.overflow, surface.name + ' document overflow').toBeLessThanOrEqual(1);
   expect.soft(measurement.measuredTextNodes + measurement.findings.length, surface.name + ' actual visible content was measured').toBeGreaterThan(3);
+  // Only resolved compositions are gated; unmeasured gradients/images stay in
+  // the evidence as pending rather than being silently treated as compliant.
+  expect.soft(measurement.findings.filter(f => f.kind === 'contrast-candidate'), surface.name + ' enabled text contrast').toEqual([]);
   if (!surface.expectedFailure) expect.soft(await page.locator('body').innerText(), surface.name + ' unexpected dead end').not.toMatch(/Página no encontrada|Error al cargar/);
 }
 
@@ -110,7 +119,14 @@ test('visual inventory: public entry, recovery and explicit error states', async
     { name: 'public-inspection-invalid-token', route: '/verificar/inspecciones/QA-NO-EXISTE', state: 'invalid token', expectedFailure: true },
     { name: 'not-found', route: '/qa-route-does-not-exist', expectedFailure: true },
   ];
-  for (const surface of surfaces) await test.step(surface.name, () => capture(page, info, surface));
+  for (const surface of surfaces) await test.step(surface.name, async () => {
+    if (surface.name === 'public-reset-without-token') {
+      await page.goto(prefix(info) + surface.route);
+      await expect(page).toHaveURL(/\/recuperar$/);
+      await expect(page.getByRole('heading', { name: 'Recuperar contraseña' }).filter({ visible: true })).toBeVisible();
+      await capture(page, info, surface, false);
+    } else await capture(page, info, surface);
+  });
 });
 
 test('visual inventory: authenticated workspaces, ABM and actor forms', async ({ page }, info) => {
@@ -149,10 +165,32 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
   ];
   for (const surface of surfaces) await test.step(surface.name, () => capture(page, info, surface));
   const inspection = await createSpontaneousInspection(page, info);
-  for (const [hash, name] of [['resumen', 'visit'], ['checklist', 'controls'], ['acta', 'record'], ['evidencias', 'evidence'], ['expediente', 'file']]) {
-    await test.step('inspection-' + name, () => capture(page, info, { name: 'inspection-' + name,
-      route: `/inspecciones/${inspection.id}#${hash}`, state: 'synthetic spontaneous inspection draft' }));
+  // Discover the actual available sections rather than guessing a hash that
+  // silently falls back to Visita. A spontaneous inspection has no declaration.
+  const navigation = page.getByRole('navigation', { name: 'Secciones del expediente', exact: true });
+  const sections = await navigation.getByRole('link').evaluateAll(links => links.map(link => ({
+    href: link.getAttribute('href')!, label: link.textContent!.trim(),
+  })));
+  const inspectedSections: string[] = [];
+  for (const section of sections) {
+    await navigation.locator(`a[href="${section.href}"]`).click();
+    const subnavigation = page.getByRole('navigation', { name: 'Apartados de ' + section.label, exact: true });
+    const entries = await subnavigation.count()
+      ? await subnavigation.getByRole('link').evaluateAll(links => links.map(link => ({ href: link.getAttribute('href')!, label: link.textContent!.trim() })))
+      : [section];
+    for (const entry of entries) {
+      if (await subnavigation.count()) await subnavigation.locator(`a[href="${entry.href}"]`).click();
+      await expect(page.getByTestId('inspection-step-content')).toBeVisible();
+      if (entry.href !== '#verificacion') await expect(page.getByTestId('inspection-step-content')).toHaveAttribute('id', entry.href.slice(1));
+      inspectedSections.push(entry.href);
+      await test.step('inspection-' + entry.href.slice(1), () => capture(page, info, {
+        name: 'inspection-' + entry.href.slice(1), route: `/inspecciones/${inspection.id}${entry.href}`,
+        state: 'synthetic spontaneous draft · ' + section.label + ' · ' + entry.label,
+      }, false));
+    }
   }
+  expect(inspectedSections).toContain('#revision');
+  expect(inspectedSections).not.toContain('#declaracion');
   // List every registered path too. Uncaptured aliases and states stay pending;
   // this prevents a capture count from being represented as 100% of the product.
   const routes = {} as Record<string, string[]>;
@@ -160,7 +198,7 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
     const content = await readFile(path.join(process.cwd(), 'src-v6', source), 'utf8');
     routes[source] = [...new Set(Array.from(content.matchAll(/<Route\b[^>]*\bpath="([^"]+)"/g), match => match[1]))];
   }
-  await info.attach('registered-route-inventory', { body: JSON.stringify({ routes, captured: surfaces,
+  await info.attach('registered-route-inventory', { body: JSON.stringify({ routes, captured: surfaces, inspectedSections,
     pending: 'aliases, additional roles, full scroll positions, hover/focus/disabled/loading/error/modals unless separately exercised; physical APK and hardware',
     businessAPIIntercepted: false, role: 'ADMIN', viewport: page.viewportSize() }, null, 2), contentType: 'application/json' });
 });

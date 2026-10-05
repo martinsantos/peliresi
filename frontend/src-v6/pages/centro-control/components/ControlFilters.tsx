@@ -48,7 +48,7 @@ export const ControlFilters: React.FC<ControlFiltersProps> = ({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
           </span>
-          <span className="text-xs font-semibold text-red-600">LIVE</span>
+          <span className="text-xs font-semibold text-red-700">LIVE</span>
         </span>
         <span className="text-xs text-neutral-400 tabular-nums w-6 text-right">{countdown}s</span>
         <button type="button" onClick={onManualRefresh} className="min-h-11 min-w-11 flex items-center justify-center hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 rounded transition-colors text-neutral-600" title="Actualizar ahora">

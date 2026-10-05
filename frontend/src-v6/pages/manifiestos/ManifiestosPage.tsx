@@ -293,7 +293,7 @@ const ManifiestosPage: React.FC = () => {
             onClick={() => {
               exportReportePDF({ titulo: 'Listado de Manifiestos', subtitulo: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', kpis: [{ label: 'Cargados', value: allRows.length }, { label: 'Total', value: totalCount }], tabla: { headers: ['Numero', 'Generador', 'Estado', 'Actividad', 'Peso'], rows: allRows.map(m => [m.numero, m.generadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), `${typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} ${m.unidad}`]) } });
             }}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-600 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
+            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
           ><FileDown size={13} /> PDF</button>
           <Button size="sm" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo Manifiesto</Button>
         </div>

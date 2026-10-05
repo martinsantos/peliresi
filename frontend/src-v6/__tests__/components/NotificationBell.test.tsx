@@ -67,4 +67,12 @@ describe('assignment notification delivery', () => {
     setup();
     expect(await screen.findByRole('button', { name: 'Notificaciones (140 sin leer)', exact: true })).toBeVisible();
   });
+  it('uses the readable inverse error token for the small unread counter', async () => {
+    service.list.mockResolvedValue({ items: [notice], noLeidas: 140 });
+    setup();
+    const counter = await screen.findByText('9+', { exact: true });
+    // Contract only: real computed contrast is measured separately in E2E.
+    expect(counter).toHaveClass('bg-error-700', 'text-white');
+    expect(screen.getByRole('button', { name: 'Notificaciones (140 sin leer)', exact: true })).toBeVisible();
+  });
 });

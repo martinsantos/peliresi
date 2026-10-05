@@ -5,9 +5,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import AlertasPage from '../../pages/alertas/AlertasPage';
 const service = vi.hoisted(() => ({ listAlertas: vi.fn(), listReglas: vi.fn(), resolverAlerta: vi.fn(), createRegla: vi.fn(), updateRegla: vi.fn(), deleteRegla: vi.fn(), evaluarSeguimiento: vi.fn(), simularSeguimiento: vi.fn(), evaluarCatalogo: vi.fn(), simularCatalogo: vi.fn() }));
 const auth = vi.hoisted(() => ({ isAdmin: true, isAnyAdmin: true }));
+const notices = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('../../services/alerta.service', () => ({ alertaService: service }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth }));
-vi.mock('../../services/notificacion.service', () => ({ notificacionService: { list: vi.fn().mockResolvedValue({ items: [], total: 0 }) } }));
+vi.mock('../../services/notificacion.service', () => ({ notificacionService: notices }));
 const caseRow = { id: 'case', estado: 'PENDIENTE', createdAt: new Date().toISOString(), manifiestoId: 'manifest', manifiesto: { numero: 'QA-001', estado: 'RECIBIDO' }, regla: { nombre: 'Seguimiento de manifiesto', evento: 'TIEMPO_EXCESIVO' }, datos: '{"descripcion":"Recepción registrada; revisar el tratamiento"}' };
 function setup() {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })}><MemoryRouter><AlertasPage /></MemoryRouter></QueryClientProvider>);
@@ -32,8 +33,17 @@ it('inspection rule is initially inactive, has exact recipients, no invented day
 });
 beforeEach(() => {
   vi.clearAllMocks(); auth.isAdmin = true; auth.isAnyAdmin = true;
+  notices.list.mockResolvedValue({ items: [], total: 0 });
   service.listAlertas.mockResolvedValue({ items: [caseRow], total: 110, page: 1, limit: 10, totalPages: 11 });
   service.listReglas.mockResolvedValue([]); service.resolverAlerta.mockResolvedValue({ ...caseRow, estado: 'RESUELTA' });
+});
+it('keeps the actor alert unread badge readable without inventing a global count', async () => {
+  auth.isAdmin = false; auth.isAnyAdmin = false;
+  notices.list.mockResolvedValue({ items: [{ id: 'qa-unread', titulo: 'Visita asignada', mensaje: 'QA aviso interno', leida: false, tipo: 'INFO_GENERAL', createdAt: new Date().toISOString() }], total: 1 });
+  setup();
+  expect(await screen.findByText('1 sin leer en esta lista', { exact: true })).toBeVisible();
+  expect(screen.getByText('1', { exact: true })).toHaveClass('bg-error-700', 'text-white');
+  expect(service.listAlertas).not.toHaveBeenCalled();
 });
 it('uses actual server pagination and exposes case state, not a fake read badge', async () => {
   setup(); expect(await screen.findByText('110 casos')).toBeVisible();

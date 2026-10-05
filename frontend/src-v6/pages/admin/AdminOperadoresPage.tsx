@@ -140,7 +140,7 @@ const AdminOperadoresPage: React.FC = () => {
   };
 
   const statCards: CRUDStatCard[] = [
-    { label: 'Total Operadores', value: statsData.total, icon: <FlaskConical size={20} className="text-emerald-600" />, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
+    { label: 'Total Operadores', value: statsData.total, icon: <FlaskConical size={20} className="text-blue-700" />, iconBg: 'bg-blue-100', iconColor: 'text-blue-700' },
     { label: 'Activos', value: statsData.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
     { label: 'Inactivos', value: statsData.inactivos, icon: <AlertTriangle size={20} className="text-warning-600" />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
     { label: 'Filtrados', value: statsData.filtrados, icon: <Search size={20} className="text-info-600" />, iconBg: 'bg-info-100', iconColor: 'text-info-600' },
@@ -204,8 +204,8 @@ const AdminOperadoresPage: React.FC = () => {
       sortable: true,
       render: (row: Row) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <FlaskConical size={20} className="text-emerald-600" />
+          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <FlaskConical size={20} className="text-blue-700" />
           </div>
           <div className="min-w-0">
             <p className="font-medium text-neutral-900 text-sm leading-tight line-clamp-2">{row.razonSocial}</p>
@@ -385,8 +385,8 @@ const AdminOperadoresPage: React.FC = () => {
       // Page metadata
       title="Admin Operadores"
       subtitle="Panel de gestion de operadores de tratamiento"
-      icon={<FlaskConical size={24} className="text-emerald-600" />}
-      iconBg="bg-emerald-100"
+      icon={<FlaskConical size={24} className="text-blue-700" />}
+      iconBg="bg-blue-100"
       // Data
       data={filteredData}
       isLoading={isLoading}
@@ -478,8 +478,8 @@ const AdminOperadoresPage: React.FC = () => {
         <Card className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0">
-                <FlaskConical size={16} className="text-emerald-600" />
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+                <FlaskConical size={16} className="text-blue-700" />
               </div>
               <div className="min-w-0">
                 <p className="font-medium text-sm text-neutral-900 truncate">{row.razonSocial}</p>

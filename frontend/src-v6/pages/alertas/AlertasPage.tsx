@@ -837,7 +837,7 @@ export const AlertasPage: React.FC = () => {
               <Bell size={20} className="text-primary-600" />
             </div>
             {!isAnyAdmin && noLeidasCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-error-700 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                 {noLeidasCount > 99 ? '99+' : noLeidasCount}
               </span>
             )}
