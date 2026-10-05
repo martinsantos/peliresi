@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  FileText, Building2, Truck, Factory, Calendar, Shield,
+  FileText, FlaskConical, Truck, Factory, Calendar, Shield,
   AlertTriangle, CheckCircle2, Clock, ArrowRight, Loader2
 } from 'lucide-react';
 import axios from 'axios';
@@ -165,7 +165,7 @@ const VerificarManifiestoPage: React.FC = () => {
           </div>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-              <Building2 size={16} className="text-blue-600" />
+              <FlaskConical size={16} className="text-blue-600" />
             </div>
             <div>
               <p className="text-xs text-neutral-500">Operador</p>

@@ -138,6 +138,26 @@ test('map symbols stay centered, padded and actionable in every shared map contr
       expect.soft(symbol.stroke, name + ' visible foreground').toBe('rgb(255, 255, 255)');
     }
   }
+  // Public QR verification must retain the same actor identity without adding
+  // links to private fichas. This is the real seeded document and real API.
+  const verified = page.waitForResponse(response => new URL(response.url()).pathname === '/api/manifiestos/verificar/2026-990001');
+  await page.goto(`${prefix(info)}/manifiestos/verificar/2026-990001`);
+  const verification = await verified;
+  expect(verification.status()).toBe(200);
+  const verifiedRecord = (await verification.json()).data.manifiesto;
+  await expect(page.getByRole('heading', { name: verifiedRecord.numero, exact: true })).toBeVisible();
+  for (const [label, actor, glyph] of [
+    ['Generador', 'generador', 'factory'],
+    ['Transportista', 'transportista', 'truck'],
+    ['Operador', 'operador', 'flask-conical'],
+  ]) {
+    const row = page.getByText(label, { exact: true }).locator('..').locator('..');
+    await expect(row.getByText(verifiedRecord[actor].razonSocial, { exact: true })).toBeVisible();
+    await expect(row.locator(`svg.lucide-${glyph}`)).toHaveCount(1);
+    await expect(row.locator('svg.lucide-building-2')).toHaveCount(0);
+    await expect(row.getByRole('link')).toHaveCount(0);
+  }
+  await page.screenshot({ path: info.outputPath('public-manifest-actor-icons.png'), animations: 'disabled' });
   await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, rowMeasurements, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
