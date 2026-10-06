@@ -4,16 +4,16 @@ import { assertFullE2EEvidence, type FullE2EEvidence } from './e2e-evidence.ts';
 
 function complete(): FullE2EEvidence {
   return {
-    stats: { expected: 171, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
+    stats: { expected: 180, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
     suites: [{ suites: ['web-desktop', 'web-responsive', 'app'].map(projectName => ({
-      specs: Array.from({ length: 57 }, () => ({ tests: [{
+      specs: Array.from({ length: 60 }, () => ({ tests: [{
         projectName, status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed', retry: 0 }],
       }] })),
     })) }],
   };
 }
 
-test('the complete 57 x 3 evidence is accepted without lowering the denominator', () => {
+test('the complete 60 x 3 evidence is accepted without lowering the denominator', () => {
   assert.doesNotThrow(() => assertFullE2EEvidence(complete()));
 });
 test('an old 141-case summary and a missing case cannot be packaged', () => {

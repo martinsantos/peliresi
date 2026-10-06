@@ -618,6 +618,22 @@ try{
     await back.tap();
     await expect(page).not.toHaveURL(/escaner-qr$/);
   });
+  await check('native-support-report-and-detail-on-actual-Android',async()=>{
+    await page.goto('http://127.0.0.1:4177/app/soporte');
+    await expect(page.getByRole('heading',{name:'Soporte',exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Reportar problema',exact:true}).last().tap();
+    const dialog=page.getByRole('dialog',{name:'Reportar un problema',exact:true});
+    await dialog.getByLabel('Asunto',{exact:true}).fill('QA soporte desde Android real emulado');
+    await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?',{exact:true}).fill('QA prueba sintética del formulario y entrega interna. Sin mensajes externos.');
+    const creating=page.waitForResponse(response=>response.url().endsWith('/api/soporte')&&response.request().method()==='POST');
+    await dialog.getByRole('button',{name:'Enviar ticket',exact:true}).tap();
+    const response=await creating;expect(response.status()).toBe(201);
+    const ticket=(await response.json()).data;
+    await expect(page).toHaveURL('http://127.0.0.1:4177/app/soporte/'+ticket.id);
+    await expect(page.getByText(ticket.referencia,{exact:true})).toBeVisible();
+    await expect(page.getByText('QA prueba sintética del formulario y entrega interna. Sin mensajes externos.',{exact:true})).toBeVisible();
+    await proof('support-actual-android');
+  });
   await check('javascript-health',async()=>{
     await expect(page).toHaveTitle(/SITREP/i);
     assert.ok(results.some(result=>result.name==='real-os-and-admin-session'&&result.status==='PASS'), 'A real authenticated session must have run');
@@ -630,7 +646,7 @@ try{
   });
 }finally{
   try{
-    await saveResults(results.length===15);
+    await saveResults(results.length===16);
     await closeContext();
     await driverStep('close-QA-device',()=>device.close(),10000);
   }finally{await stopSystemLog();}

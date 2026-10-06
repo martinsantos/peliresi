@@ -1,5 +1,75 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## Siguiente candidato: soporte nativo autorizado y retorno del Monitor
+
+El usuario autorizó implementar soporte propio, portable a infraestructura del
+Gobierno. No se copia código, base, imágenes, usuarios ni configuración de PSICOLE.
+No se depende de PSICOLE, TORRE, SaaS ni canales externos. El candidato siguiente
+incluye `/api/soporte`, `/soporte` y su ruta app/mobile con la misma interfaz.
+
+### Circuito y límites
+
+- Reportar desde el menú o Ayuda sin salir del formulario; asunto, descripción,
+  categoría y hasta tres JPG/PNG/WEBP/PDF de 5 MB. Diagnóstico mínimo de ruta sin
+  query/fragment/tokens y tamaño de pantalla. No captura automática de datos.
+- Borrador local por cuenta, no autoenvío. Después de timeout se conserva cuerpo,
+  clave y huellas de adjuntos; comprobar recepción o reintentar exactamente.
+  Los archivos no se guardan en el borrador: tras recargar deben re-adjuntarse
+  los mismos. Sin sesión humana comprobable durante impersonación se pide volver
+  a la cuenta propia: no se atribuye un reporte al administrador por datos locales.
+- Mis tickets para cada autor; mesa y responsables sólo para soporte habilitado.
+  ADMIN configura agentes explícitos. Dar soporte no cambia roles ni permisos
+  legales. Deshabilitar a un agente con tickets abiertos requiere derivarlos.
+- Toma, respuesta pública, nota privada, solicitud de respuesta, derivación con
+  motivo, cierre con resolución y reapertura en el mismo número/historial.
+  Versiones, lock de fila e idempotencia transaccional contra carreras/duplicados.
+  Un responsable deshabilitado no retiene un ticket que se reabre.
+- Avisos internos durables en la misma transacción: no SMTP/push/WhatsApp ni
+  dispatcher externo. Conversación/adjuntos privados se filtran en el servidor.
+  Archivos fuera del docroot, descargados con sesión y `private, no-store`.
+
+### Infraestructura y traslado
+
+Prisma/PostgreSQL existente más `UPLOADS_DIR/soporte`. Migración aditiva
+`20261006010000_native_support`, tablas independientes y contador SOP propio,
+sin editar usuarios, roles, inspecciones, manifiestos ni su numeración.
+Traslado: respaldo consistente de PostgreSQL y `UPLOADS_DIR`, misma configuración
+JWT/origen/API; dominio/VPN del Gobierno es infraestructura, no una URL hardcodeada
+ni una dependencia de este módulo. Antes de publicación: respaldo, migración
+revisada/aplicada y cliente Prisma generado con el schema nuevo. Un rollback de
+frontend/backend puede conservar las tablas añadidas; no borrar los tickets.
+Con `FILE_SCAN_MODE=required`, `CLAMAV_SCAN_CMD` debe estar configurado o se rechaza
+el archivo; no hay fallback que omita el antivirus. No se instaló VPN ni servidor.
+Prioridades/SLA/categorías administrables y tickets automáticos quedan fuera de
+esta primera entrega: no mostrar plazos o destinatarios ficticios.
+
+### Evidencia previa y gates siguientes
+
+QA93/37388152398 sobre661284a: 485BE+1089FE unit PASS;170/171 E2E,
+1 fallo app al cerrar Monitor. Android15/15PASS/completedtrue; APKoriginal4/4
+solamente anónimo/readonly. El DOM del fallo es404. `navigate('/app/centro-control')`
+duplicaba el basename de BrowserRouter: se usa una ruta del router, con prueba
+unit y URL E2E exacta (la expresión previa aceptaba el sufijo incorrecto).
+Cleanup confirmó runtime5956/server5957 detenidos y PostgreSQL apagado
+2026-10-06T00:03:00.289Z. ZIP93SHA256
+`59692eb8053b52c83dda0fa0b223bf7ec31332ab683e6dde4a1b8a06dd77d7f5`.
+El PASS Android93 no borra el fallo de transporte Android92, de causa no resuelta.
+
+Focal siguiente FE81/81PASS en9archivos,0fallos/omitidos, heap256/worker1;
+BE24 casos de soporte con DB/proveedores simulados. Full unit/build todavía
+pendientes. Nuevo gate HTTP real:11controles (incluye SQL aditivo original,
+concurrencia/privacidad/derivación/reapertura); tres nuevos E2E por superficie:
+se exige180 reales (60x3), no se reduce el denominador previo. Android agrega
+un reporte real sintético y detalle:16casos exigidos. Todo en una VM serial.
+Sin browser/Docker/DB/API/emulador/build/install locales ni automatizaciones.
+No publicar ni afirmar GO sin crudos, capturas originales y limpieza de la VM.
+
+Producción y publicador protegido intactos. Ningún correo, push, mensaje,
+cuenta real o expediente real creado/modificado. Los contactos ficticios de
+Ayuda se reemplazan por el circuito interno, no por otra dirección inventada.
+ASR real, APK exacto autenticado, hardware, Safari, ruido/batería/background,
+conciliación productiva y revisión visual de estados restantes siguen pendientes.
+
 ## PREVALENTE 05/10/2026 23:22 UTC — QA92 fallida, reparaciones siguientes verificadas en focal
 
 [QA92](https://github.com/martinsantos/peliresi/actions/runs/37382728904), fuente

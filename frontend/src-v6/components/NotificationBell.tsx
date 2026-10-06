@@ -8,7 +8,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, AlertTriangle, Info, AlertCircle, CheckCircle2, X, MapPin, ClipboardCheck } from 'lucide-react';
+import { Bell, AlertTriangle, Info, AlertCircle, CheckCircle2, X, MapPin, ClipboardCheck, LifeBuoy } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificacionService } from '../services/notificacion.service';
 import { getAccessToken } from '../services/api';
@@ -44,6 +44,9 @@ function getNotificationType(notif: Notificacion): NotificationType {
 }
 
 function getTypeIcon(type: NotificationType, notice: Notificacion) {
+  if (type === 'info' && resolveNotificationPath(notice).includes('/soporte/')) {
+    return <LifeBuoy size={16} className="text-primary-700 shrink-0" />;
+  }
   if (type === 'info' && resolveNotificationPath(notice).includes('/inspecciones/')) {
     return <ClipboardCheck size={16} className="text-primary-700 shrink-0" />;
   }

@@ -85,6 +85,7 @@ export const MobileDashboardPage = lazy(() => import('../pages/mobile/MobileDash
 // Notificaciones, Ayuda, QR, Estadísticas
 export const NotificacionesPage = lazy(() => import('../pages/notificaciones/NotificacionesPage'));
 export const AyudaPage = lazy(() => import('../pages/ayuda/AyudaPage'));
+export const SoportePage = lazy(() => import('../pages/soporte/SoportePage'));
 export const EscanerQRPage = lazy(() => import('../pages/escaner/EscanerQRPage'));
 export const EstadisticasPage = lazy(() => import('../pages/estadisticas/EstadisticasPage'));
 

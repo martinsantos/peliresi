@@ -38,6 +38,7 @@ import {
   FileCheck,
   Radio,
   Scale,
+  LifeBuoy,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
@@ -53,6 +54,7 @@ import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { SupportEntry } from '../components/SupportReportDialog';
 
 // ========================================
 // COMPONENT
@@ -194,7 +196,7 @@ export const MainLayout: React.FC = () => {
   })();
 
   // One current section, including detail routes; hidden role items never compete.
-  const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems]);
+  const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems, { path: '/soporte', icon: LifeBuoy, label: 'Soporte' }]);
   const currentPage = currentItem?.label || 'SITREP';
 
   return (
@@ -321,6 +323,11 @@ export const MainLayout: React.FC = () => {
           
           {/* Configuración y Ayuda al final */}
           <div className="mt-2">
+            <NavLink to="/soporte" onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}>
+              <LifeBuoy size={20} />Soporte
+            </NavLink>
+            <SupportEntry className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-white" />
             <NavLink
               to="/configuracion"
               onClick={() => setSidebarOpen(false)}

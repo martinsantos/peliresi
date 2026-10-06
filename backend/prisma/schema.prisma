@@ -56,6 +56,11 @@ model Usuario {
   evidenciasAnuladasInspeccion EvidenciaInspeccion[]   @relation("UsuarioAnulacionEvidenciasInspeccion")
   eventosInspeccion            EventoInspeccion[]      @relation("UsuarioEventosInspeccion")
   intercambiosInspeccion       IntercambioInspeccion[] @relation("UsuarioIntercambiosInspeccion")
+  agenteSoporte               AgenteSoporte?
+  ticketsSoporte              TicketSoporte[] @relation("AutorTicketSoporte")
+  ticketsSoporteAsignados      TicketSoporte[] @relation("ResponsableTicketSoporte")
+  mensajesSoporte             MensajeSoporte[]
+  eventosSoporte              EventoSoporte[]
 
   @@map("usuarios")
 }
@@ -670,6 +675,89 @@ model EventoInspeccion {
 
   @@index([inspeccionId, createdAt])
   @@map("eventos_inspeccion")
+}
+
+// Technical support is independent of legal dossiers and business-role grants.
+model AgenteSoporte {
+  usuarioId String @id
+  habilitado Boolean @default(true)
+  updatedAt DateTime @updatedAt
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  @@map("agentes_soporte")
+}
+
+model TicketSoporte {
+  id String @id @default(cuid())
+  numero Int @unique @default(autoincrement())
+  autorId String
+  responsableId String?
+  asunto String
+  categoria String @default("GENERAL")
+  estado String @default("ABIERTO")
+  contexto Json
+  clienteId String
+  huella String
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cerradoAt DateTime?
+  autor Usuario @relation("AutorTicketSoporte", fields: [autorId], references: [id], onDelete: Restrict)
+  responsable Usuario? @relation("ResponsableTicketSoporte", fields: [responsableId], references: [id], onDelete: SetNull)
+  mensajes MensajeSoporte[]
+  eventos EventoSoporte[]
+  @@unique([autorId, clienteId])
+  @@index([autorId, updatedAt])
+  @@index([estado, updatedAt])
+  @@index([responsableId, estado])
+  @@map("tickets_soporte")
+}
+
+model MensajeSoporte {
+  id String @id @default(cuid())
+  ticketId String
+  autorId String
+  cuerpo String
+  interno Boolean @default(false)
+  createdAt DateTime @default(now())
+  ticket TicketSoporte @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  autor Usuario @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  adjuntos AdjuntoSoporte[]
+  @@index([ticketId, createdAt])
+  @@map("mensajes_soporte")
+}
+
+model AdjuntoSoporte {
+  id String @id @default(cuid())
+  mensajeId String
+  nombre String
+  mime String
+  bytes Int
+  sha256 String
+  storageKey String
+  mensaje MensajeSoporte @relation(fields: [mensajeId], references: [id], onDelete: Restrict)
+  @@index([mensajeId])
+  @@map("adjuntos_soporte")
+}
+
+model EventoSoporte {
+  id String @id @default(cuid())
+  ticketId String
+  usuarioId String
+  clienteId String
+  huella String
+  accion String
+  estadoAnterior String
+  estadoNuevo String
+  responsableAnteriorId String?
+  responsableNuevoId String?
+  interno Boolean @default(false)
+  version Int
+  createdAt DateTime @default(now())
+  ticket TicketSoporte @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  @@unique([ticketId, usuarioId, clienteId])
+  @@index([ticketId, createdAt])
+  @@map("eventos_soporte")
 }
 
 // Enumeraciones

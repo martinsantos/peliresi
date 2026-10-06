@@ -420,7 +420,7 @@ for (const user of ['generador', 'transportista', 'operador', 'inspector', 'lect
           await expect(badge).toHaveCount(0);
           await expect(page.getByRole('group', { name: 'Modo del Monitor', exact: true })).toBeVisible();
           await page.getByRole('button', { name: 'Cerrar (Esc)', exact: true }).click();
-          await expect(page).toHaveURL(new RegExp(`${prefix(info)}/centro-control$`));
+          await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + '/centro-control');
         }
         await expect(badge).toHaveText('Inspector');
         await expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');

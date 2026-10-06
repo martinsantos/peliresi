@@ -17,6 +17,11 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it('opens native support in the current surface with exactly one base path', () => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'soporte', ticketId: 'ticket-1', ruta: '/soporte/ticket-1' }) };
+    expect(resolveNotificationPath(notice)).toBe('/soporte/ticket-1');
+    expect(resolveNotificationPath(notice, '/mobile')).toBe('/mobile/soporte/ticket-1');
+  });
   it('opens the exact manifiesto in the mobile app', () => {
     expect(resolveNotificationPath({ ...base, manifiestoId: 'm-1' }, '/app')).toBe('/app/manifiestos/m-1');
   });

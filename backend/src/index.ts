@@ -34,6 +34,7 @@ import blockchainRoutes from './routes/blockchain.routes';
 import renovacionRoutes from './routes/renovacion.routes';
 import solicitudRoutes from './routes/solicitud.routes';
 import inspeccionRoutes from './routes/inspeccion.routes';
+import supportRoutes from './routes/support.routes';
 import { startEmailFlushTimer } from './services/email.service';
 
 // Inicializar la aplicación Express
@@ -234,6 +235,7 @@ app.use('/api/actores', actorRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/solicitudes', solicitudRoutes);
 app.use('/api/inspecciones', inspeccionRoutes);
+app.use('/api/soporte', supportRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);

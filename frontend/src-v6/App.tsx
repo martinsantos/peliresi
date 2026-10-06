@@ -40,7 +40,7 @@ import {
   AdminRenovacionesPage, AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
   AdminSolicitudesPage, SolicitudDetallePage,
   AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
-  MobileDashboardPage, NotificacionesPage, AyudaPage, EscanerQRPage, EstadisticasPage,
+  MobileDashboardPage, NotificacionesPage, AyudaPage, SoportePage, EscanerQRPage, EstadisticasPage,
   InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
 } from './routes/pages';
 
@@ -126,6 +126,8 @@ function App() {
             <Route path="/mobile/configuracion" element={<ConfiguracionPage />} />
             <Route path="/mobile/mi-perfil" element={<PerfilPage />} />
             <Route path="/mobile/ayuda" element={<AyudaPage />} />
+            <Route path="/mobile/soporte" element={<SoportePage />} />
+            <Route path="/mobile/soporte/:id" element={<SoportePage />} />
             <Route path="/mobile/switch-user" element={<UserSwitcherPage />} />
 
             {/* Mobile Special Routes */}
@@ -258,6 +260,8 @@ function App() {
 
             {/* Ayuda */}
             <Route path="/ayuda" element={<AyudaPage />} />
+            <Route path="/soporte" element={<SoportePage />} />
+            <Route path="/soporte/:id" element={<SoportePage />} />
 
             {/* Solicitudes */}
             <Route path="/mi-solicitud" element={<MiSolicitudPage />} />

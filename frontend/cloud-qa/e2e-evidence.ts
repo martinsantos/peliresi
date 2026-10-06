@@ -9,9 +9,9 @@ export type FullE2EEvidence = {
   suites: Suite[];
 };
 
-// 57 independently exercised journeys in each of the three configured surfaces.
+// 60 independently exercised journeys: previous 57 + 3 native support journeys.
 // Keep exact denominators: adding a journey requires an explicit contract update.
-export const FULL_E2E_JOURNEYS_PER_SURFACE = 57;
+export const FULL_E2E_JOURNEYS_PER_SURFACE = 60;
 const surfaces = ['app', 'web-desktop', 'web-responsive'];
 
 /** A green aggregate alone must not authorize an incomplete or retried release. */

@@ -17,6 +17,13 @@ function setup() {
 }
 describe('assignment notification delivery', () => {
   beforeEach(() => { service.list.mockReset().mockResolvedValue({ items: [], noLeidas: 0 }); service.marcarLeida.mockReset().mockResolvedValue({}); });
+  it('uses the same support symbol and opens its native ticket', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, titulo: 'Ticket derivado a tu atención', datos: JSON.stringify({ tipo: 'soporte', ruta: '/soporte/native-ticket' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: 'Notificaciones', exact: true }));
+    const title = await screen.findByText('Ticket derivado a tu atención');
+    expect(title.closest('button')?.querySelector('svg.lucide-life-buoy')).not.toBeNull();
+    fireEvent.click(title); await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/app/soporte/native-ticket'));
+  });
 
   it('refreshes on opening so a newly assigned visit does not wait for the polling interval', async () => {
     const client = setup();

@@ -5,15 +5,13 @@
  */
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Search,
   BookOpen,
   FileText,
   Video,
   MessageCircle,
-  Phone,
-  Mail,
   ChevronRight,
   ArrowLeft,
   Play,
@@ -24,6 +22,8 @@ import {
 import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
 import WorkflowDiagram from '../../components/docs/WorkflowDiagram';
+import { SupportEntry } from '../../components/SupportReportDialog';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 
 // FAQ data
 const faqs = [
@@ -161,6 +161,7 @@ const videos = [
 
 const AyudaPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
 
@@ -212,13 +213,13 @@ const AyudaPage: React.FC = () => {
           { icon: BookOpen, label: 'Manual completo', color: 'bg-primary-50 text-primary-600', href: '/manual/' },
           { icon: FileText, label: 'Guía de inspecciones', color: 'bg-success-50 text-success-600', href: '/manual/#inspecciones' },
           { icon: Video, label: 'Tutoriales', color: 'bg-secondary-50 text-secondary-600', href: undefined },
-          { icon: MessageCircle, label: 'Chat de ayuda', color: 'bg-info-50 text-info-600', href: undefined },
+          { icon: MessageCircle, label: 'Mis tickets de soporte', color: 'bg-primary-50 text-primary-800', href: mp('/soporte') },
           { icon: FileText, label: 'Guías PDF', color: 'bg-success-50 text-success-600', href: undefined },
         ].map((item) => (
           <Card
             key={item.label}
             className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => item.href && (window.location.href = item.href)}
+            onClick={() => item.href && (item.href.includes('/soporte') ? navigate(item.href) : (window.location.href = item.href))}
           >
             <div className={`w-12 h-12 ${item.color} rounded-xl flex items-center justify-center mb-3`}>
               <item.icon size={24} />
@@ -304,31 +305,9 @@ const AyudaPage: React.FC = () => {
             <h3 className="text-lg font-semibold text-neutral-900 mb-4">
               ¿Necesitas más ayuda?
             </h3>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <a 
-                href="mailto:soporte@sitrep.gob.ar"
-                className="flex items-center gap-3 p-4 rounded-xl border border-neutral-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
-              >
-                <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center">
-                  <Mail className="text-primary-600" size={20} />
-                </div>
-                <div>
-                  <p className="font-medium text-neutral-900">Email</p>
-                  <p className="text-sm text-neutral-500">soporte@sitrep.gob.ar</p>
-                </div>
-              </a>
-              <a 
-                href="tel:08001234567"
-                className="flex items-center gap-3 p-4 rounded-xl border border-neutral-200 hover:border-success-300 hover:bg-success-50 transition-colors"
-              >
-                <div className="w-10 h-10 bg-success-50 rounded-lg flex items-center justify-center">
-                  <Phone className="text-success-600" size={20} />
-                </div>
-                <div>
-                  <p className="font-medium text-neutral-900">Teléfono</p>
-                  <p className="text-sm text-neutral-500">0800-123-4567</p>
-                </div>
-              </a>
+            <div className="flex flex-wrap gap-3">
+              <SupportEntry />
+              <Link to={mp('/soporte')} className="inline-flex min-h-11 items-center rounded-lg border border-neutral-400 px-4 text-neutral-900 hover:bg-primary-50 focus-visible:outline-primary-700">Ver mis tickets</Link>
             </div>
           </Card>
         </div>

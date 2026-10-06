@@ -29,7 +29,7 @@ import {
   AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
   AdminRenovacionesPage, AdminSolicitudesPage, SolicitudDetallePage,
   AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
-  AyudaPage, EscanerQRPage, EstadisticasPage,
+  AyudaPage, SoportePage, EscanerQRPage, EstadisticasPage,
   InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
 } from './routes/pages';
 
@@ -187,6 +187,8 @@ function AppMobile() {
             <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />
             <Route path="/mi-solicitud" element={<MiSolicitudPage />} />
             <Route path="/ayuda" element={<AyudaPage />} />
+            <Route path="/soporte" element={<SoportePage />} />
+            <Route path="/soporte/:id" element={<SoportePage />} />
             <Route path="/switch-user" element={<UserSwitcherPage />} />
 
             {/* Admin */}

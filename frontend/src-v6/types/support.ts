@@ -1,0 +1,15 @@
+export type SupportState = 'ABIERTO' | 'EN_CURSO' | 'ESPERANDO_USUARIO' | 'CERRADO';
+export const supportStates: Record<SupportState, string> = { ABIERTO: 'Abierto', EN_CURSO: 'En atención', ESPERANDO_USUARIO: 'Espera tu respuesta', CERRADO: 'Cerrado' };
+export const supportCategories = { GENERAL: 'General', SESION: 'Acceso y sesión', MANIFIESTOS: 'Manifiestos', INSPECCIONES: 'Inspecciones', GPS: 'Ubicación y viajes', QR: 'Escáner QR', DOCUMENTOS: 'Documentos', INTERFAZ: 'Interfaz' };
+export type SupportCategory = keyof typeof supportCategories;
+export type SupportAction = 'RESPONDER' | 'NOTA' | 'TOMAR' | 'DERIVAR' | 'ESPERAR' | 'CERRAR' | 'REABRIR';
+export type SupportPerson = { id: string; nombre: string; apellido?: string | null };
+export type SupportFile = { id: string; nombre: string; mime: string; bytes: number; sha256: string };
+export type SupportTicket = { id: string; referencia: string; asunto: string; categoria: SupportCategory; estado: SupportState; autorId: string;
+  responsableId: string | null; autor: SupportPerson; responsable: SupportPerson | null; version: number; createdAt: string; updatedAt: string;
+  contexto: { ruta: string | null; ancho?: number; alto?: number; online?: boolean };
+  puedeGestionar: boolean; puedeAtender: boolean; esAutor: boolean;
+  mensajes: Array<{ id: string; cuerpo: string; interno: boolean; autor: SupportPerson; createdAt: string; adjuntos: SupportFile[] }>;
+  eventos: Array<{ id: string; accion: SupportAction; estadoAnterior: SupportState; estadoNuevo: SupportState; createdAt: string; version: number }> };
+export type SupportCreate = { asunto: string; descripcion: string; categoria: SupportCategory; contexto: SupportTicket['contexto'] };
+export type SupportMutation = { accion: SupportAction; version: number; cuerpo: string; responsableId?: string };

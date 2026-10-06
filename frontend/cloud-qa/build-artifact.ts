@@ -69,12 +69,17 @@ if (mode === 'freeze') {
   assert.equal(territorial.passed, 5); assert.equal(territorial.failed, 0);
   assert.equal(territorial.compiledApi, true); assert.equal(territorial.realLogin, true);
   assert.equal(territorial.externalProvidersDisabled, true);
+  const support = await readJson('support-integration.json');
+  assert.equal(support.commit, process.env.GITHUB_SHA);
+  assert.equal(support.passed, 11); assert.equal(support.failed, 0);
+  assert.equal(support.compiledApi, true); assert.equal(support.realLogin, true);
+  assert.equal(support.externalProvidersDisabled, true);
   assertFullE2EEvidence(e2e);
   const android = await readJson('android/result.json');
   const apk = await readJson('apk/result.json');
   assert.equal(android.completed,true,'An interrupted Android suite cannot pass the package gate');
   assert.equal(android.failed + apk.failed, 0);
-  assert.equal(android.passed, 15);
+  assert.equal(android.passed, 16);
   assert.equal(apk.passed, 4);
   const androidSystemPackages = await readJson('android-system-packages.json');
   assert.equal(androidSystemPackages.stable, true, 'Require fixed Android dependency versions');

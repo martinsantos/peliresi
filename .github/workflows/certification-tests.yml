@@ -197,6 +197,8 @@ jobs:
         run: node --experimental-strip-types frontend/cloud-qa/monitor-calendar-integration.ts
       - name: Confirmed global operational reads and separate actor permission boundaries
         run: node --experimental-strip-types frontend/cloud-qa/territorial-access-integration.ts
+      - name: Native support migration, concurrency, privacy, assignment and internal notices
+        run: node --experimental-strip-types frontend/cloud-qa/support-integration.ts
       - name: Actual web and app E2E, one browser worker, no fake auth
         env:
           QA_CONTEXT_ONLY: ${{ inputs.context_only }}
@@ -222,6 +224,8 @@ jobs:
             /tmp/sitrep-night-20260926.cloud/expiry-identity.json
             /tmp/sitrep-night-20260926.cloud/monitor-calendar.json
             /tmp/sitrep-night-20260926.cloud/territorial-access.json
+            /tmp/sitrep-night-20260926.cloud/support-integration.json
+            /tmp/sitrep-night-20260926.cloud/e2e/support-*/**/*.png
             /tmp/sitrep-night-20260926.cloud/e2e/global-operation-*/**/*.png
             /tmp/sitrep-night-20260926.cloud/e2e/global-operation-*/**/error-context.md
             /tmp/sitrep-night-20260926.cloud/e2e/manual-*/**/*.png

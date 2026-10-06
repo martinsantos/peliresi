@@ -41,6 +41,7 @@ import {
   ClipboardCheck,
   Scale,
   Radio,
+  LifeBuoy,
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
@@ -59,6 +60,7 @@ import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
+import { SupportEntry } from '../components/SupportReportDialog';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -253,6 +255,7 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
     }
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
+    items.push({ to: mp('/soporte'), icon: <LifeBuoy size={20} />, label: 'Soporte', section: 'tools' });
 
     return items;
   }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId, unreadNotificationCount]);
@@ -291,6 +294,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/estadisticas')) return 'Estadísticas';
     if (path.includes('/escaner-qr')) return 'Escanear QR';
     if (path.includes('/ayuda')) return 'Ayuda';
+    if (path.includes('/soporte')) return 'Soporte';
     if (path.includes('/switch-user')) return 'Cuenta';
     if (path.includes('/centro-control')) return 'Centro de Control';
     if (path.includes('/admin/usuarios')) return 'Usuarios';
@@ -470,6 +474,7 @@ export const MobileLayout: React.FC = () => {
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
             >
               <div className="space-y-1">
+                <SupportEntry className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-neutral-900 transition-colors hover:bg-primary-50 focus-visible:outline-primary-700" />
                 {mainItems.map((item) => (
                   <MenuItem 
                     key={item.to}

@@ -9,7 +9,8 @@ import { useInspectionOperations } from '../../hooks/useInspectionOperations';
 import { useAuth } from '../../contexts/AuthContext';
 import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { monitorReturnPath } from '../../utils/monitorReturnPath';
 import { useQuery } from '@tanstack/react-query';
 import { Radio, Play, Pause, FastForward, Calendar, Film, X, Leaf, Clock, FileText } from 'lucide-react';
 import { useWarRoomData } from './hooks/useWarRoomData';
@@ -37,6 +38,7 @@ const NUM_TO_SPEED = (n: number): 'fast' | 'normal' | 'slow' =>
 
 const WarRoomPage: React.FC = () => {
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const [mode, setModeRaw] = useState<MonitorMode>('LIVE');
   const { currentUser } = useAuth();
   const inspections = useInspectionOperations({ limit: 100 }, mode === 'LIVE');
@@ -62,7 +64,7 @@ const WarRoomPage: React.FC = () => {
   const staleLive=mode==='LIVE' && !!liveData.dataUpdatedAt && now-liveData.dataUpdatedAt>45000;
   const liveCurrent=mode==='LIVE' && online && !liveData.isError && !!liveData.dataUpdatedAt && !staleLive;
   const dataStatus=!online?'Sin conexión':selectedQuery.isError || staleLive?'Sin actualizar':selectedQuery.isPending?'Cargando datos':selectedQuery.isFetching?'Actualizando datos':'Datos actualizados';
-  const closeMonitor=useCallback(()=>navigate(window.location.pathname.startsWith('/app/')?'/app/centro-control':'/centro-control'),[navigate]);
+  const closeMonitor = useCallback(() => navigate(monitorReturnPath(routerLocation.pathname)), [navigate, routerLocation.pathname]);
 
   // Active days for date navigator
   const activeDaysQuery = useQuery({ queryKey: ['monitor-active-days'], queryFn: fetchActiveDays, staleTime: 5 * 60_000 });
