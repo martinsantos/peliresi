@@ -2,6 +2,16 @@
 
 ## Siguiente candidato: soporte nativo autorizado y retorno del Monitor
 
+QA94/37394745344 sobre e996b24 terminó FAILURE en unit:509BE PASS y
+1104/1108FE PASS,4fallos. Los cuatro fixtures antiguos de Monitor no montaban
+Router porque sólo simulaban useNavigate. Reproducción local4FAIL; fixture
+actualizado con MemoryRouter real y dos casos adicionales de basenameapp/Escape
+mobile, sin cambiar producto ni expectativas previas. Focal siguiente15/15PASS.
+No compile/HTTP/E2E/Android ejecutados en94; cleanup con lista de procesos vacía,
+PostgreSQL no iniciado. ZIPfinal94SHA256
+42901b910e4b165f62d25fa14912d70bc754a0a5ff6a1bd20a6beddc51c0fd31.
+Repetir full con el fixture corregido; no convertir focal en aprobación global.
+
 El usuario autorizó implementar soporte propio, portable a infraestructura del
 Gobierno. No se copia código, base, imágenes, usuarios ni configuración de PSICOLE.
 No se depende de PSICOLE, TORRE, SaaS ni canales externos. El candidato siguiente

@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state=vi.hoisted(()=>({navigate:vi.fn(),refetch:vi.fn(),error:false,updated:1700000000000}));
 vi.mock('react-router-dom',async()=>({...await vi.importActual('react-router-dom'),useNavigate:()=>state.navigate}));
@@ -15,7 +16,7 @@ vi.mock('../../pages/monitor/components/DashboardPanels',()=>({DashboardPanels:(
 vi.mock('../../pages/monitor/components/DepartureBoard',()=>({DepartureBoard:()=>null}));
 vi.mock('../../pages/monitor/components/TimelineControls',()=>({TimelineControls:()=>null}));
 import WarRoomPage from '../../pages/monitor/WarRoomPage';
-const mount=()=>render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><WarRoomPage/></QueryClientProvider>);
+const mount=(path='/monitor',basename='/')=>render(<MemoryRouter basename={basename} initialEntries={[path]}><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><WarRoomPage/></QueryClientProvider></MemoryRouter>);
 beforeEach(()=>{state.error=false;state.updated=1700000000000;vi.clearAllMocks();});
 afterEach(cleanup);
 it('no roba Espacio a los botones ni flechas a los controles de formulario',()=>{
@@ -44,4 +45,13 @@ it('no anuncia actualización vigente después de un error y permite reintentar'
 it('volver tiene destino de SITREP también desde un enlace directo',()=>{
   mount();fireEvent.click(screen.getByRole('button',{name:/Cerrar/}));
   expect(state.navigate).toHaveBeenCalledWith('/centro-control');
+});
+it('cerrar desde app no añade de nuevo el basename a la ruta del router',()=>{
+  mount('/app/monitor','/app');fireEvent.click(screen.getByRole('button',{name:/Cerrar/}));
+  expect(state.navigate).toHaveBeenCalledWith('/centro-control');
+  expect(state.navigate).not.toHaveBeenCalledWith('/app/centro-control');
+});
+it('Escape conserva el destino mobile de la web',()=>{
+  mount('/mobile/monitor');fireEvent.keyDown(document.body,{key:'Escape'});
+  expect(state.navigate).toHaveBeenCalledWith('/mobile/centro-control');
 });
