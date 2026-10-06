@@ -42,8 +42,8 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
   return <section aria-label="Soporte de SITREP" className="min-w-0 space-y-5 pb-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><h2 className="flex items-center gap-2 text-2xl font-bold text-neutral-900"><LifeBuoy size={24} className="shrink-0 text-primary-800" />Soporte</h2>
-        <p className="mt-1 text-sm text-neutral-600">Reportes, respuestas y seguimiento dentro de SITREP.</p></div>
-      <SupportEntry />
+        {!id && <p className="mt-1 text-sm text-neutral-600">Reportes, respuestas y seguimiento dentro de SITREP.</p>}</div>
+      {!id && <SupportEntry />}
     </div>
     {access.isError && <p role="alert" className="text-error-700">{supportError(access.error)} <Button variant="outline" onClick={() => void access.refetch()}>Reintentar acceso</Button></p>}
     {id ? <>

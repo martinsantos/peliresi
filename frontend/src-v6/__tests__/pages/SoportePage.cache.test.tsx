@@ -73,6 +73,7 @@ it('puts named support controls before the conversation, without an action dropd
   for (const label of ['Responder', 'Nota interna', 'Derivar', 'Pedir respuesta', 'Cerrar']) expect(within(actions).getByRole('button', { name: label, exact: true })).toBeVisible();
   expect(actions.compareDocumentPosition(screen.getByRole('region', { name: 'Conversación', exact: true })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Acción de soporte', exact: true })).not.toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: 'Soporte de SITREP', exact: true })).queryByRole('button', { name: 'Reportar problema', exact: true })).not.toBeInTheDocument();
 });
 it('makes a private note explicit and sends the actual note action without attachments', async () => {
   openDetail();

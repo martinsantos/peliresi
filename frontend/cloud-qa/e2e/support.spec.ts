@@ -91,7 +91,11 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(settings.getByRole('button', { name: 'Deshabilitar soporte', exact: true })).toBeVisible();
     await admin.goto(path(info, '/' + ticket.id));
     const controls = admin.getByRole('region', { name: 'Atender ticket', exact: true });
-    for (const label of ['Responder', 'Nota interna', 'Derivar']) await expect(controls.getByRole('button', { name: label, exact: true })).toBeVisible();
+    await expect(admin.getByRole('region', { name: 'Soporte de SITREP', exact: true }).getByRole('button', { name: 'Reportar problema', exact: true })).toHaveCount(0);
+    for (const label of ['Responder', 'Nota interna', 'Derivar']) {
+      const control = controls.getByRole('button', { name: label, exact: true });
+      await control.scrollIntoViewIfNeeded(); await readableFixedAction(control, admin.locator('body'));
+    }
     expect(await controls.evaluate(element => Boolean(element.compareDocumentPosition(document.querySelector('[aria-label="Conversación"]')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
     await expect(admin.getByRole('button', { name: 'Acción de soporte', exact: true })).toHaveCount(0);
     await screenshot(admin, info, 'visible-attention-controls');
