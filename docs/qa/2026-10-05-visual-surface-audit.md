@@ -1,5 +1,50 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## QA100 finalizada: cinco fallos anteriores reparados; cierre todavía pendiente
+
+[QA100](https://github.com/martinsantos/peliresi/actions/runs/37449999981),
+SHA57331294d2a95cce2002f0fbf611ebaa7856d8c0, terminó FAILURE. Crudos:
+**520BE+1128FE unit PASS**, cero omitidos; **178/180E2E PASS**, cero skipped/flaky.
+Los cinco fallos99 (tres Control/uno Historial/uno manual) ya aprobaron.
+Los nueve E2E soporte aprobaron. Las etapas HTTP/calendario4/territorial/soporte
+terminaron SUCCESS; no sumarlos como si fueran endpoints distintos.
+
+Dos fallos E2E nuevos: recuperación web escritorio/responsive registró
+altura43.99998474121094px ante mínimo44. Se conserva la exigencia44 exacta.
+El formulario usa entrada translateY16px; nueva prueba de estabilidad primero
+3PASS/1FAIL, luego20/20 focales al cambiar únicamente su clase de entrada a
+fade por opacidad. No agranda controles, no redondea medidas, no baja umbral,
+no cambia colores/API/permisos. E2E ahora también exige transformnone.
+Los dos PNG100 originales de recuperación se revisaron; no hay rotura visible
+de paleta ni campos en esas capturas, y no se afirma que el target visible
+fuera43px. DOM unit no acredita geometría; nuevo gate renderizado pendiente.
+
+Android100 **completed:false,7PASS/1FAIL**, restantes no ejecutados:
+uiautomator dump salió255/774ms después del reinicio real de Chrome.
+Diagnósticos posteriores indican adb deviceoffline, y logcat salió255 sin
+stderr; logcat retuvo2MiB de6.24MiB y registra truncación. No afirmar causa raíz
+resuelta, ni fallo de identidad de SITREP: la captura nativa falló antes de
+las siguientes aserciones. No retocar auth ni aceptar XML viejo/éxito de stdout.
+APKoriginal4 comprobaciones públicas no equivalen a APK autenticado.
+
+ZIPfinal único externo native-support-run100-final.zip,116037307bytes,
+artifact11407957065,SHA256
+`28b11258c517f7208c26e20a836c342ec703559e7671725e666bde07afe614c6` confirmado.
+Cleanup runtime6045/server6046 11:03:28.250Z;PGshutdown11:03:28.322Z confirmado.
+Sin empaquetado de candidato fallido, sin despliegue ni escrituras reales.
+
+El usuario reitera publicación del refactor/soporte. Producción fue comprobada
+en lectura: release20261004-shared-ui-followup-r1 web/backend, dosPM2online,
+healthok/DBconnected, cinco symlinks compartidos intactos, correoOFF/pushOFF/
+blockchainON,4048332KiB libres. No se recargó. La protección del preparador está
+registrada como bloqueo HISTÓRICO, no se comprobó bloqueo nuevo: se retractó
+la petición de cambiar configuración por ese dato antiguo. No eludirlo ni usar
+un publicador alternativo si sigue bloqueado. El preparador antiguo además
+está fijado a otro SHA/esquema; no es apto para activar este candidato tal cual.
+Soporte agrega cinco tablas aditivas y exige clientePrisma compatible, respaldo
+y transición reversible, conservando datos/dependencias/envíos. Nueva tanda
+FULL serial del ajuste de recuperación debe completar antes de publicación.
+
 ## QA99 cerrada: soporte aprobado, cinco fallos generales preservados
 
 [QA99](https://github.com/martinsantos/peliresi/actions/runs/37405568999),

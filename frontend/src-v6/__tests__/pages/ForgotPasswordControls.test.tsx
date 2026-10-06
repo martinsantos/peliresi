@@ -8,6 +8,14 @@ vi.mock('../../services/auth.service', () => ({ authService: service }));
 const open = () => render(<MemoryRouter><ForgotPasswordPage /></MemoryRouter>);
 describe('Recovery controls work with touch, labels and a single submission', () => {
   beforeEach(() => { service.forgotPassword.mockReset().mockResolvedValue(undefined); });
+  it('does not translate the interactive form during entrance, preserving stable touch targets', () => {
+    const {container}=open();
+    expect(container.firstElementChild).not.toHaveClass('animate-fade-in-up');
+    expect(container.firstElementChild).toHaveClass('animate-fade-in','w-full','max-w-sm');
+    expect(screen.getByRole('button',{name:'Email',exact:true})).toHaveClass('min-h-11');
+    expect(screen.getByRole('button',{name:'CUIT',exact:true})).toHaveClass('min-h-11');
+    expect(service.forgotPassword).not.toHaveBeenCalled();
+  });
   it('labels the chosen identifier and announces touch-sized mode controls', () => {
     open();
     expect(screen.getByLabelText('Email', { exact: true })).toHaveAttribute('type', 'email');

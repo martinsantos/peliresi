@@ -29,7 +29,7 @@ const ForgotPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-sm animate-fade-in-up">
+    <div className="w-full max-w-sm animate-fade-in">
       <Link to="/login" className="inline-flex min-h-11 items-center gap-1.5 text-sm text-neutral-600 hover:text-neutral-800 mb-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
         <ArrowLeft size={16} /> Volver al login
       </Link>

@@ -19,6 +19,7 @@ test('public recovery: framed controls, real offline failure and non-enumerating
   await expect(heading).toBeVisible();
   const frame = page.locator('main.auth-form-panel');
   await expect(frame).toBeVisible();
+  await expect(heading.locator('..')).toHaveCSS('transform','none');
   const spacing = await heading.evaluate(element => {
     const form = element.closest('main')!;
     const bounds = form.getBoundingClientRect();
