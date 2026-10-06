@@ -44,6 +44,8 @@ describe('help bubble opens from the current task without automatic delivery', (
   });
   it('avoids the open drawer and reserves height for the mobile trip banner', () => {
     const view = render(<SupportBubble mobile aboveTrip />);
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' }).textContent).toBe('');
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' })).toHaveClass('h-12', 'w-12', 'p-0');
     expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' }).parentElement).toHaveStyle({ bottom: 'calc(148px + env(safe-area-inset-bottom, 0px))' });
     view.rerender(<SupportBubble mobile hidden />); expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico' })).not.toBeInTheDocument();
   });

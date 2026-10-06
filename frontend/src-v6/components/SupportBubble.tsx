@@ -55,8 +55,8 @@ function Bubble({ owner, mobile, aboveTrip, hidden }: { owner: string; mobile: b
     {!hidden && !keyboard && !open && <div data-support-ui className="fixed right-4 z-[45] flex flex-col items-end gap-2" style={{ bottom }}>
       {sent && <p role="status" className="max-w-[240px] rounded-lg border border-primary-200 bg-white p-3 text-sm text-primary-900 shadow-sm">Reporte enviado a soporte. Podés continuar.</p>}
       <button type="button" aria-label="Ayuda y soporte técnico" aria-haspopup="dialog" aria-busy={capturing || undefined} disabled={capturing}
-        onClick={() => void report()} className="flex min-h-12 min-w-12 items-center justify-center gap-2 rounded-full border-2 border-white bg-primary-700 px-3 text-white shadow-lg transition-colors hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:opacity-80">
-        <HelpCircle size={24} aria-hidden="true" /><span className={mobile ? 'sr-only' : 'text-sm font-semibold'}>{capturing ? 'Capturando…' : 'Ayuda'}</span>
+        onClick={() => void report()} className={`flex items-center justify-center gap-2 rounded-full border-2 border-white bg-primary-700 text-white shadow-lg transition-colors hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:opacity-80 ${mobile ? 'h-12 w-12 p-0' : 'min-h-12 min-w-12 px-3'}`}>
+        <HelpCircle size={24} aria-hidden="true" />{!mobile && <span className="text-sm font-semibold">{capturing ? 'Capturando…' : 'Ayuda'}</span>}
       </button>
     </div>}
     <SupportReportDialog open={open} onClose={() => { setOpen(false); setScreenshot(undefined); }}
