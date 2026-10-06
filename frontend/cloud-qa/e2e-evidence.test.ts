@@ -4,16 +4,16 @@ import { assertFullE2EEvidence, type FullE2EEvidence } from './e2e-evidence.ts';
 
 function complete(): FullE2EEvidence {
   return {
-    stats: { expected: 180, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
+    stats: { expected: 183, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
     suites: [{ suites: ['web-desktop', 'web-responsive', 'app'].map(projectName => ({
-      specs: Array.from({ length: 60 }, () => ({ tests: [{
+      specs: Array.from({ length: 61 }, () => ({ tests: [{
         projectName, status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed', retry: 0 }],
       }] })),
     })) }],
   };
 }
 
-test('the complete 60 x 3 evidence is accepted without lowering the denominator', () => {
+test('the complete 61 x 3 evidence is accepted without lowering the denominator', () => {
   assert.doesNotThrow(() => assertFullE2EEvidence(complete()));
 });
 test('an old 141-case summary and a missing case cannot be packaged', () => {
@@ -21,6 +21,11 @@ test('an old 141-case summary and a missing case cannot be packaged', () => {
   assert.throws(() => assertFullE2EEvidence(old));
   const missing = complete(); missing.suites[0].suites![0].specs!.pop();
   assert.throws(() => assertFullE2EEvidence(missing));
+});
+test('the previous green 60 x 3 suite cannot certify the lost-attachment recovery journey', () => {
+  const old = complete(); old.stats.expected = 180;
+  for (const surface of old.suites[0].suites!) surface.specs!.pop();
+  assert.throws(() => assertFullE2EEvidence(old));
 });
 for (const counter of ['unexpected', 'flaky', 'skipped'] as const) {
   test('rejects a nonzero ' + counter + ' counter', () => {
