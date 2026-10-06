@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, LifeBuoy, Download, UserRoundCheck, LockKeyhole, Search } from 'lucide-react';
+import { ArrowLeft, LifeBuoy, Download, UserRoundCheck, LockKeyhole, Search, MessageSquare, ArrowRightLeft, MessageCircleQuestion, CircleCheck, RotateCcw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { Button } from '../../components/ui/ButtonV2';
@@ -14,6 +14,9 @@ import { assertSupportSession, supportSessionMatches } from '../../utils/support
 
 const name = (user: { nombre: string; apellido?: string | null }) => [user.nombre, user.apellido].filter(Boolean).join(' ');
 const date = (value: string) => new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Argentina/Mendoza' }).format(new Date(value));
+const actionLabels: Record<SupportAction, string> = { RESPONDER: 'Responder', NOTA: 'Nota interna', DERIVAR: 'Derivar', ESPERAR: 'Pedir respuesta', CERRAR: 'Cerrar', REABRIR: 'Reabrir', TOMAR: 'Tomar ticket' };
+const submitLabels: Record<SupportAction, string> = { RESPONDER: 'Enviar respuesta', NOTA: 'Guardar nota interna', DERIVAR: 'Confirmar derivación', ESPERAR: 'Solicitar respuesta', CERRAR: 'Cerrar con resolución', REABRIR: 'Reabrir ticket', TOMAR: 'Tomar ticket' };
+const actionIcons = { RESPONDER: MessageSquare, NOTA: LockKeyhole, DERIVAR: ArrowRightLeft, ESPERAR: MessageCircleQuestion, CERRAR: CircleCheck, REABRIR: RotateCcw, TOMAR: UserRoundCheck };
 function State({ ticket }: { ticket: SupportTicket }) {
   const colors = ticket.estado === 'CERRADO' ? 'bg-neutral-100 text-neutral-700' : ticket.estado === 'ESPERANDO_USUARIO' ? 'bg-warning-50 text-warning-800' : 'bg-primary-50 text-primary-800';
   return <span className={'inline-flex items-center rounded-md px-2 py-1 text-sm font-semibold ' + colors}>{supportStates[ticket.estado]}</span>;
@@ -103,6 +106,7 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
         <div><dt className="text-neutral-600">Responsable</dt><dd className="font-medium text-neutral-900">{ticket.responsable ? name(ticket.responsable) : 'Pendiente de asignación'}</dd></div></dl>
       {ticket.contexto.ruta && <p className="text-sm text-neutral-600">Pantalla del reporte: <code className="[overflow-wrap:anywhere]">{ticket.contexto.ruta}</code>{ticket.contexto.ancho ? <> · <span className="whitespace-nowrap">{ticket.contexto.ancho} × {ticket.contexto.alto}</span></> : null}</p>}
     </header>
+    <TicketActions ticket={ticket} owner={owner} changed={changed} />
     <section aria-label="Conversación" className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <h4 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">Conversación</h4>
       <ol className="divide-y divide-neutral-200">{ticket.mensajes.map(message => <li key={message.id} className={'p-4 ' + (message.interno ? 'border-l-4 border-warning-600 bg-warning-50' : '')}>
@@ -113,7 +117,6 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
       </li>)}</ol>
     </section>
     {error && <p role="alert" className="text-error-700">{error}</p>}
-    <TicketActions ticket={ticket} owner={owner} changed={changed} />
     <details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Historial del ticket</summary>
       <ol className="mt-3 space-y-2 text-sm text-neutral-700"><li>Creado · {date(ticket.createdAt)}</li>{ticket.eventos.map(event => <li key={event.id}>{event.accion.replaceAll('_', ' ')} · {supportStates[event.estadoNuevo]} · {date(event.createdAt)}</li>)}</ol>
     </details>
@@ -128,6 +131,7 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   const [error, setError] = useState('');
   const [pending, setPending] = useState<{ input: SupportMutation; key: string; files: File[] } | null>(null);
   const inFlight = useRef(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const team = useQuery({ queryKey: ['soporte', owner, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
   const recipient = team.data?.find(user => user.id === target);
   const send = async (chosen = action) => {
@@ -136,11 +140,11 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
     try {
       assertSupportSession(owner);
       const frozen = pending || { key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
-        version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}) }, files };
+        version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}) }, files: chosen === 'RESPONDER' || chosen === 'NOTA' ? files : [] };
       setPending(frozen);
       await supportService.act(ticket.id, frozen.input, frozen.files, frozen.key);
       if (!supportSessionMatches(owner)) return;
-      setPending(null); setBody(''); setFiles([]); setTarget(''); setAction('RESPONDER'); await changed();
+      setPending(null); setBody(''); setFiles([]); if (fileInput.current) fileInput.current.value = ''; setTarget(''); setAction('RESPONDER'); await changed();
     } catch (failure) {
       setError(supportError(failure));
       const status = (failure as { response?: { status?: number } }).response?.status;
@@ -157,26 +161,43 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
   const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;
   const canTake = ticket.puedeGestionar && !ticket.responsableId && ticket.estado !== 'CERRADO';
+  const recipients = (team.data || []).filter(user => user.id !== ticket.responsableId);
+  const privateAction = selected === 'NOTA' || selected === 'DERIVAR';
   return <section aria-label="Atender ticket" className="min-w-0 space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
+    <h4 className="font-semibold text-neutral-900">Atender ticket</h4>
     {canTake && <Button disabled={busy || !!pending} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Tomar ticket</Button>}
     {pending?.input.accion === 'TOMAR' && <Button isLoading={busy} onClick={() => void send('TOMAR')}>Reintentar toma del ticket</Button>}
     {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : <form className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
-      <Select label="Acción de soporte" value={selected} onChange={value => setAction(value as SupportAction)} options={actions} disabled={busy || !!pending} />
+      <div role="group" aria-label="Acciones del ticket" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        {actions.map(option => {
+          const Icon = actionIcons[option.value];
+          return <Button key={option.value} type="button" variant={selected === option.value ? 'primary' : 'outline'}
+            aria-pressed={selected === option.value} disabled={busy || !!pending} leftIcon={<Icon size={18} />}
+            onClick={() => setAction(option.value)}>{option.value === 'RESPONDER' && ticket.estado === 'CERRADO' ? 'Responder y reabrir' : actionLabels[option.value]}</Button>;
+        })}
+      </div>
+      <p id="support-action-audience" className={'flex items-start gap-2 text-sm ' + (privateAction ? 'text-warning-800' : 'text-neutral-700')}>
+        {privateAction ? <LockKeyhole size={18} className="shrink-0" /> : <MessageSquare size={18} className="shrink-0" />}
+        {selected === 'NOTA' ? 'Sólo el equipo de soporte puede leer esta nota.' : selected === 'DERIVAR' ? 'El motivo es interno. El nuevo responsable recibirá un aviso dentro de SITREP.'
+          : selected === 'CERRAR' ? 'La resolución queda visible para el usuario y cierra el ticket.' : 'Este mensaje queda visible en la conversación del ticket.'}
+      </p>
       {selected === 'DERIVAR' && <>{team.isError ? <p role="alert" className="text-error-700">{supportError(team.error)} <Button variant="outline" onClick={() => void team.refetch()}>Reintentar equipo</Button></p> :
         <Select label="Nuevo responsable" value={target} onChange={setTarget} disabled={busy || !!pending || team.isPending} searchable
           helperText={recipient ? 'Responsable seleccionado: ' + recipient.email : undefined}
           renderOption={option => <span className="block [overflow-wrap:anywhere]">{option.label}</span>}
-          options={(team.data || []).filter(user => user.id !== ticket.responsableId).map(user => ({ value: user.id, label: name(user) + ' · ' + user.email }))} />}</>}
+          options={recipients.map(user => ({ value: user.id, label: name(user) + ' · ' + user.email }))} />}
+        {team.isSuccess && !recipients.length && <p role="status" className="text-sm text-neutral-700">No hay otro responsable activo. Un administrador puede configurar el Equipo de soporte desde la mesa.</p>}</>}
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-reply">{selected === 'NOTA' || selected === 'DERIVAR' ? 'Nota interna / motivo' : 'Mensaje o resolución'}</label>
-      <textarea id="support-reply" value={body} maxLength={8000} minLength={5} required disabled={busy || !!pending} onChange={event => setBody(event.target.value)} rows={4}
+      <textarea id="support-reply" aria-describedby="support-action-audience" value={body} maxLength={8000} minLength={5} required disabled={busy || !!pending} onChange={event => setBody(event.target.value)} rows={4}
         className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
-      {(selected === 'RESPONDER' || selected === 'NOTA') && <><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
-        <input id="support-reply-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy || !!pending}
+      <div hidden={selected !== 'RESPONDER' && selected !== 'NOTA'} className="space-y-2"><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
+        <p className="text-sm text-neutral-600">Opcional · podés enviar sólo texto.</p>
+        <input ref={fileInput} id="support-reply-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy || !!pending}
           className="block min-h-11 w-full text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900" onChange={event => {
             const chosen = Array.from(event.target.files || []); if (chosen.length > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; setFiles([]); } else setFiles(chosen);
-          }} /></>}
+          }} /></div>
       {pending && <p className="text-sm text-neutral-700">Envío sin confirmar. El reintento conservará el contenido y la misma clave.</p>}
-      <Button type="submit" isLoading={busy} disabled={body.trim().length < 5 || (selected === 'DERIVAR' && !target)}>{pending ? 'Reintentar mismo envío' : 'Confirmar acción'}</Button>
+      <Button type="submit" isLoading={busy} disabled={body.trim().length < 5 || (selected === 'DERIVAR' && !target)}>{pending ? 'Reintentar mismo envío' : selected ? submitLabels[selected] : 'Confirmar acción'}</Button>
     </form>}
     {error && <p role="alert" className="text-error-700">{error}</p>}
   </section>;

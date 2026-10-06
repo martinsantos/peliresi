@@ -48,8 +48,8 @@ async function report(page: Page, subject: string) {
   return dialog;
 }
 async function action(page: Page, label: string, text: string) {
-  await page.getByRole('button', { name: 'Acción de soporte', exact: true }).click();
-  await page.getByRole('option', { name: label, exact: true }).click();
+  const direct = { 'Nota interna de soporte': 'Nota interna', 'Derivar a otro responsable': 'Derivar', 'Solicitar respuesta al usuario': 'Pedir respuesta', 'Cerrar con una resolución': 'Cerrar', 'Responder y reabrir': 'Responder y reabrir' };
+  await page.getByRole('region', { name: 'Atender ticket', exact: true }).getByRole('button', { name: direct[label as keyof typeof direct] || label, exact: true }).click();
   await page.getByRole('textbox', { name: /Mensaje o resolución|Nota interna \/ motivo/ }).fill(text);
 }
 test('native support: report, take, private note, handoff, reply, close and reopen with actual notices', async ({ page, browser }, info) => {
@@ -90,15 +90,21 @@ test('native support: report, take, private note, handoff, reply, close and reop
     if (await grant.count()) await grant.click();
     await expect(settings.getByRole('button', { name: 'Deshabilitar soporte', exact: true })).toBeVisible();
     await admin.goto(path(info, '/' + ticket.id));
+    const controls = admin.getByRole('region', { name: 'Atender ticket', exact: true });
+    for (const label of ['Responder', 'Nota interna', 'Derivar']) await expect(controls.getByRole('button', { name: label, exact: true })).toBeVisible();
+    expect(await controls.evaluate(element => Boolean(element.compareDocumentPosition(document.querySelector('[aria-label="Conversación"]')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+    await expect(admin.getByRole('button', { name: 'Acción de soporte', exact: true })).toHaveCount(0);
+    await screenshot(admin, info, 'visible-attention-controls');
     await admin.getByRole('button', { name: 'Tomar ticket', exact: true }).click();
     await expect(admin.getByText('QA admin', { exact: true }).first()).toBeVisible();
     await action(admin, 'Nota interna de soporte', 'QA diagnóstico reservado: no mostrar al reportante.');
-    await admin.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
+    await expect(admin.getByText('Sólo el equipo de soporte puede leer esta nota.', { exact: true })).toBeVisible();
+    await admin.getByRole('button', { name: 'Guardar nota interna', exact: true }).click();
     await expect(admin.getByText('QA diagnóstico reservado: no mostrar al reportante.', { exact: true })).toBeVisible();
     await action(admin, 'Derivar a otro responsable', 'QA motivo privado para el nuevo responsable.');
     await admin.getByRole('button', { name: 'Nuevo responsable', exact: true }).click();
     await admin.getByRole('option', { name: 'QA ' + technician + ' · ' + technician + '@night-qa.invalid', exact: true }).click();
-    await admin.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
+    await admin.getByRole('button', { name: 'Confirmar derivación', exact: true }).click();
     await expect(admin.locator('dd').filter({ hasText: 'QA ' + technician })).toBeVisible();
     await screenshot(admin, info, 'desk-handoff'); await admin.close();
 
@@ -106,10 +112,10 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await operator.getByRole('button', { name: 'Abrir aviso: Ticket derivado a tu atención', exact: true }).first().click();
     await expect(operator).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await action(operator, 'Solicitar respuesta al usuario', 'QA verificá si la pantalla ya muestra los datos.');
-    await operator.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
+    await operator.getByRole('button', { name: 'Solicitar respuesta', exact: true }).click();
     await expect(operator.getByText('Esperando al usuario', { exact: true })).toBeVisible();
     await action(operator, 'Cerrar con una resolución', 'QA resolución sintética: se corrigió el acceso.');
-    await operator.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
+    await operator.getByRole('button', { name: 'Cerrar con resolución', exact: true }).click();
     await expect(operator.getByText('Cerrado', { exact: true }).first()).toBeVisible(); await operator.close();
 
     const reporter = await asUser('operador'); await reporter.goto(prefix(info) + '/notificaciones');
@@ -117,8 +123,10 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(reporter).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await expect(reporter.getByText('QA diagnóstico reservado: no mostrar al reportante.', { exact: true })).toHaveCount(0);
     await expect(reporter.getByText('QA motivo privado para el nuevo responsable.', { exact: true })).toHaveCount(0);
+    await expect(reporter.getByRole('button', { name: 'Nota interna', exact: true })).toHaveCount(0);
+    await expect(reporter.getByRole('button', { name: 'Derivar', exact: true })).toHaveCount(0);
     await action(reporter, 'Responder y reabrir', 'QA el problema persiste, solicito otra revisión.');
-    await reporter.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
+    await reporter.getByRole('button', { name: 'Enviar respuesta', exact: true }).click();
     await expect(reporter.getByText('Abierto', { exact: true }).first()).toBeVisible();
     await expect(reporter.getByText(ticket.referencia, { exact: true })).toBeVisible();
     await reporter.getByText('Historial del ticket', { exact: true }).click();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -50,13 +50,67 @@ it('distinguishes homonymous support agents and submits the selected account, no
   calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', responsableId: 'owner', responsable: { id: 'owner', nombre: 'QA' }, puedeGestionar: true, puedeAtender: true, esAutor: false });
   const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(<QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>);
-  fireEvent.click(await screen.findByRole('button', { name: 'Acción de soporte', exact: true }));
-  fireEvent.click(screen.getByRole('option', { name: 'Derivar a otro responsable', exact: true }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Derivar', exact: true }));
   fireEvent.click(screen.getByRole('button', { name: 'Nuevo responsable', exact: true }));
   expect(await screen.findByRole('option', { name: 'María Pérez · primera@qa.invalid', exact: true })).toBeVisible();
   fireEvent.click(screen.getByRole('option', { name: 'María Pérez · segunda@qa.invalid', exact: true }));
   expect(screen.getByText('Responsable seleccionado: segunda@qa.invalid', { exact: true })).toBeVisible();
   fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Derivación al segundo responsable del turno.' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Confirmar acción', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar derivación', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'DERIVAR', responsableId: 'second-agent' }), [], expect.any(String)));
+});
+
+function openDetail(overrides = {}) {
+  calls.team.mockResolvedValue([{ id: 'second-agent', nombre: 'Técnica QA', email: 'tecnica@qa.invalid' }]);
+  calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false, ...overrides });
+  calls.act.mockResolvedValue({ id: ticket.id, version: 2, replay: false });
+  const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>);
+}
+it('puts named support controls before the conversation, without an action dropdown', async () => {
+  openDetail();
+  const actions = await screen.findByRole('region', { name: 'Atender ticket', exact: true });
+  for (const label of ['Responder', 'Nota interna', 'Derivar', 'Pedir respuesta', 'Cerrar']) expect(within(actions).getByRole('button', { name: label, exact: true })).toBeVisible();
+  expect(actions.compareDocumentPosition(screen.getByRole('region', { name: 'Conversación', exact: true })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Acción de soporte', exact: true })).not.toBeInTheDocument();
+});
+it('makes a private note explicit and sends the actual note action without attachments', async () => {
+  openDetail();
+  fireEvent.click(await screen.findByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByText('Sólo el equipo de soporte puede leer esta nota.', { exact: true })).toBeVisible();
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Diagnóstico reservado del equipo.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'NOTA', cuerpo: 'Diagnóstico reservado del equipo.' }), [], expect.any(String)));
+});
+it('does not attach a previously selected reply file to a handoff action', async () => {
+  openDetail();
+  const input = await screen.findByLabelText('Adjuntar captura o documento');
+  fireEvent.change(input, { target: { files: [new File(['synthetic'], 'respuesta.png', { type: 'image/png' })] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Derivar', exact: true }));
+  expect(input).not.toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Nuevo responsable', exact: true }));
+  fireEvent.click(await screen.findByRole('option', { name: 'Técnica QA · tecnica@qa.invalid', exact: true }));
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Derivar al equipo de la tarde.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar derivación', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'DERIVAR', responsableId: 'second-agent' }), [], expect.any(String)));
+});
+it('does not expose internal notes or handoff actions to a common reporter', async () => {
+  openDetail({ autorId: 'owner', puedeGestionar: false, puedeAtender: false, esAutor: true });
+  await screen.findByRole('button', { name: 'Responder', exact: true });
+  for (const label of ['Nota interna', 'Derivar', 'Pedir respuesta', 'Tomar ticket']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
+  expect(screen.getByText('Este mensaje queda visible en la conversación del ticket.', { exact: true })).toBeVisible();
+  expect(calls.team).not.toHaveBeenCalled();
+});
+it('explains when no other active teammate is available rather than showing an empty handoff', async () => {
+  openDetail({ responsableId: 'second-agent' }); calls.team.mockResolvedValue([{ id: 'second-agent', nombre: 'Técnica QA', email: 'tecnica@qa.invalid' }]);
+  fireEvent.click(await screen.findByRole('button', { name: 'Derivar', exact: true }));
+  expect(await screen.findByText('No hay otro responsable activo. Un administrador puede configurar el Equipo de soporte desde la mesa.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Confirmar derivación', exact: true })).toBeDisabled();
+});
+it('keeps the existing take-first boundary for an unassigned non-admin support agent', async () => {
+  openDetail({ puedeAtender: false });
+  expect(await screen.findByRole('button', { name: 'Tomar ticket', exact: true })).toBeVisible();
+  for (const label of ['Responder', 'Nota interna', 'Derivar']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Tomar ticket', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, { accion: 'TOMAR', cuerpo: '', version: 1 }, [], expect.any(String)));
 });
