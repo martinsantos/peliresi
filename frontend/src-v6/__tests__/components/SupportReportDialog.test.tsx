@@ -111,12 +111,13 @@ describe('report problem preserves the human workflow', () => {
     expect(mocks.sent).not.toHaveBeenCalled();
     expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('pendiente');
   });
-  it('shows the captured screen for review and lets the user remove it without sending', () => {
+  it('shows the captured screen for review and lets the user remove it without sending a completed form', async () => {
     const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:screen');
     const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     render(<SupportReportDialog open onClose={vi.fn()} screenshot={new File(['screen'], 'pantalla.jpg', { type: 'image/jpeg' })} />);
     expect(screen.getByRole('img', { name: 'Captura de la pantalla que estabas usando' })).toHaveAttribute('src', 'blob:screen');
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar captura' }));
+    fill();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Quitar captura' })); });
     expect(screen.queryByRole('img', { name: 'Captura de la pantalla que estabas usando' })).not.toBeInTheDocument();
     expect(revokeUrl).toHaveBeenCalledWith('blob:screen');
     expect(mocks.create).not.toHaveBeenCalled();

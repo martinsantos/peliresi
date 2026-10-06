@@ -105,7 +105,7 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
       {preview && <figure className="space-y-2">
         <img src={preview} alt="Captura de la pantalla que estabas usando" className="max-h-48 w-full rounded-lg border border-neutral-200 object-contain" />
         <figcaption className="text-sm text-neutral-700">Esta captura se adjuntará al ticket. Revisá que no muestre datos que no quieras compartir.</figcaption>
-        <Button variant="outline" disabled={busy || !!draft.pendiente} onClick={() => setScreenFile(undefined)}>Quitar captura</Button>
+        <Button type="button" variant="outline" disabled={busy || !!draft.pendiente} onClick={() => setScreenFile(undefined)}>Quitar captura</Button>
       </figure>}
       {captureError && <p role="status" className="text-sm text-neutral-700">{captureError}</p>}
       <Input label="Asunto" helperText="Mínimo 5 caracteres." value={draft.asunto} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} required />
@@ -121,7 +121,7 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
         onChange={event => { const selected = Array.from(event.target.files || []); if (selected.length + (screenFile ? 1 : 0) > 3 || selected.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos, incluida la captura, de 5 MB cada uno.'); setFiles([]); event.target.value = ''; } else { setError(''); setFiles(selected); } }} />
       <p className="text-sm text-neutral-600">Hasta 3 archivos de 5 MB. No incluyas contraseñas ni datos ajenos al problema. Los archivos no se guardan en el borrador local.</p>
       {draft.pendiente && <div className="space-y-2 border-l-4 border-warning-600 pl-3 text-sm text-neutral-800"><p>Envío pendiente de confirmación. El texto se conserva sin cambios.</p>
-        <Button variant="outline" disabled={busy} onClick={check}>Comprobar si llegó</Button></div>}
+        <Button type="button" variant="outline" disabled={busy} onClick={check}>Comprobar si llegó</Button></div>}
       {error && <p role="alert" className="text-sm text-error-700">{error}</p>}
       <p role="status" className="text-sm text-neutral-600">{saved ? 'Borrador guardado sólo en este dispositivo y para tu cuenta. No se envía automáticamente.' : 'Este navegador no permitió guardar el borrador. No cierres esta ventana hasta copiar tu texto.'}</p>
     </form>

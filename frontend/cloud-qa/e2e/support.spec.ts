@@ -196,9 +196,12 @@ test('support list rows are keyboard navigable and a common actor cannot open an
   await expect(preview).toBeVisible();
   expect(await preview.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0
     && Math.max(image.naturalWidth, image.naturalHeight) <= 1600)).toBe(true);
+  await reviewed.getByLabel('Asunto', { exact: true }).fill('QA quitar captura sin enviar ' + info.project.name);
+  await reviewed.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA formulario válido: quitar la captura no debe enviar nada.');
   expect(supportPosts).toBe(0);
   await reviewed.getByRole('button', { name: 'Quitar captura', exact: true }).click();
   await expect(preview).toHaveCount(0);
+  expect(supportPosts).toBe(0);
   await reviewed.getByRole('button', { name: 'Continuar luego', exact: true }).click();
   await expect(page).toHaveURL(taskUrl); await expect(unsentReply).toHaveValue('QA comentario del trámite que aún no envié.');
   await bubble.click();
