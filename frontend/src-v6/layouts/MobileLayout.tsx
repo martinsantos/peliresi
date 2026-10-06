@@ -61,6 +61,7 @@ import { ToastContainer, toast } from '../components/ui/Toast';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 import { SupportEntry } from '../components/SupportReportDialog';
+import { SupportBubble } from '../components/SupportBubble';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -381,6 +382,7 @@ export const MobileLayout: React.FC = () => {
       </main>
 
       {/* Floating Action Button */}
+      <SupportBubble mobile hidden={isMenuOpen} aboveTrip={showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute)} />
       {showFab && (
         <button
           onClick={() => navigate(mp('/manifiestos/nuevo'))}

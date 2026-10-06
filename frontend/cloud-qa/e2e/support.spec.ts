@@ -179,4 +179,48 @@ test('support list rows are keyboard navigable and a common actor cannot open an
     await expect(outsider.getByRole('link', { name: 'Volver a tickets', exact: true })).toBeVisible();
     await screenshot(outsider, info, 'foreign-denied-with-exit');
   } finally { await context.close(); }
+  // The primary help entry lives on the current screen, not only in the desk.
+  const taskUrl = page.url();
+  const unsentReply = page.getByRole('textbox', { name: /Mensaje o resolución|Nota interna \/ motivo/ });
+  await unsentReply.fill('QA comentario del trámite que aún no envié.');
+  await unsentReply.blur();
+  const bubble = page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+  await expect(bubble).toBeVisible();
+  await readableFixedAction(bubble, page.locator('body'));
+  let supportPosts = 0;
+  page.on('request', request => { if (request.url().endsWith('/api/soporte') && request.method() === 'POST') supportPosts++; });
+  await screenshot(page, info, 'bubble-on-current-task');
+  await bubble.click();
+  const reviewed = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
+  const preview = reviewed.getByRole('img', { name: 'Captura de la pantalla que estabas usando', exact: true });
+  await expect(preview).toBeVisible();
+  expect(await preview.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0
+    && Math.max(image.naturalWidth, image.naturalHeight) <= 1600)).toBe(true);
+  expect(supportPosts).toBe(0);
+  await reviewed.getByRole('button', { name: 'Quitar captura', exact: true }).click();
+  await expect(preview).toHaveCount(0);
+  await reviewed.getByRole('button', { name: 'Continuar luego', exact: true }).click();
+  await expect(page).toHaveURL(taskUrl); await expect(unsentReply).toHaveValue('QA comentario del trámite que aún no envié.');
+  await bubble.click();
+  await expect(preview).toBeVisible();
+  await reviewed.getByLabel('Asunto', { exact: true }).fill('QA burbuja contextual ' + info.project.name);
+  await reviewed.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA envío desde la pantalla actual con captura revisada.');
+  await screenshot(page, info, 'bubble-capture-preview');
+  const confirming = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
+  await reviewed.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
+  const confirmed = await confirming; expect(confirmed.status()).toBe(201);
+  const capturedTicket = (await confirmed.json()).data as { id: string };
+  await expect(reviewed).toHaveCount(0); await expect(page).toHaveURL(taskUrl);
+  await expect(unsentReply).toHaveValue('QA comentario del trámite que aún no envié.');
+  await expect(page.getByRole('status').filter({ hasText: 'Reporte enviado a soporte. Podés continuar.' })).toBeVisible();
+  expect(supportPosts).toBe(1);
+  await page.goto(path(info, '/' + capturedTicket.id));
+  const screenAttachment = page.getByRole('button').filter({ hasText: /sitrep-pantalla-\d+\.jpg/ });
+  await expect(screenAttachment).toBeVisible();
+  const receivingCapture = page.waitForEvent('download'); await screenAttachment.click();
+  const captureDownload = await receivingCapture; expect(await captureDownload.failure()).toBeNull();
+  const captureBytes = await readFile((await captureDownload.path())!);
+  expect(captureBytes.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+  expect(captureBytes.length).toBeGreaterThan(1000);
+  await screenshot(page, info, 'bubble-ticket-with-private-capture');
 });

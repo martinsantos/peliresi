@@ -55,6 +55,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { SupportEntry } from '../components/SupportReportDialog';
+import { SupportBubble } from '../components/SupportBubble';
 
 // ========================================
 // COMPONENT
@@ -524,6 +525,7 @@ export const MainLayout: React.FC = () => {
 
       {/* Role-specific welcome modal */}
       <DemoAppOnboarding />
+      <SupportBubble hidden={sidebarOpen || searchOpen || showTour} />
     </div>
   );
 };

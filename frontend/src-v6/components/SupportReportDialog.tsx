@@ -14,7 +14,8 @@ import { clearSupportDraft, readSupportDraft, writeSupportDraft, supportFileDige
 import { assertSupportSession, supportSessionMatches } from '../utils/supportSession';
 import { supportCategories, type SupportCategory, type SupportCreate } from '../types/support';
 
-export function SupportReportDialog({ open, onClose, onSubmitted }: { open: boolean; onClose: () => void; onSubmitted?: () => void }) {
+type ReportProps = { open: boolean; onClose: () => void; onSubmitted?: () => void; screenshot?: File; captureError?: string; returnToTask?: boolean; context?: SupportCreate['contexto'] };
+export function SupportReportDialog({ open, onClose, onSubmitted, screenshot, captureError, returnToTask, context }: ReportProps) {
   const { currentUser } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
   if (!open || !currentUser) return null;
@@ -24,13 +25,16 @@ export function SupportReportDialog({ open, onClose, onSubmitted }: { open: bool
     <p className="text-neutral-700 mb-4">Estás viendo otra cuenta. Volvé a tu sesión para que el ticket quede a tu nombre.</p>
     <Button onClick={exitImpersonation}>Volver a mi sesión</Button>
   </Modal>;
-  return <ReportForm key={String(currentUser.id)} owner={String(currentUser.id)} onClose={onClose} onSubmitted={onSubmitted} />;
+  return <ReportForm key={String(currentUser.id)} owner={String(currentUser.id)} onClose={onClose} onSubmitted={onSubmitted}
+    screenshot={screenshot} captureError={captureError} returnToTask={returnToTask} context={context} />;
 }
 
-function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: () => void; onSubmitted?: () => void }) {
+function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, returnToTask, context }: Omit<ReportProps, 'open'> & { owner: string }) {
   const initial = useRef(readSupportDraft(owner));
   const [draft, setDraft] = useState<SupportDraft>(initial.current || { asunto: '', descripcion: '', categoria: 'GENERAL' });
   const [files, setFiles] = useState<File[]>([]);
+  const [screenFile, setScreenFile] = useState(initial.current?.pendiente ? undefined : screenshot);
+  const [preview, setPreview] = useState('');
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const acknowledged = useRef(false);
@@ -41,6 +45,11 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
   const queryClient = useQueryClient();
   const mp = useMobilePrefix();
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => {
+    if (!screenFile) { setPreview(''); return; }
+    const url = URL.createObjectURL(screenFile); setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [screenFile]);
   useEffect(() => { if (!acknowledged.current) setSaved(writeSupportDraft(owner, draft)); }, [owner, draft]);
   const complete = (ticket: { id: string }) => {
     acknowledged.current = true; clearSupportDraft(owner);
@@ -48,7 +57,7 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
     // list may still be fresh in React Query when returning from the detail.
     if (mounted.current && supportSessionMatches(owner)) {
       void queryClient.invalidateQueries({ queryKey: ['soporte', owner] });
-      onClose(); onSubmitted?.(); navigate(mp('/soporte/' + ticket.id));
+      onClose(); onSubmitted?.(); if (!returnToTask) navigate(mp('/soporte/' + ticket.id));
     }
   };
   const send = async (event: React.FormEvent) => {
@@ -58,17 +67,19 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
     try {
       if (!navigator.onLine) throw new Error('offline');
       assertSupportSession(owner);
-      const digests = await supportFileDigests(files);
+      const attachments = screenFile ? [screenFile, ...files] : files;
+      if (attachments.length > 3) throw new Error('Adjuntá hasta 3 archivos, incluyendo la captura.');
+      const digests = await supportFileDigests(attachments);
       if (!mounted.current) return;
       assertSupportSession(owner);
       const pending = draft.pendiente;
       if (pending && JSON.stringify(digests) !== JSON.stringify(pending.files)) throw new Error('Adjuntá los mismos archivos para reintentar este envío. También podés comprobar si ya llegó.');
       const input: SupportCreate = pending?.input || { asunto: draft.asunto, descripcion: draft.descripcion, categoria: draft.categoria,
-        contexto: { ruta: location.pathname, ancho: innerWidth, alto: innerHeight, online: navigator.onLine } };
+        contexto: context || { ruta: location.pathname, ancho: innerWidth, alto: innerHeight, online: navigator.onLine } };
       const key = pending?.key || crypto.randomUUID();
       const frozen = { ...draft, pendiente: { key, input, files: digests } };
       setDraft(frozen); writeSupportDraft(owner, frozen);
-      complete(await supportService.create(input, files, key));
+      complete(await supportService.create(input, attachments, key));
     } catch (failure) {
       if (failure instanceof Error && failure.message.startsWith('Adjuntá')) setError(failure.message);
       else setError(supportError(failure));
@@ -91,6 +102,12 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
     isBusy={busy} footer={<><Button variant="outline" disabled={busy} onClick={onClose}>Continuar luego</Button>
       <Button type="submit" form="sitrep-support-report" isLoading={busy} disabled={draft.asunto.trim().length < 5 || draft.descripcion.trim().length < 10}>Enviar ticket</Button></>}>
     <form id="sitrep-support-report" onSubmit={send} className="space-y-4">
+      {preview && <figure className="space-y-2">
+        <img src={preview} alt="Captura de la pantalla que estabas usando" className="max-h-48 w-full rounded-lg border border-neutral-200 object-contain" />
+        <figcaption className="text-sm text-neutral-700">Esta captura se adjuntará al ticket. Revisá que no muestre datos que no quieras compartir.</figcaption>
+        <Button variant="outline" disabled={busy || !!draft.pendiente} onClick={() => setScreenFile(undefined)}>Quitar captura</Button>
+      </figure>}
+      {captureError && <p role="status" className="text-sm text-neutral-700">{captureError}</p>}
       <Input label="Asunto" helperText="Mínimo 5 caracteres." value={draft.asunto} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} required />
       <Select label="Área del problema" value={draft.categoria} onChange={value => update({ categoria: value as SupportCategory })}
         disabled={busy || !!draft.pendiente} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
@@ -101,7 +118,7 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-files">Capturas o documentos · opcional</label>
       <input id="support-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy}
         className="block w-full min-h-11 text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900"
-        onChange={event => { const selected = Array.from(event.target.files || []); if (selected.length > 3 || selected.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos, de 5 MB cada uno.'); setFiles([]); event.target.value = ''; } else { setError(''); setFiles(selected); } }} />
+        onChange={event => { const selected = Array.from(event.target.files || []); if (selected.length + (screenFile ? 1 : 0) > 3 || selected.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos, incluida la captura, de 5 MB cada uno.'); setFiles([]); event.target.value = ''; } else { setError(''); setFiles(selected); } }} />
       <p className="text-sm text-neutral-600">Hasta 3 archivos de 5 MB. No incluyas contraseñas ni datos ajenos al problema. Los archivos no se guardan en el borrador local.</p>
       {draft.pendiente && <div className="space-y-2 border-l-4 border-warning-600 pl-3 text-sm text-neutral-800"><p>Envío pendiente de confirmación. El texto se conserva sin cambios.</p>
         <Button variant="outline" disabled={busy} onClick={check}>Comprobar si llegó</Button></div>}

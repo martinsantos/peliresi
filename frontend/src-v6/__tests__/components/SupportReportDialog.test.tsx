@@ -111,4 +111,34 @@ describe('report problem preserves the human workflow', () => {
     expect(mocks.sent).not.toHaveBeenCalled();
     expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('pendiente');
   });
+  it('shows the captured screen for review and lets the user remove it without sending', () => {
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:screen');
+    const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    render(<SupportReportDialog open onClose={vi.fn()} screenshot={new File(['screen'], 'pantalla.jpg', { type: 'image/jpeg' })} />);
+    expect(screen.getByRole('img', { name: 'Captura de la pantalla que estabas usando' })).toHaveAttribute('src', 'blob:screen');
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar captura' }));
+    expect(screen.queryByRole('img', { name: 'Captura de la pantalla que estabas usando' })).not.toBeInTheDocument();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:screen');
+    expect(mocks.create).not.toHaveBeenCalled();
+    createUrl.mockRestore(); revokeUrl.mockRestore();
+  });
+  it('sends the reviewed screen only on confirmation and stays on the current task', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:screen');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const screenshot = new File(['screen'], 'pantalla.jpg', { type: 'image/jpeg' });
+    const submitted = vi.fn();
+    render(<SupportReportDialog open onClose={vi.fn()} onSubmitted={submitted} screenshot={screenshot} returnToTask />);
+    expect(mocks.create).not.toHaveBeenCalled(); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(submitted).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][1]).toEqual([screenshot]);
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+  it('explains a capture failure but still permits reporting without an image', () => {
+    render(<SupportReportDialog open onClose={vi.fn()} captureError="No pudimos capturar esta pantalla. Podés adjuntar una imagen o enviar sólo el texto." />);
+    expect(screen.getByText(/No pudimos capturar esta pantalla/)).toBeInTheDocument();
+    fill(); expect(screen.getByRole('button', { name: 'Enviar ticket' })).toBeEnabled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
 });

@@ -135,6 +135,12 @@ describe('MobileLayout Android shell', () => {
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Menú de la aplicación' })).not.toBeInTheDocument());
     expect(support.create).toHaveBeenCalledOnce();
   });
+  it('offers contextual help above navigation and hides it while the menu is open', () => {
+    renderMobileLayout('/dashboard');
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).not.toBeInTheDocument();
+  });
 
   it('keeps the original drawer and work when reporting is deferred without acknowledgement', () => {
     renderMobileLayout('/dashboard');

@@ -17,6 +17,11 @@ vi.mock('../../components/ui/UserSwitcher',()=>({UserSwitcher:()=>null}));
 function show(path:string){render(<MemoryRouter initialEntries={[path]}><MainLayout/></MemoryRouter>);}
 describe('Sidebar: one visible current destination',()=>{
   beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;});
+  it('exposes contextual technical help without requiring navigation to the desk',()=>{
+    show('/inspecciones/qa-expediente');
+    expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true})).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
   it('identifies the inspection function without changing the base actor role',()=>{
     authState.rol='GENERADOR';authState.esInspector=true;
     show('/inspecciones/qa-expediente');
