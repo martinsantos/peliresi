@@ -16,7 +16,8 @@ const ticket = { id: 'new-ticket', referencia: 'SOP-000001', asunto: subject, ca
   mensajes: [{ id: 'message', cuerpo: 'Descripción original del reporte', interno: false, autor: { id: 'owner', nombre: 'QA' }, createdAt: '2026-10-06T01:00:00Z',
     adjuntos: [{ id: 'file', nombre: filename, mime: 'image/png', bytes: 1200, sha256: 'unit-fixture' }] }], eventos: [] };
 beforeEach(() => {
-  localStorage.clear(); vi.clearAllMocks(); calls.access.mockResolvedValue({ puedeGestionar: false, puedeConfigurar: false });
+  localStorage.clear(); localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner' })) + '.not-a-credential');
+  vi.clearAllMocks(); calls.access.mockResolvedValue({ puedeGestionar: false, puedeConfigurar: false });
   calls.list.mockResolvedValue({ items: [], total: 0, page: 1, totalPages: 0 }); calls.get.mockResolvedValue(ticket);
   calls.create.mockImplementation(async () => {
     calls.list.mockResolvedValue({ items: [ticket], total: 1, page: 1, totalPages: 1 });

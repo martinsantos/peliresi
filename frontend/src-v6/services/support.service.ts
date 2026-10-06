@@ -1,5 +1,6 @@
 import api from './api';
 import type { SupportCreate, SupportMutation, SupportPerson, SupportTicket } from '../types/support';
+import { SupportSessionChangedError } from '../utils/supportSession';
 
 function multipart(input: SupportCreate | SupportMutation, files: File[]) {
   const form = new FormData();
@@ -26,6 +27,7 @@ export const supportService = {
   async download(ticketId: string, fileId: string): Promise<Blob> { return (await api.get('/soporte/' + encodeURIComponent(ticketId) + '/adjuntos/' + encodeURIComponent(fileId), { responseType: 'blob' })).data; },
 };
 export function supportError(error: unknown): string {
+  if (error instanceof SupportSessionChangedError) return error.message;
   const failure = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
   return failure.response?.data?.message || (failure.response ? 'No se confirmó la operación. Reintentá sin cambiar el envío.' : 'No se confirmó el envío. Conservamos el texto: comprobá la conexión y reintentá.');
 }

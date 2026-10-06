@@ -10,6 +10,7 @@ import { Select } from '../../components/ui/Select';
 import { SupportEntry } from '../../components/SupportReportDialog';
 import { supportService, supportError } from '../../services/support.service';
 import { supportStates, supportCategories, type SupportAction, type SupportMutation, type SupportTicket } from '../../types/support';
+import { assertSupportSession, supportSessionMatches } from '../../utils/supportSession';
 
 const name = (user: { nombre: string; apellido?: string | null }) => [user.nombre, user.apellido].filter(Boolean).join(' ');
 const date = (value: string) => new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Argentina/Mendoza' }).format(new Date(value));
@@ -80,10 +81,16 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
 function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner: string; refresh: () => Promise<unknown> }) {
   const query = useQueryClient();
   const [error, setError] = useState('');
-  const changed = async () => { await query.invalidateQueries({ queryKey: ['soporte', owner] }); await refresh(); };
+  const changed = async () => {
+    if (!supportSessionMatches(owner)) return;
+    await query.invalidateQueries({ queryKey: ['soporte', owner] });
+    if (supportSessionMatches(owner)) await refresh();
+  };
   const download = async (file: { id: string; nombre: string }) => {
     try {
+      assertSupportSession(owner);
       const blob = await supportService.download(ticket.id, file.id);
+      assertSupportSession(owner);
       const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = file.nombre; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
     } catch (failure) { setError(supportError(failure)); }
@@ -127,10 +134,12 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
     try {
+      assertSupportSession(owner);
       const frozen = pending || { key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
         version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}) }, files };
       setPending(frozen);
       await supportService.act(ticket.id, frozen.input, frozen.files, frozen.key);
+      if (!supportSessionMatches(owner)) return;
       setPending(null); setBody(''); setFiles([]); setTarget(''); setAction('RESPONDER'); await changed();
     } catch (failure) {
       setError(supportError(failure));

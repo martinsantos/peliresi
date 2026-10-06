@@ -4,6 +4,24 @@
 
 ### QA96: defecto reproducido y corrección de navegación
 
+Actualización98: cancelada propia al reproducir el envío tardío de un formulario
+desmontado después de preparar archivos, con cambio de cuenta mientras se espera
+esa preparación. Dos casos iniciales fallaban; ampliados a ACK/navegación y
+comprobación de recibo,6PASS4FAIL válidos. Nueva guarda de intención vincula la
+cuenta del componente alID del JWT actual antes/después de preparación, antes de
+acciones/recibos/descargas y al consumir ACK. No autentica JWT ni concede permisos:
+firma, actividad y autorización siguen en backend. Acepta renovación de token
+de la misma cuenta; no continúa el formulario desmontado ni toca la nueva sesión.
+El borrador original permanece si no hubo envío; ACK verdadero sólo limpia ese
+borrador. Focal después48/48 incluye estos casos ydecodificación inválida.
+Marcadores unsigned sólo enunit DBdesconectada: NUNCA autenticaciónHTTP/E2E falsa.
+
+98crudos unit517BE+1115FE PASS,0omitidos; HTTP12soporte completo, E2EJSONfinal
+ausente por cancelación, no conteosUI/Android98. Cleanup98SUCCESS:runtime6038/
+server6039 02:35:30.833Z yPG2026-10-06T02:35:30.914Zcerrados. ZIPfinal externo
+artifact11386409455sha9cde11137497001cd6c2ec40c333f3262b1d6bb92c745f726d5ed68639b4c011.
+Siguiente candidato con guardas debe repetir gateFULLantes de aprobación.
+
 Actualización97: cancelada deliberadamente antes del bloque Android al detectar
 selector ambiguo: tanto encabezadoH1 como contenidoH2 se llaman «Soporte».
 QA96 muestra ambos; la prueba Android nueva se acota a H2, no se elimina

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const calls = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), patch: vi.fn() }));
 vi.mock('../../services/api', () => ({ default: calls }));
 import { supportService, supportError } from '../../services/support.service';
+import { SupportSessionChangedError } from '../../utils/supportSession';
 describe('native support API client', () => {
   beforeEach(() => { vi.clearAllMocks(); calls.post.mockResolvedValue({ data: { data: { id: 'ticket' } } }); calls.get.mockResolvedValue({ data: { data: [] } }); });
   it('keeps the same request key and real multipart files without owner or role fields', async () => {
@@ -26,5 +27,10 @@ describe('native support API client', () => {
   it('does not claim a successful send on timeout', () => {
     expect(supportError(new Error('timeout'))).toMatch(/No se confirmó/);
     expect(supportError({ response: { status: 409, data: { message: 'El ticket cambió' } } })).toBe('El ticket cambió');
+  });
+  it('explains a session mismatch without exposing arbitrary exception details', () => {
+    const mismatch = new SupportSessionChangedError();
+    expect(supportError(mismatch)).toBe(mismatch.message);
+    expect(supportError(new Error('private internal detail'))).not.toContain('private internal detail');
   });
 });

@@ -11,6 +11,7 @@ import { Input } from './ui/Input';
 import { Select } from './ui/Select';
 import { supportService, supportError } from '../services/support.service';
 import { clearSupportDraft, readSupportDraft, writeSupportDraft, supportFileDigests, type SupportDraft } from '../utils/supportDraft';
+import { assertSupportSession, supportSessionMatches } from '../utils/supportSession';
 import { supportCategories, type SupportCategory, type SupportCreate } from '../types/support';
 
 export function SupportReportDialog({ open, onClose, onSubmitted }: { open: boolean; onClose: () => void; onSubmitted?: () => void }) {
@@ -45,8 +46,10 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
     acknowledged.current = true; clearSupportDraft(owner);
     // Invalidate only after the server acknowledges this owner's report. The
     // list may still be fresh in React Query when returning from the detail.
-    void queryClient.invalidateQueries({ queryKey: ['soporte', owner] });
-    if (mounted.current) { onClose(); onSubmitted?.(); navigate(mp('/soporte/' + ticket.id)); }
+    if (mounted.current && supportSessionMatches(owner)) {
+      void queryClient.invalidateQueries({ queryKey: ['soporte', owner] });
+      onClose(); onSubmitted?.(); navigate(mp('/soporte/' + ticket.id));
+    }
   };
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -54,7 +57,10 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
     inFlight.current = true; setBusy(true); setError('');
     try {
       if (!navigator.onLine) throw new Error('offline');
+      assertSupportSession(owner);
       const digests = await supportFileDigests(files);
+      if (!mounted.current) return;
+      assertSupportSession(owner);
       const pending = draft.pendiente;
       if (pending && JSON.stringify(digests) !== JSON.stringify(pending.files)) throw new Error('Adjuntá los mismos archivos para reintentar este envío. También podés comprobar si ya llegó.');
       const input: SupportCreate = pending?.input || { asunto: draft.asunto, descripcion: draft.descripcion, categoria: draft.categoria,
@@ -75,7 +81,7 @@ function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: (
   const check = async () => {
     if (!draft.pendiente || inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
-    try { complete(await supportService.sent(draft.pendiente.key)); }
+    try { assertSupportSession(owner); complete(await supportService.sent(draft.pendiente.key)); }
     catch (failure) { setError((failure as { response?: { status?: number } }).response?.status === 404
       ? 'Todavía no hay constancia del ticket. Reintentá el mismo envío; no se generará un duplicado.' : supportError(failure)); }
     finally { inFlight.current = false; setBusy(false); }

@@ -115,6 +115,7 @@ function renderMobileLayout(initialPath = '/dashboard') {
 describe('MobileLayout Android shell', () => {
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: String(authState.currentUser.id) })) + '.not-a-credential');
     authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA', esInspector: false };
     impersonationState.data = null;
     impersonationState.exit.mockClear();
