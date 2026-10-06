@@ -474,7 +474,7 @@ export const MobileLayout: React.FC = () => {
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
             >
               <div className="space-y-1">
-                <SupportEntry className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-neutral-900 transition-colors hover:bg-primary-50 focus-visible:outline-primary-700" />
+                <SupportEntry onSubmitted={() => setIsMenuOpen(false)} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-neutral-900 transition-colors hover:bg-primary-50 focus-visible:outline-primary-700" />
                 {mainItems.map((item) => (
                   <MenuItem 
                     key={item.to}

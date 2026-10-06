@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { LifeBuoy } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -12,7 +13,7 @@ import { supportService, supportError } from '../services/support.service';
 import { clearSupportDraft, readSupportDraft, writeSupportDraft, supportFileDigests, type SupportDraft } from '../utils/supportDraft';
 import { supportCategories, type SupportCategory, type SupportCreate } from '../types/support';
 
-export function SupportReportDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SupportReportDialog({ open, onClose, onSubmitted }: { open: boolean; onClose: () => void; onSubmitted?: () => void }) {
   const { currentUser } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
   if (!open || !currentUser) return null;
@@ -22,10 +23,10 @@ export function SupportReportDialog({ open, onClose }: { open: boolean; onClose:
     <p className="text-neutral-700 mb-4">Estás viendo otra cuenta. Volvé a tu sesión para que el ticket quede a tu nombre.</p>
     <Button onClick={exitImpersonation}>Volver a mi sesión</Button>
   </Modal>;
-  return <ReportForm key={String(currentUser.id)} owner={String(currentUser.id)} onClose={onClose} />;
+  return <ReportForm key={String(currentUser.id)} owner={String(currentUser.id)} onClose={onClose} onSubmitted={onSubmitted} />;
 }
 
-function ReportForm({ owner, onClose }: { owner: string; onClose: () => void }) {
+function ReportForm({ owner, onClose, onSubmitted }: { owner: string; onClose: () => void; onSubmitted?: () => void }) {
   const initial = useRef(readSupportDraft(owner));
   const [draft, setDraft] = useState<SupportDraft>(initial.current || { asunto: '', descripcion: '', categoria: 'GENERAL' });
   const [files, setFiles] = useState<File[]>([]);
@@ -36,12 +37,16 @@ function ReportForm({ owner, onClose }: { owner: string; onClose: () => void }) 
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(true);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const mp = useMobilePrefix();
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { if (!acknowledged.current) setSaved(writeSupportDraft(owner, draft)); }, [owner, draft]);
   const complete = (ticket: { id: string }) => {
     acknowledged.current = true; clearSupportDraft(owner);
-    if (mounted.current) { onClose(); navigate(mp('/soporte/' + ticket.id)); }
+    // Invalidate only after the server acknowledges this owner's report. The
+    // list may still be fresh in React Query when returning from the detail.
+    void queryClient.invalidateQueries({ queryKey: ['soporte', owner] });
+    if (mounted.current) { onClose(); onSubmitted?.(); navigate(mp('/soporte/' + ticket.id)); }
   };
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -100,8 +105,8 @@ function ReportForm({ owner, onClose }: { owner: string; onClose: () => void }) 
   </Modal>;
 }
 
-export function SupportEntry({ className }: { className?: string }) {
+export function SupportEntry({ className, onSubmitted }: { className?: string; onSubmitted?: () => void }) {
   const [open, setOpen] = useState(false);
   return <><button type="button" className={className || 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-neutral-400 bg-white px-4 text-neutral-900 hover:bg-neutral-50 focus-visible:outline-primary-700'} onClick={() => setOpen(true)}>
-    <LifeBuoy size={20} className="shrink-0" />Reportar problema</button><SupportReportDialog open={open} onClose={() => setOpen(false)} /></>;
+    <LifeBuoy size={20} className="shrink-0" />Reportar problema</button><SupportReportDialog open={open} onClose={() => setOpen(false)} onSubmitted={onSubmitted} /></>;
 }

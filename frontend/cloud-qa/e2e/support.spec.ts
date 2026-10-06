@@ -43,7 +43,7 @@ test('native support: report, take, private note, handoff, reply, close and reop
   };
   observe(page);
   const asUser = async (who: string) => {
-    const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), baseURL: 'http://127.0.0.1:4177' });
+    const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177' });
     contexts.push(context); const target = await context.newPage(); observe(target); await login(target, info, who); return target;
   };
   const technician = info.project.name === 'web-desktop' ? 'operador2' : info.project.name === 'web-responsive' ? 'transportista2' : 'generador2';
@@ -137,13 +137,29 @@ test('support offline draft is recoverable across close and reload without a fal
 test('support list rows are keyboard navigable and a common actor cannot open another reporter ticket', async ({ page, browser }, info) => {
   await login(page, info, 'operador'); await page.goto(path(info));
   const subject = 'QA acceso restringido ' + info.project.name;
-  const dialog = await report(page, subject);
+  if (info.project.name !== 'web-desktop') {
+    await page.getByRole('button', { name: info.project.name === 'app' ? 'Abrir menu' : 'Abrir menú', exact: true }).click();
+  }
+  // Report from the menu, not only the page's entry. It must close on ACK and
+  // return to a fresh owned list, without an overlay intercepting row actions.
+  const menu = info.project.name === 'app' ? page.getByRole('navigation', { name: 'Menú de la aplicación', exact: true }) : page.locator('aside');
+  await menu.getByRole('button', { name: 'Reportar problema', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Continuar luego', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const menuEntry = menu.getByRole('button', { name: 'Reportar problema', exact: true });
+  await expect(menuEntry).toBeVisible(); await menuEntry.click();
+  await page.getByRole('dialog').getByLabel('Asunto', { exact: true }).fill(subject);
+  await page.getByRole('dialog').getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA reporte sintético desde el menú, debe cerrar sólo tras confirmación.');
+  const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/soporte/[^/]+$'));
+  if (info.project.name === 'app') await expect(page.getByRole('navigation', { name: 'Menú de la aplicación', exact: true })).toHaveCount(0);
+  if (info.project.name === 'web-responsive') await expect(page.getByRole('button', { name: 'Abrir menú', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await screenshot(page, info, 'menu-report-confirmed');
   const ticketUrl = page.url(); await page.getByRole('link', { name: 'Volver a tickets', exact: true }).click();
   const row = page.getByRole('link').filter({ hasText: subject }); await row.focus(); await page.keyboard.press('Enter');
   await expect(page).toHaveURL(ticketUrl); await readablePageHeading(page);
-  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177' });
+  const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177' });
   try {
     const outsider = await context.newPage(); await login(outsider, info, 'generador');
     const denied = outsider.waitForResponse(response => response.url().includes('/api/soporte/') && response.url().endsWith(ticketUrl.split('/').pop()!));

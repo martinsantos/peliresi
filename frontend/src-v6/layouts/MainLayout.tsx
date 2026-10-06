@@ -327,7 +327,7 @@ export const MainLayout: React.FC = () => {
               className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}>
               <LifeBuoy size={20} />Soporte
             </NavLink>
-            <SupportEntry className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-white" />
+            <SupportEntry onSubmitted={() => setSidebarOpen(false)} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-white" />
             <NavLink
               to="/configuracion"
               onClick={() => setSidebarOpen(false)}

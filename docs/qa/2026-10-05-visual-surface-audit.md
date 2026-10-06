@@ -2,6 +2,40 @@
 
 ## Siguiente candidato: soporte nativo autorizado y retorno del Monitor
 
+### QA96: defecto reproducido y corrección de navegación
+
+QA96/37399713667, SHA ee6413d6649cb4c43e5bac60a4ff34d66252046e,
+terminó FAILURE: 515BE +1111FE unit PASS, 12HTTP soporte PASS y 6/9 E2E
+focales PASS, 3FAIL, cero omitidos/flaky. Creación, toma, nota privada,
+derivación, aviso interno, respuesta, cierre/reapertura y borrador offline
+pasaron en escritorio, web responsive y app. Los tres fallos son reales:
+volver al listado reutilizaba una caché vacía anterior a crear el ticket.
+Prueba nueva con QueryClient real y staleTime largo: 0PASS/1FAIL antes,
+6/6 (incluidos cinco tests del diálogo) después de invalidar exclusivamente
+las consultas del autor tras ACK, nunca en timeout. Prueba del menú móvil:
+27PASS/1FAIL antes (drawer seguía sobre el ticket), 34/34 junto con diálogo/
+caché después; «Continuar luego» conserva menú y borrador, sólo ACK lo cierra.
+Focal completo de los doce archivos afectados:91/91,0fallos/omitidos,
+heap256MB/worker1. No sumar los subconjuntos anteriores.
+
+ZIP final96 único externo: artifact11384911726, SHA256
+ebd9357c1bdcd032539ac80782d8d447d47cc49fa048db0f7499c27aa341a3c5.
+Cleanup: runtime5717/server5718 detenidos 01:41:21.196Z y PostgreSQL cerrado
+2026-10-06T01:41:21.293Z. Tres PNG originales revisados: formulario escritorio,
+detalle creado app, derivación web responsive (total156 archivos revisados,
+no156 pantallas distintas ni revisión universal). Contraste/identidad son
+legibles en esas capturas; dimensiones de diagnóstico pueden partirse a
+ancho360 y control de archivos de respuesta conserva apariencia nativa: no
+certificar uniformidad global a partir de esos tres archivos.
+
+Siguiente gate conserva180E2E/16Android/12HTTP soporte y suites completas.
+El recorrido de filas ahora también crea desde el menú real, cancela sin
+enviar, confirma ACK/cierre del menú y verifica retorno al listado actualizado.
+Contextos adicionales de técnicos/actor ajeno usan el viewport exacto del
+proyecto, no el tamaño predeterminado del dispositivo. No intercepción de
+API de negocio/sesiones falsas. Ningún despliegue, servidor Gobierno, mensaje
+externo, proceso pesado local o publicador protegido.
+
 ### Ajuste después de QA95 y validación focal antes de ampliar
 
 QA95/37395443216 sobreced2d7f terminó CANCELLED por solicitud propia tras

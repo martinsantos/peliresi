@@ -1,7 +1,8 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-const mocks = vi.hoisted(() => ({ create: vi.fn(), sent: vi.fn(), navigate: vi.fn(), user: { id: 'owner', nombre: 'Usuario', rol: 'GENERADOR' }, impersonation: null as unknown }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), sent: vi.fn(), navigate: vi.fn(), invalidate: vi.fn(), user: { id: 'owner', nombre: 'Usuario', rol: 'GENERADOR' }, impersonation: null as unknown }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidate }) }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mocks.user }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: mocks.impersonation, exitImpersonation: vi.fn() }) }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
@@ -22,10 +23,12 @@ describe('report problem preserves the human workflow', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar ticket' })).not.toBeDisabled());
     expect(screen.getByLabelText('Asunto')).toBeDisabled();
     expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('No abre el manifiesto');
+    expect(mocks.invalidate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket' }));
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
     expect(mocks.create.mock.calls[0]).toEqual(mocks.create.mock.calls[1]);
     expect(localStorage.getItem('sitrep-soporte:v1:owner')).toBeNull();
+    expect(mocks.invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: ['soporte', 'owner'] });
   });
   it('lets a user close without submitting or losing the locally saved text', async () => {
     const close = vi.fn(); render(<SupportReportDialog open onClose={close} />); fill();

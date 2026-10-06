@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileLayout } from '../../layouts/MobileLayout';
@@ -22,6 +23,8 @@ const impersonationState = vi.hoisted(() => ({
   exit: vi.fn(),
 }));
 const notices = vi.hoisted(() => ({ unread: 0 }));
+const support = vi.hoisted(() => ({ create: vi.fn() }));
+vi.mock('../../services/support.service', () => ({ supportService: support, supportError: () => 'No se confirmó el ticket.' }));
 
 vi.mock('../../contexts/ImpersonationContext', () => ({
   useImpersonation: () => ({ impersonationData: impersonationState.data, exitImpersonation: impersonationState.exit }),
@@ -85,6 +88,7 @@ vi.mock('../../components/ui/Toast', () => ({
 
 function renderMobileLayout(initialPath = '/dashboard') {
   return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/" element={<MobileLayout />}>
@@ -100,9 +104,11 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
           <Route path="inspecciones/:id" element={<div>Expediente de campo</div>} />
           <Route path="mis-inspecciones/:id" element={<div>Inspección del actor</div>} />
+          <Route path="soporte/:id" element={<div>Ticket confirmado</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -113,6 +119,32 @@ describe('MobileLayout Android shell', () => {
     impersonationState.data = null;
     impersonationState.exit.mockClear();
     notices.unread = 0;
+    support.create.mockReset(); support.create.mockResolvedValue({ id: 'ticket' });
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it('closes the reporting drawer only after the server confirms the ticket', async () => {
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reportar problema', exact: true }));
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'El lector no responde' } });
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'Abrí el lector desde el viaje pero no responde.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await screen.findByText('Ticket confirmado');
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Menú de la aplicación' })).not.toBeInTheDocument());
+    expect(support.create).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the original drawer and work when reporting is deferred without acknowledgement', () => {
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reportar problema', exact: true }));
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'El lector no responde' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar luego', exact: true }));
+    expect(screen.getByRole('navigation', { name: 'Menú de la aplicación' })).toBeVisible();
+    expect(screen.getByTestId('dashboard-content')).toBeInTheDocument();
+    expect(support.create).not.toHaveBeenCalled();
+    expect(localStorage.getItem('sitrep-soporte:v1:17')).toContain('El lector no responde');
   });
 
   it('uses a short transportista bottom navigation label', () => {
