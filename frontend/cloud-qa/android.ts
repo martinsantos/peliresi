@@ -11,6 +11,7 @@ import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
 import { beginSessionEvidence } from './session-evidence.ts';
 import { nonObstructingNotices, readableWholeWords } from './e2e/helpers.ts';
+import { expectedOfflineConsole, qaManifestIcon, type ConsoleObservation, type IconProof } from './network-health.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -32,6 +33,9 @@ assert.match(chrome,/versionName=/);
 let context:BrowserContext;
 let page:Page;
 const errors:string[]=[];
+const consoleObservations:ConsoleObservation[]=[];
+const deliberateOfflineContexts=new WeakSet<BrowserContext>();
+const iconProofs:IconProof[]=[];
 const runtimeErrors:string[]=[];
 const failedResponses:Array<{url:string;method:string;status:number;at:string}>=[];
 const browserLifecycle:Array<{at:string;event:string;url?:string;expected:boolean}>=[];
@@ -54,7 +58,7 @@ const driverStep=async<T>(stage:string,operation:()=>Promise<T>,milliseconds=250
   catch(error){await record('failed',String(error));throw error;}
 };
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
-  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,runtimeErrors,failedResponses,browserLifecycle,
+  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,consoleObservations,iconProofs,runtimeErrors,failedResponses,browserLifecycle,
   sessionEvidence,sessionEvidenceOverflow,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
@@ -123,7 +127,9 @@ const observe=(target:Page)=>{
   target.on('pageerror',e=>runtimeErrors.push(e.message));
   target.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'page-close',url:target.url(),expected:intentionalClosures.has(target.context())}));
   target.on('crash',()=>runtimeErrors.push('Android Chrome page crashed: '+target.url()));
-  target.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  target.on('console',m=>{if(m.type()==='error'){
+    errors.push(m.text());consoleObservations.push({text:m.text(),at:new Date().toISOString(),deliberatelyOffline:deliberateOfflineContexts.has(target.context())});
+  }});
   target.on('response',response=>{
     if(response.url().includes('/api/')&&response.status()>=400)failedResponses.push({
       url:response.url(),method:response.request().method(),status:response.status(),at:new Date().toISOString(),
@@ -228,6 +234,20 @@ const proof=async(name:string)=>{
   // page PASS merely because its DOM screenshot was taken a few seconds earlier.
   await expect(page).toHaveTitle(/SITREP/i);
 };
+const verifyManifestIcon=async()=>{
+  const actual=await page.evaluate(async(url)=>{
+    const response=await fetch(url,{cache:'no-store'}),bytes=await response.arrayBuffer();
+    const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),byte=>byte.toString(16).padStart(2,'0')).join('');
+    const blob=URL.createObjectURL(new Blob([bytes],{type:response.headers.get('content-type')||''}));
+    try{const image=new Image();image.src=blob;await image.decode();return {url,at:new Date().toISOString(),status:response.status,mime:response.headers.get('content-type')||'',width:image.naturalWidth,height:image.naturalHeight,sha256};}
+    finally{URL.revokeObjectURL(blob);}
+  },qaManifestIcon);
+  const frozen=JSON.parse(await readFile(path.join(process.env.QA_ARTIFACTS!,'build-frozen.json'),'utf8'));
+  expect(actual.status).toBe(200);expect(actual.mime.split(';')[0]).toBe('image/png');expect(actual.width).toBe(512);expect(actual.height).toBe(512);
+  expect(actual.sha256).toBe(frozen.files.find((item:{file:string})=>item.file==='dist-app/icon-512.png')?.sha256);
+  // Use the observer clock, like consoleObservations, not an emulator clock.
+  iconProofs.push({...actual,at:new Date().toISOString()});await writeFile(path.join(output,'manifest-icon-proof.json'),JSON.stringify(iconProofs,null,2));
+};
 const check=async(name:string,task:()=>Promise<void>)=>{
   try{await task();results.push({name,status:'PASS'});console.log('PASS Android '+name);}
   catch(e){const error=e instanceof Error?e.message:String(e);results.push({name,status:'FAIL',error});
@@ -264,6 +284,7 @@ try{
   await launch();
   await check('real-os-and-admin-session',async()=>{
     await login('admin');
+    await verifyManifestIcon();
     const deviceInfo=await page.evaluate(()=>({agent:navigator.userAgent,width:innerWidth,height:innerHeight,secure:isSecureContext}));
     expect(deviceInfo.agent).toContain('Android');expect(deviceInfo.secure).toBe(true);
     await writeFile(path.join(output,'device.json'),JSON.stringify({
@@ -440,6 +461,7 @@ try{
     assert.ok(inspection?.id);
     const unsent='QA Android: comentario local sin confirmación del servidor.';
     const key='sitrep_inspection_draft_'+inspectorUserId+'_'+inspection.id;
+    deliberateOfflineContexts.add(context);
     await context.setOffline(true);
     try{
       await page.locator('#inspection-observations').fill(unsent);
@@ -588,12 +610,13 @@ try{
   await check('gps-offline-queue-survives-and-synchronizes-after-reconnection',async()=>{
     const key='gps_pending_'+fixture.deviceManifest.id;
     try{
+      deliberateOfflineContexts.add(context);
       await context.setOffline(true);
       await context.setGeolocation({latitude:-32.891,longitude:-68.841});
       await expect.poll(()=>page.evaluate(k=>JSON.parse(localStorage.getItem(k)||'[]').length,key),{timeout:45000}).toBeGreaterThan(0);
       await expect(page.getByText('Guardando local',{exact:true}).first()).toBeVisible();
       await proof('gps-offline-protected');
-    }finally{await context.setOffline(false);}
+    }finally{await context.setOffline(false);deliberateOfflineContexts.delete(context);}
     await expect.poll(()=>page.evaluate(k=>localStorage.getItem(k),key),{timeout:45000}).toBeNull();
     expect(gpsResponses.some(row=>row.status===200&&row.latitude===-32.891&&row.longitude===-68.841)).toBe(true);
     await writeFile(path.join(output,'gps-requests.json'),JSON.stringify(gpsResponses,null,2));
@@ -637,9 +660,10 @@ try{
   await check('javascript-health',async()=>{
     await expect(page).toHaveTitle(/SITREP/i);
     assert.ok(results.some(result=>result.name==='real-os-and-admin-session'&&result.status==='PASS'), 'A real authenticated session must have run');
-    // Failed transport while deliberately offline is expected; JS exceptions
-    // are still rejected. Record all console messages in the artifact.
-    expect(errors.filter(error=>!/^Failed to load resource: net::ERR_INTERNET_DISCONNECTED/.test(error))).toEqual([]);
+    await verifyManifestIcon();
+    // No blanket icon ignore: require its decoded immutable bytes before/after,
+    // plus a recorded deliberately offline context at the exact message time.
+    expect(consoleObservations.filter(event=>!expectedOfflineConsole(event,iconProofs))).toEqual([]);
     expect(runtimeErrors).toEqual([]);
     expect(failedResponses).toEqual([]);
     expect(browserLifecycle.filter(event=>!event.expected)).toEqual([]);
