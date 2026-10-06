@@ -7,7 +7,7 @@ vi.mock('../../lib/prisma', () => ({ default: {
   adjuntoSoporte: { findFirst: mocks.file }, $transaction: mocks.transaction,
 } }));
 vi.mock('../../services/supportFile.service', () => ({ persistSupportFiles: mocks.persist, discardSupportFiles: mocks.discard, describeSupportFile: vi.fn(), resolveSupportFile: vi.fn() }));
-import { accionarTicket, obtenerTicket, listarTickets, crearTicket, descargarAdjuntoSoporte, comprobarEnvioTicket } from '../../controllers/support.controller';
+import { accionarTicket, obtenerTicket, listarTickets, crearTicket, descargarAdjuntoSoporte, comprobarEnvioTicket, equipoSoporte } from '../../controllers/support.controller';
 const user = { id: 'owner', rol: 'GENERADOR', activo: true, restricted: false };
 const ticket = { id: 'ticket', numero: 1, autorId: 'owner', responsableId: 'agent', estado: 'EN_CURSO', version: 2, huella: 'hash', clienteId: 'creation123' };
 const response = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis(), setHeader: vi.fn(), type: vi.fn(), download: vi.fn() });
@@ -30,6 +30,15 @@ describe('support identity, visibility and transactional workflow', () => {
   it('constrains an actor list to its authenticated account', async () => {
     const res = response(), next = vi.fn(); await listarTickets(request() as never, res as never, next);
     expect(next).not.toHaveBeenCalled(); expect(mocks.tickets).toHaveBeenCalledWith(expect.objectContaining({ where: { autorId: 'owner' } }));
+  });
+  it('exposes registered contact identifiers only inside the authenticated support directory', async () => {
+    const next = vi.fn(); await equipoSoporte(request({}, { ...user, rol: 'ADMIN' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.team).toHaveBeenCalledWith(expect.objectContaining({ select: { id: true, nombre: true, apellido: true, email: true } }));
+  });
+  it('does not disclose the support directory to a common report author', async () => {
+    const next = vi.fn(); await equipoSoporte(request() as never, response() as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403 }); expect(mocks.team).not.toHaveBeenCalled();
   });
   it('denies a foreign ticket without disclosing that it exists', async () => {
     const next = vi.fn(); await obtenerTicket(request({}, { ...user, id: 'foreign' }) as never, response() as never, next);

@@ -46,7 +46,8 @@ async function notices(db: Db, ticket: { id: string; numero: number }, recipient
     datos: JSON.stringify({ tipo: 'soporte', ticketId: ticket.id, ruta: '/soporte/' + ticket.id }), prioridad: 'NORMAL' })) });
 }
 async function team(db: Db = prisma) {
-  return db.usuario.findMany({ where: { activo: true, OR: [{ rol: 'ADMIN' }, { agenteSoporte: { habilitado: true } }] }, select: userSelect, orderBy: { nombre: 'asc' } });
+  // Directory is staff-only. Keep the public ticket/author projection unchanged.
+  return db.usuario.findMany({ where: { activo: true, OR: [{ rol: 'ADMIN' }, { agenteSoporte: { habilitado: true } }] }, select: { ...userSelect, email: true }, orderBy: { nombre: 'asc' } });
 }
 export async function soporteAcceso(req: AuthRequest, res: Response, next: NextFunction) {
   try { res.json({ success: true, data: { puedeGestionar: await staff(req.user), puedeConfigurar: req.user.rol === 'ADMIN' } }); }

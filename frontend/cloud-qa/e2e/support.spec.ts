@@ -1,4 +1,5 @@
 import { devices, expect, test, type Page, type TestInfo, type BrowserContext } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { login, prefix, readableFixedAction, readablePageHeading } from './helpers';
 
 const path = (info: TestInfo, suffix = '') => prefix(info) + '/soporte' + suffix;
@@ -76,7 +77,7 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(admin.getByText('QA diagnóstico reservado: no mostrar al reportante.', { exact: true })).toBeVisible();
     await action(admin, 'Derivar a otro responsable', 'QA motivo privado para el nuevo responsable.');
     await admin.getByRole('button', { name: 'Nuevo responsable', exact: true }).click();
-    await admin.getByRole('option', { name: 'QA ' + technician, exact: true }).click();
+    await admin.getByRole('option', { name: 'QA ' + technician + ' · ' + technician + '@night-qa.invalid', exact: true }).click();
     await admin.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
     await expect(admin.locator('dd').filter({ hasText: 'QA ' + technician })).toBeVisible();
     await screenshot(admin, info, 'desk-handoff'); await admin.close();
@@ -151,10 +152,20 @@ test('support list rows are keyboard navigable and a common actor cannot open an
   await page.getByRole('dialog').getByLabel('Asunto', { exact: true }).fill(subject);
   await page.getByRole('dialog').getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA reporte sintético desde el menú, debe cerrar sólo tras confirmación.');
   const dialog = page.getByRole('dialog');
+  const filename = 'captura-' + 'a'.repeat(110) + '.png';
+  const fileBytes = await page.screenshot({ animations: 'disabled' });
+  await dialog.getByLabel('Capturas o documentos · opcional', { exact: true }).setInputFiles({ name: filename, mimeType: 'image/png', buffer: fileBytes });
   await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/soporte/[^/]+$'));
   if (info.project.name === 'app') await expect(page.getByRole('navigation', { name: 'Menú de la aplicación', exact: true })).toHaveCount(0);
   if (info.project.name === 'web-responsive') await expect(page.getByRole('button', { name: 'Abrir menú', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  const attachment = page.getByRole('button').filter({ hasText: filename });
+  await attachment.scrollIntoViewIfNeeded();
+  await readableFixedAction(attachment, page.getByRole('region', { name: 'Conversación', exact: true }));
+  const receiving = page.waitForEvent('download'); await attachment.click();
+  const download = await receiving; expect(download.suggestedFilename()).toBe(filename);
+  expect(await download.failure()).toBeNull();
+  expect(await readFile((await download.path())!)).toEqual(fileBytes);
   await screenshot(page, info, 'menu-report-confirmed');
   const ticketUrl = page.url(); await page.getByRole('link', { name: 'Volver a tickets', exact: true }).click();
   const row = page.getByRole('link').filter({ hasText: subject }); await row.focus(); await page.keyboard.press('Enter');

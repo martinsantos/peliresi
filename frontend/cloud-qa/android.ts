@@ -620,7 +620,7 @@ try{
   });
   await check('native-support-report-and-detail-on-actual-Android',async()=>{
     await page.goto('http://127.0.0.1:4177/app/soporte');
-    await expect(page.getByRole('heading',{name:'Soporte',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{level:2,name:'Soporte',exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Reportar problema',exact:true}).last().tap();
     const dialog=page.getByRole('dialog',{name:'Reportar un problema',exact:true});
     await dialog.getByLabel('Asunto',{exact:true}).fill('QA soporte desde Android real emulado');

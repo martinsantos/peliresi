@@ -61,7 +61,7 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
         <Button type="submit" variant="outline" leftIcon={<Search size={18} />}>Buscar</Button>
       </form>
       {list.isPending ? <p role="status">Cargando tickets…</p> : list.isError ? <div role="alert" className="space-y-2 text-error-700"><p>{supportError(list.error)}</p><Button variant="outline" onClick={() => void list.refetch()}>Reintentar lista</Button></div> : <>
-        <p className="text-sm text-neutral-600" role="status">{list.data.total} tickets en esta vista</p>
+        <p className="text-sm text-neutral-600" role="status">{list.data.total} {list.data.total === 1 ? 'ticket' : 'tickets'} en esta vista</p>
         {!list.data.items.length ? <p className="rounded-lg border border-neutral-200 bg-white p-6 text-neutral-700">No hay tickets que coincidan. Podés reportar un problema desde el botón superior.</p>
           : <ul className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 bg-white">
             {list.data.items.map(ticket => <li key={ticket.id}><Link to={mp('/soporte/' + ticket.id)} className="grid min-w-0 gap-2 p-4 text-neutral-900 hover:bg-primary-50 active:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-700 md:grid-cols-[8rem_minmax(0,1fr)_12rem]">
@@ -94,7 +94,7 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
       <h3 className="break-words text-xl font-bold text-neutral-900">{ticket.asunto}</h3>
       <dl className="grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-neutral-600">Reportado por</dt><dd className="font-medium text-neutral-900">{name(ticket.autor)}</dd></div>
         <div><dt className="text-neutral-600">Responsable</dt><dd className="font-medium text-neutral-900">{ticket.responsable ? name(ticket.responsable) : 'Pendiente de asignación'}</dd></div></dl>
-      {ticket.contexto.ruta && <p className="break-all text-sm text-neutral-600">Pantalla del reporte: <code>{ticket.contexto.ruta}</code>{ticket.contexto.ancho ? ' · ' + ticket.contexto.ancho + ' × ' + ticket.contexto.alto : ''}</p>}
+      {ticket.contexto.ruta && <p className="text-sm text-neutral-600">Pantalla del reporte: <code className="[overflow-wrap:anywhere]">{ticket.contexto.ruta}</code>{ticket.contexto.ancho ? <> · <span className="whitespace-nowrap">{ticket.contexto.ancho} × {ticket.contexto.alto}</span></> : null}</p>}
     </header>
     <section aria-label="Conversación" className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
       <h4 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">Conversación</h4>
@@ -102,7 +102,7 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-semibold text-neutral-900">{name(message.autor)}</span><time dateTime={message.createdAt} className="text-neutral-600">{date(message.createdAt)}</time></div>
         {message.interno && <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-warning-800"><LockKeyhole size={16} />Nota interna · sólo soporte</p>}
         <p className="whitespace-pre-wrap break-words text-base text-neutral-800">{message.cuerpo}</p>
-        {!!message.adjuntos.length && <ul className="mt-3 space-y-2">{message.adjuntos.map(file => <li key={file.id}><Button variant="outline" onClick={() => void download(file)} leftIcon={<Download size={16} />}>{file.nombre} · {(file.bytes / 1024).toFixed(0)} KB</Button></li>)}</ul>}
+        {!!message.adjuntos.length && <ul className="mt-3 space-y-2">{message.adjuntos.map(file => <li key={file.id}><Button variant="outline" className="max-w-full [overflow-wrap:anywhere]" onClick={() => void download(file)} leftIcon={<Download size={16} />}>{file.nombre} · {(file.bytes / 1024).toFixed(0)} KB</Button></li>)}</ul>}
       </li>)}</ol>
     </section>
     {error && <p role="alert" className="text-error-700">{error}</p>}
@@ -122,6 +122,7 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   const [pending, setPending] = useState<{ input: SupportMutation; key: string; files: File[] } | null>(null);
   const inFlight = useRef(false);
   const team = useQuery({ queryKey: ['soporte', owner, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
+  const recipient = team.data?.find(user => user.id === target);
   const send = async (chosen = action) => {
     if (inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
@@ -147,20 +148,22 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
   const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;
   const canTake = ticket.puedeGestionar && !ticket.responsableId && ticket.estado !== 'CERRADO';
-  return <section aria-label="Atender ticket" className="space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5">
+  return <section aria-label="Atender ticket" className="min-w-0 space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
     {canTake && <Button disabled={busy || !!pending} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Tomar ticket</Button>}
     {pending?.input.accion === 'TOMAR' && <Button isLoading={busy} onClick={() => void send('TOMAR')}>Reintentar toma del ticket</Button>}
     {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : <form className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
       <Select label="Acción de soporte" value={selected} onChange={value => setAction(value as SupportAction)} options={actions} disabled={busy || !!pending} />
       {selected === 'DERIVAR' && <>{team.isError ? <p role="alert" className="text-error-700">{supportError(team.error)} <Button variant="outline" onClick={() => void team.refetch()}>Reintentar equipo</Button></p> :
         <Select label="Nuevo responsable" value={target} onChange={setTarget} disabled={busy || !!pending || team.isPending} searchable
-          options={(team.data || []).filter(user => user.id !== ticket.responsableId).map(user => ({ value: user.id, label: name(user) }))} />}</>}
+          helperText={recipient ? 'Responsable seleccionado: ' + recipient.email : undefined}
+          renderOption={option => <span className="block [overflow-wrap:anywhere]">{option.label}</span>}
+          options={(team.data || []).filter(user => user.id !== ticket.responsableId).map(user => ({ value: user.id, label: name(user) + ' · ' + user.email }))} />}</>}
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-reply">{selected === 'NOTA' || selected === 'DERIVAR' ? 'Nota interna / motivo' : 'Mensaje o resolución'}</label>
       <textarea id="support-reply" value={body} maxLength={8000} minLength={5} required disabled={busy || !!pending} onChange={event => setBody(event.target.value)} rows={4}
         className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
       {(selected === 'RESPONDER' || selected === 'NOTA') && <><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
         <input id="support-reply-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy || !!pending}
-          className="block min-h-11 w-full text-sm text-neutral-700" onChange={event => {
+          className="block min-h-11 w-full text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900" onChange={event => {
             const chosen = Array.from(event.target.files || []); if (chosen.length > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; setFiles([]); } else setFiles(chosen);
           }} /></>}
       {pending && <p className="text-sm text-neutral-700">Envío sin confirmar. El reintento conservará el contenido y la misma clave.</p>}

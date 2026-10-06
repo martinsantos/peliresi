@@ -4,6 +4,29 @@
 
 ### QA96: defecto reproducido y corrección de navegación
 
+Actualización97: cancelada deliberadamente antes del bloque Android al detectar
+selector ambiguo: tanto encabezadoH1 como contenidoH2 se llaman «Soporte».
+QA96 muestra ambos; la prueba Android nueva se acota a H2, no se elimina
+la comprobación ni se rediseña el producto para favorecerla. Unit97 crudos
+515BE+1114FE PASS,0omitidos. E2EJSONfinal ausente por cancelación: no inventar
+conteos ni certificar Android97. Cleanup97 SUCCESS: runtime6023/server6024
+detenidos02:07:51.557Z,PGcerrado2026-10-06T02:07:51.654Z. ZIPfinal externo
+artifact11385289692sha e309c25b4eb67126e3c744ae955db8b752a75a695c2e68faab2133e57b442974.
+No repetir ni descargar el summary duplicado.
+
+Pulido nativo acotado a soporte: medidas360×800 no se parten, control de
+adjuntos de respuesta usa el mismo estilo44px del reporte, nombre largo
+puede envolver dentro del botón y «1 ticket» usa singular. E2E de menú
+añade carga y descarga protegida de PNG real de QA con nombre largo,
+geometría del botón y comparación byteporbyte (no API interceptada).
+Homónimos: antes31/32BE y1/2FE focales, después32/32BE+92/92FE conjuntos,
+0omitidos. Directorio de técnicos usa correo registrado sólo para staff;
+selector muestra identificador y envía elID elegido, no el nombre. Autor
+común no obtiene el directorio/candidatos ni el correo en ficha de ticket.
+HTTP amplía estos asserts dentro de los12grupos existentes; no cambia
+roles, destinatarios externos ni denominadores180E2E/16Android.
+Siguiente: commit/push y una VM FULL con este candidato; resultados pendientes.
+
 QA96/37399713667, SHA ee6413d6649cb4c43e5bac60a4ff34d66252046e,
 terminó FAILURE: 515BE +1111FE unit PASS, 12HTTP soporte PASS y 6/9 E2E
 focales PASS, 3FAIL, cero omitidos/flaky. Creación, toma, nota privada,

@@ -47,6 +47,8 @@ try {
   await check('anonymous sessions and non-support actors cannot open the desk or configure agents', async () => {
     await call(null, '/soporte/acceso', 'GET', undefined, 401);
     await call('generador', '/soporte?scope=mesa', 'GET', undefined, 403);
+    await call('generador', '/soporte/equipo', 'GET', undefined, 403);
+    await call('generador', '/soporte/candidatos?search=qa', 'GET', undefined, 403);
     await call('generador', '/soporte/equipo/' + fixture.users.operador2, 'PATCH', { habilitado: true }, 403);
   });
   const input = { asunto: 'QA soporte HTTP: problema sintético', descripcion: 'Detalle completamente sintético, sin destinatarios externos.', categoria: 'GENERAL', contexto: { ruta: '/app/manifiestos/case?token=secret#section', rol: 'ADMIN', token: 'secret' } };
@@ -83,7 +85,8 @@ try {
   privateForm.append('files', new Blob([Buffer.from('%PDF-1.7\nQA support fixture')], { type: 'application/pdf' }), 'qa-note.pdf');
   await call('admin', '/soporte/' + id + '/acciones', 'POST', privateForm, 200, 'http-private-note-123');
   await check('private notes, attachments and history stay server-filtered for the reporter', async () => {
-    const own = await call<Ticket>('generador', '/soporte/' + id);
+    const own = await call<Ticket & { autor: Record<string, unknown> }>('generador', '/soporte/' + id);
+    assert.equal(Object.hasOwn(own.autor, 'email'), false);
     const staff = await call<Ticket>('admin', '/soporte/' + id);
     assert.equal(own.mensajes.length, 1); assert.equal(staff.mensajes.length, 2);
     const file = staff.mensajes.find(message => message.interno)!.adjuntos[0];
@@ -95,6 +98,9 @@ try {
   await call('admin', '/soporte/equipo/' + fixture.users.operador2, 'PATCH', { habilitado: true });
   await check('support grant does not expand actor role or legal dossier permissions', async () => {
     const user = await db.usuario.findUniqueOrThrow({ where: { id: fixture.users.operador2 } }); assert.equal(user.rol, 'OPERADOR');
+    const directory = await call<Array<{ id: string; email: string }>>('operador2', '/soporte/equipo');
+    assert.equal(directory.find(agent => agent.id === user.id)?.email, 'operador2@night-qa.invalid');
+    await call('operador2', '/soporte/candidatos?search=qa', 'GET', undefined, 403);
     await call('operador2', '/actores/generadores/' + fixture.actors.generador, 'GET', undefined, 403);
     await call('operador2', '/soporte/equipo/' + fixture.users.generador2, 'PATCH', { habilitado: true }, 403);
   });
