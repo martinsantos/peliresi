@@ -84,6 +84,88 @@ describe('report problem preserves the human workflow', () => {
     expect(close).toHaveBeenCalled(); expect(mocks.create).not.toHaveBeenCalled();
     expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('No abre el manifiesto');
   });
+  const pendingReport = () => {
+    const input = { asunto: 'No puedo enviar el ticket', descripcion: 'El envío falló y perdí la captura después de recargar.', categoria: 'GENERAL', contexto: { ruta: '/dashboard' } };
+    const pending = { key: 'existing-send-key', input, files: [{ nombre: 'pantalla.jpg', sha256: 'old-screen-digest' }] };
+    localStorage.setItem('sitrep-soporte:v1:owner', JSON.stringify({ ...input, pendiente: pending }));
+    return pending;
+  };
+  it('recovers a reloaded report without requiring a lost optional screenshot or creating a new key', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValue({ response: { status: 404 } });
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    expect(screen.getByLabelText('Asunto')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(pending.input, [], pending.key));
+    expect(mocks.sent).toHaveBeenCalledExactlyOnceWith(pending.key);
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toBeNull();
+  });
+  it('uses the prior server receipt instead of resending when optional files were lost', async () => {
+    const pending = pendingReport();
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(mocks.sent).toHaveBeenCalledExactlyOnceWith(pending.key);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it('does not discard lost-attachment delivery evidence or send when receipt verification is unavailable', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValue(new Error('offline'));
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await screen.findByRole('alert');
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual(pending);
+    expect(screen.getByLabelText('Asunto')).toBeDisabled();
+  });
+  it('preserves the same text-only retry after a timeout without demanding the lost screenshot again', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValue({ response: { status: 404 } });
+    mocks.create.mockRejectedValueOnce(new Error('timeout'));
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await screen.findByRole('alert');
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual({ ...pending, files: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(mocks.create).toHaveBeenCalledTimes(2);
+    expect(mocks.create.mock.calls[0]).toEqual(mocks.create.mock.calls[1]);
+  });
+  it('reconciles a racing original attachment request instead of creating a duplicate', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValueOnce({ response: { status: 404 } }).mockResolvedValueOnce({ id: 'already-created' });
+    mocks.create.mockRejectedValue({ response: { status: 409 } });
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/already-created'));
+    expect(mocks.create).toHaveBeenCalledExactlyOnceWith(pending.input, [], pending.key);
+    expect(mocks.sent).toHaveBeenCalledTimes(2);
+  });
+  it('does not resend a recovered report under an account that changed during receipt verification', async () => {
+    const pending = pendingReport();
+    let rejectReceipt!: (error: unknown) => void;
+    mocks.sent.mockImplementation(() => new Promise((_, reject) => { rejectReceipt = reject; }));
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.sent).toHaveBeenCalledOnce());
+    localStorage.setItem('sitrep_access_token', token('second-owner'));
+    await act(async () => { rejectReceipt({ response: { status: 404 } }); });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual(pending);
+    expect(screen.getByRole('alert')).toHaveTextContent('La sesión cambió');
+  });
+  it('does not verify or send a recovered report while offline', async () => {
+    const pending = pendingReport();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await screen.findByRole('alert');
+    expect(mocks.sent).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual(pending);
+  });
   it('does not claim delivery or call the network while offline', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     render(<SupportReportDialog open onClose={vi.fn()} />); fill(); fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket' }));

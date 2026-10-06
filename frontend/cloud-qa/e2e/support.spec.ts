@@ -155,6 +155,62 @@ test('support offline draft is recoverable across close and reload without a fal
   await expect(page).toHaveURL(new RegExp('/soporte/[^/]+$')); expect(requests.length).toBe(1);
 });
 
+test('support reload can recover lost optional attachments with a real receipt and one ticket per sending key', async ({ page }, info) => {
+  test.setTimeout(120000);
+  await login(page, info, 'generador');
+  for (const delivered of [false, true]) {
+    await page.goto(path(info));
+    const subject = 'QA adjuntos perdidos ' + delivered + ' ' + info.project.name;
+    const dialog = await report(page, subject);
+    const description = await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).inputValue();
+    let key: string = crypto.randomUUID();
+    let existingId: string | undefined;
+    if (delivered) {
+      await dialog.getByLabel('Capturas o documentos · opcional', { exact: true }).setInputFiles({ name: 'captura-perdida.png', mimeType: 'image/png', buffer: await page.screenshot({ animations: 'disabled' }) });
+      const createdResponse = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
+      await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
+      const response = await createdResponse;
+      expect(response.status()).toBe(201);
+      key = response.request().headers()['idempotency-key'];
+      existingId = (await response.json()).data.id;
+    } else {
+      await dialog.getByRole('button', { name: 'Continuar luego', exact: true }).click();
+    }
+    // Explicit synthetic persisted draft, NOT a session or business API mock.
+    // The live authenticated API determines whether the original send exists.
+    await page.evaluate(({ subject, description, key }) => {
+      const token = localStorage.getItem('sitrep_access_token')!;
+      const owner = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).id;
+      const input = { asunto: subject, descripcion: description, categoria: 'GENERAL', contexto: { ruta: location.pathname } };
+      localStorage.setItem('sitrep-soporte:v1:' + encodeURIComponent(owner), JSON.stringify({ ...input,
+        pendiente: { key, input, files: [{ nombre: 'captura-perdida.png', sha256: '0'.repeat(64) }] } }));
+    }, { subject, description, key });
+    await page.goto(path(info)); await page.reload();
+    await page.getByRole('region', { name: 'Soporte de SITREP', exact: true }).getByRole('button', { name: 'Reportar problema', exact: true }).click();
+    const restored = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
+    await expect(restored.getByLabel('Asunto', { exact: true })).toHaveValue(subject);
+    await expect(restored.getByLabel('Asunto', { exact: true })).toBeDisabled();
+    await expect(restored.getByText(/Si perdiste los adjuntos/)).toBeVisible();
+    await restored.getByRole('button', { name: 'Enviar solo texto', exact: true }).scrollIntoViewIfNeeded();
+    await screenshot(page, info, 'lost-attachments-' + delivered);
+    const posts: import('@playwright/test').Request[] = [];
+    const observe = (request: import('@playwright/test').Request) => { if (request.url().endsWith('/api/soporte') && request.method() === 'POST') posts.push(request); };
+    page.on('request', observe);
+    try {
+      const receiptResponse = page.waitForResponse(response => response.url().endsWith('/api/soporte/envios/' + key));
+      await restored.getByRole('button', { name: 'Enviar solo texto', exact: true }).click();
+      expect((await receiptResponse).status()).toBe(delivered ? 200 : 404);
+      await expect(page).toHaveURL(new RegExp('/soporte/[^/]+$'));
+      if (delivered) { expect(posts).toEqual([]); expect(page.url()).toBe('http://127.0.0.1:4177' + path(info, '/' + existingId)); }
+      else { expect(posts).toHaveLength(1); expect(posts[0].headers()['idempotency-key']).toBe(key); expect(posts[0].postData()).not.toContain('filename='); }
+      await expect(page.getByText(subject, { exact: true })).toBeVisible();
+      await screenshot(page, info, 'text-only-recovered-' + delivered);
+    } finally { page.off('request', observe); }
+    await page.getByRole('link', { name: 'Volver a tickets', exact: true }).click();
+    await expect(page.getByRole('link').filter({ hasText: subject })).toHaveCount(1);
+  }
+});
+
 test('support list rows are keyboard navigable and a common actor cannot open another reporter ticket', async ({ page, browser }, info) => {
   await login(page, info, 'operador'); await page.goto(path(info));
   const subject = 'QA acceso restringido ' + info.project.name;

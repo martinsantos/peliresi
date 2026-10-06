@@ -44,6 +44,7 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
   const [validationAttempted, setValidationAttempted] = useState(false);
   const subjectInput = useRef<HTMLInputElement>(null);
   const descriptionInput = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const subjectLength = draft.asunto.trim().length;
   const descriptionLength = draft.descripcion.trim().length;
   const shortSubject = subjectLength < 5;
@@ -68,8 +69,8 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
       onClose(); onSubmitted?.(); if (!returnToTask) navigate(mp('/soporte/' + ticket.id));
     }
   };
-  const send = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const send = async (event?: React.FormEvent, withoutAttachments = false) => {
+    event?.preventDefault();
     if (inFlight.current) return;
     // A disabled submit hides the reason, especially after scrolling on mobile.
     // Guide the human to the first incomplete field without freezing/sending it.
@@ -82,25 +83,42 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
     try {
       if (!navigator.onLine) throw new Error('offline');
       assertSupportSession(owner);
-      const attachments = screenFile ? [screenFile, ...files] : files;
+      const attachments = withoutAttachments ? [] : screenFile ? [screenFile, ...files] : files;
       if (attachments.length > 3) throw new Error('Adjuntá hasta 3 archivos, incluyendo la captura.');
       const digests = await supportFileDigests(attachments);
       if (!mounted.current) return;
       assertSupportSession(owner);
       const pending = draft.pendiente;
-      if (pending && JSON.stringify(digests) !== JSON.stringify(pending.files)) throw new Error('Adjuntá los mismos archivos para reintentar este envío. También podés comprobar si ya llegó.');
+      const changedFiles = pending && JSON.stringify(digests) !== JSON.stringify(pending.files);
+      if (pending && (withoutAttachments || changedFiles)) {
+        // A reload loses optional files, not the report. Reconcile first and
+        // retain the SAME key: a racing original request cannot create a second
+        // ticket even when the human explicitly chooses a text-only retry.
+        try { const received = await supportService.sent(pending.key); complete(received); return; }
+        catch (failure) { if ((failure as { response?: { status?: number } }).response?.status !== 404) throw failure; }
+        if (!mounted.current) return;
+        assertSupportSession(owner);
+        if (changedFiles && !withoutAttachments) throw new Error('Los adjuntos del intento anterior no están disponibles. Podés enviar solo el texto, sin volver a adjuntarlos.');
+      }
       const input: SupportCreate = pending?.input || { asunto: draft.asunto, descripcion: draft.descripcion, categoria: draft.categoria,
         contexto: context || { ruta: location.pathname, ancho: innerWidth, alto: innerHeight, online: navigator.onLine } };
       const key = pending?.key || crypto.randomUUID();
       const frozen = { ...draft, pendiente: { key, input, files: digests } };
       setDraft(frozen); writeSupportDraft(owner, frozen);
+      if (withoutAttachments) { setScreenFile(undefined); setFiles([]); if (fileInput.current) fileInput.current.value = ''; }
       complete(await supportService.create(input, attachments, key));
     } catch (failure) {
-      if (failure instanceof Error && failure.message.startsWith('Adjuntá')) setError(failure.message);
+      const status = (failure as { response?: { status?: number } }).response?.status;
+      if (status === 409 && draft.pendiente) {
+        // The original attachment upload may have committed after the 404.
+        // Its owned receipt is authoritative; do not invent a new sending key.
+        try { assertSupportSession(owner); complete(await supportService.sent(draft.pendiente.key)); return; }
+        catch { /* Keep the same pending key if reconciliation is unavailable. */ }
+      }
+      if (failure instanceof Error && (failure.message.startsWith('Adjuntá') || failure.message.startsWith('Los adjuntos'))) setError(failure.message);
       else setError(supportError(failure));
       // Validation failures prove the transaction was rejected. A timeout does
       // not: keep its exact body/key and do not silently create a second ticket.
-      const status = (failure as { response?: { status?: number } }).response?.status;
       if (status === 400 || status === 413 || status === 422) setDraft(previous => ({ ...previous, pendiente: undefined }));
     } finally { inFlight.current = false; setBusy(false); }
   };
@@ -135,12 +153,15 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
       <p id="support-description-help" className={validationAttempted && shortDescription ? 'text-sm text-error-700' : 'text-sm text-neutral-600'}>
         {validationAttempted && shortDescription ? 'Escribí al menos 10 caracteres para describir el problema.' : 'Mínimo 10 caracteres. Describí qué esperabas y qué viste.'}</p>
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-files">Capturas o documentos · opcional</label>
-      <input id="support-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy}
+      <input ref={fileInput} id="support-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy}
         className="block w-full min-h-11 text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900"
         onChange={event => { const selected = Array.from(event.target.files || []); if (selected.length + (screenFile ? 1 : 0) > 3 || selected.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos, incluida la captura, de 5 MB cada uno.'); setFiles([]); event.target.value = ''; } else { setError(''); setFiles(selected); } }} />
       <p className="text-sm text-neutral-600">Hasta 3 archivos de 5 MB. No incluyas contraseñas ni datos ajenos al problema. Los archivos no se guardan en el borrador local.</p>
       {draft.pendiente && <div className="space-y-2 border-l-4 border-warning-600 pl-3 text-sm text-neutral-800"><p>Envío pendiente de confirmación. El texto se conserva sin cambios.</p>
-        <Button type="button" variant="outline" disabled={busy} onClick={check}>Comprobar si llegó</Button></div>}
+        <Button type="button" variant="outline" disabled={busy} onClick={check}>Comprobar si llegó</Button>
+        {!!draft.pendiente.files.length && <><p>Si perdiste los adjuntos, podés enviar solo el texto. Primero comprobamos si el ticket ya llegó para no duplicarlo.</p>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => void send(undefined, true)}>Enviar solo texto</Button></>}
+      </div>}
       {error && <p role="alert" className="text-sm text-error-700">{error}</p>}
       <p role="status" className="text-sm text-neutral-600">{saved ? 'Borrador guardado sólo en este dispositivo y para tu cuenta. No se envía automáticamente.' : 'Este navegador no permitió guardar el borrador. No cierres esta ventana hasta copiar tu texto.'}</p>
     </form>
