@@ -18,6 +18,51 @@ const fill = () => {
 const token = (id: string, iat = 1) => 'unit.' + btoa(JSON.stringify({ id, iat })) + '.not-a-credential';
 describe('report problem preserves the human workflow', () => {
   beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); mocks.digests.mockResolvedValue([]); mocks.user.id = 'owner'; mocks.impersonation = null; mocks.create.mockResolvedValue({ id: 'ticket' }); mocks.sent.mockResolvedValue({ id: 'ticket' }); localStorage.setItem('sitrep_access_token', token('owner')); Object.defineProperty(navigator, 'onLine', { configurable: true, value: true }); });
+  it('explains the actual two-character report instead of silently disabling its primary action', () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'yy' } });
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'hh' } });
+    const submit = screen.getByRole('button', { name: 'Enviar ticket', exact: true });
+    expect(submit).toBeEnabled();
+    expect(screen.getByText('Para enviar: asunto (2/5 caracteres) y descripción (2/10 caracteres).')).toBeInTheDocument();
+    fireEvent.click(submit);
+    expect(screen.getByLabelText('Asunto')).toHaveFocus();
+    expect(screen.getByLabelText('Asunto')).toHaveAttribute('aria-invalid', 'true');
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).not.toContain('pendiente');
+  });
+  it('guides an empty report to its first required field without sending or freezing the draft', () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    expect(screen.getByLabelText('Asunto')).toHaveFocus();
+    expect(screen.getByText('Escribí al menos 5 caracteres para el asunto.')).toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Asunto')).toBeEnabled();
+  });
+  it('focuses a short description, then permits one acknowledged send at the exact thresholds', async () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'Error' } });
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'hh' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    expect(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?')).toHaveFocus();
+    expect(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?')).toHaveAttribute('aria-invalid', 'true');
+    expect(mocks.create).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'No aparece' } });
+    expect(screen.queryByText(/Para enviar:/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?')).not.toHaveAttribute('aria-invalid', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+  });
+  it('does not count spaces as report content or silently submit invalid text', () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: '     ' } });
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: '          ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    expect(screen.getByText('Para enviar: asunto (0/5 caracteres) y descripción (0/10 caracteres).')).toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Asunto')).toHaveFocus();
+  });
   it('keeps a timeout request frozen, retries the same key and clears only after acknowledgement', async () => {
     mocks.create.mockRejectedValueOnce(new Error('timeout'));
     render(<SupportReportDialog open onClose={vi.fn()} />); fill();

@@ -41,6 +41,14 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
   const mounted = useRef(true);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(true);
+  const [validationAttempted, setValidationAttempted] = useState(false);
+  const subjectInput = useRef<HTMLInputElement>(null);
+  const descriptionInput = useRef<HTMLTextAreaElement>(null);
+  const subjectLength = draft.asunto.trim().length;
+  const descriptionLength = draft.descripcion.trim().length;
+  const shortSubject = subjectLength < 5;
+  const shortDescription = descriptionLength < 10;
+  const missing = [shortSubject && `asunto (${subjectLength}/5 caracteres)`, shortDescription && `descripción (${descriptionLength}/10 caracteres)`].filter(Boolean).join(' y ');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const mp = useMobilePrefix();
@@ -63,6 +71,13 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
     if (inFlight.current) return;
+    // A disabled submit hides the reason, especially after scrolling on mobile.
+    // Guide the human to the first incomplete field without freezing/sending it.
+    if (shortSubject || shortDescription) {
+      setValidationAttempted(true); setError('');
+      (shortSubject ? subjectInput.current : descriptionInput.current)?.focus();
+      return;
+    }
     inFlight.current = true; setBusy(true); setError('');
     try {
       if (!navigator.onLine) throw new Error('offline');
@@ -99,22 +114,26 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
   };
   const update = (change: Partial<SupportDraft>) => setDraft(previous => ({ ...previous, ...change }));
   return <Modal isOpen onClose={onClose} title="Reportar un problema" description="Tu reporte queda en Soporte de SITREP. No modifica el trámite que estás completando."
-    isBusy={busy} footer={<><Button variant="outline" disabled={busy} onClick={onClose}>Continuar luego</Button>
-      <Button type="submit" form="sitrep-support-report" isLoading={busy} disabled={draft.asunto.trim().length < 5 || draft.descripcion.trim().length < 10}>Enviar ticket</Button></>}>
-    <form id="sitrep-support-report" onSubmit={send} className="space-y-4">
+    isBusy={busy} footer={<>{missing && <p id="support-submit-help" className="w-full text-sm text-neutral-700">Para enviar: {missing}.</p>}
+      <Button type="button" variant="outline" disabled={busy} onClick={onClose}>Continuar luego</Button>
+      <Button type="submit" form="sitrep-support-report" isLoading={busy} aria-describedby={missing ? 'support-submit-help' : undefined}>Enviar ticket</Button></>}>
+    <form id="sitrep-support-report" onSubmit={send} noValidate className="space-y-4">
       {preview && <figure className="space-y-2">
         <img src={preview} alt="Captura de la pantalla que estabas usando" className="max-h-48 w-full rounded-lg border border-neutral-200 object-contain" />
         <figcaption className="text-sm text-neutral-700">Esta captura se adjuntará al ticket. Revisá que no muestre datos que no quieras compartir.</figcaption>
         <Button type="button" variant="outline" disabled={busy || !!draft.pendiente} onClick={() => setScreenFile(undefined)}>Quitar captura</Button>
       </figure>}
       {captureError && <p role="status" className="text-sm text-neutral-700">{captureError}</p>}
-      <Input label="Asunto" helperText="Mínimo 5 caracteres." value={draft.asunto} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} required />
+      <Input ref={subjectInput} label="Asunto" helperText="Mínimo 5 caracteres." errorMessage={validationAttempted && shortSubject ? 'Escribí al menos 5 caracteres para el asunto.' : undefined}
+        value={draft.asunto} minLength={5} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} required />
       <Select label="Área del problema" value={draft.categoria} onChange={value => update({ categoria: value as SupportCategory })}
         disabled={busy || !!draft.pendiente} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-description">¿Qué intentabas hacer y qué ocurrió?</label>
-      <textarea id="support-description" value={draft.descripcion} onChange={event => update({ descripcion: event.target.value })} maxLength={8000} required minLength={10}
-        aria-describedby="support-description-help" disabled={busy || !!draft.pendiente} rows={5} className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
-      <p id="support-description-help" className="text-sm text-neutral-600">Mínimo 10 caracteres. Describí qué esperabas y qué viste.</p>
+      <textarea ref={descriptionInput} id="support-description" value={draft.descripcion} onChange={event => update({ descripcion: event.target.value })} maxLength={8000} required minLength={10}
+        aria-describedby="support-description-help" aria-invalid={validationAttempted && shortDescription} disabled={busy || !!draft.pendiente} rows={5}
+        className={`w-full rounded-lg border p-3 text-base text-neutral-900 focus-visible:outline-primary-700 ${validationAttempted && shortDescription ? 'border-error-500' : 'border-neutral-400'}`} />
+      <p id="support-description-help" className={validationAttempted && shortDescription ? 'text-sm text-error-700' : 'text-sm text-neutral-600'}>
+        {validationAttempted && shortDescription ? 'Escribí al menos 10 caracteres para describir el problema.' : 'Mínimo 10 caracteres. Describí qué esperabas y qué viste.'}</p>
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-files">Capturas o documentos · opcional</label>
       <input id="support-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy}
         className="block w-full min-h-11 text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900"

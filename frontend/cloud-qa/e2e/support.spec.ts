@@ -22,6 +22,26 @@ async function nativeState(page: Page, info: TestInfo) {
 async function report(page: Page, subject: string) {
   await page.getByRole('button', { name: 'Reportar problema', exact: true }).last().click();
   const dialog = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
+  const posts: string[] = [];
+  const observe = (request: import('@playwright/test').Request) => { if (request.url().endsWith('/api/soporte') && request.method() === 'POST') posts.push(request.url()); };
+  page.on('request', observe);
+  try {
+    // Actual reported state: both fields filled, but too short. The sticky
+    // primary action must explain/focus the field, not become a silent dead end.
+    await dialog.getByLabel('Asunto', { exact: true }).fill('yy');
+    await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('hh');
+    const submit = dialog.getByRole('button', { name: 'Enviar ticket', exact: true });
+    await expect(submit).toBeEnabled();
+    await expect(dialog.getByText('Para enviar: asunto (2/5 caracteres) y descripción (2/10 caracteres).', { exact: true })).toBeVisible();
+    await submit.click();
+    await expect(dialog.getByLabel('Asunto', { exact: true })).toBeFocused();
+    expect(posts).toEqual([]);
+    await dialog.getByLabel('Asunto', { exact: true }).fill(subject);
+    await submit.click();
+    await expect(dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true })).toBeFocused();
+    expect(posts).toEqual([]);
+    await screenshot(page, test.info(), 'incomplete-report-feedback');
+  } finally { page.off('request', observe); }
   await dialog.getByLabel('Asunto', { exact: true }).fill(subject);
   await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA reporte sintético: la pantalla no muestra la información esperada.');
   await expect(dialog.getByRole('button', { name: 'Enviar ticket', exact: true })).toBeEnabled();
