@@ -1,5 +1,5 @@
 export type SupportState = 'ABIERTO' | 'EN_CURSO' | 'ESPERANDO_USUARIO' | 'CERRADO';
-export const supportStates: Record<SupportState, string> = { ABIERTO: 'Abierto', EN_CURSO: 'En atención', ESPERANDO_USUARIO: 'Espera tu respuesta', CERRADO: 'Cerrado' };
+export const supportStates: Record<SupportState, string> = { ABIERTO: 'Abierto', EN_CURSO: 'En atención', ESPERANDO_USUARIO: 'Esperando al usuario', CERRADO: 'Cerrado' };
 export const supportCategories = { GENERAL: 'General', SESION: 'Acceso y sesión', MANIFIESTOS: 'Manifiestos', INSPECCIONES: 'Inspecciones', GPS: 'Ubicación y viajes', QR: 'Escáner QR', DOCUMENTOS: 'Documentos', INTERFAZ: 'Interfaz' };
 export type SupportCategory = keyof typeof supportCategories;
 export type SupportAction = 'RESPONDER' | 'NOTA' | 'TOMAR' | 'DERIVAR' | 'ESPERAR' | 'CERRAR' | 'REABRIR';

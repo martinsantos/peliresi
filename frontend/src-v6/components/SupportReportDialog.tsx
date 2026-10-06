@@ -80,12 +80,13 @@ function ReportForm({ owner, onClose }: { owner: string; onClose: () => void }) 
     isBusy={busy} footer={<><Button variant="outline" disabled={busy} onClick={onClose}>Continuar luego</Button>
       <Button type="submit" form="sitrep-support-report" isLoading={busy} disabled={draft.asunto.trim().length < 5 || draft.descripcion.trim().length < 10}>Enviar ticket</Button></>}>
     <form id="sitrep-support-report" onSubmit={send} className="space-y-4">
-      <Input label="Asunto" value={draft.asunto} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} required />
+      <Input label="Asunto" helperText="Mínimo 5 caracteres." value={draft.asunto} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} required />
       <Select label="Área del problema" value={draft.categoria} onChange={value => update({ categoria: value as SupportCategory })}
         disabled={busy || !!draft.pendiente} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-description">¿Qué intentabas hacer y qué ocurrió?</label>
       <textarea id="support-description" value={draft.descripcion} onChange={event => update({ descripcion: event.target.value })} maxLength={8000} required minLength={10}
-        disabled={busy || !!draft.pendiente} rows={5} className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
+        aria-describedby="support-description-help" disabled={busy || !!draft.pendiente} rows={5} className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
+      <p id="support-description-help" className="text-sm text-neutral-600">Mínimo 10 caracteres. Describí qué esperabas y qué viste.</p>
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-files">Capturas o documentos · opcional</label>
       <input id="support-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy}
         className="block w-full min-h-11 text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900"

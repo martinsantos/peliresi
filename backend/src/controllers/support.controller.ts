@@ -65,7 +65,7 @@ export async function candidatosSoporte(req: AuthRequest, res: Response, next: N
     if (search.length < 2) return res.json({ success: true, data: [] });
     const rows = await prisma.usuario.findMany({ where: { activo: true, OR: [
       { nombre: { contains: search, mode: 'insensitive' } }, { email: { contains: search, mode: 'insensitive' } },
-    ] }, select: { ...userSelect, rol: true, agenteSoporte: { select: { habilitado: true } } }, take: 20, orderBy: { nombre: 'asc' } });
+    ] }, select: { ...userSelect, email: true, rol: true, agenteSoporte: { select: { habilitado: true } } }, take: 20, orderBy: { nombre: 'asc' } });
     res.json({ success: true, data: rows });
   } catch (error) { next(error); }
 }

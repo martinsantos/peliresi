@@ -122,6 +122,44 @@ try {
     const row = await db.ticketSoporte.findUniqueOrThrow({ where: { id } }); assert.equal(row.numero, number); assert.equal(row.estado, 'ABIERTO'); assert.equal(row.version, 7); assert.equal(row.responsableId, null);
     assert.equal(await db.eventoSoporte.count({ where: { ticketId: id } }), 6);
   });
+  await check('account and actor deletion preserve support history and roll back every dependent record', async () => {
+    const password = (await db.usuario.findUniqueOrThrow({ where: { id: fixture.users.generador } })).password;
+    const createAccount = async (suffix: string) => {
+      const user = await db.usuario.create({ data: { email: 'qa-support-delete-' + suffix + '@night-qa.invalid', nombre: 'QA baja sintética ' + suffix,
+        password, rol: 'TRANSPORTISTA', activo: true, emailVerified: true } });
+      const actor = await db.transportista.create({ data: { usuarioId: user.id, razonSocial: 'QA sin actividad ' + suffix, cuit: '99-8000000' + suffix + '-0',
+        domicilio: 'QA sintético', telefono: '0000000000', email: user.email, numeroHabilitacion: 'QA DELETE ' + suffix } });
+      const vehicle = await db.vehiculo.create({ data: { transportistaId: actor.id, patente: 'QAD' + suffix, marca: 'QA', modelo: 'QA', anio: 2026, capacidad: 1, numeroHabilitacion: 'QA', vencimiento: new Date('2030-01-01') } });
+      const driver = await db.chofer.create({ data: { transportistaId: actor.id, nombre: 'QA', apellido: 'Sintético', dni: '0000000' + suffix, licencia: 'QA', vencimiento: new Date('2030-01-01'), telefono: '0000000' } });
+      return { user, actor, vehicle, driver };
+    };
+    const retained = await createAccount('1');
+    const loginResponse = await fetch(base + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '127.10.4.20' }, body: JSON.stringify({ email: retained.user.email, password: 'OnlyLocal-NightQA-2026!' }) });
+    assert.equal(loginResponse.status, 200); tokens.retained = (await loginResponse.json()).data.tokens.accessToken;
+    const created = await call<{ id: string }>('retained', '/soporte', 'POST', { ...input, asunto: 'QA conservar historia al intentar baja' }, 201, 'http-delete-history-123');
+    for (const route of ['/admin/usuarios/' + retained.user.id, '/actores/transportistas/' + retained.actor.id]) {
+      await call('admin', route, 'DELETE', undefined, 400);
+      assert.ok(await db.usuario.findUnique({ where: { id: retained.user.id } })); assert.ok(await db.transportista.findUnique({ where: { id: retained.actor.id } }));
+      assert.ok(await db.vehiculo.findUnique({ where: { id: retained.vehicle.id } })); assert.ok(await db.chofer.findUnique({ where: { id: retained.driver.id } }));
+      assert.ok(await db.ticketSoporte.findUnique({ where: { id: created.id } }));
+    }
+    const free = await createAccount('2');
+    await call('admin', '/soporte/equipo/' + free.user.id, 'PATCH', { habilitado: true });
+    await call('admin', '/actores/transportistas/' + free.actor.id, 'DELETE');
+    assert.equal(await db.usuario.findUnique({ where: { id: free.user.id } }), null);
+    assert.equal(await db.transportista.findUnique({ where: { id: free.actor.id } }), null);
+    assert.equal(await db.agenteSoporte.findUnique({ where: { usuarioId: free.user.id } }), null);
+    const held = await createAccount('3');
+    // A deliberate isolated FK after dependent removals proves REAL rollback,
+    // not just a mocked transaction or a pre-flight support guard.
+    await db.$executeRawUnsafe('CREATE TABLE support_qa_account_hold ("usuarioId" TEXT PRIMARY KEY REFERENCES usuarios(id) ON DELETE RESTRICT)');
+    try {
+      await db.$executeRaw`INSERT INTO support_qa_account_hold ("usuarioId") VALUES (${held.user.id})`;
+      await call('admin', '/actores/transportistas/' + held.actor.id, 'DELETE', undefined, 400);
+      assert.ok(await db.usuario.findUnique({ where: { id: held.user.id } })); assert.ok(await db.transportista.findUnique({ where: { id: held.actor.id } }));
+      assert.ok(await db.vehiculo.findUnique({ where: { id: held.vehicle.id } })); assert.ok(await db.chofer.findUnique({ where: { id: held.driver.id } }));
+    } finally { await db.$executeRawUnsafe('DROP TABLE support_qa_account_hold'); }
+  });
 } catch (error) { fatal = String(error); throw error; }
 finally {
   await db.$disconnect();
@@ -129,4 +167,4 @@ finally {
     passed: results.filter(row => row.status === 'PASS').length, failed: results.filter(row => row.status === 'FAIL').length + (fatal && !results.some(row => row.status === 'FAIL') ? 1 : 0), fatal,
     database: fixture.database, port: 55440, compiledApi: true, realLogin: true, externalProvidersDisabled: true }, null, 2));
 }
-assert.equal(results.length, 11);
+assert.equal(results.length, 12);

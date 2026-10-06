@@ -27,6 +27,11 @@ on:
         type: boolean
         required: true
         default: false
+      support_only:
+        description: Only native support UI journeys after full unit/build/HTTP; never packages or certifies a complete candidate
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -203,10 +208,15 @@ jobs:
         env:
           QA_CONTEXT_ONLY: ${{ inputs.context_only }}
           QA_ALERT_ONLY: ${{ inputs.alert_only }}
+          QA_SUPPORT_ONLY: ${{ inputs.support_only }}
         run: |
           cd frontend
           test "$QA_ALERT_ONLY" != 'true' || test "$QA_CONTEXT_ONLY" != 'true'
-          if test "$QA_ALERT_ONLY" = 'true'; then
+          if test "$QA_SUPPORT_ONLY" = 'true'; then
+            test "$QA_ALERT_ONLY" != 'true'
+            test "$QA_CONTEXT_ONLY" != 'true'
+            npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/support.spec.ts
+          elif test "$QA_ALERT_ONLY" = 'true'; then
             npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/alert-repository.spec.ts cloud-qa/e2e/alert-catalogue.spec.ts
           elif test "$QA_CONTEXT_ONLY" = 'true'; then
             npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/proactive-context.spec.ts cloud-qa/e2e/global-operation.spec.ts cloud-qa/e2e/map-symbol-alignment.spec.ts cloud-qa/e2e/visual-surface.spec.ts
@@ -226,6 +236,9 @@ jobs:
             /tmp/sitrep-night-20260926.cloud/territorial-access.json
             /tmp/sitrep-night-20260926.cloud/support-integration.json
             /tmp/sitrep-night-20260926.cloud/e2e/support-*/**/*.png
+            /tmp/sitrep-night-20260926.cloud/e2e/support-*/**/error-context.md
+            /tmp/sitrep-night-20260926.cloud/e2e/support-*/**/trace.zip
+            /tmp/sitrep-night-20260926.cloud/e2e/support-*/**/*.json
             /tmp/sitrep-night-20260926.cloud/e2e/global-operation-*/**/*.png
             /tmp/sitrep-night-20260926.cloud/e2e/global-operation-*/**/error-context.md
             /tmp/sitrep-night-20260926.cloud/e2e/manual-*/**/*.png
@@ -245,18 +258,18 @@ jobs:
             /tmp/sitrep-night-20260926.cloud/frontend-unit.json
           retention-days: 3
       - name: Enable Android hardware acceleration only on the temporary VM
-        if: always() && inputs.android && steps.qa-start.outcome == 'success'
+        if: always() && !cancelled() && inputs.android && steps.qa-start.outcome == 'success'
         run: |
           test -e /dev/kvm
           sudo chmod 666 /dev/kvm
       - name: Receive already verified APK with read-only QA job permissions
-        if: always() && inputs.android && steps.qa-start.outcome == 'success' && needs.stage-original-apk.result == 'success'
+        if: always() && !cancelled() && inputs.android && steps.qa-start.outcome == 'success' && needs.stage-original-apk.result == 'success'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: sitrep-original-apk-${{ github.run_id }}
           path: ${{ runner.temp }}/sitrep-apk-transfer
       - name: Android 15 actual OS and Chrome, no local emulator
-        if: always() && inputs.android && steps.qa-start.outcome == 'success'
+        if: always() && !cancelled() && inputs.android && steps.qa-start.outcome == 'success'
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
         with:
           api-level: 35
@@ -268,10 +281,10 @@ jobs:
           disable-animations: true
           script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
       - name: Package the exact tested backend, web and app bytes only after every gate passes
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only
+        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only
         run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts package
       - name: Preserve exact tested frontend builds, never dependencies or backend env
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only
+        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-frontend-${{ github.run_id }}-${{ github.run_attempt }}
@@ -281,7 +294,7 @@ jobs:
           retention-days: 3
           if-no-files-found: error
       - name: Preserve exact tested backend bytes, without env, uploads or dependencies
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only
+        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-backend-${{ github.run_id }}-${{ github.run_attempt }}

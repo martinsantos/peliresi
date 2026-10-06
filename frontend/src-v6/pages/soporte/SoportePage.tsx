@@ -189,7 +189,8 @@ function TeamSettings({ owner }: { owner: string }) {
     {results.isFetching && <p role="status">Buscando usuarios…</p>}
     {results.isError && <p role="alert" className="text-error-700">{supportError(results.error)}</p>}
     {results.data && <ul className="divide-y divide-neutral-200">{results.data.map(user => <li key={user.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-      <p className="min-w-0 break-words text-neutral-900">{name(user)} <span className="text-sm text-neutral-600">· {user.rol}</span></p>
+      <div className="min-w-0"><p className="break-words text-neutral-900">{name(user)} <span className="text-sm text-neutral-600">· {user.rol}</span></p>
+        <p className="break-all text-sm text-neutral-600">{user.email}</p></div>
       {user.rol === 'ADMIN' ? <span className="text-sm text-primary-800">Administrador</span> : <Button variant="outline" disabled={busy} onClick={() => void change(user.id, !user.agenteSoporte?.habilitado)}>{user.agenteSoporte?.habilitado ? 'Deshabilitar soporte' : 'Habilitar soporte'}</Button>}
     </li>)}{!results.data.length && <li className="py-3 text-neutral-600">No hay usuarios que coincidan.</li>}</ul>}
     {error && <p role="alert" className="text-error-700">{error}</p>}

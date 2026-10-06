@@ -5,6 +5,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
 import { parsePagination } from '../utils/pagination';
+import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
 import {
     buildFiscalWhere,
     combineWhere,
@@ -414,8 +415,9 @@ export const deleteGenerador = async (req: AuthRequest, res: Response, next: Nex
         }
 
         // Eliminar generador y su usuario
-        await prisma.generador.delete({ where: { id } });
-        await prisma.usuario.delete({ where: { id: generador.usuarioId } });
+        await deleteAccountPreservingSupport(generador.usuarioId, async db => {
+            await db.generador.delete({ where: { id } });
+        });
 
         await auditarActor({ accion: 'DELETE', modulo: 'GENERADOR', datosAntes: generador, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
@@ -696,10 +698,11 @@ export const deleteTransportista = async (req: AuthRequest, res: Response, next:
         }
 
         // Eliminar vehículos y choferes asociados, luego transportista, luego usuario
-        await prisma.vehiculo.deleteMany({ where: { transportistaId: id } });
-        await prisma.chofer.deleteMany({ where: { transportistaId: id } });
-        await prisma.transportista.delete({ where: { id } });
-        await prisma.usuario.delete({ where: { id: transportista.usuarioId } });
+        await deleteAccountPreservingSupport(transportista.usuarioId, async db => {
+            await db.vehiculo.deleteMany({ where: { transportistaId: id } });
+            await db.chofer.deleteMany({ where: { transportistaId: id } });
+            await db.transportista.delete({ where: { id } });
+        });
 
         await auditarActor({ accion: 'DELETE', modulo: 'TRANSPORTISTA', datosAntes: transportista, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 
@@ -1198,8 +1201,9 @@ export const deleteOperador = async (req: AuthRequest, res: Response, next: Next
             throw new AppError('Operador no encontrado', 404);
         }
 
-        await prisma.operador.delete({ where: { id } });
-        await prisma.usuario.delete({ where: { id: operador.usuarioId } });
+        await deleteAccountPreservingSupport(operador.usuarioId, async db => {
+            await db.operador.delete({ where: { id } });
+        });
 
         await auditarActor({ accion: 'DELETE', modulo: 'OPERADOR', datosAntes: operador, usuarioId: req.user!.id, operadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
 

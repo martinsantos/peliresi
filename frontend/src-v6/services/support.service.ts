@@ -21,7 +21,7 @@ export const supportService = {
     return (await api.post('/soporte/' + encodeURIComponent(id) + '/acciones', multipart(input, files), { headers: { 'Content-Type': undefined, 'Idempotency-Key': key } })).data.data;
   },
   async team(): Promise<SupportPerson[]> { return (await api.get('/soporte/equipo')).data.data; },
-  async candidates(search: string): Promise<Array<SupportPerson & { rol: string; agenteSoporte: { habilitado: boolean } | null }>> { return (await api.get('/soporte/candidatos', { params: { search } })).data.data; },
+  async candidates(search: string): Promise<Array<SupportPerson & { email: string; rol: string; agenteSoporte: { habilitado: boolean } | null }>> { return (await api.get('/soporte/candidatos', { params: { search } })).data.data; },
   async agent(id: string, habilitado: boolean): Promise<void> { await api.patch('/soporte/equipo/' + encodeURIComponent(id), { habilitado }); },
   async download(ticketId: string, fileId: string): Promise<Blob> { return (await api.get('/soporte/' + encodeURIComponent(ticketId) + '/adjuntos/' + encodeURIComponent(fileId), { responseType: 'blob' })).data; },
 };

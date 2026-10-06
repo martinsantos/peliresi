@@ -8,6 +8,7 @@ import { verificarVencimientos } from '../jobs/vencimiento.job';
 import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
 import { parseDateRange } from '../utils/dateRange';
+import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
 
 // ============== USUARIOS CRUD (Admin) ==============
 
@@ -281,10 +282,11 @@ export const deleteUsuario = async (req: AuthRequest, res: Response, next: NextF
     }
 
     // Eliminar actor asociado primero, luego usuario
-    if (usuario.generador) await prisma.generador.delete({ where: { id: usuario.generador.id } });
-    if (usuario.transportista) await prisma.transportista.delete({ where: { id: usuario.transportista.id } });
-    if (usuario.operador) await prisma.operador.delete({ where: { id: usuario.operador.id } });
-    await prisma.usuario.delete({ where: { id } });
+    await deleteAccountPreservingSupport(id, async db => {
+      if (usuario.generador) await db.generador.delete({ where: { id: usuario.generador.id } });
+      if (usuario.transportista) await db.transportista.delete({ where: { id: usuario.transportista.id } });
+      if (usuario.operador) await db.operador.delete({ where: { id: usuario.operador.id } });
+    });
 
     res.json({ success: true, message: 'Usuario eliminado' });
   } catch (error) {

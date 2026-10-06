@@ -2,6 +2,39 @@
 
 ## Siguiente candidato: soporte nativo autorizado y retorno del Monitor
 
+### Ajuste después de QA95 y validación focal antes de ampliar
+
+QA95/37395443216 sobreced2d7f terminó CANCELLED por solicitud propia tras
+detectar incompatibilidad de bajas. Sólo unit/compilación/HTTP están completos:
+509BE+1110FE y11HTTPsoporte PASS. E2EJSONfinal NO sobrevivió; no inventar conteos.
+Dos PNG originales de soporte escritorio fallido fueron revisados (acumulado153
+archivos, no153pantallas únicas): formulario y lista vacía. No hay prueba de
+circuito UI completo. Los logs del job cancelado devolvieron404; se ampliará
+evidencia nativa de formulario/traces en la siguiente tanda. ZIP PARCIAL único
+sha aada981f9753e237c3b579a1737d7708176efde146f8c80a90da70c22129514d.
+Android se inició después de cancelar poralways(); se exige !cancelled() para
+las tres etapas Android futuras. La cancelación forzada se consultó según
+[GitHub](https://docs.github.com/en/rest/actions/workflow-runs#force-cancel-a-workflow-run),
+pero respondió409 porque95ya había terminado cancelada: no se aplicó. Cleanup
+quedópending/no crudo de cierrePG95; no declararlo ejecutado ni PASS Android.
+El runner era hospedado/efímero yel run estácompleted, no iniciar VMsolapada.
+
+Reproducción local válida:4bajas (usuario/G/T/O) llegaban aP2003 tras borrar
+dependientes; ahora un único transaction/lock verifica historia soporte antes
+de borrar actor/flota/usuario. Sin historia conserva la baja previa y elimina
+sólo membresía efímera; si otraFKrechaza la cuenta, revierte toda la operación
+y explica400sin borrar tickets. Se añadirá prueba PostgreSQL de rollback real,
+no se certifica rollback a partir de mocks. Focal BE30/30 yFE88/88 PASS,0omitidos.
+También label neutral «Esperando al usuario», requisitos mínimos visibles y
+correo identificador en búsqueda de equipo sóloADMIN (no en fichas del autor).
+
+Siguiente: modo focal support_only (unit/build/HTTP completos +9E2E soporte,
+sin Android ni empaquetado) para verificar interacciones y capturas sin gastar
+otros180recorridos antesde entender los fallos UI. Nunca reduce denominadores:
+después exige full180E2E/16Android/12HTTPsoporte para un candidato publicable.
+No producción ni publicador protegido ni mensajes externos. Fuente/helper de
+pruebas registra estadoDOMnativo/validación yconsola, no respuestas deAPI falsas.
+
 QA94/37394745344 sobre e996b24 terminó FAILURE en unit:509BE PASS y
 1104/1108FE PASS,4fallos. Los cuatro fixtures antiguos de Monitor no montaban
 Router porque sólo simulaban useNavigate. Reproducción local4FAIL; fixture

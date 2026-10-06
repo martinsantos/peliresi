@@ -8,11 +8,22 @@ async function screenshot(page: Page, info: TestInfo, label: string) {
   await expect(page).toHaveTitle(/SITREP/);
   await page.screenshot({ path: info.outputPath('support-' + label + '.png'), animations: 'disabled' });
 }
+async function nativeState(page: Page, info: TestInfo) {
+  const state = await page.evaluate(() => ({ path: location.pathname,
+    formCount: document.querySelectorAll('#sitrep-support-report').length,
+    fields: Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('#sitrep-support-report input:not([type=password]), #sitrep-support-report textarea')).map(element => ({
+      id: element.id, length: element.value.length, disabled: element.disabled, required: element.required, valid: element.validity.valid,
+    })), submit: Array.from(document.querySelectorAll<HTMLButtonElement>('button[form="sitrep-support-report"]')).map(element => ({
+      disabled: element.disabled, busy: element.getAttribute('aria-busy'), formId: element.form?.id, height: element.getBoundingClientRect().height,
+    })) }));
+  await info.attach('support-native-ui-state', { body: JSON.stringify(state), contentType: 'application/json' });
+}
 async function report(page: Page, subject: string) {
   await page.getByRole('button', { name: 'Reportar problema', exact: true }).last().click();
   const dialog = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
   await dialog.getByLabel('Asunto', { exact: true }).fill(subject);
   await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA reporte sintético: la pantalla no muestra la información esperada.');
+  await expect(dialog.getByRole('button', { name: 'Enviar ticket', exact: true })).toBeEnabled();
   return dialog;
 }
 async function action(page: Page, label: string, text: string) {
@@ -24,7 +35,12 @@ test('native support: report, take, private note, handoff, reply, close and reop
   test.setTimeout(180000);
   const contexts: BrowserContext[] = [];
   const errors: string[] = [];
-  const observe = (target: Page) => target.on('pageerror', error => errors.push(error.message));
+  let activePage = page;
+  const observe = (target: Page) => {
+    activePage = target;
+    target.on('pageerror', error => errors.push(error.message));
+    target.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  };
   observe(page);
   const asUser = async (who: string) => {
     const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), baseURL: 'http://127.0.0.1:4177' });
@@ -34,8 +50,8 @@ test('native support: report, take, private note, handoff, reply, close and reop
   try {
     await login(page, info, 'operador'); await page.goto(path(info));
     const dialog = await report(page, 'QA circuito completo ' + info.project.name);
-    await readableFixedAction(dialog.getByRole('button', { name: 'Enviar ticket', exact: true }), dialog);
     await screenshot(page, info, 'report-form');
+    await readableFixedAction(dialog.getByRole('button', { name: 'Enviar ticket', exact: true }), dialog);
     const creating = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
     await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
     const created = await creating; expect(created.status()).toBe(201);
@@ -70,7 +86,7 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await expect(operator).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
     await action(operator, 'Solicitar respuesta al usuario', 'QA verificá si la pantalla ya muestra los datos.');
     await operator.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
-    await expect(operator.getByText('Espera tu respuesta', { exact: true })).toBeVisible();
+    await expect(operator.getByText('Esperando al usuario', { exact: true })).toBeVisible();
     await action(operator, 'Cerrar con una resolución', 'QA resolución sintética: se corrigió el acceso.');
     await operator.getByRole('button', { name: 'Confirmar acción', exact: true }).click();
     await expect(operator.getByText('Cerrado', { exact: true }).first()).toBeVisible(); await operator.close();
@@ -89,6 +105,9 @@ test('native support: report, take, private note, handoff, reply, close and reop
     await reporter.getByText('Historial del ticket', { exact: true }).click();
     await expect(reporter.getByText(/CERRAR · Cerrado/)).not.toBeVisible();
     await screenshot(reporter, info, 'reporter-reopened'); expect(errors).toEqual([]);
+  } catch (error) {
+    if (!activePage.isClosed()) { await nativeState(activePage, info).catch(() => {}); await screenshot(activePage, info, 'failed-step').catch(() => {}); }
+    throw error;
   } finally { for (const context of contexts) await context.close(); }
 });
 
@@ -109,7 +128,8 @@ test('support offline draft is recoverable across close and reload without a fal
   } finally { await context.setOffline(false); }
   await page.reload(); await page.getByRole('button', { name: 'Reportar problema', exact: true }).last().click();
   const restored = page.getByRole('dialog');
-  await expect(restored.getByLabel('Asunto', { exact: true })).toHaveValue('QA borrador offline ' + info.project.name);
+    await expect(restored.getByLabel('Asunto', { exact: true })).toHaveValue('QA borrador offline ' + info.project.name);
+    await expect(restored.getByRole('button', { name: 'Enviar ticket', exact: true })).toBeEnabled();
   await restored.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/soporte/[^/]+$')); expect(requests.length).toBe(1);
 });
