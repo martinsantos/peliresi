@@ -20,6 +20,20 @@ export function parseDateParam(value: unknown, paramName: string, endOfDay = fal
   return d;
 }
 
+/** Civil-day filters for operations in Mendoza; explicit instants stay exact. */
+export function parseOperationalDateParam(value: unknown, paramName: string, endOfDay = false): Date | undefined {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return parseDateParam(value, paramName);
+  }
+  const calendar = new Date(value + 'T00:00:00Z');
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== value) {
+    throw new AppError(`Parametro '${paramName}' invalido: fecha de calendario inexistente`, 400);
+  }
+  // Same UTC-03 civil boundary already used by Monitor's timeline endpoint.
+  const start = Date.parse(value + 'T00:00:00-03:00');
+  return new Date(start + (endOfDay ? 86399999 : 0));
+}
+
 /**
  * Parse a date range from query params. Returns { gte, lte } object suitable
  * for Prisma where clauses, or undefined if both are missing.

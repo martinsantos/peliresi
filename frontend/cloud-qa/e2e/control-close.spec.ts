@@ -2,6 +2,8 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { login, prefix, readableMapLayers } from './helpers';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 function earliestSyntheticSlot() {
   const raw=execFileSync('psql',['-U','qa','-h','127.0.0.1','-p','55440','-d','sitrep_night_qa_20260926','-X','-tA','-c',`SELECT json_build_object('database',current_database(),'host',inet_server_addr(),'port',inet_server_port(),'first',COALESCE(min("fechaProgramada"),now())) FROM inspecciones`],{encoding:'utf8'});
@@ -197,13 +199,35 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await header.getByRole('button',{name:'Modo mapa oscuro (C)'}).click();
   const timeline = page.waitForResponse(r => r.url().includes('/api/centro-control/timeline'));
   await header.getByRole('button', { name: 'Historial', exact: true }).click();
-  const timelineResponse = await timeline;
+  let timelineResponse = await timeline;
   expect(timelineResponse.status()).toBe(200);
-  const timelineData = (await timelineResponse.json()).data;
-  const selectedDate = new URL(timelineResponse.url()).searchParams.get('fecha');
+  let timelineData = (await timelineResponse.json()).data;
+  let selectedDate = new URL(timelineResponse.url()).searchParams.get('fecha');
   expect(activeDays).toContain(selectedDate);
   await info.attach('monitor-calendar-selection', { body: JSON.stringify({ activeDays, selectedDate,
     events: timelineData.eventos.map((event: { id: string; timestamp: string }) => ({ id: event.id, timestamp: event.timestamp })) }), contentType: 'application/json' });
+  // An active day can contain only an eventless manifest. That is not a movie
+  // event. Preserve and verify that empty state instead of fabricating activity
+  // or assuming the newest day always has events (especially at midnight).
+  if(timelineData.eventos.length===0){
+    await expect(page.getByText('Sin movimientos registrados en este período.',{exact:true})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Abrir detalle del evento actual'})).toHaveCount(0);
+    await visibleProof(page,info,'monitor-empty-newest-day');
+  }
+  const fixture=JSON.parse(await readFile(path.join(process.env.QA_ARTIFACTS!,'fixture.json'),'utf8'));
+  const targetIndex=activeDays.indexOf(fixture.playbackProbe.date);
+  let currentIndex=activeDays.indexOf(selectedDate!);
+  expect(targetIndex).toBeGreaterThanOrEqual(0);expect(currentIndex).toBeGreaterThanOrEqual(targetIndex);
+  // Walk the known calendar via real controls; not retries looking for a pass.
+  while(currentIndex>targetIndex){
+    const previousDate=activeDays[currentIndex-1];
+    const previous=page.waitForResponse(r=>r.url().includes('/api/centro-control/timeline')&&new URL(r.url()).searchParams.get('fecha')===previousDate);
+    await page.getByRole('button',{name:'Día activo anterior',exact:true}).click();
+    timelineResponse=await previous;expect(timelineResponse.status()).toBe(200);
+    timelineData=(await timelineResponse.json()).data;selectedDate=previousDate;currentIndex--;
+  }
+  expect(selectedDate).toBe(fixture.playbackProbe.date);
+  expect(timelineData.eventos.some((event:{id:string})=>event.id===fixture.playbackProbe.eventId)).toBe(true);
   expect(timelineData.eventos.length).toBeGreaterThan(0);
   await expect(page.getByText('Creados', { exact: true })).toBeVisible();
   await separatedPlaybackControls(page);

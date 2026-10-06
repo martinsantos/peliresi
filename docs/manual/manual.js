@@ -295,6 +295,10 @@
     var activeIndex = 0;
     var stepSections = [];
     var stepLinks = [];
+    // Native scroll restoration and late images must not replace a requested
+    // deep link with an intermediate step. User scrolling always takes priority.
+    var restoringHashIndex = -1;
+    function releaseHashRestoration() { restoringHashIndex = -1; }
 
     guide.steps.forEach(function (step, index) {
       var id = 'paso-' + (index + 1) + '-' + slugify(step.title);
@@ -303,6 +307,7 @@
       link.href = '#' + id;
       link.innerHTML = '<span class="index-marker">' + (index + 1) + '</span><span>' + escapeHTML(step.title) + '</span>';
       link.addEventListener('click', function () {
+        releaseHashRestoration();
         updateActive(index, true);
         if (window.innerWidth <= 820) setMobileIndex(false);
       });
@@ -346,6 +351,7 @@
     }
 
     function goToStep(index) {
+      releaseHashRestoration();
       var target = Math.max(0, Math.min(index, guide.steps.length - 1));
       if (index >= guide.steps.length) {
         writeProgress(guide, guide.steps.length - 1);
@@ -370,6 +376,7 @@
 
     var scrollTicking = false;
     function syncStepFromScroll() {
+      if (restoringHashIndex >= 0) return;
       var readingLine = window.innerWidth <= 820 ? 240 : 170;
       var current = 0;
       stepSections.forEach(function (section, index) {
@@ -390,7 +397,29 @@
     var saved = readProgress()[guide.id];
     var initial = hashIndex >= 0 ? hashIndex : (saved ? Math.min(saved.step || 0, guide.steps.length - 1) : 0);
     updateActive(initial, false);
-    if (hashIndex >= 0) window.setTimeout(function () { stepSections[hashIndex].scrollIntoView({ block: 'start' }); }, 60);
+    if (hashIndex >= 0) {
+      restoringHashIndex = hashIndex;
+      var restoreHashStep = function () {
+        if (restoringHashIndex < 0) return;
+        stepSections[restoringHashIndex].scrollIntoView({ behavior: 'instant', block: 'start' });
+      };
+      window.setTimeout(restoreHashStep, 60);
+      window.addEventListener('load', restoreHashStep, { once: true });
+      stepSections.slice(0, hashIndex + 1).forEach(function (section) {
+        section.querySelectorAll('img.guide-image').forEach(function (image) {
+          if (image.complete) return;
+          image.loading = 'eager';
+          image.addEventListener('load', restoreHashStep, { once: true });
+          image.addEventListener('error', restoreHashStep, { once: true });
+        });
+      });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(restoreHashStep);
+      window.addEventListener('wheel', releaseHashRestoration, { passive: true });
+      window.addEventListener('touchmove', releaseHashRestoration, { passive: true });
+      window.addEventListener('keydown', function (event) {
+        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].indexOf(event.key) >= 0) releaseHashRestoration();
+      });
+    }
 
     var mobileToggle = document.getElementById('mobileIndexToggle');
     var sidebar = document.getElementById('tutorialSidebar');

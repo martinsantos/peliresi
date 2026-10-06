@@ -36,6 +36,16 @@ try {
     fechaRetiro:new Date(), observaciones:'QA Android GPS y lector QR; datos completamente sintéticos',
     residuos:{create:[{tipoResiduoId:fixture.wastes[0],cantidad:10,unidad:'kg',estado:'SOLIDO'}]},
   }});
+  // Stable persisted event for playback controls, independent of whether the
+  // suite crosses civil midnight or the newest manifest is still eventless.
+  await db.eventoManifiesto.create({data:{id:'cloud-qa-device-created',
+    manifiestoId:deviceManifest.id,usuarioId:fixture.users.admin,tipo:'CREACION',
+    descripcion:'QA creación de viaje completamente sintético',isDemoData:true,
+    createdAt:deviceManifest.createdAt,
+  }});
+  const playbackProbe = {date:new Intl.DateTimeFormat('en-CA',{
+    timeZone:'America/Argentina/Mendoza',year:'numeric',month:'2-digit',day:'2-digit',
+  }).format(deviceManifest.createdAt),eventId:'EVENTO:cloud-qa-device-created'};
   // LIVE popup checks need a genuinely persisted observation. The earlier
   // fixture had no GPS until the later Android phase, so no marker was correct.
   // Coordinates are explicit synthetic inputs, not a UI/API fallback location.
@@ -95,6 +105,6 @@ try {
   assert.equal(notices[0].usuarioId, operator.usuarioId);
   await writeFile(path.join(output,'fixture.json'),JSON.stringify({
     ...fixture,followup:{id:followup.id,numero:followup.numero},deviceManifest:{id:deviceManifest.id,numero:deviceManifest.numero},database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
-    externalDelivery:false,syntheticReportRecords:155},null,2));
+    externalDelivery:false,syntheticReportRecords:155,playbackProbe},null,2));
 }finally{await db.$disconnect();}
 console.log('Synthetic cloud fixture ready; no production data or credentials');

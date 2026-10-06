@@ -7,7 +7,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
-import { parseDateParam } from '../utils/dateRange';
+import { parseOperationalDateParam } from '../utils/dateRange';
 import { canAccessManifiesto } from '../utils/roleFilter';
 
 /**
@@ -23,17 +23,12 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     const { fechaDesde, fechaHasta, capas, incluirTodos } = req.query;
     const showAll = incluirTodos === 'true';
 
-    // Date range — ensure "hasta" covers the full day (end-of-day, not midnight)
-    // parseDateParam throws AppError(400) if the input is malformed
-    const desdeParsed = parseDateParam(fechaDesde, 'fechaDesde');
-    const hastaRawParsed = parseDateParam(fechaHasta, 'fechaHasta');
+    // The selector supplies Mendoza civil days, not UTC days. A timestamp
+    // supplied explicitly remains an instant, even when its time is midnight.
+    const desdeParsed = parseOperationalDateParam(fechaDesde, 'fechaDesde');
+    const hastaParsed = parseOperationalDateParam(fechaHasta, 'fechaHasta', true);
     const desde = desdeParsed ?? new Date(Date.now() - 30 * 24 * 3600000);
-    const hastaRaw = hastaRawParsed ?? new Date();
-    // If fechaHasta is a date-only string (e.g. "2026-02-05"), it parses to midnight.
-    // Bump to 23:59:59.999 so the entire day is included.
-    const hasta = hastaRawParsed && hastaRaw.getUTCHours() === 0 && hastaRaw.getUTCMinutes() === 0
-      ? new Date(hastaRaw.getTime() + 86399999)
-      : hastaRaw;
+    const hasta = hastaParsed ?? new Date();
 
     // Layers to include — empty string means zero layers (not all layers)
     const layerList = capas !== undefined

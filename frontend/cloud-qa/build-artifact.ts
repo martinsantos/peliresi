@@ -61,7 +61,7 @@ if (mode === 'freeze') {
   assert.equal(expiry.compiledSubscriber, true); assert.equal(expiry.externalProvidersDisabled, true);
   const calendar = await readJson('monitor-calendar.json');
   assert.equal(calendar.commit, process.env.GITHUB_SHA);
-  assert.equal(calendar.passed, 3); assert.equal(calendar.failed, 0);
+  assert.equal(calendar.passed, 4); assert.equal(calendar.failed, 0);
   assert.equal(calendar.compiledApi, true); assert.equal(calendar.realLogin, true);
   assert.equal(calendar.externalProvidersDisabled, true);
   const territorial = await readJson('territorial-access.json');

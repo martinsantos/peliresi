@@ -25,7 +25,26 @@ describe('tracking distribution uses the created-period cohort without replacing
   expect(db.manifiesto.findMany.mock.calls[0][0].select).toMatchObject({generadorId:true,transportistaId:true,operadorId:true});
   expect(res.json.mock.calls[0][0].data.enTransito[0]).not.toHaveProperty('transportistaId');
  });
- it('returns cancellations, total and distribution from one grouped cohort while preserving the operational pipeline',async()=>{const {stats,next}=await invoke();expect(next).not.toHaveBeenCalled();expect(db.manifiesto.groupBy).toHaveBeenCalledWith({by:['estado'],where:{createdAt:{gte:new Date('2026-10-01T00:00:00Z'),lte:new Date('2026-10-01T23:59:59.999Z')}},_count:{_all:true}});expect(stats.totalManifiestos).toBe(5);expect(stats.distribucionPorEstado).toEqual({APROBADO:2,CANCELADO:3});expect(stats.porEstado.APROBADO).toBe(1);}),
+ it('returns cancellations, total and distribution from one grouped cohort while preserving the operational pipeline',async()=>{const {stats,next}=await invoke();expect(next).not.toHaveBeenCalled();expect(db.manifiesto.groupBy).toHaveBeenCalledWith({by:['estado'],where:{createdAt:{gte:new Date('2026-10-01T03:00:00Z'),lte:new Date('2026-10-02T02:59:59.999Z')}},_count:{_all:true}});expect(stats.totalManifiestos).toBe(5);expect(stats.distribucionPorEstado).toEqual({APROBADO:2,CANCELADO:3});expect(stats.porEstado.APROBADO).toBe(1);}),
  it('returns an empty real cohort without a made-up denominator',async()=>{db.manifiesto.groupBy.mockResolvedValue([]);const {stats,next}=await invoke();expect(next).not.toHaveBeenCalled();expect(stats.totalManifiestos).toBe(0);expect(stats.distribucionPorEstado).toEqual({});}),
  it('propagates aggregation failure instead of returning a misleading zero',async()=>{const error=new Error('aggregation unavailable');db.manifiesto.groupBy.mockRejectedValue(error);const {res,next}=await invoke();expect(res.json).not.toHaveBeenCalled();expect(next).toHaveBeenCalledWith(error);});
+});
+
+describe('Control uses the same civil days as the Mendoza period selector',()=>{
+ it('includes the final three UTC hours belonging to the selected Mendoza day',async()=>{
+  const {next}=await invoke();expect(next).not.toHaveBeenCalled();
+  expect(db.manifiesto.groupBy.mock.calls[0][0].where.createdAt).toEqual({
+   gte:new Date('2026-10-01T03:00:00Z'),lte:new Date('2026-10-02T02:59:59.999Z'),
+  });
+ });
+ it('does not expand an explicitly supplied timestamp at UTC midnight',async()=>{
+  const next=vi.fn();await getActividadCentroControl({query:{capas:'',fechaDesde:'2026-10-01T00:00:00Z',fechaHasta:'2026-10-02T00:00:00Z'}} as never,{json:vi.fn()} as never,next);
+  expect(next).not.toHaveBeenCalled();
+  expect(db.manifiesto.groupBy.mock.calls[0][0].where.createdAt).toEqual({gte:new Date('2026-10-01T00:00:00Z'),lte:new Date('2026-10-02T00:00:00Z')});
+ });
+ it('rejects an impossible civil date before reading business data',async()=>{
+  const next=vi.fn();await getActividadCentroControl({query:{capas:'',fechaDesde:'2026-02-30',fechaHasta:'2026-03-01'}} as never,{json:vi.fn()} as never,next);
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:400}));
+  expect(db.manifiesto.groupBy).not.toHaveBeenCalled();
+ });
 });

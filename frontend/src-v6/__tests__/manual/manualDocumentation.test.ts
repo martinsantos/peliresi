@@ -56,7 +56,7 @@ describe('manual documentation stays usable and truthful', () => {
     for (const file of ['index.html', 'search.html', 'tutorial.html']) {
       const html = readFileSync(manual + file, 'utf8');
       expect(html).toContain('help-data.js?v=2026.16.1');
-      expect(html).toContain('manual.js?v=2026.16.1');
+      expect(html).toContain('manual.js?v=2026.16.2');
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');
     expect(script).toContain("'administrador-alertas-proactivas'");

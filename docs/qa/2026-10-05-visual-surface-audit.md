@@ -1,5 +1,57 @@
 # Auditoría renderizada de superficies e interacción — 05/10/2026
 
+## QA99 cerrada: soporte aprobado, cinco fallos generales preservados
+
+[QA99](https://github.com/martinsantos/peliresi/actions/runs/37405568999),
+fuente `db25564ae1461cf9984efebd18014a24173c9b2e`, terminó FAILURE.
+Crudos: **517/517 backend + 1125/1125 frontend unit**, 54 HTTP generales y
+12 grupos HTTP soporte PASS. E2E **175/180 PASS, cinco FAIL**, cero omitidos
+ni flaky. Los nueve E2E de soporte aprobaron en escritorio1440×900,
+responsive360×800 y app360×800: circuito, borrador offline, menú/ACK/lista,
+adjuntos con descarga byteporbyte, navegación de filas y aislamiento.
+Android15/Chrome emulado **16/16 PASS**, incluido reportar/abrir ticket;
+runtimeErrors/failedResponses vacíos. ERR_INTERNET_DISCONNECTED corresponde
+al corte offline deliberado. No equivale a probar el APK autenticado ni un
+teléfono físico. Producción y sus datos no se modificaron.
+
+Los cinco fallos no se excluyen ni se convierten en aprobación:
+
+- G2/T2/O2 escritorio: período del frontend usa Mendoza, backend terminaba
+  el filtro a medianoche UTC; ocultaba la actividad de las últimas tres horas
+  del día local. Nuevos unit reprodujeron11PASS/3FAIL; corrección sólo en
+  actividad de Centro Control usa límites civiles de Monitor, conserva instantes
+  explícitos y rechaza fechas imposibles: **14/14 focales PASS**. La anterior
+  expectativa UTC se actualiza al criterio civil confirmado, no a menor umbral.
+  Se agrega cuarto HTTP de calendario: dos observaciones separadas por
+  medianoche, cohorte persistida real y total del Centro de Control idéntico.
+  Gate de empaquetado ahora exige4/4, no3/3.
+- Monitor responsive: calendario seleccionó06/10 y pidió corte03:00:35.272Z,
+  sin eventos/GPS y con un manifiesto. Un día con manifiesto sin eventos no
+  garantiza película. Se conserva esa evidencia y se fortalece el recorrido:
+  comprobar vacío real si corresponde, luego navegar días conocidos mediante
+  botones hasta un evento explícitamente persistido en el fixture inicial.
+  Sin reloj/sesión/API interceptados ni reintentos buscando un PASS. El control
+  sigue exigiendo película, cantidades, contraste, popups y30días completos.
+- Manual responsive: recarga del enlace7 terminaba mostrando paso6, por
+  scroll restaurado y medidas que cambian al cargar capturas. Unit DOM de
+  script real reprodujo1PASS/2FAIL. Guarda de restauración conserva enlace,
+  realinea al cargar imágenes/fuentes y cede ante scroll/teclado/intención del
+  usuario. **15/15 focales** con documentación y fechas PASS, cero omitidos.
+  JS versionado2026.16.2; no cambia datos/guías/capturas ni esquema visual.
+  Esta prueba DOM no acredita geometría: debe pasar nuevamente el E2E real.
+
+ZIP final único en disco externo `native-support-run99-final.zip`,
+136714237bytes, artifact11388835992, SHA256
+`419ea738f7237b4e38ec41f0ae68eae85224a4b355e310ebd9e601d624fac248` verificado.
+Originales99 vistos: soporte app, soporte Android, ControlG2 fallido y manual
+fallido; no revisión universal de todas las capturas. Cierre runtime5994/
+server5995 a03:22:22.286Z y PostgreSQL shutdown03:22:22.326Z confirmado.
+Empaquetado omitido por gate fallido; no publicación/migración real/envíos.
+
+Siguiente candidato repite suites completas,180E2E/16Android y HTTP, en una VM
+serial; los focales aprobados no son GO. Sin Docker/DB/browser/emulador/build
+pesados locales, dependencias instaladas ni automatizaciones reactivadas.
+
 ## Siguiente candidato: soporte nativo autorizado y retorno del Monitor
 
 ### QA96: defecto reproducido y corrección de navegación

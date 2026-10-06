@@ -58,7 +58,7 @@ try {
   const request = async (route: string) => {
     const response = await fetch(base + route, { headers: { Authorization: `Bearer ${session.data.tokens.accessToken}` } });
     assert.equal(response.status, 200, route);
-    const body = await response.json() as { success: boolean; data: { days: string[]; eventos: Array<{ id: string }> } };
+    const body = await response.json() as { success: boolean; data: { days: string[]; eventos: Array<{ id: string }>; estadisticas: {totalManifiestos:number} } };
     assert.equal(body.success, true);
     return body.data;
   };
@@ -74,6 +74,17 @@ try {
     assert.ok(!timeline.eventos.some(event => event.id === 'EVENTO:cloud-qa-calendar-event-' + absent));
   }
   checks.push('exclusive Mendoza midnight splits events exactly, without omissions or duplication');
+  const controlCohorts = [];
+  for(const date of [previous,day]){
+    const activity=await request('/centro-control/actividad?capas=&fechaDesde='+date+'&fechaHasta='+date);
+    const start=new Date(date+'T00:00:00-03:00'),end=new Date(start.getTime()+86400000);
+    const expected=await db.manifiesto.count({where:{createdAt:{gte:start,lt:end}}});
+    assert.equal(expected,1,'The synthetic midnight pair must belong to two separate civil days');
+    assert.equal(activity.estadisticas.totalManifiestos,expected,'Control must use the same civil cohort as Monitor');
+    controlCohorts.push({date,expected,actual:activity.estadisticas.totalManifiestos});
+  }
+  evidence.controlCohorts=controlCohorts;
+  checks.push('Control date-only filters include late Mendoza hours and agree with the persisted civil cohort');
   assert.ok(active.days.includes(gpsCivilDay));
   const gpsHistory = await request('/centro-control/timeline?fecha=' + gpsCivilDay);
   assert.ok(gpsHistory.eventos.some(event => event.id === 'GPS:cloud-qa-calendar-gps-only'));
