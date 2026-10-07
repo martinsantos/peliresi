@@ -78,6 +78,7 @@ export const MainLayout: React.FC = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
   const location = useLocation();
+  const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
@@ -481,7 +482,7 @@ export const MainLayout: React.FC = () => {
             {searchOpen && <GlobalSearchPanel onClose={() => setSearchOpen(false)} />}
 
             {/* Help / Tour restart */}
-            <button
+            {isInspectionCase ? <SupportBubble inline hidden={sidebarOpen || searchOpen || showTour} /> : <button
               onClick={() => {
                 resetOnboardingTour();
                 setShowTour(true);
@@ -491,7 +492,7 @@ export const MainLayout: React.FC = () => {
               aria-label="Ver tour de ayuda"
             >
               <HelpCircle size={20} />
-            </button>
+            </button>}
 
             {/* Notifications */}
             <NotificationBell />
@@ -525,7 +526,7 @@ export const MainLayout: React.FC = () => {
 
       {/* Role-specific welcome modal */}
       <DemoAppOnboarding />
-      <SupportBubble hidden={sidebarOpen || searchOpen || showTour} />
+      {!isInspectionCase && <SupportBubble hidden={sidebarOpen || searchOpen || showTour} />}
     </div>
   );
 };

@@ -1,0 +1,68 @@
+import { expect, test } from '@playwright/test';
+import { createSpontaneousInspection, login, prefix, readableFixedAction, readablePageHeading } from './helpers';
+
+test('inspection identity, numbered sections and contextual help never displace or cover field work', async ({ page }, info) => {
+  test.setTimeout(120000);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await login(page, info, 'inspector');
+  const record = await createSpontaneousInspection(page, info);
+  const nav = page.getByRole('navigation', { name: 'Secciones del expediente', exact: true });
+  await nav.getByRole('link', { name: 'Visita', exact: true }).click();
+  const start = page.waitForResponse(response => response.url().endsWith(`/api/inspecciones/${record.id}/estado`) && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Iniciar visita', exact: true }).click();
+  expect((await start).status()).toBe(200);
+  await nav.getByRole('link', { name: 'Controles', exact: true }).click();
+  await page.getByRole('link', { name: 'En campo', exact: true }).click();
+  const control = page.locator(`[id="control-${record.items[0].id}"]`);
+  const toggle = control.locator('button[aria-controls]').first();
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+  const note = control.getByRole('textbox', { name: `Observación: ${record.items[0].etiqueta}`, exact: true });
+  await note.fill('QA comentario protegido durante la revisión de jerarquía móvil');
+  const sizes = [page.viewportSize()!, { width: 390, height: 844 }, { width: 320, height: 640 }, { width: 800, height: 480 }];
+  for (const size of sizes) {
+    await page.setViewportSize(size);
+    await readablePageHeading(page);
+    const heading = page.getByTestId('inspection-case-identity').getByRole('heading', { name: record.numero, exact: true });
+    const title = (await heading.boundingBox())!;
+    const workspace = (await page.getByTestId('inspection-workspace').boundingBox())!;
+    expect(Math.abs(title.x - workspace.x), 'The back arrow must not indent the dossier title').toBeLessThanOrEqual(1);
+    expect(title.width).toBeGreaterThan(150);
+    expect((await page.getByTestId('inspection-scroll-region').boundingBox())!.height, 'Retain useful field space, including landscape').toBeGreaterThan(100);
+    for (const [index, label] of ['Visita', 'Controles', 'Registro', 'Expediente'].entries()) {
+      const section = nav.getByRole('link', { name: label, exact: true });
+      await expect(section).toContainText(String(index + 1));
+      await readableFixedAction(section, nav);
+    }
+    await expect(nav.getByRole('link', { name: 'Controles', exact: true })).toHaveAttribute('aria-current', 'page');
+    const help = page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+    await expect(help).toHaveCount(1);
+    await readableFixedAction(help, page.getByRole('banner'));
+    expect(await help.evaluate(element => getComputedStyle(element.parentElement!).position)).not.toBe('fixed');
+    const bar = page.getByTestId('inspection-action-bar');
+    const save = page.getByRole('button', { name: 'Guardar cambios', exact: true });
+    await readableFixedAction(save, bar);
+    expect(await save.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2));
+    }), 'Save must remain the actual hit target, not hidden behind help or a toast').toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath(`inspection-hierarchy-${size.width}x${size.height}.png`), animations: 'disabled' });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true }).click();
+  const report = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
+  await expect(report).toBeVisible();
+  await report.getByRole('button', { name: 'Continuar luego', exact: true }).click();
+  await expect(report).toHaveCount(0);
+  await expect(note).toHaveValue('QA comentario protegido durante la revisión de jerarquía móvil');
+  const saved = page.waitForResponse(response => response.url().endsWith(`/api/inspecciones/${record.id}/borrador`) && response.request().method() === 'PATCH');
+  await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  expect((await saved).status()).toBe(200);
+  await page.reload();
+  await expect(note).toHaveValue('QA comentario protegido durante la revisión de jerarquía móvil');
+  await expect(page).toHaveURL(new RegExp(`${prefix(info)}/inspecciones/${record.id}`));
+  await expect(page.locator('vite-error-overlay')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

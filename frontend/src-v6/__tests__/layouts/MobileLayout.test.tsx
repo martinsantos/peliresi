@@ -141,6 +141,13 @@ describe('MobileLayout Android shell', () => {
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
     expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).not.toBeInTheDocument();
   });
+  it('moves inspection help into the header rather than over the save bar', () => {
+    renderMobileLayout('/inspecciones/qa-expediente');
+    const button = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+    expect(button.closest('header')).toBe(screen.getByRole('banner'));
+    expect(button.parentElement).not.toHaveClass('fixed');
+    expect(screen.queryByRole('navigation', { name: /principal/i })).not.toBeInTheDocument();
+  });
 
   it('keeps the original drawer and work when reporting is deferred without acknowledgement', () => {
     renderMobileLayout('/dashboard');

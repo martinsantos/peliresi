@@ -36,7 +36,7 @@ export async function operacionesInspecciones(req: AuthRequest, res: Response, n
       ...(period ? [{ [dateField]: period }] : []),
       ...(input.estado ? [{ estado: input.estado }] : []),
       ...(input.inspectorId ? [{ inspectorId: input.inspectorId }] : []),
-      ...(input.activas === 'true' ? [{ estado: { notIn: INSPECTION_TERMINAL_STATES } }] : []),
+      ...(input.activas === 'true' ? [{ estado: { notIn: [EstadoInspeccion.BORRADOR, ...INSPECTION_TERMINAL_STATES] } }] : []),
     ] };
     const [items, total, states, sinUbicacion, sinResponsable] = await prisma.$transaction([
       prisma.inspeccion.findMany({ where, skip: exporting ? 0 : (input.page - 1) * input.limit, take: exporting ? 10001 : input.limit,

@@ -36,6 +36,12 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       : ['generadores', 'transportistas', 'operadores', 'transito'];
 
     const dateFilter = { gte: desde, lte: hasta };
+    // One activity cohort for the map, agenda, KPI and operational pipeline.
+    // An older trip can be active through its actual start or a GPS observation.
+    const transitWhere = { estado: 'EN_TRANSITO' as const, OR: [
+      { createdAt: dateFilter }, { fechaRetiro: dateFilter },
+      { tracking: { some: { timestamp: dateFilter } } },
+    ] };
 
     const result: any = {
       generadores: [],
@@ -189,16 +195,10 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     }
 
     // ── En Tránsito layer — trips with real activity in the period ──
-    // Show EN_TRANSITO if created in range OR has GPS tracking in range
+    // Use the same actual trip cohort as the KPI, including starts without GPS.
     if (layerList.includes('transito')) {
       const enTransito = await prisma.manifiesto.findMany({
-        where: {
-          estado: 'EN_TRANSITO',
-          OR: [
-            { createdAt: dateFilter },
-            { tracking: { some: { timestamp: dateFilter } } },
-          ],
-        },
+        where: transitWhere,
         select: {
           id: true,
           numero: true,
@@ -256,6 +256,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       distributionCounts,
       generadoresActivos,
       operadoresActivos,
+      enTransitoCount,
       // Single raw SQL GROUP BY replaces 8 per-estado count() queries
       estadoCounts,
       residuosAgg,
@@ -276,12 +277,14 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           manifiestos: { some: { fechaRecepcion: dateFilter } },
         },
       }),
+      // Reuse the actual returned map rows when visible, so a concurrent state
+      // transition cannot make the map and its KPI disagree within one response.
+      layerList.includes('transito') ? Promise.resolve(result.enTransito.length) : prisma.manifiesto.count({ where: transitWhere }),
       // One query for all 8 estado counts (replaces 8 individual prisma.manifiesto.count calls)
       prisma.$queryRaw<{ estado: string; cnt: bigint }[]>`
         SELECT estado, COUNT(*)::bigint as cnt FROM manifiestos
         WHERE (
           (estado IN ('BORRADOR', 'APROBADO', 'RECHAZADO') AND "createdAt" >= ${desde} AND "createdAt" <= ${hasta})
-          OR (estado = 'EN_TRANSITO' AND "fechaRetiro" >= ${desde} AND "fechaRetiro" <= ${hasta})
           OR (estado = 'ENTREGADO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaEntrega" >= ${desde} AND "fechaEntrega" <= ${hasta}))
           OR (estado = 'RECIBIDO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaRecepcion" >= ${desde} AND "fechaRecepcion" <= ${hasta}))
           OR (estado = 'EN_TRATAMIENTO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaRecepcion" >= ${desde} AND "fechaRecepcion" <= ${hasta}))
@@ -316,7 +319,6 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     }
     const borradores = countMap['BORRADOR'] || 0;
     const aprobados = countMap['APROBADO'] || 0;
-    const enTransitoCount = countMap['EN_TRANSITO'] || 0;
     const entregados = countMap['ENTREGADO'] || 0;
     const recibidos = countMap['RECIBIDO'] || 0;
     const enTratamiento = countMap['EN_TRATAMIENTO'] || 0;

@@ -20,6 +20,8 @@ describe('Sidebar: one visible current destination',()=>{
   it('exposes contextual technical help without requiring navigation to the desk',()=>{
     show('/inspecciones/qa-expediente');
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true})).toBeVisible();
+    expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).closest('header')).toBe(screen.getByRole('banner'));
+    expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).parentElement).not.toHaveClass('fixed');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
   it('identifies the inspection function without changing the base actor role',()=>{

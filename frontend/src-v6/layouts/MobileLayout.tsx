@@ -368,6 +368,7 @@ export const MobileLayout: React.FC = () => {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {isInspectionCase && <SupportBubble mobile inline hidden={isMenuOpen} />}
             <NotificationBell basePath={mp('')} inverse />
           </div>
         </div>
@@ -382,7 +383,7 @@ export const MobileLayout: React.FC = () => {
       </main>
 
       {/* Floating Action Button */}
-      <SupportBubble mobile hidden={isMenuOpen} aboveTrip={showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute)} />
+      {!isInspectionCase && <SupportBubble mobile hidden={isMenuOpen} aboveTrip={showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute)} />}
       {showFab && (
         <button
           onClick={() => navigate(mp('/manifiestos/nuevo'))}

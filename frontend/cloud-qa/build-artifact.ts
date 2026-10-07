@@ -74,6 +74,12 @@ if (mode === 'freeze') {
   assert.equal(support.passed, 20); assert.equal(support.failed, 0);
   assert.equal(support.compiledApi, true); assert.equal(support.realLogin, true);
   assert.equal(support.externalProvidersDisabled, true);
+  const coherence = await readJson('operational-coherence.json');
+  assert.equal(coherence.commit, process.env.GITHUB_SHA);
+  assert.equal(coherence.passed, 6); assert.equal(coherence.failed, 0);
+  assert.equal(coherence.compiledApi, true); assert.equal(coherence.realLogin, true);
+  assert.equal(coherence.externalProvidersDisabled, true);
+  assert.equal(coherence.database, 'sitrep_night_qa_20260926'); assert.equal(coherence.port, 55440);
   assertFullE2EEvidence(e2e);
   const android = await readJson('android/result.json');
   const apk = await readJson('apk/result.json');

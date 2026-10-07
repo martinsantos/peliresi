@@ -27,7 +27,7 @@ beforeEach(() => {
   db.inspeccion.findMany.mockResolvedValue([caseRow]);
   db.inspeccion.updateMany.mockResolvedValue({ count: 1 });
   db.inspeccion.count.mockResolvedValue(1);
-  db.inspeccion.groupBy.mockResolvedValue([{ estado: 'BORRADOR', _count: { _all: 1 } }]);
+  db.inspeccion.groupBy.mockResolvedValue([{ estado: 'EN_CAMPO', _count: { _all: 1 } }]);
   db.usuario.findUnique.mockResolvedValue(user);
   db.secuenciaInspeccion.findUnique.mockResolvedValue(null);
   db.secuenciaInspeccion.upsert.mockResolvedValue({ ultimo: 1 });
@@ -111,7 +111,7 @@ describe('shared operational scope and organization', () => {
     await operacionesInspecciones({ user: { ...user, rol: 'GENERADOR' }, path: '/operaciones', query: { desde: '2026-09-24', hasta: '2026-09-24', inspectorId: 'other' } } as any, res as any, next);
     expect(next).not.toHaveBeenCalled();
     expect(db.inspeccion.findMany.mock.calls[0][0].where.AND).toEqual(expect.arrayContaining([{ inspectorId: 'admin' }, { inspectorId: 'other' }, { fechaProgramada: { gte: new Date('2026-09-24T03:00:00Z'), lte: new Date('2026-09-25T02:59:59.999Z') } }]));
-    expect(res.json.mock.calls[0][0].data.summary.byState).toEqual({ BORRADOR: 1 });
+    expect(res.json.mock.calls[0][0].data.summary.byState).toEqual({ EN_CAMPO: 1 });
   });
   it('forbids a non-inspector from reading operational totals', async () => {
     const next = vi.fn();

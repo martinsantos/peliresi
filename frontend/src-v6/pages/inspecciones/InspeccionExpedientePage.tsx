@@ -811,14 +811,14 @@ const InspeccionExpedientePage: React.FC = () => {
     navigate((mobile ? '/mobile' : '') + '/inspecciones');
   };
   return <div className="inspection-case flex h-full min-h-0 min-w-0 flex-col gap-3">
-    <header className="relative flex shrink-0 items-start gap-2">
-      <Button variant="ghost" size="sm" aria-label="Volver al listado" title="Volver al listado" leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} disabled={dictating} className="h-11 w-11 shrink-0 px-0"><span className="sr-only">Volver al listado</span></Button>
-      <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-        <div className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h1 className="text-base sm:text-2xl font-bold text-neutral-900 break-words">{inspection.numero}</h1><Badge variant="soft" color={COLORS[inspection.estado] || 'neutral'}>{LABELS[inspection.estado]}</Badge>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación · datos sintéticos</Badge>}</div>
+    <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div data-testid="inspection-case-identity" className="min-w-0 sm:flex-1"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h1 className="text-lg sm:text-2xl font-bold text-neutral-900 break-words">{inspection.numero}</h1><Badge variant="soft" color={COLORS[inspection.estado] || 'neutral'}>{LABELS[inspection.estado]}</Badge>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación · datos sintéticos</Badge>}</div>
           {actor && <Link to={actorRoute} state={{ inspectionReturn: location.pathname + location.search + location.hash }} onClick={(event) => { if (dictating) { event.preventDefault(); return; } if (!flushDraft()) event.preventDefault(); }} aria-label={'Abrir actor inspeccionado: ' + actor.razonSocial} className="mt-1 block max-w-full rounded-sm break-words text-sm font-semibold text-neutral-700 !no-underline hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link>}
           <p className="mt-1 hidden text-xs text-neutral-500 lg:block">Actualizada {inspectionDate(inspection.updatedAt, true)} · Versión {inspection.version}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div data-testid="inspection-case-actions" className="flex shrink-0 items-center justify-between gap-1 sm:justify-end">
+          <Button variant="ghost" size="sm" aria-label="Volver al listado" title="Volver al listado" leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} disabled={dictating} className="min-h-11 shrink-0 px-2"><span>Listado</span></Button>
+          <div className="flex shrink-0 items-center gap-1">
           <Button variant="outline" size="sm" aria-label="Descargar expediente" title="Descargar expediente" className="max-lg:w-11 max-lg:px-0" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
           <DropdownMenu>
             <DropdownTrigger asChild><Button variant="ghost" size="sm" aria-label="Otras descargas" rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span className="sr-only">Documentos por separado</span></Button></DropdownTrigger>
@@ -830,8 +830,8 @@ const InspeccionExpedientePage: React.FC = () => {
               <DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('informe-tecnico')}>Informe técnico<span className="block text-[11px] font-normal text-neutral-500">Evaluación para dictamen</span></DropdownItem>
             </DropdownContent>
           </DropdownMenu>
+          </div>
         </div>
-      </div>
     </header>
     {(query.offlineCacheProblem || (guided && draftOwnership.status !== 'owned') || (pendingEvidenceReadFailed && guided) || !isOnline || pendingEvidence.length > 0 || storageFailed) && <details data-testid="inspection-storage-status" className="rounded-lg border border-neutral-200 bg-white px-4 text-sm">
       <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 font-medium text-neutral-700"><span>{storageFailed ? 'Guardado local no confirmado · no cierres esta pantalla' : guided && draftOwnership.status !== 'owned' ? draftOwnership.status === 'blocked' ? 'Solo lectura · otra pestaña está editando' : draftOwnership.status === 'checking' ? 'Comprobando disponibilidad de edición' : 'Solo lectura · edición no disponible en este navegador' : query.offlineCacheProblem ? 'No se pudo preparar la copia sin conexión.' : pendingEvidenceReadFailed && guided ? 'Capturas locales sin verificar · cierre de campo no disponible' : !isOnline ? 'Sin conexión · trabajando en este dispositivo' : pendingEvidence.length + ' capturas pendientes de enviar'}</span><ChevronDown size={16} className="shrink-0" /></summary>

@@ -9,9 +9,9 @@ export type FullE2EEvidence = {
   suites: Suite[];
 };
 
-// 64 independently exercised journeys: previous 61 + impersonation/triage/voice.
+// 65 independently exercised journeys: previous 64 + inspection hierarchy/help.
 // Keep exact denominators: adding a journey requires an explicit contract update.
-export const FULL_E2E_JOURNEYS_PER_SURFACE = 64;
+export const FULL_E2E_JOURNEYS_PER_SURFACE = 65;
 const surfaces = ['app', 'web-desktop', 'web-responsive'];
 
 /** A green aggregate alone must not authorize an incomplete or retried release. */
