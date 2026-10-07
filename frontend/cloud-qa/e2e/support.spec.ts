@@ -146,12 +146,17 @@ test('native support: report, take, private note, handoff, reply, close and reop
 
 test('support impersonation returns the report and the actual response to the represented account', async ({ page, browser }, info) => {
   test.setTimeout(150000);
-  const who = info.project.name === 'app' ? 'operador2' : info.project.name === 'web-responsive' ? 'transportista2' : 'generador2';
+  // These are ordinary reporters. The separate lifecycle journey explicitly
+  // grants the *2 fixtures technical-support access, which persists between
+  // surfaces and must not be confused with an owner-privacy regression.
+  const who = info.project.name === 'app' ? 'operador' : info.project.name === 'web-responsive' ? 'transportista' : 'generador';
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await login(page, info, 'admin'); await page.goto(prefix(info) + '/switch-user');
   await page.getByLabel('Buscar usuario', { exact: true }).fill(who + '@night-qa.invalid');
   const switching = page.waitForResponse(response => /\/api\/admin\/impersonate\//.test(response.url()) && response.request().method() === 'POST');
-  await page.getByRole('button').filter({ hasText: new RegExp('QA ' + who + '\\b') }).click();
+  const target = page.getByRole('button').filter({ has: page.getByText('QA ' + who, { exact: true }) });
+  await expect(target).toHaveCount(1);
+  await target.click();
   expect((await switching).status()).toBe(200); await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto(path(info));
   const dialog = await report(page, 'QA impersonación ' + info.project.name);
@@ -192,7 +197,8 @@ test('support triage persists independently of closure and is found by actual nu
   await page.getByLabel('Nota interna / motivo', { exact: true }).fill('QA el escáner bloquea la tarea de campo.');
   await screenshot(page, info, 'triage-form');
   await page.getByRole('button', { name: 'Guardar clasificación', exact: true }).click();
-  await expect(page.getByText('Escáner QR · Problema técnico · Prioridad Alta', { exact: true })).toBeVisible();
+  const header = page.locator('header').filter({ has: page.getByText(ticket.referencia, { exact: true }) });
+  await expect(header.getByText('Escáner QR · Problema técnico · Prioridad Alta', { exact: true })).toBeVisible();
   await expect(page.getByText('Abierto', { exact: true }).first()).toBeVisible();
   await action(page, 'Cerrar con una resolución', 'QA resolución sintética conservando triaje.'); await page.getByRole('button', { name: 'Cerrar con resolución', exact: true }).click();
   await expect(page.getByText('Cerrado', { exact: true }).first()).toBeVisible();
@@ -204,7 +210,7 @@ test('support triage persists independently of closure and is found by actual nu
   await filters.getByRole('button', { name: 'Clasificación', exact: true }).click(); await page.getByRole('option', { name: 'Clasificados', exact: true }).click();
   const row = page.getByRole('link').filter({ hasText: ticket.referencia }); await expect(row).toBeVisible(); await expect(row).toContainText('Cerrado');
   await screenshot(page, info, 'triage-filtered'); await row.click();
-  await expect(page.getByText('Escáner QR · Problema técnico · Prioridad Alta', { exact: true })).toBeVisible();
+  await expect(header.getByText('Escáner QR · Problema técnico · Prioridad Alta', { exact: true })).toBeVisible();
 });
 
 test('support voice records synthetic microphone audio and plays its authenticated server copy for staff', async ({ page, browser }, info) => {
