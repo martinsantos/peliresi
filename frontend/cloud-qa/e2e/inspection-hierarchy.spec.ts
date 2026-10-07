@@ -34,6 +34,7 @@ test('inspection identity, numbered sections and contextual help never displace 
   for (const size of sizes) {
     await page.setViewportSize(size);
     await readablePageHeading(page);
+    await readableWholeWords(page.getByRole('banner').getByRole('heading').first());
     const heading = page.getByTestId('inspection-case-identity').getByRole('heading', { name: record.numero, exact: true });
     const title = (await heading.boundingBox())!;
     const workspace = (await page.getByTestId('inspection-workspace').boundingBox())!;
