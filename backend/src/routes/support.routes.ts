@@ -8,6 +8,9 @@ import { SUPPORT_FILE_LIMIT } from '../services/supportFile.service';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: SUPPORT_FILE_LIMIT, files: 3, fields: 8, fieldSize: 40000 } });
 const writes = rateLimit({ windowMs: 60000, max: 30, standardHeaders: true, legacyHeaders: false,
+  // Authentication runs before this limiter. Users sharing a mobile NAT must
+  // not consume each other's allowance; the global API/IP limit still applies.
+  keyGenerator: req => String((req as import('../middlewares/auth.middleware').AuthRequest).user.id),
   message: { success: false, message: 'Demasiados envíos. Conservá el borrador y reintentá en un momento.' } });
 router.use(isAuthenticated, requireFullAccess);
 router.get('/acceso', soporteAcceso);

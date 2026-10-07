@@ -32,7 +32,7 @@ async function check(name: string, task: () => Promise<void>) {
   catch (error) { results.push({ name, status: 'FAIL', error: String(error) }); throw error; }
 }
 try {
-  for (const [index, who] of ['admin', 'generador', 'generador2', 'operador2'].entries()) {
+  for (const [index, who] of ['admin', 'generador', 'generador2', 'transportista', 'transportista2', 'operador', 'operador2', 'inspector', 'lector-generadores', 'lector-transporte', 'lector-operadores'].entries()) {
     const response = await fetch(base + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '127.10.4.' + (index + 1) },
       body: JSON.stringify({ email: who + '@night-qa.invalid', password: 'OnlyLocal-NightQA-2026!' }) });
     assert.equal(response.status, 200);
@@ -41,7 +41,13 @@ try {
   }
   await check('unaltered additive migration executes on PostgreSQL without changing existing users', async () => {
     const migration = await readFile(path.join(root, 'backend/prisma/migrations/20261006010000_native_support/migration.sql'), 'utf8');
-    const sql = 'BEGIN; CREATE SCHEMA support_migration_check; SET LOCAL search_path TO support_migration_check; CREATE TABLE usuarios(id TEXT PRIMARY KEY);\n' + migration + '\nROLLBACK;';
+    const upgrade = await readFile(path.join(root, 'backend/prisma/migrations/20261007010000_support_triage_identity/migration.sql'), 'utf8');
+    const sql = 'BEGIN; CREATE SCHEMA support_migration_check; SET LOCAL search_path TO support_migration_check; CREATE TABLE usuarios(id TEXT PRIMARY KEY);\n' + migration + `
+      INSERT INTO usuarios(id) VALUES ('retained-owner');
+      INSERT INTO tickets_soporte(id,"autorId",asunto,contexto,"clienteId",huella,"updatedAt") VALUES ('retained-ticket','retained-owner','Original retained','{}','original-key','hash',now());
+      ` + upgrade + `
+      DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM tickets_soporte WHERE id='retained-ticket' AND numero=1 AND "autorId"='retained-owner' AND estado='ABIERTO' AND tipo IS NULL AND prioridad='NORMAL') THEN RAISE EXCEPTION 'Upgrade changed existing ticket'; END IF; END $$;
+      ROLLBACK;`;
     execFileSync('psql', ['-h', '127.0.0.1', '-p', '55440', '-U', 'qa', '-d', 'sitrep_night_qa_20260926', '-v', 'ON_ERROR_STOP=1'], { input: sql, encoding: 'utf8', timeout: 15000 });
   });
   await check('anonymous sessions and non-support actors cannot open the desk or configure agents', async () => {
@@ -166,6 +172,92 @@ try {
       assert.ok(await db.vehiculo.findUnique({ where: { id: held.vehicle.id } })); assert.ok(await db.chofer.findUnique({ where: { id: held.driver.id } }));
     } finally { await db.$executeRawUnsafe('DROP TABLE support_qa_account_hold'); }
   });
+  await check('eleven real account logins keep owned tickets isolated across actors, inspectors and sector administrators', async () => {
+    for (const who of ['transportista', 'operador', 'inspector', 'lector-generadores', 'lector-transporte', 'lector-operadores']) {
+      const own = await call<{ id: string }>(who, '/soporte', 'POST', { ...input, asunto: 'QA propiedad ' + who }, 201, 'matrix-owner-' + who);
+      const detail = await call<Ticket & { autorId: string; puedeGestionar: boolean }>(who, '/soporte/' + own.id);
+      assert.equal(detail.autorId, fixture.users[who]); assert.equal(detail.puedeGestionar, false);
+      await call(who, '/soporte/' + id, 'GET', undefined, 404);
+      await call(who, '/soporte/' + own.id + '/acciones', 'POST', { accion: 'CLASIFICAR', version: 1, cuerpo: 'Intento de triaje no autorizado.', categoria: 'QR', tipo: 'PROBLEMA', prioridad: 'ALTA' }, 403, 'matrix-triage-' + who);
+    }
+  });
+  await check('twenty concurrent reports receive unique increasing references without renumbering or cross-user ownership', async () => {
+    const who = ['transportista2', 'generador2', 'operador', 'inspector'];
+    const created = await Promise.all(Array.from({ length: 20 }, (_, index) => call<{ id: string; referencia: string }>(who[index % who.length], '/soporte', 'POST',
+      { ...input, asunto: 'QA correlativo concurrente ' + index }, 201, 'parallel-reference-' + index)));
+    assert.equal(new Set(created.map(row => row.id)).size, 20); assert.equal(new Set(created.map(row => row.referencia)).size, 20);
+    const numbers = created.map(row => Number(row.referencia.replace('SOP-', ''))).sort((a, b) => a - b);
+    for (let index = 1; index < numbers.length; index++) assert.equal(numbers[index], numbers[index - 1] + 1);
+    for (let index = 0; index < created.length; index++) assert.equal((await db.ticketSoporte.findUniqueOrThrow({ where: { id: created[index].id } })).autorId, fixture.users[who[index % who.length]]);
+  });
+  let proxyId = '';
+  await check('signed impersonation and renewal record the real administrator but deliver the ticket to the represented user', async () => {
+    const impersonation = await call<{ tokens: { accessToken: string; refreshToken: string } }>('admin', '/admin/impersonate/' + fixture.users.generador2, 'POST');
+    const renewed = await call<{ accessToken: string; refreshToken: string }>(null, '/auth/refresh-token', 'POST', { refreshToken: impersonation.tokens.refreshToken });
+    tokens.proxy = renewed.accessToken;
+    tokens.proxyRefresh = renewed.refreshToken;
+    const created = await call<{ id: string }>('proxy', '/soporte', 'POST', { ...input, asunto: 'QA reporte durante impersonación' }, 201, 'proxy-create-123'); proxyId = created.id;
+    const row = await db.ticketSoporte.findUniqueOrThrow({ where: { id: proxyId } });
+    assert.equal(row.autorId, fixture.users.generador2); assert.equal(row.registradoPorId, fixture.users.admin);
+    assert.equal((await db.mensajeSoporte.findFirstOrThrow({ where: { ticketId: proxyId } })).autorId, fixture.users.admin);
+    const notice = await db.notificacion.findFirstOrThrow({ where: { usuarioId: fixture.users.generador2, datos: { contains: proxyId } } });
+    assert.equal(notice.titulo, 'Ticket registrado a tu nombre'); assert.equal(JSON.parse(notice.datos).ruta, '/soporte/' + proxyId);
+    assert.equal((await call<Ticket>('generador2', '/soporte/' + proxyId)).id, proxyId);
+  });
+  await check('signed operator identity does not grant administrator rights to the represented account', async () => {
+    await call('proxy', '/soporte?scope=mesa', 'GET', undefined, 403);
+    await call('proxy', '/soporte/equipo', 'GET', undefined, 403);
+    await call('proxy', '/admin/impersonate/' + fixture.users.operador, 'POST', undefined, 403);
+    await call('proxy', '/soporte', 'POST', { ...input, registradoPorId: fixture.users.admin }, 400, 'forge-proxy-id-123');
+    await db.usuario.update({ where: { id: fixture.users.admin }, data: { activo: false } });
+    try {
+      await call('proxy', '/soporte/acceso', 'GET', undefined, 401);
+      await call(null, '/auth/refresh-token', 'POST', { refreshToken: tokens.proxyRefresh }, 401);
+    } finally { await db.usuario.update({ where: { id: fixture.users.admin }, data: { activo: true } }); }
+  });
+  await check('triage filters persist a private audit while leaving ticket state unchanged even after closure', async () => {
+    const triage = { accion: 'CLASIFICAR', version: 1, cuerpo: 'QA diagnóstico interno reservado.', categoria: 'QR', tipo: 'PROBLEMA', prioridad: 'ALTA' };
+    await call('admin', '/soporte/' + proxyId + '/acciones', 'POST', triage, 200, 'triage-proxy-123');
+    const own = await call<Ticket & { tipo: string; prioridad: string; eventos: unknown[] }>('generador2', '/soporte/' + proxyId);
+    assert.equal(own.estado, 'ABIERTO'); assert.equal(own.tipo, 'PROBLEMA'); assert.equal(own.prioridad, 'ALTA'); assert.equal(own.mensajes.length, 1); assert.equal(own.eventos.length, 0);
+    const desk = await call<{ items: Array<{ id: string }> }>('admin', '/soporte?scope=mesa&tipo=PROBLEMA&prioridad=ALTA&clasificado=si');
+    assert.ok(desk.items.some(row => row.id === proxyId));
+    await call('admin', '/soporte/' + proxyId + '/acciones', 'POST', { accion: 'CERRAR', version: 2, cuerpo: 'QA cierre con resolución visible.' }, 200, 'triage-close-123');
+    const closed = await db.ticketSoporte.findUniqueOrThrow({ where: { id: proxyId } });
+    await call('admin', '/soporte/' + proxyId + '/acciones', 'POST', { ...triage, version: 3, tipo: 'CONSULTA' }, 200, 'triage-closed-123');
+    const after = await db.ticketSoporte.findUniqueOrThrow({ where: { id: proxyId } }); assert.equal(after.estado, 'CERRADO'); assert.equal(after.cerradoAt?.toISOString(), closed.cerradoAt?.toISOString());
+    const exact = await call<{ items: Array<{ id: string }> }>('generador2', '/soporte?search=SOP-' + String(after.numero).padStart(6, '0'));
+    assert.deepEqual(exact.items.map(row => row.id), [proxyId]);
+  });
+  await check('audio attachments are private authenticated files delivered unchanged with the public response', async () => {
+    const audio = Buffer.alloc(48); audio.write('RIFF', 0); audio.writeUInt32LE(40, 4); audio.write('WAVEfmt ', 8); audio.writeUInt32LE(16, 16);
+    audio.writeUInt16LE(1, 20); audio.writeUInt16LE(1, 22); audio.writeUInt32LE(8000, 24); audio.writeUInt32LE(16000, 28); audio.writeUInt16LE(2, 32); audio.writeUInt16LE(16, 34); audio.write('data', 36); audio.writeUInt32LE(4, 40);
+    const version = (await db.ticketSoporte.findUniqueOrThrow({ where: { id } })).version;
+    const form = new FormData(); form.append('accion', 'RESPONDER'); form.append('version', String(version)); form.append('cuerpo', 'QA respuesta pública con audio.');
+    form.append('files', new Blob([audio], { type: 'audio/wav' }), 'qa-voice.wav');
+    await call('admin', '/soporte/' + id + '/acciones', 'POST', form, 200, 'audio-response-123');
+    const own = await call<Ticket>('generador', '/soporte/' + id); const file = own.mensajes.at(-1)!.adjuntos[0];
+    const downloaded = await fetch(base + '/soporte/' + id + '/adjuntos/' + file.id, { headers: { Authorization: 'Bearer ' + tokens.generador } });
+    assert.equal(downloaded.status, 200); assert.match(downloaded.headers.get('content-type')!, /^audio\/wav/); assert.equal(downloaded.headers.get('cache-control'), 'private, no-store');
+    assert.deepEqual(Buffer.from(await downloaded.arrayBuffer()), audio);
+    await call('generador2', '/soporte/' + id + '/adjuntos/' + file.id, 'GET', undefined, 404);
+    await call(null, '/soporte/' + id + '/adjuntos/' + file.id, 'GET', undefined, 401);
+    assert.ok(await db.notificacion.findFirst({ where: { usuarioId: fixture.users.generador, datos: { contains: id } } }));
+  });
+  await check('staff handoff history carries the exact from and to identities without leaking its private reason', async () => {
+    const detail = await call<Ticket & { eventos: Array<{ accion: string; detalle?: { desde: string; hacia: string } }> }>('admin', '/soporte/' + id);
+    const handoff = detail.eventos.find(row => row.accion === 'DERIVAR'); assert.equal(handoff?.detalle?.hacia, 'QA operador2'); assert.equal(handoff?.detalle?.desde, 'QA admin');
+    const own = await call<Ticket>('generador', '/soporte/' + id); assert.ok(own.mensajes.every(row => !row.cuerpo.includes('motivo interno')));
+  });
+  await check('the thirty-write account allowance survives shared NAT while still blocking the same account on its thirty-first write', async () => {
+    const password = (await db.usuario.findUniqueOrThrow({ where: { id: fixture.users.generador } })).password;
+    const throttle = await db.usuario.create({ data: { email: 'qa-support-throttle@night-qa.invalid', nombre: 'QA límite soporte', rol: 'GENERADOR', activo: true, emailVerified: true, password } });
+    const signed = await call<{ tokens: { accessToken: string } }>(null, '/auth/login', 'POST', { email: throttle.email, password: 'OnlyLocal-NightQA-2026!' }); tokens.throttle = signed.tokens.accessToken;
+    for (let index = 0; index < 30; index++) await call('throttle', '/soporte', 'POST', { asunto: '' }, 400, 'throttle-key-' + index);
+    await call('throttle', '/soporte', 'POST', { asunto: '' }, 429, 'throttle-over-123');
+    await call('lector-operadores', '/soporte', 'POST', { asunto: '' }, 400, 'other-after-throttle-123');
+    assert.equal(await db.ticketSoporte.count({ where: { autorId: throttle.id } }), 0);
+  });
 } catch (error) { fatal = String(error); throw error; }
 finally {
   await db.$disconnect();
@@ -173,4 +265,4 @@ finally {
     passed: results.filter(row => row.status === 'PASS').length, failed: results.filter(row => row.status === 'FAIL').length + (fatal && !results.some(row => row.status === 'FAIL') ? 1 : 0), fatal,
     database: fixture.database, port: 55440, compiledApi: true, realLogin: true, externalProvidersDisabled: true }, null, 2));
 }
-assert.equal(results.length, 12);
+assert.equal(results.length, 20);

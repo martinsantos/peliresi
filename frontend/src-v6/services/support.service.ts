@@ -10,7 +10,7 @@ function multipart(input: SupportCreate | SupportMutation, files: File[]) {
 }
 export const supportService = {
   async access(): Promise<{ puedeGestionar: boolean; puedeConfigurar: boolean }> { return (await api.get('/soporte/acceso')).data.data; },
-  async list(params: { scope: string; estado?: string; search?: string; page: number }): Promise<{ items: SupportTicket[]; total: number; page: number; totalPages: number }> {
+  async list(params: { scope: string; estado?: string; search?: string; page: number; tipo?: string; prioridad?: string; categoria?: string; clasificado?: string }): Promise<{ items: SupportTicket[]; total: number; page: number; totalPages: number }> {
     return (await api.get('/soporte', { params })).data.data;
   },
   async get(id: string): Promise<SupportTicket> { return (await api.get('/soporte/' + encodeURIComponent(id))).data.data; },

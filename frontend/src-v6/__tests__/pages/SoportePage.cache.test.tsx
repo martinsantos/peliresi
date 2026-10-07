@@ -11,6 +11,7 @@ import SoportePage from '../../pages/soporte/SoportePage';
 const subject = 'Problema de QR confirmado';
 const filename = 'captura-' + 'a'.repeat(110) + '.png';
 const ticket = { id: 'new-ticket', referencia: 'SOP-000001', asunto: subject, categoria: 'QR', estado: 'ABIERTO', autorId: 'owner', responsableId: null,
+  tipo: null, prioridad: 'NORMAL', clasificadoAt: null, registradoPor: null,
   autor: { id: 'owner', nombre: 'QA' }, responsable: null, version: 1, createdAt: '2026-10-06T01:00:00Z', updatedAt: '2026-10-06T01:00:00Z',
   contexto: { ruta: '/soporte', ancho: 360, alto: 800 }, puedeGestionar: false, puedeAtender: false, esAutor: true,
   mensajes: [{ id: 'message', cuerpo: 'Descripción original del reporte', interno: false, autor: { id: 'owner', nombre: 'QA' }, createdAt: '2026-10-06T01:00:00Z',
@@ -67,6 +68,33 @@ function openDetail(overrides = {}) {
   const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>);
 }
+it('classifies area, type and priority with an internal reason rather than closing the ticket', async () => {
+  openDetail();
+  fireEvent.click(await screen.findByRole('button', { name: 'Clasificar', exact: true }));
+  expect(screen.getByText('El motivo es interno. Clasificar no cierra el ticket.')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Tipo de ticket', exact: true }));
+  fireEvent.click(screen.getByRole('option', { name: 'Problema técnico', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Prioridad', exact: true }));
+  fireEvent.click(screen.getByRole('option', { name: 'Alta', exact: true }));
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'El escáner QR bloquea el trabajo de campo.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar clasificación', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'CLASIFICAR', categoria: 'QR', tipo: 'PROBLEMA', prioridad: 'ALTA' }), [], expect.any(String)));
+});
+it('lets a common reporter read the response before the composer while keeping staff actions separate', async () => {
+  openDetail({ autorId: 'owner', esAutor: true, puedeGestionar: false, puedeAtender: false });
+  const conversation = await screen.findByRole('region', { name: 'Conversación', exact: true });
+  const reply = screen.getByRole('region', { name: 'Atender ticket', exact: true });
+  expect(conversation.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Las respuestas llegan a tus avisos' })).toHaveAttribute('href', '/notificaciones');
+  expect(screen.queryByRole('button', { name: 'Clasificar', exact: true })).not.toBeInTheDocument();
+});
+it('explains and focuses an incomplete reply instead of silently disabling sending', async () => {
+  openDetail();
+  const submit = await screen.findByRole('button', { name: 'Enviar respuesta', exact: true });
+  expect(submit).toBeEnabled(); fireEvent.click(submit);
+  expect(screen.getByRole('alert')).toHaveTextContent('Escribí al menos 5 caracteres');
+  expect(screen.getByLabelText('Mensaje o resolución')).toHaveFocus(); expect(calls.act).not.toHaveBeenCalled();
+});
 it('puts named support controls before the conversation, without an action dropdown', async () => {
   openDetail();
   const actions = await screen.findByRole('region', { name: 'Atender ticket', exact: true });

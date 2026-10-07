@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { supportCreateInput, supportMutationInput, supportContext, supportFingerprint, supportCanManage } from '../../services/supportPolicy.service';
+import { supportCreateInput, supportMutationInput, supportContext, supportFingerprint, supportCanManage, supportNumber } from '../../services/supportPolicy.service';
 
 describe('native support contract', () => {
+  it('classifies with a complete triage without confusing classification with closure', () => {
+    expect(supportMutationInput.safeParse({ accion: 'CLASIFICAR', version: 2, cuerpo: 'Revisado por soporte técnico.', categoria: 'GPS', tipo: 'PROBLEMA', prioridad: 'ALTA' }).success).toBe(true);
+    for (const patch of [{ tipo: undefined }, { prioridad: undefined }, { categoria: undefined }, { prioridad: 'FAKE' }]) {
+      expect(supportMutationInput.safeParse({ accion: 'CLASIFICAR', version: 2, cuerpo: 'Motivo interno de triaje.', categoria: 'GPS', tipo: 'PROBLEMA', prioridad: 'ALTA', ...patch }).success).toBe(false);
+    }
+    expect(supportMutationInput.safeParse({ accion: 'RESPONDER', version: 2, cuerpo: 'Un mensaje del usuario.', prioridad: 'URGENTE' }).success).toBe(false);
+  });
+  it('retains the published ticket format including numbers beyond six digits', () => {
+    expect([1, 2, 1000000].map(supportNumber)).toEqual(['SOP-000001', 'SOP-000002', 'SOP-1000000']);
+  });
   it('requires a useful subject and description, and rejects forged identity', () => {
     expect(supportCreateInput.safeParse({ asunto: 'GPS no responde', descripcion: 'No muestra mi posición después de habilitar el permiso.', categoria: 'GPS' }).success).toBe(true);
     expect(supportCreateInput.safeParse({ asunto: 'a', descripcion: '' }).success).toBe(false);

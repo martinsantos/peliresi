@@ -178,6 +178,16 @@ describe('report problem preserves the human workflow', () => {
     expect(screen.getByRole('button', { name: 'Volver a mi sesión' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enviar ticket' })).not.toBeInTheDocument();
   });
+  it('permits a verified impersonation report for the represented account, never a client-chosen owner', async () => {
+    mocks.impersonation = { adminUser: { id: 'admin', nombre: 'Administradora' } };
+    localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner', impersonatedBy: 'admin' })) + '.not-a-credential');
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    expect(screen.getByText(/El ticket y las respuestas quedarán para Usuario/)).toBeVisible();
+    fill(); fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('autorId');
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('registradoPorId');
+  });
   it('does not leak the previous account draft after a role/session switch', () => {
     const { rerender } = render(<SupportReportDialog open onClose={vi.fn()} />); fill(); mocks.user.id = 'second-owner';
     rerender(<SupportReportDialog open onClose={vi.fn()} />); expect(screen.getByLabelText('Asunto')).toHaveValue('');

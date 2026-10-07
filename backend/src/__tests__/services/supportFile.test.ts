@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { supportFileType, describeSupportFile, resolveSupportFile, SUPPORT_FILE_LIMIT } from '../../services/supportFile.service';
 describe('private support files', () => {
+  it('accepts bounded audio containers based on bytes and rejects video renamed to audio', () => {
+    const webm = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.from('webm A_OPUS QA')]);
+    expect(supportFileType(webm)).toEqual({ mime: 'audio/webm', extension: 'webm' });
+    expect(supportFileType(Buffer.from('OggS0000OpusHeadQA'))).toEqual({ mime: 'audio/ogg', extension: 'ogg' });
+    expect(supportFileType(Buffer.from('RIFF1234WAVEfmt dataQA'))).toEqual({ mime: 'audio/wav', extension: 'wav' });
+    const mp4 = Buffer.concat([Buffer.from([0,0,0,24]), Buffer.from('ftypisom0000moovhdlr0000sounQA')]);
+    expect(supportFileType(mp4)).toEqual({ mime: 'audio/mp4', extension: 'm4a' });
+    for (const video of [Buffer.concat([webm, Buffer.from('V_VP9')]), Buffer.concat([mp4, Buffer.from('vide')]), Buffer.from('OggS0000theoraQA')]) expect(() => supportFileType(video)).toThrow();
+    expect(resolveSupportFile('soporte/12345678-1234-1234-1234-123456789abc.webm')).toMatch(/\.webm$/);
+  });
   it.each([
     [Buffer.from([137,80,78,71,13,10,26,10]), 'image/png'],
     [Buffer.from([255,216,255,0]), 'image/jpeg'],

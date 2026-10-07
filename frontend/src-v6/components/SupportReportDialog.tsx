@@ -12,27 +12,31 @@ import { Select } from './ui/Select';
 import { supportService, supportError } from '../services/support.service';
 import { clearSupportDraft, readSupportDraft, writeSupportDraft, supportFileDigests, type SupportDraft } from '../utils/supportDraft';
 import { assertSupportSession, supportSessionMatches } from '../utils/supportSession';
-import { supportCategories, type SupportCategory, type SupportCreate } from '../types/support';
+import { supportCategories, supportFileAccept, type SupportCategory, type SupportCreate } from '../types/support';
+import { SupportAudioInput } from './SupportAudioInput';
 
 type ReportProps = { open: boolean; onClose: () => void; onSubmitted?: () => void; screenshot?: File; captureError?: string; returnToTask?: boolean; context?: SupportCreate['contexto'] };
 export function SupportReportDialog({ open, onClose, onSubmitted, screenshot, captureError, returnToTask, context }: ReportProps) {
   const { currentUser } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
   if (!open || !currentUser) return null;
-  // Existing impersonation tokens identify the represented account, not the
-  // human administrator. Do not pretend a local role label proves authorship.
-  if (impersonationData) return <Modal isOpen onClose={onClose} title="Reportar con tu cuenta">
-    <p className="text-neutral-700 mb-4">Estás viendo otra cuenta. Volvé a tu sesión para que el ticket quede a tu nombre.</p>
+  // Older impersonation tokens lack signed operator identity. Never invent it
+  // from localStorage or submit an unsigned administrator ID in the payload.
+  if (impersonationData && !supportSessionMatches(String(currentUser.id), String(impersonationData.adminUser.id))) return <Modal isOpen onClose={onClose} title="Renovar impersonación para reportar">
+    <p className="text-neutral-700 mb-4">Esta sesión anterior no identifica al administrador que registra el reporte. Volvé a tu cuenta y seleccioná otra vez al usuario para reportar a su nombre.</p>
     <Button onClick={exitImpersonation}>Volver a mi sesión</Button>
   </Modal>;
   return <ReportForm key={String(currentUser.id)} owner={String(currentUser.id)} onClose={onClose} onSubmitted={onSubmitted}
-    screenshot={screenshot} captureError={captureError} returnToTask={returnToTask} context={context} />;
+    screenshot={screenshot} captureError={captureError} returnToTask={returnToTask} context={context}
+    administratorId={impersonationData ? String(impersonationData.adminUser.id) : undefined} representedName={impersonationData ? currentUser.nombre : undefined} />;
 }
 
-function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, returnToTask, context }: Omit<ReportProps, 'open'> & { owner: string }) {
+function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, returnToTask, context, administratorId, representedName }: Omit<ReportProps, 'open'> & { owner: string; administratorId?: string; representedName?: string }) {
   const initial = useRef(readSupportDraft(owner));
   const [draft, setDraft] = useState<SupportDraft>(initial.current || { asunto: '', descripcion: '', categoria: 'GENERAL' });
   const [files, setFiles] = useState<File[]>([]);
+  const [audio, setAudio] = useState<File | null>(null);
+  const [recording, setRecording] = useState(false);
   const [screenFile, setScreenFile] = useState(initial.current?.pendiente ? undefined : screenshot);
   const [preview, setPreview] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,14 +68,14 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
     acknowledged.current = true; clearSupportDraft(owner);
     // Invalidate only after the server acknowledges this owner's report. The
     // list may still be fresh in React Query when returning from the detail.
-    if (mounted.current && supportSessionMatches(owner)) {
+    if (mounted.current && supportSessionMatches(owner, administratorId)) {
       void queryClient.invalidateQueries({ queryKey: ['soporte', owner] });
       onClose(); onSubmitted?.(); if (!returnToTask) navigate(mp('/soporte/' + ticket.id));
     }
   };
   const send = async (event?: React.FormEvent, withoutAttachments = false) => {
     event?.preventDefault();
-    if (inFlight.current) return;
+    if (inFlight.current || recording) return;
     // A disabled submit hides the reason, especially after scrolling on mobile.
     // Guide the human to the first incomplete field without freezing/sending it.
     if (shortSubject || shortDescription) {
@@ -82,12 +86,12 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
     inFlight.current = true; setBusy(true); setError('');
     try {
       if (!navigator.onLine) throw new Error('offline');
-      assertSupportSession(owner);
-      const attachments = withoutAttachments ? [] : screenFile ? [screenFile, ...files] : files;
+      assertSupportSession(owner, administratorId);
+      const attachments = withoutAttachments ? [] : [...(screenFile ? [screenFile] : []), ...files, ...(audio ? [audio] : [])];
       if (attachments.length > 3) throw new Error('Adjuntá hasta 3 archivos, incluyendo la captura.');
       const digests = await supportFileDigests(attachments);
       if (!mounted.current) return;
-      assertSupportSession(owner);
+      assertSupportSession(owner, administratorId);
       const pending = draft.pendiente;
       const changedFiles = pending && JSON.stringify(digests) !== JSON.stringify(pending.files);
       if (pending && (withoutAttachments || changedFiles)) {
@@ -97,7 +101,7 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
         try { const received = await supportService.sent(pending.key); complete(received); return; }
         catch (failure) { if ((failure as { response?: { status?: number } }).response?.status !== 404) throw failure; }
         if (!mounted.current) return;
-        assertSupportSession(owner);
+        assertSupportSession(owner, administratorId);
         if (changedFiles && !withoutAttachments) throw new Error('Los adjuntos del intento anterior no están disponibles. Podés enviar solo el texto, sin volver a adjuntarlos.');
       }
       const input: SupportCreate = pending?.input || { asunto: draft.asunto, descripcion: draft.descripcion, categoria: draft.categoria,
@@ -105,14 +109,14 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
       const key = pending?.key || crypto.randomUUID();
       const frozen = { ...draft, pendiente: { key, input, files: digests } };
       setDraft(frozen); writeSupportDraft(owner, frozen);
-      if (withoutAttachments) { setScreenFile(undefined); setFiles([]); if (fileInput.current) fileInput.current.value = ''; }
+      if (withoutAttachments) { setScreenFile(undefined); setFiles([]); setAudio(null); if (fileInput.current) fileInput.current.value = ''; }
       complete(await supportService.create(input, attachments, key));
     } catch (failure) {
       const status = (failure as { response?: { status?: number } }).response?.status;
       if (status === 409 && draft.pendiente) {
         // The original attachment upload may have committed after the 404.
         // Its owned receipt is authoritative; do not invent a new sending key.
-        try { assertSupportSession(owner); complete(await supportService.sent(draft.pendiente.key)); return; }
+        try { assertSupportSession(owner, administratorId); complete(await supportService.sent(draft.pendiente.key)); return; }
         catch { /* Keep the same pending key if reconciliation is unavailable. */ }
       }
       if (failure instanceof Error && (failure.message.startsWith('Adjuntá') || failure.message.startsWith('Los adjuntos'))) setError(failure.message);
@@ -125,17 +129,18 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
   const check = async () => {
     if (!draft.pendiente || inFlight.current) return;
     inFlight.current = true; setBusy(true); setError('');
-    try { assertSupportSession(owner); complete(await supportService.sent(draft.pendiente.key)); }
+    try { assertSupportSession(owner, administratorId); complete(await supportService.sent(draft.pendiente.key)); }
     catch (failure) { setError((failure as { response?: { status?: number } }).response?.status === 404
       ? 'Todavía no hay constancia del ticket. Reintentá el mismo envío; no se generará un duplicado.' : supportError(failure)); }
     finally { inFlight.current = false; setBusy(false); }
   };
   const update = (change: Partial<SupportDraft>) => setDraft(previous => ({ ...previous, ...change }));
   return <Modal isOpen onClose={onClose} title="Reportar un problema" description="Tu reporte queda en Soporte de SITREP. No modifica el trámite que estás completando."
-    isBusy={busy} footer={<>{missing && <p id="support-submit-help" className="w-full text-sm text-neutral-700">Para enviar: {missing}.</p>}
+    isBusy={busy || recording} footer={<>{missing && <p id="support-submit-help" className="w-full text-sm text-neutral-700">Para enviar: {missing}.</p>}
       <Button type="button" variant="outline" disabled={busy} onClick={onClose}>Continuar luego</Button>
-      <Button type="submit" form="sitrep-support-report" isLoading={busy} aria-describedby={missing ? 'support-submit-help' : undefined}>Enviar ticket</Button></>}>
+      <Button type="submit" form="sitrep-support-report" isLoading={busy} disabled={recording} aria-describedby={missing ? 'support-submit-help' : undefined}>Enviar ticket</Button></>}>
     <form id="sitrep-support-report" onSubmit={send} noValidate className="space-y-4">
+      {representedName && <p className="border-l-4 border-primary-700 pl-3 text-sm text-neutral-800">El ticket y las respuestas quedarán para {representedName}. Se registrará también el administrador que lo cargó.</p>}
       {preview && <figure className="space-y-2">
         <img src={preview} alt="Captura de la pantalla que estabas usando" className="max-h-48 w-full rounded-lg border border-neutral-200 object-contain" />
         <figcaption className="text-sm text-neutral-700">Esta captura se adjuntará al ticket. Revisá que no muestre datos que no quieras compartir.</figcaption>
@@ -153,9 +158,10 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
       <p id="support-description-help" className={validationAttempted && shortDescription ? 'text-sm text-error-700' : 'text-sm text-neutral-600'}>
         {validationAttempted && shortDescription ? 'Escribí al menos 10 caracteres para describir el problema.' : 'Mínimo 10 caracteres. Describí qué esperabas y qué viste.'}</p>
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-files">Capturas o documentos · opcional</label>
-      <input ref={fileInput} id="support-files" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy}
+      <SupportAudioInput value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={busy || !!draft.pendiente} />
+      <input ref={fileInput} id="support-files" type="file" multiple accept={supportFileAccept} disabled={busy}
         className="block w-full min-h-11 text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900"
-        onChange={event => { const selected = Array.from(event.target.files || []); if (selected.length + (screenFile ? 1 : 0) > 3 || selected.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos, incluida la captura, de 5 MB cada uno.'); setFiles([]); event.target.value = ''; } else { setError(''); setFiles(selected); } }} />
+        onChange={event => { const selected = Array.from(event.target.files || []); if (selected.length + (screenFile ? 1 : 0) + (audio ? 1 : 0) > 3 || selected.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos, incluidos captura y audio, de 5 MB cada uno.'); setFiles([]); event.target.value = ''; } else { setError(''); setFiles(selected); } }} />
       <p className="text-sm text-neutral-600">Hasta 3 archivos de 5 MB. No incluyas contraseñas ni datos ajenos al problema. Los archivos no se guardan en el borrador local.</p>
       {draft.pendiente && <div className="space-y-2 border-l-4 border-warning-600 pl-3 text-sm text-neutral-800"><p>Envío pendiente de confirmación. El texto se conserva sin cambios.</p>
         <Button type="button" variant="outline" disabled={busy} onClick={check}>Comprobar si llegó</Button>

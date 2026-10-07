@@ -364,6 +364,7 @@ export const updatePreferenciasNotificacion = async (req: AuthRequest, res: Resp
 
 export const impersonateUsuario = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (req.user.impersonatedBy) throw new AppError('Volvé a tu cuenta administradora antes de cambiar de usuario otra vez', 400);
     const { userId } = req.params;
 
     const target = await prisma.usuario.findUnique({
@@ -375,7 +376,7 @@ export const impersonateUsuario = async (req: AuthRequest, res: Response, next: 
     if (!target.activo) throw new AppError('Usuario inactivo', 400);
     if (target.id === req.user.id) throw new AppError('No podés impersonarte a vos mismo', 400);
 
-    const { accessToken, refreshToken } = generateTokens(target.id);
+    const { accessToken, refreshToken } = generateTokens(target.id, false, undefined, req.user.id);
 
     try {
       await prisma.auditoria.create({

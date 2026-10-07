@@ -71,7 +71,7 @@ if (mode === 'freeze') {
   assert.equal(territorial.externalProvidersDisabled, true);
   const support = await readJson('support-integration.json');
   assert.equal(support.commit, process.env.GITHUB_SHA);
-  assert.equal(support.passed, 12); assert.equal(support.failed, 0);
+  assert.equal(support.passed, 20); assert.equal(support.failed, 0);
   assert.equal(support.compiledApi, true); assert.equal(support.realLogin, true);
   assert.equal(support.externalProvidersDisabled, true);
   assertFullE2EEvidence(e2e);

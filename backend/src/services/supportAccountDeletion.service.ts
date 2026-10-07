@@ -9,7 +9,7 @@ export async function deleteAccountPreservingSupport(usuarioId: string, removeAc
     await prisma.$transaction(async db => {
       await db.$queryRaw`SELECT id FROM usuarios WHERE id = ${usuarioId} FOR UPDATE`;
       const references = await Promise.all([
-        db.ticketSoporte.count({ where: { OR: [{ autorId: usuarioId }, { responsableId: usuarioId }] } }),
+        db.ticketSoporte.count({ where: { OR: [{ autorId: usuarioId }, { responsableId: usuarioId }, { registradoPorId: usuarioId }] } }),
         db.mensajeSoporte.count({ where: { autorId: usuarioId } }),
         db.eventoSoporte.count({ where: { usuarioId } }),
       ]);

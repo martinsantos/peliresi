@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 export const SUPPORT_STATES = ['ABIERTO', 'EN_CURSO', 'ESPERANDO_USUARIO', 'CERRADO'] as const;
 export const SUPPORT_CATEGORIES = ['GENERAL', 'SESION', 'MANIFIESTOS', 'INSPECCIONES', 'GPS', 'QR', 'DOCUMENTOS', 'INTERFAZ'] as const;
+export const SUPPORT_TYPES = ['PROBLEMA', 'CONSULTA', 'MEJORA'] as const;
+export const SUPPORT_PRIORITIES = ['BAJA', 'NORMAL', 'ALTA', 'URGENTE'] as const;
 export const supportCreateInput = z.object({
   asunto: z.string().trim().min(5).max(180),
   descripcion: z.string().trim().min(10).max(8000),
@@ -10,14 +12,19 @@ export const supportCreateInput = z.object({
   contexto: z.unknown().optional(),
 }).strict();
 export const supportMutationInput = z.object({
-  accion: z.enum(['RESPONDER', 'NOTA', 'TOMAR', 'DERIVAR', 'ESPERAR', 'CERRAR', 'REABRIR']),
+  accion: z.enum(['RESPONDER', 'NOTA', 'TOMAR', 'DERIVAR', 'ESPERAR', 'CERRAR', 'REABRIR', 'CLASIFICAR']),
   version: z.coerce.number().int().positive(),
   cuerpo: z.string().trim().max(8000).default(''),
   responsableId: z.string().trim().min(1).max(100).optional(),
+  categoria: z.enum(SUPPORT_CATEGORIES).optional(),
+  tipo: z.enum(SUPPORT_TYPES).optional(),
+  prioridad: z.enum(SUPPORT_PRIORITIES).optional(),
 }).strict().superRefine((input, ctx) => {
   if (input.accion !== 'TOMAR' && input.cuerpo.length < 5) ctx.addIssue({ code: 'custom', message: 'Explicá el motivo o escribí un mensaje (mínimo 5 caracteres)', path: ['cuerpo'] });
   if (input.accion === 'DERIVAR' && !input.responsableId) ctx.addIssue({ code: 'custom', message: 'Elegí un responsable', path: ['responsableId'] });
   if (input.accion !== 'DERIVAR' && input.responsableId) ctx.addIssue({ code: 'custom', message: 'Esta acción no permite cambiar el responsable', path: ['responsableId'] });
+  if (input.accion === 'CLASIFICAR' && (!input.categoria || !input.tipo || !input.prioridad)) ctx.addIssue({ code: 'custom', message: 'Elegí área, tipo y prioridad para clasificar', path: ['tipo'] });
+  if (input.accion !== 'CLASIFICAR' && (input.categoria || input.tipo || input.prioridad)) ctx.addIssue({ code: 'custom', message: 'Usá Clasificar para cambiar el triaje', path: ['accion'] });
 });
 
 export function supportCanManage(user: { rol?: string; activo?: boolean; restricted?: boolean } | undefined, enabled: boolean): boolean {

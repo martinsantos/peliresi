@@ -24,3 +24,11 @@ it('fails closed for malformed or non-account claims', () => {
     localStorage.setItem('sitrep_access_token', token); expect(supportSessionMatches('owner')).toBe(false);
   }
 });
+it('binds a represented report to the expected signed operator without treating the client hint as authorization', () => {
+  localStorage.setItem('sitrep_access_token', marker({ id: 'owner' }));
+  expect(supportSessionMatches('owner', 'admin')).toBe(false);
+  localStorage.setItem('sitrep_access_token', marker({ id: 'owner', impersonatedBy: 'admin' }));
+  expect(supportSessionMatches('owner', 'admin')).toBe(true);
+  expect(supportSessionMatches('owner', 'other-admin')).toBe(false);
+  expect(() => assertSupportSession('owner', 'other-admin')).toThrow(SupportSessionChangedError);
+});

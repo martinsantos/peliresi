@@ -144,6 +144,97 @@ test('native support: report, take, private note, handoff, reply, close and reop
   } finally { for (const context of contexts) await context.close(); }
 });
 
+test('support impersonation returns the report and the actual response to the represented account', async ({ page, browser }, info) => {
+  test.setTimeout(150000);
+  const who = info.project.name === 'app' ? 'operador2' : info.project.name === 'web-responsive' ? 'transportista2' : 'generador2';
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await login(page, info, 'admin'); await page.goto(prefix(info) + '/switch-user');
+  await page.getByLabel('Buscar usuario', { exact: true }).fill(who + '@night-qa.invalid');
+  const switching = page.waitForResponse(response => /\/api\/admin\/impersonate\//.test(response.url()) && response.request().method() === 'POST');
+  await page.getByRole('button').filter({ hasText: new RegExp('QA ' + who + '\\b') }).click();
+  expect((await switching).status()).toBe(200); await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto(path(info));
+  const dialog = await report(page, 'QA impersonación ' + info.project.name);
+  await expect(dialog.getByText('El ticket y las respuestas quedarán para QA ' + who + '. Se registrará también el administrador que lo cargó.', { exact: true })).toBeVisible();
+  const creating = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
+  const result = await creating; expect(result.status()).toBe(201); const ticket = (await result.json()).data;
+  await expect(page.getByText('Registrado por QA admin en nombre de QA ' + who + '.', { exact: true })).toBeVisible();
+  await screenshot(page, info, 'impersonated-owner');
+  // Exit uses the product's restored administrator session, not injected tokens.
+  if (info.project.name === 'app') await page.getByTestId('exit-impersonation').click();
+  else await page.getByRole('button', { name: 'Volver a mi cuenta', exact: true }).click();
+  await expect(page).toHaveURL(/\/switch-user$/); await page.goto(path(info, '/' + ticket.id));
+  await action(page, 'Responder', 'QA soporte respondió al usuario impersonado: el acceso fue revisado.');
+  await page.getByRole('button', { name: 'Enviar respuesta', exact: true }).click();
+  await expect(page.getByText('QA soporte respondió al usuario impersonado: el acceso fue revisado.', { exact: true })).toBeVisible();
+  const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177' });
+  try {
+    const recipient = await context.newPage(); await login(recipient, info, who); await recipient.goto(prefix(info) + '/notificaciones');
+    await recipient.getByRole('button', { name: 'Abrir aviso: Actualización de soporte', exact: true }).first().click();
+    await expect(recipient).toHaveURL('http://127.0.0.1:4177' + path(info, '/' + ticket.id));
+    await expect(recipient.getByText('QA soporte respondió al usuario impersonado: el acceso fue revisado.', { exact: true })).toBeVisible();
+    await expect(recipient.getByRole('button', { name: 'Derivar', exact: true })).toHaveCount(0);
+    await expect(recipient.getByRole('button', { name: 'Clasificar', exact: true })).toHaveCount(0);
+    await screenshot(recipient, info, 'response-delivered-to-owner');
+  } finally { await context.close(); }
+  expect(errors).toEqual([]);
+});
+
+test('support triage persists independently of closure and is found by actual number, classification and priority', async ({ page }, info) => {
+  await login(page, info); await page.goto(path(info)); const dialog = await report(page, 'QA triaje ' + info.project.name);
+  const creating = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click(); const saved = await creating; expect(saved.status()).toBe(201); const ticket = (await saved.json()).data;
+  await page.getByRole('button', { name: 'Clasificar', exact: true }).click();
+  await page.getByRole('button', { name: 'Área del problema', exact: true }).click(); await page.getByRole('option', { name: 'Escáner QR', exact: true }).click();
+  await page.getByRole('button', { name: 'Tipo de ticket', exact: true }).click(); await page.getByRole('option', { name: 'Problema técnico', exact: true }).click();
+  await page.getByRole('button', { name: 'Prioridad', exact: true }).click(); await page.getByRole('option', { name: 'Alta', exact: true }).click();
+  await page.getByLabel('Nota interna / motivo', { exact: true }).fill('QA el escáner bloquea la tarea de campo.');
+  await screenshot(page, info, 'triage-form');
+  await page.getByRole('button', { name: 'Guardar clasificación', exact: true }).click();
+  await expect(page.getByText('Escáner QR · Problema técnico · Prioridad Alta', { exact: true })).toBeVisible();
+  await expect(page.getByText('Abierto', { exact: true }).first()).toBeVisible();
+  await action(page, 'Cerrar con una resolución', 'QA resolución sintética conservando triaje.'); await page.getByRole('button', { name: 'Cerrar con resolución', exact: true }).click();
+  await expect(page.getByText('Cerrado', { exact: true }).first()).toBeVisible();
+  await page.getByRole('link', { name: 'Volver a tickets', exact: true }).click();
+  await page.getByLabel('Buscar por número o asunto', { exact: true }).fill(ticket.referencia); await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await page.getByText('Filtrar triaje', { exact: true }).click();
+  const filters = page.locator('details').filter({ hasText: 'Filtrar triaje' });
+  await filters.getByRole('button', { name: 'Prioridad', exact: true }).click(); await page.getByRole('option', { name: 'Alta', exact: true }).click();
+  await filters.getByRole('button', { name: 'Clasificación', exact: true }).click(); await page.getByRole('option', { name: 'Clasificados', exact: true }).click();
+  const row = page.getByRole('link').filter({ hasText: ticket.referencia }); await expect(row).toBeVisible(); await expect(row).toContainText('Cerrado');
+  await screenshot(page, info, 'triage-filtered'); await row.click();
+  await expect(page.getByText('Escáner QR · Problema técnico · Prioridad Alta', { exact: true })).toBeVisible();
+});
+
+test('support voice records synthetic microphone audio and plays its authenticated server copy for staff', async ({ page, browser }, info) => {
+  test.setTimeout(120000);
+  await page.context().grantPermissions(['microphone']);
+  await login(page, info, 'generador'); await page.goto(path(info)); const dialog = await report(page, 'QA voz ' + info.project.name);
+  const voice = dialog.getByRole('group', { name: 'Audio opcional', exact: true });
+  await voice.getByRole('button', { name: 'Grabar audio', exact: true }).click();
+  await expect(voice.getByRole('button', { name: 'Terminar grabación', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Enviar ticket', exact: true })).toBeDisabled();
+  await expect(voice.getByRole('status')).toHaveText(/^0:(?:0[1-9]|[1-5]\d)$/, { timeout: 6000 });
+  await voice.getByRole('button', { name: 'Terminar grabación', exact: true }).click();
+  await expect(voice.getByLabel('Escuchar audio antes de enviarlo', { exact: true })).toBeVisible();
+  await screenshot(page, info, 'voice-preview');
+  const creating = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click(); const created = await creating; expect(created.status()).toBe(201); const ticket = (await created.json()).data;
+  const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177' });
+  try {
+    const staff = await context.newPage(); await login(staff, info); await staff.goto(path(info, '/' + ticket.id));
+    const downloading = staff.waitForResponse(response => /\/api\/soporte\/[^/]+\/adjuntos\//.test(response.url()));
+    await staff.getByRole('button', { name: 'Escuchar audio', exact: true }).click();
+    const received = await downloading; expect(received.status()).toBe(200); expect(received.headers()['content-type']).toMatch(/^audio\/webm/);
+    const audio = staff.getByLabel(/^Audio del ticket: audio-/); await expect(audio).toBeVisible();
+    await audio.evaluate(async element => { await (element as HTMLAudioElement).play(); });
+    await expect.poll(() => audio.evaluate(element => (element as HTMLAudioElement).currentTime), { timeout: 10000 }).toBeGreaterThan(0);
+    await audio.evaluate(element => (element as HTMLAudioElement).pause());
+    await screenshot(staff, info, 'voice-server-playback');
+  } finally { await context.close(); }
+});
+
 test('support offline draft is recoverable across close and reload without a false server acknowledgement', async ({ page, context }, info) => {
   await login(page, info, 'generador'); await page.goto(path(info));
   const dialog = await report(page, 'QA borrador offline ' + info.project.name);

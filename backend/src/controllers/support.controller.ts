@@ -3,12 +3,12 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
-import { supportCanManage, supportContext, supportCreateInput, supportMutationInput, supportFingerprint, supportNumber, SUPPORT_STATES } from '../services/supportPolicy.service';
+import { supportCanManage, supportContext, supportCreateInput, supportMutationInput, supportFingerprint, supportNumber, SUPPORT_STATES, SUPPORT_TYPES, SUPPORT_PRIORITIES, SUPPORT_CATEGORIES } from '../services/supportPolicy.service';
 import { describeSupportFile, discardSupportFiles, persistSupportFiles, resolveSupportFile, SupportFile } from '../services/supportFile.service';
 
 const userSelect = { id: true, nombre: true, apellido: true } as const;
 const fileSelect = { id: true, nombre: true, mime: true, bytes: true, sha256: true } as const;
-const ticketInclude = { autor: { select: userSelect }, responsable: { select: userSelect } } as const;
+const ticketInclude = { autor: { select: userSelect }, responsable: { select: userSelect }, registradoPor: { select: userSelect } } as const;
 type Db = Prisma.TransactionClient;
 async function staff(user: AuthRequest['user'], db: Db = prisma) {
   if (!user || user.restricted || user.activo === false) return false;
@@ -99,9 +99,21 @@ export async function listarTickets(req: AuthRequest, res: Response, next: NextF
     const page = Math.max(1, Math.min(10000, Number(req.query.page) || 1));
     if (!Number.isInteger(page)) throw new AppError('Página inválida', 400);
     const search = String(req.query.search || '').trim().slice(0, 180);
+    const tipo = req.query.tipo && String(req.query.tipo);
+    const prioridad = req.query.prioridad && String(req.query.prioridad);
+    const categoria = req.query.categoria && String(req.query.categoria);
+    const clasificado = req.query.clasificado && String(req.query.clasificado);
+    if (tipo && !SUPPORT_TYPES.includes(tipo as typeof SUPPORT_TYPES[number])) throw new AppError('Tipo de ticket inválido', 400);
+    if (prioridad && !SUPPORT_PRIORITIES.includes(prioridad as typeof SUPPORT_PRIORITIES[number])) throw new AppError('Prioridad inválida', 400);
+    if (categoria && !SUPPORT_CATEGORIES.includes(categoria as typeof SUPPORT_CATEGORIES[number])) throw new AppError('Área inválida', 400);
+    if (clasificado && !['si', 'no'].includes(clasificado)) throw new AppError('Filtro de clasificación inválido', 400);
+    const numberMatch = /^(?:SOP-)?([0-9]{1,10})$/i.exec(search);
     const where: Prisma.TicketSoporteWhereInput = {
       ...(scope === 'mis' ? { autorId: req.user.id } : scope === 'asignados' ? { responsableId: req.user.id } : {}),
-      ...(state ? { estado: state } : {}), ...(search ? { asunto: { contains: search, mode: 'insensitive' } } : {}),
+      ...(state ? { estado: state } : {}),
+      ...(tipo ? { tipo } : {}), ...(prioridad ? { prioridad } : {}), ...(categoria ? { categoria } : {}),
+      ...(clasificado ? { clasificadoAt: clasificado === 'si' ? { not: null } : null } : {}),
+      ...(search ? { OR: [{ asunto: { contains: search, mode: 'insensitive' } }, ...(numberMatch && Number(numberMatch[1]) <= 2147483647 ? [{ numero: Number(numberMatch[1]) }] : [])] } : {}),
     };
     const [items, total] = await Promise.all([
       prisma.ticketSoporte.findMany({ where, include: ticketInclude, skip: (page - 1) * 20, take: 20, orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }] }),
@@ -118,7 +130,8 @@ export async function obtenerTicket(req: AuthRequest, res: Response, next: NextF
       prisma.mensajeSoporte.findMany({ where: { ticketId: ticket.id, ...(managing ? {} : { interno: false }) },
         include: { autor: { select: userSelect }, adjuntos: { select: fileSelect } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
       prisma.eventoSoporte.findMany({ where: { ticketId: ticket.id, ...(managing ? {} : { interno: false }) },
-        select: { id: true, accion: true, estadoAnterior: true, estadoNuevo: true, version: true, createdAt: true }, orderBy: { version: 'asc' } }),
+        select: { id: true, accion: true, estadoAnterior: true, estadoNuevo: true, version: true, createdAt: true, responsableAnteriorId: true, responsableNuevoId: true,
+          usuario: { select: userSelect }, detalle: managing }, orderBy: { version: 'asc' } }),
     ]);
     const { huella, clienteId, ...safe } = ticket;
     res.json({ success: true, data: { ...safe, referencia: supportNumber(ticket.numero), mensajes, eventos,
@@ -141,6 +154,7 @@ export async function crearTicket(req: AuthRequest, res: Response, next: NextFun
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const clienteId = key(req);
     const payload = { ...parsed.data, contexto: supportContext(parsed.data.contexto) };
+    const operatorId = req.user.impersonatedBy?.id || req.user.id;
     const files = uploads(req);
     const huella = supportFingerprint(payload, files.map(describeSupportFile));
     const previous = await prisma.ticketSoporte.findUnique({ where: { autorId_clienteId: { autorId: req.user.id, clienteId } } });
@@ -149,10 +163,11 @@ export async function crearTicket(req: AuthRequest, res: Response, next: NextFun
     let created;
     try {
       created = await prisma.$transaction(async db => {
-        const ticket = await db.ticketSoporte.create({ data: { autorId: req.user.id, clienteId, huella, asunto: payload.asunto, categoria: payload.categoria, contexto: payload.contexto } });
-        await db.mensajeSoporte.create({ data: { ticketId: ticket.id, autorId: req.user.id, cuerpo: payload.descripcion,
+        const ticket = await db.ticketSoporte.create({ data: { autorId: req.user.id, registradoPorId: req.user.impersonatedBy?.id || null, clienteId, huella, asunto: payload.asunto, categoria: payload.categoria, contexto: payload.contexto } });
+        await db.mensajeSoporte.create({ data: { ticketId: ticket.id, autorId: operatorId, cuerpo: payload.descripcion,
           adjuntos: { create: stored } } });
-        await notices(db, ticket, (await team(db)).map(user => user.id), req.user.id, 'Nuevo ticket de soporte');
+        await notices(db, ticket, (await team(db)).map(user => user.id), operatorId, 'Nuevo ticket de soporte');
+        if (req.user.impersonatedBy) await notices(db, ticket, [req.user.id], operatorId, 'Ticket registrado a tu nombre');
         return ticket;
       });
       committed = true;
@@ -193,7 +208,7 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
       const assigned = managing && (ticket.responsableId === req.user.id || req.user.rol === 'ADMIN');
       let estado = ticket.estado;
       let responsableId = ticket.responsableId;
-      const internal = input.accion === 'NOTA' || input.accion === 'DERIVAR';
+      const internal = ['NOTA', 'DERIVAR', 'CLASIFICAR'].includes(input.accion);
       switch (input.accion) {
         case 'RESPONDER':
           if (!own && !assigned) throw new AppError('Tomá o recibí el ticket antes de responder', 403);
@@ -215,6 +230,7 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
           responsableId = target!.id; estado = 'EN_CURSO'; break;
         }
         case 'NOTA': if (!assigned) throw new AppError('Sólo el responsable puede agregar notas', 403); break;
+        case 'CLASIFICAR': if (!assigned) throw new AppError('Sólo el responsable o administrador puede clasificar', 403); break;
         case 'ESPERAR':
           if (!assigned || own) throw new AppError('Sólo soporte puede solicitar una respuesta', 403);
           if (ticket.estado === 'CERRADO') throw new AppError('El ticket está cerrado', 409);
@@ -234,12 +250,18 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
         // reopened work back on the active desk instead of a dead assignment.
         if (!await staff(assignedUser, db)) { responsableId = null; estado = 'ABIERTO'; }
       }
-      const updated = await db.ticketSoporte.update({ where: { id: ticket.id }, data: { estado, responsableId, version: { increment: 1 }, cerradoAt: estado === 'CERRADO' ? new Date() : null } });
+      const triage = input.accion === 'CLASIFICAR' ? { categoria: input.categoria!, tipo: input.tipo!, prioridad: input.prioridad!, clasificadoAt: new Date() } : {};
+      const operatorId = req.user.impersonatedBy?.id || req.user.id;
+      const updated = await db.ticketSoporte.update({ where: { id: ticket.id }, data: { estado, responsableId, ...triage, version: { increment: 1 },
+        cerradoAt: estado === 'CERRADO' ? ticket.cerradoAt || new Date() : null } });
       if (input.cuerpo) await db.mensajeSoporte.create({ data: { ticketId: ticket.id, autorId: req.user.id, cuerpo: input.cuerpo,
         interno: internal, adjuntos: { create: stored } } });
       await db.eventoSoporte.create({ data: { ticketId: ticket.id, usuarioId: req.user.id, clienteId, huella, accion: input.accion,
         estadoAnterior: ticket.estado, estadoNuevo: estado, responsableAnteriorId: ticket.responsableId,
-        responsableNuevoId: responsableId, version: updated.version, interno: input.accion === 'NOTA' } });
+        responsableNuevoId: responsableId, version: updated.version, interno: input.accion === 'NOTA' || input.accion === 'CLASIFICAR',
+        detalle: { ...(req.user.impersonatedBy ? { registradoPorId: operatorId, actuandoPorId: req.user.id } : {}),
+          ...(input.accion === 'CLASIFICAR' ? { antes: { categoria: ticket.categoria, tipo: ticket.tipo || null, prioridad: ticket.prioridad || 'NORMAL' }, despues: { categoria: input.categoria!, tipo: input.tipo!, prioridad: input.prioridad! } } : {}),
+          ...(input.accion === 'DERIVAR' ? { desde: ticket.responsable?.nombre || 'Sin asignar', hacia: (await db.usuario.findUnique({ where: { id: responsableId! }, select: userSelect }))?.nombre || 'Responsable' } : {}) } } });
       const recipients = internal ? [responsableId].filter((id): id is string => !!id) : [ticket.autorId, responsableId].filter((id): id is string => !!id);
       if (own && !responsableId && !internal) recipients.push(...(await team(db)).map(user => user.id));
       await notices(db, ticket, recipients, req.user.id, input.accion === 'DERIVAR' ? 'Ticket derivado a tu atención' : 'Actualización de soporte');

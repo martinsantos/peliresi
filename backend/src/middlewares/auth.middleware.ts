@@ -5,6 +5,7 @@ import { config } from '../config/config';
 import { AppError } from './errorHandler';
 import prisma from '../lib/prisma';
 import { isFullAccess } from '../utils/roleFilter';
+import { verifiedImpersonator } from '../services/impersonationIdentity.service';
 
 /** Shape of req.user set by isAuthenticated middleware. */
 export interface AuthUser {
@@ -18,6 +19,7 @@ export interface AuthUser {
   transportista: { id: string; [key: string]: unknown } | null;
   operador: { id: string; [key: string]: unknown } | null;
   restricted: boolean;
+  impersonatedBy?: { id: string; nombre: string };
 }
 
 export interface AuthRequest extends Request {
@@ -41,7 +43,7 @@ export const isAuthenticated = async (
     const token = authHeader.split(' ')[1];
     
     // Verificar el token
-    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string };
+    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
 
     // Before email verification this token may only operate on its own draft.
     // Do not grant access to another actor, inspection or admin endpoint.
@@ -78,7 +80,8 @@ export const isAuthenticated = async (
     }
 
     // Adjuntar el usuario al objeto de solicitud (with restricted flag)
-    req.user = { ...user, restricted: decoded.restricted || false };
+    const impersonatedBy = await verifiedImpersonator(decoded.impersonatedBy, user.id, decoded.restricted);
+    req.user = { ...user, restricted: decoded.restricted || false, ...(impersonatedBy ? { impersonatedBy } : {}) };
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {

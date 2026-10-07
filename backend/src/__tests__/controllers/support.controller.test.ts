@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ agent: vi.fn(), person: vi.fn(), ticket: vi.fn(), tickets: vi.fn(), count: vi.fn(), messages: vi.fn(), events: vi.fn(), transaction: vi.fn(), create: vi.fn(), createMessage: vi.fn(), createNotices: vi.fn(), team: vi.fn(), update: vi.fn(), event: vi.fn(), createEvent: vi.fn(), lock: vi.fn(), persist: vi.fn(), discard: vi.fn(), file: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
-  agenteSoporte: { findUnique: mocks.agent }, usuario: { findMany: mocks.team },
+  agenteSoporte: { findUnique: mocks.agent }, usuario: { findMany: mocks.team, findUnique: mocks.person },
   ticketSoporte: { findUnique: mocks.ticket, findMany: mocks.tickets, count: mocks.count },
   mensajeSoporte: { findMany: mocks.messages }, eventoSoporte: { findMany: mocks.events },
   adjuntoSoporte: { findFirst: mocks.file }, $transaction: mocks.transaction,
@@ -26,6 +26,35 @@ describe('support identity, visibility and transactional workflow', () => {
       mensajeSoporte: { create: mocks.createMessage }, eventoSoporte: { findUnique: mocks.event, create: mocks.createEvent },
       notificacion: { createMany: mocks.createNotices },
     }));
+  });
+  it('stores a report for the represented account and records the real administrator separately', async () => {
+    mocks.ticket.mockResolvedValue(null); mocks.create.mockResolvedValue({ ...ticket, numero: 10 });
+    const req = request({ asunto: 'Error cargando el manifiesto', descripcion: 'El administrador reproduce el error en mi cuenta.' });
+    req.user = { ...user, impersonatedBy: { id: 'real-admin', nombre: 'Administradora real' } } as typeof user;
+    const next = vi.fn(); await crearTicket(req as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ autorId: 'owner', registradoPorId: 'real-admin' }) }));
+    expect(mocks.createMessage).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ autorId: 'real-admin' }) }));
+    expect(mocks.createNotices.mock.calls.flatMap(call => call[0].data)).toContainEqual(expect.objectContaining({ usuarioId: 'owner', titulo: 'Ticket registrado a tu nombre' }));
+  });
+  it('keeps classification private, audited and separate from the current workflow state', async () => {
+    const next = vi.fn();
+    await accionarTicket(request({ accion: 'CLASIFICAR', version: 2, cuerpo: 'Diagnóstico del equipo de soporte.', categoria: 'QR', tipo: 'PROBLEMA', prioridad: 'ALTA' }, { ...user, id: 'agent', rol: 'ADMIN' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ estado: 'EN_CURSO', categoria: 'QR', tipo: 'PROBLEMA', prioridad: 'ALTA', clasificadoAt: expect.any(Date) }) }));
+    expect(mocks.createMessage).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ interno: true }) }));
+    expect(mocks.createEvent).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ accion: 'CLASIFICAR', interno: true, detalle: expect.objectContaining({ despues: { categoria: 'QR', tipo: 'PROBLEMA', prioridad: 'ALTA' } }) }) }));
+    expect(mocks.createNotices).not.toHaveBeenCalled();
+  });
+  it('does not let a common author triage or change priority', async () => {
+    const next = vi.fn(); await accionarTicket(request({ accion: 'CLASIFICAR', version: 2, cuerpo: 'Quiero cambiar la prioridad.', categoria: 'GENERAL', tipo: 'CONSULTA', prioridad: 'URGENTE' }) as never, response() as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403 }); expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it('searches the actual reference number within the current owner boundary', async () => {
+    const req = request(); req.query = { search: 'SOP-000001' }; const next = vi.fn();
+    await listarTickets(req as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.tickets).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ autorId: 'owner', OR: expect.arrayContaining([{ numero: 1 }]) }) }));
   });
   it('constrains an actor list to its authenticated account', async () => {
     const res = response(), next = vi.fn(); await listarTickets(request() as never, res as never, next);

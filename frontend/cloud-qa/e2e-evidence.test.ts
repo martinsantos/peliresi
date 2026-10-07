@@ -4,17 +4,22 @@ import { assertFullE2EEvidence, type FullE2EEvidence } from './e2e-evidence.ts';
 
 function complete(): FullE2EEvidence {
   return {
-    stats: { expected: 183, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
+    stats: { expected: 192, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
     suites: [{ suites: ['web-desktop', 'web-responsive', 'app'].map(projectName => ({
-      specs: Array.from({ length: 61 }, () => ({ tests: [{
+      specs: Array.from({ length: 64 }, () => ({ tests: [{
         projectName, status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed', retry: 0 }],
       }] })),
     })) }],
   };
 }
 
-test('the complete 61 x 3 evidence is accepted without lowering the denominator', () => {
+test('the complete 64 x 3 evidence is accepted without lowering the denominator', () => {
   assert.doesNotThrow(() => assertFullE2EEvidence(complete()));
+});
+test('the previous 61 x 3 evidence does not certify impersonation, triage or voice', () => {
+  const old = complete(); old.stats.expected = 183;
+  for (const surface of old.suites[0].suites!) surface.specs!.splice(61);
+  assert.throws(() => assertFullE2EEvidence(old));
 });
 test('an old 141-case summary and a missing case cannot be packaged', () => {
   const old = complete(); old.stats.expected = 141;

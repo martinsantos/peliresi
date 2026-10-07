@@ -10,7 +10,7 @@ const execFileAsync = promisify(execFile);
 export const SUPPORT_FILE_LIMIT = 5 * 1024 * 1024;
 export type SupportFile = { nombre: string; mime: string; bytes: number; sha256: string; storageKey: string };
 export function resolveSupportFile(key: string): string {
-  if (!/^soporte\/[a-f0-9-]{36}\.(png|jpg|webp|pdf)$/.test(key)) throw new AppError('Adjunto inválido', 400);
+  if (!/^soporte\/[a-f0-9-]{36}\.(png|jpg|webp|pdf|webm|ogg|wav|m4a)$/.test(key)) throw new AppError('Adjunto inválido', 400);
   return path.join(root, key);
 }
 export function supportFileType(buffer: Buffer): { mime: string; extension: string } {
@@ -19,7 +19,15 @@ export function supportFileType(buffer: Buffer): { mime: string; extension: stri
   if (buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255]))) return { mime: 'image/jpeg', extension: 'jpg' };
   if (buffer.length >= 12 && buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP') return { mime: 'image/webp', extension: 'webp' };
   if (buffer.subarray(0, 5).toString() === '%PDF-') return { mime: 'application/pdf', extension: 'pdf' };
-  throw new AppError('Adjuntá JPG, PNG, WEBP o PDF. No se permiten archivos ejecutables ni SVG.', 400);
+  // Container/codec signatures, not filename or client MIME. AV scanning below
+  // stays mandatory when configured; these checks are not a malware scanner.
+  const header = buffer.subarray(0, 65536).toString('latin1');
+  if (buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) && header.includes('webm') && /A_(OPUS|VORBIS)/.test(header) && !/V_[A-Z0-9]+/.test(header)) return { mime: 'audio/webm', extension: 'webm' };
+  if (header.startsWith('OggS') && /OpusHead|\x01vorbis/.test(header) && !header.includes('theora')) return { mime: 'audio/ogg', extension: 'ogg' };
+  if (header.startsWith('RIFF') && header.slice(8, 12) === 'WAVE' && header.includes('fmt ') && header.includes('data')) return { mime: 'audio/wav', extension: 'wav' };
+  // MP4 metadata may be at the end of a bounded audio file.
+  if (buffer.subarray(4, 8).toString() === 'ftyp' && buffer.includes(Buffer.from('soun')) && !buffer.includes(Buffer.from('vide'))) return { mime: 'audio/mp4', extension: 'm4a' };
+  throw new AppError('Adjuntá imágenes, PDF o audio WEBM, OGG, WAV o M4A. No se permiten videos, ejecutables ni SVG.', 400);
 }
 export function describeSupportFile(file: Express.Multer.File): Omit<SupportFile, 'storageKey'> {
   const { mime } = supportFileType(file.buffer);

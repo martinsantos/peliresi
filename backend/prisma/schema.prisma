@@ -59,6 +59,7 @@ model Usuario {
   agenteSoporte               AgenteSoporte?
   ticketsSoporte              TicketSoporte[] @relation("AutorTicketSoporte")
   ticketsSoporteAsignados      TicketSoporte[] @relation("ResponsableTicketSoporte")
+  ticketsSoporteRegistrados    TicketSoporte[] @relation("RegistroTicketSoporte")
   mensajesSoporte             MensajeSoporte[]
   eventosSoporte              EventoSoporte[]
 
@@ -693,6 +694,10 @@ model TicketSoporte {
   responsableId String?
   asunto String
   categoria String @default("GENERAL")
+  tipo String?
+  prioridad String @default("NORMAL")
+  clasificadoAt DateTime?
+  registradoPorId String?
   estado String @default("ABIERTO")
   contexto Json
   clienteId String
@@ -703,12 +708,14 @@ model TicketSoporte {
   cerradoAt DateTime?
   autor Usuario @relation("AutorTicketSoporte", fields: [autorId], references: [id], onDelete: Restrict)
   responsable Usuario? @relation("ResponsableTicketSoporte", fields: [responsableId], references: [id], onDelete: SetNull)
+  registradoPor Usuario? @relation("RegistroTicketSoporte", fields: [registradoPorId], references: [id], onDelete: Restrict)
   mensajes MensajeSoporte[]
   eventos EventoSoporte[]
   @@unique([autorId, clienteId])
   @@index([autorId, updatedAt])
   @@index([estado, updatedAt])
   @@index([responsableId, estado])
+  @@index([tipo, prioridad, estado])
   @@map("tickets_soporte")
 }
 
@@ -751,6 +758,7 @@ model EventoSoporte {
   responsableAnteriorId String?
   responsableNuevoId String?
   interno Boolean @default(false)
+  detalle Json?
   version Int
   createdAt DateTime @default(now())
   ticket TicketSoporte @relation(fields: [ticketId], references: [id], onDelete: Restrict)

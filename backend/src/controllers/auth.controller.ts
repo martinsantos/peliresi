@@ -8,6 +8,7 @@ import { config } from '../config/config';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
+import { verifiedImpersonator } from '../services/impersonationIdentity.service';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -44,8 +45,8 @@ function validatePasswordStrength(password: string): string | null {
 }
 
 // Generar tokens JWT
-export const generateTokens = (userId: string, restricted = false, registrationDraft?: string) => {
-  const payload = { id: userId, ...(restricted ? { restricted: true } : {}), ...(registrationDraft ? { registrationDraft } : {}) };
+export const generateTokens = (userId: string, restricted = false, registrationDraft?: string, impersonatedBy?: string) => {
+  const payload = { id: userId, ...(restricted ? { restricted: true } : {}), ...(registrationDraft ? { registrationDraft } : {}), ...(impersonatedBy ? { impersonatedBy } : {}) };
   const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
   const accessToken = jwt.sign(payload, config.JWT_SECRET as string, options);
   const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
@@ -460,9 +461,9 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     const { refreshToken: token } = req.body;
     if (!token) throw new AppError('Refresh token es requerido', 400);
 
-    let decoded: { id: string; restricted?: boolean; registrationDraft?: string };
+    let decoded: { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
     try {
-      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string };
+      decoded = jwt.verify(token, config.JWT_SECRET as string) as typeof decoded;
     } catch {
       throw new AppError('Refresh token inválido o expirado', 401);
     }
@@ -475,11 +476,12 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
       throw new AppError('Usuario no encontrado o inactivo', 401);
     }
 
+    const impersonator = await verifiedImpersonator(decoded.impersonatedBy, user.id, decoded.restricted);
     if (decoded.restricted) {
       return res.json({ success: true, data: generateTokens(user.id, true, decoded.registrationDraft) });
     }
 
-    res.json({ success: true, data: generateTokens(user.id) });
+    res.json({ success: true, data: generateTokens(user.id, false, undefined, impersonator?.id) });
   } catch (error) {
     next(error);
   }
