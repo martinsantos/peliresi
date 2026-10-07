@@ -16,13 +16,17 @@ const results: Array<{ name: string; status: string; error?: string }> = [];
 let fatal: string | undefined;
 const tokens: Record<string, string> = {};
 type Ticket = { id: string; version: number; estado: string; mensajes: Array<{ cuerpo: string; interno: boolean; adjuntos: Array<{ id: string }> }> };
-async function call<T>(who: string | null, route: string, method = 'GET', body?: unknown, expected = 200, key?: string) {
+async function call<T>(who: string | null, route: string, method = 'GET', body?: unknown, expected = 200, key?: string, clientIp?: string) {
   const response = await fetch(base + route, { method, headers: {
     ...(who ? { Authorization: 'Bearer ' + tokens[who] } : {}),
     ...(body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
     ...(key ? { 'Idempotency-Key': key } : {}),
+    ...(clientIp ? { 'X-Forwarded-For': clientIp } : {}),
   }, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined });
-  assert.equal(response.status, expected, method + ' ' + route);
+  if (response.status !== expected) {
+    const diagnostic = await response.clone().json().catch(() => ({ message: 'Non-JSON response' })) as { message?: unknown };
+    assert.equal(response.status, expected, method + ' ' + route + ' · ' + String(diagnostic.message || '').slice(0, 180));
+  }
   const result = await response.json() as { success: boolean; data: T };
   assert.equal(result.success, expected < 400); if (expected >= 400) assert.equal(result.data, undefined);
   return result.data;
@@ -250,12 +254,16 @@ try {
     const own = await call<Ticket>('generador', '/soporte/' + id); assert.ok(own.mensajes.every(row => !row.cuerpo.includes('motivo interno')));
   });
   await check('the thirty-write account allowance survives shared NAT while still blocking the same account on its thirty-first write', async () => {
+    // The other HTTP suites share loopback and may consume the global IP
+    // allowance. This scenario gets ONE fresh synthetic NAT shared by BOTH
+    // accounts, preserving the global limiter and the per-account 30 limit.
+    const nat = '127.10.40.1';
     const password = (await db.usuario.findUniqueOrThrow({ where: { id: fixture.users.generador } })).password;
     const throttle = await db.usuario.create({ data: { email: 'qa-support-throttle@night-qa.invalid', nombre: 'QA límite soporte', rol: 'GENERADOR', activo: true, emailVerified: true, password } });
-    const signed = await call<{ tokens: { accessToken: string } }>(null, '/auth/login', 'POST', { email: throttle.email, password: 'OnlyLocal-NightQA-2026!' }); tokens.throttle = signed.tokens.accessToken;
-    for (let index = 0; index < 30; index++) await call('throttle', '/soporte', 'POST', { asunto: '' }, 400, 'throttle-key-' + index);
-    await call('throttle', '/soporte', 'POST', { asunto: '' }, 429, 'throttle-over-123');
-    await call('lector-operadores', '/soporte', 'POST', { asunto: '' }, 400, 'other-after-throttle-123');
+    const signed = await call<{ tokens: { accessToken: string } }>(null, '/auth/login', 'POST', { email: throttle.email, password: 'OnlyLocal-NightQA-2026!' }, 200, undefined, nat); tokens.throttle = signed.tokens.accessToken;
+    for (let index = 0; index < 30; index++) await call('throttle', '/soporte', 'POST', { asunto: '' }, 400, 'throttle-key-' + index, nat);
+    await call('throttle', '/soporte', 'POST', { asunto: '' }, 429, 'throttle-over-123', nat);
+    await call('lector-operadores', '/soporte', 'POST', { asunto: '' }, 400, 'other-after-throttle-123', nat);
     assert.equal(await db.ticketSoporte.count({ where: { autorId: throttle.id } }), 0);
   });
 } catch (error) { fatal = String(error); throw error; }
