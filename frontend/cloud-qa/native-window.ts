@@ -25,7 +25,10 @@ export function chromeButtonPoint(xml: string, text: string): { x: number; y: nu
   const matches = nativeNodes(xml).filter(node => node.package === 'com.android.chrome'
     && node.text === text && node.enabled === 'true' && node.clickable === 'true');
   assert.equal(matches.length, 1, 'Tap only one currently observed native Chrome button: ' + text);
-  const bounds = matches[0].bounds.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/);
+  return pointFromObservedBounds(matches[0].bounds);
+}
+function pointFromObservedBounds(observed: string): { x: number; y: number } {
+  const bounds = observed?.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/);
   assert.ok(bounds, 'Native bounds must be present, never guessed');
   const [left, top, right, bottom] = bounds.slice(1).map(Number);
   assert.ok(right > left && bottom > top, 'Never tap a zero-area or inverted native node');
@@ -41,7 +44,7 @@ export function chromeRenderedButtonPoint(xml: string, renderedText: string): { 
     && normalize(node.text || '') === label);
   assert.equal(matches.length, 1, 'Require exactly one native button with the full rendered label: ' + label);
   // Reuse the same bounds guard; do not guess a location or use substring match.
-  return chromeButtonPoint('<hierarchy><node package="com.android.chrome" text="target" enabled="true" clickable="true" bounds="' + matches[0].bounds + '"/></hierarchy>', 'target');
+  return pointFromObservedBounds(matches[0].bounds);
 }
 const PIXEL_LAUNCHER_ANR = "Pixel Launcher isn't responding";
 export function pixelLauncherAnrClosePoint(xml: string): { x: number; y: number } | null {
