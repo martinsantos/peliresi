@@ -1,11 +1,11 @@
 {
-  "productCommit": "576d895270dcf1296fb3f441f272e5fdc9076422",
-  "hash": "e761d71902b99d651231a9b4bb6a9f1451a603124249ac05f116b2d9bb553c51",
+  "productCommit": "9fdd87a8f6c85e700e4fddb70a7354297bdff4ef",
+  "hash": "b86c3b2a384d560d4f10079af2cfe072b193619691a8bd9db1657ae645695e5f",
   "trackedFiles": 925,
   "scope": "All tracked backend, frontend and scripts except the isolated cloud-qa harness",
-  "measuredUnitRun": 37691163515,
-  "measuredUnitCommit": "576d895270dcf1296fb3f441f272e5fdc9076422",
-  "approvalScope": "Unit stage and raw reports only; this run failed one rendered E2E and is NOT release approval",
+  "measuredUnitRun": 37693057353,
+  "measuredUnitCommit": "9fdd87a8f6c85e700e4fddb70a7354297bdff4ef",
+  "approvalScope": "Unit stage and raw reports only; 195 browser E2E passed but one Android input failed, so NOT release approval",
   "backend": {
     "passed": 543,
     "failed": 0,

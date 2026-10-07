@@ -550,7 +550,12 @@ try{
     const header=row.locator('button[aria-controls]').first();
     const observation=row.getByRole('textbox',{name:'Observación: '+field.etiqueta,exact:true});
     await observation.fill('QA nota Android preservada al cerrar');
-    await page.getByRole('button',{name:'Volver al control actual',exact:true}).tap();
+    // The Android visual viewport is panned while the field keyboard is open.
+    // Run121's CDP touch hit other elements although the OS screenshot showed
+    // this action. Require fresh native bounds and a real OS tap, as for Save;
+    // retain the keyboard, draft and actual collapsed-state expectations.
+    await nativeButtonTap('Volver al control actual','return-to-current-control');
+    await expect(page.getByRole('button',{name:new RegExp('^Ver los '+created.items.length+' controles$')})).toHaveAttribute('aria-expanded','false');
     await header.tap();
     await expect(header).toHaveAttribute('aria-expanded','false');
     await expect(observation).toHaveCount(0);
