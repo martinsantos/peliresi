@@ -39,7 +39,7 @@ describe('InspectionWorkspace navigation contract', () => {
     const number = within(current).getByText('2', { exact: true });
     expect(number).toHaveAttribute('aria-hidden', 'true');
     expect(current).toHaveAttribute('aria-current', 'page');
-    expect(current).toHaveClass('bg-primary-700', 'text-white', 'hover:text-white', 'focus-visible:text-white');
+    expect(current).toHaveClass('bg-primary-700', 'text-white', 'hover:text-white', 'focus-visible:text-white', 'transition-none', 'flex-[1_1_auto]');
     expect(within(nav).getByRole('link', { name: 'Expediente', exact: true })).toHaveTextContent('4');
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });

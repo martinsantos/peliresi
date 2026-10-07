@@ -275,6 +275,7 @@ export const MobileLayout: React.FC = () => {
 
   // Título según la ruta actual
   const getPageTitle = () => {
+    if (isInspectionCase) return 'Inspección';
     const path = location.pathname;
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';

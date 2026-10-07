@@ -199,7 +199,7 @@ export const MainLayout: React.FC = () => {
 
   // One current section, including detail routes; hidden role items never compete.
   const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems, { path: '/soporte', icon: LifeBuoy, label: 'Soporte' }]);
-  const currentPage = currentItem?.label || 'SITREP';
+  const currentPage = isInspectionCase ? 'Inspección' : currentItem?.label || 'SITREP';
 
   return (
     <div data-app-shell className={`h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-12' : ''}`}>

@@ -144,6 +144,7 @@ describe('MobileLayout Android shell', () => {
   it('moves inspection help into the header rather than over the save bar', () => {
     renderMobileLayout('/inspecciones/qa-expediente');
     const button = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+    expect(screen.getByRole('heading', { name: 'Inspección', exact: true })).toBeVisible();
     expect(button.closest('header')).toBe(screen.getByRole('banner'));
     expect(button.parentElement).not.toHaveClass('fixed');
     expect(screen.queryByRole('navigation', { name: /principal/i })).not.toBeInTheDocument();

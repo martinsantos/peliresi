@@ -37,6 +37,7 @@
   [data-testid='inspection-navigation'] { display: flex; }
   [data-testid='inspection-navigation'] > nav { flex: 1; padding: 0; }
   [data-testid='inspection-navigation'] > nav + nav { max-width: 50%; border-left: 1px solid #E0E0DC; }
+  [data-testid='inspection-navigation'] > nav:first-child > a { flex-direction: column; gap: 2px; }
   [data-testid='inspection-navigation'] > nav > a { min-height: 44px; padding-inline: 8px; }
 }
 
