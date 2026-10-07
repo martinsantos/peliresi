@@ -31,6 +31,18 @@ export function chromeButtonPoint(xml: string, text: string): { x: number; y: nu
   assert.ok(right > left && bottom > top, 'Never tap a zero-area or inverted native node');
   return { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) };
 }
+/** Multi-line DOM option text is serialized as one accessibility button name. */
+export function chromeRenderedButtonPoint(xml: string, renderedText: string): { x: number; y: number } {
+  const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
+  const label = normalize(renderedText);
+  assert.ok(label, 'Require the actual complete rendered option label');
+  const matches = nativeNodes(xml).filter(node => node.package === 'com.android.chrome'
+    && node.class === 'android.widget.Button' && node.enabled === 'true' && node.clickable === 'true'
+    && normalize(node.text || '') === label);
+  assert.equal(matches.length, 1, 'Require exactly one native button with the full rendered label: ' + label);
+  // Reuse the same bounds guard; do not guess a location or use substring match.
+  return chromeButtonPoint('<hierarchy><node package="com.android.chrome" text="target" enabled="true" clickable="true" bounds="' + matches[0].bounds + '"/></hierarchy>', 'target');
+}
 const PIXEL_LAUNCHER_ANR = "Pixel Launcher isn't responding";
 export function pixelLauncherAnrClosePoint(xml: string): { x: number; y: number } | null {
   const nodes = nativeNodes(xml);

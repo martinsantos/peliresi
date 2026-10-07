@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chromeButtonPoint, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
+import { chromeButtonPoint, chromeRenderedButtonPoint, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
 
 test('reads explicit OS keyboard visibility rather than inferring it from DOM focus or viewport size', () => {
   assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=true mShowRequested=true'), true);
@@ -19,6 +19,20 @@ test('uses the observed native button bounds, not fixed emulator coordinates', (
 test('rejects absent and ambiguous native targets', () => {
   assert.throws(() => chromeButtonPoint(window(''), 'No thanks'));
   assert.throws(() => chromeButtonPoint(window(node() + node()), 'No thanks'));
+});
+test('multi-line options use their complete actual native button label and observed bounds', () => {
+  const option = node('class="android.widget.Button"', '[60,280][1000,410]').replace('No thanks', '1 Domicilio declarado Establecimiento Pendiente');
+  assert.deepEqual(chromeRenderedButtonPoint(window(option), '1\nDomicilio declarado\nEstablecimiento\nPendiente'), { x: 530, y: 345 });
+  assert.throws(() => chromeRenderedButtonPoint(window(option), 'Domicilio declarado'));
+});
+test('option targeting rejects matching search inputs, ambiguous labels, other packages and invalid bounds', () => {
+  const option = node('class="android.widget.Button"').replace('No thanks', '1 Domicilio declarado Establecimiento Pendiente');
+  for (const unsafe of [option.replace('android.widget.Button', 'android.widget.EditText'), option + option,
+    option.replace('com.android.chrome', 'other.app'), option.replace('enabled="true"', 'enabled="false"'),
+    option.replace('[40,100][240,180]', '[40,100][40,100]')]) {
+    assert.throws(() => chromeRenderedButtonPoint(window(unsafe), '1 Domicilio declarado Establecimiento Pendiente'));
+  }
+  assert.throws(() => chromeRenderedButtonPoint(window(option), ''));
 });
 test('never taps disabled, other-package or zero-area nodes', () => {
   assert.throws(() => chromeButtonPoint(window(node().replace('enabled="true"', 'enabled="false"')), 'No thanks'));

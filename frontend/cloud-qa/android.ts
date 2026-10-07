@@ -1,11 +1,11 @@
-import { _android as android, type BrowserContext, type Page } from 'playwright';
+import { _android as android, type BrowserContext, type Locator, type Page } from 'playwright';
 import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
-import { chromeButtonPoint, dismissObservedChromePrompts, nativeKeyboardShown, readNativeWindow } from './native-window.ts';
+import { chromeButtonPoint, chromeRenderedButtonPoint, dismissObservedChromePrompts, nativeKeyboardShown, readNativeWindow } from './native-window.ts';
 import { DeadlineError, withinDeadline } from './deadline.ts';
 import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
@@ -84,8 +84,8 @@ const keyboardProof=async(shown:boolean,name:string)=>{
   },{timeout:10000,message:'Actual OS keyboard visibility: '+name}).toBe(shown);
   await proof(name);
 };
-const nativeButtonTap=async(name:string,evidence:string)=>{
-  const button=page.getByRole('button',{name,exact:true});
+const nativeButtonTap=async(name:string,evidence:string,target?:Locator)=>{
+  const button=target||page.getByRole('button',{name,exact:true});
   await expect(button).toBeVisible();await expect(button).toBeEnabled();
   await button.scrollIntoViewIfNeeded();
   // Keep the keyboard open. A visible DOM button can still lie behind it.
@@ -115,7 +115,7 @@ const nativeButtonTap=async(name:string,evidence:string)=>{
   assert.ok(dom.rect.width>0&&dom.rect.height>0&&dom.rect.top>=(visible?.offsetTop||0)
     &&dom.rect.bottom<=(visible?visible.offsetTop+visible.height:dom.viewport.height),
     'A native tap requires the entire button inside the current visible viewport');
-  const point=chromeButtonPoint(xml,name);
+  const point=target?chromeRenderedButtonPoint(xml,await button.innerText()):chromeButtonPoint(xml,name);
   await writeFile(path.join(output,evidence+'-tap-point.json'),JSON.stringify(point,null,2));
   // run14 had a visible enabled footer but CDP touch produced no creation
   // request. Exercise the actual OS input using freshly observed bounds;
@@ -580,7 +580,7 @@ try{
     await keyboardProof(true,'declared-explicit-search-keyboard');
     const label=(await index.getByRole('button').first().locator('span.block.text-sm').textContent())!;
     await declaredSearch.fill(label);
-    await index.getByRole('button').first().tap();
+    await nativeButtonTap(label,'declared-option-with-keyboard',index.getByRole('button').first());
     await expect(page.getByRole('textbox',{name:'Valor verificado: '+label,exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Ocultar detalle',exact:true}).tap();
     await expect(page.getByRole('textbox',{name:'Valor verificado: '+label,exact:true})).toHaveCount(0);
