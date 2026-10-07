@@ -1,13 +1,23 @@
 import { expect, test } from '@playwright/test';
-import { createSpontaneousInspection, login, prefix, readableFixedAction, readablePageHeading } from './helpers';
+import { login, prefix, readableFixedAction, readablePageHeading, readableWholeWords } from './helpers';
 
 test('inspection identity, numbered sections and contextual help never displace or cover field work', async ({ page }, info) => {
   test.setTimeout(120000);
+  page.setDefaultTimeout(15000);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await login(page, info, 'inspector');
-  const record = await createSpontaneousInspection(page, info);
+  await page.goto(`${prefix(info)}/inspecciones`);
+  await page.getByRole('button', { name: 'Nueva inspección', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nueva inspección', exact: true });
+  await dialog.getByRole('combobox', { name: 'Tipo de inspección', exact: true }).selectOption('GENERADOR');
+  await dialog.getByRole('combobox', { name: 'Actor inspeccionado', exact: true }).selectOption({ label: 'QA Generador 1' });
+  const created = page.waitForResponse(response => response.url().endsWith('/api/inspecciones') && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Crear expediente', exact: true }).click();
+  const response = await created; expect(response.status()).toBe(201);
+  const record = (await response.json()).data as { id: string; numero: string; tipoActor: string; items: Array<{ id: string; etiqueta: string }> };
+  expect(record.tipoActor).toBe('GENERADOR');
   const nav = page.getByRole('navigation', { name: 'Secciones del expediente', exact: true });
   await nav.getByRole('link', { name: 'Visita', exact: true }).click();
   const start = page.waitForResponse(response => response.url().endsWith(`/api/inspecciones/${record.id}/estado`) && response.request().method() === 'POST');
@@ -28,7 +38,7 @@ test('inspection identity, numbered sections and contextual help never displace 
     const title = (await heading.boundingBox())!;
     const workspace = (await page.getByTestId('inspection-workspace').boundingBox())!;
     expect(Math.abs(title.x - workspace.x), 'The back arrow must not indent the dossier title').toBeLessThanOrEqual(1);
-    expect(title.width).toBeGreaterThan(150);
+    await readableWholeWords(heading);
     expect((await page.getByTestId('inspection-scroll-region').boundingBox())!.height, 'Retain useful field space, including landscape').toBeGreaterThan(100);
     for (const [index, label] of ['Visita', 'Controles', 'Registro', 'Expediente'].entries()) {
       const section = nav.getByRole('link', { name: label, exact: true });
@@ -36,6 +46,13 @@ test('inspection identity, numbered sections and contextual help never displace 
       await readableFixedAction(section, nav);
     }
     await expect(nav.getByRole('link', { name: 'Controles', exact: true })).toHaveAttribute('aria-current', 'page');
+    const activeSection = nav.getByRole('link', { name: 'Controles', exact: true });
+    await activeSection.hover();
+    await expect(activeSection).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await activeSection.focus();
+    await expect(activeSection).toHaveCSS('color', 'rgb(255, 255, 255)');
+    const parts = page.getByRole('navigation', { name: 'Apartados de Controles', exact: true });
+    for (const part of await parts.getByRole('link').all()) await readableFixedAction(part, parts);
     const help = page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
     await expect(help).toHaveCount(1);
     await readableFixedAction(help, page.getByRole('banner'));

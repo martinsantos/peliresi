@@ -32,6 +32,11 @@ on:
         type: boolean
         required: true
         default: false
+      inspection_only:
+        description: Inspection hierarchy, selection and collapse journeys only; never packages a complete candidate
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -212,10 +217,16 @@ jobs:
           QA_CONTEXT_ONLY: ${{ inputs.context_only }}
           QA_ALERT_ONLY: ${{ inputs.alert_only }}
           QA_SUPPORT_ONLY: ${{ inputs.support_only }}
+          QA_INSPECTION_ONLY: ${{ inputs.inspection_only }}
         run: |
           cd frontend
           test "$QA_ALERT_ONLY" != 'true' || test "$QA_CONTEXT_ONLY" != 'true'
-          if test "$QA_SUPPORT_ONLY" = 'true'; then
+          if test "$QA_INSPECTION_ONLY" = 'true'; then
+            test "$QA_SUPPORT_ONLY" != 'true'
+            test "$QA_ALERT_ONLY" != 'true'
+            test "$QA_CONTEXT_ONLY" != 'true'
+            npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/inspection-hierarchy.spec.ts cloud-qa/e2e/selection-collapse.spec.ts
+          elif test "$QA_SUPPORT_ONLY" = 'true'; then
             test "$QA_ALERT_ONLY" != 'true'
             test "$QA_CONTEXT_ONLY" != 'true'
             npx --no-install playwright test --config cloud-qa/playwright.config.ts cloud-qa/e2e/support.spec.ts
@@ -287,10 +298,10 @@ jobs:
           disable-animations: true
           script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
       - name: Package the exact tested backend, web and app bytes only after every gate passes
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only
+        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
         run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts package
       - name: Preserve exact tested frontend builds, never dependencies or backend env
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only
+        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-frontend-${{ github.run_id }}-${{ github.run_attempt }}
@@ -300,7 +311,7 @@ jobs:
           retention-days: 3
           if-no-files-found: error
       - name: Preserve exact tested backend bytes, without env, uploads or dependencies
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only
+        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-backend-${{ github.run_id }}-${{ github.run_attempt }}
