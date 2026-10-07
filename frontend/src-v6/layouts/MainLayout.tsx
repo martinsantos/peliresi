@@ -470,10 +470,11 @@ export const MainLayout: React.FC = () => {
             {/* Global search trigger */}
             <button
               onClick={() => setSearchOpen(true)}
-              className="hidden md:flex items-center bg-neutral-100 hover:bg-neutral-200 rounded-xl px-4 py-2 gap-2 transition-colors w-52"
+              aria-label="Buscar en SITREP"
+              className="hidden h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-neutral-100 px-3 transition-colors hover:bg-neutral-200 md:flex lg:w-52 lg:justify-start lg:px-4"
             >
               <Search size={18} className="text-neutral-400 shrink-0" />
-              <span className="text-sm text-neutral-400 flex-1 text-left">Buscar...</span>
+              <span className="hidden flex-1 text-left text-sm text-neutral-400 lg:block">Buscar...</span>
               <kbd className="hidden lg:flex items-center text-[10px] text-neutral-400 bg-white rounded px-1.5 py-0.5 border border-neutral-200 font-mono">
                 ⌘K
               </kbd>

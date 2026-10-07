@@ -7,6 +7,7 @@ import { supportSessionMatches } from '../utils/supportSession';
 import { captureSupportScreen } from '../services/supportCapture';
 import type { SupportCreate } from '../types/support';
 import { SupportReportDialog } from './SupportReportDialog';
+import { toast } from './ui/Toast';
 
 export function SupportBubble({ mobile = false, aboveTrip = false, hidden = false, inline = false }: { mobile?: boolean; aboveTrip?: boolean; hidden?: boolean; inline?: boolean }) {
   const { currentUser } = useAuth();
@@ -53,13 +54,13 @@ function Bubble({ owner, mobile, aboveTrip, hidden, inline }: { owner: string; m
   const bottom = mobile ? `calc(${aboveTrip ? 148 : 88}px + env(safe-area-inset-bottom, 0px))` : '24px';
   return <>
     {!hidden && !keyboard && <div data-support-ui className={inline ? 'relative flex shrink-0 items-center' : 'fixed right-4 z-[45] flex flex-col items-end gap-2'} style={inline ? undefined : { bottom }} hidden={open && !inline}>
-      {sent && <p role="status" className={inline ? 'absolute right-0 top-full z-50 mt-2 w-60 rounded-lg border border-primary-200 bg-white p-3 text-sm text-primary-900 shadow-sm' : 'max-w-[240px] rounded-lg border border-primary-200 bg-white p-3 text-sm text-primary-900 shadow-sm'}>Reporte enviado a soporte. Podés continuar.</p>}
+      {sent && !inline && <p role="status" className="max-w-[240px] rounded-lg border border-primary-200 bg-white p-3 text-sm text-primary-900 shadow-sm">Reporte enviado a soporte. Podés continuar.</p>}
       <button type="button" title="Ayuda y soporte técnico" aria-label="Ayuda y soporte técnico" aria-haspopup="dialog" aria-busy={capturing || undefined} disabled={capturing || open}
         onClick={() => void report()} className={`flex items-center justify-center gap-2 rounded-full border-2 border-white bg-primary-700 text-white transition-colors hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:opacity-80 ${inline ? 'h-11 w-11 p-0' : mobile ? 'h-12 w-12 p-0 shadow-lg' : 'min-h-12 min-w-12 px-3 shadow-lg'}`}>
         <HelpCircle size={inline ? 20 : 24} aria-hidden="true" />{!mobile && !inline && <span className="text-sm font-semibold">{capturing ? 'Capturando…' : 'Ayuda'}</span>}
       </button>
     </div>}
     <SupportReportDialog open={open} onClose={() => { setOpen(false); setScreenshot(undefined); }}
-      onSubmitted={() => setSent(true)} screenshot={screenshot} captureError={captureError} context={context} returnToTask />
+      onSubmitted={() => { if (inline) toast.success('Reporte enviado a soporte'); else setSent(true); }} screenshot={screenshot} captureError={captureError} context={context} returnToTask />
   </>;
 }

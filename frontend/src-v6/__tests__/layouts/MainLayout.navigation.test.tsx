@@ -21,6 +21,7 @@ describe('Sidebar: one visible current destination',()=>{
     show('/inspecciones/qa-expediente');
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true})).toBeVisible();
     expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Inspección',exact:true})).toBeVisible();
+    expect(screen.getByRole('button',{name:'Buscar en SITREP',exact:true})).toHaveClass('w-11','lg:w-52');
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).closest('header')).toBe(screen.getByRole('banner'));
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).parentElement).not.toHaveClass('fixed');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

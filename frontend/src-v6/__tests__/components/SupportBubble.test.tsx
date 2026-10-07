@@ -10,6 +10,7 @@ vi.mock('../../utils/supportDraft', () => ({ readSupportDraft: () => mocks.pendi
 vi.mock('../../components/SupportReportDialog', () => ({ SupportReportDialog: ({ open, screenshot, captureError, returnToTask, onClose, onSubmitted }: { open: boolean; screenshot?: File; captureError?: string; returnToTask: boolean; onClose: () => void; onSubmitted: () => void }) =>
   open ? <div role="dialog"><span>{screenshot?.name}</span><span>{captureError}</span><span>{String(returnToTask)}</span><button onClick={onClose}>Cerrar reporte</button><button onClick={() => { onClose(); onSubmitted(); }}>ACK real simulado</button></div> : null }));
 import { SupportBubble } from '../../components/SupportBubble';
+import { ToastContainer } from '../../components/ui/Toast';
 describe('help bubble opens from the current task without automatic delivery', () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.user.id = 'owner'; mocks.pending = null; mocks.impersonation = null; mocks.matches.mockReturnValue(true); mocks.capture.mockResolvedValue(new File(['jpeg'], 'pantalla.jpg')); });
   it('captures only after a deliberate click, prevents double clicks and opens the reviewed report', async () => {
@@ -50,7 +51,7 @@ describe('help bubble opens from the current task without automatic delivery', (
     view.rerender(<SupportBubble mobile hidden />); expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico' })).not.toBeInTheDocument();
   });
   it('can live in the inspection header without floating over save controls', async () => {
-    render(<SupportBubble mobile inline />);
+    render(<><SupportBubble mobile inline /><ToastContainer /></>);
     const button = screen.getByRole('button', { name: 'Ayuda y soporte técnico' });
     expect(button).toHaveClass('h-11', 'w-11');
     expect(button.parentElement).not.toHaveClass('fixed');
@@ -58,5 +59,10 @@ describe('help bubble opens from the current task without automatic delivery', (
     fireEvent.click(button);
     await screen.findByRole('dialog');
     expect(mocks.capture).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'ACK real simulado' }));
+    expect(button.parentElement?.querySelector('[role="status"]')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Avisos del sistema' })).toHaveTextContent('Reporte enviado a soporte');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar notificación' }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
