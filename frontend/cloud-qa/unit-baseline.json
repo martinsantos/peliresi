@@ -1,17 +1,18 @@
 {
-  "productCommit": "96e7bfd6ec80d6a450a7646749af7fb9b978dd71",
-  "hash": "7da792a4c116ea44038c592dfcfb63fabb968d0546ee0a89686769716dd66b87",
-  "trackedFiles": 795,
+  "productCommit": "576d895270dcf1296fb3f441f272e5fdc9076422",
+  "hash": "e761d71902b99d651231a9b4bb6a9f1451a603124249ac05f116b2d9bb553c51",
+  "trackedFiles": 925,
   "scope": "All tracked backend, frontend and scripts except the isolated cloud-qa harness",
-  "measuredUnitRun": 36999929921,
-  "measuredUnitCommit": "2439778bc2d82b03809770406128db640a5ce8a6",
+  "measuredUnitRun": 37691163515,
+  "measuredUnitCommit": "576d895270dcf1296fb3f441f272e5fdc9076422",
+  "approvalScope": "Unit stage and raw reports only; this run failed one rendered E2E and is NOT release approval",
   "backend": {
-    "passed": 353,
+    "passed": 543,
     "failed": 0,
     "pending": 0
   },
   "frontend": {
-    "passed": 617,
+    "passed": 1180,
     "failed": 0,
     "pending": 0
   }

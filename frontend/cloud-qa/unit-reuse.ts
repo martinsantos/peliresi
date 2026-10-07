@@ -17,4 +17,4 @@ writeFileSync(path.join(process.env.QA_ARTIFACTS!, 'unit-reuse.json'), JSON.stri
   ...baseline, currentQACommit: process.env.GITHUB_SHA, actualHash,
   repeatedThisRun: false, reason: 'Only the cloud QA harness changed; all tracked product and unit files are byte-identical',
 }, null, 2));
-console.log('Reusing measured 353 backend and 617 frontend unit gates for byte-identical product sources; not counting repeats as new tests');
+console.log(`Reusing measured ${baseline.backend.passed} backend and ${baseline.frontend.passed} frontend unit gates for byte-identical product sources; not counting repeats as new tests or approving the prior E2E`);

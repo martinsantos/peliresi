@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login, prefix, readableFixedAction, readablePageHeading, readableWholeWords } from './helpers';
+import { login, nonObstructingNotices, prefix, readableFixedAction, readablePageHeading, readableWholeWords } from './helpers';
 
 test('inspection identity, numbered sections and contextual help never displace or cover field work', async ({ page }, info) => {
   test.setTimeout(120000);
@@ -75,6 +75,24 @@ test('inspection identity, numbered sections and contextual help never displace 
   await report.getByRole('button', { name: 'Continuar luego', exact: true }).click();
   await expect(report).toHaveCount(0);
   await expect(note).toHaveValue('QA comentario protegido durante la revisión de jerarquía móvil');
+  await page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true }).click();
+  await expect(report).toBeVisible();
+  // Actual acknowledged text-only delivery must return to the untouched field
+  // work. No modal fake, mandatory screenshot or permanent header overlay.
+  const removeCapture = report.getByRole('button', { name: 'Quitar captura', exact: true });
+  if (await removeCapture.count()) await removeCapture.click();
+  await report.getByLabel('Asunto', { exact: true }).fill('QA ayuda durante visita ' + info.project.name);
+  await report.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA prueba sintética de confirmación de soporte sin tapar el expediente ni perder la observación de campo.');
+  const submitted = page.waitForResponse(response => response.url().endsWith('/api/soporte') && response.request().method() === 'POST');
+  await report.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
+  expect((await submitted).status()).toBe(201);
+  await expect(report).toHaveCount(0);
+  await expect(note).toHaveValue('QA comentario protegido durante la revisión de jerarquía móvil');
+  await page.screenshot({ path: info.outputPath('inspection-support-acknowledged.png'), animations: 'disabled' });
+  await expect(page.getByRole('banner').getByRole('status'), 'Do not paint a permanent confirmation over the dossier identity').toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Avisos del sistema', exact: true }).getByRole('status')).toContainText('Reporte enviado a soporte');
+  await nonObstructingNotices(page);
+  await page.getByRole('region', { name: 'Avisos del sistema', exact: true }).getByRole('button', { name: 'Cerrar notificación' }).click();
   const saved = page.waitForResponse(response => response.url().endsWith(`/api/inspecciones/${record.id}/borrador`) && response.request().method() === 'PATCH');
   await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
   expect((await saved).status()).toBe(200);
