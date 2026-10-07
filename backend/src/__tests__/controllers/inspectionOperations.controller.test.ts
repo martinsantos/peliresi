@@ -90,6 +90,22 @@ describe('creation independent of registered actors', () => {
 });
 
 describe('shared operational scope and organization', () => {
+  it('excludes drafts and terminal inspections from the default operational list and all its totals', async () => {
+    const next = vi.fn();
+    await operacionesInspecciones({ user, path: '/operaciones', query: {} } as any, response() as any, next);
+    expect(next).not.toHaveBeenCalled();
+    const where = db.inspeccion.findMany.mock.calls[0][0].where;
+    expect(where.AND).toContainEqual({ estado: { notIn: ['BORRADOR', 'CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA'] } });
+    expect(db.inspeccion.count.mock.calls[0][0].where).toEqual(where);
+    expect(db.inspeccion.groupBy.mock.calls[0][0].where).toEqual(where);
+    for (const call of db.inspeccion.count.mock.calls.slice(1)) expect(call[0].where.AND[0]).toEqual(where);
+  });
+  it('keeps drafts queryable when explicitly requesting all states, without changing permissions', async () => {
+    const next = vi.fn();
+    await operacionesInspecciones({ user: { ...user, rol: 'ADMIN_GENERADOR' }, path: '/operaciones', query: { activas: 'false', estado: 'BORRADOR' } } as any, response() as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(db.inspeccion.findMany.mock.calls[0][0].where.AND).toEqual([{ tipoActor: 'GENERADOR' }, { estado: 'BORRADOR' }]);
+  });
   it('uses assignment scope and scheduled date rather than createdAt', async () => {
     const next = vi.fn(); const res = response();
     await operacionesInspecciones({ user: { ...user, rol: 'GENERADOR' }, path: '/operaciones', query: { desde: '2026-09-24', hasta: '2026-09-24', inspectorId: 'other' } } as any, res as any, next);

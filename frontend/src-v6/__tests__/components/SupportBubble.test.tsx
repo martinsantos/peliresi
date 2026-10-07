@@ -49,4 +49,14 @@ describe('help bubble opens from the current task without automatic delivery', (
     expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' }).parentElement).toHaveStyle({ bottom: 'calc(148px + env(safe-area-inset-bottom, 0px))' });
     view.rerender(<SupportBubble mobile hidden />); expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico' })).not.toBeInTheDocument();
   });
+  it('can live in the inspection header without floating over save controls', async () => {
+    render(<SupportBubble mobile inline />);
+    const button = screen.getByRole('button', { name: 'Ayuda y soporte técnico' });
+    expect(button).toHaveClass('h-11', 'w-11');
+    expect(button.parentElement).not.toHaveClass('fixed');
+    expect(button.parentElement?.style.bottom).toBe('');
+    fireEvent.click(button);
+    await screen.findByRole('dialog');
+    expect(mocks.capture).toHaveBeenCalledOnce();
+  });
 });

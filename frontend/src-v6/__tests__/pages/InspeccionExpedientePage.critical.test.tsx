@@ -153,6 +153,16 @@ describe('InspeccionExpedientePage critical review UX', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
+  it('keeps the dossier identity first and back navigation in a separate action row', async () => {
+    renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#checklist');
+    const heading = await screen.findByRole('heading', { name: 'I-2026-000001', exact: true });
+    const header = heading.closest('header')!;
+    expect(header.firstElementChild).toContainElement(heading);
+    expect(header.firstElementChild).not.toContainElement(screen.getByRole('button', { name: 'Volver al listado', exact: true }));
+    expect(screen.getByRole('button', { name: 'Volver al listado', exact: true })).toHaveTextContent('Listado');
+    expect(header.firstElementChild).toContainElement(screen.getByRole('link', { name: 'Abrir actor inspeccionado: Planta Auditada SA', exact: true }));
+  });
+
   it('prioritizes the editable technical report in its own step during review', async () => {
     renderPage(inspectionFixture());
 

@@ -32,6 +32,18 @@ describe('InspectionWorkspace navigation contract', () => {
     expect(screen.getByRole('link', { name: 'Controles', exact: true })).toHaveAttribute('aria-current', 'page');
   });
 
+  it('numbers section groups without claiming completion or changing accessible destinations', () => {
+    setup('#checklist');
+    const nav = screen.getByRole('navigation', { name: 'Secciones del expediente' });
+    const current = within(nav).getByRole('link', { name: 'Controles', exact: true });
+    const number = within(current).getByText('2', { exact: true });
+    expect(number).toHaveAttribute('aria-hidden', 'true');
+    expect(current).toHaveAttribute('aria-current', 'page');
+    expect(current).toHaveClass('bg-primary-700', 'text-white');
+    expect(within(nav).getByRole('link', { name: 'Expediente', exact: true })).toHaveTextContent('4');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
   it('preserves a child note when leaving and returning, and never offers generic save for it', () => {
     setup('#trazabilidad');
     const note = screen.getByRole('textbox', { name: 'Nota sin enviar' });
