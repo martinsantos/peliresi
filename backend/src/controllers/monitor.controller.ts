@@ -8,11 +8,9 @@
  */
 
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/prisma';
 import type { AuthRequest } from '../middlewares/auth.middleware';
 import { canAccessManifiesto } from '../utils/roleFilter';
-
-const prisma = new PrismaClient();
 
 // ─── Timeline (PLAYBACK mode) ─────────────────────────────────────────────────
 

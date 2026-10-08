@@ -1,6 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const db = vi.hoisted(() => ({ events: vi.fn(), gps: vi.fn(), manifests: vi.fn(), actors: vi.fn() }));
+const independentPools = vi.hoisted(() => [] as string[]);
+vi.mock('../../lib/prisma', () => ({ default: {
+  eventoManifiesto: { findMany: db.events }, manifiesto: { findMany: db.manifests },
+  generador: { findMany: db.actors }, transportista: { findMany: db.actors }, operador: { findMany: db.actors },
+  $queryRawUnsafe: db.gps,
+} }));
 vi.mock('@prisma/client', () => ({ PrismaClient: class {
+  constructor() { independentPools.push('new monitor pool'); }
   eventoManifiesto = { findMany: db.events };
   manifiesto = { findMany: db.manifests };
   generador = { findMany: db.actors }; transportista = { findMany: db.actors }; operador = { findMany: db.actors };
@@ -8,6 +15,9 @@ vi.mock('@prisma/client', () => ({ PrismaClient: class {
 } }));
 import { getActiveDays, getTimeline, getForecast } from '../../controllers/monitor.controller';
 beforeEach(() => { vi.clearAllMocks(); for (const f of Object.values(db)) f.mockResolvedValue([]); });
+it('Monitor reuses the shared bounded client instead of opening an independent per-worker pool', () => {
+  expect(independentPools).toEqual([]);
+});
 it.each([
   [{rol:'TRANSPORTISTA',transportista:{id:'owner'}},true],
   [{rol:'TRANSPORTISTA',transportista:{id:'other'}},false],

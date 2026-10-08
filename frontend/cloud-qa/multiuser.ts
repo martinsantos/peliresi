@@ -186,7 +186,11 @@ server { listen 127.0.0.1:3038; location / { proxy_pass http://127.0.0.1:3037; p
             await call(user, '/inspecciones/' + user.inspection + '/borrador', 'PATCH', { version: current.version, items: [], comparaciones: [], observaciones: 'QA persistido ' + phase.sessions + '/' + tick });
           }
           if (user.group === 4 && tick % 3 === 0) await call(user, '/centro-control/actividad?capas=transito,inspecciones');
-          if (user.group === 4 && tick % 6 === 0) await call(user, '/reportes/manifiestos?limit=10');
+          if (user.group === 4 && tick % 6 === 0) {
+            await call(user, '/reportes/manifiestos?limit=10');
+            const monitor = await call(user, '/centro-control/monitor-live');
+            assert.ok(monitor.enTransito.some((trip: { manifiestoId: string }) => trip.manifiestoId === users[10].manifest));
+          }
           if (user.group === 2 && tick % 6 === 0) await call(user, '/pdf/manifiesto/' + user.manifest);
           if (tick > 0 && tick % 30 === 0) {
             const renewed = await call(null, '/auth/refresh-token', 'POST', { refreshToken: user.refresh });
