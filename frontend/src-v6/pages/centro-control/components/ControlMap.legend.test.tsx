@@ -15,18 +15,29 @@ vi.mock('react-leaflet', () => ({
   useMap: () => ({ on: vi.fn(), off: vi.fn(), flyTo: vi.fn(), setView: vi.fn(), flyToBounds: vi.fn() }),
 }));
 
-function renderMap(inspection?: boolean, cc: React.ComponentProps<typeof ControlMap>['cc'] = null) {
+function renderMap(inspection?: boolean, cc: React.ComponentProps<typeof ControlMap>['cc'] = null, overrides: Partial<React.ComponentProps<typeof ControlMap>> = {}) {
   const props: React.ComponentProps<typeof ControlMap> = {
     cc, layers: { generadores: true, transportistas: true, operadores: true, transito: true, inspecciones: inspection }, onToggleLayer: vi.fn(),
     mapZoom: 10, onZoomChange: vi.fn(), enTransitoForMap: [], selectedTripId: null,
     onSelectTrip: vi.fn(), selectedRealizadoId: null, tripPanel: 'activos', inspections: [],
     selectedInspectionId: null, onSelectInspection: vi.fn(), viajesRealizados: [],
     activeTripFlyPoints: [], panelBoundsPoints: [], realizadoFlyPoints: [], mapColRef: React.createRef(),
+    ...overrides,
   };
   return render(<MemoryRouter><ControlMap {...props} /></MemoryRouter>);
 }
 
 describe('Control map visual identity across desktop and mobile', () => {
+  it('retains the selected trip data but hides all its map symbols when the transit layer is off', () => {
+    renderMap(false, null, {
+      layers: { generadores: true, transportistas: true, operadores: true, transito: false },
+      selectedTripId: 'qa-hidden',
+      enTransitoForMap: [{ manifiestoId: 'qa-hidden', numero: 'QA', origen: 'QA origen', destino: 'QA destino', transportista: 'QA transporte', origenLatLng: [-32.8, -68.8], destinoLatLng: [-32.9, -68.9], ultimaPosicion: { latitud: -32.85, longitud: -68.85, velocidad: null, direccion: null, timestamp: '2026-10-07T12:00:00Z' }, ruta: [] }],
+    });
+    expect(screen.getByRole('button', { name: 'En Tránsito', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByTestId('marker')).toBeNull();
+    expect(screen.getByText('1 en tránsito')).toBeVisible();
+  });
   it('uses the same explicitly approximate carrier reference as Reportes', () => {
     const cc = { generadores: [], operadores: [], transportistas: [{ id: 'qa-ref', razonSocial: 'Transporte de referencia', cuit: 'synthetic', latitud: null, longitud: null, domicilio: 'Ruta, Maipú', vehiculosActivos: 0, enviosEnTransito: 0 }] } as unknown as React.ComponentProps<typeof ControlMap>['cc'];
     renderMap(false, cc);

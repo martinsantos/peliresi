@@ -11,7 +11,7 @@
  * Step UI is delegated to components in ./inscripcion/steps/.
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Send, Check,
@@ -88,6 +88,15 @@ const InscripcionWizardPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
+  const activeStepRef = useRef<HTMLButtonElement>(null);
+
+  // A committed navigation starts at its heading, not at the previous page's
+  // footer. Typing, validation errors and asynchronous requirements do not move
+  // the viewport. Keep the active step visible within its own horizontal rail.
+  useLayoutEffect(() => {
+    activeStepRef.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [tipo, phase, step, submitSuccess]);
 
   // TEF ref for snapshotting values
   const tefRef = useRef<StepTEFHandle>(null);
@@ -447,48 +456,47 @@ const InscripcionWizardPage: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 px-3 py-5 sm:px-4 sm:py-8">
       <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6" data-testid="registration-wizard">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <button type="button" onClick={() => navigate(-1)} aria-label="Volver a la pantalla anterior" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white border border-neutral-200 hover:bg-neutral-50 transition-colors">
-            <ArrowLeft size={18} className="text-neutral-600" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
+        <header className="space-y-3" data-testid="registration-identity">
+          <h2 className="text-xl font-bold text-neutral-900 sm:text-2xl">
+            Inscripción como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
+          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <div aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
               {isGenerador
-                ? <Factory size={22} className="text-purple-600" />
-                : isOperador ? <FlaskConical size={22} className="text-blue-600" />
-                : <Truck size={22} className="text-orange-600" />
+                ? <Factory size={18} className="text-purple-600" />
+                : isOperador ? <FlaskConical size={18} className="text-blue-600" />
+                : <Truck size={18} className="text-orange-600" />
               }
+              </div>
+              <p className="text-sm leading-5 text-neutral-600">Paso {step} de {totalSteps} · {steps[step - 1]?.label}</p>
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-neutral-900">
-                Inscripción como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
-              </h2>
-              <p className="text-xs text-neutral-500">Paso {step} de {totalSteps} · {steps[step - 1]?.label}</p>
-            </div>
+            <button type="button" onClick={() => navigate(-1)} aria-label="Volver a la pantalla anterior" className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+              <ArrowLeft size={16} aria-hidden="true" /> Volver
+            </button>
           </div>
-        </div>
+        </header>
 
         {/* Stepper */}
-        <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm [scrollbar-width:thin] sm:p-4" aria-label="Etapas de la inscripción" data-testid="registration-stepper">
+        <nav className="overflow-x-auto rounded-xl border border-neutral-200 bg-white p-3 [scrollbar-width:thin] sm:p-4" aria-label="Etapas de la inscripción" data-testid="registration-stepper">
           <div className="flex min-w-max items-start justify-center">
             {steps.map((s, i) => {
-              const Icon = s.icon;
               const isActive = step === s.id;
               const isDone = step > s.id;
               const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
               return (
                 <React.Fragment key={s.id}>
-                  <button type="button" onClick={() => void goStep(s.id)} disabled={saving || submitting} aria-current={isActive ? 'step' : undefined} aria-label={`Paso ${s.id} de ${totalSteps}: ${s.label}`} className={`group flex min-h-11 w-14 shrink-0 flex-col items-center justify-start gap-1.5 rounded-lg px-1 transition-all sm:w-[76px] lg:w-[84px] ${isActive ? 'scale-[1.03]' : ''}`}>
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                  <button ref={isActive ? activeStepRef : undefined} type="button" onClick={() => void goStep(s.id)} disabled={saving || submitting} aria-current={isActive ? 'step' : undefined} aria-label={`Paso ${s.id} de ${totalSteps}: ${s.label}`} className="group flex min-h-11 w-[112px] shrink-0 flex-col items-center justify-start gap-1.5 rounded-lg px-1 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700">
+                    <div aria-hidden="true" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
                       hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
-                      isActive ? 'bg-[#0D8A4F] text-white shadow-lg shadow-[#0D8A4F]/20' :
-                      isDone ? 'bg-[#0D8A4F]/10 text-[#0D8A4F]' :
-                      'bg-neutral-100 text-neutral-400 group-hover:bg-neutral-200'
+                      isActive ? 'bg-primary-700 text-white' :
+                      isDone ? 'bg-primary-50 text-primary-800' :
+                      'bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200'
                     }`}>
-                      {hasErr ? <AlertCircle size={16} /> : isDone ? <Check size={16} /> : <Icon size={16} />}
+                      {hasErr ? <AlertCircle size={16} /> : s.id}
                     </div>
-                    <span className={`hidden max-w-full text-center text-[10px] font-medium leading-tight sm:block ${
-                      hasErr ? 'text-error-600' : isActive ? 'text-[#0D8A4F]' : isDone ? 'text-[#0D8A4F]' : 'text-neutral-400'
+                    <span className={`block max-w-full text-center text-xs font-medium leading-tight ${
+                      hasErr ? 'text-error-700' : isActive ? 'text-primary-800' : isDone ? 'text-primary-700' : 'text-neutral-600'
                     }`}>{s.label}</span>
                   </button>
                   {i < steps.length - 1 && (
@@ -498,7 +506,7 @@ const InscripcionWizardPage: React.FC = () => {
               );
             })}
           </div>
-        </div>
+        </nav>
 
         {/* Step Content */}
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">

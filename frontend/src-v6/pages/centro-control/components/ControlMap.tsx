@@ -285,7 +285,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               ))}
 
               {/* Selected active trip: origin/destination markers */}
-              {tripPanel === 'activos' && selectedTripId && (() => {
+              {layers.transito && tripPanel === 'activos' && selectedTripId && (() => {
                 const trip = enTransitoForMap.find(m => m.manifiestoId === selectedTripId);
                 if (!trip) return null;
                 return (

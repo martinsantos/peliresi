@@ -60,13 +60,23 @@ export const CentroControlPage: React.FC = () => {
   const inspections = useInspectionOperations({ limit: 100 });
   const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(null);
   const selectInspection = (id: string) => { panelInitialized.current = true; setSelectedInspectionId(id); setTripPanel('inspecciones'); setLayers((previous) => ({ ...previous, inspecciones: true })); };
+  const selectTrip = (id: string | null) => {
+    panelInitialized.current = true;
+    setSelectedTripId(id);
+    if (id) {
+      setTripPanel('activos');
+      setLayers(previous => ({ ...previous, transito: true }));
+    }
+  };
 
   // ── API Hooks ──
   const { refetch: refetchStats } = useDashboardStats();
   const { data: ccData, refetch: refetchCC } = useCentroControl({
     fechaDesde,
     fechaHasta,
-    capas: Object.entries(layers).filter(([k, v]) => v && k !== 'inspecciones').map(([k]) => k),
+    // These rows also supply the agenda and statistics. Map visibility is a
+    // local presentation choice, not an operational-data filter or new fetch.
+    capas: ['generadores', 'transportistas', 'operadores', 'transito'],
   });
   // Only fetch alertas for ADMIN — TRANSPORTISTA gets 403
   const { data: alertasData } = useAlertas({ limit: 10 }, isAdmin);
@@ -262,7 +272,7 @@ export const CentroControlPage: React.FC = () => {
           onZoomChange={setMapZoom}
           enTransitoForMap={enTransitoForMap}
           selectedTripId={selectedTripId}
-          onSelectTrip={setSelectedTripId}
+          onSelectTrip={selectTrip}
           selectedRealizadoId={selectedRealizadoId}
           tripPanel={tripPanel}
           viajesRealizados={viajesRealizados}
@@ -283,7 +293,7 @@ export const CentroControlPage: React.FC = () => {
           tripPanel={tripPanel}
           onTripPanelChange={handleTripPanelChange}
           selectedTripId={selectedTripId}
-          onSelectTrip={setSelectedTripId}
+          onSelectTrip={selectTrip}
           selectedRealizadoId={selectedRealizadoId}
           onSelectRealizado={setSelectedRealizadoId}
           viajesRef={viajesRef}
