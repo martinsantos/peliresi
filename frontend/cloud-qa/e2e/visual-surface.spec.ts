@@ -137,6 +137,13 @@ test('visual inventory: public entry, recovery and explicit error states', async
       await expect(page).toHaveURL(/\/recuperar$/);
       await expect(page.getByRole('heading', { name: 'Recuperar contraseña' }).filter({ visible: true })).toBeVisible();
       await capture(page, info, surface, false);
+    } else if (surface.name === 'not-found' && info.project.name === 'app') {
+      // AuthGate redirects anonymous private/unknown app URLs to login. Wait
+      // for that destination before measuring, not the redirect's empty frame.
+      await page.goto(prefix(info) + surface.route);
+      await expect(page).toHaveURL(/\/app\/login$/);
+      await expect(page.getByRole('button', { name: 'Ingresar', exact: true })).toBeVisible();
+      await capture(page, info, { ...surface, state: 'anonymous app route redirects to login' }, false);
     } else await capture(page, info, surface);
     if (surface.name === 'public-register') {
       const heading = page.getByRole('heading', { name: 'Crear cuenta en SITREP', exact: true });

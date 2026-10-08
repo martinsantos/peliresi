@@ -140,7 +140,7 @@ it('offers assignment and direct routing for unassigned staff without opening re
   openDetail({ puedeAtender: false });
   expect(await screen.findByRole('button', { name: 'Asignarme', exact: true })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Derivar', exact: true })).toBeVisible();
-  for (const label of ['Responder', 'Nota interna']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
+  for (const label of ['Responder', 'Nota interna', 'Pedir respuesta']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Asignarme', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, { accion: 'TOMAR', cuerpo: '', version: 1 }, [], expect.any(String)));
 });

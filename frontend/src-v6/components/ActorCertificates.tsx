@@ -69,7 +69,7 @@ export default function ActorCertificates({ type, actorId }: { type: ActorType; 
     {documents.isPending ? <p role="status" className="mt-2 text-sm text-neutral-600">Cargando certificados…</p>
       : documents.isError ? <div role="alert" className="mt-2 text-sm text-error-700">No se pudieron consultar los certificados. <Button variant="outline" onClick={() => void documents.refetch()}>Reintentar</Button></div>
         : certificates.length ? <ul className="mt-3 divide-y divide-neutral-200">{certificates.map(doc => <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-          <span className="min-w-0 text-sm text-neutral-800"><span className="font-semibold">{doc.anio || 'Sin año informado'}</span> · <span className="break-words">{doc.nombre}</span>{doc.estado !== 'APROBADO' && <span className="block text-warning-800">Pendiente de publicación por DGFA</span>}</span>
+          <span className="min-w-0 text-sm text-neutral-800"><span className="font-semibold">{doc.anio || 'Sin año informado'}</span> · <span className="break-words">{doc.nombre}</span>{doc.estado !== 'APROBADO' && <span className="block text-warning-800">{doc.estado === 'RECHAZADO' ? 'Rechazado por DGFA' : 'Pendiente de publicación por DGFA'}</span>}</span>
           <div className="flex flex-wrap gap-2"><Button variant="outline" leftIcon={<Download size={16} />} onClick={() => void download(doc)}>Descargar CAA {doc.anio || ''}</Button>
             {manager && doc.estado === 'PENDIENTE' && <Button variant="outline" isLoading={busy} onClick={() => void approve(doc)}>Publicar certificado</Button>}</div>
         </li>)}</ul> : <p className="mt-2 text-sm text-neutral-600">DGFA todavía no publicó un certificado para este actor.</p>}

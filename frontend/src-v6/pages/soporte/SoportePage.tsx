@@ -190,7 +190,7 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   if (ticket.puedeAtender) actions.push({ value: 'CLASIFICAR', label: 'Clasificar ticket' });
   if ((ticket.puedeAtender || (ticket.puedeGestionar && !ticket.responsableId)) && ticket.estado !== 'CERRADO') {
     actions.push({ value: 'DERIVAR', label: 'Derivar a otro responsable' });
-    if (!ticket.esAutor) actions.push({ value: 'ESPERAR', label: 'Solicitar respuesta al usuario' });
+    if (ticket.puedeAtender && !ticket.esAutor) actions.push({ value: 'ESPERAR', label: 'Solicitar respuesta al usuario' });
   }
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
   const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;

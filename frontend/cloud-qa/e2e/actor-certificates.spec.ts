@@ -49,11 +49,13 @@ for (const actor of [
   const context = await browser.newContext({ viewport: info.project.name === 'web-desktop' ? { width: 1440, height: 900 } : { width: 360, height: 800 } });
   try {
     const owner = await context.newPage(); await login(owner, info, actor.key);
-    await owner.goto(`${prefix(info)}/perfil`);
+    await owner.goto(`${prefix(info)}/mi-perfil`);
     const ownCertificates = owner.getByRole('region', { name: 'Certificados ambientales oficiales', exact: true });
+    await expect(ownCertificates).toBeVisible();
     await expect(ownCertificates.getByText('Cargar certificado oficial', { exact: true })).toHaveCount(0);
     for (const [year, stored] of files) {
-      const downloaded = owner.waitForEvent('download');
+      await expect(ownCertificates.getByRole('button', { name: `Descargar CAA ${year}`, exact: true })).toBeVisible();
+      const downloaded = owner.waitForEvent('download', { timeout: 15000 });
       await ownCertificates.getByRole('button', { name: `Descargar CAA ${year}`, exact: true }).click();
       const file = await downloaded; const saved = await file.path(); expect(saved).toBeTruthy();
       expect(createHash('sha256').update(await readFile(saved!)).digest('hex')).toBe(createHash('sha256').update(stored.bytes).digest('hex'));

@@ -10,7 +10,7 @@ test('brief reports need no title or attachment; staff can route to themselves o
   await login(page, info, 'generador');
   const briefReport = async (description: string) => {
     await page.goto(path(info));
-    await page.getByRole('button', { name: 'Reportar problema', exact: true }).click();
+    await page.getByRole('region', { name: 'Soporte de SITREP', exact: true }).getByRole('button', { name: 'Reportar problema', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
     await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill(description);
     const posted = page.waitForResponse(response => new URL(response.url()).pathname === '/api/soporte' && response.request().method() === 'POST');
