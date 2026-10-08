@@ -34,7 +34,7 @@ describe('Control map visual identity across desktop and mobile', () => {
       selectedTripId: 'qa-hidden',
       enTransitoForMap: [{ manifiestoId: 'qa-hidden', numero: 'QA', origen: 'QA origen', destino: 'QA destino', transportista: 'QA transporte', origenLatLng: [-32.8, -68.8], destinoLatLng: [-32.9, -68.9], ultimaPosicion: { latitud: -32.85, longitud: -68.85, velocidad: null, direccion: null, timestamp: '2026-10-07T12:00:00Z' }, ruta: [] }],
     });
-    expect(screen.getByRole('button', { name: 'En Tránsito', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'En Tránsito' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByTestId('marker')).toBeNull();
     expect(screen.getByText('1 en tránsito')).toBeVisible();
   });

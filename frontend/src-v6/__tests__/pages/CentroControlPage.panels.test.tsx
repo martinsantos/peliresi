@@ -64,11 +64,11 @@ describe('Centro de Control respects explicit panel choices across responses', (
       data: { ...activeData, enTransito: capas.includes('transito') ? activeData.enTransito : [] }, refetch: refresh,
     }));
     render(page);
-    const layer = screen.getByRole('button', { name: 'Capa En Tránsito', exact: true });
-    const trip = screen.getByRole('button', { name: 'Seleccionar viaje QA-VIAJE', exact: true });
+    const layer = screen.getByRole('button', { name: 'Capa En Tránsito' });
+    const trip = screen.getByRole('button', { name: 'Seleccionar viaje QA-VIAJE' });
     fireEvent.click(layer);
     expect(layer).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: 'Viajes Activos 1', exact: true })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Viajes Activos 1' })).toBeVisible();
     expect(trip).toBeVisible();
     expect(centro).toHaveBeenLastCalledWith(expect.objectContaining({ capas: ['generadores', 'transportistas', 'operadores', 'transito'] }));
     fireEvent.click(trip);

@@ -35,7 +35,7 @@ describe('Shared registration navigation keeps identity, steps and data stable',
       </Routes></MemoryRouter>);
     });
     const identity = screen.getByTestId('registration-identity');
-    expect(identity.firstElementChild).toBe(screen.getByRole('heading', { name: `Inscripción como ${label}`, exact: true }));
+    expect(identity.firstElementChild).toBe(screen.getByRole('heading', { name: `Inscripción como ${label}` }));
     expect(within(identity).getByRole('button', { name: 'Volver a la pantalla anterior' })).toHaveTextContent('Volver');
     expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'instant' });
     expect(railScroll).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'center', behavior: 'instant' });
@@ -48,13 +48,13 @@ describe('Shared registration navigation keeps identity, steps and data stable',
     fireEvent.change(company, { target: { value: 'QA dato conservado al cambiar de paso' } });
     expect(window.scrollTo).not.toHaveBeenCalled();
     expect(railScroll).not.toHaveBeenCalled();
-    fireEvent.click(within(rail).getByRole('button', { name: `Paso 2 de ${total}: ${secondStep}`, exact: true }));
+    fireEvent.click(within(rail).getByRole('button', { name: `Paso 2 de ${total}: ${secondStep}` }));
     expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'instant' });
-    const active = within(rail).getByRole('button', { name: `Paso 2 de ${total}: ${secondStep}`, exact: true });
+    const active = within(rail).getByRole('button', { name: `Paso 2 de ${total}: ${secondStep}` });
     expect(active).toHaveAttribute('aria-current', 'step');
     expect(active.firstElementChild).toHaveTextContent('2');
     expect(active.firstElementChild).toHaveClass('bg-primary-700', 'text-white');
-    fireEvent.click(screen.getByRole('button', { name: 'Anterior', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Anterior' }));
     expect(screen.getByPlaceholderText(type === 'transportista' ? 'Transporte S.A.' : type === 'operador' ? 'Operador S.A.' : 'Empresa S.A.')).toHaveValue('QA dato conservado al cambiar de paso');
     expect(requests.put).not.toHaveBeenCalled();
     expect(requests.post).not.toHaveBeenCalled();
