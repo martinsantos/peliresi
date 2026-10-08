@@ -42,6 +42,8 @@ async function check(name: string, task: () => Promise<void>) {
   catch (error) { checks.push({ name, status: 'FAIL', error: String(error) }); throw error; }
 }
 async function seedUsers() {
+  const wasteId = JSON.parse(await readFile(path.join(output, 'fixture.json'), 'utf8')).wastes[0];
+  assert.ok(wasteId, 'The isolated operator must be authorised for an existing synthetic waste');
   const encoded = await backendRequire('bcryptjs').hash(password, 10);
   for (let index = 0; index < 50; index++) {
     const group = Math.floor(index / 10), role = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'GENERADOR', 'ADMIN'][group];
@@ -54,7 +56,9 @@ async function seedUsers() {
     if (group === 0) row.actor = (await db.generador.create({ data: { ...common, categoria: 'GRAN_GENERADOR', numeroInscripcion: 'QA-MU-G-' + index } })).id;
     if (group === 1) row.actor = (await db.transportista.create({ data: { ...common, numeroHabilitacion: 'QA-MU-T-' + index, vencimientoHabilitacion: new Date('2030-01-01') } })).id;
     if (group === 2) {
-      row.actor = (await db.operador.create({ data: { ...common, categoria: 'TRATAMIENTO', numeroHabilitacion: 'QA-MU-O-' + index, modalidades: ['FIJO'], vencimientoHabilitacion: new Date('2030-01-01') } })).id;
+      row.actor = (await db.operador.create({ data: { ...common, categoria: 'TRATAMIENTO', numeroHabilitacion: 'QA-MU-O-' + index, modalidades: ['FIJO'], vencimientoHabilitacion: new Date('2030-01-01'),
+        tratamientos: { create: { tipoResiduoId: wasteId, metodo: 'QA proceso sintético autorizado', activo: true } },
+      } })).id;
     }
     users.push(row);
   }

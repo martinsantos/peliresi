@@ -17,6 +17,15 @@ for (const row of frozen.backendFiles) {
 const units = [await read('backend-unit.json'), await read('frontend-unit.json')];
 for (const unit of units) { assert.equal(unit.success, true); assert.equal(unit.numFailedTests + unit.numPendingTests, 0); assert.equal(unit.numPassedTests, unit.numTotalTests); }
 assertFullE2EEvidence(await read('e2e.json'));
+let browserEvidence = { repeatedThisRun: true, baselineRun: process.env.GITHUB_RUN_ID, baselineCommit: process.env.GITHUB_SHA };
+if (process.env.QA_BROWSER_REUSE === 'true') {
+  const reuse = await read('browser-reuse.json');
+  assert.equal(reuse.baselineRun, '37831212967'); assert.equal(reuse.baselineCommit, '436d830ce3d38beff230719e799d4ed6af8371b4');
+  assert.equal(reuse.currentCommit, process.env.GITHUB_SHA); assert.equal(reuse.browserRepeatedThisRun, false);
+  assert.equal(reuse.productAndBrowserSourcesUnchanged, true); assert.equal(reuse.backendAndPrismaBytesIdentical, true);
+  assert.equal(reuse.originalReportSha256, createHash('sha256').update(await readFile(path.join(output, 'e2e.json'))).digest('hex'));
+  browserEvidence = { repeatedThisRun: false, baselineRun: reuse.baselineRun, baselineCommit: reuse.baselineCommit };
+}
 const http = await read('http-summary.json'); assert.equal(http.passed, 54); assert.equal(http.failed, 0);
 for (const [name, passed] of [['expiry-identity.json', 2], ['monitor-calendar.json', 4], ['territorial-access.json', 5], ['support-integration.json', 20], ['operational-coherence.json', 6]] as const) {
   const check = await read(name); assert.equal(check.commit, process.env.GITHUB_SHA); assert.equal(check.passed, passed); assert.equal(check.failed, 0); assert.equal(check.externalProvidersDisabled, true);
@@ -37,6 +46,6 @@ await writeFile(path.join(output, 'multiuser-tested-backend.json'), JSON.stringi
   archiveSha256: createHash('sha256').update(await readFile(archive)).digest('hex'), files: backend, sourceHashes,
   units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })), e2e: (await read('e2e.json')).stats,
   multiuser: { accounts: 50, seconds: 1800, cluster: 'two Node20 workers', checks: load.checks.length, restore: true },
-  builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false, scope: 'backend-only', androidRepeated: false,
+  builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false, scope: 'backend-only', androidRepeated: false, browserEvidence,
   containsEnvironment: false, containsUploads: false, containsDependencies: false }, null, 2));
 console.log('Backend-only package frozen after 219 E2E, full unit/HTTP, thirty-minute multiuser and actual restore gates');

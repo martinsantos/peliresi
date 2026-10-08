@@ -22,6 +22,11 @@ on:
         type: boolean
         required: true
         default: false
+      reuse_browser:
+        description: Backend-only mixed-user follow-up; reuse measured 219 cases only for unchanged source/journeys and byte-identical backend from run138
+        type: boolean
+        required: true
+        default: false
       context_only:
         description: Inspection/map context and authenticated global operation checks only; never packages or certifies a complete candidate
         type: boolean
@@ -107,6 +112,9 @@ jobs:
     if: always() && !cancelled() && github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && !inputs.load_only
     runs-on: ubuntu-24.04
     timeout-minutes: 95
+    permissions:
+      contents: read
+      actions: read
     env:
       CI: 'true'
       NODE_ENV: test
@@ -136,11 +144,13 @@ jobs:
       QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
       QA_MANUAL_ROOT: ${{ github.workspace }}/frontend/dist/manual
       QA_MULTIUSER: ${{ inputs.multiuser }}
+      QA_BROWSER_REUSE: ${{ inputs.reuse_browser }}
       PGUSER: qa
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 16
       - name: Install exact production Node20 runtime only for multiuser cluster
         if: inputs.multiuser
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -163,6 +173,7 @@ jobs:
           node --experimental-strip-types --test frontend/cloud-qa/manual-build.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/e2e-evidence.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/network-health.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/browser-reuse.test.ts
           test ! -f backend/.env
           test ! -f frontend/.env
           mkdir -p "$QA_ARTIFACTS"
@@ -172,6 +183,11 @@ jobs:
             test '${{ inputs.alert_only }}' != 'true'
             test '${{ inputs.support_only }}' != 'true'
             test '${{ inputs.inspection_only }}' != 'true'
+          fi
+          if test "$QA_BROWSER_REUSE" = 'true'; then
+            test "$QA_MULTIUSER" = 'true'
+            test '${{ inputs.unit }}' = 'true'
+            test '${{ inputs.android }}' != 'true'
           fi
       - name: Reuse unit evidence only when ALL tracked product and unit files are unchanged
         if: ${{ !inputs.unit }}
@@ -194,6 +210,9 @@ jobs:
       - name: Backend and frontend unit tests with disconnected DB
         if: inputs.unit
         run: |
+          if test "$QA_MULTIUSER" = 'true'; then
+            node --experimental-strip-types --test frontend/cloud-qa/multiuser-seed.test.ts
+          fi
           cd backend
           npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
           cd ../frontend
@@ -208,6 +227,20 @@ jobs:
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
           cd ..
           node --experimental-strip-types frontend/cloud-qa/build-artifact.ts freeze
+      - name: Receive measured browser evidence from pinned run138
+        if: inputs.reuse_browser
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sitrep-cloud-qa-37831212967-1
+          github-token: ${{ github.token }}
+          run-id: 37831212967
+          path: ${{ runner.temp }}/sitrep-browser-baseline138
+      - name: Verify identical product, journeys, backend and generated runtime before browser reuse
+        if: inputs.reuse_browser
+        env:
+          QA_GITHUB_TOKEN: ${{ github.token }}
+          QA_BROWSER_BASELINE: ${{ runner.temp }}/sitrep-browser-baseline138
+        run: node --experimental-strip-types frontend/cloud-qa/browser-reuse.ts
       - name: Create temporary loopback PostgreSQL, never a production copy
         id: qa-start
         run: |
@@ -237,6 +270,7 @@ jobs:
       - name: Actual active-inspection and map-agenda-KPI cohort coherence
         run: node --experimental-strip-types frontend/cloud-qa/operational-coherence-integration.ts
       - name: Actual web and app E2E, one browser worker, no fake auth
+        if: ${{ !inputs.reuse_browser }}
         env:
           QA_CONTEXT_ONLY: ${{ inputs.context_only }}
           QA_ALERT_ONLY: ${{ inputs.alert_only }}
