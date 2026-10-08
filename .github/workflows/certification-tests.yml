@@ -27,6 +27,11 @@ on:
         type: boolean
         required: true
         default: false
+      recovery_only:
+        description: Reuse exact passed thirty-minute capacity from run139; repeat physical database/files restoration and fifty real logins
+        type: boolean
+        required: true
+        default: false
       context_only:
         description: Inspection/map context and authenticated global operation checks only; never packages or certifies a complete candidate
         type: boolean
@@ -145,6 +150,8 @@ jobs:
       QA_MANUAL_ROOT: ${{ github.workspace }}/frontend/dist/manual
       QA_MULTIUSER: ${{ inputs.multiuser }}
       QA_BROWSER_REUSE: ${{ inputs.reuse_browser }}
+      QA_RECOVERY_ONLY: ${{ inputs.recovery_only }}
+      QA_CAPACITY_BASELINE: ${{ runner.temp }}/sitrep-capacity-baseline139
       PGUSER: qa
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -174,6 +181,7 @@ jobs:
           node --experimental-strip-types --test frontend/cloud-qa/e2e-evidence.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/network-health.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/browser-reuse.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/capacity-reuse.test.ts frontend/cloud-qa/evidence-json.test.ts
           test ! -f backend/.env
           test ! -f frontend/.env
           mkdir -p "$QA_ARTIFACTS"
@@ -188,6 +196,10 @@ jobs:
             test "$QA_MULTIUSER" = 'true'
             test '${{ inputs.unit }}' = 'true'
             test '${{ inputs.android }}' != 'true'
+          fi
+          if test "$QA_RECOVERY_ONLY" = 'true'; then
+            test "$QA_MULTIUSER" = 'true'
+            test "$QA_BROWSER_REUSE" = 'true'
           fi
       - name: Reuse unit evidence only when ALL tracked product and unit files are unchanged
         if: ${{ !inputs.unit }}
@@ -241,6 +253,19 @@ jobs:
           QA_GITHUB_TOKEN: ${{ github.token }}
           QA_BROWSER_BASELINE: ${{ runner.temp }}/sitrep-browser-baseline138
         run: node --experimental-strip-types frontend/cloud-qa/browser-reuse.ts
+      - name: Receive actual capacity and synthetic database/files from pinned run139
+        if: inputs.recovery_only
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sitrep-cloud-qa-37837156424-1
+          github-token: ${{ github.token }}
+          run-id: 37837156424
+          path: ${{ runner.temp }}/sitrep-capacity-baseline139
+      - name: Verify thirty-minute capacity provenance without repeating passed work
+        if: inputs.recovery_only
+        env:
+          QA_GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types frontend/cloud-qa/capacity-reuse.ts
       - name: Create temporary loopback PostgreSQL, never a production copy
         id: qa-start
         run: |

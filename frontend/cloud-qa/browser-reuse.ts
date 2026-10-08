@@ -13,6 +13,8 @@ const allowedHarnessChanges = new Set([
   'frontend/cloud-qa/multiuser.ts', 'frontend/cloud-qa/multiuser-seed.test.ts',
   'frontend/cloud-qa/browser-reuse.ts', 'frontend/cloud-qa/browser-reuse.test.ts',
   'frontend/cloud-qa/multiuser-package.ts',
+  'frontend/cloud-qa/capacity-reuse.ts', 'frontend/cloud-qa/capacity-reuse.test.ts',
+  'frontend/cloud-qa/evidence-json.ts', 'frontend/cloud-qa/evidence-json.test.ts',
 ]);
 type File = { file: string; sha256: string };
 type Frozen = { commit: string; backendFiles: File[] };

@@ -6,6 +6,8 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 import { startMultiuserCluster, stopMultiuserCluster } from './multiuser-cluster.ts';
+import { evidenceJson } from './evidence-json.ts';
+import { restoreCapacitySource, CAPACITY_BASELINE } from './capacity-reuse.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_MULTIUSER, 'true');
@@ -21,6 +23,8 @@ const measurements: Array<{ group: string; ms: number; status: number }> = [];
 const samples: unknown[] = [];
 let cluster: ChildProcess | undefined, nginx: ChildProcess | undefined;
 let startedAt: string | undefined, endedAt: string | undefined;
+let capacitySource: any;
+const recoveryOnly = process.env.QA_RECOVERY_ONLY === 'true';
 const phases = [{ sessions: 10, seconds: 300 }, { sessions: 25, seconds: 300 }, { sessions: 50, seconds: 1200 }];
 const hash = (value: Uint8Array) => createHash('sha256').update(value).digest('hex');
 async function call(user: User | null, route: string, method = 'GET', body?: unknown, expected: number | number[] = 200, key?: string) {
@@ -105,9 +109,9 @@ async function restoreCheck() {
     const number = Number(created.referencia.replace('SOP-', ''));
     assert.ok(Number.isInteger(number) && number > last._max.numero);
     assert.equal((await restored.ticketSoporte.findUniqueOrThrow({ where: { id: created.id } })).numero, number);
-    await writeFile(path.join(output, 'multiuser-restore.json'), JSON.stringify({ at: new Date().toISOString(), sourceDatabase: 'sitrep_night_qa_20260926',
+    await writeFile(path.join(output, 'multiuser-restore.json'), evidenceJson({ at: new Date().toISOString(), sourceDatabase: 'sitrep_night_qa_20260926',
       restoredDatabase: 'sitrep_night_qa_restore_20261008', port: 55440, counts, files: originalFiles, databaseArchiveSha256: hash(await readFile(backup)),
-      fileArchiveSha256: hash(await readFile(archive)), authenticatedUsers: 50, originalDownload: true, numberingContinues: true, productionData: false, statsBefore: before }, null, 2));
+      fileArchiveSha256: hash(await readFile(archive)), authenticatedUsers: 50, originalDownload: true, numberingContinues: true, productionData: false, statsBefore: before }));
   } finally { await restored.$disconnect(); }
 }
 
@@ -115,7 +119,19 @@ try {
   // Close the earlier browser/API phase before the capacity phase; one VM only.
   execFileSync(process.execPath, ['--experimental-strip-types', path.join(root, 'frontend/cloud-qa/close.ts')]);
   await new Promise(resolve => setTimeout(resolve, 1000));
-  await seedUsers();
+  if (recoveryOnly) {
+    capacitySource = await restoreCapacitySource();
+    startedAt = capacitySource.startedAt; endedAt = capacitySource.endedAt;
+    samples.push(...capacitySource.samples);
+    for (let index = 0; index < 50; index++) {
+      const user = await db.usuario.findUniqueOrThrow({ where: { email: 'multiuser-' + index + '@night-qa.invalid' },
+        include: { generador: true, transportista: true, operador: true } });
+      const group = Math.floor(index / 10), ticket = await db.ticketSoporte.findFirstOrThrow({ where: { autorId: user.id } });
+      assert.equal(user.rol, ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'GENERADOR', 'ADMIN'][group]);
+      users.push({ id: user.id, email: user.email, role: user.rol, group, token: '', refresh: '', ticket: ticket.id,
+        actor: group === 0 ? user.generador.id : group === 1 ? user.transportista.id : group === 2 ? user.operador.id : undefined });
+    }
+  } else await seedUsers();
   cluster = await startMultiuserCluster(process.env.DATABASE_URL!);
   const nginxConfig = path.join(output, 'multiuser-nginx.conf');
   await writeFile(nginxConfig, `daemon off; pid ${output}/multiuser-nginx.pid;
@@ -124,6 +140,16 @@ server { listen 127.0.0.1:3038; location / { proxy_pass http://127.0.0.1:3037; p
 `);
   nginx = spawn('nginx', ['-c', nginxConfig, '-p', output], { stdio: 'inherit' });
   await new Promise(resolve => setTimeout(resolve, 500));
+  if (recoveryOnly) {
+    // Real new logins, not resurrected or injected old sessions.
+    await Promise.all(users.map(async user => {
+      const login = await call(null, '/auth/login', 'POST', { email: user.email, password });
+      assert.equal(login.user.id, user.id); assert.equal(login.user.rol, user.role);
+      user.token = login.tokens.accessToken; user.refresh = login.tokens.refreshToken;
+    }));
+    checks.push(...capacitySource.checks.slice(0,6).map((row: any) => ({ ...row, measuredInRun: CAPACITY_BASELINE.run, repeatedThisRun: false })));
+    console.log('Retained six original passed checks and actual 30-minute measurements; all fifty recovery owners logged in again');
+  } else {
   await check('fifty real, distinct authenticated sessions enter concurrently through one shared proxy IP', async () => {
     await Promise.all(users.map(async user => {
       const login = await call(null, '/auth/login', 'POST', { email: user.email, password });
@@ -229,6 +255,7 @@ server { listen 127.0.0.1:3038; location / { proxy_pass http://127.0.0.1:3037; p
     await Promise.all(Array.from({ length: 12 }, () => call(carrier, '/manifiestos/' + carrier.manifest + '/ubicacion', 'POST', { latitud: -32.89, longitud: -68.84 }, 404)));
     assert.equal(await db.trackingGPS.count({ where: { manifiestoId: carrier.manifest } }), count);
   });
+  }
   await check('fresh database and physical uploads restore with fifty authenticated owners and continuing references', restoreCheck);
 } catch (error) {
   console.error(String(error));
@@ -248,7 +275,10 @@ server { listen 127.0.0.1:3038; location / { proxy_pass http://127.0.0.1:3037; p
   });
   await writeFile(path.join(output, 'multiuser.json'), JSON.stringify({ commit: process.env.GITHUB_SHA, startedAt, endedAt, phases,
     accounts: users.length, distinctAccounts: new Set(users.map(user => user.id)).size, authenticatedAccounts: users.filter(user => user.token).length,
-    checks, metrics, samples, externalProvidersDisabled: true, productionDataWritten: false, proxy: 'nginx loopback', backend: 'two Node20 cluster workers',
+    checks, metrics: capacitySource?.metrics ?? metrics, recoveryMetrics: capacitySource ? metrics : undefined,
+    capacityMeasuredInRun: capacitySource ? CAPACITY_BASELINE.run : process.env.GITHUB_RUN_ID,
+    capacityRepeatedThisRun: !capacitySource, priorRecoveryLoggingFailurePreserved: !!capacitySource,
+    samples, externalProvidersDisabled: true, productionDataWritten: false, proxy: 'nginx loopback', backend: 'two Node20 cluster workers',
     limitations: ['Cloud hardware and operating system differ from the production host', 'HTTP sessions are concurrent; browser E2E is separate', 'Physical phones and complete authenticated original APK remain separate'] }, null, 2));
   await writeFile(path.join(output, 'multiuser-closure.json'), JSON.stringify({ at: new Date().toISOString(), clusterStopped: true, nginxStopped: !nginx || nginx.exitCode !== null || nginx.signalCode !== null }));
 }

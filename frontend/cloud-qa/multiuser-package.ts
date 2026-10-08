@@ -36,6 +36,22 @@ assert.equal(load.distinctAccounts, 50); assert.equal(load.externalProvidersDisa
 assert.equal(load.checks.length, 7); assert.ok(load.checks.every((row: { status: string }) => row.status === 'PASS'));
 assert.ok(Date.parse(load.endedAt) - Date.parse(load.startedAt) >= 1800000);
 assert.deepEqual(load.phases, [{ sessions: 10, seconds: 300 }, { sessions: 25, seconds: 300 }, { sessions: 50, seconds: 1200 }]);
+let capacityEvidence = { repeatedThisRun: true, baselineRun: process.env.GITHUB_RUN_ID, baselineCommit: process.env.GITHUB_SHA };
+if (process.env.QA_RECOVERY_ONLY === 'true') {
+  const reuse = await read('capacity-reuse.json'), original = await read('multiuser-prior139.json');
+  assert.equal(reuse.baselineRun, '37837156424'); assert.equal(reuse.baselineCommit, 'd12d57fa34ee048aae72a743dd25208406a1dd3c');
+  assert.equal(reuse.currentCommit, process.env.GITHUB_SHA); assert.equal(reuse.backendBytesIdentical, true);
+  assert.equal(reuse.capacityRepeatedThisRun, false); assert.equal(reuse.priorRecoveryLoggingFailurePreserved, true);
+  assert.equal(reuse.originalReportSha256, createHash('sha256').update(await readFile(path.join(output,'multiuser-prior139.json'))).digest('hex'));
+  assert.equal(load.capacityMeasuredInRun,reuse.baselineRun); assert.equal(load.capacityRepeatedThisRun,false);
+  assert.equal(original.checks[6].error,'TypeError: Do not know how to serialize a BigInt');
+  assert.deepEqual(load.metrics,original.metrics); assert.deepEqual(load.samples,original.samples);
+  for(let index=0;index<6;index++){
+    assert.equal(load.checks[index].name,original.checks[index].name); assert.equal(original.checks[index].status,'PASS');
+    assert.equal(load.checks[index].measuredInRun,reuse.baselineRun); assert.equal(load.checks[index].repeatedThisRun,false);
+  }
+  capacityEvidence={repeatedThisRun:false,baselineRun:reuse.baselineRun,baselineCommit:reuse.baselineCommit};
+}
 assert.equal(recovery.authenticatedUsers, 50); assert.equal(recovery.originalDownload, true); assert.equal(recovery.numberingContinues, true);
 assert.equal(recovery.productionData, false); assert.equal(recovery.restoredDatabase, 'sitrep_night_qa_restore_20261008');
 assert.equal((await read('multiuser-closure.json')).clusterStopped, true);
@@ -46,6 +62,6 @@ await writeFile(path.join(output, 'multiuser-tested-backend.json'), JSON.stringi
   archiveSha256: createHash('sha256').update(await readFile(archive)).digest('hex'), files: backend, sourceHashes,
   units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })), e2e: (await read('e2e.json')).stats,
   multiuser: { accounts: 50, seconds: 1800, cluster: 'two Node20 workers', checks: load.checks.length, restore: true },
-  builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false, scope: 'backend-only', androidRepeated: false, browserEvidence,
+  builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false, scope: 'backend-only', androidRepeated: false, browserEvidence, capacityEvidence,
   containsEnvironment: false, containsUploads: false, containsDependencies: false }, null, 2));
 console.log('Backend-only package frozen after 219 E2E, full unit/HTTP, thirty-minute multiuser and actual restore gates');
