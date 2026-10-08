@@ -151,7 +151,6 @@ jobs:
       QA_MULTIUSER: ${{ inputs.multiuser }}
       QA_BROWSER_REUSE: ${{ inputs.reuse_browser }}
       QA_RECOVERY_ONLY: ${{ inputs.recovery_only }}
-      QA_CAPACITY_BASELINE: ${{ runner.temp }}/sitrep-capacity-baseline139
       PGUSER: qa
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

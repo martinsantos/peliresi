@@ -27,8 +27,8 @@ export function assertCapacityReuse(prior: any, frozen: any, current: any) {
 }
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 const priorDirectory = () => {
-  const directory = process.env.QA_CAPACITY_BASELINE!;
-  assert.equal(directory, path.join(process.env.RUNNER_TEMP!, 'sitrep-capacity-baseline139')); return directory;
+  assert.ok(process.env.RUNNER_TEMP && path.isAbsolute(process.env.RUNNER_TEMP));
+  return path.join(process.env.RUNNER_TEMP!, 'sitrep-capacity-baseline139');
 };
 async function main() {
   assertCloudEnvironment(); assert.equal(process.env.QA_RECOVERY_ONLY, 'true'); assert.equal(process.env.QA_BROWSER_REUSE, 'true');
