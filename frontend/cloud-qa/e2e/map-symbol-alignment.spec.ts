@@ -99,6 +99,45 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   await page.getByRole('navigation', { name: 'Tipos de reporte' }).getByRole('button', { name: 'Mapa de Actores', exact: true }).click();
   await expect(page.locator('.leaflet-container')).toBeVisible();
   const reportLayers = page.getByRole('group', { name: 'Capas del mapa', exact: true });
+  const mapFilters = page.getByRole('group', { name: 'Filtros y resumen del mapa', exact: true });
+  await expect(mapFilters).toBeVisible();
+  const department = mapFilters.getByRole('button', { name: 'Todos los deptos.', exact: true });
+  const activitySwitch = mapFilters.getByRole('switch');
+  const summary = mapFilters.getByText(/^\d+ actores \(\d+ operadores\)$/);
+  const compactHeader = async () => {
+    const boxes = await Promise.all([department, summary, activitySwitch].map(control => control.boundingBox()));
+    expect(boxes.every(Boolean), 'Department, count and switch must all render').toBe(true);
+    const [dep, count, toggle] = boxes.map(box => box!);
+    expect(dep.height).toBeGreaterThanOrEqual(44);
+    expect(toggle.height).toBeGreaterThanOrEqual(44);
+    if (info.project.name === 'web-desktop') {
+      for (const box of [count, toggle]) {
+        expect(Math.abs(box.y + box.height / 2 - dep.y - dep.height / 2), 'Desktop map filters share one row').toBeLessThanOrEqual(1);
+      }
+    }
+    for (const box of boxes) {
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    }
+    return boxes;
+  };
+  await mapFilters.scrollIntoViewIfNeeded();
+  const headerGeometry = { normal: await compactHeader(), narrow: null as Awaited<ReturnType<typeof compactHeader>> | null };
+  await page.screenshot({ path: info.outputPath('report-map-toolbar.png'), animations: 'disabled' });
+  // The relocated switch must still change the real query, not just its paint.
+  const originalSummary = await summary.textContent();
+  const refreshed = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/centro-control/actividad' && response.status() === 200
+      && url.searchParams.get('incluirTodos') !== 'true';
+  });
+  await activitySwitch.click();
+  const activeActors = (await (await refreshed).json()).data;
+  await expect(activitySwitch).toHaveAttribute('aria-checked', 'false');
+  await expect(summary).toHaveText(`${activeActors.generadores.length + activeActors.transportistas.length + activeActors.operadores.length} actores (${activeActors.operadores.length} operadores)`);
+  await activitySwitch.click();
+  await expect(activitySwitch).toHaveAttribute('aria-checked', 'true');
+  await expect(summary).toHaveText(originalSummary!); // May correctly reuse fresh query cache.
   await reportLayers.scrollIntoViewIfNeeded();
   rowMeasurements.reports = await readableMapLayers(reportLayers);
   measurements.reports = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));
@@ -107,6 +146,9 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   if (info.project.name !== 'web-desktop') {
     await page.setViewportSize({ width: 320, height: 800 });
     await readablePageHeading(page);
+    await mapFilters.scrollIntoViewIfNeeded();
+    headerGeometry.narrow = await compactHeader();
+    await page.screenshot({ path: info.outputPath('report-map-toolbar-320.png'), animations: 'disabled' });
     await reportLayers.scrollIntoViewIfNeeded();
     rowMeasurements.reports320 = await readableMapLayers(reportLayers);
     measurements.reports320 = await symbolGeometry(reportLayers.locator('[data-map-symbol]'));
@@ -177,7 +219,7 @@ test('map symbols stay centered, padded and actionable in every shared map contr
     await expect(row.getByRole('link')).toHaveCount(0);
   }
   await page.screenshot({ path: info.outputPath('public-manifest-actor-icons.png'), animations: 'disabled' });
-  await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, rowMeasurements, publicHeader, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
+  await info.attach('rendered-symbol-geometry', { body: JSON.stringify({ url: page.url(), viewport: page.viewportSize(), measurements, rowMeasurements, headerGeometry, publicHeader, errors, warnings, businessAPIIntercepted: false }, null, 2), contentType: 'application/json' });
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);

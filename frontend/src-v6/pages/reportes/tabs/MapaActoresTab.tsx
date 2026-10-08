@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Layers, Download, FileDown, Printer,
+  Download, FileDown, Printer,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { useQuery } from '@tanstack/react-query';
@@ -216,32 +216,25 @@ export default function MapaActoresTab({
     <div className="space-y-6 animate-fade-in">
       {/* Layer controls stay in flow: the expanded mobile group must not cover rows. */}
       <div className="-mx-4 lg:-mx-8 px-4 lg:px-8 pb-3 bg-[#FAFAF8]">
-        <div className="flex flex-wrap items-center gap-3 p-3.5 bg-white rounded-2xl border border-neutral-100 shadow-sm">
-          <Layers size={16} className="text-neutral-400" />
-          {/* Departamento filter */}
-          <Select
-            value={selectedDep}
-            onChange={(val) => setSelectedDep(val)}
-            placeholder="Todos los deptos."
-            options={[
-              { value: '', label: 'Todos los deptos.' },
-              ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d.nombre, label: d.nombre })),
-            ]}
-            size="base"
-            isFullWidth={false}
-          />
-          <span className="w-px h-5 bg-neutral-200" />
-        <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2 sm:flex sm:w-auto sm:flex-wrap">
-            <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} count={selectedDep ? filteredGen.length : totalGen} onToggle={() => toggleLayer('generadores')} />
-            <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} count={selectedDep ? filteredTrans.length : totalTrans} onToggle={() => toggleLayer('transportistas')} />
-            <MapLayerToggle category="operador" label="Op. Fijos" pressed={layers.operadoresFijos} count={selectedDep ? filteredOpFijos.length : operadoresFijos.length} onToggle={() => toggleLayer('operadoresFijos')} />
-            <MapLayerToggle category="operador" label="Op. In Situ" pressed={layers.operadoresInSitu} count={selectedDep ? filteredOpInSitu.length : operadoresInSitu.length} onToggle={() => toggleLayer('operadoresInSitu')} />
-            {canUseInspectionOperations(currentUser) && <MapLayerToggle category="inspeccion" label="Inspecciones" pressed={layers.inspecciones} count={inspectedPlaces.length} onToggle={() => toggleLayer('inspecciones')} />}
-          </div>
-          <div className="ml-auto flex items-center gap-3 text-xs text-neutral-500">
-            {totalGen + totalTrans + totalOper} actores ({totalOper} operadores)
+        <div className="space-y-3 p-3.5 bg-white rounded-2xl border border-neutral-100 shadow-sm">
+          <div role="group" aria-label="Filtros y resumen del mapa" className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {/* Departamento filter */}
+            <Select
+              value={selectedDep}
+              onChange={(val) => setSelectedDep(val)}
+              placeholder="Todos los deptos."
+              options={[
+                { value: '', label: 'Todos los deptos.' },
+                ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d.nombre, label: d.nombre })),
+              ]}
+              size="base"
+              isFullWidth={false}
+            />
+            <span className="text-xs text-neutral-500 sm:ml-auto">
+              {totalGen + totalTrans + totalOper} actores ({totalOper} operadores)
+            </span>
             {onToggleIncluirTodos && (
-              <div className="flex items-center gap-1.5 border-l border-neutral-200 pl-3">
+              <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
                 <span className="text-xs font-medium text-neutral-700">Incluir sin actividad</span>
                 <button
                   type="button"
@@ -255,6 +248,13 @@ export default function MapaActoresTab({
                 </button>
               </div>
             )}
+          </div>
+          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2 sm:flex sm:flex-wrap">
+            <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} count={selectedDep ? filteredGen.length : totalGen} onToggle={() => toggleLayer('generadores')} />
+            <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} count={selectedDep ? filteredTrans.length : totalTrans} onToggle={() => toggleLayer('transportistas')} />
+            <MapLayerToggle category="operador" label="Op. Fijos" pressed={layers.operadoresFijos} count={selectedDep ? filteredOpFijos.length : operadoresFijos.length} onToggle={() => toggleLayer('operadoresFijos')} />
+            <MapLayerToggle category="operador" label="Op. In Situ" pressed={layers.operadoresInSitu} count={selectedDep ? filteredOpInSitu.length : operadoresInSitu.length} onToggle={() => toggleLayer('operadoresInSitu')} />
+            {canUseInspectionOperations(currentUser) && <MapLayerToggle category="inspeccion" label="Inspecciones" pressed={layers.inspecciones} count={inspectedPlaces.length} onToggle={() => toggleLayer('inspecciones')} />}
           </div>
         </div>
       </div>
