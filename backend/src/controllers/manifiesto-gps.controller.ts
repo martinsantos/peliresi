@@ -100,8 +100,20 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
       _enTransitoCache.set(id, cacheEntry);
     }
 
-    const tracking = await prisma.trackingGPS.create({
-      data: { manifiestoId: id, latitud, longitud, velocidad, direccion },
+    // A PM2 worker cannot invalidate another worker's memory. Check live
+    // ownership/state under a shared row lock before persisting every point;
+    // delivery updates serialize with this short transaction across workers.
+    const tracking = await prisma.$transaction(async tx => {
+      const rows = await tx.$queryRaw<Array<{ estado: string; generadorId: string | null; transportistaId: string | null; operadorId: string | null }>>`
+        SELECT estado, "generadorId", "transportistaId", "operadorId"
+        FROM manifiestos WHERE id = ${id} FOR SHARE
+      `;
+      const current = rows[0];
+      if (!current || current.estado !== 'EN_TRANSITO' || !canAccessManifiesto(req.user, current)) {
+        invalidateGpsCache(id);
+        throw new AppError('Manifiesto no encontrado o no esta en transito', 404);
+      }
+      return tx.trackingGPS.create({ data: { manifiestoId: id, latitud, longitud, velocidad, direccion } });
     });
 
     res.json({ success: true, data: { tracking } });

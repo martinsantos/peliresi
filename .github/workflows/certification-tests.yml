@@ -17,6 +17,11 @@ on:
         type: boolean
         required: true
         default: false
+      multiuser:
+        description: Full functional gates plus thirty-minute mixed-user Node20 cluster and real restore; backend-only publication artifact
+        type: boolean
+        required: true
+        default: false
       context_only:
         description: Inspection/map context and authenticated global operation checks only; never packages or certifies a complete candidate
         type: boolean
@@ -101,7 +106,7 @@ jobs:
     needs: stage-original-apk
     if: always() && !cancelled() && github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002' && !inputs.load_only
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 95
     env:
       CI: 'true'
       NODE_ENV: test
@@ -130,11 +135,20 @@ jobs:
       QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
       QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
       QA_MANUAL_ROOT: ${{ github.workspace }}/frontend/dist/manual
+      QA_MULTIUSER: ${{ inputs.multiuser }}
       PGUSER: qa
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Install exact production Node20 runtime only for multiuser cluster
+        if: inputs.multiuser
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20.19.6'
+      - name: Remember the production runtime, then keep the QA orchestrator on Node22
+        if: inputs.multiuser
+        run: echo "QA_NODE20=$(command -v node)" >> "$GITHUB_ENV"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
@@ -152,6 +166,13 @@ jobs:
           test ! -f backend/.env
           test ! -f frontend/.env
           mkdir -p "$QA_ARTIFACTS"
+          if test "$QA_MULTIUSER" = 'true'; then
+            test '${{ inputs.unit }}' = 'true'
+            test '${{ inputs.context_only }}' != 'true'
+            test '${{ inputs.alert_only }}' != 'true'
+            test '${{ inputs.support_only }}' != 'true'
+            test '${{ inputs.inspection_only }}' != 'true'
+          fi
       - name: Reuse unit evidence only when ALL tracked product and unit files are unchanged
         if: ${{ !inputs.unit }}
         run: node --experimental-strip-types frontend/cloud-qa/unit-reuse.ts
@@ -167,6 +188,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends poppler-utils postgresql-16
+          if test "$QA_MULTIUSER" = 'true'; then sudo apt-get install -y --no-install-recommends nginx; fi
           cd frontend
           npx --no-install playwright install --with-deps chromium
       - name: Backend and frontend unit tests with disconnected DB
@@ -190,7 +212,9 @@ jobs:
         id: qa-start
         run: |
           /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-cloud-pg" --username=qa --auth-local=trust --auth-host=trust
-          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=20" -w start
+          QA_PG_MAX=20
+          if test "$QA_MULTIUSER" = 'true'; then QA_PG_MAX=100; fi
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-cloud-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=$QA_PG_MAX" -w start
           /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
           node --experimental-strip-types frontend/cloud-qa/preflight.ts
           cd backend
@@ -298,10 +322,10 @@ jobs:
           disable-animations: true
           script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
       - name: Package the exact tested backend, web and app bytes only after every gate passes
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
+        if: success() && inputs.unit && inputs.android && !inputs.multiuser && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
         run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts package
       - name: Preserve exact tested frontend builds, never dependencies or backend env
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
+        if: success() && inputs.unit && inputs.android && !inputs.multiuser && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-frontend-${{ github.run_id }}-${{ github.run_attempt }}
@@ -311,7 +335,7 @@ jobs:
           retention-days: 3
           if-no-files-found: error
       - name: Preserve exact tested backend bytes, without env, uploads or dependencies
-        if: success() && inputs.unit && inputs.android && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
+        if: success() && inputs.unit && inputs.android && !inputs.multiuser && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sitrep-tested-backend-${{ github.run_id }}-${{ github.run_attempt }}
@@ -320,6 +344,12 @@ jobs:
             /tmp/sitrep-night-20260926.cloud/tested-backend.json
           retention-days: 3
           if-no-files-found: error
+      - name: Thirty-minute mixed users behind Nginx, two actual Node20 workers and real DB/files restore
+        if: success() && inputs.multiuser
+        run: node --experimental-strip-types frontend/cloud-qa/multiuser.ts
+      - name: Package backend-only bytes after full unit, HTTP, web/app and multiuser gates
+        if: success() && inputs.multiuser
+        run: node --experimental-strip-types frontend/cloud-qa/multiuser-package.ts
       - name: Close owned QA processes and PostgreSQL
         if: always()
         run: |

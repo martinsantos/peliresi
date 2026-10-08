@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ find: vi.fn(), create: vi.fn(), list: vi.fn(), emit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ find: vi.fn(), create: vi.fn(), list: vi.fn(), emit: vi.fn(), current: vi.fn(), transaction: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   manifiesto: { findUnique: mocks.find }, trackingGPS: { create: mocks.create, findMany: mocks.list },
+  $transaction: mocks.transaction,
 } }));
 vi.mock('../../controllers/notification.controller', () => ({ anomaliaDetector: { detectarAnomalias: vi.fn() } }));
 vi.mock('../../services/domainEvent.service', () => ({ domainEvents: { emit: mocks.emit } }));
@@ -27,6 +28,8 @@ describe('GPS concurrency and recovery guards', () => {
     mocks.find.mockResolvedValue(trip);
     mocks.create.mockResolvedValue({ id: 'point-1', ...point });
     mocks.list.mockResolvedValue([]);
+    mocks.current.mockResolvedValue([trip]);
+    mocks.transaction.mockImplementation(async callback => callback({ $queryRaw: mocks.current, trackingGPS: { create: mocks.create } }));
   });
   afterEach(() => { vi.restoreAllMocks(); invalidateGpsCache(trip.id); });
 
@@ -79,6 +82,23 @@ describe('GPS concurrency and recovery guards', () => {
     mocks.find.mockResolvedValue({ ...trip, estado: 'ENTREGADO' });
     const next = vi.fn();
     await actualizarUbicacion(request(), response(), next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects GPS after another worker delivers a trip even while this worker cache is warm', async () => {
+    await actualizarUbicacion(request(), response(), vi.fn());
+    mocks.current.mockResolvedValue([{ ...trip, estado: 'ENTREGADO' }]);
+    const next = vi.fn(), res = response();
+    await actualizarUbicacion(request(), res, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
+    expect(res.json).not.toHaveBeenCalled(); expect(mocks.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a stale cached owner after the database ownership changes', async () => {
+    await actualizarUbicacion(request(), response(), vi.fn());
+    mocks.current.mockResolvedValue([{ ...trip, transportistaId: 'carrier-2' }]);
+    const next = vi.fn(); await actualizarUbicacion(request(), response(), next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
     expect(mocks.create).toHaveBeenCalledTimes(1);
   });
