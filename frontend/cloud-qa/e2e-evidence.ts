@@ -9,9 +9,10 @@ export type FullE2EEvidence = {
   suites: Suite[];
 };
 
-// 66 independently exercised journeys: previous 65 + all public wizard steps.
+// 73 journeys: previous 66 + three actor certificate and three address/history
+// flows + brief reporting and direct self-assignment/routing.
 // Keep exact denominators: adding a journey requires an explicit contract update.
-export const FULL_E2E_JOURNEYS_PER_SURFACE = 66;
+export const FULL_E2E_JOURNEYS_PER_SURFACE = 73;
 const surfaces = ['app', 'web-desktop', 'web-responsive'];
 
 /** A green aggregate alone must not authorize an incomplete or retried release. */

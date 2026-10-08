@@ -31,7 +31,13 @@ async function inventory(directory: string, prefix: string): Promise<Item[]> {
 }
 const files = [...await inventory(path.join(root, 'frontend/dist'), 'dist'),
   ...await inventory(path.join(root, 'frontend/dist-app'), 'dist-app')];
-const backendFiles = await inventory(path.join(root, 'backend/dist'), 'dist');
+// A schema change needs the exact generated client used by the real HTTP/E2E
+// tests. Include only Prisma's runtime/client, not a duplicate dependency tree.
+const prismaFiles = [...await inventory(path.join(root, 'backend/node_modules/.prisma/client'), 'node_modules/.prisma/client'),
+  ...await inventory(path.join(root, 'backend/node_modules/@prisma/client'), 'node_modules/@prisma/client')];
+assert.ok(prismaFiles.some(item => item.file.endsWith('libquery_engine-rhel-openssl-3.0.x.so.node')), 'Production engine must be present');
+const schemaFile = { file: 'prisma/schema.prisma', sha256: createHash('sha256').update(await readFile(path.join(root, 'backend/prisma/schema.prisma'))).digest('hex') };
+const backendFiles = [...await inventory(path.join(root, 'backend/dist'), 'dist'), schemaFile, ...prismaFiles];
 assert.ok(backendFiles.some(item => item.file === 'dist/index.js'));
 assert.ok(files.length > 50 && files.length < 5000);
 assert.ok(files.some(item => item.file === 'dist/index.html'));
@@ -102,7 +108,7 @@ if (mode === 'freeze') {
     builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
   }, null, 2));
   const backendArchive = path.join(output, 'tested-backend.tar.gz');
-  execFileSync('tar', ['-czf', backendArchive, '-C', path.join(root, 'backend'), 'dist'], { timeout: 30000 });
+  execFileSync('tar', ['-czf', backendArchive, '-C', path.join(root, 'backend'), 'dist', 'prisma/schema.prisma', 'node_modules/.prisma/client', 'node_modules/@prisma/client'], { timeout: 30000 });
   const sourceHashes = await Promise.all(['package.json', 'package-lock.json', 'prisma/schema.prisma'].map(async file => ({
     file, sha256: createHash('sha256').update(await readFile(path.join(root, 'backend', file))).digest('hex'),
   })));
@@ -113,7 +119,7 @@ if (mode === 'freeze') {
     units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })),
     e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed }, androidSystemPackages,
     builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
-    containsDependencies: false, containsEnvironment: false, containsUploads: false,
+    containsDependencies: 'prisma-client-only', containsEnvironment: false, containsUploads: false,
   }, null, 2));
-  console.log('Exact tested backend/web/app archives retained after all gates passed; no dependencies, uploads or environment secrets');
+  console.log('Exact tested backend/web/app and Prisma client retained after all gates; no other dependencies, uploads or secrets');
 }

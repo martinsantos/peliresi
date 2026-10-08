@@ -4,17 +4,22 @@ import { assertFullE2EEvidence, type FullE2EEvidence } from './e2e-evidence.ts';
 
 function complete(): FullE2EEvidence {
   return {
-    stats: { expected: 198, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
+    stats: { expected: 219, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
     suites: [{ suites: ['web-desktop', 'web-responsive', 'app'].map(projectName => ({
-      specs: Array.from({ length: 66 }, () => ({ tests: [{
+      specs: Array.from({ length: 73 }, () => ({ tests: [{
         projectName, status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed', retry: 0 }],
       }] })),
     })) }],
   };
 }
 
-test('the complete 66 x 3 evidence is accepted without lowering the denominator', () => {
+test('the complete 73 x 3 evidence is accepted without lowering the denominator', () => {
   assert.doesNotThrow(() => assertFullE2EEvidence(complete()));
+});
+test('the former 66 x 3 suite does not certify original certificates, address history or simplified ticket routing', () => {
+  const old = complete(); old.stats.expected = 198;
+  for (const surface of old.suites[0].suites!) surface.specs!.splice(66);
+  assert.throws(() => assertFullE2EEvidence(old));
 });
 test('the previous 65 x 3 evidence does not certify public wizard alignment, step visibility or scroll recovery', () => {
   const old = complete(); old.stats.expected = 195;

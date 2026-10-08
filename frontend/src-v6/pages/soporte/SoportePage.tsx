@@ -31,15 +31,16 @@ export default function SoportePage() {
 }
 function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
   const mp = useMobilePrefix();
-  const [scope, setScope] = useState('mis');
+  const [scope, setScope] = useState<string | null>(null);
   const [state, setState] = useState('');
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [triageFilters, setTriageFilters] = useState({ categoria: '', tipo: '', prioridad: '', clasificado: '' });
   const access = useQuery({ queryKey: ['soporte', owner, 'acceso'], queryFn: supportService.access, retry: false });
-  const list = useQuery({ queryKey: ['soporte', owner, 'lista', scope, state, appliedSearch, page, triageFilters], enabled: !id,
-    queryFn: () => supportService.list({ scope, estado: state || undefined, search: appliedSearch, page, ...triageFilters }), retry: false, refetchInterval: 30000 });
+  const selectedScope = scope || (access.data?.puedeGestionar ? 'mesa' : 'mis');
+  const list = useQuery({ queryKey: ['soporte', owner, 'lista', selectedScope, state, appliedSearch, page, triageFilters], enabled: !id && access.isSuccess,
+    queryFn: () => supportService.list({ scope: selectedScope, estado: state || undefined, search: appliedSearch, page, ...triageFilters }), retry: false, refetchInterval: 30000 });
   const detail = useQuery({ queryKey: ['soporte', owner, 'ticket', id], enabled: !!id, queryFn: () => supportService.get(id!), retry: false, refetchInterval: 30000 });
   const [teamOpen, setTeamOpen] = useState(false);
   return <section aria-label="Soporte de SITREP" className="min-w-0 space-y-5 pb-4">
@@ -57,7 +58,7 @@ function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div role="group" aria-label="Vistas de soporte" className="flex flex-wrap gap-1">
           {[['mis', 'Mis tickets'], ...(access.data?.puedeGestionar ? [['mesa', 'Mesa de soporte'], ['asignados', 'A mi cargo']] : [])].map(([value, label]) =>
-            <Button key={value} variant={scope === value ? 'primary' : 'outline'} aria-pressed={scope === value} onClick={() => { setScope(value); setPage(1); }}>{label}</Button>)}
+            <Button key={value} variant={selectedScope === value ? 'primary' : 'outline'} aria-pressed={selectedScope === value} onClick={() => { setScope(value); setPage(1); }}>{label}</Button>)}
         </div>
         {access.data?.puedeConfigurar && <Button variant="outline" aria-expanded={teamOpen} onClick={() => setTeamOpen(value => !value)}>Equipo de soporte</Button>}
       </div>
@@ -164,7 +165,7 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   const recipient = team.data?.find(user => user.id === target);
   const send = async (chosen = action) => {
     if (inFlight.current || recording) return;
-    if (!pending && chosen !== 'TOMAR' && body.trim().length < 5) { setError('Escribí al menos 5 caracteres para el mensaje o motivo.'); bodyInput.current?.focus(); return; }
+    if (!pending && !['TOMAR', 'DERIVAR', 'CLASIFICAR'].includes(chosen) && !body.trim()) { setError('Escribí un mensaje o una resolución.'); bodyInput.current?.focus(); return; }
     if (!pending && chosen === 'DERIVAR' && !target) { setError('Elegí el nuevo responsable antes de confirmar la derivación.'); return; }
     inFlight.current = true; setBusy(true); setError('');
     try {
@@ -187,18 +188,19 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   if (ticket.esAutor || (ticket.puedeAtender && ticket.estado !== 'CERRADO')) actions.push({ value: 'RESPONDER', label: ticket.estado === 'CERRADO' ? 'Responder y reabrir' : 'Respuesta visible al usuario' });
   if (ticket.puedeAtender) actions.push({ value: 'NOTA', label: 'Nota interna de soporte' });
   if (ticket.puedeAtender) actions.push({ value: 'CLASIFICAR', label: 'Clasificar ticket' });
-  if (ticket.puedeAtender && ticket.estado !== 'CERRADO') {
+  if ((ticket.puedeAtender || (ticket.puedeGestionar && !ticket.responsableId)) && ticket.estado !== 'CERRADO') {
     actions.push({ value: 'DERIVAR', label: 'Derivar a otro responsable' });
     if (!ticket.esAutor) actions.push({ value: 'ESPERAR', label: 'Solicitar respuesta al usuario' });
   }
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
   const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;
-  const canTake = ticket.puedeGestionar && !ticket.responsableId && ticket.estado !== 'CERRADO';
+  const canTake = ticket.puedeGestionar && ticket.responsableId !== owner && (!ticket.responsableId || ticket.puedeAtender) && ticket.estado !== 'CERRADO';
+  const optionalBody = selected === 'DERIVAR' || selected === 'CLASIFICAR';
   const recipients = (team.data || []).filter(user => user.id !== ticket.responsableId);
   const privateAction = selected === 'NOTA' || selected === 'DERIVAR' || selected === 'CLASIFICAR';
   return <section aria-label="Atender ticket" className="min-w-0 space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
     <h4 className="font-semibold text-neutral-900">Atender ticket</h4>
-    {canTake && <Button disabled={busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Tomar ticket</Button>}
+    {canTake && <Button disabled={busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
     {pending?.input.accion === 'TOMAR' && <Button isLoading={busy} onClick={() => void send('TOMAR')}>Reintentar toma del ticket</Button>}
     {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
       <div role="group" aria-label="Acciones del ticket" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -225,10 +227,10 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
           renderOption={option => <span className="block [overflow-wrap:anywhere]">{option.label}</span>}
           options={recipients.map(user => ({ value: user.id, label: name(user) + ' · ' + user.email }))} />}
         {team.isSuccess && !recipients.length && <p role="status" className="text-sm text-neutral-700">No hay otro responsable activo. Un administrador puede configurar el Equipo de soporte desde la mesa.</p>}</>}
-      <label className="block text-sm font-medium text-neutral-700" htmlFor="support-reply">{privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'}</label>
-      <textarea ref={bodyInput} id="support-reply" aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} minLength={5} required disabled={busy || !!pending} onChange={event => setBody(event.target.value)} rows={4}
+      <label className="block text-sm font-medium text-neutral-700" htmlFor="support-reply">{privateAction ? `Nota interna / motivo${optionalBody ? ' (opcional)' : ''}` : 'Mensaje o resolución'}</label>
+      <textarea ref={bodyInput} id="support-reply" aria-label={privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'} aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} required={!optionalBody} disabled={busy || !!pending} onChange={event => setBody(event.target.value)} rows={optionalBody ? 2 : 4}
         className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
-      <p id="support-reply-help" className="text-sm text-neutral-600">Mínimo 5 caracteres. El audio puede acompañar tu mensaje.</p>
+      <p id="support-reply-help" className="text-sm text-neutral-600">{optionalBody ? 'Podés confirmar sin escribir un motivo. La acción y el responsable quedan en el historial.' : 'El audio puede acompañar tu mensaje.'}</p>
       <div hidden={selected !== 'RESPONDER' && selected !== 'NOTA'} className="space-y-2"><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
         <p className="text-sm text-neutral-600">Opcional · podés enviar sólo texto.</p>
         <SupportAudioInput value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={busy || !!pending} />

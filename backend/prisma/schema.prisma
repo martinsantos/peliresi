@@ -142,6 +142,7 @@ model Transportista {
   usuario      Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   vehiculos    Vehiculo[]
   choferes     Chofer[]
+  documentos   Documento[]
   manifiestos  Manifiesto[]
   inspecciones Inspeccion[]
 
@@ -1101,6 +1102,7 @@ model Documento {
   id            String    @id @default(cuid())
   generadorId   String?
   operadorId    String?
+  transportistaId String?
   tipo          String
   nombre        String
   path          String
@@ -1117,9 +1119,11 @@ model Documento {
 
   generador Generador? @relation(fields: [generadorId], references: [id], onDelete: Cascade)
   operador  Operador?  @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+  transportista Transportista? @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
 
   @@index([generadorId])
   @@index([operadorId])
+  @@index([transportistaId])
   @@map("documentos")
 }
 

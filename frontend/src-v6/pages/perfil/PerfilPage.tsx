@@ -27,6 +27,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { usuarioService } from '../../services/usuario.service';
 import { useGenerador, useOperador } from '../../hooks/useActores';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
+import ActorCertificates from '../../components/ActorCertificates';
 
 
 const PerfilPage: React.FC = () => {
@@ -74,11 +75,12 @@ const PerfilPage: React.FC = () => {
         });
       }
       toast.success('Perfil actualizado', 'Tus cambios se guardaron correctamente');
+      setEditando(false);
     } catch {
-      toast.warning('Cambios locales', 'Los cambios se aplicaron localmente');
+      toast.error('No se guardaron los cambios', 'Reintentá cuando tengas conexión.');
+      return;
     } finally {
       setGuardando(false);
-      setEditando(false);
     }
   };
 
@@ -89,6 +91,8 @@ const PerfilPage: React.FC = () => {
         <h2 className="text-2xl font-bold text-neutral-900">Mi Perfil</h2>
         <p className="text-neutral-600 mt-1">Gestiona tu información personal</p>
       </div>
+
+      {currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}
       {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isLoading && <p role="status">Cargando datos de tu establecimiento…</p>}

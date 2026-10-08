@@ -49,11 +49,8 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
   const subjectInput = useRef<HTMLInputElement>(null);
   const descriptionInput = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const subjectLength = draft.asunto.trim().length;
   const descriptionLength = draft.descripcion.trim().length;
-  const shortSubject = subjectLength < 5;
-  const shortDescription = descriptionLength < 10;
-  const missing = [shortSubject && `asunto (${subjectLength}/5 caracteres)`, shortDescription && `descripción (${descriptionLength}/10 caracteres)`].filter(Boolean).join(' y ');
+  const shortDescription = descriptionLength === 0;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const mp = useMobilePrefix();
@@ -78,9 +75,9 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
     if (inFlight.current || recording) return;
     // A disabled submit hides the reason, especially after scrolling on mobile.
     // Guide the human to the first incomplete field without freezing/sending it.
-    if (shortSubject || shortDescription) {
+    if (shortDescription) {
       setValidationAttempted(true); setError('');
-      (shortSubject ? subjectInput.current : descriptionInput.current)?.focus();
+      descriptionInput.current?.focus();
       return;
     }
     inFlight.current = true; setBusy(true); setError('');
@@ -104,7 +101,7 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
         assertSupportSession(owner, administratorId);
         if (changedFiles && !withoutAttachments) throw new Error('Los adjuntos del intento anterior no están disponibles. Podés enviar solo el texto, sin volver a adjuntarlos.');
       }
-      const input: SupportCreate = pending?.input || { asunto: draft.asunto, descripcion: draft.descripcion, categoria: draft.categoria,
+      const input: SupportCreate = pending?.input || { asunto: draft.asunto.trim() || draft.descripcion.trim().split(/\r?\n/)[0].slice(0, 180), descripcion: draft.descripcion, categoria: draft.categoria,
         contexto: context || { ruta: location.pathname, ancho: innerWidth, alto: innerHeight, online: navigator.onLine } };
       const key = pending?.key || crypto.randomUUID();
       const frozen = { ...draft, pendiente: { key, input, files: digests } };
@@ -136,9 +133,9 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
   };
   const update = (change: Partial<SupportDraft>) => setDraft(previous => ({ ...previous, ...change }));
   return <Modal isOpen onClose={onClose} title="Reportar un problema" description="Tu reporte queda en Soporte de SITREP. No modifica el trámite que estás completando."
-    isBusy={busy || recording} footer={<>{missing && <p id="support-submit-help" className="w-full text-sm text-neutral-700">Para enviar: {missing}.</p>}
+    isBusy={busy || recording} footer={<>
       <Button type="button" variant="outline" disabled={busy} onClick={onClose}>Continuar luego</Button>
-      <Button type="submit" form="sitrep-support-report" isLoading={busy} disabled={recording} aria-describedby={missing ? 'support-submit-help' : undefined}>Enviar ticket</Button></>}>
+      <Button type="submit" form="sitrep-support-report" isLoading={busy} disabled={recording}>Enviar ticket</Button></>}>
     <form id="sitrep-support-report" onSubmit={send} noValidate className="space-y-4">
       {representedName && <p className="border-l-4 border-primary-700 pl-3 text-sm text-neutral-800">El ticket y las respuestas quedarán para {representedName}. Se registrará también el administrador que lo cargó.</p>}
       {preview && <figure className="space-y-2">
@@ -147,16 +144,16 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
         <Button type="button" variant="outline" disabled={busy || !!draft.pendiente} onClick={() => setScreenFile(undefined)}>Quitar captura</Button>
       </figure>}
       {captureError && <p role="status" className="text-sm text-neutral-700">{captureError}</p>}
-      <Input ref={subjectInput} label="Asunto" helperText="Mínimo 5 caracteres." errorMessage={validationAttempted && shortSubject ? 'Escribí al menos 5 caracteres para el asunto.' : undefined}
-        value={draft.asunto} minLength={5} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} required />
+      <Input ref={subjectInput} label="Asunto" helperText="Opcional. Si lo dejás vacío, usamos el inicio de tu descripción."
+        value={draft.asunto} maxLength={180} disabled={busy || !!draft.pendiente} onChange={event => update({ asunto: event.target.value })} />
       <Select label="Área del problema" value={draft.categoria} onChange={value => update({ categoria: value as SupportCategory })}
         disabled={busy || !!draft.pendiente} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-description">¿Qué intentabas hacer y qué ocurrió?</label>
-      <textarea ref={descriptionInput} id="support-description" value={draft.descripcion} onChange={event => update({ descripcion: event.target.value })} maxLength={8000} required minLength={10}
+      <textarea ref={descriptionInput} id="support-description" value={draft.descripcion} onChange={event => update({ descripcion: event.target.value })} maxLength={8000} required
         aria-describedby="support-description-help" aria-invalid={validationAttempted && shortDescription} disabled={busy || !!draft.pendiente} rows={5}
         className={`w-full rounded-lg border p-3 text-base text-neutral-900 focus-visible:outline-primary-700 ${validationAttempted && shortDescription ? 'border-error-500' : 'border-neutral-400'}`} />
       <p id="support-description-help" className={validationAttempted && shortDescription ? 'text-sm text-error-700' : 'text-sm text-neutral-600'}>
-        {validationAttempted && shortDescription ? 'Escribí al menos 10 caracteres para describir el problema.' : 'Mínimo 10 caracteres. Describí qué esperabas y qué viste.'}</p>
+        {validationAttempted && shortDescription ? 'Describí el problema para enviar el ticket.' : 'Contanos qué pasó. Podés enviar sólo texto.'}</p>
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-files">Capturas o documentos · opcional</label>
       <SupportAudioInput value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={busy || !!draft.pendiente} />
       <input ref={fileInput} id="support-files" type="file" multiple accept={supportFileAccept} disabled={busy}

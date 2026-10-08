@@ -161,8 +161,8 @@ router.get('/generadores/:id/documentos', requireActorRead('generador'), getDocu
 router.post('/generadores/:id/documentos', requireAdminOrGenerador, upload.single('archivo'), uploadDocumento);
 router.get('/documentos/:docId/download',                     downloadDocumento);
 // The document lookup in each controller enforces its actual actor sector.
-router.patch('/documentos/:docId/revisar', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), revisarDocumento);
-router.delete('/documentos/:docId', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), deleteDocumento);
+router.patch('/documentos/:docId/revisar', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'), revisarDocumento);
+router.delete('/documentos/:docId', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'), deleteDocumento);
 
 // ===== TRANSPORTISTAS =====
 
@@ -581,5 +581,7 @@ router.post('/operadores/:id/documentos', requireAdminOrOperador, upload.single(
 router.get('/generadores/:id/historial', requireActorRead('generador'), getHistorialActor);
 router.get('/operadores/:id/historial', requireActorRead('operador'), getHistorialActor);
 router.get('/transportistas/:id/historial', requireActorRead('transportista'), getHistorialActor);
+router.get('/transportistas/:id/documentos', requireActorRead('transportista'), getDocumentos);
+router.post('/transportistas/:id/documentos', requireAdminOrTransportista, upload.single('archivo'), uploadDocumento);
 
 export default router;

@@ -372,9 +372,11 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
             latitud, longitud, tefInputs,
         } = req.body;
 
-        const antes = await prisma.generador.findUnique({ where: { id } });
-
-        const generador = await prisma.generador.update({
+        const generador = await prisma.$transaction(async transaction => {
+            await transaction.$queryRaw`SELECT id FROM generadores WHERE id = ${id} FOR UPDATE`;
+            const antes = await transaction.generador.findUnique({ where: { id } });
+            if (!antes) throw new AppError('Generador no encontrado', 404);
+            const actualizado = await transaction.generador.update({
             where: { id },
             data: {
                 razonSocial, domicilio, telefono, email, numeroInscripcion, categoria, activo, actividad, rubro, corrientesControl,
@@ -391,7 +393,9 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
             }
         });
 
-        await auditarActor({ accion: 'UPDATE', modulo: 'GENERADOR', datosAntes: antes, datosDespues: generador, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+        await auditarActor({ accion: 'UPDATE', modulo: 'GENERADOR', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
+            return actualizado;
+        });
 
         res.json({ success: true, data: { generador } });
     } catch (error) {
@@ -654,9 +658,11 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
             latitud, longitud,
         } = req.body;
 
-        const antes = await prisma.transportista.findUnique({ where: { id } });
-
-        const transportista = await prisma.transportista.update({
+        const transportista = await prisma.$transaction(async transaction => {
+            await transaction.$queryRaw`SELECT id FROM transportistas WHERE id = ${id} FOR UPDATE`;
+            const antes = await transaction.transportista.findUnique({ where: { id } });
+            if (!antes) throw new AppError('Transportista no encontrado', 404);
+            const actualizado = await transaction.transportista.update({
             where: { id },
             data: {
                 razonSocial, domicilio, numeroHabilitacion, telefono, email, activo,
@@ -675,7 +681,9 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
             }
         });
 
-        await auditarActor({ accion: 'UPDATE', modulo: 'TRANSPORTISTA', datosAntes: antes, datosDespues: transportista, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+        await auditarActor({ accion: 'UPDATE', modulo: 'TRANSPORTISTA', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
+            return actualizado;
+        });
 
         res.json({ success: true, data: { transportista } });
     } catch (error) {
@@ -1160,9 +1168,11 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
             vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
         } = req.body;
 
-        const antes = await prisma.operador.findUnique({ where: { id } });
-
-        const operador = await prisma.operador.update({
+        const operador = await prisma.$transaction(async transaction => {
+            await transaction.$queryRaw`SELECT id FROM operadores WHERE id = ${id} FOR UPDATE`;
+            const antes = await transaction.operador.findUnique({ where: { id } });
+            if (!antes) throw new AppError('Operador no encontrado', 404);
+            const actualizado = await transaction.operador.update({
             where: { id },
             data: {
                 razonSocial, numeroHabilitacion, domicilio, telefono, email, categoria, activo, tipoOperador, tecnologia, corrientesY,
@@ -1179,7 +1189,9 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
             }
         });
 
-        await auditarActor({ accion: 'UPDATE', modulo: 'OPERADOR', datosAntes: antes, datosDespues: operador, usuarioId: req.user!.id, operadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] });
+        await auditarActor({ accion: 'UPDATE', modulo: 'OPERADOR', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, operadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
+            return actualizado;
+        });
 
         res.json({ success: true, data: { operador } });
     } catch (error) {

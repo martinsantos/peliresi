@@ -6,11 +6,11 @@ export const SUPPORT_CATEGORIES = ['GENERAL', 'SESION', 'MANIFIESTOS', 'INSPECCI
 export const SUPPORT_TYPES = ['PROBLEMA', 'CONSULTA', 'MEJORA'] as const;
 export const SUPPORT_PRIORITIES = ['BAJA', 'NORMAL', 'ALTA', 'URGENTE'] as const;
 export const supportCreateInput = z.object({
-  asunto: z.string().trim().min(5).max(180),
-  descripcion: z.string().trim().min(10).max(8000),
+  asunto: z.string().trim().max(180).default(''),
+  descripcion: z.string().trim().min(1, 'Describí el problema').max(8000),
   categoria: z.enum(SUPPORT_CATEGORIES).default('GENERAL'),
   contexto: z.unknown().optional(),
-}).strict();
+}).strict().transform(input => ({ ...input, asunto: input.asunto || input.descripcion.split(/\r?\n/)[0].slice(0, 180) }));
 export const supportMutationInput = z.object({
   accion: z.enum(['RESPONDER', 'NOTA', 'TOMAR', 'DERIVAR', 'ESPERAR', 'CERRAR', 'REABRIR', 'CLASIFICAR']),
   version: z.coerce.number().int().positive(),
@@ -20,7 +20,7 @@ export const supportMutationInput = z.object({
   tipo: z.enum(SUPPORT_TYPES).optional(),
   prioridad: z.enum(SUPPORT_PRIORITIES).optional(),
 }).strict().superRefine((input, ctx) => {
-  if (input.accion !== 'TOMAR' && input.cuerpo.length < 5) ctx.addIssue({ code: 'custom', message: 'Explicá el motivo o escribí un mensaje (mínimo 5 caracteres)', path: ['cuerpo'] });
+  if (!['TOMAR', 'DERIVAR', 'CLASIFICAR'].includes(input.accion) && !input.cuerpo.length) ctx.addIssue({ code: 'custom', message: 'Escribí un mensaje o una resolución', path: ['cuerpo'] });
   if (input.accion === 'DERIVAR' && !input.responsableId) ctx.addIssue({ code: 'custom', message: 'Elegí un responsable', path: ['responsableId'] });
   if (input.accion !== 'DERIVAR' && input.responsableId) ctx.addIssue({ code: 'custom', message: 'Esta acción no permite cambiar el responsable', path: ['responsableId'] });
   if (input.accion === 'CLASIFICAR' && (!input.categoria || !input.tipo || !input.prioridad)) ctx.addIssue({ code: 'custom', message: 'Elegí área, tipo y prioridad para clasificar', path: ['tipo'] });

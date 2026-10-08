@@ -51,6 +51,8 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
 import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import HistorialCambiosActor from '../../components/HistorialCambiosActor';
+import ActorCertificates from '../../components/ActorCertificates';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 
@@ -363,6 +365,9 @@ const TransportistaDetallePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`))}>Editar datos del padrón</Button>}
+      <ActorCertificates type="TRANSPORTISTA" actorId={id || ''} />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -724,6 +729,11 @@ const TransportistaDetallePage: React.FC = () => {
         </TabPanel>}
 
         <TabPanel id="historial">
+          <details className="mb-4 rounded-xl border border-neutral-200 bg-white p-4">
+            <summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Cambios de datos del padrón</summary>
+            <p className="mb-3 text-sm text-neutral-600">Quién cambió cada campo, cuándo y sus valores antes y después.</p>
+            <HistorialCambiosActor tipoActor="TRANSPORTISTA" actorId={id || ''} />
+          </details>
           <TrazabilidadTimeline
             actorType="transportista"
             actorId={id || ''}

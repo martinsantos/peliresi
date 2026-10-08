@@ -49,6 +49,16 @@ describe('actor documents: ownership and sector boundaries before side effects',
     const result = await invoke(downloadDocumento, owner);
     expect(result.error).toBeUndefined(); expect(mock.pipe).toHaveBeenCalledWith(result.res);
   });
+  it('serves only the matching transportista certificate and rejects ambiguous ownership', async () => {
+    mock.find.mockResolvedValue({ ...stored, generadorId: null, transportistaId: 'carrier-1' });
+    const user = { id: 'carrier', rol: 'TRANSPORTISTA', transportista: { id: 'carrier-1' } };
+    expect((await invoke(downloadDocumento, user)).error).toBeUndefined();
+    mock.stream.mockClear();
+    expect((await invoke(downloadDocumento, { ...user, transportista: { id: 'carrier-2' } })).error).toMatchObject({ statusCode: 403 });
+    expect(mock.stream).not.toHaveBeenCalled();
+    mock.find.mockResolvedValue({ ...stored, transportistaId: 'carrier-1' });
+    expect((await invoke(downloadDocumento, { id: 'admin', rol: 'ADMIN' })).error).toMatchObject({ statusCode: 403 });
+  });
   it.each([foreign, { id: 'unlinked', rol: 'GENERADOR' }, { id: 'operator', rol: 'OPERADOR', operador: { id: 'op-1' } }])
     ('rejects foreign/unlinked reads before filesystem access: $rol', async user => {
       const result = await invoke(downloadDocumento, user);

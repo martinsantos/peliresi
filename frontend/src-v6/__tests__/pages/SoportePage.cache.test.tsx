@@ -92,7 +92,7 @@ it('explains and focuses an incomplete reply instead of silently disabling sendi
   openDetail();
   const submit = await screen.findByRole('button', { name: 'Enviar respuesta', exact: true });
   expect(submit).toBeEnabled(); fireEvent.click(submit);
-  expect(screen.getByRole('alert')).toHaveTextContent('Escribí al menos 5 caracteres');
+  expect(screen.getByRole('alert')).toHaveTextContent('Escribí un mensaje o una resolución.');
   expect(screen.getByLabelText('Mensaje o resolución')).toHaveFocus(); expect(calls.act).not.toHaveBeenCalled();
 });
 it('puts named support controls before the conversation, without an action dropdown', async () => {
@@ -136,10 +136,11 @@ it('explains when no other active teammate is available rather than showing an e
   expect(await screen.findByText('No hay otro responsable activo. Un administrador puede configurar el Equipo de soporte desde la mesa.')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Confirmar derivación', exact: true })).toBeDisabled();
 });
-it('keeps the existing take-first boundary for an unassigned non-admin support agent', async () => {
+it('offers assignment and direct routing for unassigned staff without opening response permissions', async () => {
   openDetail({ puedeAtender: false });
-  expect(await screen.findByRole('button', { name: 'Tomar ticket', exact: true })).toBeVisible();
-  for (const label of ['Responder', 'Nota interna', 'Derivar']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Tomar ticket', exact: true }));
+  expect(await screen.findByRole('button', { name: 'Asignarme', exact: true })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Derivar', exact: true })).toBeVisible();
+  for (const label of ['Responder', 'Nota interna']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Asignarme', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, { accion: 'TOMAR', cuerpo: '', version: 1 }, [], expect.any(String)));
 });

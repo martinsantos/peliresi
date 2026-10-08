@@ -120,6 +120,26 @@ describe('support identity, visibility and transactional workflow', () => {
     const res = response(); await comprobarEnvioTicket(request() as never, res as never, vi.fn());
     expect(mocks.ticket).toHaveBeenCalledWith({ where: { autorId_clienteId: { autorId: 'owner', clienteId: 'creation123' } } });
   });
+  it('lets an administrator assign an open ticket to themselves without a mandatory message', async () => {
+    const next = vi.fn();
+    await accionarTicket(request({ accion: 'TOMAR', version: 2 }, { ...user, id: 'admin', rol: 'ADMIN' }) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ responsableId: 'admin', estado: 'EN_CURSO' }) }));
+    expect(mocks.createEvent).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ accion: 'TOMAR', responsableAnteriorId: 'agent', responsableNuevoId: 'admin' }) }));
+  });
+  it('allows staff to route an unassigned ticket directly but not take over another staff assignment', async () => {
+    mocks.agent.mockResolvedValue({ habilitado: true });
+    const staff = { ...user, id: 'staff' };
+    mocks.ticket.mockResolvedValue({ ...ticket, responsableId: null });
+    let next = vi.fn();
+    await accionarTicket(request({ accion: 'DERIVAR', version: 2, responsableId: 'agent' }, staff) as never, response() as never, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.createNotices).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ usuarioId: 'agent' })] }));
+    mocks.ticket.mockResolvedValue(ticket); mocks.update.mockClear(); next = vi.fn();
+    await accionarTicket(request({ accion: 'DERIVAR', version: 2, responsableId: 'another' }, staff) as never, response() as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403 });
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
   it('rejects a reused creation key with different contents and does not write', async () => {
     const next = vi.fn(); await crearTicket(request({ asunto: 'GPS no responde', descripcion: 'No muestra el marcador después del permiso.', categoria: 'GPS' }) as never, response() as never, next);
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 }); expect(mocks.transaction).not.toHaveBeenCalled();

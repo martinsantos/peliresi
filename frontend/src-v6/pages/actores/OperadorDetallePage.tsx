@@ -28,6 +28,7 @@ import {
   Briefcase,
   Route,
   ClipboardCheck,
+  Pencil,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -42,6 +43,8 @@ import type { OperadorEnriched } from '../../data/operadores-enrichment';
 import { CORRIENTES_Y } from '../../data/corrientes-y';
 import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import HistorialCambiosActor from '../../components/HistorialCambiosActor';
+import ActorCertificates from '../../components/ActorCertificates';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 
@@ -114,6 +117,16 @@ const OperadorDetallePage: React.FC = () => {
 
   // CSV enrichment lookup by CUIT
   const enriched: OperadorEnriched | null = operador?.cuit ? (OPERADORES_DATA[operador.cuit] || null) : null;
+  const realAddress = {
+    calle: apiOperador?.domicilioRealCalle ?? enriched?.domicilioReal?.calle ?? '',
+    localidad: apiOperador?.domicilioRealLocalidad ?? enriched?.domicilioReal?.localidad ?? '',
+    departamento: apiOperador?.domicilioRealDepto ?? enriched?.domicilioReal?.departamento ?? '',
+  };
+  const legalAddress = {
+    calle: apiOperador?.domicilioLegalCalle ?? enriched?.domicilioLegal?.calle ?? '',
+    localidad: apiOperador?.domicilioLegalLocalidad ?? enriched?.domicilioLegal?.localidad ?? '',
+    departamento: apiOperador?.domicilioLegalDepto ?? enriched?.domicilioLegal?.departamento ?? '',
+  };
 
   // Parse tecnologías from CSV into structured list
   const tecnologiasParsed = useMemo(() =>
@@ -178,6 +191,9 @@ const OperadorDetallePage: React.FC = () => {
         </div>
       </div>
 
+      {canViewCatalog && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/operadores/${id}/editar`))}>Editar datos del padrón</Button>}
+      <ActorCertificates type="OPERADOR" actorId={id || ''} />
+
       {/* Stats — only real data */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <Card className="p-4">
@@ -208,13 +224,13 @@ const OperadorDetallePage: React.FC = () => {
               <CardContent>
                 <div className="space-y-4">
                   {/* Direccion Real (CSV - structured) */}
-                  {enriched?.domicilioReal ? (
+                  {realAddress.calle ? (
                     <div className="flex items-start gap-3 text-sm">
                       <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
                       <div>
                         <p className="text-neutral-500">Direccion Real {apiOperador?.tipoOperador === 'IN_SITU' ? '(sede administrativa)' : '(planta)'}</p>
-                        <p className="font-medium text-neutral-900">{enriched.domicilioReal.calle}</p>
-                        <p className="text-neutral-600">{enriched.domicilioReal.localidad}, {enriched.domicilioReal.departamento}</p>
+                        <p className="font-medium text-neutral-900">{realAddress.calle}</p>
+                        <p className="text-neutral-600">{[realAddress.localidad, realAddress.departamento].filter(Boolean).join(', ')}</p>
                         {apiOperador?.tipoOperador === 'IN_SITU' && (
                           <p className="text-xs text-amber-600 mt-1">Opera en la ubicacion del generador</p>
                         )}
@@ -230,13 +246,13 @@ const OperadorDetallePage: React.FC = () => {
                     </div>
                   )}
                   {/* Direccion Fiscal (CSV) */}
-                  {enriched?.domicilioLegal && (
+                  {legalAddress.calle && (
                     <div className="flex items-start gap-3 text-sm">
                       <MapPin size={16} className="text-neutral-400 shrink-0 mt-0.5" />
                       <div>
                         <p className="text-neutral-500">Direccion Fiscal</p>
-                        <p className="font-medium text-neutral-900">{enriched.domicilioLegal.calle}</p>
-                        <p className="text-neutral-600">{enriched.domicilioLegal.localidad}, {enriched.domicilioLegal.departamento}</p>
+                        <p className="font-medium text-neutral-900">{legalAddress.calle}</p>
+                        <p className="text-neutral-600">{[legalAddress.localidad, legalAddress.departamento].filter(Boolean).join(', ')}</p>
                       </div>
                     </div>
                   )}
@@ -484,6 +500,11 @@ const OperadorDetallePage: React.FC = () => {
         </TabPanel>}
 
         <TabPanel id="historial">
+          <details className="mb-4 rounded-xl border border-neutral-200 bg-white p-4">
+            <summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Cambios de datos del padrón</summary>
+            <p className="mb-3 text-sm text-neutral-600">Quién cambió cada campo, cuándo y sus valores antes y después.</p>
+            <HistorialCambiosActor tipoActor="OPERADOR" actorId={id || ''} />
+          </details>
           <TrazabilidadTimeline
             actorType="operador"
             actorId={id || ''}

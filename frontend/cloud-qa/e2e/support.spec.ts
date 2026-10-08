@@ -1,8 +1,47 @@
 import { devices, expect, test, type Page, type TestInfo, type BrowserContext } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import pathNode from 'node:path';
 import { login, prefix, readableFixedAction, readablePageHeading } from './helpers';
 
 const path = (info: TestInfo, suffix = '') => prefix(info) + '/soporte' + suffix;
+test('brief reports need no title or attachment; staff can route to themselves or claim in one action', async ({ page, browser }, info) => {
+  const fixture = JSON.parse(await readFile(pathNode.join(process.env.QA_ARTIFACTS!, 'fixture.json'), 'utf8'));
+  expect(fixture.database).toBe('sitrep_night_qa_20260926'); expect(fixture.externalDelivery).toBe(false);
+  await login(page, info, 'generador');
+  const briefReport = async (description: string) => {
+    await page.goto(path(info));
+    await page.getByRole('button', { name: 'Reportar problema', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
+    await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill(description);
+    const posted = page.waitForResponse(response => new URL(response.url()).pathname === '/api/soporte' && response.request().method() === 'POST');
+    await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
+    const response = await posted; expect(response.status()).toBe(201);
+    const ticket = (await response.json()).data;
+    await expect(page.getByRole('heading', { name: description, exact: true })).toBeVisible();
+    return ticket;
+  };
+  const first = await briefReport('QR');
+  const second = await briefReport('GPS');
+  const context = await browser.newContext({ viewport: info.project.name === 'web-desktop' ? { width: 1440, height: 900 } : { width: 360, height: 800 } });
+  try {
+    const staff = await context.newPage(); await login(staff, info);
+    await staff.goto(path(info, '/' + first.id));
+    await staff.getByRole('button', { name: 'Derivar', exact: true }).click();
+    await staff.getByRole('button', { name: 'Nuevo responsable', exact: true }).click();
+    await staff.getByRole('option', { name: 'QA admin · admin@night-qa.invalid', exact: true }).click();
+    const routed = staff.waitForResponse(response => new URL(response.url()).pathname === `/api/soporte/${first.id}/acciones` && response.request().method() === 'POST');
+    await staff.getByRole('button', { name: 'Confirmar derivación', exact: true }).click();
+    expect((await routed).status()).toBe(200);
+    await expect(staff.getByText('Responsable', { exact: true }).locator('..')).toContainText('QA admin');
+    await screenshot(staff, info, 'direct-self-routing');
+    await staff.goto(path(info, '/' + second.id));
+    const claimed = staff.waitForResponse(response => new URL(response.url()).pathname === `/api/soporte/${second.id}/acciones` && response.request().method() === 'POST');
+    await staff.getByRole('button', { name: 'Asignarme', exact: true }).click();
+    expect((await claimed).status()).toBe(200);
+    await expect(staff.getByText('Responsable', { exact: true }).locator('..')).toContainText('QA admin');
+    await screenshot(staff, info, 'one-action-assignment');
+  } finally { await context.close(); }
+});
 async function screenshot(page: Page, info: TestInfo, label: string) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
@@ -26,15 +65,14 @@ async function report(page: Page, subject: string) {
   const observe = (request: import('@playwright/test').Request) => { if (request.url().endsWith('/api/soporte') && request.method() === 'POST') posts.push(request.url()); };
   page.on('request', observe);
   try {
-    // Actual reported state: both fields filled, but too short. The sticky
-    // primary action must explain/focus the field, not become a silent dead end.
+    // Only a description is required. A short optional title must not block it.
     await dialog.getByLabel('Asunto', { exact: true }).fill('yy');
-    await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('hh');
+    await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('  ');
     const submit = dialog.getByRole('button', { name: 'Enviar ticket', exact: true });
     await expect(submit).toBeEnabled();
-    await expect(dialog.getByText('Para enviar: asunto (2/5 caracteres) y descripción (2/10 caracteres).', { exact: true })).toBeVisible();
     await submit.click();
-    await expect(dialog.getByLabel('Asunto', { exact: true })).toBeFocused();
+    await expect(dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true })).toBeFocused();
+    await expect(dialog.getByText('Describí el problema para enviar el ticket.', { exact: true })).toBeVisible();
     expect(posts).toEqual([]);
     await dialog.getByLabel('Asunto', { exact: true }).fill(subject);
     await submit.click();
@@ -99,7 +137,7 @@ test('native support: report, take, private note, handoff, reply, close and reop
     expect(await controls.evaluate(element => Boolean(element.compareDocumentPosition(document.querySelector('[aria-label="Conversación"]')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
     await expect(admin.getByRole('button', { name: 'Acción de soporte', exact: true })).toHaveCount(0);
     await screenshot(admin, info, 'visible-attention-controls');
-    await admin.getByRole('button', { name: 'Tomar ticket', exact: true }).click();
+    await admin.getByRole('button', { name: 'Asignarme', exact: true }).click();
     await expect(admin.getByText('QA admin', { exact: true }).first()).toBeVisible();
     await action(admin, 'Nota interna de soporte', 'QA diagnóstico reservado: no mostrar al reportante.');
     await expect(admin.getByText('Sólo el equipo de soporte puede leer esta nota.', { exact: true })).toBeVisible();

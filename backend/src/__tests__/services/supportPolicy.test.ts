@@ -17,9 +17,14 @@ describe('native support contract', () => {
     expect(supportCreateInput.safeParse({ asunto: 'a', descripcion: '' }).success).toBe(false);
     expect(supportCreateInput.safeParse({ asunto: 'GPS no responde', descripcion: 'No muestra mi posición.', usuarioId: 'another-user' }).success).toBe(false);
   });
-  it('requires a version and a reason when handing off or closing', () => {
+  it('derives an optional subject and retains the identity boundary', () => {
+    expect(supportCreateInput.parse({ descripcion: 'QR\nNo lee la cámara' })).toMatchObject({ asunto: 'QR', categoria: 'GENERAL' });
+    expect(supportCreateInput.safeParse({ descripcion: ' ' }).success).toBe(false);
+  });
+  it('requires a version and resolution but allows routing without mandatory prose', () => {
     expect(supportMutationInput.safeParse({ accion: 'DERIVAR', version: 1, responsableId: 'agent', cuerpo: 'Revisar los permisos del dispositivo.' }).success).toBe(true);
-    expect(supportMutationInput.safeParse({ accion: 'DERIVAR', version: 1, responsableId: 'agent', cuerpo: '' }).success).toBe(false);
+    expect(supportMutationInput.safeParse({ accion: 'DERIVAR', version: 1, responsableId: 'agent', cuerpo: '' }).success).toBe(true);
+    expect(supportMutationInput.safeParse({ accion: 'DERIVAR', version: 1, cuerpo: '' }).success).toBe(false);
     expect(supportMutationInput.safeParse({ accion: 'CERRAR', version: 1, cuerpo: 'Resuelto con autorización del usuario.' }).success).toBe(true);
     expect(supportMutationInput.safeParse({ accion: 'CERRAR', version: 0, cuerpo: '' }).success).toBe(false);
     expect(supportMutationInput.safeParse({ accion: 'RESPONDER', version: 1, cuerpo: 'Respuesta', interno: true, usuarioId: 'admin' }).success).toBe(false);

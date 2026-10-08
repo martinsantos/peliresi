@@ -218,10 +218,10 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
         case 'TOMAR':
           if (!managing) throw new AppError('No autorizado para tomar tickets', 403);
           if (ticket.estado === 'CERRADO') throw new AppError('El ticket está cerrado', 409);
-          if (ticket.responsableId && ticket.responsableId !== req.user.id) throw new AppError('El ticket ya tiene responsable; usá una derivación', 409);
+          if (ticket.responsableId && ticket.responsableId !== req.user.id && req.user.rol !== 'ADMIN') throw new AppError('El ticket ya tiene responsable; usá una derivación', 409);
           responsableId = req.user.id; estado = 'EN_CURSO'; break;
         case 'DERIVAR': {
-          if (!assigned) throw new AppError('Sólo el responsable o administrador puede derivar', 403);
+          if (!assigned && !(managing && !ticket.responsableId)) throw new AppError('Sólo el responsable o administrador puede derivar', 403);
           if (ticket.estado === 'CERRADO') throw new AppError('Reabrí antes de derivar', 409);
           if (input.responsableId === ticket.responsableId) throw new AppError('Elegí otro responsable', 400);
           await db.$queryRaw`SELECT id FROM usuarios WHERE id = ${input.responsableId} FOR UPDATE`;

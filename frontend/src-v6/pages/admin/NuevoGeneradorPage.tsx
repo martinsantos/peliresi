@@ -262,7 +262,7 @@ const NuevoGeneradorPage: React.FC = () => {
           id,
           data: {
             razonSocial: form.razonSocial, cuit: form.cuit,
-            domicilio: form.domicilio || form.domicilioLegalCalle,
+            domicilio: [form.domicilioLegalCalle, form.domicilioLegalLocalidad, form.domicilioLegalDepto].filter(Boolean).join(', ') || form.domicilio,
             telefono: form.telefono, email: form.email,
             numeroInscripcion: form.numeroInscripcion, categoria: form.categoria,
             actividad: form.actividad, rubro: form.rubro,

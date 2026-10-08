@@ -30,6 +30,8 @@ import DocumentUpload from '../../components/DocumentUpload';
 import CalculadoraTEF from '../../components/CalculadoraTEF';
 import { generadorFiscalService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import HistorialCambiosActor from '../../components/HistorialCambiosActor';
+import ActorCertificates from '../../components/ActorCertificates';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 // ===== Inline CRUD Modal =====
@@ -357,6 +359,9 @@ const GeneradorDetallePage: React.FC = () => {
         </Card>
       </div>
 
+      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`))}>Editar datos del padrón</Button>}
+      <ActorCertificates type="GENERADOR" actorId={id || ''} />
+
       {/* 5 Tabs */}
       <Tabs defaultTab="info" variant="default">
         <TabList>
@@ -647,6 +652,11 @@ const GeneradorDetallePage: React.FC = () => {
         </TabPanel>}
 
         <TabPanel id="historial">
+          <details className="mb-4 rounded-xl border border-neutral-200 bg-white p-4">
+            <summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Cambios de datos del padrón</summary>
+            <p className="mb-3 text-sm text-neutral-600">Quién cambió cada campo, cuándo y sus valores antes y después.</p>
+            <HistorialCambiosActor tipoActor="GENERADOR" actorId={id || ''} />
+          </details>
           <TrazabilidadTimeline
             actorType="generador"
             actorId={id || ''}

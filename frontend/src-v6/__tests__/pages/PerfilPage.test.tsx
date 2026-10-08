@@ -16,6 +16,7 @@ function setup() {
 beforeEach(() => {
   m.user = { id: 'user', actorId: 'op-1', rol: 'OPERADOR', nombre: 'QA usuario', email: 'qa@example.invalid' };
   m.get.mockReset().mockImplementation(async (url: string) => {
+    if (url.endsWith('/documentos')) return { data: { success: true, data: { documentos: [] } } };
     const key = url.includes('/generadores/') ? 'generador' : 'operador';
     return { data: { success: true, data: { [key]: actor(url.split('/').at(-1)!) } } };
   });
@@ -41,10 +42,11 @@ it('uses the generator response without querying another category', async () => 
   m.user = { ...m.user, rol: 'GENERADOR', actorId: 'g-1' }; setup();
   expect(await screen.findByText('QA establecimiento g-1')).toBeVisible();
   expect(screen.getByText('QA-G-1')).toBeVisible();
-  expect(m.get.mock.calls.map(([url]) => url)).toEqual(['/actores/generadores/g-1']);
+  expect(m.get.mock.calls.map(([url]) => url)).toEqual(expect.arrayContaining(['/actores/generadores/g-1', '/actores/generadores/g-1/documentos']));
 });
 it('shows a real error and allows retry instead of silently displaying empty data', async () => {
-  m.get.mockRejectedValueOnce(new Error('offline')); setup();
+  const original = m.get.getMockImplementation()!; let failed = false;
+  m.get.mockImplementation(async (url: string) => { if (url === '/actores/operadores/op-1' && !failed) { failed = true; throw new Error('offline'); } return original(url); }); setup();
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar');
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar datos del establecimiento' }));
   expect(await screen.findByText('QA establecimiento op-1')).toBeVisible();
@@ -63,6 +65,6 @@ it('does not request an actor for an unbound administrative identity', async () 
 });
 it('identifies loading rather than showing placeholder establishment fields', async () => {
   m.get.mockImplementation(() => new Promise(() => {})); setup();
-  expect(await screen.findByRole('status')).toHaveTextContent('Cargando datos');
+  expect(await screen.findByText('Cargando datos de tu establecimiento…')).toBeVisible();
   expect(screen.queryByText('Razon Social')).toBeNull();
 });
