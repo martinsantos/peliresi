@@ -7,6 +7,7 @@ import { CentroControlPage } from '../../pages/centro-control/CentroControlPage'
 const centro = vi.hoisted(() => vi.fn());
 const refresh = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => vi.fn());
+const mapProps = vi.hoisted(() => vi.fn());
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: auth }));
 vi.mock('../../hooks/useCentroControl', () => ({ useCentroControl: centro }));
 vi.mock('../../hooks/useDashboard', () => ({ useDashboardStats: () => ({ refetch: refresh }) }));
@@ -14,7 +15,10 @@ vi.mock('../../hooks/useManifiestos', () => ({ useManifiestos: () => ({ data: { 
 vi.mock('../../hooks/useAlertas', () => ({ useAlertas: () => ({ data: { items: [] } }) }));
 vi.mock('../../hooks/useInspectionOperations', () => ({ useInspectionOperations: () => ({ data: { total: 0, items: [] }, refetch: refresh, isError: false, isPending: false }) }));
 vi.mock('../../pages/centro-control/components/ControlFilters', () => ({ ControlFilters: () => null }));
-vi.mock('../../pages/centro-control/components/ControlMap', () => ({ ControlMap: () => null }));
+vi.mock('../../pages/centro-control/components/ControlMap', () => ({ ControlMap: (props: { layers: { transito: boolean }; onToggleLayer: (layer: 'transito') => void }) => {
+  mapProps(props);
+  return <button type="button" aria-label="Capa En Tránsito" aria-pressed={props.layers.transito} onClick={() => props.onToggleLayer('transito')}>Capa de tránsito</button>;
+} }));
 vi.mock('../../pages/centro-control/components/ControlStats', () => ({ ControlStats: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 
 const activeData = { enTransito: [{ manifiestoId: 'qa-trip', numero: 'QA-VIAJE', transportista: 'QA Transporte', origen: 'QA Origen', destino: 'QA Destino', origenLatLng: null, destinoLatLng: null, ultimaPosicion: null, ruta: [] }] };
@@ -51,6 +55,29 @@ describe('Centro de Control respects explicit panel choices across responses', (
     fireEvent.click(screen.getByRole('button', { name: 'Seleccionar viaje QA-VIAJE' }));
     expect(screen.queryByRole('button', { name: 'Ver detalle del viaje' })).toBeNull();
     expect(screen.getByText('Vista operativa · expediente restringido')).toBeVisible();
+  });
+
+  it('hides map symbols without deleting agenda trips and permits selecting a hidden trip explicitly', () => {
+    // Reproduce the actual API contract: an omitted transit layer returns no
+    // transit rows. Presentation changes must not remove this operational data.
+    centro.mockImplementation(({ capas }: { capas: string[] }) => ({
+      data: { ...activeData, enTransito: capas.includes('transito') ? activeData.enTransito : [] }, refetch: refresh,
+    }));
+    render(page);
+    const layer = screen.getByRole('button', { name: 'Capa En Tránsito', exact: true });
+    const trip = screen.getByRole('button', { name: 'Seleccionar viaje QA-VIAJE', exact: true });
+    fireEvent.click(layer);
+    expect(layer).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Viajes Activos 1', exact: true })).toBeVisible();
+    expect(trip).toBeVisible();
+    expect(centro).toHaveBeenLastCalledWith(expect.objectContaining({ capas: ['generadores', 'transportistas', 'operadores', 'transito'] }));
+    fireEvent.click(trip);
+    expect(layer).toHaveAttribute('aria-pressed', 'true');
+    expect(mapProps.mock.lastCall?.[0].selectedTripId).toBe('qa-trip');
+    expect(mapProps.mock.lastCall?.[0].tripPanel).toBe('activos');
+    // Deselecting must preserve the normal toggle, not force another selection.
+    fireEvent.click(trip);
+    expect(mapProps.mock.lastCall?.[0].selectedTripId).toBeNull();
   });
 
   it('does not reopen a panel closed by the user when the first data response arrives', () => {
