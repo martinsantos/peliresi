@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chromeButtonPoint, chromeRenderedButtonPoint, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
+import { chromeButtonPoint, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
 
 test('reads explicit OS keyboard visibility rather than inferring it from DOM focus or viewport size', () => {
   assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=true mShowRequested=true'), true);
@@ -38,6 +38,23 @@ test('never taps disabled, other-package or zero-area nodes', () => {
   assert.throws(() => chromeButtonPoint(window(node().replace('enabled="true"', 'enabled="false"')), 'No thanks'));
   assert.throws(() => chromeButtonPoint(window(node().replace('com.android.chrome', 'ar.com.ultimamilla.sitrep')), 'No thanks'));
   assert.throws(() => chromeButtonPoint(window(node('', '[40,100][40,100]')), 'No thanks'));
+});
+test('diagnoses exact all-zero accessibility bounds without authorizing a native tap', () => {
+  const button = node('class="android.widget.Button"', '[0,0][0,0]').replace('No thanks', 'Guardar cambios');
+  assert.equal(chromeButtonHasZeroBounds(window(button), 'Guardar cambios'), true);
+  assert.throws(() => chromeButtonPoint(window(button), 'Guardar cambios'));
+  assert.equal(chromeButtonHasZeroBounds(window(button.replace('[0,0][0,0]', '[40,100][240,180]')), 'Guardar cambios'), false);
+});
+test('zero-bounds diagnosis rejects wrong labels, packages, classes, disabled or ambiguous nodes', () => {
+  const button = node('class="android.widget.Button"', '[0,0][0,0]').replace('No thanks', 'Guardar cambios');
+  for (const invalid of ['', button + button, button.replace('com.android.chrome', 'other.app'),
+    button.replace('android.widget.Button', 'android.widget.EditText'), button.replace('enabled="true"', 'enabled="false"'),
+    button.replace('clickable="true"', 'clickable="false"'), button.replace('Guardar cambios', 'Guardar cambios ajenos')])
+    assert.throws(() => chromeButtonHasZeroBounds(window(invalid), 'Guardar cambios'));
+});
+test('malformed or clipped native bounds never become a DOM-input exception', () => {
+  for (const bounds of ['', '[40,100][40,100]', '[240,180][40,100]', 'unknown'])
+    assert.throws(() => chromeButtonHasZeroBounds(window(node('class="android.widget.Button"', bounds)), 'No thanks'));
 });
 test('requires a complete dump and decodes native text without executing it', () => {
   assert.throws(() => nativeNodes('<hierarchy><node/>'));

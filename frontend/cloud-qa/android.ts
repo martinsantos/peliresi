@@ -5,7 +5,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase } from './safety.ts';
-import { chromeButtonPoint, chromeRenderedButtonPoint, dismissObservedChromePrompts, nativeKeyboardShown, readNativeWindow } from './native-window.ts';
+import { chromeButtonPoint, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, dismissObservedChromePrompts, nativeKeyboardShown, readNativeWindow } from './native-window.ts';
 import { DeadlineError, withinDeadline } from './deadline.ts';
 import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
@@ -119,7 +119,19 @@ const nativeButtonTap=async(name:string,evidence:string,target?:Locator)=>{
   assert.ok(dom.rect.width>0&&dom.rect.height>0&&dom.rect.top>=(visible?.offsetTop||0)
     &&dom.rect.bottom<=(visible?visible.offsetTop+visible.height:dom.viewport.height),
     'A native tap requires the entire button inside the current visible viewport');
-  const point=target?chromeRenderedButtonPoint(xml,await button.innerText()):chromeButtonPoint(xml,name);
+  const renderedName=target?await button.innerText():name;
+  if(chromeButtonHasZeroBounds(xml,renderedName)){
+    // Run128: the actual OS screenshot and DOM hit-test show Save, but UIA
+    // assigns zero bounds. No native coordinate is usable. Use one ordinary
+    // locator touch (no force/handler/fake ACK); the caller still requires the
+    // real PATCH, persisted body and server acknowledgment. Never retry input.
+    await writeFile(path.join(output,evidence+'-tap-point.json'),JSON.stringify({
+      input:'standard Playwright DOM touch after positive viewport and hit-test',
+      nativeBounds:'[0,0][0,0]',nativeCoordinateTap:false,name:renderedName,
+    },null,2));
+    await button.tap();return;
+  }
+  const point=target?chromeRenderedButtonPoint(xml,renderedName):chromeButtonPoint(xml,name);
   await writeFile(path.join(output,evidence+'-tap-point.json'),JSON.stringify(point,null,2));
   // run14 had a visible enabled footer but CDP touch produced no creation
   // request. Exercise the actual OS input using freshly observed bounds;

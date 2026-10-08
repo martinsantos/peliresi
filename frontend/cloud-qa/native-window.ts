@@ -46,6 +46,20 @@ export function chromeRenderedButtonPoint(xml: string, renderedText: string): { 
   // Reuse the same bounds guard; do not guess a location or use substring match.
   return pointFromObservedBounds(matches[0].bounds);
 }
+/** Chrome128 exposed a visibly painted DOM button as [0,0][0,0] in UIA.
+ * This diagnoses that one exact node; it never authorizes a native-coordinate
+ * tap or excuses absent/ambiguous/disabled/inverted accessibility records. */
+export function chromeButtonHasZeroBounds(xml: string, renderedText: string): boolean {
+  const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
+  const label = normalize(renderedText); assert.ok(label);
+  const matches = nativeNodes(xml).filter(node => node.package === 'com.android.chrome'
+    && node.class === 'android.widget.Button' && node.enabled === 'true' && node.clickable === 'true'
+    && normalize(node.text || '') === label);
+  assert.equal(matches.length, 1, 'Require one exact observed native Chrome button: ' + label);
+  if (matches[0].bounds === '[0,0][0,0]') return true;
+  pointFromObservedBounds(matches[0].bounds);
+  return false;
+}
 const PIXEL_LAUNCHER_ANR = "Pixel Launcher isn't responding";
 export function pixelLauncherAnrClosePoint(xml: string): { x: number; y: number } | null {
   const nodes = nativeNodes(xml);
