@@ -1,11 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import GeneradorDetallePage from '../../pages/admin/GeneradorDetallePage';
 import ProtectedRoute from '../../components/ProtectedRoute';
 
 const mock = vi.hoisted(() => ({ role: 'GENERADOR', write: vi.fn(), download: vi.fn(), error: vi.fn() }));
 vi.mock('../../services/generador-fiscal.service', () => ({ generadorFiscalService: { downloadDocumento: mock.download } }));
+vi.mock('../../services/api', () => ({ default: { get: vi.fn().mockResolvedValue({ data: { data: { documentos: [] } } }) } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), error: mock.error } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { rol: mock.role, esInspector: true }, isLoading: false, isRestricted: false }) }));
 vi.mock('../../hooks/useActores', () => ({ useGenerador: () => ({ data: { id: 'g-1', razonSocial: 'Planta de prueba', cuit: '30-12345678-9', activo: true } }) }));
@@ -23,11 +25,12 @@ vi.mock('../../hooks/useGeneradorFiscal', () => {
   };
 });
 function open(allowInspector: boolean) {
-  render(<MemoryRouter initialEntries={['/admin/actores/generadores/g-1']}><Routes>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/admin/actores/generadores/g-1']}><Routes>
     <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR']} allowInspector={allowInspector} />}>
       <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
     </Route>
-  </Routes></MemoryRouter>);
+  </Routes></MemoryRouter></QueryClientProvider>);
 }
 describe('inspector actor consultation', () => {
   beforeEach(() => {
@@ -43,6 +46,7 @@ describe('inspector actor consultation', () => {
   it('can read the same ficha without payment, declaration, upload, review or delete controls', () => {
     open(true);
     expect(screen.getByRole('heading', { name: 'Planta de prueba' })).toBeInTheDocument();
+    expect(screen.queryByText('Cargar certificado oficial')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Situacion Fiscal' }));
     expect(screen.queryByRole('button', { name: 'Registrar Pago' })).not.toBeInTheDocument();
     expect(screen.queryByText('Acciones')).not.toBeInTheDocument();
