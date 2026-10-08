@@ -152,7 +152,9 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(async () => {
-          const cached = await cache.match(request);
+          // Installation already saves the brand icons in the release cache.
+          // A first offline manifest download must not overlook that precache.
+          const cached = await matchOwnCache(request);
           return (isCacheableAsset(request, cached) && cached) || new Response('', { status: 408, statusText: 'Offline' });
         });
     })

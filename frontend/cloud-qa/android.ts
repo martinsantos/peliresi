@@ -38,6 +38,7 @@ const deliberateOfflineContexts=new WeakSet<BrowserContext>();
 const iconProofs:IconProof[]=[];
 const runtimeErrors:string[]=[];
 const failedResponses:Array<{url:string;method:string;status:number;at:string}>=[];
+const iconTransportFailures:Array<{url:string;error:string|null;at:string;deliberatelyOffline:boolean}>=[];
 const browserLifecycle:Array<{at:string;event:string;url?:string;expected:boolean}>=[];
 const intentionalClosures=new WeakSet<BrowserContext>();
 let inspectorUserId='';
@@ -58,7 +59,7 @@ const driverStep=async<T>(stage:string,operation:()=>Promise<T>,milliseconds=250
   catch(error){await record('failed',String(error));throw error;}
 };
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
-  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,consoleObservations,iconProofs,runtimeErrors,failedResponses,browserLifecycle,
+  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,consoleObservations,iconProofs,iconTransportFailures,runtimeErrors,failedResponses,browserLifecycle,
   sessionEvidence,sessionEvidenceOverflow,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
@@ -92,7 +93,8 @@ const nativeButtonTap=async(name:string,evidence:string,target?:Locator)=>{
   await expect.poll(()=>button.evaluate(el=>{
     const r=el.getBoundingClientRect(),v=visualViewport;
     return r.width>0&&r.height>0&&r.top>=(v?.offsetTop||0)
-      &&r.bottom<=(v?(v.offsetTop+v.height):innerHeight);
+      &&r.bottom<=(v?(v.offsetTop+v.height):innerHeight)
+      &&el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));
   })).toBe(true);
   await device.screenshot({path:path.join(output,evidence+'-device.png')});
   const xml=await readNativeWindow();
@@ -101,7 +103,9 @@ const nativeButtonTap=async(name:string,evidence:string,target?:Locator)=>{
     active:document.activeElement?.tagName,viewport:{width:innerWidth,height:innerHeight,
       visual:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null},
     workspace:document.querySelector('[data-testid="inspection-workspace"]')?.getBoundingClientRect().toJSON(),
-    scroll:document.querySelector('[data-inspection-scroll]')?.getBoundingClientRect().toJSON()}));
+    scroll:document.querySelector('[data-inspection-scroll]')?.getBoundingClientRect().toJSON(),
+    ancestors:Array.from((()=>{const rows:Element[]=[];let node:Element|null=el;while(node){rows.push(node);node=node.parentElement;}return rows;})())
+      .map(node=>({tag:node.tagName,testId:node.getAttribute('data-testid'),className:node.getAttribute('class'),rect:node.getBoundingClientRect().toJSON(),height:getComputedStyle(node).height,maxHeight:getComputedStyle(node).maxHeight,overflow:getComputedStyle(node).overflow}))}));
   await writeFile(path.join(output,evidence+'-input.json'),JSON.stringify({
     name,input:'Android adb input tap at fresh native accessibility bounds',
     dom,
@@ -134,6 +138,10 @@ const observe=(target:Page)=>{
     if(response.url().includes('/api/')&&response.status()>=400)failedResponses.push({
       url:response.url(),method:response.request().method(),status:response.status(),at:new Date().toISOString(),
     });
+  });
+  target.on('requestfailed',request=>{
+    if(request.url()===qaManifestIcon)iconTransportFailures.push({url:request.url(),error:request.failure()?.errorText||null,
+      at:new Date().toISOString(),deliberatelyOffline:deliberateOfflineContexts.has(target.context())});
   });
 };
 const launch=async()=>{
@@ -550,6 +558,8 @@ try{
     const header=row.locator('button[aria-controls]').first();
     const observation=row.getByRole('textbox',{name:'Observación: '+field.etiqueta,exact:true});
     await observation.fill('QA nota Android preservada al cerrar');
+    await expect.poll(() => page.locator('[data-inspection-scroll]').evaluate(element => element.getBoundingClientRect().height),
+      { message: 'Keyboard editing must retain a real visible scroll surface, never height zero' }).toBeGreaterThan(0);
     // The Android visual viewport is panned while the field keyboard is open.
     // Run121's CDP touch hit other elements although the OS screenshot showed
     // this action. Require fresh native bounds and a real OS tap, as for Save;

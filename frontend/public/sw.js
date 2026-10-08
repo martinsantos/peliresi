@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v103';
-const RUNTIME_CACHE = 'runtime-cache-v103';
+const CACHE_NAME = 'trazabilidad-rrpp-v104';
+const RUNTIME_CACHE = 'runtime-cache-v104';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
@@ -116,7 +116,8 @@ self.addEventListener('fetch', (event) => {
                 }
                 return response;
             } catch {
-                const cached = await cache.match(request);
+                // Brand icons may exist only in the installed release cache.
+                const cached = await cache.match(request) || await (await caches.open(CACHE_NAME)).match(request);
                 // Always return a Response — never undefined
                 return (isCacheableAsset(request, cached) && cached) || new Response('', { status: 408, statusText: 'Offline' });
             }

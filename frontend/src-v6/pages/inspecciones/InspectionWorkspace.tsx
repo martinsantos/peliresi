@@ -42,13 +42,16 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   const location = useLocation();
   const navigate = useNavigate();
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [constrainedViewport, setConstrainedViewport] = useState(false);
   const scrollPositions = useRef(new Map<string, number>());
   const all = [...steps, ...reference];
   let hash = location.hash.slice(1);
   try { hash = decodeURIComponent(hash); } catch { /* Invalid links fall back safely. */ }
   const active = all.find((step) => step.id === hash.split('/')[0])
     || all.find((step) => step.id === defaultStep) || steps[0];
+  const scrollStepRef = useRef(active.id);
   const [visited, setVisited] = useState<Set<string>>(() => new Set([active.id]));
   if (!visited.has(active.id)) setVisited(new Set([...visited, active.id]));
   const availableSections = sections.map((section) => ({ ...section, entries: section.ids.flatMap((id) => all.filter((step) => step.id === id)) })).filter((section) => section.entries.length);
@@ -61,22 +64,42 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
 
   // On Android, the keyboard can pan/shrink visualViewport while h-full/dvh
   // still describe the larger layout viewport. Keep the ordinary flex footer
-  // inside the visible panel; do not scroll the document or move draft fields.
+  // inside the visible panel. If fixed chrome would consume the reading area,
+  // the same mounted panel becomes one scroll surface; do not hide/remount
+  // fields or leave an invisible zero-height input region behind the keyboard.
   useLayoutEffect(() => {
     const workspace = workspaceRef.current, viewport = window.visualViewport;
     if (!workspace || !viewport) return;
+    let frame = 0;
     const measure = () => {
       const top = workspace.getBoundingClientRect().top;
       if (!Number.isFinite(top) || !Number.isFinite(viewport.height) || viewport.height <= 0 || !Number.isFinite(viewport.offsetTop)) return;
       const height = Math.max(0, Math.floor(viewport.offsetTop + viewport.height - top - 12));
       workspace.style.maxHeight = height + 'px';
+      const parentHeight = workspace.parentElement?.getBoundingClientRect().height;
+      const room = Number.isFinite(parentHeight) && parentHeight! > 0 ? Math.min(height, parentHeight!) : height;
+      const navigation = workspace.querySelector<HTMLElement>('[data-testid="inspection-navigation"]');
+      const footer = workspace.querySelector<HTMLElement>('[data-testid="inspection-action-bar"]');
+      const chrome = (navigation?.getBoundingClientRect().height || 0) + (footer?.getBoundingClientRect().height || 0);
+      setConstrainedViewport(room < chrome + 96);
     };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
     measure();
-    viewport.addEventListener('resize', measure, { passive: true });
-    viewport.addEventListener('scroll', measure, { passive: true });
+    viewport.addEventListener('resize', schedule, { passive: true });
+    viewport.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+    workspace.addEventListener('focusin', schedule);
+    workspace.addEventListener('focusout', schedule);
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : undefined;
+    if (workspace.parentElement) observer?.observe(workspace.parentElement);
+    for (const element of workspace.querySelectorAll('[data-testid="inspection-navigation"], [data-testid="inspection-action-bar"]')) observer?.observe(element);
     return () => {
-      viewport.removeEventListener('resize', measure);
-      viewport.removeEventListener('scroll', measure);
+      cancelAnimationFrame(frame); observer?.disconnect();
+      viewport.removeEventListener('resize', schedule);
+      viewport.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      workspace.removeEventListener('focusin', schedule);
+      workspace.removeEventListener('focusout', schedule);
       workspace.style.removeProperty('max-height');
     };
   }, []);
@@ -88,11 +111,15 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
 
   // Each section owns its reading position; the shell and tabs never scroll.
   useLayoutEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.style.removeProperty('--inspection-scroll-reserve');
-      scrollRef.current.scrollTop = scrollPositions.current.get(active.id) || 0;
+    const region = constrainedViewport ? workspaceRef.current : contentRef.current;
+    const previous = scrollRef.current;
+    if (region) {
+      region.style.removeProperty('--inspection-scroll-reserve');
+      region.scrollTop = previous && previous !== region && scrollStepRef.current === active.id ? previous.scrollTop : scrollPositions.current.get(active.id) || 0;
     }
-  }, [active.id]);
+    scrollRef.current = region;
+    scrollStepRef.current = active.id;
+  }, [active.id, constrainedViewport]);
 
   // Remember the actual visible field, without changing browser history or
   // adding another navigation bar. This also covers manual long-list scrolling.
@@ -116,7 +143,7 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
     const region = scrollRef.current;
     region?.addEventListener('scroll', remember);
     return () => { region?.removeEventListener('scroll', remember); cancelAnimationFrame(frame); };
-  }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId]);
+  }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId, constrainedViewport]);
 
   const go = (event: React.MouseEvent<HTMLAnchorElement>, step: InspectionWorkspaceStep) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
@@ -126,8 +153,8 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
     navigate({ pathname: location.pathname, search: location.search, hash: '#' + step.id });
   };
 
-  return <div ref={workspaceRef} data-testid="inspection-workspace" className="flex h-full min-h-0 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white [--inspection-middle-top:0px] [--inspection-anchor-offset:56px]">
-    <div data-testid="inspection-navigation" className="sticky top-0 z-20 shrink-0 rounded-t-xl bg-white">
+  return <div ref={workspaceRef} data-testid="inspection-workspace" data-inspection-scroll={constrainedViewport ? '' : undefined} data-constrained-viewport={constrainedViewport || undefined} className={'flex h-full min-h-0 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white [--inspection-middle-top:0px] [--inspection-anchor-offset:56px]' + (constrainedViewport ? ' overflow-y-auto overscroll-contain [overflow-anchor:none]' : '')} onScroll={(event) => { if (constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
+    <div data-testid="inspection-navigation" className={(constrainedViewport ? 'relative' : 'sticky top-0') + ' z-20 shrink-0 rounded-t-xl bg-white'}>
       <nav aria-label="Secciones del expediente" className="flex gap-1 border-b border-neutral-200 bg-neutral-100 p-2">
         {availableSections.map((section) => <a key={section.label} href={'#' + section.entries[0].id} aria-current={selectedSection === section ? 'page' : undefined} onClick={(event) => go(event, section.entries[0])}
           className={'flex min-h-14 [@media(max-height:500px)]:min-h-11 min-w-0 flex-[1_1_auto] flex-col items-center justify-center gap-1 rounded-lg px-1 text-xs font-semibold !no-underline transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:flex-row sm:gap-2 sm:px-4 sm:text-sm ' + (selectedSection === section ? 'bg-primary-700 text-white hover:text-white focus-visible:text-white' : 'text-neutral-700 hover:bg-white hover:text-neutral-900')}><span aria-hidden="true" className={'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ' + (selectedSection === section ? 'bg-white/20 text-white' : 'bg-white text-neutral-600')}>{sections.findIndex(entry => entry.label === section.label) + 1}</span>{section.label}</a>)}
@@ -137,7 +164,7 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
           className={'flex min-h-11 shrink-0 items-center gap-2 rounded-md border px-2 text-sm !no-underline focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-3 ' + (active.id === step.id ? 'border-primary-300 bg-white font-bold text-primary-900' : 'border-transparent text-neutral-700 hover:bg-white')}>{step.id === 'checklist' && <Eye size={18} aria-hidden="true" />}{step.id === 'declaracion' && <FileSearch size={18} aria-hidden="true" />}{labels[step.id] || step.label}</a>)}
       </nav>}
     </div>
-    <div ref={scrollRef} data-inspection-scroll data-testid="inspection-scroll-region" className="min-h-0 flex-1 scroll-pt-14 scroll-pb-4 overflow-y-auto overscroll-contain rounded-b-xl [overflow-anchor:none] after:block after:h-[var(--inspection-scroll-reserve,0px)] after:content-['']" onScroll={(event) => { scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
+    <div ref={contentRef} data-inspection-scroll={constrainedViewport ? undefined : ''} data-testid="inspection-scroll-region" className={`min-h-0 scroll-pt-14 scroll-pb-4 rounded-b-xl [overflow-anchor:none] after:block after:h-[var(--inspection-scroll-reserve,0px)] after:content-[''] ${constrainedViewport ? 'shrink-0 overflow-visible' : 'flex-1 overflow-y-auto overscroll-contain'}`} onScroll={(event) => { if (!constrainedViewport && event.target === event.currentTarget) scrollPositions.current.set(active.id, event.currentTarget.scrollTop); }}>
     {active.nextAction && <div data-testid="inspection-start" className="border-b border-primary-200 bg-primary-50 p-4 sm:p-6"><h2 className="mb-1 text-lg font-bold text-primary-900">Comenzar el recorrido</h2><p className="mb-3 text-sm leading-relaxed text-neutral-800">Al iniciar se registra la hora y se abre el trabajo de campo.</p>{active.nextAction}</div>}
     {/* Hidden sections remain mounted to protect local drafts and selected files. */}
     {all.map((step) => <section key={step.id} hidden={step.id !== active.id} aria-label={step.title} id={step.id === 'verificacion' ? undefined : step.id} data-testid={step.id === active.id ? 'inspection-step-content' : undefined} className="min-w-0 space-y-6 p-4 sm:p-6 [&>section]:shadow-none [&>div]:shadow-none">

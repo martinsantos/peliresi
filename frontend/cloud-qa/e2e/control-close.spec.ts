@@ -124,13 +124,21 @@ test('control center queries real layers, refreshes and opens the exact active i
   await visibleProof(page, info, 'map-legend-after');
   const layer = page.getByRole('button', { name: 'Generadores', exact: true });
   await expect(layer).toHaveAttribute('aria-pressed', 'true');
-  const changed = page.waitForResponse(r => r.url().includes('/api/centro-control/actividad') && !new URL(r.url()).searchParams.get('capas')?.includes('generadores') && r.status() === 200);
+  const generatorMarkers = page.locator('.leaflet-marker-icon').filter({ has: page.locator('svg path[d^="M2 20"]') });
+  expect(await generatorMarkers.count()).toBeGreaterThan(0);
+  // Layer visibility is local: it must hide the actual symbols without
+  // discarding the operational data used by the agenda and counters.
   await layer.click();
-  await changed;
   await expect(layer).toHaveAttribute('aria-pressed', 'false');
+  await expect(generatorMarkers).toHaveCount(0);
+  await expect(page.getByText('Total Manifiestos', { exact: true }).locator('..')).toContainText(String(stats.estadisticas.totalManifiestos));
   const refreshed = page.waitForResponse(r => r.url().includes('/api/centro-control/actividad') && r.status() === 200);
   await page.getByTitle('Actualizar ahora', { exact: true }).click();
-  await refreshed;
+  const refreshedResponse = await refreshed;
+  expect(new URL(refreshedResponse.url()).searchParams.get('capas')?.split(',').sort()).toEqual(['generadores', 'operadores', 'transito', 'transportistas']);
+  expect((await refreshedResponse.json()).data.estadisticas.totalManifiestos).toBe(stats.estadisticas.totalManifiestos);
+  await expect(layer).toHaveAttribute('aria-pressed', 'false');
+  await expect(generatorMarkers).toHaveCount(0);
   const inspectionPanel = page.locator('button[aria-expanded]').filter({ hasText: /^Inspecciones/ });
   await inspectionPanel.click();
   await expect(inspectionPanel).toHaveAttribute('aria-expanded', 'true');

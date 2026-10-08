@@ -53,23 +53,30 @@ test('map symbols stay centered, padded and actionable in every shared map contr
   measurements.control = await symbolGeometry(layers.locator('[data-map-symbol]'));
   await page.screenshot({ path: info.outputPath('control-map-symbols.png'), animations: 'disabled' });
   await layers.screenshot({ path: info.outputPath('control-map-controls.png'), animations: 'disabled' });
-  for (const [label, key] of [['Generadores', 'generadores'], ['Transportistas', 'transportistas'], ['Operadores', 'operadores'], ['En Tránsito', 'transito']]) {
+  for (const [label, key, glyph] of [
+    ['Generadores', 'generadores', 'svg path[d^="M2 20"]'],
+    ['Transportistas', 'transportistas', 'svg path[d^="M14 18"]'],
+    ['Operadores', 'operadores', 'svg path[d^="M10 2"]'],
+    ['En Tránsito', 'transito', 'svg polygon[points="3 11 22 2 13 21 11 13 3 11"]'],
+  ]) {
     const toggle = layers.getByRole('button', { name: label, exact: true });
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     const old = await toggle.boundingBox();
+    const markers = page.locator('.leaflet-marker-icon').filter({ has: page.locator(glyph) });
+    const originalCount = await markers.count();
+    expect(originalCount, `${label}: actual seeded symbols must exist before toggling`).toBeGreaterThan(0);
     for (const pressed of [false, true]) {
-      const activity = page.waitForResponse(response => {
-        const url = new URL(response.url());
-        return url.pathname === '/api/centro-control/actividad' && response.status() === 200
-          && (url.searchParams.get('capas') || '').split(',').includes(key) === pressed;
-      });
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-pressed', String(pressed));
-      // Returning to a fresh query may use its cache. Exercise the real refresh
-      // control instead of mistaking that legitimate cache for a missing request.
+      await expect(markers).toHaveCount(pressed ? originalCount : 0);
+      // Refresh still fetches real canonical operational data, independent of
+      // visible map layers. A refresh must preserve the chosen visibility.
+      const activity = page.waitForResponse(response => new URL(response.url()).pathname === '/api/centro-control/actividad' && response.status() === 200);
       await page.getByTitle('Actualizar ahora', { exact: true }).click();
-      await activity;
+      const response = await activity;
+      expect(new URL(response.url()).searchParams.get('capas')?.split(',').sort()).toEqual(['generadores', 'operadores', 'transito', 'transportistas']);
       await expect(toggle).toHaveAttribute('aria-pressed', String(pressed));
+      await expect(markers).toHaveCount(pressed ? originalCount : 0);
       rowMeasurements[`control-${key}-${pressed}`] = await readableMapLayers(layers);
       measurements[`control-${key}-${pressed}`] = await symbolGeometry(toggle.locator('[data-map-symbol]'));
       const next = (await toggle.boundingBox())!;
