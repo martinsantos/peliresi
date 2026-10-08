@@ -98,7 +98,9 @@ async function restoreCheck() {
     assert.equal(hash(bytes), hash(await readFile(document.path)));
     const last = await restored.ticketSoporte.aggregate({ _max: { numero: true } });
     const created = await call(users[0], '/soporte', 'POST', { descripcion: 'QA continuidad después de restauración' }, 201, 'qa-restore-reference-20261008');
-    assert.ok(created.numero > last._max.numero);
+    const number = Number(created.referencia.replace('SOP-', ''));
+    assert.ok(Number.isInteger(number) && number > last._max.numero);
+    assert.equal((await restored.ticketSoporte.findUniqueOrThrow({ where: { id: created.id } })).numero, number);
     await writeFile(path.join(output, 'multiuser-restore.json'), JSON.stringify({ at: new Date().toISOString(), sourceDatabase: 'sitrep_night_qa_20260926',
       restoredDatabase: 'sitrep_night_qa_restore_20261008', port: 55440, counts, files: originalFiles, databaseArchiveSha256: hash(await readFile(backup)),
       fileArchiveSha256: hash(await readFile(archive)), authenticatedUsers: 50, originalDownload: true, numberingContinues: true, productionData: false, statsBefore: before }, null, 2));
