@@ -671,11 +671,24 @@ try{
       execFileSync('adb',['devices','-l'],{encoding:'utf8',timeout:5000}));
     await proof('scanner-without-hardware');
     await back.tap();
-    await expect(page).not.toHaveURL(/escaner-qr$/);
+    // The previous entry was a real trip document. Wait for its recovered UI,
+    // not just for the scanner URL to disappear: a second document navigation
+    // cancelled icon and profile together in run37961585228, attempt2.
+    await expect(page).toHaveURL('http://127.0.0.1:4177/app/transporte/viaje/'+fixture.deviceManifest.id);
+    await expect(page.getByText('GPS activo',{exact:true}).first()).toBeVisible();
   });
   await check('native-support-report-and-detail-on-actual-Android',async()=>{
-    await page.goto('http://127.0.0.1:4177/app/soporte');
+    // Follow the user's actual in-app route. Do not race browser Back with a
+    // forced reload, ignore online console errors or retry a cancelled icon.
+    const from=page.url();
+    await page.getByRole('button',{name:'Abrir menu',exact:true}).tap();
+    await page.getByRole('navigation',{name:'Menú de la aplicación',exact:true})
+      .getByRole('link',{name:'Soporte',exact:true}).tap();
+    await expect(page).toHaveURL('http://127.0.0.1:4177/app/soporte');
     await expect(page.getByRole('heading',{level:2,name:'Soporte',exact:true})).toBeVisible();
+    await writeFile(path.join(output,'support-entry-navigation.json'),JSON.stringify({
+      from,to:page.url(),at:new Date().toISOString(),input:'Actual Android menu link; no document reload',
+    },null,2));
     await page.getByRole('button',{name:'Reportar problema',exact:true}).last().tap();
     const dialog=page.getByRole('dialog',{name:'Reportar un problema',exact:true});
     await dialog.getByLabel('Asunto',{exact:true}).fill('QA soporte desde Android real emulado');
