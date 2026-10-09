@@ -1,0 +1,75 @@
+name: SITREP Registration Focused Unit QA
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sitrep-cloud-qa-20261002
+  cancel-in-progress: false
+jobs:
+  unit:
+    if: github.ref == 'refs/heads/codex/sitrep-cloud-qa-20261002'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      NODE_APP_INSTANCE: qa
+      ALLOW_SYNTHETIC_QA: '1'
+      PORT: '3037'
+      NODE_OPTIONS: --max-old-space-size=1536
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=1
+      DISABLE_EMAILS: 'true'
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      JWT_SECRET: only-cloud-unit-qa-not-production
+      VITE_API_URL: /api
+      UPLOADS_DIR: /tmp/sitrep-registration-unit-qa/uploads
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Disconnected unit isolation, no server, mail or production credentials
+        run: |
+          test ! -f backend/.env
+          test ! -f frontend/.env
+          node --experimental-strip-types --input-type=module -e "import { assertCloudEnvironment } from './frontend/cloud-qa/safety.ts'; assertCloudEnvironment();"
+          node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+      - name: Cloud-only locked dependencies
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+      - name: Backend registration contracts
+        id: backend
+        continue-on-error: true
+        working-directory: backend
+        run: npm test -- src/__tests__/controllers/registrationApproval.controller.test.ts src/__tests__/controllers/registrationDocuments.controller.test.ts --maxWorkers=1 --reporter=json --outputFile=/tmp/sitrep-registration-unit-backend.json
+      - name: Frontend registration contracts
+        id: frontend
+        continue-on-error: true
+        working-directory: frontend
+        run: npm test -- src-v6/__tests__/services/registrationDraft.test.ts src-v6/__tests__/pages/RegistrationRecovery.test.tsx src-v6/__tests__/pages/InscripcionWizard.layout.test.tsx src-v6/__tests__/pages/ActorUploadRecovery.test.tsx src-v6/__tests__/pages/ActorCreationContract.test.tsx --maxWorkers=1 --reporter=json --outputFile=/tmp/sitrep-registration-unit-frontend.json
+      - name: Require both measured results, never publish a unit-only candidate
+        if: always()
+        run: |
+          test '${{ steps.backend.outcome }}' = success
+          test '${{ steps.frontend.outcome }}' = success
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-registration-unit-${{ github.run_id }}
+          path: /tmp/sitrep-registration-unit-*.json
+          retention-days: 3
+          if-no-files-found: error
