@@ -37,7 +37,7 @@ async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> 
   await page.getByPlaceholder(actor === 'generador' ? 'Empresa S.A.' : actor === 'operador' ? 'Operador S.A.' : 'Transporte S.A.').fill(`QA establecimiento ${id}`);
   await page.getByPlaceholder('Calle 123, Ciudad', { exact: true }).fill('Domicilio QA Mendoza 123');
   if (actor === 'operador') {
-    await page.getByRole('combobox', { name: 'Tipo de Operador', exact: true }).click();
+    await page.getByLabel('Tipo de Operador', { exact: true }).click();
     await page.getByRole('option', { name: 'Operador in situ', exact: true }).click();
   }
   const documentStep = actor === 'generador' ? 6 : actor === 'operador' ? 7 : 4;
