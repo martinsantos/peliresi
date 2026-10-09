@@ -89,27 +89,30 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           const state = uploadStates[doc.tipo];
           const attached = uploaded || pendingFile;
           const isBusy = state === 'uploading' || state === 'deleting' || state === 'reading' || state === 'downloading';
+          const rejected = uploaded?.estado === 'RECHAZADO';
           return (
-            <div key={doc.tipo} data-testid={`registration-document-${doc.tipo}`} className={`rounded-xl border p-3 transition-colors ${uploaded ? 'border-emerald-200 bg-emerald-50/60' : state === 'error' ? 'border-error-200 bg-error-50/60' : 'border-neutral-200 bg-neutral-50'}`}>
-              <div className="flex items-center justify-between gap-3">
+            <div key={doc.tipo} data-testid={`registration-document-${doc.tipo}`} className={`rounded-xl border p-3 transition-colors ${state === 'error' || rejected ? 'border-error-200 bg-error-50/60' : uploaded ? 'border-emerald-200 bg-emerald-50/60' : 'border-neutral-200 bg-neutral-50'}`}>
+              <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 {state === 'uploading' || state === 'deleting'
                   ? <Loader2 size={17} className="shrink-0 animate-spin text-[#0D8A4F]" />
-                  : uploaded ? <CheckCircle2 size={17} className="shrink-0 text-emerald-600" /> : <Paperclip size={16} className="shrink-0 text-neutral-400" />}
+                  : rejected ? <AlertCircle size={17} className="shrink-0 text-error-700" /> : uploaded ? <CheckCircle2 size={17} className="shrink-0 text-emerald-600" /> : <Paperclip size={16} className="shrink-0 text-neutral-400" />}
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-neutral-800">{doc.nombre} {doc.required && <span className="text-error-600" aria-label="obligatorio">*</span>}</p>
                   {attached && (
                     <div className={`text-xs ${uploaded ? 'text-emerald-700' : 'text-neutral-600'}`}>
-                      <p className="truncate" title={uploaded ? uploaded.nombre : pendingFile?.name}>{uploaded ? uploaded.nombre : pendingFile?.name}</p>
-                      <p>{((uploaded ? uploaded.size : pendingFile?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : uploaded ? 'Guardado' : reviewMode ? 'Seleccionado para revisión' : 'Pendiente'}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
+                      <p className="truncate" title={pendingFile?.name || uploaded?.nombre}>{pendingFile?.name || uploaded?.nombre}</p>
+                      <p>{((pendingFile?.size || uploaded?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : pendingFile ? (reviewMode ? 'Seleccionado para revisión' : 'Pendiente') : 'Guardado'}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
+                      {pendingFile && uploaded && <p className="text-neutral-700">Reemplazo pendiente. El original {uploaded.nombre} sigue guardado hasta confirmar la nueva carga.</p>}
                     </div>
                   )}
                 </div>
               </div>
               {attached ? (
-                <div className="flex shrink-0 items-center">
+                <div className="flex shrink-0 flex-wrap items-center justify-end">
+                {uploaded && <button type="button" disabled={isBusy} aria-label={`Reemplazar ${doc.nombre}`} onClick={() => triggerFileInput(doc.tipo)} className="min-h-11 rounded-lg px-2 text-sm font-semibold text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-40">Reemplazar</button>}
                 {uploaded && onDownloadFile && <button type="button" disabled={isBusy} aria-label={`Descargar ${uploaded.nombre}`} onClick={() => void onDownloadFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-40"><Download size={16} aria-hidden="true" /></button>}
-                <button type="button" disabled={isBusy} aria-label={`Eliminar ${doc.nombre}`} onClick={() => void onRemoveFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-error-500 transition-colors hover:bg-error-100 disabled:opacity-40">
+                <button type="button" disabled={isBusy} aria-label={pendingFile && uploaded ? `Descartar selección pendiente de ${doc.nombre}` : `Eliminar ${doc.nombre}`} onClick={() => void onRemoveFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-error-500 transition-colors hover:bg-error-100 disabled:opacity-40">
                   <X size={16} />
                 </button>
                 </div>
@@ -119,10 +122,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 </Button>
               )}
               </div>
+              {rejected && <p className="mt-2 text-sm text-error-800" role="alert">Documento rechazado: {uploaded.observaciones || 'Reemplazalo para corregir la solicitud antes de enviarla.'}</p>}
               {uploadErrors[doc.tipo] && <p className="mt-2 flex items-start gap-1.5 text-xs text-error-700" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{uploadErrors[doc.tipo]}</p>}
               {state === 'error' && pendingFile && <Button variant="outline" size="sm" className="mt-2" onClick={() => void onAddFile(doc.tipo, pendingFile)}>Reintentar {doc.nombre}</Button>}
               {doc.tipo === 'COMPROBANTE_PAGO' && !uploaded && <p className="mt-2 text-sm leading-6 text-neutral-700">Sellados tributarios: recibo de caja de banco o comprobante de transferencia. Se revisa el original; no se acredita automáticamente un pago de TEF.</p>}
-              <DocumentAnalysis analysis={uploaded?.analisis} retrying={isBusy} onRetry={uploaded && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
+              <DocumentAnalysis analysis={pendingFile ? undefined : uploaded?.analisis} retrying={isBusy} onRetry={uploaded && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
             </div>
           );
         })}

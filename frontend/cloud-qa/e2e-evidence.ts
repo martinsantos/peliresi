@@ -9,16 +9,16 @@ export type FullE2EEvidence = {
   suites: Suite[];
 };
 
-// 79 journeys: previous 73 plus actual public registrations for all three
-// actors, private duplicate feedback, real Spanish OCR and transport recovery.
+// 88 journeys: previous 79 plus three current-step/concurrent draft journeys,
+// three administrative recovery/registry journeys and three verified owners.
 // Keep exact denominators: adding a journey requires an explicit contract update.
-export const FULL_E2E_JOURNEYS_PER_SURFACE = 79;
+export const FULL_E2E_JOURNEYS_PER_SURFACE = 88;
 const surfaces = ['app', 'web-desktop', 'web-responsive'];
 
 /** A green aggregate alone must not authorize an incomplete or retried release. */
 export function assertFullE2EEvidence(evidence: FullE2EEvidence, scope: 'current' | 'pinned-run138' = 'current'): void {
   // Historical evidence keeps 73 journeys; only the pinned reuse guard may
-  // accept it. A current release always requires the complete 79 journeys.
+  // accept it. A current release always requires the complete 88 journeys.
   const journeys = scope === 'pinned-run138' ? 73 : FULL_E2E_JOURNEYS_PER_SURFACE;
   assert.equal(evidence.stats.expected, journeys * surfaces.length);
   assert.equal(evidence.stats.unexpected + evidence.stats.flaky + evidence.stats.skipped, 0);

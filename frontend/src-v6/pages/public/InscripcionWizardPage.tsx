@@ -261,7 +261,7 @@ const InscripcionWizardPage: React.FC = () => {
       if (requirementsStatus !== 'loaded') {
         errs.push('No se pudieron verificar los requisitos documentales vigentes');
       } else {
-        const missing = requirements.filter((requirement) => requirement.required && !uploadedDocs[requirement.tipo] && !adjuntos[requirement.tipo]);
+        const missing = requirements.filter((requirement) => requirement.required && (!uploadedDocs[requirement.tipo] || uploadedDocs[requirement.tipo].estado === 'RECHAZADO') && !adjuntos[requirement.tipo]);
         if (missing.length > 0) errs.push(`Faltan documentos obligatorios: ${missing.map((item) => item.nombre).join(', ')}`);
       }
     }
@@ -270,11 +270,11 @@ const InscripcionWizardPage: React.FC = () => {
 
   const stepHasErrors = (s: number) => getStepErrors(s).length > 0;
 
-  const assertDraftSession = () => {
+  const assertDraftSession = useCallback(() => {
     if (!owner || registrationSessionOwner(getAccessToken()) !== owner) throw new Error('La sesión cambió o venció. Iniciá sesión con tu cuenta para recuperar el borrador.');
     if (!ownership.canWrite()) throw new Error('Este borrador está abierto en otra pestaña o no se pudo proteger su edición. Cerrá la otra pestaña y reintentá.');
     if (localConflict) throw new Error('Elegí qué versión conservar antes de guardar.');
-  };
+  }, [owner, ownership.canWrite, localConflict]);
   const persistDraft = async (target: number): Promise<boolean> => {
     if (saveInFlight.current || submitInFlight.current) return false;
     saveInFlight.current = true; setSaving(true); setSaveError(null);
@@ -350,12 +350,17 @@ const InscripcionWizardPage: React.FC = () => {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo guardar el archivo. Volve a seleccionarlo o reintenta al enviar.') }));
     } finally { uploadsInFlight.current.delete(tipo); }
-  }, [isReviewMode, requirementsMaxBytes, solicitudId]);
+  }, [isReviewMode, requirementsMaxBytes, solicitudId, assertDraftSession]);
 
   const handleRemoveFile = useCallback(async (tipo: string) => {
     if (uploadsInFlight.current.has(tipo)) return;
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     const uploaded = uploadedDocs[tipo];
+    if (adjuntos[tipo] && uploaded) {
+      setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
+      setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
+      return;
+    }
     if (!uploaded || isReviewMode || !solicitudId) {
       setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadedDocs(previous => { const next = { ...previous }; delete next[tipo]; return next; });
@@ -376,7 +381,7 @@ const InscripcionWizardPage: React.FC = () => {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo eliminar el archivo guardado.') }));
     } finally { uploadsInFlight.current.delete(tipo); }
-  }, [isReviewMode, solicitudId, uploadedDocs]);
+  }, [isReviewMode, solicitudId, uploadedDocs, adjuntos, assertDraftSession]);
 
   // Submit
   const handleDownloadFile = async (tipo: string) => {

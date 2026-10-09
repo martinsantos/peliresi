@@ -110,6 +110,21 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
     await evaluation.locator('summary').click();
     await expect(evaluation).not.toHaveAttribute('open', '');
   } else await expect(page.getByTestId('tef-admin-review')).toHaveCount(0);
+  const approval = page.waitForResponse(response => new URL(response.url()).pathname === `/api/solicitudes/${candidate.id}/aprobar` && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Aprobar', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Confirmar Aprobacion' }).getByRole('button', { name: 'Confirmar Aprobacion', exact: true }).click();
+  const approved = await approval; expect(approved.status()).toBe(200);
+  const record = (await approved.json()).data.solicitud;
+  const actorId = record[actor === 'generador' ? 'generadorId' : actor === 'operador' ? 'operadorId' : 'transportistaId'];
+  expect(typeof actorId).toBe('string');
+  const plural = actor === 'generador' ? 'generadores' : actor === 'operador' ? 'operadores' : 'transportistas';
+  const profile = page.waitForResponse(response => new URL(response.url()).pathname === `/api/actores/${plural}/${actorId}` && response.request().method() === 'GET');
+  await page.goto(`${prefix(info)}/admin/actores/${plural}/${actorId}`);
+  const persisted = (await (await profile).json()).data[actor];
+  expect(persisted.domicilio).toBe('Domicilio QA Mendoza 123');
+  if (actor !== 'transportista') expect(persisted.tefInputs).toEqual({ personal: 32, potenciaHP: 120, superficieM2: 1250, zona: 'zona_industrial' });
+  // Approving a declaration does not create a payment or an official CAA.
+  expect(persisted.pagos || []).toEqual([]);
   expect(errors).toEqual([]);
 });
 

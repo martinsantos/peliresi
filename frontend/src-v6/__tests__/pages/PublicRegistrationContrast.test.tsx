@@ -5,7 +5,7 @@ import { StepCuenta } from '../../pages/public/inscripcion/steps/StepCuenta';
 
 const requests = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock('axios', () => ({ default: requests }));
-vi.mock('../../services/api', () => ({ setTokensDurably: vi.fn() }));
+vi.mock('../../services/api', () => ({ default: { get: vi.fn() }, getAccessToken: () => null, setTokensDurably: vi.fn() }));
 
 describe('Public account forms have a readable, working return to login', () => {
   it.each(['GENERADOR', 'OPERADOR', 'TRANSPORTISTA'] as const)('%s shares the accessible login action without creating an account', tipoActor => {
@@ -15,8 +15,8 @@ describe('Public account forms have a readable, working return to login', () => 
         reg={{ nombre: '', email: '', cuit: '', password: '', confirmPassword: '' }} onRegChange={vi.fn()} onPhase2={vi.fn()} />} />
       <Route path="/login" element={<h1>Ingreso institucional</h1>} />
     </Routes></MemoryRouter>);
-    const action = screen.getByRole('button', { name: 'Inicia sesion' });
-    expect(action).toHaveClass('text-primary-700', 'hover:text-primary-800', 'focus-visible:ring-2');
+    const action = screen.getByRole('button', { name: 'Iniciá sesión para recuperar tus datos' });
+    expect(action).toHaveClass('text-primary-800', 'hover:underline', 'focus-visible:ring-2', 'min-h-11');
     fireEvent.click(action);
     expect(screen.getByRole('heading', { name: 'Ingreso institucional' })).toBeVisible();
     expect(requests.post).not.toHaveBeenCalled();

@@ -81,4 +81,11 @@ describe('a real registration UI protects the current step and account boundary'
     expect(screen.queryByDisplayValue('PRIVATE-QA')).toBeNull(); expect(mock.put).not.toHaveBeenCalled();
     expect(readRegistrationDraft('owner', 'public:GENERADOR:draft')?.data.form).toMatchObject({ razonSocial: 'PRIVATE-QA' });
   });
+  it('preserves historical structured data when saving a new field', async () => {
+    const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ tefInputs: { personal: 0, potenciaHP: 100 }, legacy: { version: 1 } });
+    mock.get.mockResolvedValue(response); await open();
+    fireEvent.change(screen.getByPlaceholderText('Empresa S.A.'), { target: { value: 'QA nueva declaración' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' })); await waitFor(() => expect(mock.put).toHaveBeenCalledOnce());
+    expect(mock.put.mock.calls[0][1].datosActor).toMatchObject({ tefInputs: { personal: 0, potenciaHP: 100 }, legacy: { version: 1 }, razonSocial: 'QA nueva declaración' });
+  });
 });

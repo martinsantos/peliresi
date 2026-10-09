@@ -16,4 +16,18 @@ describe('saved registration receipts remain identifiable and inspectable on pho
     expect(handlers.onDownloadFile).toHaveBeenCalledWith(doc.tipo);
     expect(handlers.onRemoveFile).not.toHaveBeenCalled(); expect(handlers.onAddFile).not.toHaveBeenCalled();
   });
+  it('marks a rejected document as rejected and offers replacement rather than pretending it passed review', () => {
+    const handlers = props(); handlers.uploadedDocs[doc.tipo] = { ...doc, estado: 'RECHAZADO', observaciones: 'QA archivo ilegible' };
+    render(<StepDocumentos {...handlers} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Documento rechazado: QA archivo ilegible');
+    expect(screen.getByRole('button', { name: 'Reemplazar Comprobante de sellado / pago' })).toBeEnabled();
+    expect(screen.getByTestId(`registration-document-${doc.tipo}`)).toHaveClass('border-error-200');
+  });
+  it('does not label the selected replacement as already saved or reuse the original OCR under its new name', () => {
+    const pending = new File(['QA'], 'nuevo-pendiente.pdf', { type: 'application/pdf' });
+    render(<StepDocumentos {...props()} adjuntos={{ [doc.tipo]: pending }} uploadStates={{ [doc.tipo]: 'error' }} />);
+    expect(screen.getByText(/KB · Pendiente/)).toBeVisible();
+    expect(screen.getByText(/El original.*sigue guardado/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Descartar selección pendiente de Comprobante de sellado / pago' })).toBeEnabled();
+  });
 });
