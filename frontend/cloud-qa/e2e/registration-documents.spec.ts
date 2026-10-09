@@ -37,6 +37,14 @@ async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> 
   await page.getByPlaceholder(actor === 'generador' ? 'Empresa S.A.' : actor === 'operador' ? 'Operador S.A.' : 'Transporte S.A.').fill(`QA establecimiento ${id}`);
   await page.getByPlaceholder('Calle 123, Ciudad', { exact: true }).fill('Domicilio QA Mendoza 123');
   const documentStep = actor === 'generador' ? 6 : actor === 'operador' ? 7 : 4;
+  if (actor !== 'transportista') {
+    await page.getByRole('navigation', { name: 'Etapas de la inscripción' }).getByRole('button', { name: new RegExp(`^Paso ${documentStep - 1} de .*: Actividad$`) }).click();
+    await page.getByLabel('Personal en planta', { exact: true }).fill('32');
+    await page.getByLabel('Potencia instalada (HP)', { exact: true }).fill('120');
+    await page.getByLabel('Superficie cubierta (m²)', { exact: true }).fill('1250');
+    await page.getByLabel('Zona del establecimiento', { exact: true }).selectOption('zona_industrial');
+    await expect(page.getByTestId('tef-calculator')).toHaveCount(0);
+  }
   await page.getByRole('navigation', { name: 'Etapas de la inscripción' }).getByRole('button', { name: new RegExp(`^Paso ${documentStep} de .*: Documentos$`) }).click();
   await expect(page.getByTestId('registration-document-COMPROBANTE_PAGO')).toBeVisible();
   return { id: body.solicitudId, authorization: `Bearer ${body.tokens.accessToken}`, documentStep, actor };
@@ -85,6 +93,23 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
   await page.getByRole('button', { name: 'Enviar solicitud', exact: true }).click();
   expect((await send).status()).toBe(200);
   await expect(page.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
+  await login(page, info);
+  await page.goto(`${prefix(info)}/admin/solicitudes/${candidate.id}`);
+  if (actor !== 'transportista') {
+    const evaluation = page.getByTestId('tef-admin-review');
+    await evaluation.locator('summary').click();
+    await expect(evaluation).toHaveAttribute('open', '');
+    await expect(evaluation.getByLabel('Cantidad de Personal', { exact: true })).toHaveValue('32');
+    await expect(evaluation.getByLabel('Potencia Instalada en HP', { exact: true })).toHaveValue('120');
+    await expect(evaluation.getByLabel('Superficie Cubierta en M2', { exact: true })).toHaveValue('1250');
+    const result = evaluation.getByText('Tasa de Evaluacion y Fiscalizacion', { exact: true });
+    await expect(result).toBeVisible();
+    expect(await result.evaluate(element => getComputedStyle(element).color)).toBe('rgb(255, 255, 255)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath(`${actor}-administrative-tef.png`), animations: 'disabled' });
+    await evaluation.locator('summary').click();
+    await expect(evaluation).not.toHaveAttribute('open', '');
+  } else await expect(page.getByTestId('tef-admin-review')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

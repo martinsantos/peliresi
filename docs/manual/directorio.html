@@ -1689,6 +1689,7 @@ SITREP implementa un sistema de certificacion blockchain basado en <strong>2 sel
 
 <section id="mod-inscripcion" data-role="all">
 <h3>3.12 Inscripcion Publica, Wizards de Alta y Calculo TEF</h3>
+<p><strong>Actualizado el 09/10/2026:</strong> el solicitante no calcula TEF. Declara su actividad y adjunta documentación; la evaluación corresponde al administrador en el trámite y en la ficha del generador u operador. Los importes de la calculadora administrativa son una simulación, no una liquidación emitida ni un pago aprobado.</p>
 <div class="section-intro">
 SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-inscripcion publica</strong> (sin login, accesible desde cualquier navegador) y <strong>creacion directa</strong> por un administrador desde el panel de gestion. La auto-inscripcion genera una <em>solicitud</em> que debe ser aprobada por un administrador antes de activar la cuenta. Esta seccion documenta en detalle los <strong>6 wizards</strong> de alta (3 publicos + 3 admin), el componente de <strong>calculo TEF</strong>, y el workflow de solicitudes.
 </div>
@@ -1756,14 +1757,14 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
   <td>Datos complementarios del establecimiento</td>
 </tr>
 <tr>
-  <td><strong>5</strong></td><td>Calculo TEF</td><td>Calculator</td>
-  <td>Factor R, Monto MxR, Zona, Personal, Potencia HP, Superficie m2</td>
-  <td>Version simplificada del calculo TEF (ver <a href="#inscr-tef">seccion 3.12.5</a>)</td>
+  <td><strong>5</strong></td><td>Actividad</td><td>Factory</td>
+  <td>Personal en planta, Potencia HP, Superficie m2 y Zona</td>
+  <td>Datos declarados. Sin importe, fórmula ni coeficientes fiscales para el solicitante</td>
 </tr>
 <tr>
   <td><strong>6</strong></td><td>Documentos</td><td>FileText</td>
-  <td>Constancia AFIP, Memoria Tecnica, Certificado de Habilitacion</td>
-  <td>3 documentos obligatorios. Carga de archivos PDF/imagen</td>
+  <td>Constancia AFIP, Memoria Tecnica, Certificado de Habilitacion y comprobante de sellado/pago opcional</td>
+  <td>Requisitos vigentes consultados al servidor. PDF, JPG o PNG; hasta 10 MB por archivo</td>
 </tr>
 <tr>
   <td><strong>7</strong></td><td>Resumen</td><td>Check</td>
@@ -1773,7 +1774,9 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
 </tbody>
 </table>
 
-<div class="cu-screenshot"><a href="screenshots/desktop/W05_pub_gen_paso5.png" target="_blank"><img src="screenshots/desktop/W05_pub_gen_paso5.png" alt="Generador — Paso 5 TEF" loading="lazy"></a><div class="cu-screenshot-caption">Paso 5: Calculo TEF simplificado (inscripcion publica)</div></div>
+<details><summary>Captura histórica anterior al 09/10/2026 — ya no corresponde al alta pública</summary><div class="cu-screenshot"><a href="screenshots/desktop/W05_pub_gen_paso5.png" target="_blank"><img src="screenshots/desktop/W05_pub_gen_paso5.png" alt="Vista histórica del cálculo retirado del alta pública" loading="lazy"></a><div class="cu-screenshot-caption">Histórico: el paso 5 actual es Actividad, sin cálculo TEF</div></div></details>
+<p><strong>Probar desde la home o el login:</strong> abre <code>?modo=revision</code> con datos sintéticos. Permite recorrer todos los pasos y seleccionar archivos, pero no crea cuenta, no sube documentación ni ejecuta OCR. La etiqueta es <em>Seleccionado para revisión</em>, no Guardado.</p>
+<p><strong>En un alta real:</strong> Guardado confirma que el original se conserva en la solicitud y se recupera al volver. El comprobante de caja de banco o transferencia se lee automáticamente cuando el motor lo permite; el texto es para revisión humana. Un archivo con la misma huella genera un aviso persistente de comprobante repetido, sin exponer datos del otro usuario. Podés descargar el original o reintentar la lectura sin volver a subirlo. Ni el OCR ni el aviso aprueban un pago de forma automática; otra foto del mismo papel puede tener una huella diferente.</p>
 
 <div class="cu-screenshot"><a href="screenshots/desktop/W07_pub_gen_paso7.png" target="_blank"><img src="screenshots/desktop/W07_pub_gen_paso7.png" alt="Generador — Paso 7 Resumen" loading="lazy"></a><div class="cu-screenshot-caption">Paso 7: Resumen con secciones colapsables y boton de envio</div></div>
 
@@ -1782,7 +1785,7 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
 <!-- ============================================================ -->
 <h4 id="inscr-oper">3.12.3 Wizard de Operador — Inscripcion Publica (8 pasos)</h4>
 
-<p>El wizard de operador es el mas extenso, con 8 pasos que incluyen datos de representantes legales y tecnicos, corrientes Y autorizadas, y calculo TEF.</p>
+<p>El wizard de operador tiene 8 pasos: representantes legales y técnicos, corrientes Y y datos de actividad. No ofrece un cálculo TEF al solicitante.</p>
 
 <div class="cu-screenshot"><a href="screenshots/desktop/W08_pub_oper_paso1.png" target="_blank"><img src="screenshots/desktop/W08_pub_oper_paso1.png" alt="Operador — Paso 1" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Establecimiento — seleccion de tipo FIJO / IN SITU</div></div>
 
@@ -1815,14 +1818,14 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
   <td>Seleccion via textarea (una corriente por linea)</td>
 </tr>
 <tr>
-  <td><strong>6</strong></td><td>Calculo TEF</td><td>Calculator</td>
-  <td>Factor R, Monto MxR, Zona, Personal, Potencia HP, Superficie m2, Capacidad TEF</td>
-  <td>Incluye campo <code>tefCapacidad</code> especifico para operadores</td>
+  <td><strong>6</strong></td><td>Actividad</td><td>FlaskConical</td>
+  <td>Personal, Potencia HP, Superficie m2, Zona y capacidad de tratamiento opcional (t/mes)</td>
+  <td>Sin importe ni coeficientes TEF. La evaluación es administrativa</td>
 </tr>
 <tr>
   <td><strong>7</strong></td><td>Documentos</td><td>FileText</td>
-  <td>Constancia AFIP, Certificado de Habilitacion, Resolucion DPA</td>
-  <td>3 documentos obligatorios</td>
+  <td>Constancia AFIP, Certificado de Habilitacion, Resolucion DPA y comprobante de sellado/pago opcional</td>
+  <td>Requisitos vigentes y confirmación de guardado de cada original</td>
 </tr>
 <tr>
   <td><strong>8</strong></td><td>Resumen</td><td>Check</td>
@@ -1865,8 +1868,8 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
 </tr>
 <tr>
   <td><strong>4</strong></td><td>Documentos</td><td>FileText</td>
-  <td>Constancia AFIP, Habilitacion de Transporte, Seguro Ambiental</td>
-  <td>3 documentos obligatorios</td>
+  <td>Constancia AFIP, Habilitacion de Transporte, Seguro Ambiental y comprobante de sellado/pago opcional</td>
+  <td>Requisitos vigentes y lectura del recibo para revisión; no acredita el pago</td>
 </tr>
 <tr>
   <td><strong>5</strong></td><td>Resumen</td><td>Check</td>
@@ -1883,7 +1886,7 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
 <!-- ============================================================ -->
 <h4 id="inscr-tef">3.12.5 Calculo TEF — Tasa de Evaluacion y Fiscalizacion</h4>
 
-<p>El calculo TEF implementa el <strong>Decreto 2625/99 — Ley 5917 (Mendoza)</strong>. Es utilizado tanto en la inscripcion publica (campos manuales simplificados) como en los wizards admin (componente interactivo <code>CalculadoraTEF</code> con calculo en tiempo real).</p>
+<p>La calculadora mantiene la fórmula existente y sus coeficientes; esta actualización no modifica normativa ni valores. Está disponible para administradores en los formularios administrativos, en el detalle del trámite y en las fichas de generadores y operadores mediante <strong>Evaluación TEF · Administración</strong>, que abre y cierra. Si faltan datos declarados, lo informa: un resultado cero no acredita una tasa determinada. No se presenta en el alta pública ni en Probar.</p>
 
 <div class="cu-screenshot"><a href="screenshots/desktop/W20_adm_gen_paso4_tef.png" target="_blank"><img src="screenshots/desktop/W20_adm_gen_paso4_tef.png" alt="CalculadoraTEF — vista completa" loading="lazy"></a><div class="cu-screenshot-caption">Componente CalculadoraTEF en el wizard admin — header con resultado y desglose de coeficientes</div></div>
 

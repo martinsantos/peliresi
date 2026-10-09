@@ -45,6 +45,7 @@ import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
+import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 
@@ -193,6 +194,9 @@ const OperadorDetallePage: React.FC = () => {
 
       {canViewCatalog && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/operadores/${id}/editar`))}>Editar datos del padrón</Button>}
       <ActorCertificates type="OPERADOR" actorId={id || ''} />
+      <AdministrativeTEF actorType="OPERADOR" identity={operador.id} declaration={apiOperador}
+        corrientesY={(apiOperador?.corrientesY || enriched?.corrientes.join(',') || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
+        tieneISO={false} />
 
       {/* Stats — only real data */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

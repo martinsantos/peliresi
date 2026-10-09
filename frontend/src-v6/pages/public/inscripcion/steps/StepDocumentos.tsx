@@ -10,6 +10,7 @@ import type { DocumentoSolicitud } from '../../../../types/api';
 import { DocumentAnalysis } from '../../../../components/DocumentAnalysis';
 
 interface StepDocumentosProps {
+  reviewMode?: boolean;
   docs: DocDef[];
   adjuntos: Record<string, File>;
   uploadedDocs: Record<string, DocumentoSolicitud>;
@@ -25,6 +26,7 @@ interface StepDocumentosProps {
 }
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
+  reviewMode = false,
   docs,
   adjuntos,
   uploadedDocs,
@@ -58,7 +60,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   return (
     <div className="space-y-4">
       <SectionTitle icon={FileText} title="Documentos" />
-      <p className="text-sm leading-relaxed text-neutral-700">Los documentos marcados como <strong>Guardado</strong> quedan en tu solicitud y se recuperan al volver.</p>
+      <p className="text-sm leading-relaxed text-neutral-700">{reviewMode ? 'En esta revisión podés seleccionar archivos para recorrer el formulario. No se suben ni se guardan al salir.' : <>Los documentos marcados como <strong>Guardado</strong> quedan en tu solicitud y se recuperan al volver.</>}</p>
+      {reviewMode && <p className="text-sm leading-6 text-neutral-700">La lectura automática y el aviso de duplicados se ejecutan al guardar en un alta real; no se simulan en esta revisión.</p>}
       <p className="text-sm text-neutral-500">Formatos aceptados: PDF, JPG y PNG. Máximo {(maxBytes / 1024 / 1024).toFixed(0)} MB por archivo.</p>
       <input
         ref={fileInputRef}
@@ -98,7 +101,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                   {attached && (
                     <div className={`text-xs ${uploaded ? 'text-emerald-700' : 'text-neutral-600'}`}>
                       <p className="truncate" title={uploaded ? uploaded.nombre : pendingFile?.name}>{uploaded ? uploaded.nombre : pendingFile?.name}</p>
-                      <p>{((uploaded ? uploaded.size : pendingFile?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : uploaded ? 'Guardado' : 'Pendiente'}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
+                      <p>{((uploaded ? uploaded.size : pendingFile?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : uploaded ? 'Guardado' : reviewMode ? 'Seleccionado para revisión' : 'Pendiente'}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
                     </div>
                   )}
                 </div>

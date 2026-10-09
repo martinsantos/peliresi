@@ -27,7 +27,7 @@ import { downloadCsv } from '../../utils/exportCsv';
 import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import DocumentUpload from '../../components/DocumentUpload';
-import CalculadoraTEF from '../../components/CalculadoraTEF';
+import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { generadorFiscalService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
@@ -550,7 +550,8 @@ const GeneradorDetallePage: React.FC = () => {
             </Card>
 
             {/* Calculadora TEF */}
-            <CalculadoraTEF
+            <AdministrativeTEF
+              actorType="GENERADOR" identity={g.id} declaration={g}
               corrientesY={categorias}
               tieneISO={!!(g.certificacionISO)}
             />

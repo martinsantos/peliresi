@@ -6,6 +6,7 @@ import { Check } from 'lucide-react';
 import { SectionTitle } from '../SectionTitle';
 import type { RegistrationData, TipoActor } from '../shared';
 import type { DocumentoSolicitud } from '../../../../types/api';
+import { ZONAS } from '../../../../utils/calculoTEF';
 
 interface StepResumenProps {
   reg: RegistrationData;
@@ -127,18 +128,16 @@ export const StepResumen: React.FC<StepResumenProps> = ({
     });
   }
 
-  // TEF
+  // Operational declarations only. Never present a calculated fee to applicants.
   if (!isTransportista) {
     const tefFields: { label: string; value: string }[] = [
-      { label: 'Factor R', value: form.factorR || '' },
-      { label: 'Monto MxR', value: form.montoMxR ? `$ ${form.montoMxR}` : '' },
       { label: 'Personal', value: form.tefPersonal || '' },
       { label: 'Superficie (m2)', value: form.tefSuperficie || '' },
-      { label: 'Zona', value: form.tefZona || '' },
+      { label: 'Potencia (HP)', value: form.tefPotencia || '' },
+      { label: 'Zona', value: ZONAS.find(zona => zona.id === form.tefZona)?.label || form.tefZona || '' },
     ];
-    if (isGenerador) tefFields.push({ label: 'Potencia (HP)', value: form.tefPotencia || '' });
     if (isOperador) tefFields.push({ label: 'Capacidad (tn/mes)', value: form.tefCapacidad || '' });
-    sections.push({ label: 'Calculo TEF', fields: tefFields });
+    sections.push({ label: 'Actividad', fields: tefFields });
   }
 
   // Transportista-specific

@@ -115,18 +115,18 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
   const maxC = corrientesY.length > 0 ? Math.max(...corrientesY.map(y => C_CORRIENTES[y.trim()] || 0)) : 0;
 
   const content = (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="tef-calculator">
       {/* === RESULTADO TEF === */}
       <div className="bg-neutral-900 rounded-2xl p-6 text-white shadow-xl">
-        <p className="text-neutral-400 text-xs font-semibold uppercase tracking-widest">Tasa de Evaluacion y Fiscalizacion</p>
-        <div className="flex items-end justify-between mt-2">
-          <p className="text-5xl font-black font-mono tracking-tight text-white">{fmtMoney(result.TEF)}</p>
-          <div className="text-right text-neutral-400 text-xs space-y-0.5">
-            <p>TEF = M x R x ISO</p>
-            <p className="font-mono text-neutral-300">{result.M} x {result.R.toFixed(4)} x {result.ISO}</p>
+        <p className="text-white text-sm font-semibold uppercase tracking-wide">Tasa de Evaluacion y Fiscalizacion</p>
+        <div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <p className="min-w-0 break-words text-3xl font-black font-mono tracking-tight text-white sm:text-5xl">{fmtMoney(result.TEF)}</p>
+          <div className="text-left text-sm space-y-0.5 sm:text-right">
+            <p className="text-white">TEF = M x R x ISO</p>
+            <p className="font-mono text-white">{result.M} x {result.R.toFixed(4)} x {result.ISO}</p>
           </div>
         </div>
-        <div className="grid grid-cols-5 gap-2 mt-5">
+        <div className="grid grid-cols-2 gap-2 mt-5 sm:grid-cols-5">
           {[
             { label: 'Z', desc: 'Zona', value: result.Z.toFixed(2), bg: 'bg-blue-500/20 border-blue-500/30' },
             { label: 'A', desc: 'Ambiental', value: result.A.toFixed(2), bg: 'bg-amber-500/20 border-amber-500/30' },
@@ -134,10 +134,10 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             { label: 'C', desc: 'Residuo', value: result.C.toFixed(1), bg: 'bg-red-500/20 border-red-500/30' },
             { label: 'R', desc: 'Riesgo', value: result.R.toFixed(2), bg: 'bg-white/10 border-white/20' },
           ].map(item => (
-            <div key={item.label} className={`rounded-xl p-2.5 text-center border ${item.bg}`}>
-              <p className="text-[10px] text-neutral-400 font-medium">{item.desc}</p>
+            <div key={item.label} className={`min-w-0 rounded-xl p-2.5 text-center border ${item.bg} ${item.label === 'R' ? 'col-span-2 sm:col-span-1' : ''}`}>
+              <p className="text-sm text-white font-medium">{item.desc}</p>
               <p className="text-lg font-bold font-mono text-white">{item.value}</p>
-              <p className="text-[9px] text-neutral-500 font-mono">{item.label}</p>
+              <p className="text-xs text-white font-mono">{item.label}</p>
             </div>
           ))}
         </div>
@@ -157,6 +157,8 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           {ZONAS.map(z => (
             <button
               key={z.id}
+              type="button"
+              aria-pressed={zona === z.id}
               onClick={() => setZona(z.id)}
               className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all ${
                 zona === z.id
@@ -181,15 +183,16 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           Se determina en funcion del personal, potencia instalada y superficie cubierta de la empresa,
           segun datos de la declaracion jurada anual.
         </p>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-neutral-700">Cantidad de Personal *</label>
             <p className="text-[10px] text-neutral-400">Empleados en planta</p>
             <input
               type="number" min={0} value={personal || ''}
+              aria-label="Cantidad de Personal"
               onChange={e => setPersonal(Number(e.target.value) || 0)}
               placeholder="0"
-              className="w-full h-10 px-3 rounded-xl border border-neutral-200 text-sm focus:border-purple-500 focus:outline-none font-mono text-center"
+              className="w-full min-h-11 px-3 rounded-xl border border-neutral-200 text-base sm:text-sm focus:border-purple-500 focus:outline-none font-mono text-center"
             />
           </div>
           <div className="space-y-1">
@@ -197,9 +200,10 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             <p className="text-[10px] text-neutral-400">Horse Power total</p>
             <input
               type="number" min={0} value={potenciaHP || ''}
+              aria-label="Potencia Instalada en HP"
               onChange={e => setPotenciaHP(Number(e.target.value) || 0)}
               placeholder="0"
-              className="w-full h-10 px-3 rounded-xl border border-neutral-200 text-sm focus:border-purple-500 focus:outline-none font-mono text-center"
+              className="w-full min-h-11 px-3 rounded-xl border border-neutral-200 text-base sm:text-sm focus:border-purple-500 focus:outline-none font-mono text-center"
             />
           </div>
           <div className="space-y-1">
@@ -207,9 +211,10 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             <p className="text-[10px] text-neutral-400">Metros cuadrados</p>
             <input
               type="number" min={0} value={superficieM2 || ''}
+              aria-label="Superficie Cubierta en M2"
               onChange={e => setSuperficieM2(Number(e.target.value) || 0)}
               placeholder="0"
-              className="w-full h-10 px-3 rounded-xl border border-neutral-200 text-sm focus:border-purple-500 focus:outline-none font-mono text-center"
+              className="w-full min-h-11 px-3 rounded-xl border border-neutral-200 text-base sm:text-sm focus:border-purple-500 focus:outline-none font-mono text-center"
             />
           </div>
         </div>
@@ -242,6 +247,8 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
                   <div className="flex-1">
                     <span className="text-[11px] font-bold text-neutral-800 uppercase leading-tight">{A_LABELS[key]}</span>
                     <button
+                      type="button"
+                      aria-label={`Ayuda sobre ${A_LABELS[key]}`}
                       onClick={() => setShowHelp(showHelp === key ? null : key)}
                       className="text-neutral-300 hover:text-amber-600 ml-1 align-middle"
                     >
@@ -254,9 +261,10 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
                   <span className="text-xs font-mono font-bold text-amber-700 shrink-0">{coefA[key]}</span>
                 </div>
                 <select
+                  aria-label={A_LABELS[key]}
                   value={coefA[key]}
                   onChange={e => updateA(key, Number(e.target.value))}
-                  className="w-full h-9 px-3 rounded-lg border border-neutral-200 text-xs bg-neutral-50 focus:border-amber-500 focus:outline-none"
+                  className="w-full min-h-11 px-3 rounded-lg border border-neutral-200 text-base sm:text-sm bg-neutral-50 focus:border-amber-500 focus:outline-none"
                 >
                   {A_OPTIONS[key].map(opt => (
                     <option key={opt.valor} value={opt.valor}>

@@ -35,7 +35,7 @@ import {
 import { StepCuenta } from './inscripcion/steps/StepCuenta';
 import { StepEmpresa } from './inscripcion/steps/StepEmpresa';
 import { StepDocumentos } from './inscripcion/steps/StepDocumentos';
-import { StepTEF, type StepTEFHandle } from './inscripcion/steps/StepTEF';
+import { StepActividad } from './inscripcion/steps/StepActividad';
 import { StepResumen } from './inscripcion/steps/StepResumen';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { solicitudService } from '../../services/solicitud.service';
@@ -100,7 +100,6 @@ const InscripcionWizardPage: React.FC = () => {
   }, [tipo, phase, step, submitSuccess]);
 
   // TEF ref for snapshotting values
-  const tefRef = useRef<StepTEFHandle>(null);
 
   const up = useCallback((field: string, value: string) => {
     setDirty(true);
@@ -194,20 +193,6 @@ const InscripcionWizardPage: React.FC = () => {
 
   const stepHasErrors = (s: number) => getStepErrors(s).length > 0;
 
-  const tefStepNumber = isGenerador ? 5 : isOperador ? 6 : -1;
-
-  const snapshotTEF = useCallback((): Record<string, string> => {
-    if (!tefRef.current) return {};
-    const tefValues = tefRef.current.snapshotTEF();
-    setForm(prev => ({ ...prev, ...tefValues }));
-    return tefValues;
-  }, []);
-
-  const leaveStep = (): Record<string, string> => {
-    if (step !== tefStepNumber) return form;
-    return { ...form, ...snapshotTEF() };
-  };
-
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;
     if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la operación del archivo. Los datos siguen en pantalla.'); return; }
@@ -216,7 +201,7 @@ const InscripcionWizardPage: React.FC = () => {
       setSaveError(getStepErrors(step).join('. '));
       return;
     }
-    const currentForm = leaveStep();
+    const currentForm = form;
     if (isReviewMode) {
       setStep(target);
       return;
@@ -333,8 +318,7 @@ const InscripcionWizardPage: React.FC = () => {
       setSubmitSuccess(true);
       return;
     }
-    // Snapshot TEF if currently on TEF step
-    const submitForm = { ...form, ...snapshotTEF() };
+    const submitForm = form;
     // Validate required steps
     for (let s = 1; s <= totalSteps; s++) {
       const errs = getStepErrors(s);
@@ -378,6 +362,7 @@ const InscripcionWizardPage: React.FC = () => {
   // ========================================
 
   const documentStep = <StepDocumentos
+    reviewMode={isReviewMode}
     docs={requirements}
     adjuntos={adjuntos}
     uploadedDocs={uploadedDocs}
@@ -395,18 +380,19 @@ const InscripcionWizardPage: React.FC = () => {
   /** Maps the current wizard step to the corresponding step component */
   const renderStepContent = () => {
     // Determine which logical step we're on
-    // Generador: 1-4=empresa, 5=TEF, 6=docs, 7=resumen
-    // Operador:  1-5=empresa, 6=TEF, 7=docs, 8=resumen
+    // Keep the persisted step numbers stable for existing drafts.
+    // Generador: 1-4=empresa, 5=actividad, 6=docs, 7=resumen
+    // Operador:  1-5=empresa, 6=actividad, 7=docs, 8=resumen
     // Transport: 1-3=empresa, 4=docs, 5=resumen
 
     if (isGenerador) {
       if (step <= 4) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
-      if (step === 5) return <StepTEF ref={tefRef} form={form} isGenerador={isGenerador} isOperador={isOperador} />;
+      if (step === 5) return <StepActividad form={form} up={up} isOperador={false} />;
       if (step === 6) return documentStep;
       if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isOperador) {
       if (step <= 5) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
-      if (step === 6) return <StepTEF ref={tefRef} form={form} isGenerador={isGenerador} isOperador={isOperador} />;
+      if (step === 6) return <StepActividad form={form} up={up} isOperador />;
       if (step === 7) return documentStep;
       if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isTransportista) {

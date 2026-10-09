@@ -27,6 +27,7 @@ import {
 import type { EstadoSolicitud, DocumentoSolicitud, MensajeSolicitud } from '../../types/api';
 import { solicitudService } from '../../services/solicitud.service';
 import { DocumentAnalysis } from '../../components/DocumentAnalysis';
+import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
 
@@ -228,6 +229,11 @@ const SolicitudDetallePage: React.FC = () => {
           </p>
         </div>
       </div>
+
+      <AdministrativeTEF actorType={solicitud.tipoActor} identity={solicitud.id}
+        declaration={datosActor}
+        corrientesY={(datosActor.corrientesControl || datosActor.corrientesY || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
+        tieneISO={!!datosActor.certificacionISO} />
 
       {/* 3-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
