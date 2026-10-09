@@ -138,6 +138,18 @@ describe('actor creation contract', () => {
     open(type, true); if (type !== 'transportista') step('Domicilios');
     expect(screen.getByLabelText(/Coordenadas/)).toHaveValue('0, -68'); expect(mock.update).not.toHaveBeenCalled();
   });
+  it.each(['generador', 'operador', 'transportista'] as const)('%s sends a valid zero coordinate when saving the verified record', async type => {
+    mock.existing = { id: 'qa', razonSocial: 'QA coordenada', cuit: '30-12345678-9', email: 'qa@night-qa.invalid', latitud: 0, longitud: -68 };
+    open(type, true); step(type === 'transportista' ? 'Confirmar' : 'Adjuntos'); step('Guardar Cambios');
+    await waitFor(() => expect(mock.update).toHaveBeenCalledOnce()); expect(mock.update.mock.calls[0][0].data).toMatchObject({ latitud: 0, longitud: -68 });
+  });
+  for (const type of ['generador', 'operador', 'transportista'] as const) it.each(['not-a-number, -68', '91, -68', '-32, 181', ', -68'])(`${type} refuses invalid coordinates %j without losing the text`, async value => {
+    mock.existing = { id: 'qa', razonSocial: 'QA coordenada', cuit: '30-12345678-9', email: 'qa@night-qa.invalid' };
+    open(type, true); if (type !== 'transportista') step('Domicilios'); fill(/Coordenadas/, value);
+    step(type === 'transportista' ? 'Confirmar' : 'Adjuntos'); const save = screen.queryByRole('button', { name: 'Guardar Cambios', exact: true }); if (save) fireEvent.click(save);
+    await waitFor(() => expect(screen.getByLabelText(/Coordenadas/)).toHaveAttribute('aria-invalid', 'true'));
+    expect(mock.update).not.toHaveBeenCalled(); expect(screen.getByLabelText(/Coordenadas/)).toHaveValue(value);
+  });
   it('does not drop an incomplete driver or invent an expiry', async () => {
     open(); basics(); fill(/Contraseña inicial/, 'OnlyLocal-QA-secret!');
     step('Choferes'); step('Agregar'); fill(/Nombre \*/, 'QA Chofer'); fill(/DNI/, '00000000');

@@ -47,4 +47,26 @@ describe('actor data and its exact history share one transaction', () => {
     await updateOperador({ params: { id: 'actor' }, body: { tipoOperador: 'IN_SITU' }, user: { id: 'owner', rol: 'OPERADOR' }, headers: {} } as never, response as never, next);
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403 }); expect(mock.update).not.toHaveBeenCalled();
   });
+  for (const [kind, handler] of [['GENERADOR', updateGenerador], ['OPERADOR', updateOperador], ['TRANSPORTISTA', updateTransportista]] as const) {
+    it.each([{ latitud: ' ', longitud: -68 }, { latitud: 91, longitud: -68 }, { latitud: -32, longitud: 181 }, { latitud: false, longitud: 0 }, { latitud: [], longitud: 0 }])(`${kind}: rejects invalid coordinates %j rather than fabricating a location`, async body => {
+      const next = vi.fn(), response = { json: vi.fn() };
+      await handler({ params: { id: 'actor' }, body, user: { id: 'staff', rol: 'ADMIN' }, headers: {} } as never, response as never, next);
+      expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 400 }); expect(mock.update).not.toHaveBeenCalled();
+    });
+    it(`${kind}: preserves an explicit unknown location as null, not zero`, async () => {
+      const next = vi.fn(), response = { json: vi.fn() };
+      await handler({ params: { id: 'actor' }, body: { latitud: null, longitud: null }, user: { id: 'staff', rol: 'ADMIN' }, headers: {} } as never, response as never, next);
+      expect(next).not.toHaveBeenCalled(); expect(mock.update.mock.calls[0][0].data).toMatchObject({ latitud: null, longitud: null });
+    });
+  }
+  it('keeps null fiscal inputs unknown rather than inventing zero amounts', async () => {
+    const next = vi.fn(), response = { json: vi.fn() };
+    await updateGenerador({ params: { id: 'actor' }, body: { factorR: null, montoMxR: null }, user: { id: 'staff', rol: 'ADMIN' }, headers: {} } as never, response as never, next);
+    expect(next).not.toHaveBeenCalled(); expect(mock.update.mock.calls[0][0].data).toMatchObject({ factorR: null, montoMxR: null });
+  });
+  it('refuses nonnumeric fiscal input before it can turn into null or zero', async () => {
+    const next = vi.fn(), response = { json: vi.fn() };
+    await updateGenerador({ params: { id: 'actor' }, body: { factorR: 'not-a-number' }, user: { id: 'staff', rol: 'ADMIN' }, headers: {} } as never, response as never, next);
+    expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 400 }); expect(mock.update).not.toHaveBeenCalled();
+  });
 });
