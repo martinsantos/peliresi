@@ -236,7 +236,7 @@ const MiSolicitudPage: React.FC = () => {
           <div className="text-4xl mb-3">&#127881;</div>
           <h3 className="text-xl font-bold text-green-800 mb-2">Tu inscripcion fue aprobada</h3>
           <p className="text-sm text-green-700 mb-6">
-            Ya puedes acceder al sistema como {solicitud.tipoActor}.
+            Tu inscripción como {solicitud.tipoActor} fue aprobada. El acceso al sistema requiere ingresar con tu cuenta habilitada y verificada.
           </p>
           <Button variant="primary" onClick={() => navigate('/dashboard')}>
             Ir al Dashboard <ArrowRight size={16} className="ml-1" />

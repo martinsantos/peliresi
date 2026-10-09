@@ -42,7 +42,19 @@ import { StepActividad } from './inscripcion/steps/StepActividad';
 import { StepResumen } from './inscripcion/steps/StepResumen';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { solicitudService } from '../../services/solicitud.service';
-import type { DocumentoSolicitud } from '../../types/api';
+import type { DocumentoSolicitud, EstadoSolicitud } from '../../types/api';
+import { queryClient } from '../../lib/queryClient';
+
+type ReceivedState = Exclude<EstadoSolicitud, 'BORRADOR' | 'OBSERVADA'>;
+const RECEIVED_STATES: Record<ReceivedState, { title: string; detail: string }> = {
+  ENVIADA: { title: 'Solicitud enviada', detail: 'SITREP recibió tu solicitud. No hace falta volver a enviarla.' },
+  EN_REVISION: { title: 'Solicitud enviada', detail: 'Tu solicitud está en revisión por la administración. No hace falta volver a enviarla.' },
+  APROBADA: { title: 'Solicitud aprobada', detail: 'La administración aprobó tu solicitud. Podés consultar el resultado y continuar por el acceso de tu cuenta.' },
+  RECHAZADA: { title: 'Solicitud rechazada', detail: 'La administración registró un rechazo. Consultá el motivo y las comunicaciones de tu trámite.' },
+};
+function receivedState(value: unknown): value is ReceivedState {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(RECEIVED_STATES, value);
+}
 
 // ========================================
 // COMPONENT
@@ -100,6 +112,7 @@ const InscripcionWizardPage: React.FC = () => {
   const [dirty, setDirty] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [confirmedState, setConfirmedState] = useState<ReceivedState | null>(null);
   const [regError, setRegError] = useState<string | null>(null);
   const activeStepRef = useRef<HTMLButtonElement>(null);
   const draftScope = `public:${tipoActor}:${solicitudId || ''}`;
@@ -153,7 +166,9 @@ const InscripcionWizardPage: React.FC = () => {
     const load = async () => {
       if (!pending.id) {
         const response = await api.get('/solicitudes/mis-solicitudes');
-        const own = response.data?.data?.solicitudes?.find((item: { usuarioId: string; tipoActor: string; estado: string }) => item.usuarioId === accountAtStart && item.tipoActor === tipoActor && ['BORRADOR', 'OBSERVADA'].includes(item.estado));
+        const candidates = response.data?.data?.solicitudes?.filter((item: { usuarioId: string; tipoActor: string }) => item.usuarioId === accountAtStart && item.tipoActor === tipoActor) || [];
+        const own = candidates.find((item: { estado: string }) => ['BORRADOR', 'OBSERVADA'].includes(item.estado))
+          || candidates.find((item: { estado: string }) => ['ENVIADA', 'EN_REVISION'].includes(item.estado));
         if (!own) return null;
         pending = { id: own.id, tipoActor, step: 1 };
       }
@@ -163,13 +178,16 @@ const InscripcionWizardPage: React.FC = () => {
       if (cancelled) return;
       if (!response) { setResumeStatus('idle'); return; }
       const solicitud = response.data?.data?.solicitud;
-      if (!solicitud || solicitud.tipoActor !== tipoActor) throw new Error('Solicitud incompatible');
+      if (!solicitud || solicitud.tipoActor !== tipoActor || solicitud.id !== pending.id) throw new Error('Solicitud incompatible');
       if (!accountAtStart || solicitud.usuarioId !== accountAtStart || registrationSessionOwner(getAccessToken()) !== accountAtStart) throw new Error('La sesión no pertenece a este borrador');
-      if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
-        localStorage.removeItem('sitrep_pending_solicitud');
-        setResumeStatus('idle');
+      if (receivedState(solicitud.estado)) {
+        setOwner(accountAtStart); setSolicitudId(solicitud.id); setConfirmedState(solicitud.estado);
+        setDirty(false); setSubmitSuccess(true); setResumeStatus('loaded');
+        void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
+        clearRegistrationDraft(accountAtStart, `public:${tipoActor}:${solicitud.id}`);
         return;
       }
+      if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) throw new Error('Estado de solicitud no reconocido');
       let persistedForm: Record<string, string> = {};
       try {
         const data = typeof solicitud.datosActor === 'string' ? JSON.parse(solicitud.datosActor || '{}') : solicitud.datosActor;
@@ -207,12 +225,12 @@ const InscripcionWizardPage: React.FC = () => {
   // Persist the CURRENT step, not just a completed navigation. Only the account
   // validated by the server can read it back; passwords and file bytes never enter it.
   useEffect(() => {
-    if (isReviewMode || !owner || !solicitudId || localConflict || !ownership.canWrite()) return;
+    if (isReviewMode || submitSuccess || !owner || !solicitudId || localConflict || !ownership.canWrite()) return;
     if (registrationSessionOwner(getAccessToken()) !== owner) return;
     setLocalSaved(writeRegistrationDraft(owner, draftScope, {
       form, step, serverRevision, files: [...new Set([...Object.keys(adjuntos), ...missingLocalFiles])].filter(type => !uploadedDocs[type]),
     }));
-  }, [isReviewMode, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
+  }, [isReviewMode, submitSuccess, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
 
   useEffect(() => {
     if (!owner) return;
@@ -222,6 +240,7 @@ const InscripcionWizardPage: React.FC = () => {
       serverExtraFields.current = {};
       setLocalConflict(null); setMissingLocalFiles([]); setDirty(false); setLocalSaved(false);
       setReg({ nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
+      setConfirmedState(null); setSubmitSuccess(false);
       setResumeStatus('error'); setPhase(1);
     };
     window.addEventListener('storage', accountChanged);
@@ -462,8 +481,25 @@ const InscripcionWizardPage: React.FC = () => {
       assertDraftSession();
       clearRegistrationDraft(owner!, draftScope);
       try { localStorage.removeItem('sitrep_pending_solicitud'); } catch { /* submission was already confirmed by SITREP */ }
+      setConfirmedState('ENVIADA');
       setSubmitSuccess(true);
+      void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
     } catch (err: unknown) {
+      // A response can be lost after commit. Read the actual owned record;
+      // never retry sending blindly or infer acceptance from a network error.
+      try {
+        if (owner && registrationSessionOwner(getAccessToken()) === owner) {
+          const response = await api.get(`/solicitudes/${solicitudId}`);
+          const actual = response.data?.data?.solicitud;
+          if (registrationSessionOwner(getAccessToken()) === owner && actual?.id === solicitudId
+              && actual.usuarioId === owner && actual.tipoActor === tipoActor && receivedState(actual.estado)) {
+            setConfirmedState(actual.estado); setSubmitSuccess(true); setDirty(false); setRegError(null);
+            clearRegistrationDraft(owner, draftScope);
+            void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
+            return;
+          }
+        }
+      } catch { /* Keep the original failure and editable fields if acceptance cannot be verified. */ }
       setRegError(getApiErrorMessage(err, 'Error al enviar la solicitud'));
     } finally {
       submitInFlight.current = false; setSubmitting(false);
@@ -538,19 +574,24 @@ const InscripcionWizardPage: React.FC = () => {
   // ========================================
 
   if (submitSuccess) {
+    const receipt = confirmedState ? RECEIVED_STATES[confirmedState] : RECEIVED_STATES.ENVIADA;
+    const CompletionIcon = isReviewMode || confirmedState === 'APROBADA' ? Check : confirmedState === 'RECHAZADA' ? AlertCircle : Send;
     return (
       <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-8 max-w-lg text-center">
           <div className="w-16 h-16 bg-[#0D8A4F]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check size={32} className="text-[#0D8A4F]" />
+            <CompletionIcon size={32} className={confirmedState === 'RECHAZADA' ? 'text-error-700' : 'text-[#0D8A4F]'} />
           </div>
-          <h2 className="text-2xl font-bold text-neutral-900 mb-2">{isReviewMode ? 'Revisión finalizada' : 'Solicitud enviada'}</h2>
+          <h2 className="text-2xl font-bold text-neutral-900 mb-2">{isReviewMode ? 'Revisión finalizada' : receipt.title}</h2>
           <p className="text-neutral-600 mb-6">
             {isReviewMode
               ? 'Recorriste el formulario de prueba. No se creó ninguna cuenta, no se subieron archivos y no se envió ningún correo.'
-              : `Tu solicitud de inscripción como ${isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'} fue enviada. Podrás consultar el estado al iniciar sesión.`}
+              : receipt.detail}
           </p>
-          <Button variant="primary" onClick={() => navigate(isReviewMode ? '/' : '/login')}>{isReviewMode ? 'Volver al inicio' : 'Ir al login'}</Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            {!isReviewMode && <Button variant="primary" onClick={() => navigate('/mi-solicitud')}>Ver mi solicitud</Button>}
+            <Button variant={isReviewMode ? 'primary' : 'outline'} onClick={() => navigate(isReviewMode ? '/' : '/login')}>{isReviewMode ? 'Volver al inicio' : 'Ir al login'}</Button>
+          </div>
         </div>
       </div>
     );

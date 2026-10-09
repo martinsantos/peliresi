@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import InscripcionWizardPage from '../../pages/public/InscripcionWizardPage';
 import { readRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
+import { queryClient } from '../../lib/queryClient';
 
 const mock = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn(), requirements: vi.fn(), canWrite: vi.fn(), token: '' }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get, put: mock.put, post: mock.post }, getAccessToken: () => mock.token, setTokensDurably: vi.fn() }));
@@ -16,14 +17,14 @@ async function open() {
   await act(async () => { render(<MemoryRouter initialEntries={['/inscripcion/generador']}><Routes><Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
 }
 beforeEach(() => {
-  vi.clearAllMocks(); localStorage.clear(); mock.token = session('owner'); mock.canWrite.mockReturnValue(true);
+  vi.clearAllMocks(); localStorage.clear(); queryClient.clear(); mock.token = session('owner'); mock.canWrite.mockReturnValue(true);
   mock.get.mockResolvedValue(request()); mock.requirements.mockResolvedValue({ documentos: [], maxBytes: 10485760 });
   mock.put.mockResolvedValue({ data: { data: { solicitud: { updatedAt: '2026-10-09T10:01:00.000Z' } } } });
   mock.post.mockResolvedValue({ data: {} });
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); queryClient.clear(); vi.restoreAllMocks(); });
 
 describe('a real registration UI protects the current step and account boundary', () => {
   it('allows saving an incomplete draft without submitting or moving the current step', async () => {
@@ -36,8 +37,10 @@ describe('a real registration UI protects the current step and account boundary'
   });
   it.each(['ENVIADA', 'EN_REVISION', 'APROBADA'])('recovers the actual %s state instead of offering another registration', async state => {
     const response = request(); response.data.data.solicitud.estado = state; mock.get.mockResolvedValue(response);
+    queryClient.setQueryData(['solicitudes', 'mis'], [{ id: 'draft', estado: 'BORRADOR' }]);
     await open(); expect(screen.getByRole('heading', { name: state === 'APROBADA' ? 'Solicitud aprobada' : 'Solicitud enviada', exact: true })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Crear cuenta y continuar', exact: true })).toBeNull(); expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+    expect(queryClient.getQueryState(['solicitudes', 'mis'])?.isInvalidated).toBe(true);
   });
   it('does not display a submitted record from another owner', async () => {
     const response = request('other'); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
@@ -48,9 +51,25 @@ describe('a real registration UI protects the current step and account boundary'
     mock.get.mockImplementation(async () => response);
     mock.post.mockImplementation(async () => { response.data.data.solicitud.estado = 'ENVIADA'; throw new Error('QA acknowledgement lost after commit'); });
     await open(); fireEvent.click(screen.getByRole('button', { name: /^Paso 7 de 7: Resumen$/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar solicitud', exact: true })).toBeVisible());
     fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud', exact: true }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible());
     expect(mock.post).toHaveBeenCalledOnce(); expect(mock.get.mock.calls.filter(call => call[0] === '/solicitudes/draft')).toHaveLength(2);
+  });
+  it('never infers acceptance when the post fails and the server still identifies a draft', async () => {
+    const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA alta', domicilio: 'QA Registro 100' }); mock.get.mockResolvedValue(response);
+    mock.post.mockRejectedValue(new Error('QA not submitted')); await open();
+    fireEvent.click(screen.getByRole('button', { name: /^Paso 7 de 7: Resumen$/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar solicitud', exact: true })).toBeVisible());
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud', exact: true }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('QA not submitted'));
+    expect(screen.queryByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeNull(); expect(mock.post).toHaveBeenCalledOnce();
+  });
+  it('clears the previous receipt state when the account changes', async () => {
+    const response = request(); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
+    await open(); expect(screen.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
+    mock.token = session('other'); fireEvent(window, new StorageEvent('storage', { key: 'sitrep_access_token' }));
+    expect(screen.queryByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeNull(); expect(screen.getByRole('button', { name: 'Iniciar sesión y recuperar' })).toBeVisible();
   });
   it('recovers text typed without ever changing steps after a close/reopen', async () => {
     await open(); fireEvent.change(screen.getByPlaceholderText('Empresa S.A.'), { target: { value: 'QA sin navegar' } });

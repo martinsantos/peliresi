@@ -299,7 +299,7 @@ export type EstadoSolicitud = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'OBSERVAD
 export interface SolicitudInscripcion {
   id: string;
   usuarioId: string;
-  tipoActor: 'GENERADOR' | 'OPERADOR';
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
   estado: EstadoSolicitud;
   datosActor: string;
   datosResiduos?: string;
@@ -312,6 +312,7 @@ export interface SolicitudInscripcion {
   observaciones?: string;
   generadorId?: string;
   operadorId?: string;
+  transportistaId?: string;
   createdAt: string;
   updatedAt: string;
   usuario?: { id: string; email: string; nombre: string; rol: string };

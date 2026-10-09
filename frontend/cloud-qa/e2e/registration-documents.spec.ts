@@ -100,6 +100,11 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Crear cuenta y continuar', exact: true })).toHaveCount(0);
+  const ownRequests = page.waitForResponse(response => new URL(response.url()).pathname === '/api/solicitudes/mis-solicitudes' && response.status() === 200);
+  await page.getByRole('button', { name: 'Ver mi solicitud', exact: true }).click();
+  const mine = (await (await ownRequests).json()).data.solicitudes;
+  expect(mine.some((record: { id: string; estado: string }) => record.id === candidate.id && record.estado === 'ENVIADA')).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Mi Solicitud de Inscripcion', exact: true })).toBeVisible();
   await login(page, info);
   await page.goto(`${prefix(info)}/admin/solicitudes/${candidate.id}`);
   if (actor !== 'transportista') {
