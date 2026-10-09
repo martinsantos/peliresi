@@ -122,6 +122,22 @@ describe('actor creation contract', () => {
     open('transportista', true, '/app'); step('Vehiculos');
     expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/app/admin/actores/transportistas/qa');
   });
+  it.each(['generador', 'operador', 'transportista'] as const)('%s never edits an unavailable or mismatched registry record', type => {
+    mock.existing = { id: 'wrong-actor', razonSocial: 'Do not reuse', cuit: '30-12345678-9', email: 'qa@night-qa.invalid' };
+    open(type, true); expect(screen.queryByLabelText('Razon Social *')).toBeNull(); expect(screen.getByRole('alert')).toHaveTextContent('No se pudo verificar');
+    expect(mock.update).not.toHaveBeenCalled();
+  });
+  it.each(['generador', 'operador', 'transportista'] as const)('%s keeps current edits when the same registry is refetched', type => {
+    mock.existing = { id: 'qa', razonSocial: 'QA original', cuit: '30-12345678-9', email: 'qa@night-qa.invalid' };
+    open(type, true); mock.existing = { ...mock.existing as object, razonSocial: 'QA server refetch' };
+    fill(/Razon Social/, 'QA current edit'); expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA current edit');
+    expect(mock.update).not.toHaveBeenCalled();
+  });
+  it.each(['generador', 'operador', 'transportista'] as const)('%s retains a valid zero coordinate during verified preload', type => {
+    mock.existing = { id: 'qa', razonSocial: 'QA coordenada', cuit: '30-12345678-9', email: 'qa@night-qa.invalid', latitud: 0, longitud: -68 };
+    open(type, true); if (type !== 'transportista') step('Domicilios');
+    expect(screen.getByLabelText(/Coordenadas/)).toHaveValue('0, -68'); expect(mock.update).not.toHaveBeenCalled();
+  });
   it('does not drop an incomplete driver or invent an expiry', async () => {
     open(); basics(); fill(/Contraseña inicial/, 'OnlyLocal-QA-secret!');
     step('Choferes'); step('Agregar'); fill(/Nombre \*/, 'QA Chofer'); fill(/DNI/, '00000000');

@@ -193,7 +193,7 @@ function renderOperadorStep(
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Select label="Tipo de Operador" value={form.tipoOperador || ''} onChange={(val) => up('tipoOperador', val)} options={[{ value: '', label: 'Seleccionar...' }, { value: 'TRATAMIENTO', label: 'Tratamiento' }, { value: 'DISPOSICION_FINAL', label: 'Disposicion Final' }, { value: 'ALMACENAMIENTO', label: 'Almacenamiento' }]} size="base" />
+            <Select label="Tipo de Operador" value={form.tipoOperador || ''} onChange={(val) => up('tipoOperador', val)} options={[{ value: '', label: 'Seleccionar...' }, { value: 'FIJO', label: 'Planta fija' }, { value: 'IN_SITU', label: 'Operador in situ' }, ...(form.tipoOperador && !['FIJO', 'IN_SITU'].includes(form.tipoOperador) ? [{ value: form.tipoOperador, label: `Dato previo: ${form.tipoOperador}` }] : [])]} size="base" />
           </div>
           <div>
             <label htmlFor="registration-tecnologia" className={labelCls}>Tecnologia</label>

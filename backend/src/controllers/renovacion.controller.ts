@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { approvedOperatorModeChange } from '../domain/operatorModalities';
 import {
     canReviewRenovacion,
     canSubmitRenovacion,
@@ -151,7 +152,10 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
                 if (tipoActor === 'GENERADOR' && renovacion.generadorId) {
                     await tx.generador.update({ where: { id: renovacion.generadorId }, data: safeChanges as Prisma.GeneradorUpdateInput });
                 } else if (tipoActor === 'OPERADOR' && renovacion.operadorId) {
-                    await tx.operador.update({ where: { id: renovacion.operadorId }, data: safeChanges as Prisma.OperadorUpdateInput });
+                    const current = await tx.operador.findUnique({ where: { id: renovacion.operadorId }, select: { tipoOperador: true } });
+                    if (!current) throw new AppError('Operador no encontrado', 404);
+                    const mode = approvedOperatorModeChange(current, safeChanges.tipoOperador, true);
+                    await tx.operador.update({ where: { id: renovacion.operadorId }, data: { ...safeChanges, ...mode } as Prisma.OperadorUpdateInput });
                 }
             }
             const status = await tx.renovacion.updateMany({

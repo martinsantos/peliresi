@@ -28,8 +28,15 @@ export function ActorRegistryLookup({ type, cuit }: { type: 'GENERADOR' | 'OPERA
       const normalized = `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
       const response = await api.get(`/actores/${plural}`, { params: { search: normalized, limit: 20 } });
       if (generation.current !== request || registrationSessionOwner(getAccessToken()) !== owner) return;
-      const entries = response.data.data[plural] || [];
-      const exact = entries.find((actor: { cuit: string }) => String(actor.cuit).replace(/\D/g, '') === digits);
+      const matches = (entries: Array<{ id: string; razonSocial: string; cuit: string }>) => entries.find(actor => String(actor.cuit).replace(/\D/g, '') === digits);
+      let exact = matches(response.data.data[plural] || []);
+      // Imported padrón rows may have the same CUIT without separators. Do not
+      // rewrite identities or disclose an unverified public registry to match it.
+      if (!exact) {
+        const imported = await api.get(`/actores/${plural}`, { params: { search: digits, limit: 20 } });
+        if (generation.current !== request || registrationSessionOwner(getAccessToken()) !== owner) return;
+        exact = matches(imported.data.data[plural] || []);
+      }
       setFound(exact ? { id: exact.id, razonSocial: exact.razonSocial, cuit: exact.cuit } : null);
       if (!exact) setNotice('No hay una ficha de esta categoría con ese CUIT en SITREP. Podés continuar el alta.');
     } catch (error) { setNotice(getApiErrorMessage(error, 'No se pudo consultar el padrón. Los campos siguen en pantalla.')); }

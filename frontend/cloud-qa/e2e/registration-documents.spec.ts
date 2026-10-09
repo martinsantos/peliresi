@@ -36,6 +36,10 @@ async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> 
   await expect(page.getByTestId('registration-wizard')).toBeVisible();
   await page.getByPlaceholder(actor === 'generador' ? 'Empresa S.A.' : actor === 'operador' ? 'Operador S.A.' : 'Transporte S.A.').fill(`QA establecimiento ${id}`);
   await page.getByPlaceholder('Calle 123, Ciudad', { exact: true }).fill('Domicilio QA Mendoza 123');
+  if (actor === 'operador') {
+    await page.getByRole('combobox', { name: 'Tipo de Operador', exact: true }).click();
+    await page.getByRole('option', { name: 'Operador in situ', exact: true }).click();
+  }
   const documentStep = actor === 'generador' ? 6 : actor === 'operador' ? 7 : 4;
   if (actor !== 'transportista') {
     await page.getByRole('navigation', { name: 'Etapas de la inscripción' }).getByRole('button', { name: new RegExp(`^Paso ${documentStep - 1} de .*: Actividad$`) }).click();
@@ -123,6 +127,7 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
   const persisted = (await (await profile).json()).data[actor];
   expect(persisted.domicilio).toBe('Domicilio QA Mendoza 123');
   if (actor !== 'transportista') expect(persisted.tefInputs).toEqual({ personal: 32, potenciaHP: 120, superficieM2: 1250, zona: 'zona_industrial' });
+  if (actor === 'operador') expect(persisted.modalidades).toEqual(['IN_SITU']);
   // Approving a declaration does not create a payment or an official CAA.
   expect(persisted.pagos || []).toEqual([]);
   expect(errors).toEqual([]);

@@ -78,4 +78,8 @@ describe('approved registration preserves declarations, not invented fiscal auth
     mock.find.mockResolvedValue({ ...draft(), datosActor: JSON.stringify({ ...declared, cuit: '30-11111111-1' }) });
     expect((await approve()).error).toMatchObject({ statusCode: 400 }); expect(mock.create).not.toHaveBeenCalled();
   });
+  it('keeps approved in-situ type and runtime modality aligned without inventing another mode', async () => {
+    mock.find.mockResolvedValue({ ...draft('OPERADOR'), datosActor: JSON.stringify({ ...declared, tipoOperador: 'IN_SITU' }) });
+    await approve('ADMIN_OPERADOR'); expect(mock.create.mock.calls[0][0].data).toMatchObject({ tipoOperador: 'IN_SITU', modalidades: ['IN_SITU'] });
+  });
 });

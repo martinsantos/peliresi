@@ -70,7 +70,8 @@ const NuevoTransportistaPage: React.FC = () => {
   const mp = useMobilePrefix();
   const isEdit = !!id;
 
-  const { data: existing } = useTransportista(isEdit ? id! : '');
+  const { data: existing, isLoading: loadingExisting, refetch: reloadExisting } = useTransportista(isEdit ? id! : '');
+  const initializedActor = useRef<string | null>(null);
   const createMutation = useCreateTransportista();
   const updateMutation = useUpdateTransportista();
 
@@ -88,6 +89,7 @@ const NuevoTransportistaPage: React.FC = () => {
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
   const draftData = { form, step, vehiculos, choferes, savedActorId, files: [...missingFiles, ...Object.values(pendingDocuments).map(value => value.file.name)] };
   const draft = useActorRegistrationDraft('TRANSPORTISTA', id, draftData, data => {
+    setPendingDocuments({}); setDocumentError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
     setVehiculos(Array.isArray(data.vehiculos) ? data.vehiculos.map(value => restoreRegistrationForm(EMPTY_VEHICULO, value)) : []);
     setChoferes(Array.isArray(data.choferes) ? data.choferes.map(value => restoreRegistrationForm(EMPTY_CHOFER, value)) : []);
@@ -98,7 +100,13 @@ const NuevoTransportistaPage: React.FC = () => {
   }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || vehiculos.length > 0 || choferes.length > 0 || Boolean(savedActorId));
 
   useEffect(() => {
-    if (!isEdit || !existing) return;
+    initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setVehiculos([]); setChoferes([]);
+    setPendingDocuments({}); setSavedActorId(null); setSavedDocuments([]); setMissingFiles([]);
+  }, [id, draft.owner]);
+
+  useEffect(() => {
+    if (!isEdit || !existing || existing.id !== id || initializedActor.current === id) return;
+    initializedActor.current = id!;
     const t = existing;
     setForm({
       razonSocial: t.razonSocial || '', cuit: t.cuit || '',
@@ -107,7 +115,7 @@ const NuevoTransportistaPage: React.FC = () => {
       password: '', nombre: t.usuario?.nombre || '',
       numeroHabilitacion: t.numeroHabilitacion || '',
       vencimientoHabilitacion: t.vencimientoHabilitacion ? new Date(t.vencimientoHabilitacion).toISOString().split('T')[0] : '',
-      coordenadas: t.latitud ? `${t.latitud}, ${t.longitud}` : '',
+      coordenadas: t.latitud != null && t.longitud != null ? `${t.latitud}, ${t.longitud}` : '',
       corrientesAutorizadas: t.corrientesAutorizadas || '',
       expedienteDPA: t.expedienteDPA || '',
       resolucionDPA: t.resolucionDPA || '',
@@ -131,7 +139,7 @@ const NuevoTransportistaPage: React.FC = () => {
         telefono: c.telefono || '',
       })));
     }
-  }, [existing, isEdit]);
+  }, [existing, isEdit, id, draft.owner]);
 
   const up = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -263,6 +271,8 @@ const NuevoTransportistaPage: React.FC = () => {
 
   const isPending = savingDocuments || createMutation.isPending || updateMutation.isPending;
   const backPath = mp('/admin/actores/transportistas');
+  if (isEdit && loadingExisting) return <p role="status" className="p-6 text-neutral-700">Recuperando la ficha del transportista…</p>;
+  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del transportista. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
@@ -316,7 +326,7 @@ const NuevoTransportistaPage: React.FC = () => {
 
       {/* Step Content */}
       <Card className="p-6 min-h-[360px]">
-        <fieldset className="min-w-0" disabled={isPending || (Boolean(savedActorId) && step !== 5)}>
+        <fieldset className="min-w-0" disabled={isPending || Boolean(draft.available) || (Boolean(savedActorId) && step !== 5)}>
         {step === 1 && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Truck size={20} className="text-orange-600" /> Datos Basicos</h3>

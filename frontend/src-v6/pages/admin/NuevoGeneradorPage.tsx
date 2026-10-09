@@ -113,6 +113,7 @@ const NuevoGeneradorPage: React.FC = () => {
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
   const draftData = { form, step, selectedY: [...selectedY], tefInputs, savedActorId, uploadedDocs, files: [...missingFiles, ...Object.values(adjuntos).map(file => file.name)] };
   const draft = useActorRegistrationDraft('GENERADOR', id, draftData, data => {
+    setAdjuntos({}); setSubmitError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
     setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
     setTefInputs(data.tefInputs ? tefDeclaredInputs({ tefInputs: data.tefInputs }).inputs : null);
@@ -122,7 +123,8 @@ const NuevoGeneradorPage: React.FC = () => {
     setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
   }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || Boolean(savedActorId));
 
-  const { data: existing, isLoading: loadingExisting } = useGenerador(id || '');
+  const { data: existing, isLoading: loadingExisting, refetch: reloadExisting } = useGenerador(id || '');
+  const initializedActor = useRef<string | null>(null);
   const createMutation = useCreateGenerador();
   const updateMutation = useUpdateGenerador();
   const uploadDocMutation = useUploadDocumento();
@@ -130,7 +132,13 @@ const NuevoGeneradorPage: React.FC = () => {
   const backPath = '/admin/actores/generadores';
 
   useEffect(() => {
-    if (!isEdit || !existing) return;
+    initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setSelectedY(new Set());
+    setAdjuntos({}); setSavedActorId(null); setUploadedDocs({}); setTefInputs(null); setMissingFiles([]);
+  }, [id, draft.owner]);
+
+  useEffect(() => {
+    if (!isEdit || !existing || existing.id !== id || initializedActor.current === id) return;
+    initializedActor.current = id!;
     const g = existing;
     // CSV enrichment fallback for fields not yet persisted in DB
     const csv = g.cuit ? (GENERADORES_DATA[g.cuit] || GENERADORES_DATA[g.cuit?.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
@@ -159,7 +167,7 @@ const NuevoGeneradorPage: React.FC = () => {
       categoriaIndividual: g.categoriaIndividual || '',
       montoMxR: g.montoMxR != null ? String(g.montoMxR) : '',
       libroOperatoria: g.libroOperatoria ?? false,
-      coordenadas: g.latitud ? `${g.latitud}, ${g.longitud}` : '',
+      coordenadas: g.latitud != null && g.longitud != null ? `${g.latitud}, ${g.longitud}` : '',
     });
 
     const corrientesStr = g.corrientesControl || (csv?.categoriasControl ? csv.categoriasControl.join(', ') : '');
@@ -170,7 +178,7 @@ const NuevoGeneradorPage: React.FC = () => {
     if (g.tefInputs) {
       setTefInputs(g.tefInputs as unknown as TEFInputs);
     }
-  }, [existing, isEdit]);
+  }, [existing, isEdit, id, draft.owner]);
 
   const up = (field: string, value: string | boolean) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -371,6 +379,7 @@ const NuevoGeneradorPage: React.FC = () => {
       </div>
     );
   }
+  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del generador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
@@ -423,7 +432,7 @@ const NuevoGeneradorPage: React.FC = () => {
       </fieldset>
 
       {/* Step Content */}
-      <fieldset disabled={isPending || (Boolean(savedActorId) && step !== TOTAL_STEPS)} className="min-w-0 min-h-[400px]">
+      <fieldset disabled={isPending || Boolean(draft.available) || (Boolean(savedActorId) && step !== TOTAL_STEPS)} className="min-w-0 min-h-[400px]">
         {/* ===== PASO 1 ===== */}
         {step === 1 && (
           <Card>

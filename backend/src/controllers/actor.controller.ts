@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
+import { approvedOperatorModeChange, operatorModalitiesForType } from '../domain/operatorModalities';
 import { parsePagination } from '../utils/pagination';
 import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
 import {
@@ -1111,6 +1112,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
 
         validateInitialPassword(password, cuit);
         const passwordHash = await bcrypt.hash(password, 10);
+        const modalidades = ['ADMIN', 'ADMIN_OPERADOR'].includes(req.user!.rol) ? operatorModalitiesForType(tipoOperador) : undefined;
         const operador = await prisma.$transaction(async tx => {
             const usuario = await tx.usuario.create({
                 data: {
@@ -1138,6 +1140,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                     latitud: latitud !== undefined ? Number(latitud) : undefined,
                     longitud: longitud !== undefined ? Number(longitud) : undefined,
                     ...(tefInputs !== undefined && { tefInputs }),
+                    ...(modalidades ? { modalidades } : {}),
                 },
                 include: { usuario: { select: { email: true, nombre: true } } }
             });
@@ -1172,6 +1175,7 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
             await transaction.$queryRaw`SELECT id FROM operadores WHERE id = ${id} FOR UPDATE`;
             const antes = await transaction.operador.findUnique({ where: { id } });
             if (!antes) throw new AppError('Operador no encontrado', 404);
+            const mode = approvedOperatorModeChange(antes, tipoOperador, ['ADMIN', 'ADMIN_OPERADOR'].includes(req.user!.rol));
             const actualizado = await transaction.operador.update({
             where: { id },
             data: {
@@ -1186,6 +1190,7 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
                 ...(latitud !== undefined && { latitud: Number(latitud) }),
                 ...(longitud !== undefined && { longitud: Number(longitud) }),
                 ...(tefInputs !== undefined && { tefInputs }),
+                ...mode,
             }
         });
 

@@ -29,4 +29,22 @@ describe('actor data and its exact history share one transaction', () => {
       expect(next).toHaveBeenCalledWith(failure); expect(response.json).not.toHaveBeenCalled();
     });
   }
+  it('an administrative type change updates the exact runtime mode as part of the audited transaction', async () => {
+    mock.before.mockResolvedValue({ id: 'actor', tipoOperador: 'FIJO', modalidades: ['FIJO'] });
+    const response = { json: vi.fn() }, next = vi.fn();
+    await updateOperador({ params: { id: 'actor' }, body: { tipoOperador: 'IN_SITU' }, user: { id: 'staff', rol: 'ADMIN_OPERADOR' }, headers: {} } as never, response as never, next);
+    expect(next).not.toHaveBeenCalled(); expect(mock.update.mock.calls[0][0].data).toMatchObject({ tipoOperador: 'IN_SITU', modalidades: ['IN_SITU'] });
+  });
+  it('does not silently remove a historical second mode when only an address changes', async () => {
+    mock.before.mockResolvedValue({ id: 'actor', tipoOperador: 'FIJO', modalidades: ['FIJO', 'IN_SITU'] });
+    const response = { json: vi.fn() }, next = vi.fn();
+    await updateOperador({ params: { id: 'actor' }, body: { tipoOperador: 'FIJO', domicilio: 'Nuevo' }, user: { id: 'staff', rol: 'ADMIN_OPERADOR' }, headers: {} } as never, response as never, next);
+    expect(next).not.toHaveBeenCalled(); expect(mock.update.mock.calls[0][0].data).not.toHaveProperty('modalidades');
+  });
+  it('a common operator cannot self-grant a new runtime mode', async () => {
+    mock.before.mockResolvedValue({ id: 'actor', tipoOperador: 'FIJO', modalidades: ['FIJO'] });
+    const response = { json: vi.fn() }, next = vi.fn();
+    await updateOperador({ params: { id: 'actor' }, body: { tipoOperador: 'IN_SITU' }, user: { id: 'owner', rol: 'OPERADOR' }, headers: {} } as never, response as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403 }); expect(mock.update).not.toHaveBeenCalled();
+  });
 });

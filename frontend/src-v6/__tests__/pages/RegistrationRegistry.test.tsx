@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RegisteredAccount } from '../../pages/public/inscripcion/RegisteredAccount';
 import SolicitarCambiosPage from '../../pages/perfil/SolicitarCambiosPage';
+import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
 const mock = vi.hoisted(() => ({ get: vi.fn(), token: '', role: 'GENERADOR', submit: vi.fn() }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get }, getAccessToken: () => mock.token }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', actorId: 'actor' }, isGenerador: mock.role === 'GENERADOR', isOperador: mock.role === 'OPERADOR' }) }));
@@ -10,6 +11,20 @@ vi.mock('../../services/renovacion.service', () => ({ renovacionService: { creat
 vi.mock('../../components/ui/Toast', () => ({ toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
 beforeEach(() => { vi.clearAllMocks(); mock.role = 'GENERADOR'; mock.token = `qa.${btoa(JSON.stringify({ id: 'owner' }))}.qa`; });
 describe('existing registry is available only through the verified owner and actual API shape', () => {
+  it('finds the exact imported CUIT without separators, without rewriting it or matching another actor', async () => {
+    mock.get.mockResolvedValueOnce({ data: { data: { generadores: [] } } })
+      .mockResolvedValueOnce({ data: { data: { generadores: [{ id: 'exact', razonSocial: 'QA importado', cuit: '30123456789' }, { id: 'other', razonSocial: 'Otra ficha', cuit: '30999999999' }] } } });
+    render(<MemoryRouter><ActorRegistryLookup type="GENERADOR" cuit="30-12345678-9" /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar en padrón' }));
+    await waitFor(() => expect(screen.getByText('QA importado · 30123456789')).toBeVisible());
+    expect(screen.queryByText(/Otra ficha/)).toBeNull();
+    expect(mock.get.mock.calls.map(call => call[1].params.search)).toEqual(['30-12345678-9', '30123456789']);
+  });
+  it('does not query or disclose the padrón without an actual session', async () => {
+    mock.token = ''; render(<MemoryRouter><ActorRegistryLookup type="OPERADOR" cuit="30-12345678-9" /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar en padrón' }));
+    await waitFor(() => expect(screen.getByText('Iniciá sesión para consultar el padrón.')).toBeVisible()); expect(mock.get).not.toHaveBeenCalled();
+  });
   it.each(['GENERADOR', 'OPERADOR'] as const)('%s precarga uses the wrapped actor API and retains the current address', async role => {
     mock.role = role; mock.get.mockResolvedValue({ data: { data: { [role.toLowerCase()]: { id: 'actor', razonSocial: 'QA padrón', domicilio: 'QA domicilio anterior', telefono: '0261-QA' } } } });
     await act(async () => render(<MemoryRouter><SolicitarCambiosPage /></MemoryRouter>));

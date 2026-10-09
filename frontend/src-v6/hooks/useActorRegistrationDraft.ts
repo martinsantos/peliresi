@@ -17,11 +17,13 @@ export function useActorRegistrationDraft(type: 'GENERADOR' | 'OPERADOR' | 'TRAN
   const [restoring, setRestoring] = useState(false);
   const dataRef = useRef(data); dataRef.current = data;
   const restoreRef = useRef(onRestore); restoreRef.current = onRestore;
+  const previousOwner = useRef(owner);
   const paused = useRef(false);
   const serialized = JSON.stringify(data);
   const ownership = useInspectionDraftOwnership(`registration:${owner}:${scope}`, Boolean(owner && verified === owner));
   useEffect(() => {
-    let cancelled = false; setVerified(null); setAvailable(null); setSaved(false);
+    let cancelled = false; setVerified(null); setAvailable(null); setSaved(false); setError(null); paused.current = false;
+    if (previousOwner.current !== owner) { restoreRef.current({}); previousOwner.current = owner; }
     if (!owner) return;
     api.get('/auth/profile').then(response => {
       if (cancelled || registrationSessionOwner(getAccessToken()) !== owner) return;
@@ -75,6 +77,6 @@ export function useActorRegistrationDraft(type: 'GENERADOR' | 'OPERADOR' | 'TRAN
     catch (failure) { setError(getApiErrorMessage(failure, 'No se pudo iniciar otro borrador')); }
   };
   const clear = () => { paused.current = true; if (owner) clearRegistrationDraft(owner, scope); };
-  return { available, saved, error, restoring, checkpoint, restore, discard, clear, assertSession,
+  return { owner, available, saved, error, restoring, checkpoint, restore, discard, clear, assertSession,
     blocked: ownership.status === 'blocked' || (verified === owner && ownership.status === 'unavailable'), retry: ownership.retry };
 }

@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
 import { readRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
@@ -41,5 +42,16 @@ describe('all administrative actor drafts use a verified account and actual save
     await waitFor(() => expect(result.current.saved).toBe(true)); mock.token = session('other');
     act(() => { expect(result.current.checkpoint()).toBe(false); });
     expect(readRegistrationDraft('other', 'admin:OPERADOR:new')).toBeNull(); expect(readRegistrationDraft('admin', 'admin:OPERADOR:new')).not.toBeNull();
+  });
+  it('clears the visible form on an account boundary without copying the previous private draft into the new account', async () => {
+    const { result, rerender } = renderHook(() => {
+      const [data, restore] = useState<Record<string, unknown>>({ form: { razonSocial: 'PRIVATE-OLD-ACCOUNT' } });
+      return useActorRegistrationDraft('GENERADOR', undefined, data, restore, Boolean(data.form));
+    });
+    await waitFor(() => expect(result.current.saved).toBe(true));
+    mock.token = session('other'); mock.get.mockResolvedValue({ data: { data: { user: { id: 'other' } } } }); rerender();
+    await waitFor(() => expect(mock.get).toHaveBeenCalledTimes(2));
+    expect(readRegistrationDraft('other', 'admin:GENERADOR:new')).toBeNull();
+    expect(readRegistrationDraft('admin', 'admin:GENERADOR:new')?.data.form).toEqual({ razonSocial: 'PRIVATE-OLD-ACCOUNT' });
   });
 });

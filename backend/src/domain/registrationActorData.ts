@@ -1,4 +1,5 @@
 import { AppError } from '../middlewares/errorHandler';
+import { operatorModalitiesForType } from './operatorModalities';
 
 const addresses = ['domicilioLegalCalle', 'domicilioLegalLocalidad', 'domicilioLegalDepto', 'domicilioRealCalle', 'domicilioRealLocalidad', 'domicilioRealDepto'] as const;
 const generatorFields = [...addresses, 'actividad', 'rubro', 'corrientesControl', 'expedienteInscripcion', 'resolucionInscripcion', 'categoriaIndividual'] as const;
@@ -58,6 +59,7 @@ export function registrationActorFields(type: string, data: Record<string, unkno
   const tefInputs = type === 'TRANSPORTISTA' ? undefined : registrationActivity(data);
   const certificacionISO = type === 'GENERADOR' ? date(data.certificacionISO, 'Certificación ISO') : undefined;
   const vencimientoHabilitacion = type !== 'GENERADOR' ? date(data.vencimientoHabilitacion, 'Vencimiento de habilitación') : undefined;
+  const modalidades = type === 'OPERADOR' ? operatorModalitiesForType(data.tipoOperador) : undefined;
   return { ...strings, ...coordinates, ...(tefInputs ? { tefInputs } : {}),
-    ...(certificacionISO ? { certificacionISO } : {}), ...(vencimientoHabilitacion ? { vencimientoHabilitacion } : {}) };
+    ...(certificacionISO ? { certificacionISO } : {}), ...(vencimientoHabilitacion ? { vencimientoHabilitacion } : {}), ...(modalidades ? { modalidades } : {}) };
 }
