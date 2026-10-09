@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import os from 'node:os';
 import path from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { login, prefix } from './helpers';
 const require = createRequire(new URL('../../package.json', import.meta.url));
@@ -62,6 +63,16 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
   const read = await attach(page, candidate.id, 'COMPROBANTE_PAGO', bytes, 'application/pdf', 'Recibo-QA.pdf');
   expect(read.analisis).toMatchObject({ lectura: 'LEIDO', motor: 'PDF_TEXT', duplicado: false });
   expect(read.analisis.texto).toContain('RECIBO QA SIN VALIDEZ FISCAL');
+  const receiptRow = page.getByTestId('registration-document-COMPROBANTE_PAGO');
+  await expect(receiptRow.getByText(/KB · Guardado/, { exact: false })).toBeVisible();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    receiptRow.getByRole('button', { name: 'Descargar Recibo-QA.pdf', exact: true }).click(),
+  ]);
+  expect(await download.failure()).toBeNull(); expect(download.suggestedFilename()).toBe('Recibo-QA.pdf');
+  const downloaded = await download.path(); expect(downloaded).not.toBeNull();
+  expect(await readFile(downloaded!)).toEqual(bytes);
+  await receiptRow.scrollIntoViewIfNeeded();
   await page.getByText('Ver texto leído del recibo', { exact: true }).click();
   await expect(page.getByText(/Lectura automática para revisar; no valida el pago/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

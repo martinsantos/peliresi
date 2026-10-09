@@ -2,7 +2,7 @@
  * Step Documentos — File upload step for required documents
  */
 import React, { useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Paperclip, RefreshCw, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, FileText, Loader2, Paperclip, RefreshCw, Upload, X } from 'lucide-react';
 import { Button } from '../../../../components/ui/ButtonV2';
 import { SectionTitle } from '../SectionTitle';
 import type { DocDef } from '../shared';
@@ -13,7 +13,7 @@ interface StepDocumentosProps {
   docs: DocDef[];
   adjuntos: Record<string, File>;
   uploadedDocs: Record<string, DocumentoSolicitud>;
-  uploadStates: Record<string, 'uploading' | 'deleting' | 'reading' | 'error' | undefined>;
+  uploadStates: Record<string, 'uploading' | 'deleting' | 'reading' | 'downloading' | 'error' | undefined>;
   uploadErrors: Record<string, string | undefined>;
   requirementsStatus: 'loading' | 'loaded' | 'error';
   maxBytes: number;
@@ -21,6 +21,7 @@ interface StepDocumentosProps {
   onAddFile: (tipo: string, file: File) => void | Promise<void>;
   onRemoveFile: (tipo: string) => void | Promise<void>;
   onRetryReading?: (tipo: string) => void | Promise<void>;
+  onDownloadFile?: (tipo: string) => void | Promise<void>;
 }
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
@@ -35,6 +36,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   onAddFile,
   onRemoveFile,
   onRetryReading,
+  onDownloadFile,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDocTipo, setActiveDocTipo] = useState<string | null>(null);
@@ -83,25 +85,31 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           const uploaded = uploadedDocs[doc.tipo];
           const state = uploadStates[doc.tipo];
           const attached = uploaded || pendingFile;
-          const isBusy = state === 'uploading' || state === 'deleting' || state === 'reading';
+          const isBusy = state === 'uploading' || state === 'deleting' || state === 'reading' || state === 'downloading';
           return (
             <div key={doc.tipo} data-testid={`registration-document-${doc.tipo}`} className={`rounded-xl border p-3 transition-colors ${uploaded ? 'border-emerald-200 bg-emerald-50/60' : state === 'error' ? 'border-error-200 bg-error-50/60' : 'border-neutral-200 bg-neutral-50'}`}>
               <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 {state === 'uploading' || state === 'deleting'
                   ? <Loader2 size={17} className="shrink-0 animate-spin text-[#0D8A4F]" />
                   : uploaded ? <CheckCircle2 size={17} className="shrink-0 text-emerald-600" /> : <Paperclip size={16} className="shrink-0 text-neutral-400" />}
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-neutral-800">{doc.nombre} {doc.required && <span className="text-error-600" aria-label="obligatorio">*</span>}</p>
                   {attached && (
-                    <p className={`truncate text-xs ${uploaded ? 'text-emerald-700' : 'text-neutral-600'}`}>{uploaded ? uploaded.nombre : pendingFile?.name} ({((uploaded ? uploaded.size : pendingFile?.size || 0) / 1024).toFixed(0)} KB) · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : uploaded ? 'Guardado' : 'Pendiente'}</p>
+                    <div className={`text-xs ${uploaded ? 'text-emerald-700' : 'text-neutral-600'}`}>
+                      <p className="truncate" title={uploaded ? uploaded.nombre : pendingFile?.name}>{uploaded ? uploaded.nombre : pendingFile?.name}</p>
+                      <p>{((uploaded ? uploaded.size : pendingFile?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : uploaded ? 'Guardado' : 'Pendiente'}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
+                    </div>
                   )}
                 </div>
               </div>
               {attached ? (
+                <div className="flex shrink-0 items-center">
+                {uploaded && onDownloadFile && <button type="button" disabled={isBusy} aria-label={`Descargar ${uploaded.nombre}`} onClick={() => void onDownloadFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-40"><Download size={16} aria-hidden="true" /></button>}
                 <button type="button" disabled={isBusy} aria-label={`Eliminar ${doc.nombre}`} onClick={() => void onRemoveFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-error-500 transition-colors hover:bg-error-100 disabled:opacity-40">
                   <X size={16} />
                 </button>
+                </div>
               ) : (
                 <Button className="min-h-11" variant="outline" size="sm" leftIcon={<Upload size={14} />} disabled={isBusy} onClick={() => triggerFileInput(doc.tipo)}>
                   Adjuntar

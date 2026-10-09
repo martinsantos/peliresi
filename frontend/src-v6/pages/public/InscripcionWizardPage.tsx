@@ -73,7 +73,7 @@ const InscripcionWizardPage: React.FC = () => {
   const [form, setForm] = useState<Record<string, string>>(reviewFixture?.form || {});
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({});
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, DocumentoSolicitud>>({});
-  const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'reading' | 'error' | undefined>>({});
+  const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'reading' | 'downloading' | 'error' | undefined>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
   const uploadsInFlight = useRef(new Set<string>());
   const [requirements, setRequirements] = useState<DocDef[]>([]);
@@ -210,7 +210,7 @@ const InscripcionWizardPage: React.FC = () => {
 
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;
-    if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la carga del archivo. Los datos siguen en pantalla.'); return; }
+    if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la operación del archivo. Los datos siguen en pantalla.'); return; }
     setAttempted(prev => new Set(prev).add(step));
     if (target > step && getStepErrors(step).length > 0) {
       setSaveError(getStepErrors(step).join('. '));
@@ -299,6 +299,17 @@ const InscripcionWizardPage: React.FC = () => {
   }, [isReviewMode, solicitudId, uploadedDocs]);
 
   // Submit
+  const handleDownloadFile = async (tipo: string) => {
+    const uploaded = uploadedDocs[tipo];
+    if (!solicitudId || !uploaded || uploadsInFlight.current.has(tipo) || isReviewMode) return;
+    uploadsInFlight.current.add(tipo);
+    setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
+    setUploadStates(previous => ({ ...previous, [tipo]: 'downloading' }));
+    try { await solicitudService.downloadDocumento(solicitudId, uploaded); }
+    catch (error) { setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo descargar el original. El archivo sigue guardado.') })); }
+    finally { uploadsInFlight.current.delete(tipo); setUploadStates(previous => ({ ...previous, [tipo]: undefined })); }
+  };
+
   const handleRetryReading = async (tipo: string) => {
     const uploaded = uploadedDocs[tipo];
     if (!solicitudId || !uploaded || uploadsInFlight.current.has(tipo) || isReviewMode) return;
@@ -378,6 +389,7 @@ const InscripcionWizardPage: React.FC = () => {
     onAddFile={handleAddFile}
     onRemoveFile={handleRemoveFile}
     onRetryReading={handleRetryReading}
+    onDownloadFile={handleDownloadFile}
   />;
 
   /** Maps the current wizard step to the corresponding step component */

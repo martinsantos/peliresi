@@ -28,6 +28,7 @@ import type { EstadoSolicitud, DocumentoSolicitud, MensajeSolicitud } from '../.
 import { solicitudService } from '../../services/solicitud.service';
 import { DocumentAnalysis } from '../../components/DocumentAnalysis';
 import { useAuth } from '../../contexts/AuthContext';
+import { getApiErrorMessage } from '../../utils/api-error';
 
 // ── Status config ──
 
@@ -91,8 +92,10 @@ const SolicitudDetallePage: React.FC = () => {
   const [rechazarModal, setRechazarModal] = useState(false);
   const [rechazarText, setRechazarText] = useState('');
   const [confirmarAprobar, setConfirmarAprobar] = useState(false);
+  const [readingReceipt, setReadingReceipt] = useState(false);
+  const readingInFlight = useRef(false);
 
-  const { data: solicitud, isLoading } = useSolicitud(id || '');
+  const { data: solicitud, isLoading, refetch } = useSolicitud(id || '');
   const { data: mensajes } = useMensajesSolicitud(id || '');
 
   const enviarMensaje = useEnviarMensaje();
@@ -115,6 +118,13 @@ const SolicitudDetallePage: React.FC = () => {
   }, [solicitud?.estado, solicitud?.tipoActor, currentUser?.rol, id]);
 
   // ── Handlers ──
+  const handleRetryReading = async (docId: string) => {
+    if (!id || !solicitud || !currentUser || !['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol) || readingInFlight.current) return;
+    readingInFlight.current = true; setReadingReceipt(true);
+    try { await solicitudService.analizarDocumento(id, docId); await refetch(); }
+    catch (error) { toast.error('Lectura del comprobante', getApiErrorMessage(error, 'No se pudo reintentar. El original sigue guardado.')); }
+    finally { readingInFlight.current = false; setReadingReceipt(false); }
+  };
 
   const handleSendMessage = async () => {
     if (!id || !messageText.trim()) return;
@@ -298,7 +308,7 @@ const SolicitudDetallePage: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
-                    <DocumentAnalysis analysis={doc.analisis} />
+                    <DocumentAnalysis analysis={doc.analisis} retrying={readingReceipt} onRetry={canAct && doc.tipo === 'COMPROBANTE_PAGO' ? () => void handleRetryReading(doc.id) : undefined} />
 
                     <div className="flex items-center gap-1.5">
                       <button
