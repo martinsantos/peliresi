@@ -35,10 +35,11 @@ describe('a real registration UI protects the current step and account boundary'
     expect(mock.put.mock.calls[0][1]).toMatchObject({ datosActor: { razonSocial: 'QA recién escrito' }, expectedUpdatedAt: revision });
     expect(mock.post).not.toHaveBeenCalled(); expect(screen.getByPlaceholderText('Empresa S.A.')).toHaveValue('QA recién escrito');
   });
-  it.each(['ENVIADA', 'EN_REVISION', 'APROBADA'])('recovers the actual %s state instead of offering another registration', async state => {
+  it.each(['ENVIADA', 'EN_REVISION', 'APROBADA', 'RECHAZADA'])('recovers the actual %s state instead of offering another registration', async state => {
     const response = request(); response.data.data.solicitud.estado = state; mock.get.mockResolvedValue(response);
     queryClient.setQueryData(['solicitudes', 'mis'], [{ id: 'draft', estado: 'BORRADOR' }]);
-    await open(); expect(screen.getByRole('heading', { name: state === 'APROBADA' ? 'Solicitud aprobada' : 'Solicitud enviada', exact: true })).toBeVisible();
+    const heading = state === 'APROBADA' ? 'Solicitud aprobada' : state === 'RECHAZADA' ? 'Solicitud rechazada' : 'Solicitud enviada';
+    await open(); expect(screen.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Crear cuenta y continuar', exact: true })).toBeNull(); expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
     expect(queryClient.getQueryState(['solicitudes', 'mis'])?.isInvalidated).toBe(true);
   });
