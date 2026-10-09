@@ -15,10 +15,13 @@ import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Send, Check,
-  Factory, FlaskConical, AlertCircle, Loader2, Truck,
+  Factory, FlaskConical, AlertCircle, Loader2, Truck, Save,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
-import api from '../../services/api';
+import api, { getAccessToken } from '../../services/api';
+import { registrationDraftHint, registrationSessionOwner } from '../../services/registrationSession';
+import { clearRegistrationDraft, readRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
+import { useInspectionDraftOwnership } from '../../hooks/useInspectionDraftOwnership';
 
 // Shared constants & types
 import {
@@ -71,6 +74,7 @@ const InscripcionWizardPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const [form, setForm] = useState<Record<string, string>>(reviewFixture?.form || {});
+  const serverExtraFields = useRef<Record<string, unknown>>({});
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({});
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, DocumentoSolicitud>>({});
   const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'reading' | 'downloading' | 'error' | undefined>>({});
@@ -85,11 +89,21 @@ const InscripcionWizardPage: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [resumeStatus, setResumeStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
   const [resumeAttempt, setResumeAttempt] = useState(0);
+  const [owner, setOwner] = useState<string | null>(null);
+  const [serverRevision, setServerRevision] = useState<string | null>(null);
+  const serverRevisionRef = useRef<string | null>(null);
+  const [localSaved, setLocalSaved] = useState(false);
+  const [localConflict, setLocalConflict] = useState<Record<string, string> | null>(null);
+  const [missingLocalFiles, setMissingLocalFiles] = useState<string[]>([]);
+  const editRevision = useRef(0);
+  const submitInFlight = useRef(false);
   const [dirty, setDirty] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
   const activeStepRef = useRef<HTMLButtonElement>(null);
+  const draftScope = `public:${tipoActor}:${solicitudId || ''}`;
+  const ownership = useInspectionDraftOwnership(`registration:${owner}:${draftScope}`, Boolean(owner && solicitudId && !isReviewMode && !submitSuccess));
 
   // A committed navigation starts at its heading, not at the previous page's
   // footer. Typing, validation errors and asynchronous requirements do not move
@@ -99,9 +113,8 @@ const InscripcionWizardPage: React.FC = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [tipo, phase, step, submitSuccess]);
 
-  // TEF ref for snapshotting values
-
   const up = useCallback((field: string, value: string) => {
+    editRevision.current++;
     setDirty(true);
     setForm(prev => ({ ...prev, [field]: value }));
   }, []);
@@ -126,32 +139,63 @@ const InscripcionWizardPage: React.FC = () => {
 
   useEffect(() => {
     if (isReviewMode) return undefined;
-    const raw = localStorage.getItem('sitrep_pending_solicitud');
-    if (!raw) return undefined;
-    let pending: { id?: string; tipoActor?: TipoActor; step?: number };
-    try { pending = JSON.parse(raw); } catch { return undefined; }
-    if (!pending.id || pending.tipoActor !== tipoActor) return undefined;
+    let pending: { id?: string; tipoActor?: TipoActor; step?: number } = {};
+    try { pending = JSON.parse(localStorage.getItem('sitrep_pending_solicitud') || '{}'); } catch { /* use the server-owned draft */ }
+    const token = getAccessToken();
+    const hint = token ? registrationDraftHint(token) : null;
+    if (hint) pending = { id: hint, tipoActor, step: pending.id === hint ? pending.step : 1 };
+    if (pending.tipoActor !== tipoActor) pending = {};
+    if (!pending.id && !token) return undefined;
 
     let cancelled = false;
     setResumeStatus('loading');
-    api.get(`/solicitudes/${pending.id}`).then(response => {
+    const accountAtStart = registrationSessionOwner(getAccessToken());
+    const load = async () => {
+      if (!pending.id) {
+        const response = await api.get('/solicitudes/mis-solicitudes');
+        const own = response.data?.data?.solicitudes?.find((item: { usuarioId: string; tipoActor: string; estado: string }) => item.usuarioId === accountAtStart && item.tipoActor === tipoActor && ['BORRADOR', 'OBSERVADA'].includes(item.estado));
+        if (!own) return null;
+        pending = { id: own.id, tipoActor, step: 1 };
+      }
+      return api.get(`/solicitudes/${pending.id}`);
+    };
+    load().then(response => {
       if (cancelled) return;
+      if (!response) { setResumeStatus('idle'); return; }
       const solicitud = response.data?.data?.solicitud;
       if (!solicitud || solicitud.tipoActor !== tipoActor) throw new Error('Solicitud incompatible');
+      if (!accountAtStart || solicitud.usuarioId !== accountAtStart || registrationSessionOwner(getAccessToken()) !== accountAtStart) throw new Error('La sesión no pertenece a este borrador');
       if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
         localStorage.removeItem('sitrep_pending_solicitud');
         setResumeStatus('idle');
         return;
       }
       let persistedForm: Record<string, string> = {};
-      try { persistedForm = JSON.parse(solicitud.datosActor || '{}'); } catch { /* keep blank fields */ }
+      try {
+        const data = typeof solicitud.datosActor === 'string' ? JSON.parse(solicitud.datosActor || '{}') : solicitud.datosActor;
+        if (data && !Array.isArray(data)) {
+          persistedForm = Object.fromEntries(Object.entries(data).filter(([, value]) => typeof value === 'string')) as Record<string, string>;
+          serverExtraFields.current = Object.fromEntries(Object.entries(data).filter(([, value]) => typeof value !== 'string'));
+        }
+      } catch { /* keep blank fields */ }
+      const local = readRegistrationDraft(accountAtStart, `public:${tipoActor}:${pending.id}`);
+      const localForm = local?.data.form && typeof local.data.form === 'object' && !Array.isArray(local.data.form)
+        ? Object.fromEntries(Object.entries(local.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : null;
+      const hasLocalChanges = localForm && JSON.stringify(localForm) !== JSON.stringify(persistedForm);
+      const serverChanged = hasLocalChanges && local?.data.serverRevision !== solicitud.updatedAt;
+      if (hasLocalChanges && !serverChanged) { persistedForm = localForm; setDirty(true); }
+      setLocalConflict(serverChanged ? localForm : null);
+      setMissingLocalFiles(Array.isArray(local?.data.files) ? local.data.files.filter(value => typeof value === 'string') as string[] : []);
+      setOwner(accountAtStart);
+      serverRevisionRef.current = solicitud.updatedAt;
+      setServerRevision(solicitud.updatedAt);
       setForm(persistedForm);
       setUploadedDocs(Object.fromEntries(
         (solicitud.documentos || []).map((documento: DocumentoSolicitud) => [documento.tipo, documento]),
       ));
       setReg(previous => ({ ...previous, nombre: solicitud.usuario?.nombre || '', email: solicitud.usuario?.email || '', cuit: solicitud.usuario?.cuit || '' }));
       setSolicitudId(pending.id!);
-      setStep(Math.min(totalSteps, Math.max(1, Number(pending.step) || 1)));
+      setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step ?? pending.step) || 1)));
       setPhase(2);
       setResumeStatus('loaded');
     }).catch(() => {
@@ -159,6 +203,31 @@ const InscripcionWizardPage: React.FC = () => {
     });
     return () => { cancelled = true; };
   }, [tipoActor, isReviewMode, resumeAttempt, totalSteps]);
+
+  // Persist the CURRENT step, not just a completed navigation. Only the account
+  // validated by the server can read it back; passwords and file bytes never enter it.
+  useEffect(() => {
+    if (isReviewMode || !owner || !solicitudId || localConflict || !ownership.canWrite()) return;
+    if (registrationSessionOwner(getAccessToken()) !== owner) return;
+    setLocalSaved(writeRegistrationDraft(owner, draftScope, {
+      form, step, serverRevision, files: [...new Set([...Object.keys(adjuntos), ...missingLocalFiles])].filter(type => !uploadedDocs[type]),
+    }));
+  }, [isReviewMode, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
+
+  useEffect(() => {
+    if (!owner) return;
+    const accountChanged = () => {
+      if (registrationSessionOwner(getAccessToken()) === owner) return;
+      setForm({}); setAdjuntos({}); setUploadedDocs({}); setOwner(null);
+      serverExtraFields.current = {};
+      setLocalConflict(null); setMissingLocalFiles([]); setDirty(false); setLocalSaved(false);
+      setReg({ nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
+      setResumeStatus('error'); setPhase(1);
+    };
+    window.addEventListener('storage', accountChanged);
+    window.addEventListener('focus', accountChanged);
+    return () => { window.removeEventListener('storage', accountChanged); window.removeEventListener('focus', accountChanged); };
+  }, [owner]);
 
   useEffect(() => {
     if (isReviewMode || submitSuccess || (!dirty && Object.keys(adjuntos).length === 0)) return undefined;
@@ -179,6 +248,14 @@ const InscripcionWizardPage: React.FC = () => {
     if (s === 1) {
       if (!form.razonSocial?.trim()) errs.push('Razon Social es obligatoria');
       if (!form.domicilio?.trim()) errs.push('Domicilio es obligatorio');
+      if (form.emailContacto?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.emailContacto.trim())) errs.push('Revisá el formato del email de contacto');
+      if (isTransportista && form.coordenadas?.trim()) {
+        const pair = form.coordenadas.split(',').map(value => Number(value.trim()));
+        if (pair.length !== 2 || !pair.every(Number.isFinite) || Math.abs(pair[0]) > 90 || Math.abs(pair[1]) > 180) errs.push('Coordenadas: indicá latitud y longitud válidas, separadas por coma');
+      }
+    }
+    if (s === (isGenerador ? 5 : isOperador ? 6 : 0)) for (const [field, label] of [['tefPersonal', 'Personal'], ['tefPotencia', 'Potencia instalada'], ['tefSuperficie', 'Superficie'], ['tefCapacidad', 'Capacidad']]) {
+      if (form[field]?.trim() && (!Number.isFinite(Number(form[field])) || Number(form[field]) < 0)) errs.push(`${label}: indicá un número mayor o igual a cero`);
     }
     if (s === docStepNumber) {
       if (requirementsStatus !== 'loaded') {
@@ -193,6 +270,33 @@ const InscripcionWizardPage: React.FC = () => {
 
   const stepHasErrors = (s: number) => getStepErrors(s).length > 0;
 
+  const assertDraftSession = () => {
+    if (!owner || registrationSessionOwner(getAccessToken()) !== owner) throw new Error('La sesión cambió o venció. Iniciá sesión con tu cuenta para recuperar el borrador.');
+    if (!ownership.canWrite()) throw new Error('Este borrador está abierto en otra pestaña o no se pudo proteger su edición. Cerrá la otra pestaña y reintentá.');
+    if (localConflict) throw new Error('Elegí qué versión conservar antes de guardar.');
+  };
+  const persistDraft = async (target: number): Promise<boolean> => {
+    if (saveInFlight.current || submitInFlight.current) return false;
+    saveInFlight.current = true; setSaving(true); setSaveError(null);
+    const revisionAtStart = editRevision.current;
+    try {
+      assertDraftSession();
+      const response = await api.put(`/solicitudes/${solicitudId}`, {
+        datosActor: { ...serverExtraFields.current, ...form, nombre: reg.nombre, cuit: reg.cuit, email: reg.email }, expectedUpdatedAt: serverRevisionRef.current,
+      });
+      assertDraftSession();
+      const updated = response.data?.data?.solicitud?.updatedAt;
+      if (typeof updated !== 'string') throw new Error('No se recibió confirmación del guardado. Conservamos los datos en pantalla.');
+      serverRevisionRef.current = updated; setServerRevision(updated);
+      try { localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solicitudId, tipoActor, step: target })); } catch { /* owned draft also exists on server */ }
+      if (editRevision.current === revisionAtStart) setDirty(false);
+      return true;
+    } catch (error) {
+      setSaveError(`No se confirmó el guardado en SITREP. ${getApiErrorMessage(error, 'Revisá la conexión y reintentá; los datos siguen en pantalla.')}`);
+      return false;
+    } finally { saveInFlight.current = false; setSaving(false); }
+  };
+
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;
     if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la operación del archivo. Los datos siguen en pantalla.'); return; }
@@ -201,7 +305,6 @@ const InscripcionWizardPage: React.FC = () => {
       setSaveError(getStepErrors(step).join('. '));
       return;
     }
-    const currentForm = form;
     if (isReviewMode) {
       setStep(target);
       return;
@@ -210,20 +313,7 @@ const InscripcionWizardPage: React.FC = () => {
       setSaveError('No hay una solicitud activa. Volvé al inicio del alta para crearla.');
       return;
     }
-    saveInFlight.current = true;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      await api.put(`/solicitudes/${solicitudId}`, { datosActor: { ...currentForm, nombre: reg.nombre, cuit: reg.cuit, email: reg.email } });
-      localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solicitudId, tipoActor, step: target }));
-      setDirty(false);
-      setStep(target);
-    } catch (error: unknown) {
-      setSaveError(`No se guardó este paso. Los datos siguen en pantalla. ${getApiErrorMessage(error, 'Revisá la conexión e intentá de nuevo.')}`);
-    } finally {
-      saveInFlight.current = false;
-      setSaving(false);
-    }
+    if (await persistDraft(target)) setStep(target);
   };
 
   const goNext = () => { if (step < totalSteps) void goStep(step + 1); };
@@ -239,6 +329,7 @@ const InscripcionWizardPage: React.FC = () => {
       return;
     }
     setAdjuntos(previous => ({ ...previous, [tipo]: file }));
+    setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
     if (isReviewMode) return;
     if (!solicitudId) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
@@ -249,7 +340,9 @@ const InscripcionWizardPage: React.FC = () => {
     setUploadStates(previous => ({ ...previous, [tipo]: 'uploading' }));
     uploadsInFlight.current.add(tipo);
     try {
+      assertDraftSession();
       const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
+      assertDraftSession();
       setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
       setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
@@ -273,7 +366,9 @@ const InscripcionWizardPage: React.FC = () => {
     setUploadStates(previous => ({ ...previous, [tipo]: 'deleting' }));
     uploadsInFlight.current.add(tipo);
     try {
+      assertDraftSession();
       await solicitudService.deleteDocumento(solicitudId, uploaded.id);
+      assertDraftSession();
       setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadedDocs(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
@@ -290,7 +385,7 @@ const InscripcionWizardPage: React.FC = () => {
     uploadsInFlight.current.add(tipo);
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     setUploadStates(previous => ({ ...previous, [tipo]: 'downloading' }));
-    try { await solicitudService.downloadDocumento(solicitudId, uploaded); }
+    try { assertDraftSession(); await solicitudService.downloadDocumento(solicitudId, uploaded); }
     catch (error) { setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo descargar el original. El archivo sigue guardado.') })); }
     finally { uploadsInFlight.current.delete(tipo); setUploadStates(previous => ({ ...previous, [tipo]: undefined })); }
   };
@@ -302,7 +397,9 @@ const InscripcionWizardPage: React.FC = () => {
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
     try {
+      assertDraftSession();
       const document = await solicitudService.analizarDocumento(solicitudId, uploaded.id);
+      assertDraftSession();
       setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
     } catch (error) {
@@ -312,7 +409,7 @@ const InscripcionWizardPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (saveInFlight.current || submitting) return;
+    if (saveInFlight.current || submitInFlight.current) return;
     if (uploadsInFlight.current.size) { setRegError('Esperá a que termine la carga de documentos antes de enviar.'); return; }
     if (isReviewMode) {
       setSubmitSuccess(true);
@@ -324,6 +421,7 @@ const InscripcionWizardPage: React.FC = () => {
       const errs = getStepErrors(s);
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
+        setSaveError(errs.join('. '));
         setStep(s);
         return;
       }
@@ -333,27 +431,37 @@ const InscripcionWizardPage: React.FC = () => {
       setRegError('No hay una solicitud activa para enviar.');
       return;
     }
-    setSubmitting(true);
+    submitInFlight.current = true; setSubmitting(true); setRegError(null);
 
     try {
       // Save final form data
-      await api.put(`/solicitudes/${solicitudId}`, { datosActor: { ...submitForm, nombre: reg.nombre, cuit: reg.cuit, email: reg.email } });
+      assertDraftSession();
+      const saved = await api.put(`/solicitudes/${solicitudId}`, { datosActor: { ...serverExtraFields.current, ...submitForm, nombre: reg.nombre, cuit: reg.cuit, email: reg.email }, expectedUpdatedAt: serverRevisionRef.current });
+      assertDraftSession();
+      const updated = saved.data?.data?.solicitud?.updatedAt;
+      if (typeof updated !== 'string') throw new Error('No se recibió confirmación del borrador. Reintentá el guardado antes de enviar.');
+      serverRevisionRef.current = updated; setServerRevision(updated); setDirty(false);
 
       // Retry only documents that could not be persisted immediately.
       for (const [tipo, file] of Object.entries(adjuntos)) {
+        assertDraftSession();
         const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
+        assertDraftSession();
         setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
         setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       }
 
       // Submit solicitud
+      assertDraftSession();
       await api.post(`/solicitudes/${solicitudId}/enviar`);
-      localStorage.removeItem('sitrep_pending_solicitud');
+      assertDraftSession();
+      clearRegistrationDraft(owner!, draftScope);
+      try { localStorage.removeItem('sitrep_pending_solicitud'); } catch { /* submission was already confirmed by SITREP */ }
       setSubmitSuccess(true);
     } catch (err: unknown) {
       setRegError(getApiErrorMessage(err, 'Error al enviar la solicitud'));
     } finally {
-      setSubmitting(false);
+      submitInFlight.current = false; setSubmitting(false);
     }
   };
 
@@ -453,7 +561,7 @@ const InscripcionWizardPage: React.FC = () => {
         <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm" role={resumeStatus === 'error' ? 'alert' : 'status'}>
           <h2 className="text-lg font-bold">{resumeStatus === 'loading' ? 'Recuperando tu solicitud' : 'No se pudo recuperar tu solicitud'}</h2>
           <p className="mt-2 text-sm text-neutral-600">{resumeStatus === 'loading' ? 'Estamos leyendo el borrador guardado.' : 'No se perdió el borrador. Revisá la conexión o iniciá sesión con la cuenta creada.'}</p>
-          {resumeStatus === 'error' && <Button variant="outline" className="mt-4" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button>}
+          {resumeStatus === 'error' && <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button><Button onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Iniciar sesión y recuperar</Button></div>}
         </div>
       </div>;
     }
@@ -465,7 +573,7 @@ const InscripcionWizardPage: React.FC = () => {
         isTransportista={isTransportista}
         reg={reg}
         onRegChange={upReg}
-        onPhase2={(solId) => { setSolicitudId(solId); setPhase(2); }}
+        onPhase2={() => { setReg(previous => ({ ...previous, password: '', confirmPassword: '' })); setResumeAttempt(value => value + 1); }}
       />
     );
   }
@@ -535,8 +643,15 @@ const InscripcionWizardPage: React.FC = () => {
         {/* Step Content */}
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
           {isReviewMode && <div role="status" className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900"><strong>Modo revisión de alta.</strong> Podés recorrer todos los pasos sin completar campos. Nada se envía al servidor.</div>}
-          {resumeStatus === 'loaded' && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Borrador recuperado. Continuá desde el último paso guardado.</p>}
-          {saveError && <p role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-700">{saveError}</p>}
+          {!isReviewMode && <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 pb-3">
+            <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Cambios guardados en este dispositivo · pendientes de guardar en SITREP' : 'Cambios en pantalla · no se pudo guardar en este dispositivo') : 'Borrador guardado en SITREP · todavía no enviado'}</p>
+            <Button variant="outline" leftIcon={<Save size={16} />} isLoading={saving} disabled={submitting || Boolean(localConflict)} onClick={() => void persistDraft(step)}>Guardar borrador</Button>
+          </div>}
+          {!isReviewMode && ownership.status === 'blocked' && <div role="alert" className="mb-4 text-sm text-error-800">Este borrador está abierto en otra pestaña. No se sobrescribirá.<Button variant="outline" className="ml-2" onClick={ownership.retry}>Reintentar edición</Button></div>}
+          {!isReviewMode && ownership.status === 'unavailable' && <p role="alert" className="mb-4 text-sm text-error-800">El navegador no pudo proteger el borrador frente a otra pestaña. Los datos siguen en pantalla; no se guardará una edición sin proteger.</p>}
+          {localConflict && <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p>El borrador de SITREP cambió desde tu copia local. Elegí qué conservar; no mezclamos ni sobrescribimos automáticamente.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setForm(localConflict); setLocalConflict(null); setDirty(true); editRevision.current++; }}>Recuperar mis cambios locales</Button><Button variant="outline" onClick={() => { clearRegistrationDraft(owner!, draftScope); setLocalConflict(null); }}>Conservar versión de SITREP</Button></div></div>}
+          {missingLocalFiles.length > 0 && <p role="alert" className="mb-4 text-sm text-amber-900">Hay archivos que no llegaron a guardarse: {missingLocalFiles.join(', ')}. Volvé a seleccionarlos en Documentos. Los originales ya guardados se recuperan.</p>}
+          {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
           {renderStepContent()}
         </div>
 

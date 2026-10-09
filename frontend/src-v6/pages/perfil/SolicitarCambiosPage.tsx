@@ -5,7 +5,7 @@
  * Los cambios quedan como solicitud de renovacion CON_CAMBIOS para revision del ADMIN.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -68,6 +68,9 @@ const SolicitarCambiosPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const submissionInFlight = useRef(false);
 
   const fields = isGenerador ? GENERADOR_FIELDS : OPERADOR_FIELDS;
   const actorId = currentUser?.actorId;
@@ -79,10 +82,14 @@ const SolicitarCambiosPage: React.FC = () => {
       return;
     }
 
+    let cancelled = false;
+    setLoading(true); setLoadError(null);
     const tipo = isGenerador ? 'generadores' : 'operadores';
     api.get(`/actores/${tipo}/${actorId}`)
       .then(res => {
-        const data = res.data.data;
+        if (cancelled) return;
+        const data = res.data.data[isGenerador ? 'generador' : 'operador'] || res.data.data;
+        if (data.id !== actorId) throw new Error('La ficha no coincide con tu cuenta');
         setActorData(data);
         // Initialize form with current values
         const initial: Record<string, string> = {};
@@ -92,10 +99,13 @@ const SolicitarCambiosPage: React.FC = () => {
         setFormData(initial);
       })
       .catch(() => {
+        if (cancelled) return;
+        setLoadError('No se pudieron recuperar los datos del padrón. No completés una ficha vacía; reintentá la carga.');
         toast.error('Error', 'No se pudieron cargar los datos del establecimiento');
       })
-      .finally(() => setLoading(false));
-  }, [actorId, isGenerador]); // eslint-disable-line react-hooks/exhaustive-deps
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [actorId, isGenerador, loadAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track which fields have been modified
   const changedKeys = useMemo(() => {
@@ -113,12 +123,13 @@ const SolicitarCambiosPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (submissionInFlight.current || !actorData || loadError) return;
     if (changedKeys.length === 0) {
       toast.warning('Sin cambios', 'No has modificado ningun campo');
       return;
     }
 
-    setSubmitting(true);
+    submissionInFlight.current = true; setSubmitting(true);
     try {
       const datosNuevos: Record<string, string> = {};
       changedKeys.forEach(key => {
@@ -140,6 +151,7 @@ const SolicitarCambiosPage: React.FC = () => {
     } catch {
       toast.error('Error', 'No se pudo enviar la solicitud. Intenta nuevamente.');
     } finally {
+      submissionInFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -209,6 +221,8 @@ const SolicitarCambiosPage: React.FC = () => {
     );
   }
 
+  if (loadError || !actorData) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>{loadError || 'No hay una ficha asociada a tu cuenta. Solicitá revisión a soporte; no se creará otra ficha automáticamente.'}</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setLoadAttempt(value => value + 1)}>Reintentar precarga</Button><Button variant="outline" onClick={() => navigate('/mi-perfil')}>Volver a mi perfil</Button></div></div>;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -252,8 +266,8 @@ const SolicitarCambiosPage: React.FC = () => {
                 <div key={field.key}>
                   <div className="flex items-center gap-2 mb-1.5">
                     <div className="flex items-center gap-1.5 text-neutral-500">
-                      {field.icon}
-                      <span className="text-xs font-medium uppercase">{field.label}</span>
+                      <span aria-hidden="true">{field.icon}</span>
+                      <label htmlFor={`profile-change-${field.key}`} className="text-sm font-medium text-neutral-700">{field.label}</label>
                     </div>
                     {isModified && (
                       <Badge variant="soft" color="warning" size="sm">
@@ -262,6 +276,7 @@ const SolicitarCambiosPage: React.FC = () => {
                     )}
                   </div>
                   <Input
+                    id={`profile-change-${field.key}`}
                     type={field.type || 'text'}
                     value={formData[field.key] || ''}
                     onChange={e => handleChange(field.key, e.target.value)}

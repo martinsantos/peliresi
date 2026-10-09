@@ -27,8 +27,8 @@ async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> 
   await page.getByLabel('Nombre completo *', { exact: true }).fill(`QA ${actor} ${id}`);
   await page.getByLabel('Email *', { exact: true }).fill(`${id}@night-qa.invalid`);
   await page.getByLabel('CUIT *', { exact: true }).fill(`30-${String(Date.now()).slice(-8)}-1`);
-  await page.getByLabel('Password *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
-  await page.getByLabel('Confirmar password *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
+  await page.getByLabel('Contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
+  await page.getByLabel('Confirmar contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   const posted = page.waitForResponse(response => new URL(response.url()).pathname === '/api/solicitudes/iniciar' && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Crear cuenta y continuar', exact: true }).click();
   const created = await posted; expect(created.status()).toBe(201);

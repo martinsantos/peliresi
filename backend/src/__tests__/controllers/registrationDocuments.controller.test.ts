@@ -24,7 +24,7 @@ vi.mock('fs', async original => {
 import { uploadDocumento, updateSolicitud, deleteDocumento } from '../../controllers/solicitud.controller';
 
 const pdf = Buffer.from('%PDF-1.4\nQA document, not an official certificate\n%%EOF');
-const draft = { id: 'draft', usuarioId: 'owner', tipoActor: 'GENERADOR', estado: 'BORRADOR' };
+const draft = { id: 'draft', usuarioId: 'owner', tipoActor: 'GENERADOR', estado: 'BORRADOR', updatedAt: new Date('2026-10-09T10:00:00.000Z') };
 async function call(handler: typeof uploadDocumento, body: object, mime = 'application/pdf') {
   const req = { params: { id: 'draft', docId: 'doc' }, user: { id: 'owner', rol: 'GENERADOR', restricted: true }, body,
     file: { originalname: 'QA.pdf', path: '/unit-virtual/QA.pdf', mimetype: mime, size: pdf.length } };
@@ -86,5 +86,16 @@ describe('registration documents preserve genuine bytes and safe data', () => {
     mock.find.mockResolvedValue({ ...draft, usuarioId: 'another' });
     expect((await call(uploadDocumento, { tipo: 'CONSTANCIA_AFIP' })).error).toMatchObject({ statusCode: 403 });
     expect(mock.removeDocs).not.toHaveBeenCalled(); expect(mock.saveDoc).not.toHaveBeenCalled();
+  });
+  it('does not overwrite a draft saved by another editor since the caller version', async () => {
+    mock.find.mockResolvedValue({ ...draft, updatedAt: new Date('2026-10-09T10:30:00.000Z') });
+    expect((await call(updateSolicitud, { datosActor: { razonSocial: 'QA late editor' }, expectedUpdatedAt: '2026-10-09T10:29:00.000Z' })).error).toMatchObject({ statusCode: 409 });
+    expect(mock.update).not.toHaveBeenCalled();
+  });
+  it('saves a matching draft revision and preserves incomplete fields without submitting', async () => {
+    mock.find.mockResolvedValue({ ...draft, updatedAt: new Date('2026-10-09T10:30:00.000Z') });
+    expect((await call(updateSolicitud, { datosActor: { razonSocial: '', domicilio: '' }, expectedUpdatedAt: '2026-10-09T10:30:00.000Z' })).error).toBeUndefined();
+    expect(mock.update).toHaveBeenCalledWith({ where: { id: 'draft' }, data: expect.objectContaining({ datosActor: '{"razonSocial":"","domicilio":""}' }) });
+    expect(mock.notices).not.toHaveBeenCalled();
   });
 });

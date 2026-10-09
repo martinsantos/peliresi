@@ -6,6 +6,7 @@ import NuevoGeneradorPage from '../../pages/admin/NuevoGeneradorPage';
 import NuevoOperadorPage from '../../pages/admin/NuevoOperadorPage';
 
 const mock = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), uploadDoc: vi.fn(), success: vi.fn(), error: vi.fn(), existing: undefined as unknown }));
+vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn(), clear: vi.fn(), assertSession: vi.fn() }) }));
 vi.mock('../../services/generador-fiscal.service', () => ({ transportistaDocumentoService: { upload: mock.uploadDoc }, generadorFiscalService: { downloadDocumento: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: mock.success, error: mock.error } }));
 vi.mock('../../hooks/useActores', () => {

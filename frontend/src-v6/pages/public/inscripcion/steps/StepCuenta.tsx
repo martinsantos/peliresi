@@ -19,6 +19,7 @@ import {
 import { FieldError } from '../FieldError';
 import { getApiErrorMessage } from '../../../../utils/api-error';
 import { setTokensDurably } from '../../../../services/api';
+import { RegisteredAccount } from '../RegisteredAccount';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -54,12 +55,12 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reg.email)) e.email = 'Email invalido';
     if (!reg.cuit.trim()) e.cuit = 'CUIT es obligatorio';
     else if (!validateCuit(reg.cuit)) e.cuit = 'CUIT debe tener 11 digitos';
-    if (!reg.password) e.password = 'Password es obligatorio';
+    if (!reg.password) e.password = 'La contraseña es obligatoria';
     else {
       const pw = validatePassword(reg.password);
       if (!pw.valid) e.password = pw.errors.join(', ');
     }
-    if (reg.password !== reg.confirmPassword) e.confirmPassword = 'Las passwords no coinciden';
+    if (reg.password !== reg.confirmPassword) e.confirmPassword = 'Las contraseñas no coinciden';
     return e;
   }, [reg]);
 
@@ -67,7 +68,10 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
     if (registrationInFlight.current) return;
     setRegAttempted(true);
     const errors = regErrors();
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {
+      const field = { nombre: 'name', email: 'email', cuit: 'cuit', password: 'password', confirmPassword: 'confirm' }[Object.keys(errors)[0] as keyof RegistrationData];
+      document.getElementById(`registration-${field}`)?.focus(); return;
+    }
 
     registrationInFlight.current = true;
     setRegSubmitting(true);
@@ -87,7 +91,7 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
         throw new Error('La solicitud se creó, pero no se recibió una sesión para completar el formulario. Iniciá sesión para recuperarla.');
       }
       await setTokensDurably(data.tokens.accessToken, data.tokens.refreshToken);
-      localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solId, tipoActor }));
+      try { localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solId, tipoActor })); } catch { /* the server-owned session hint also recovers the draft */ }
 
       onPhase2(solId);
     } catch (err: unknown) {
@@ -121,82 +125,89 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
         </div>
 
         {/* Registration Form */}
-        <form onSubmit={event => { event.preventDefault(); void handleRegistration(); }} className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 space-y-4">
+        <RegisteredAccount type={tipoActor}>
+        <form noValidate onSubmit={event => { event.preventDefault(); void handleRegistration(); }} className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 space-y-4">
           <h3 className="text-base font-semibold text-neutral-800">Crear cuenta</h3>
 
           <div>
             <label htmlFor="registration-name" className={labelCls}>Nombre completo *</label>
             <input
               id="registration-name" autoComplete="name"
+              aria-invalid={Boolean(rErr.nombre)} aria-describedby={rErr.nombre ? 'registration-name-error' : undefined}
               type="text" value={reg.nombre}
               onChange={e => onRegChange('nombre', e.target.value)}
               placeholder="Juan Perez"
               className={inputCls(!!rErr.nombre)}
             />
-            <FieldError show={!!rErr.nombre} msg={rErr.nombre || ''} />
+            <FieldError id="registration-name-error" show={!!rErr.nombre} msg={rErr.nombre || ''} />
           </div>
 
           <div>
             <label htmlFor="registration-email" className={labelCls}>Email *</label>
             <input
               id="registration-email" autoComplete="email" inputMode="email"
+              aria-invalid={Boolean(rErr.email)} aria-describedby={rErr.email ? 'registration-email-error' : undefined}
               type="email" value={reg.email}
               onChange={e => onRegChange('email', e.target.value)}
               placeholder="correo@empresa.com"
               className={inputCls(!!rErr.email)}
             />
-            <FieldError show={!!rErr.email} msg={rErr.email || ''} />
+            <FieldError id="registration-email-error" show={!!rErr.email} msg={rErr.email || ''} />
           </div>
 
           <div>
             <label htmlFor="registration-cuit" className={labelCls}>CUIT *</label>
             <input
               id="registration-cuit" inputMode="numeric"
+              aria-invalid={Boolean(rErr.cuit)} aria-describedby={rErr.cuit ? 'registration-cuit-error' : undefined}
               type="text" value={reg.cuit}
               onChange={e => onRegChange('cuit', e.target.value)}
               placeholder="30-12345678-9"
               className={inputCls(!!rErr.cuit)}
             />
-            <FieldError show={!!rErr.cuit} msg={rErr.cuit || ''} />
+            <FieldError id="registration-cuit-error" show={!!rErr.cuit} msg={rErr.cuit || ''} />
           </div>
 
           <div>
-            <label htmlFor="registration-password" className={labelCls}>Password *</label>
+            <label htmlFor="registration-password" className={labelCls}>Contraseña *</label>
             <div className="relative">
               <input
                 id="registration-password" autoComplete="new-password"
+                aria-invalid={Boolean(rErr.password)} aria-describedby={rErr.password ? 'registration-password-error' : undefined}
                 type={showPassword ? 'text' : 'password'}
                 value={reg.password}
                 onChange={e => onRegChange('password', e.target.value)}
-                placeholder="Min 8 chars, 1 mayuscula, 1 numero"
-                className={inputCls(!!rErr.password)}
+                placeholder="Mínimo 8 caracteres, una mayúscula y un número"
+                className={`${inputCls(!!rErr.password)} pr-14`}
               />
               <button
                 type="button"
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={showPassword}
                 onClick={() => setShowPassword(p => !p)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            <FieldError show={!!rErr.password} msg={rErr.password || ''} />
+            <FieldError id="registration-password-error" show={!!rErr.password} msg={rErr.password || ''} />
           </div>
 
           <div>
-            <label htmlFor="registration-confirm" className={labelCls}>Confirmar password *</label>
+            <label htmlFor="registration-confirm" className={labelCls}>Confirmar contraseña *</label>
             <input
               id="registration-confirm" autoComplete="new-password"
+              aria-invalid={Boolean(rErr.confirmPassword)} aria-describedby={rErr.confirmPassword ? 'registration-confirm-error' : undefined}
               type="password"
               value={reg.confirmPassword}
               onChange={e => onRegChange('confirmPassword', e.target.value)}
-              placeholder="Repetir password"
+              placeholder="Repetí la contraseña"
               className={inputCls(!!rErr.confirmPassword)}
             />
-            <FieldError show={!!rErr.confirmPassword} msg={rErr.confirmPassword || ''} />
+            <FieldError id="registration-confirm-error" show={!!rErr.confirmPassword} msg={rErr.confirmPassword || ''} />
           </div>
 
           {regError && (
-            <div className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
+            <div role="alert" className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-800">
               {regError}
             </div>
           )}
@@ -210,13 +221,15 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
             Crear cuenta y continuar
           </Button>
 
-          <p className="text-xs text-neutral-400 text-center mt-2">
-            Ya tenes cuenta?{' '}
-            <button type="button" onClick={() => navigate('/login')} className="text-primary-700 font-medium hover:text-primary-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2">
-              Inicia sesion
+          <p className="text-sm text-neutral-700 text-center mt-2">
+            ¿Ya estabas en el padrón o tenés un borrador?{' '}
+            <button type="button" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipoActor.toLowerCase()}` } })} className="min-h-11 text-primary-800 font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2">
+              Iniciá sesión para recuperar tus datos
             </button>
           </p>
+          <p className="text-sm text-neutral-700 text-center"><button type="button" className="min-h-11 font-medium text-primary-800 hover:underline" onClick={() => navigate('/reclamar')}>Recuperar acceso al correo ya registrado</button></p>
         </form>
+        </RegisteredAccount>
       </div>
     </div>
   );

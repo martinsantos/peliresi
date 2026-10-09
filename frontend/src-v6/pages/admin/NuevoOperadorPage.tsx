@@ -33,6 +33,11 @@ import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/co
 import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import { C_CORRIENTES } from '../../utils/calculoTEF';
 import CalculadoraTEF, { type TEFInputs } from '../../components/CalculadoraTEF';
+import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
+import { ActorRegistrationDraftBar } from '../../components/ActorRegistrationDraftBar';
+import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
+import { restoreRegistrationForm } from '../../services/registrationDraft';
+import { tefDeclaredInputs } from '../../utils/tefDeclaredInputs';
 
 const STEPS = [
   { id: 1, label: 'Identificacion', icon: FlaskConical },
@@ -107,6 +112,17 @@ const NuevoOperadorPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const submissionInFlight = useRef(false);
   const [tefInputs, setTefInputs] = useState<TEFInputs | null>(null);
+  const [missingFiles, setMissingFiles] = useState<string[]>([]);
+  const draftData = { form, step, selectedY: [...selectedY], tefInputs, savedActorId, uploadedDocs, files: [...missingFiles, ...Object.values(adjuntos).map(file => file.name)] };
+  const draft = useActorRegistrationDraft('OPERADOR', id, draftData, data => {
+    setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
+    setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
+    setTefInputs(data.tefInputs ? tefDeclaredInputs({ tefInputs: data.tefInputs }).inputs : null);
+    setSavedActorId(typeof data.savedActorId === 'string' ? data.savedActorId : null);
+    setUploadedDocs(data.uploadedDocs && typeof data.uploadedDocs === 'object' ? data.uploadedDocs as Record<string, string> : {});
+    setStep(data.savedActorId ? TOTAL_STEPS : Math.min(TOTAL_STEPS, Math.max(1, Number(data.step) || 1)));
+    setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
+  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || Boolean(savedActorId));
 
   const { data: existing, isLoading: loadingExisting } = useOperador(id || '');
   const createMutation = useCreateOperador();
@@ -221,7 +237,9 @@ const NuevoOperadorPage: React.FC = () => {
   };
 
   const attachFile = (tipo: string, file: File) => {
+    if (!file.size || file.size > 10 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) { setSubmitError('Elegí un PDF, JPG o PNG con contenido de hasta 10 MB. No se modificó ningún documento guardado.'); return; }
     setAdjuntos(prev => ({ ...prev, [tipo]: file }));
+    setMissingFiles(previous => previous.filter(name => name !== file.name));
     toast.success('Archivo adjuntado', `${file.name}`);
   };
 
@@ -283,6 +301,7 @@ const NuevoOperadorPage: React.FC = () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      draft.assertSession();
       let operadorId: string | undefined = savedActorId || undefined;
 
       if (!operadorId && isEdit && id) {
@@ -316,14 +335,18 @@ const NuevoOperadorPage: React.FC = () => {
       }
 
       if (!operadorId) throw new Error('El servidor no devolvió el identificador del operador.');
+      draft.assertSession();
       setSavedActorId(operadorId);
+      draft.checkpoint({ ...draftData, savedActorId: operadorId });
       const filesToUpload = Object.entries(adjuntos);
       const failed: string[] = [];
       if (operadorId && filesToUpload.length > 0) {
         let uploaded = 0;
         for (const [tipo, file] of filesToUpload) {
           try {
+            draft.assertSession();
             const document = await uploadDocMutation.mutateAsync({ operadorId, file, tipo });
+            draft.assertSession();
             if (document.analisis?.duplicado) toast.warning('Comprobante repetido', 'La huella coincide con un recibo ya cargado. No acredita un pago nuevo.');
             uploaded++;
             setUploadedDocs(prev => ({ ...prev, [tipo]: file.name }));
@@ -345,7 +368,7 @@ const NuevoOperadorPage: React.FC = () => {
         setSubmitError(`Operador guardado. No se subieron: ${failed.join(', ')}. Reintentá los adjuntos pendientes; no se repetirá el alta.`);
         return;
       }
-      navigate(backPath);
+      draft.clear(); navigate(backPath);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Error desconocido al guardar';
       console.error('Submit error:', err);
@@ -383,6 +406,9 @@ const NuevoOperadorPage: React.FC = () => {
         </div>
       </div>
 
+      <ActorRegistrationDraftBar draft={draft} />
+      {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos que estaban pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
+
       {/* Stepper */}
       <fieldset disabled={isPending || Boolean(savedActorId)} className="min-w-0 bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
         <MobileFormSteps steps={STEPS} currentStep={step} onSelect={goStep} />
@@ -417,7 +443,7 @@ const NuevoOperadorPage: React.FC = () => {
       </fieldset>
 
       {/* Step Content */}
-      <fieldset disabled={isPending} className="min-w-0 min-h-[400px]">
+      <fieldset disabled={isPending || (Boolean(savedActorId) && step !== TOTAL_STEPS)} className="min-w-0 min-h-[400px]">
 
         {/* ===== PASO 1: Identificacion ===== */}
         {step === 1 && (
@@ -439,6 +465,7 @@ const NuevoOperadorPage: React.FC = () => {
                   <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9"
                     className={showError('cuit') ? 'border-error-400 bg-error-50' : ''} />
                   <FieldError show={showError('cuit')} msg="El CUIT es obligatorio" />
+                  {!isEdit && !savedActorId && <ActorRegistryLookup type="OPERADOR" cuit={form.cuit} />}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -761,7 +788,7 @@ const NuevoOperadorPage: React.FC = () => {
                               ) : uploadedDocs[doc.tipo] ? (
                                 <span className="inline-flex flex-wrap items-center justify-center gap-1 text-xs text-success-700"><Check size={14} /><span className="max-w-[120px] truncate">{uploadedDocs[doc.tipo]}</span><span>Guardado</span></span>
                               ) : (
-                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-primary-50 border border-neutral-200 hover:border-primary-300 rounded-lg cursor-pointer transition-colors text-xs font-medium text-neutral-700 hover:text-primary-700">
+                                <label className="inline-flex min-h-11 min-w-11 items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-primary-50 border border-neutral-200 hover:border-primary-300 rounded-lg cursor-pointer transition-colors text-sm font-medium text-neutral-700 hover:text-primary-700">
                                   <Upload size={14} />
                                   Subir
                                   <input type="file" aria-label={`Adjuntar ${doc.nombre}`} className="hidden" accept=".pdf,.jpg,.jpeg,.png"

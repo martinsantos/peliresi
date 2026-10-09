@@ -11,6 +11,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
+import { registrationActorFields } from '../domain/registrationActorData';
 import { describeDocument, readReceipt, mergeReceiptRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
 import {
   getMissingRequiredDocumentTypes,
@@ -257,7 +258,8 @@ export const getSolicitud = async (req: AuthRequest, res: Response, next: NextFu
 export const updateSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { datosActor, datosResiduos, datosTEF, datosRegulatorio } = req.body;
+    const { datosActor, datosResiduos, datosTEF, datosRegulatorio, expectedUpdatedAt } = req.body;
+    if (expectedUpdatedAt !== undefined && (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt)))) throw new AppError('La versión del borrador es inválida', 400);
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
@@ -280,7 +282,9 @@ export const updateSolicitud = async (req: AuthRequest, res: Response, next: Nex
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
       if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya no admite cambios', 409);
-      return tx.solicitudInscripcion.update({ where: { id }, data });
+      if (expectedUpdatedAt !== undefined && current.updatedAt.toISOString() !== expectedUpdatedAt) throw new AppError('El borrador cambió en SITREP. Recuperá la versión actual antes de guardar; tus cambios siguen en pantalla.', 409);
+      // Monotonic even when two serialized edits land in the same millisecond.
+      return tx.solicitudInscripcion.update({ where: { id }, data: { ...data, updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) } });
     });
 
     res.json({ success: true, data: { solicitud: updated } });
@@ -322,6 +326,7 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
     }
 
     const datosActor = JSON.parse(jsonObject(solicitud.datosActor));
+    registrationActorFields(solicitud.tipoActor, datosActor);
     if (!datosActor.razonSocial && !datosActor.nombre) {
       throw new AppError('La razon social o nombre es obligatorio', 400);
     }
@@ -824,9 +829,15 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Solo se pueden aprobar solicitudes en estado EN_REVISION', 400);
     }
 
-    const datosActor = JSON.parse(solicitud.datosActor);
-
     const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || current.estado !== 'EN_REVISION') throw new AppError('La solicitud ya fue procesada por otro usuario', 409);
+      const datosActor = JSON.parse(jsonObject(current.datosActor));
+      if (datosActor.cuit && normalizeCuit(String(datosActor.cuit)) !== solicitud.usuario.cuit) throw new AppError('El CUIT declarado no coincide con el de la cuenta solicitante', 400);
+      const declared = registrationActorFields(solicitud.tipoActor, datosActor);
+      const contact = typeof datosActor.emailContacto === 'string' && datosActor.emailContacto.trim()
+        ? datosActor.emailContacto.trim() : solicitud.usuario.email;
       let generadorId: string | undefined;
       let operadorId: string | undefined;
       let transportistaId: string | undefined;
@@ -836,16 +847,13 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           data: {
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
-            cuit: datosActor.cuit || solicitud.usuario.cuit || '',
+            cuit: solicitud.usuario.cuit || '',
             domicilio: datosActor.domicilio || '',
             telefono: datosActor.telefono || '',
-            email: datosActor.email || solicitud.usuario.email,
+            email: contact,
             numeroInscripcion: datosActor.numeroInscripcion || 'PENDIENTE',
             categoria: datosActor.categoria || 'PENDIENTE',
-            actividad: datosActor.actividad,
-            rubro: datosActor.rubro,
-            latitud: datosActor.latitud ? parseFloat(datosActor.latitud) : undefined,
-            longitud: datosActor.longitud ? parseFloat(datosActor.longitud) : undefined,
+            ...declared,
           },
         });
         generadorId = generador.id;
@@ -854,16 +862,13 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           data: {
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
-            cuit: datosActor.cuit || solicitud.usuario.cuit || '',
+            cuit: solicitud.usuario.cuit || '',
             domicilio: datosActor.domicilio || '',
             telefono: datosActor.telefono || '',
-            email: datosActor.email || solicitud.usuario.email,
+            email: contact,
             numeroHabilitacion: datosActor.numeroHabilitacion || 'PENDIENTE',
             categoria: datosActor.categoria || 'PENDIENTE',
-            tipoOperador: datosActor.tipoOperador,
-            tecnologia: datosActor.tecnologia,
-            latitud: datosActor.latitud ? parseFloat(datosActor.latitud) : undefined,
-            longitud: datosActor.longitud ? parseFloat(datosActor.longitud) : undefined,
+            ...declared,
           },
         });
         operadorId = operador.id;
@@ -872,21 +877,12 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           data: {
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
-            cuit: datosActor.cuit || solicitud.usuario.cuit || '',
+            cuit: solicitud.usuario.cuit || '',
             domicilio: datosActor.domicilio || '',
             telefono: datosActor.telefono || '',
-            email: datosActor.email || solicitud.usuario.email,
+            email: contact,
             numeroHabilitacion: datosActor.numeroHabilitacion || 'PENDIENTE',
-            ...(datosActor.localidad && { localidad: datosActor.localidad }),
-            ...(datosActor.vencimientoHabilitacion && { vencimientoHabilitacion: new Date(datosActor.vencimientoHabilitacion) }),
-            ...(datosActor.corrientesAutorizadas && { corrientesAutorizadas: datosActor.corrientesAutorizadas }),
-            ...(datosActor.expedienteDPA && { expedienteDPA: datosActor.expedienteDPA }),
-            ...(datosActor.resolucionDPA && { resolucionDPA: datosActor.resolucionDPA }),
-            ...(datosActor.resolucionSSP && { resolucionSSP: datosActor.resolucionSSP }),
-            ...(datosActor.actaInspeccion && { actaInspeccion: datosActor.actaInspeccion }),
-            ...(datosActor.actaInspeccion2 && { actaInspeccion2: datosActor.actaInspeccion2 }),
-            ...(datosActor.latitud && { latitud: parseFloat(datosActor.latitud) }),
-            ...(datosActor.longitud && { longitud: parseFloat(datosActor.longitud) }),
+            ...declared,
           },
         });
         transportistaId = transportista.id;
@@ -915,11 +911,9 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         },
       });
 
-      return updated;
-    });
-
-    // Notify candidate
-    await prisma.notificacion.create({
+      // Same transaction: a failed internal notice must not leave a committed
+      // approval reported as failed to the administrator.
+      await tx.notificacion.create({
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_APROBADA',
@@ -928,6 +922,8 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         prioridad: 'ALTA',
         datos: JSON.stringify({ tipo: 'solicitud_aprobada', solicitudId: id }),
       },
+      });
+      return updated;
     });
 
     res.json({ success: true, data: { solicitud: result } });

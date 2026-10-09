@@ -74,4 +74,8 @@ describe('approved registration preserves declarations, not invented fiscal auth
     expect((await approve('ADMIN_OPERADOR')).error).toMatchObject({ statusCode: 403 });
     expect(mock.transaction).not.toHaveBeenCalled(); expect(mock.create).not.toHaveBeenCalled();
   });
+  it('does not create an actor for a CUIT substituted after account creation', async () => {
+    mock.find.mockResolvedValue({ ...draft(), datosActor: JSON.stringify({ ...declared, cuit: '30-11111111-1' }) });
+    expect((await approve()).error).toMatchObject({ statusCode: 400 }); expect(mock.create).not.toHaveBeenCalled();
+  });
 });

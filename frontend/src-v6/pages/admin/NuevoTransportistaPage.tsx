@@ -18,6 +18,10 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { initialPasswordError, vehicleCapacityError } from '../../utils/actorCreationValidation';
 import { toast } from '../../components/ui/Toast';
 import DocumentUpload from '../../components/DocumentUpload';
+import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
+import { ActorRegistrationDraftBar } from '../../components/ActorRegistrationDraftBar';
+import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
+import { restoreRegistrationForm } from '../../services/registrationDraft';
 import { generadorFiscalService, transportistaDocumentoService, type Documento } from '../../services/generador-fiscal.service';
 import {
   useTransportista,
@@ -46,6 +50,11 @@ interface ChoferForm {
 
 const EMPTY_VEHICULO: VehiculoForm = { patente: '', marca: '', modelo: '', anio: '', capacidad: '', numeroHabilitacion: '', vencimiento: '' };
 const EMPTY_CHOFER: ChoferForm = { nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '', telefono: '' };
+const INITIAL_FORM = {
+  razonSocial: '', cuit: '', domicilio: '', localidad: '', telefono: '', email: '', password: '', nombre: '',
+  numeroHabilitacion: '', vencimientoHabilitacion: '', coordenadas: '', corrientesAutorizadas: '', expedienteDPA: '',
+  resolucionDPA: '', resolucionSSP: '', actaInspeccion: '', actaInspeccion2: '',
+};
 
 const STEPS = [
   { id: 1, label: 'Datos Basicos', icon: Truck },
@@ -68,14 +77,7 @@ const NuevoTransportistaPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const submitInFlight = useRef(false);
-  const [form, setForm] = useState({
-    razonSocial: '', cuit: '', domicilio: '', localidad: '',
-    telefono: '', email: '', password: '', nombre: '',
-    numeroHabilitacion: '', vencimientoHabilitacion: '',
-    coordenadas: '',
-    corrientesAutorizadas: '', expedienteDPA: '', resolucionDPA: '',
-    resolucionSSP: '', actaInspeccion: '', actaInspeccion2: '',
-  });
+  const [form, setForm] = useState(INITIAL_FORM);
   const [vehiculos, setVehiculos] = useState<VehiculoForm[]>([]);
   const [choferes, setChoferes] = useState<ChoferForm[]>([]);
   const [pendingDocuments, setPendingDocuments] = useState<Record<string, { file: File; anio?: number }>>({});
@@ -83,6 +85,17 @@ const NuevoTransportistaPage: React.FC = () => {
   const [savedActorId, setSavedActorId] = useState<string | null>(null);
   const [savingDocuments, setSavingDocuments] = useState(false);
   const [documentError, setDocumentError] = useState<string | null>(null);
+  const [missingFiles, setMissingFiles] = useState<string[]>([]);
+  const draftData = { form, step, vehiculos, choferes, savedActorId, files: [...missingFiles, ...Object.values(pendingDocuments).map(value => value.file.name)] };
+  const draft = useActorRegistrationDraft('TRANSPORTISTA', id, draftData, data => {
+    setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
+    setVehiculos(Array.isArray(data.vehiculos) ? data.vehiculos.map(value => restoreRegistrationForm(EMPTY_VEHICULO, value)) : []);
+    setChoferes(Array.isArray(data.choferes) ? data.choferes.map(value => restoreRegistrationForm(EMPTY_CHOFER, value)) : []);
+    setSavedActorId(typeof data.savedActorId === 'string' ? data.savedActorId : null);
+    setSavedDocuments(Array.isArray(data.savedDocuments) ? data.savedDocuments : []);
+    setStep(data.savedActorId ? STEPS.length : Math.min(STEPS.length, Math.max(1, Number(data.step) || 1)));
+    setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
+  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || vehiculos.length > 0 || choferes.length > 0 || Boolean(savedActorId));
 
   useEffect(() => {
     if (!isEdit || !existing) return;
@@ -166,7 +179,7 @@ const NuevoTransportistaPage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (submitInFlight.current) return;
-    if (![1, 3, 4].every(validateStep)) return;
+    if (!savedActorId && ![1, 3, 4].every(validateStep)) return;
 
     const payload: any = {
       razonSocial: form.razonSocial, cuit: form.cuit,
@@ -210,6 +223,7 @@ const NuevoTransportistaPage: React.FC = () => {
     setSavingDocuments(true);
     setDocumentError(null);
     try {
+      draft.assertSession();
       let actorId = savedActorId || id;
       if (!savedActorId && isEdit && id) {
         await updateMutation.mutateAsync({ id, data: payload });
@@ -220,11 +234,15 @@ const NuevoTransportistaPage: React.FC = () => {
         toast.success('Creado', `Transportista ${form.razonSocial} creado`);
       }
       if (!actorId) throw new Error('El servidor no devolvió el identificador del transportista.');
+      draft.assertSession();
       setSavedActorId(actorId);
+      draft.checkpoint({ ...draftData, savedActorId: actorId });
       const failed: string[] = [];
       for (const [tipo, selection] of Object.entries(pendingDocuments)) {
         try {
+          draft.assertSession();
           const saved = await transportistaDocumentoService.upload(actorId, selection.file, tipo, selection.anio);
+          draft.assertSession();
           setSavedDocuments(previous => [...previous, saved]);
           setPendingDocuments(previous => { const next = { ...previous }; delete next[tipo]; return next; });
           if (saved.analisis?.duplicado) toast.warning('Comprobante repetido', 'La huella coincide con un recibo ya cargado. No acredita un pago nuevo.');
@@ -234,7 +252,7 @@ const NuevoTransportistaPage: React.FC = () => {
         setDocumentError(`Transportista guardado. Quedan adjuntos pendientes: ${failed.join(', ')}. Reintentá sin repetir el alta.`);
         return;
       }
-      navigate(mp('/admin/actores/transportistas'));
+      draft.clear(); navigate(mp('/admin/actores/transportistas'));
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
     } finally {
@@ -263,6 +281,9 @@ const NuevoTransportistaPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ActorRegistrationDraftBar draft={draft} />
+      {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
 
       {/* Stepper */}
       <MobileFormSteps steps={STEPS} currentStep={step} onSelect={goStep} />
@@ -303,6 +324,7 @@ const NuevoTransportistaPage: React.FC = () => {
               <Input label="Razon Social *" value={form.razonSocial} onChange={e => up('razonSocial', e.target.value)} errorMessage={attempted.has(1) && !form.razonSocial.trim() ? 'La razón social es obligatoria' : undefined} placeholder="Transporte S.A." />
               <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} errorMessage={attempted.has(1) && !form.cuit.trim() ? 'El CUIT es obligatorio' : undefined} placeholder="30-12345678-9" />
             </div>
+            {!isEdit && !savedActorId && <ActorRegistryLookup type="TRANSPORTISTA" cuit={form.cuit} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="Email *" type="email" value={form.email} onChange={e => up('email', e.target.value)} errorMessage={attempted.has(1) && !form.email.trim() ? 'El email es obligatorio' : undefined} placeholder="contacto@empresa.com" />
               <Input label="Telefono" value={form.telefono} onChange={e => up('telefono', e.target.value)} placeholder="+54 261 ..." />
