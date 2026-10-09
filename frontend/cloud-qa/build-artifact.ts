@@ -87,6 +87,13 @@ if (mode === 'freeze') {
   assert.equal(coherence.externalProvidersDisabled, true);
   assert.equal(coherence.database, 'sitrep_night_qa_20260926'); assert.equal(coherence.port, 55440);
   assertFullE2EEvidence(e2e);
+  const receiptMigration = await readJson('receipt-migration.json');
+  assert.equal(receiptMigration.commit, process.env.GITHUB_SHA);
+  assert.equal(receiptMigration.migrationSha256, createHash('sha256').update(await readFile(path.join(root, 'backend/prisma/migrations/20261008220000_document_analysis/migration.sql'))).digest('hex'));
+  assert.equal(receiptMigration.passed, 4); assert.equal(receiptMigration.failed, 0);
+  assert.equal(receiptMigration.exactSql, true); assert.equal(receiptMigration.committed, false);
+  assert.equal(receiptMigration.productionDataWritten, false);
+  assert.equal(receiptMigration.externalProvidersDisabled, true);
   const android = await readJson('android/result.json');
   const apk = await readJson('apk/result.json');
   assert.equal(android.completed,true,'An interrupted Android suite cannot pass the package gate');
