@@ -7,6 +7,7 @@ import {
   updateSolicitud,
   enviarSolicitud,
   uploadDocumento,
+  analizarDocumentoSolicitud,
   downloadDocumentoSolicitud,
   deleteDocumento,
   getMensajes,
@@ -36,6 +37,7 @@ router.get('/:id', isAuthenticated, getSolicitud);
 router.put('/:id', isAuthenticated, updateSolicitud);
 router.post('/:id/enviar', isAuthenticated, enviarSolicitud);
 router.post('/:id/documentos', isAuthenticated, upload.single('file'), uploadDocumento);
+router.post('/:id/documentos/:docId/analizar', isAuthenticated, analizarDocumentoSolicitud);
 router.get('/:id/documentos/:docId/download', isAuthenticated, downloadDocumentoSolicitud);
 router.delete('/:id/documentos/:docId', isAuthenticated, deleteDocumento);
 router.get('/:id/mensajes', isAuthenticated, getMensajes);

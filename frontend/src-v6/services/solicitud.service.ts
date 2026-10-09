@@ -56,6 +56,10 @@ export const solicitudService = {
   async deleteDocumento(solicitudId: string, docId: string): Promise<void> {
     await api.delete(`/solicitudes/${solicitudId}/documentos/${docId}`);
   },
+  async analizarDocumento(solicitudId: string, docId: string): Promise<DocumentoSolicitud> {
+    const { data } = await api.post(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(docId)}/analizar`);
+    return data.data.documento;
+  },
   async downloadDocumento(solicitudId: string, item: DocumentoSolicitud): Promise<void> {
     const { data } = await api.get(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(item.id)}/download`, { responseType: 'blob' });
     const url = URL.createObjectURL(data);

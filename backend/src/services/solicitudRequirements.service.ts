@@ -34,7 +34,7 @@ export function isSolicitudActorType(value: string): value is SolicitudActorType
 export function getSolicitudRequirements(tipoActor: string): SolicitudDocumentRequirement[] {
   if (!isSolicitudActorType(tipoActor)) return [];
   return [...REQUIREMENTS[tipoActor].map((requirement) => ({ ...requirement })),
-    { tipo: 'COMPROBANTE_PAGO', nombre: 'Recibo o comprobante de pago', required: false }];
+    { tipo: 'COMPROBANTE_PAGO', nombre: 'Comprobante de sellado / pago', required: false }];
 }
 
 export function getMissingRequiredDocumentTypes(tipoActor: string, uploadedTypes: string[]): string[] {

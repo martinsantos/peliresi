@@ -7,6 +7,12 @@ const doc = { id: 'qa-doc', nombre: 'Memoria técnica QA.pdf', tipo: 'MEMORIA_TE
 const props = () => ({ documentos: [doc], isAdmin: true, onUpload: vi.fn(), onDownload: vi.fn(), onRevisar: vi.fn(), onDelete: vi.fn() });
 
 describe('document rows preserve identity and actions on a narrow screen', () => {
+  it('labels the document controls and keeps them readable and touchable on phones', () => {
+    render(<DocumentUpload {...props()} />);
+    for (const label of ['Tipo documento', 'Año fiscal']) {
+      expect(screen.getByLabelText(label, { exact: true })).toHaveClass('min-h-11', 'text-base');
+    }
+  });
   it('gives the filename its own flexible column, with status/actions on a separate mobile row', () => {
     render(<DocumentUpload {...props()} />);
     const identity = screen.getByText(doc.nombre).parentElement!;

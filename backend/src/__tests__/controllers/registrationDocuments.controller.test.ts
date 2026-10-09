@@ -4,10 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({
   find: vi.fn(), listDocs: vi.fn(), saveDoc: vi.fn(), removeDocs: vi.fn(), update: vi.fn(),
   transaction: vi.fn(), query: vi.fn(), notices: vi.fn(), read: vi.fn(), exists: vi.fn(), unlink: vi.fn(),
+  findDoc: vi.fn(), deleteDoc: vi.fn(),
 }));
 vi.mock('../../lib/prisma', () => ({ default: {
   solicitudInscripcion: { findUnique: mock.find, update: mock.update },
-  documentoSolicitud: { findMany: mock.listDocs, findFirst: vi.fn(), create: mock.saveDoc },
+  documentoSolicitud: { findMany: mock.listDocs, findFirst: vi.fn(), findUnique: mock.findDoc, delete: mock.deleteDoc, create: mock.saveDoc },
   usuario: { findMany: vi.fn().mockResolvedValue([]) }, notificacion: { create: mock.notices },
   $transaction: mock.transaction,
 } }));
@@ -20,12 +21,12 @@ vi.mock('fs', async original => {
     readFileSync: mock.read, unlinkSync: mock.unlink } };
 });
 
-import { uploadDocumento, updateSolicitud } from '../../controllers/solicitud.controller';
+import { uploadDocumento, updateSolicitud, deleteDocumento } from '../../controllers/solicitud.controller';
 
 const pdf = Buffer.from('%PDF-1.4\nQA document, not an official certificate\n%%EOF');
 const draft = { id: 'draft', usuarioId: 'owner', tipoActor: 'GENERADOR', estado: 'BORRADOR' };
 async function call(handler: typeof uploadDocumento, body: object, mime = 'application/pdf') {
-  const req = { params: { id: 'draft' }, user: { id: 'owner', rol: 'GENERADOR', restricted: true }, body,
+  const req = { params: { id: 'draft', docId: 'doc' }, user: { id: 'owner', rol: 'GENERADOR', restricted: true }, body,
     file: { originalname: 'QA.pdf', path: '/unit-virtual/QA.pdf', mimetype: mime, size: pdf.length } };
   const res = { json: vi.fn(), status: vi.fn().mockReturnThis() }, next = vi.fn();
   await handler(req as never, res as never, next);
@@ -38,9 +39,11 @@ beforeEach(() => {
   mock.saveDoc.mockImplementation(async ({ data }) => ({ id: 'doc', ...data }));
   mock.update.mockImplementation(async ({ data }) => ({ ...draft, ...data }));
   mock.query.mockResolvedValue([]);
+  mock.findDoc.mockResolvedValue({ id: 'doc', solicitudId: 'draft', path: '/unit-virtual/original.pdf' });
+  mock.deleteDoc.mockResolvedValue({ id: 'doc', solicitudId: 'draft', path: '/unit-virtual/original.pdf' });
   mock.transaction.mockImplementation(callback => callback({
     $queryRaw: mock.query, solicitudInscripcion: { findUnique: mock.find, update: mock.update },
-    documentoSolicitud: { findMany: mock.listDocs, findFirst: vi.fn().mockResolvedValue(null), deleteMany: mock.removeDocs, create: mock.saveDoc },
+    documentoSolicitud: { findMany: mock.listDocs, findFirst: vi.fn().mockResolvedValue(null), findUnique: mock.findDoc, delete: mock.deleteDoc, deleteMany: mock.removeDocs, create: mock.saveDoc },
     documento: { findFirst: vi.fn().mockResolvedValue(null) },
     huellaRecibo: { findUnique: vi.fn().mockResolvedValue(null), upsert: vi.fn() },
     usuario: { findMany: vi.fn().mockResolvedValue([]) }, notificacion: { create: mock.notices },
@@ -48,6 +51,16 @@ beforeEach(() => {
 });
 
 describe('registration documents preserve genuine bytes and safe data', () => {
+  it('does not destroy the original attachment when its database deletion fails', async () => {
+    mock.deleteDoc.mockRejectedValue(new Error('Database unavailable'));
+    expect((await call(deleteDocumento, {})).error).toBeDefined();
+    expect(mock.unlink).not.toHaveBeenCalled();
+  });
+  it('rechecks the submitted state under lock before deleting a document', async () => {
+    mock.find.mockResolvedValueOnce(draft).mockResolvedValue({ ...draft, estado: 'ENVIADA' });
+    expect((await call(deleteDocumento, {})).error).toMatchObject({ statusCode: 409 });
+    expect(mock.deleteDoc).not.toHaveBeenCalled(); expect(mock.unlink).not.toHaveBeenCalled();
+  });
   it('records the digest of the bytes stored, independently of filename', async () => {
     expect((await call(uploadDocumento, { tipo: 'CONSTANCIA_AFIP' })).error).toBeUndefined();
     expect(mock.saveDoc).toHaveBeenCalledWith({ data: expect.objectContaining({ sha256: createHash('sha256').update(pdf).digest('hex') }) });

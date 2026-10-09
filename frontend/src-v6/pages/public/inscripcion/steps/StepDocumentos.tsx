@@ -13,13 +13,14 @@ interface StepDocumentosProps {
   docs: DocDef[];
   adjuntos: Record<string, File>;
   uploadedDocs: Record<string, DocumentoSolicitud>;
-  uploadStates: Record<string, 'uploading' | 'deleting' | 'error' | undefined>;
+  uploadStates: Record<string, 'uploading' | 'deleting' | 'reading' | 'error' | undefined>;
   uploadErrors: Record<string, string | undefined>;
   requirementsStatus: 'loading' | 'loaded' | 'error';
   maxBytes: number;
   onRetryRequirements: () => void;
   onAddFile: (tipo: string, file: File) => void | Promise<void>;
   onRemoveFile: (tipo: string) => void | Promise<void>;
+  onRetryReading?: (tipo: string) => void | Promise<void>;
 }
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
@@ -33,6 +34,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   onRetryRequirements,
   onAddFile,
   onRemoveFile,
+  onRetryReading,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeDocTipo, setActiveDocTipo] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           const uploaded = uploadedDocs[doc.tipo];
           const state = uploadStates[doc.tipo];
           const attached = uploaded || pendingFile;
-          const isBusy = state === 'uploading' || state === 'deleting';
+          const isBusy = state === 'uploading' || state === 'deleting' || state === 'reading';
           return (
             <div key={doc.tipo} data-testid={`registration-document-${doc.tipo}`} className={`rounded-xl border p-3 transition-colors ${uploaded ? 'border-emerald-200 bg-emerald-50/60' : state === 'error' ? 'border-error-200 bg-error-50/60' : 'border-neutral-200 bg-neutral-50'}`}>
               <div className="flex items-center justify-between gap-3">
@@ -108,7 +110,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               </div>
               {uploadErrors[doc.tipo] && <p className="mt-2 flex items-start gap-1.5 text-xs text-error-700" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{uploadErrors[doc.tipo]}</p>}
               {state === 'error' && pendingFile && <Button variant="outline" size="sm" className="mt-2" onClick={() => void onAddFile(doc.tipo, pendingFile)}>Reintentar {doc.nombre}</Button>}
-              <DocumentAnalysis analysis={uploaded?.analisis} />
+              {doc.tipo === 'COMPROBANTE_PAGO' && !uploaded && <p className="mt-2 text-sm leading-6 text-neutral-700">Sellados tributarios: recibo de caja de banco o comprobante de transferencia. Se revisa el original; no se acredita automáticamente un pago de TEF.</p>}
+              <DocumentAnalysis analysis={uploaded?.analisis} retrying={isBusy} onRetry={uploaded && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
             </div>
           );
         })}

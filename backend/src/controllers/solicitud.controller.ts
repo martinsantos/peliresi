@@ -11,7 +11,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
-import { describeDocument, readReceipt, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { describeDocument, readReceipt, mergeReceiptRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
 import {
   getMissingRequiredDocumentTypes,
   getSolicitudRequirements,
@@ -419,7 +419,13 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
       if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya fue enviada; no se reemplazó ningún archivo.', 409);
       previous = await tx.documentoSolicitud.findMany({ where: { solicitudId: id, tipo }, select: { id: true, path: true, sha256: true } });
-      if (previous[0]?.sha256 === description.sha256) return tx.documentoSolicitud.findUniqueOrThrow({ where: { id: previous[0].id } });
+      if (previous[0]?.sha256 === description.sha256) {
+        const original = await tx.documentoSolicitud.findUniqueOrThrow({ where: { id: previous[0].id } });
+        if (analysis && analysis.lectura === 'LEIDO' && (original.analisis as { lectura?: string } | null)?.lectura !== 'LEIDO') {
+          return tx.documentoSolicitud.update({ where: { id: original.id }, data: { analisis: mergeReceiptRead(original.analisis, analysis) } });
+        }
+        return original;
+      }
       if (analysis) analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
       await tx.documentoSolicitud.deleteMany({ where: { solicitudId: id, tipo } });
       const saved = await tx.documentoSolicitud.create({
@@ -458,6 +464,37 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
   }
 };
 
+/** Retry only OCR metadata; never replace the original or approve a payment. */
+export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id, docId } = req.params;
+    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
+    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    if (solicitud.usuarioId !== req.user?.id) assertReviewPermission(req, solicitud);
+    const original = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
+    if (!original || original.solicitudId !== id) throw new AppError('Documento no encontrado', 404);
+    if (original.tipo !== 'COMPROBANTE_PAGO') throw new AppError('La lectura automática corresponde a comprobantes de pago', 400);
+    if (!fs.existsSync(original.path)) throw new AppError('Archivo no disponible', 404);
+    const description = describeDocument({ path: original.path, mimetype: original.mimeType });
+    if (original.sha256 && original.sha256 !== description.sha256) throw new AppError('El archivo no coincide con su huella registrada; requiere revisión.', 409);
+    const reading = await readReceipt({ path: original.path, mimeType: description.mimeType });
+    const documento = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!current || current.solicitudId !== id || current.path !== original.path || current.sha256 !== original.sha256) {
+        throw new AppError('El adjunto cambió durante la lectura. Actualizá la solicitud para continuar.', 409);
+      }
+      reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
+      const analisis = mergeReceiptRead(current.analisis, reading);
+      const saved = await tx.documentoSolicitud.update({ where: { id: docId }, data: { sha256: description.sha256, analisis } });
+      await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
+      if (analisis.duplicado && !(current.analisis as { duplicado?: boolean } | null)?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: docId });
+      return saved;
+    });
+    res.json({ success: true, data: { documento } });
+  } catch (error) { next(error); }
+};
+
 /** Protected original-file download; filesystem paths are never browser URLs. */
 export const downloadDocumentoSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -493,16 +530,22 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('No se pueden eliminar archivos de una solicitud enviada o cerrada', 400);
     }
 
-    const documento = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
-    if (!documento) throw new AppError('Documento no encontrado', 404);
-    if (documento.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
-
-    // Delete file from disk
+    const documento = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya fue enviada; no se eliminó ningún archivo.', 409);
+      const saved = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!saved) throw new AppError('Documento no encontrado', 404);
+      if (saved.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
+      return tx.documentoSolicitud.delete({ where: { id: docId } });
+    });
+    // Remove bytes only AFTER the database commit. A failed transaction must
+    // leave the original available to the applicant and reviewer.
     if (fs.existsSync(documento.path)) {
-      fs.unlinkSync(documento.path);
+      try { fs.unlinkSync(documento.path); } catch (error) {
+        logger.warn({ error, path: documento.path }, 'No se pudo limpiar un archivo de solicitud eliminado');
+      }
     }
-
-    await prisma.documentoSolicitud.delete({ where: { id: docId } });
 
     res.json({ success: true, message: 'Documento eliminado' });
   } catch (error) {

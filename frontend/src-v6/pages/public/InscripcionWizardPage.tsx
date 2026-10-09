@@ -73,7 +73,7 @@ const InscripcionWizardPage: React.FC = () => {
   const [form, setForm] = useState<Record<string, string>>(reviewFixture?.form || {});
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({});
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, DocumentoSolicitud>>({});
-  const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'error' | undefined>>({});
+  const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'reading' | 'error' | undefined>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
   const uploadsInFlight = useRef(new Set<string>());
   const [requirements, setRequirements] = useState<DocDef[]>([]);
@@ -299,6 +299,22 @@ const InscripcionWizardPage: React.FC = () => {
   }, [isReviewMode, solicitudId, uploadedDocs]);
 
   // Submit
+  const handleRetryReading = async (tipo: string) => {
+    const uploaded = uploadedDocs[tipo];
+    if (!solicitudId || !uploaded || uploadsInFlight.current.has(tipo) || isReviewMode) return;
+    uploadsInFlight.current.add(tipo);
+    setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
+    setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
+    try {
+      const document = await solicitudService.analizarDocumento(solicitudId, uploaded.id);
+      setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
+      setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
+    } catch (error) {
+      setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
+      setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo reintentar la lectura. El archivo sigue guardado.') }));
+    } finally { uploadsInFlight.current.delete(tipo); }
+  };
+
   const handleSubmit = async () => {
     if (saveInFlight.current || submitting) return;
     if (uploadsInFlight.current.size) { setRegError('Esperá a que termine la carga de documentos antes de enviar.'); return; }
@@ -361,6 +377,7 @@ const InscripcionWizardPage: React.FC = () => {
     onRetryRequirements={() => setRequirementsAttempt(value => value + 1)}
     onAddFile={handleAddFile}
     onRemoveFile={handleRemoveFile}
+    onRetryReading={handleRetryReading}
   />;
 
   /** Maps the current wizard step to the corresponding step component */

@@ -100,18 +100,21 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminGenerador) {
       items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminTransportista) {
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminOperador) {
       items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });

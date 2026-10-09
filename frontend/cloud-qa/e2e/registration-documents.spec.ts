@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import os from 'node:os';
+import path from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { login, prefix } from './helpers';
 const require = createRequire(new URL('../../package.json', import.meta.url));
@@ -94,12 +98,37 @@ test('same receipt in two real applicant accounts raises a persistent warning wi
   } finally { await secondContext.close(); }
 });
 
-test('a photographed receipt is actually read in Spanish, not a stub result', async ({ page }, info) => {
+test('a photographed receipt recovers from a real busy OCR and is read in Spanish without a second upload', async ({ page }, info) => {
   test.setTimeout(120000);
   const candidate = await draft(page, info, 'transportista');
-  const svg = Buffer.from('<svg width="1400" height="600" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white"/><g font-family="DejaVu Sans" font-size="52" fill="black"><text x="70" y="100">RECIBO DE PAGO QA</text><text x="70" y="220">IMPORTE 12500</text><text x="70" y="340">SIN VALIDEZ FISCAL</text></g></svg>');
+  // A distinct synthetic receipt per journey. Reusing identical PNG bytes
+  // across viewports correctly triggers the duplicate detector, not an OCR bug.
+  const svg = Buffer.from(`<svg width="1400" height="600" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white"/><g font-family="DejaVu Sans" font-size="52" fill="black"><text x="70" y="100">RECIBO DE PAGO QA</text><text x="70" y="220">IMPORTE 12500</text><text x="70" y="340">SIN VALIDEZ FISCAL</text><text x="70" y="480" font-size="28">Referencia ${randomUUID()}</text></g></svg>`);
   const bytes = await sharp(svg).png().toBuffer();
-  const doc = await attach(page, candidate.id, 'COMPROBANTE_PAGO', bytes, 'image/png', 'foto-recibo-QA.png');
+  // Hold the actual shared engine lock, not an intercepted business response.
+  // -F keeps Node on the tracked PID and finally always releases our own child.
+  const blocker = spawn('flock', ['-F', '-n', path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock'), process.execPath, '-e', 'process.stdout.write("QA_LOCKED"); setInterval(()=>{},1000);'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stop: Promise<unknown[]> | undefined;
+  let stored: any;
+  try {
+    const ready = await Promise.race([
+      once(blocker.stdout, 'data').then(([data]) => String(data)),
+      once(blocker, 'exit').then(([code]) => { throw new Error(`QA lock failed: ${code}`); }),
+      new Promise<never>((_, reject) => { const timeout = setTimeout(() => reject(new Error('QA lock readiness timeout')), 5000); timeout.unref(); }),
+    ]);
+    expect(ready).toContain('QA_LOCKED');
+    stored = await attach(page, candidate.id, 'COMPROBANTE_PAGO', bytes, 'image/png', 'foto-recibo-QA.png');
+    expect(stored.analisis).toMatchObject({ lectura: 'NO_DISPONIBLE', texto: '' });
+    await expect(page.getByRole('button', { name: 'Reintentar lectura', exact: true })).toBeVisible();
+  } finally {
+    if (blocker.pid && blocker.exitCode === null && blocker.signalCode === null) { stop = once(blocker, 'exit'); blocker.kill('SIGTERM'); }
+    if (stop) await stop;
+  }
+  const retried = page.waitForResponse(response => new URL(response.url()).pathname === `/api/solicitudes/${candidate.id}/documentos/${stored.id}/analizar`);
+  await page.getByRole('button', { name: 'Reintentar lectura', exact: true }).click();
+  const response = await retried; expect(response.status()).toBe(200);
+  const doc = (await response.json()).data.documento;
+  expect(doc.id).toBe(stored.id); expect(doc.sha256).toBe(stored.sha256); expect(doc.estado).toBe('PENDIENTE');
   expect(doc.analisis).toMatchObject({ lectura: 'LEIDO', motor: 'TESSERACT', duplicado: false });
   expect(doc.analisis.texto).toMatch(/RECIBO DE PAGO QA/i); expect(doc.analisis.texto).toContain('12500');
   await page.getByText('Ver texto leído del recibo', { exact: true }).click();
@@ -114,7 +143,7 @@ test('administrative transport registration preserves its saved actor after a fa
   await page.getByLabel('Razon Social *', { exact: true }).fill(`QA Transportista ${id}`);
   await page.getByLabel('CUIT *', { exact: true }).fill(`30-${String(Date.now()).slice(-8)}-1`);
   await page.getByLabel('Email *', { exact: true }).fill(`${id}@night-qa.invalid`);
-  await page.getByLabel('Password Inicial *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
+  await page.getByLabel('Contraseña inicial *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   if (info.project.name === 'web-desktop') await page.getByRole('button', { name: '5. Confirmar', exact: true }).click();
   else await page.getByRole('combobox', { name: 'Paso del registro' }).selectOption('5');
   const panel = page.getByRole('region', { name: 'Documentación del transportista' });

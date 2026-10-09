@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Upload, FileText, Download, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
 import { Badge } from './ui/BadgeV2';
 import type { Documento } from '../services/generador-fiscal.service';
@@ -9,7 +9,7 @@ const TIPO_LABELS: Record<string, string> = {
   DDJJ_ANUAL: 'DDJJ Anual',
   INFORME_TECNICO: 'Informe Tecnico',
   LIBRO_OPERATORIA: 'Libro de Operatoria',
-  COMPROBANTE_PAGO: 'Comprobante de Pago',
+  COMPROBANTE_PAGO: 'Comprobante de sellado / pago',
   OTRO: 'Otro',
 };
 
@@ -41,6 +41,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   documentos, onUpload, onDownload, onRevisar, onDelete, isAdmin, isPending, readOnly = false, initialTipo = 'CERTIFICADO_AMBIENTAL'
 }) => {
   const fileRef = useRef<HTMLInputElement>(null);
+  const controlId = useId();
   const [tipo, setTipo] = useState(initialTipo);
   const [anio, setAnio] = useState<number>(new Date().getFullYear());
   const [dragOver, setDragOver] = useState(false);
@@ -69,11 +70,12 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
       <div className="flex flex-col sm:flex-row gap-3 items-end">
         <div className="flex-1 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-neutral-500 mb-1">Tipo documento</label>
+            <label htmlFor={`${controlId}-tipo`} className="block text-sm font-medium text-neutral-700 mb-1">Tipo documento</label>
             <select
+              id={`${controlId}-tipo`}
               value={tipo}
               onChange={e => setTipo(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl border border-neutral-200 text-sm bg-white focus:border-primary-500 focus:outline-none"
+              className="w-full min-h-11 px-3 rounded-xl border border-neutral-300 text-base sm:text-sm bg-white focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-100"
             >
               {Object.entries(TIPO_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
@@ -81,18 +83,20 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-neutral-500 mb-1">Ano fiscal</label>
+            <label htmlFor={`${controlId}-anio`} className="block text-sm font-medium text-neutral-700 mb-1">Año fiscal</label>
             <input
+              id={`${controlId}-anio`}
               type="number"
               value={anio}
               onChange={e => setAnio(Number(e.target.value))}
-              className="w-full h-10 px-3 rounded-xl border border-neutral-200 text-sm focus:border-primary-500 focus:outline-none"
+              className="w-full min-h-11 px-3 rounded-xl border border-neutral-300 text-base sm:text-sm focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-100"
               min={2015}
               max={2030}
             />
           </div>
         </div>
       </div>
+      {tipo === 'COMPROBANTE_PAGO' && <p className="text-sm leading-6 text-neutral-700">Sellados tributarios: recibo de caja de banco o comprobante de transferencia. La lectura ayuda a revisar el original; no acredita el pago ni lo confunde con la TEF.</p>}
 
       <div
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${

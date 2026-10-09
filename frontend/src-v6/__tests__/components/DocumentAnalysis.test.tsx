@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DocumentAnalysis } from '../../components/DocumentAnalysis';
 import type { ReceiptAnalysis } from '../../types/documentAnalysis';
 const analysis: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: 'RECIBO QA · 12500', alcance: 'Página 1.', aviso: null };
@@ -25,5 +25,17 @@ describe('receipt feedback is readable evidence, never a payment certification',
     render(<DocumentAnalysis analysis={{ ...analysis, lectura, texto: '' }} />);
     expect(screen.getByRole('status')).toHaveTextContent('revisión manual');
     expect(screen.queryByText('Ver texto leído del recibo')).toBeNull();
+  });
+  it('offers a retry of the saved receipt without requiring replacement or a second upload', () => {
+    const retry = vi.fn();
+    render(<DocumentAnalysis analysis={{ ...analysis, lectura: 'NO_DISPONIBLE', texto: '', duplicado: true }} onRetry={retry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura', exact: true }));
+    expect(retry).toHaveBeenCalledTimes(1); expect(screen.getByRole('alert')).toHaveTextContent('Comprobante repetido');
+  });
+  it('disables repeated retries while a read is in progress', () => {
+    const retry = vi.fn();
+    render(<DocumentAnalysis analysis={{ ...analysis, lectura: 'NO_DISPONIBLE', texto: '' }} onRetry={retry} retrying />);
+    fireEvent.click(screen.getByRole('button', { name: 'Leyendo recibo…', exact: true }));
+    expect(retry).not.toHaveBeenCalled(); expect(screen.getByRole('button')).toBeDisabled();
   });
 });

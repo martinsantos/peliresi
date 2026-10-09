@@ -18,6 +18,20 @@ export type ReceiptAnalysis = {
   aviso: string | null;
 };
 
+/** Retrying extraction must not lose a successful read or a duplicate warning. */
+export function mergeReceiptRead(previous: unknown, next: ReceiptAnalysis): ReceiptAnalysis {
+  if (!previous || typeof previous !== 'object' || Array.isArray(previous)) return next;
+  const old = previous as Partial<ReceiptAnalysis>;
+  if (old.version !== 1) return next;
+  const duplicado = next.duplicado || old.duplicado === true;
+  if (old.lectura === 'LEIDO' && typeof old.texto === 'string' && old.texto.trim()) {
+    return { version: 1, duplicado, lectura: 'LEIDO', texto: old.texto,
+      motor: old.motor === 'PDF_TEXT' || old.motor === 'TESSERACT' ? old.motor : null,
+      alcance: typeof old.alcance === 'string' ? old.alcance : next.alcance, aviso: null };
+  }
+  return { ...next, duplicado };
+}
+
 /** The original file is never normalized, rewritten, or treated as proof of payment. */
 export function describeDocument(file: { path: string; mimetype: string }) {
   const bytes = fs.readFileSync(file.path);

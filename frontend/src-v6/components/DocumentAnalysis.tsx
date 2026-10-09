@@ -1,8 +1,8 @@
-import { AlertTriangle, ChevronDown, FileSearch } from 'lucide-react';
+import { AlertTriangle, ChevronDown, FileSearch, RefreshCw } from 'lucide-react';
 import type { ReceiptAnalysis } from '../types/documentAnalysis';
 
 /** Reading a receipt is not confirming its amount, issuer, or payment. */
-export function DocumentAnalysis({ analysis }: { analysis?: ReceiptAnalysis | null }) {
+export function DocumentAnalysis({ analysis, onRetry, retrying = false }: { analysis?: ReceiptAnalysis | null; onRetry?: () => void; retrying?: boolean }) {
   if (!analysis || analysis.version !== 1) return null;
   return <div className="mt-3 space-y-2 text-sm leading-6">
     {analysis.duplicado && <div role="alert" className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
@@ -16,5 +16,8 @@ export function DocumentAnalysis({ analysis }: { analysis?: ReceiptAnalysis | nu
         <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words font-sans text-base text-neutral-900">{analysis.texto}</pre>
       </div>
     </details> : <p role="status" className="text-neutral-700">{analysis.aviso || 'No se encontró texto legible. El archivo quedó guardado para revisión manual.'}</p>}
+    {analysis.lectura !== 'LEIDO' && onRetry && <button type="button" disabled={retrying} onClick={onRetry} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-semibold text-primary-900 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-60">
+      <RefreshCw size={16} aria-hidden="true" className={retrying ? 'animate-spin motion-reduce:animate-none' : undefined} />{retrying ? 'Leyendo recibo…' : 'Reintentar lectura'}
+    </button>}
   </div>;
 }
