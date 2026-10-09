@@ -5,7 +5,7 @@ export const transportistaDocumentoService = {
     const form = new FormData();
     form.append('archivo', file); form.append('tipo', tipo);
     if (anio) form.append('anio', String(anio));
-    const { data } = await api.post(`/actores/transportistas/${encodeURIComponent(id)}/documentos`, form);
+    const { data } = await api.post(`/actores/transportistas/${encodeURIComponent(id)}/documentos`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
     return data.data.documento;
   },
 };

@@ -5,7 +5,8 @@ import NuevoTransportistaPage from '../../pages/admin/NuevoTransportistaPage';
 import NuevoGeneradorPage from '../../pages/admin/NuevoGeneradorPage';
 import NuevoOperadorPage from '../../pages/admin/NuevoOperadorPage';
 
-const mock = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), success: vi.fn(), error: vi.fn(), existing: undefined as unknown }));
+const mock = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), uploadDoc: vi.fn(), success: vi.fn(), error: vi.fn(), existing: undefined as unknown }));
+vi.mock('../../services/generador-fiscal.service', () => ({ transportistaDocumentoService: { upload: mock.uploadDoc }, generadorFiscalService: { downloadDocumento: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: mock.success, error: mock.error } }));
 vi.mock('../../hooks/useActores', () => {
   const create = () => ({ mutateAsync: mock.create, isPending: false });
@@ -33,7 +34,21 @@ function submit() { step('Confirmar'); const button = screen.queryByRole('button
 function vehicle() { step('Vehiculos'); step('Agregar'); fill(/Patente/, 'QA123ZZ'); fill(/Ano/, '2026'); fill(/Vencimiento/, '2030-01-01'); }
 
 describe('actor creation contract', () => {
-  beforeEach(() => { vi.clearAllMocks(); mock.existing = undefined; mock.create.mockResolvedValue({ id: 'created' }); mock.update.mockResolvedValue({}); });
+  beforeEach(() => { vi.clearAllMocks(); mock.existing = undefined; mock.create.mockResolvedValue({ id: 'created' }); mock.update.mockResolvedValue({}); mock.uploadDoc.mockResolvedValue({ id: 'qa-doc', nombre: 'QA.pdf', tipo: 'OTRO', size: 100, estado: 'PENDIENTE' }); });
+  it('keeps already saved data read-only after a partial upload failure while allowing attachment replacement and retry', async () => {
+    mock.uploadDoc.mockRejectedValueOnce(new Error('QA upload rejected'));
+    open(); basics(); fill(/Contraseña inicial/, 'OnlyLocal-QA-secret!'); step('Confirmar');
+    const file = new File(['QA'], 'QA.pdf', { type: 'application/pdf' });
+    fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Transportista' }));
+    await waitFor(() => expect(screen.getByRole('alert', { name: 'Adjuntos pendientes' })).toHaveTextContent('Transportista guardado'));
+    step('Datos Basicos'); expect(screen.getByLabelText(/Razon Social/)).toBeDisabled();
+    step('Confirmar'); expect(screen.getByRole('button', { name: 'Quitar QA.pdf', exact: true })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar adjuntos', exact: true }));
+    await waitFor(() => expect(screen.getByText('Listado')).toBeInTheDocument());
+    expect(mock.create).toHaveBeenCalledOnce(); expect(mock.uploadDoc).toHaveBeenCalledTimes(2);
+    expect(mock.uploadDoc.mock.calls.map(call => call[0])).toEqual(['created', 'created']);
+  });
   it.each(['', 'short', '30123456789', '30-12345678-9', '        '])('does not send invalid initial password %j or substitute CUIT', async password => {
     open(); basics(); fill(/Password inicial|Contraseña inicial/, password); submit();
     await waitFor(() => expect(screen.getByLabelText(/Password inicial|Contraseña inicial/)).toHaveAttribute('aria-invalid', 'true'));

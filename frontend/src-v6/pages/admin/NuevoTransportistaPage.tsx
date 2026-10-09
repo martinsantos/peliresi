@@ -295,6 +295,7 @@ const NuevoTransportistaPage: React.FC = () => {
 
       {/* Step Content */}
       <Card className="p-6 min-h-[360px]">
+        <fieldset className="min-w-0" disabled={isPending || (Boolean(savedActorId) && step !== 5)}>
         {step === 1 && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Truck size={20} className="text-orange-600" /> Datos Basicos</h3>
@@ -480,6 +481,7 @@ const NuevoTransportistaPage: React.FC = () => {
             )}
           </div>
         )}
+        </fieldset>
       </Card>
 
       {/* Navigation */}

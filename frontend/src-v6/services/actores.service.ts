@@ -74,12 +74,12 @@ export const actoresService = {
 
   async createTransportista(req: CreateTransportistaRequest): Promise<Transportista> {
     const { data } = await api.post('/actores/transportistas', req);
-    return data.data;
+    return data.data.transportista || data.data;
   },
 
   async updateTransportista(id: string, req: Partial<CreateTransportistaRequest>): Promise<Transportista> {
     const { data } = await api.put(`/actores/transportistas/${id}`, req);
-    return data.data;
+    return data.data.transportista || data.data;
   },
 
   async deleteTransportista(id: string): Promise<void> {
