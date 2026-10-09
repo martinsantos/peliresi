@@ -88,6 +88,10 @@ describe('receipt reuse is serialized, persistent and private', () => {
   it('creates only an internal owner notice and never identifies another actor', async () => {
     const db = tx(); await receiptNotice(db as never, 'owner', { solicitudId: 'own-draft' });
     expect(db.notificacion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ usuarioId: 'owner', tipo: 'ALERTA_SISTEMA', prioridad: 'ALTA' }) });
-    expect(JSON.parse(db.notificacion.create.mock.calls[0][0].data.datos)).toEqual({ tipo: 'comprobante_repetido', solicitudId: 'own-draft' });
+    expect(JSON.parse(db.notificacion.create.mock.calls[0][0].data.datos)).toEqual({ tipo: 'comprobante_repetido', solicitudId: 'own-draft', ruta: '/mi-solicitud' });
+  });
+  it('returns an actor receipt notice to their own profile, not a restricted admin ficha', async () => {
+    const db = tx(); await receiptNotice(db as never, 'owner', { actorTipo: 'transportista', actorId: 'own-actor' });
+    expect(JSON.parse(db.notificacion.create.mock.calls[0][0].data.datos)).toMatchObject({ ruta: '/mi-perfil', actorId: 'own-actor' });
   });
 });

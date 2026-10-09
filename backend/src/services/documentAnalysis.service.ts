@@ -116,7 +116,8 @@ export async function retainReceiptDigest(tx: Prisma.TransactionClient, sha256: 
 }
 
 export async function receiptNotice(tx: Prisma.TransactionClient, usuarioId: string, datos: object): Promise<void> {
+  const ruta = 'solicitudId' in datos && typeof datos.solicitudId === 'string' ? '/mi-solicitud' : '/mi-perfil';
   await tx.notificacion.create({ data: { usuarioId, tipo: 'ALERTA_SISTEMA', prioridad: 'ALTA',
     titulo: 'Comprobante repetido', mensaje: 'La huella de este archivo coincide con un comprobante ya cargado. Revisá el documento; no acredita un pago nuevo.',
-    datos: JSON.stringify({ tipo: 'comprobante_repetido', ...datos }) } });
+    datos: JSON.stringify({ tipo: 'comprobante_repetido', ...datos, ruta }) } });
 }
