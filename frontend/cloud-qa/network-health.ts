@@ -1,6 +1,15 @@
-export type ConsoleObservation = { text: string; at: string; deliberatelyOffline: boolean };
+export type ConsoleObservation = { text: string; at: string; deliberatelyOffline: boolean; resourceUrl?: string };
 export type IconProof = { url: string; at: string; status: number; mime: string; width: number; height: number; sha256: string };
 export const qaManifestIcon = 'http://127.0.0.1:4177/app/icon-512.png';
+
+/** Keep evidence useful without persisting query credentials or inline contents. */
+export function diagnosticResourceUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.origin + url.pathname;
+  } catch { /* Browser-internal or missing locations are not network URLs. */ }
+  return '[non-network resource]';
+}
 
 // Record every message. Only a consequence of a deliberately disconnected
 // context is expected; normal online failures and JS exceptions still fail QA.

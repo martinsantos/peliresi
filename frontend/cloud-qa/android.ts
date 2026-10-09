@@ -11,7 +11,7 @@ import { renewAndroidConnection } from './android-connection.ts';
 import { startSystemLog } from './system-log.ts';
 import { beginSessionEvidence } from './session-evidence.ts';
 import { nonObstructingNotices, readableWholeWords } from './e2e/helpers.ts';
-import { expectedOfflineConsole, qaManifestIcon, type ConsoleObservation, type IconProof } from './network-health.ts';
+import { diagnosticResourceUrl, expectedOfflineConsole, qaManifestIcon, type ConsoleObservation, type IconProof } from './network-health.ts';
 
 await assertCloudDatabase();
 const output=path.join(process.env.QA_ARTIFACTS!,'android');
@@ -34,6 +34,8 @@ let context:BrowserContext;
 let page:Page;
 const errors:string[]=[];
 const consoleObservations:ConsoleObservation[]=[];
+const resourceTransportFailures:Array<{url:string;type:string;error:string|null;at:string;deliberatelyOffline:boolean}>=[];
+let resourceEvidenceOverflow=false;
 const deliberateOfflineContexts=new WeakSet<BrowserContext>();
 const iconProofs:IconProof[]=[];
 const runtimeErrors:string[]=[];
@@ -59,7 +61,7 @@ const driverStep=async<T>(stage:string,operation:()=>Promise<T>,milliseconds=250
   catch(error){await record('failed',String(error));throw error;}
 };
 const saveResults=async(completed=false)=>writeFile(path.join(output,'result.json'),JSON.stringify({
-  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,consoleObservations,iconProofs,iconTransportFailures,runtimeErrors,failedResponses,browserLifecycle,
+  commit:process.env.GITHUB_SHA,startedOnActualAndroid:true,completed,results,consoleErrors:errors,consoleObservations,resourceTransportFailures,resourceEvidenceOverflow,iconProofs,iconTransportFailures,runtimeErrors,failedResponses,browserLifecycle,
   sessionEvidence,sessionEvidenceOverflow,
   passed:results.filter(r=>r.status==='PASS').length,failed:results.filter(r=>r.status==='FAIL').length,
   limitations:['Android emulator, not a physical phone','Authenticated flow uses Chrome and the isolated QA origin, not the release APK production session','No real microphone, noise, battery or cellular-network certification'],
@@ -144,7 +146,7 @@ const observe=(target:Page)=>{
   target.on('close',()=>browserLifecycle.push({at:new Date().toISOString(),event:'page-close',url:target.url(),expected:intentionalClosures.has(target.context())}));
   target.on('crash',()=>runtimeErrors.push('Android Chrome page crashed: '+target.url()));
   target.on('console',m=>{if(m.type()==='error'){
-    errors.push(m.text());consoleObservations.push({text:m.text(),at:new Date().toISOString(),deliberatelyOffline:deliberateOfflineContexts.has(target.context())});
+    errors.push(m.text());consoleObservations.push({text:m.text(),at:new Date().toISOString(),deliberatelyOffline:deliberateOfflineContexts.has(target.context()),resourceUrl:diagnosticResourceUrl(m.location().url)});
   }});
   target.on('response',response=>{
     if(response.url().includes('/api/')&&response.status()>=400)failedResponses.push({
@@ -152,6 +154,9 @@ const observe=(target:Page)=>{
     });
   });
   target.on('requestfailed',request=>{
+    if(resourceTransportFailures.length>=512) resourceEvidenceOverflow=true;
+    else resourceTransportFailures.push({url:diagnosticResourceUrl(request.url()),type:request.resourceType(),
+      error:request.failure()?.errorText||null,at:new Date().toISOString(),deliberatelyOffline:deliberateOfflineContexts.has(target.context())});
     if(request.url()===qaManifestIcon)iconTransportFailures.push({url:request.url(),error:request.failure()?.errorText||null,
       at:new Date().toISOString(),deliberatelyOffline:deliberateOfflineContexts.has(target.context())});
   });
@@ -691,6 +696,7 @@ try{
     // No blanket icon ignore: require its decoded immutable bytes before/after,
     // plus a recorded deliberately offline context at the exact message time.
     expect(consoleObservations.filter(event=>!expectedOfflineConsole(event,iconProofs))).toEqual([]);
+    expect(resourceEvidenceOverflow).toBe(false);
     expect(runtimeErrors).toEqual([]);
     expect(failedResponses).toEqual([]);
     expect(browserLifecycle.filter(event=>!event.expected)).toEqual([]);
