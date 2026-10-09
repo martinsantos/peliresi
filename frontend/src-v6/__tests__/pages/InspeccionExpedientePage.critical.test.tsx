@@ -163,6 +163,42 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(header.firstElementChild).toContainElement(screen.getByRole('link', { name: 'Abrir actor inspeccionado: Planta Auditada SA', exact: true }));
   });
 
+  it.each(['touch', 'mouse'])('retains the active editor only for touch save without submitting on pointerdown (%s)', async (pointerType) => {
+    const { inspeccionService } = await import('../../services/inspeccion.service');
+    const { toast } = await import('../../components/ui/Toast');
+    const rendered = renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#acta');
+    const editor = await waitFor(() => { const field = rendered.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(field).toBeEnabled(); return field!; });
+    fireEvent.change(editor, { target: { value: 'Comentario de campo confirmado por una acción explícita.' } });
+    editor.focus();
+    const button = screen.getByRole('button', { name: 'Guardar cambios', exact: true });
+    await waitFor(() => expect(button).toBeEnabled());
+    const down = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+    Object.defineProperty(down, 'pointerType', { value: pointerType });
+    fireEvent(button, down);
+    expect(down.defaultPrevented).toBe(pointerType === 'touch');
+    expect(editor).toHaveFocus();
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
+    expect(inspeccionService.saveDraft).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ observaciones: 'Comentario de campo confirmado por una acción explícita.' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+  });
+
+  it('retains ordinary keyboard activation of save', async () => {
+    const { inspeccionService } = await import('../../services/inspeccion.service');
+    const { toast } = await import('../../components/ui/Toast');
+    const rendered = renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#acta');
+    const editor = await waitFor(() => { const field = rendered.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(field).toBeEnabled(); return field!; });
+    fireEvent.change(editor, { target: { value: 'Observación guardada desde el botón enfocado.' } });
+    const button = screen.getByRole('button', { name: 'Guardar cambios', exact: true });
+    await waitFor(() => expect(button).toBeEnabled());
+    button.focus();
+    expect(button).toHaveFocus();
+    fireEvent.click(button, { detail: 0 });
+    await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+  });
+
   it('prioritizes the editable technical report in its own step during review', async () => {
     renderPage(inspectionFixture());
 
