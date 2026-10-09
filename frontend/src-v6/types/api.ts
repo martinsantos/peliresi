@@ -328,6 +328,8 @@ export interface DocumentoSolicitud {
   path: string;
   mimeType: string;
   size: number;
+  sha256?: string | null;
+  analisis?: import('./documentAnalysis').ReceiptAnalysis | null;
   estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
   observaciones?: string;
   revisadoPor?: string;

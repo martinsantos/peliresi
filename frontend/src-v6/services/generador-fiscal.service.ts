@@ -1,5 +1,15 @@
 import api from './api';
 
+export const transportistaDocumentoService = {
+  async upload(id: string, file: File, tipo: string, anio?: number): Promise<Documento> {
+    const form = new FormData();
+    form.append('archivo', file); form.append('tipo', tipo);
+    if (anio) form.append('anio', String(anio));
+    const { data } = await api.post(`/actores/transportistas/${encodeURIComponent(id)}/documentos`, form);
+    return data.data.documento;
+  },
+};
+
 export interface PagoTEF {
   id: string;
   generadorId: string;
@@ -37,6 +47,8 @@ export interface Documento {
   path: string;
   mimeType: string;
   size: number;
+  sha256?: string | null;
+  analisis?: import('../types/documentAnalysis').ReceiptAnalysis | null;
   anio: number | null;
   estado: string;
   observaciones: string | null;

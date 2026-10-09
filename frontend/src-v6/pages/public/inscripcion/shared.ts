@@ -160,9 +160,9 @@ export function validatePassword(pw: string): { valid: boolean; errors: string[]
 }
 
 export const inputCls = (hasError = false) =>
-  `w-full px-4 h-10 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors`;
+  `w-full px-4 min-h-11 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-base sm:text-sm bg-white transition-colors`;
 
 export const selectCls = (hasError = false) =>
-  `w-full px-4 h-10 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors`;
+  `w-full px-4 min-h-11 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-base sm:text-sm bg-white transition-colors`;
 
 export const labelCls = 'block text-sm font-medium text-neutral-700 mb-1';

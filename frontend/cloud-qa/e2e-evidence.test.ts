@@ -4,17 +4,22 @@ import { assertFullE2EEvidence, type FullE2EEvidence } from './e2e-evidence.ts';
 
 function complete(): FullE2EEvidence {
   return {
-    stats: { expected: 219, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
+    stats: { expected: 237, unexpected: 0, flaky: 0, skipped: 0 }, errors: [],
     suites: [{ suites: ['web-desktop', 'web-responsive', 'app'].map(projectName => ({
-      specs: Array.from({ length: 73 }, () => ({ tests: [{
+      specs: Array.from({ length: 79 }, () => ({ tests: [{
         projectName, status: 'expected', expectedStatus: 'passed', results: [{ status: 'passed', retry: 0 }],
       }] })),
     })) }],
   };
 }
 
-test('the complete 73 x 3 evidence is accepted without lowering the denominator', () => {
+test('the complete 79 x 3 evidence is accepted without lowering the denominator', () => {
   assert.doesNotThrow(() => assertFullE2EEvidence(complete()));
+});
+test('the older 219-case suite cannot certify current receipt and registration flows', () => {
+  const old = complete(); old.stats.expected = 219;
+  for (const surface of old.suites[0].suites!) surface.specs!.splice(73);
+  assert.throws(() => assertFullE2EEvidence(old));
 });
 test('the former 66 x 3 suite does not certify original certificates, address history or simplified ticket routing', () => {
   const old = complete(); old.stats.expected = 198;

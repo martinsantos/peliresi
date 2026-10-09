@@ -2,10 +2,12 @@ import { Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import { randomUUID } from 'node:crypto';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest, canReadActorRecord } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
+import { describeDocument, readReceipt, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/var/www/sitrep-uploads';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -49,7 +51,7 @@ const storage = multer.diskStorage({
         cb(null, dir);
     },
     filename: (_req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e6);
+        const uniqueSuffix = randomUUID();
         const ext = path.extname(file.originalname);
         cb(null, uniqueSuffix + ext);
     }
@@ -89,18 +91,20 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
         if (official) {
             assertDocumentWrite(req, ownership);
             if (!Number.isInteger(Number(anio)) || Number(anio) < 1900 || Number(anio) > 2100) throw new AppError('Indicá el año del certificado', 400);
-            const signature = fs.readFileSync(file.path).subarray(0, 5).toString('ascii');
-            if (file.mimetype !== 'application/pdf' || signature !== '%PDF-') throw new AppError('El certificado oficial debe ser un PDF', 400);
+            if (file.mimetype !== 'application/pdf') throw new AppError('El certificado oficial debe ser un PDF', 400);
         }
+        const description = describeDocument(file);
+        const analysis = tipo === 'COMPROBANTE_PAGO' ? await readReceipt({ path: file.path, mimeType: description.mimeType }) : undefined;
         const documento = await prisma.$transaction(async transaction => {
+          if (analysis) analysis.duplicado = await receiptDuplicate(transaction, description.sha256);
           const saved = await transaction.documento.create({
             data: {
                 ...ownership,
                 tipo,
                 nombre: file.originalname,
                 path: file.path,
-                mimeType: file.mimetype,
-                size: file.size,
+                ...description,
+                ...(analysis ? { analisis: analysis } : {}),
                 anio: anio ? Number(anio) : undefined,
                 observaciones,
                 subidoPor: req.user!.id,
@@ -109,6 +113,8 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
           });
           await auditarActor({ accion: 'UPDATE', modulo: actorType.toUpperCase() as 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA',
             ...ownership, usuarioId: req.user!.id, datosDespues: { documentoId: saved.id, tipo, anio: saved.anio, nombre: saved.nombre, estado: saved.estado }, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
+          if (analysis) await retainReceiptDigest(transaction, description.sha256, saved.id, 'ACTOR');
+          if (analysis?.duplicado) await receiptNotice(transaction, actor.usuarioId, { actorTipo: actorType, actorId: id, documentoId: saved.id });
           return saved;
         });
 

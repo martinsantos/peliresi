@@ -10,7 +10,8 @@ import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearUserOfflineData } from '../services/offline-sync';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
-import { getAccessToken, clearTokens, restoreSessionCheckpoint, confirmSessionCheckpoint } from '../services/api';
+import { api, getAccessToken, clearTokens, restoreSessionCheckpoint, confirmSessionCheckpoint } from '../services/api';
+import { registrationDraftHint } from '../services/registrationSession';
 import { clearOfflineSession, isOfflineNetworkError, readOfflineSession, saveOfflineSession } from '../services/offlineSession';
 import { ImpersonationProvider } from './ImpersonationContext';
 import type { Usuario } from '../types/models';
@@ -164,6 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const validateSession = async () => {
       if (!sessionReady || sessionChanging.current) return;
       const token = getAccessToken();
+      const draftHint = token ? registrationDraftHint(token) : null;
       if (token && pendingToken === token) return;
       const generation = ++authGeneration.current;
       pendingToken = token;
@@ -172,6 +174,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!token) {
           clearOfflineSession();
           setCurrentUser(null);
+          return;
+        }
+        if (draftHint) {
+          const response = await api.get(`/solicitudes/${encodeURIComponent(draftHint)}`);
+          if (!isCurrent()) return;
+          if (response.data?.data?.solicitud?.id !== draftHint) throw new Error('Solicitud incompatible');
+          clearOfflineSession();
+          setCurrentUser(null); setOfflineExpiresAt(null);
+          setIsRestricted(true); setSolicitudId(draftHint); setAuthError(null);
           return;
         }
         const apiUser = await authService.getMe();
@@ -183,6 +194,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentUser(mapped);
       } catch (error) {
         if (!isCurrent()) return;
+        if (draftHint && isOfflineNetworkError(error)) {
+          // Preserve credentials for retry, granting no profile from a hint.
+          clearOfflineSession(); setCurrentUser(null); setOfflineExpiresAt(null);
+          setAuthError('No se pudo consultar tu solicitud. Revisá la conexión para continuar.');
+          return;
+        }
         const cached = token && isOfflineNetworkError(error) ? readOfflineSession(token) : null;
         if (cached) {
           setCurrentUser(cached.user);

@@ -1108,6 +1108,8 @@ model Documento {
   path          String
   mimeType      String
   size          Int
+  sha256        String?
+  analisis      Json?
   anio          Int?
   estado        String    @default("PENDIENTE")
   observaciones String?
@@ -1124,6 +1126,7 @@ model Documento {
   @@index([generadorId])
   @@index([operadorId])
   @@index([transportistaId])
+  @@index([sha256])
   @@map("documentos")
 }
 
@@ -1222,6 +1225,8 @@ model DocumentoSolicitud {
   path          String
   mimeType      String
   size          Int
+  sha256        String?
+  analisis      Json?
   estado        String    @default("PENDIENTE") // PENDIENTE | APROBADO | RECHAZADO
   observaciones String?
   revisadoPor   String?
@@ -1231,7 +1236,18 @@ model DocumentoSolicitud {
   solicitud SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
 
   @@index([solicitudId])
+  @@index([sha256])
   @@map("documentos_solicitud")
+}
+
+// Retain the first receipt digest even when its attachment is later replaced.
+// No actor/account details are exposed with duplicate warnings.
+model HuellaRecibo {
+  sha256 String @id
+  documentoId String
+  origen String
+  createdAt DateTime @default(now())
+  @@map("huellas_recibo")
 }
 
 model MensajeSolicitud {

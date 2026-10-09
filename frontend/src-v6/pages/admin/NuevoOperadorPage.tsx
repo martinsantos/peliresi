@@ -53,6 +53,7 @@ const DOCUMENTOS_REQUERIDOS = [
   { tipo: 'CERTIFICADO_TRATAMIENTO', nombre: 'Certificado de Tratamiento', obligatorio: true },
   { tipo: 'POLIZA_SEGURO', nombre: 'Poliza de Seguro Ambiental', obligatorio: false },
   { tipo: 'PLANOS_PLANTA', nombre: 'Planos de Planta', obligatorio: false },
+  { tipo: 'COMPROBANTE_PAGO', nombre: 'Recibo o comprobante de pago', obligatorio: false },
 ];
 
 const CATEGORIAS = ['Planta Fija', 'Operador In Situ'];
@@ -322,7 +323,8 @@ const NuevoOperadorPage: React.FC = () => {
         let uploaded = 0;
         for (const [tipo, file] of filesToUpload) {
           try {
-            await uploadDocMutation.mutateAsync({ operadorId, file, tipo });
+            const document = await uploadDocMutation.mutateAsync({ operadorId, file, tipo });
+            if (document.analisis?.duplicado) toast.warning('Comprobante repetido', 'La huella coincide con un recibo ya cargado. No acredita un pago nuevo.');
             uploaded++;
             setUploadedDocs(prev => ({ ...prev, [tipo]: file.name }));
             setAdjuntos(prev => {

@@ -75,6 +75,7 @@ const InscripcionWizardPage: React.FC = () => {
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, DocumentoSolicitud>>({});
   const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'error' | undefined>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
+  const uploadsInFlight = useRef(new Set<string>());
   const [requirements, setRequirements] = useState<DocDef[]>([]);
   const [requirementsStatus, setRequirementsStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const [requirementsMaxBytes, setRequirementsMaxBytes] = useState(10 * 1024 * 1024);
@@ -209,6 +210,7 @@ const InscripcionWizardPage: React.FC = () => {
 
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;
+    if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la carga del archivo. Los datos siguen en pantalla.'); return; }
     setAttempted(prev => new Set(prev).add(step));
     if (target > step && getStepErrors(step).length > 0) {
       setSaveError(getStepErrors(step).join('. '));
@@ -244,10 +246,11 @@ const InscripcionWizardPage: React.FC = () => {
 
   // File handling
   const handleAddFile = useCallback(async (tipo: string, file: File) => {
+    if (uploadsInFlight.current.has(tipo)) return;
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
-    if (file.size > requirementsMaxBytes) {
+    if (file.size === 0 || file.size > requirementsMaxBytes || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
-      setUploadErrors(previous => ({ ...previous, [tipo]: `El archivo supera el maximo de ${(requirementsMaxBytes / 1024 / 1024).toFixed(0)} MB.` }));
+      setUploadErrors(previous => ({ ...previous, [tipo]: `Elegí un PDF, JPG o PNG con contenido de hasta ${(requirementsMaxBytes / 1024 / 1024).toFixed(0)} MB.` }));
       return;
     }
     setAdjuntos(previous => ({ ...previous, [tipo]: file }));
@@ -259,6 +262,7 @@ const InscripcionWizardPage: React.FC = () => {
     }
 
     setUploadStates(previous => ({ ...previous, [tipo]: 'uploading' }));
+    uploadsInFlight.current.add(tipo);
     try {
       const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
       setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
@@ -267,10 +271,11 @@ const InscripcionWizardPage: React.FC = () => {
     } catch (error) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo guardar el archivo. Volve a seleccionarlo o reintenta al enviar.') }));
-    }
+    } finally { uploadsInFlight.current.delete(tipo); }
   }, [isReviewMode, requirementsMaxBytes, solicitudId]);
 
   const handleRemoveFile = useCallback(async (tipo: string) => {
+    if (uploadsInFlight.current.has(tipo)) return;
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     const uploaded = uploadedDocs[tipo];
     if (!uploaded || isReviewMode || !solicitudId) {
@@ -281,19 +286,22 @@ const InscripcionWizardPage: React.FC = () => {
     }
 
     setUploadStates(previous => ({ ...previous, [tipo]: 'deleting' }));
+    uploadsInFlight.current.add(tipo);
     try {
       await solicitudService.deleteDocumento(solicitudId, uploaded.id);
+      setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadedDocs(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
     } catch (error) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo eliminar el archivo guardado.') }));
-    }
+    } finally { uploadsInFlight.current.delete(tipo); }
   }, [isReviewMode, solicitudId, uploadedDocs]);
 
   // Submit
   const handleSubmit = async () => {
     if (saveInFlight.current || submitting) return;
+    if (uploadsInFlight.current.size) { setRegError('Esperá a que termine la carga de documentos antes de enviar.'); return; }
     if (isReviewMode) {
       setSubmitSuccess(true);
       return;
@@ -324,6 +332,7 @@ const InscripcionWizardPage: React.FC = () => {
       for (const [tipo, file] of Object.entries(adjuntos)) {
         const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
         setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
+        setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       }
 
       // Submit solicitud

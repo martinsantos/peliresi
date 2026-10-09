@@ -1,7 +1,7 @@
 /**
  * Step Cuenta — Phase 1 account creation form
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Factory, FlaskConical, Truck, Eye, EyeOff,
@@ -18,6 +18,7 @@ import {
 } from '../shared';
 import { FieldError } from '../FieldError';
 import { getApiErrorMessage } from '../../../../utils/api-error';
+import { setTokensDurably } from '../../../../services/api';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -44,6 +45,7 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
   const [regSubmitting, setRegSubmitting] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
   const [regAttempted, setRegAttempted] = useState(false);
+  const registrationInFlight = useRef(false);
 
   const regErrors = useCallback((): Record<string, string> => {
     const e: Record<string, string> = {};
@@ -62,10 +64,12 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
   }, [reg]);
 
   const handleRegistration = async () => {
+    if (registrationInFlight.current) return;
     setRegAttempted(true);
     const errors = regErrors();
     if (Object.keys(errors).length > 0) return;
 
+    registrationInFlight.current = true;
     setRegSubmitting(true);
     setRegError(null);
     try {
@@ -82,14 +86,14 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
       if (!solId || !data.tokens?.accessToken || !data.tokens?.refreshToken) {
         throw new Error('La solicitud se creó, pero no se recibió una sesión para completar el formulario. Iniciá sesión para recuperarla.');
       }
-      localStorage.setItem('sitrep_access_token', data.tokens.accessToken);
-      localStorage.setItem('sitrep_refresh_token', data.tokens.refreshToken);
+      await setTokensDurably(data.tokens.accessToken, data.tokens.refreshToken);
       localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solId, tipoActor }));
 
       onPhase2(solId);
     } catch (err: unknown) {
       setRegError(getApiErrorMessage(err, 'Error al crear la cuenta'));
     } finally {
+      registrationInFlight.current = false;
       setRegSubmitting(false);
     }
   };
@@ -117,12 +121,13 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
         </div>
 
         {/* Registration Form */}
-        <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 space-y-4">
+        <form onSubmit={event => { event.preventDefault(); void handleRegistration(); }} className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 space-y-4">
           <h3 className="text-base font-semibold text-neutral-800">Crear cuenta</h3>
 
           <div>
-            <label className={labelCls}>Nombre completo *</label>
+            <label htmlFor="registration-name" className={labelCls}>Nombre completo *</label>
             <input
+              id="registration-name" autoComplete="name"
               type="text" value={reg.nombre}
               onChange={e => onRegChange('nombre', e.target.value)}
               placeholder="Juan Perez"
@@ -132,8 +137,9 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
           </div>
 
           <div>
-            <label className={labelCls}>Email *</label>
+            <label htmlFor="registration-email" className={labelCls}>Email *</label>
             <input
+              id="registration-email" autoComplete="email" inputMode="email"
               type="email" value={reg.email}
               onChange={e => onRegChange('email', e.target.value)}
               placeholder="correo@empresa.com"
@@ -143,8 +149,9 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
           </div>
 
           <div>
-            <label className={labelCls}>CUIT *</label>
+            <label htmlFor="registration-cuit" className={labelCls}>CUIT *</label>
             <input
+              id="registration-cuit" inputMode="numeric"
               type="text" value={reg.cuit}
               onChange={e => onRegChange('cuit', e.target.value)}
               placeholder="30-12345678-9"
@@ -154,9 +161,10 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
           </div>
 
           <div>
-            <label className={labelCls}>Password *</label>
+            <label htmlFor="registration-password" className={labelCls}>Password *</label>
             <div className="relative">
               <input
+                id="registration-password" autoComplete="new-password"
                 type={showPassword ? 'text' : 'password'}
                 value={reg.password}
                 onChange={e => onRegChange('password', e.target.value)}
@@ -175,8 +183,9 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
           </div>
 
           <div>
-            <label className={labelCls}>Confirmar password *</label>
+            <label htmlFor="registration-confirm" className={labelCls}>Confirmar password *</label>
             <input
+              id="registration-confirm" autoComplete="new-password"
               type="password"
               value={reg.confirmPassword}
               onChange={e => onRegChange('confirmPassword', e.target.value)}
@@ -195,7 +204,7 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
           <Button
             variant="primary" fullWidth
             isLoading={regSubmitting}
-            onClick={handleRegistration}
+            type="submit"
             rightIcon={<ArrowRight size={16} />}
           >
             Crear cuenta y continuar
@@ -203,11 +212,11 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
 
           <p className="text-xs text-neutral-400 text-center mt-2">
             Ya tenes cuenta?{' '}
-            <button onClick={() => navigate('/login')} className="text-primary-700 font-medium hover:text-primary-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2">
+            <button type="button" onClick={() => navigate('/login')} className="text-primary-700 font-medium hover:text-primary-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2">
               Inicia sesion
             </button>
           </p>
-        </div>
+        </form>
       </div>
     </div>
   );

@@ -9,15 +9,18 @@ export type FullE2EEvidence = {
   suites: Suite[];
 };
 
-// 73 journeys: previous 66 + three actor certificate and three address/history
-// flows + brief reporting and direct self-assignment/routing.
+// 79 journeys: previous 73 plus actual public registrations for all three
+// actors, private duplicate feedback, real Spanish OCR and transport recovery.
 // Keep exact denominators: adding a journey requires an explicit contract update.
-export const FULL_E2E_JOURNEYS_PER_SURFACE = 73;
+export const FULL_E2E_JOURNEYS_PER_SURFACE = 79;
 const surfaces = ['app', 'web-desktop', 'web-responsive'];
 
 /** A green aggregate alone must not authorize an incomplete or retried release. */
-export function assertFullE2EEvidence(evidence: FullE2EEvidence): void {
-  assert.equal(evidence.stats.expected, FULL_E2E_JOURNEYS_PER_SURFACE * surfaces.length);
+export function assertFullE2EEvidence(evidence: FullE2EEvidence, scope: 'current' | 'pinned-run138' = 'current'): void {
+  // Historical evidence keeps 73 journeys; only the pinned reuse guard may
+  // accept it. A current release always requires the complete 79 journeys.
+  const journeys = scope === 'pinned-run138' ? 73 : FULL_E2E_JOURNEYS_PER_SURFACE;
+  assert.equal(evidence.stats.expected, journeys * surfaces.length);
   assert.equal(evidence.stats.unexpected + evidence.stats.flaky + evidence.stats.skipped, 0);
   assert.deepEqual(evidence.errors, []);
   const cases: Case[] = [];
@@ -31,7 +34,7 @@ export function assertFullE2EEvidence(evidence: FullE2EEvidence): void {
   assert.equal(cases.length, evidence.stats.expected, 'Require actual cases, not only summary counters');
   assert.deepEqual([...new Set(cases.map(test => test.projectName))].sort(), surfaces);
   for (const surface of surfaces) {
-    assert.equal(cases.filter(test => test.projectName === surface).length, FULL_E2E_JOURNEYS_PER_SURFACE, surface);
+    assert.equal(cases.filter(test => test.projectName === surface).length, journeys, surface);
   }
   for (const test of cases) {
     assert.equal(test.expectedStatus, 'passed', 'No expected failure or skipped business journey');

@@ -271,7 +271,7 @@ function App() {
         </Route>
 
         {/* Admin Solicitudes - ADMIN + sub-admins */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
             <Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} />

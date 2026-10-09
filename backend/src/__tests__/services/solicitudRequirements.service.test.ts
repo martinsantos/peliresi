@@ -11,10 +11,17 @@ describe('solicitudRequirements', () => {
       'CONSTANCIA_AFIP',
       'MEMORIA_TECNICA',
       'CERTIFICADO_HABILITACION',
+      'COMPROBANTE_PAGO',
     ]);
     first[0].nombre = 'mutated';
     expect(getSolicitudRequirements('GENERADOR')[0].nombre).toBe('Constancia AFIP');
     expect(SOLICITUD_DOCUMENT_MAX_BYTES).toBe(10 * 1024 * 1024);
+  });
+
+  it('never makes a receipt a new legal requirement', () => {
+    for (const actor of ['GENERADOR', 'OPERADOR', 'TRANSPORTISTA']) {
+      expect(getSolicitudRequirements(actor).find(doc => doc.tipo === 'COMPROBANTE_PAGO')?.required).toBe(false);
+    }
   });
 
   it('returns only required documents that are still missing', () => {

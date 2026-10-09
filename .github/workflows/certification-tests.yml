@@ -214,7 +214,7 @@ jobs:
       - name: Install PDF and browser test tools on the cloud VM
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends poppler-utils postgresql-16
+          sudo apt-get install -y --no-install-recommends poppler-utils postgresql-16 tesseract-ocr tesseract-ocr-spa
           if test "$QA_MULTIUSER" = 'true'; then sudo apt-get install -y --no-install-recommends nginx; fi
           cd frontend
           npx --no-install playwright install --with-deps chromium

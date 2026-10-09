@@ -5,6 +5,7 @@ import { StepCuenta } from '../../pages/public/inscripcion/steps/StepCuenta';
 
 const requests = vi.hoisted(() => ({ post: vi.fn() }));
 vi.mock('axios', () => ({ default: requests }));
+vi.mock('../../services/api', () => ({ setTokensDurably: vi.fn() }));
 
 describe('Public account forms have a readable, working return to login', () => {
   it.each(['GENERADOR', 'OPERADOR', 'TRANSPORTISTA'] as const)('%s shares the accessible login action without creating an account', tipoActor => {

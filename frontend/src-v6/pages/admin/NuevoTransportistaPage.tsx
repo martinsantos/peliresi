@@ -17,6 +17,8 @@ import { MobileFormSteps } from '../../components/MobileFormSteps';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { initialPasswordError, vehicleCapacityError } from '../../utils/actorCreationValidation';
 import { toast } from '../../components/ui/Toast';
+import DocumentUpload from '../../components/DocumentUpload';
+import { generadorFiscalService, transportistaDocumentoService, type Documento } from '../../services/generador-fiscal.service';
 import {
   useTransportista,
   useCreateTransportista,
@@ -76,6 +78,11 @@ const NuevoTransportistaPage: React.FC = () => {
   });
   const [vehiculos, setVehiculos] = useState<VehiculoForm[]>([]);
   const [choferes, setChoferes] = useState<ChoferForm[]>([]);
+  const [pendingDocuments, setPendingDocuments] = useState<Record<string, { file: File; anio?: number }>>({});
+  const [savedDocuments, setSavedDocuments] = useState<Documento[]>([]);
+  const [savedActorId, setSavedActorId] = useState<string | null>(null);
+  const [savingDocuments, setSavingDocuments] = useState(false);
+  const [documentError, setDocumentError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isEdit || !existing) return;
@@ -200,23 +207,43 @@ const NuevoTransportistaPage: React.FC = () => {
     }
 
     submitInFlight.current = true;
+    setSavingDocuments(true);
+    setDocumentError(null);
     try {
-      if (isEdit && id) {
+      let actorId = savedActorId || id;
+      if (!savedActorId && isEdit && id) {
         await updateMutation.mutateAsync({ id, data: payload });
         toast.success('Actualizado', `Transportista ${form.razonSocial} actualizado`);
-      } else {
-        await createMutation.mutateAsync(payload);
+      } else if (!savedActorId) {
+        const created = await createMutation.mutateAsync(payload);
+        actorId = created.id;
         toast.success('Creado', `Transportista ${form.razonSocial} creado`);
+      }
+      if (!actorId) throw new Error('El servidor no devolvió el identificador del transportista.');
+      setSavedActorId(actorId);
+      const failed: string[] = [];
+      for (const [tipo, selection] of Object.entries(pendingDocuments)) {
+        try {
+          const saved = await transportistaDocumentoService.upload(actorId, selection.file, tipo, selection.anio);
+          setSavedDocuments(previous => [...previous, saved]);
+          setPendingDocuments(previous => { const next = { ...previous }; delete next[tipo]; return next; });
+          if (saved.analisis?.duplicado) toast.warning('Comprobante repetido', 'La huella coincide con un recibo ya cargado. No acredita un pago nuevo.');
+        } catch { failed.push(selection.file.name); }
+      }
+      if (failed.length) {
+        setDocumentError(`Transportista guardado. Quedan adjuntos pendientes: ${failed.join(', ')}. Reintentá sin repetir el alta.`);
+        return;
       }
       navigate(mp('/admin/actores/transportistas'));
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
     } finally {
       submitInFlight.current = false;
+      setSavingDocuments(false);
     }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isPending = savingDocuments || createMutation.isPending || updateMutation.isPending;
   const backPath = mp('/admin/actores/transportistas');
 
   return (
@@ -407,6 +434,16 @@ const NuevoTransportistaPage: React.FC = () => {
         {step === 5 && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Check size={20} className="text-orange-600" /> Confirmar datos</h3>
+            <section aria-label="Documentación del transportista" className="space-y-3 border-b border-neutral-200 pb-5">
+              <h4 className="font-semibold text-neutral-900">Documentación · opcional al registrar</h4>
+              <DocumentUpload documentos={savedDocuments} isAdmin={false} isPending={isPending} initialTipo="OTRO"
+                onUpload={(file, tipo, anio) => setPendingDocuments(previous => ({ ...previous, [tipo]: { file, anio } }))}
+                onDownload={doc => void generadorFiscalService.downloadDocumento(doc.id, doc.nombre)} />
+              {Object.entries(pendingDocuments).map(([tipo, selection]) => <div key={tipo} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-300 bg-neutral-50 px-3 py-2">
+                <p className="min-w-0 break-words text-sm text-neutral-800">{selection.file.name} · Pendiente de guardar</p>
+                <Button variant="ghost" disabled={isPending} aria-label={`Quitar ${selection.file.name}`} onClick={() => setPendingDocuments(previous => { const next = { ...previous }; delete next[tipo]; return next; })}>Quitar</Button>
+              </div>)}
+            </section>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 ['Razon Social', form.razonSocial], ['CUIT', form.cuit], ['Email', form.email],
@@ -446,6 +483,7 @@ const NuevoTransportistaPage: React.FC = () => {
       </Card>
 
       {/* Navigation */}
+      {documentError && <p role="alert" aria-label="Adjuntos pendientes" className="rounded-xl border border-error-300 bg-error-50 p-4 text-sm text-error-900">{documentError}</p>}
       <div className="flex items-center justify-between">
         <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => step > 1 ? setStep(step - 1) : navigate(backPath)} disabled={isPending}>
           {step === 1 ? 'Cancelar' : 'Anterior'}
@@ -456,7 +494,7 @@ const NuevoTransportistaPage: React.FC = () => {
           </Button>
         ) : (
           <Button onClick={handleSubmit} isLoading={isPending}>
-            {isEdit ? 'Guardar Cambios' : 'Crear Transportista'}
+            {savedActorId ? 'Reintentar adjuntos' : isEdit ? 'Guardar Cambios' : 'Crear Transportista'}
           </Button>
         )}
       </div>

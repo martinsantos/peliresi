@@ -25,6 +25,9 @@ import {
   useRevisarDocumento,
 } from '../../hooks/useSolicitudes';
 import type { EstadoSolicitud, DocumentoSolicitud, MensajeSolicitud } from '../../types/api';
+import { solicitudService } from '../../services/solicitud.service';
+import { DocumentAnalysis } from '../../components/DocumentAnalysis';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ── Status config ──
 
@@ -79,6 +82,7 @@ function fieldLabel(key: string): string {
 const SolicitudDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [messageText, setMessageText] = useState('');
@@ -104,11 +108,11 @@ const SolicitudDetallePage: React.FC = () => {
 
   // Auto-mark as EN_REVISION when admin opens an ENVIADA solicitud
   useEffect(() => {
-    if (solicitud?.estado === 'ENVIADA' && id) {
+    if (solicitud?.estado === 'ENVIADA' && id && currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)) {
       revisarSolicitud.mutate(id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [solicitud?.estado, id]);
+  }, [solicitud?.estado, solicitud?.tipoActor, currentUser?.rol, id]);
 
   // ── Handlers ──
 
@@ -180,7 +184,8 @@ const SolicitudDetallePage: React.FC = () => {
   const eCfg = ESTADO_CONFIG[solicitud.estado] || ESTADO_CONFIG.ENVIADA;
   const datosActor = parseDatosActor(solicitud.datosActor || '{}');
   const documentos = solicitud.documentos || [];
-  const canAct = solicitud.estado === 'EN_REVISION' || solicitud.estado === 'OBSERVADA';
+  const canAct = !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)
+    && (solicitud.estado === 'EN_REVISION' || solicitud.estado === 'OBSERVADA');
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -293,17 +298,18 @@ const SolicitudDetallePage: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
+                    <DocumentAnalysis analysis={doc.analisis} />
 
                     <div className="flex items-center gap-1.5">
-                      <a
-                        href={doc.path}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500"
+                      <button
+                        type="button"
+                        aria-label={`Descargar ${doc.nombre}`}
+                        onClick={() => { if (id) void solicitudService.downloadDocumento(id, doc).catch(() => toast.error('Error', 'No se pudo descargar el documento')); }}
+                        className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-700 focus-visible:ring-2 focus-visible:ring-primary-700"
                         title="Descargar"
                       >
                         <Download size={13} />
-                      </a>
+                      </button>
                       {doc.estado === 'PENDIENTE' && canAct && (
                         <>
                           <button

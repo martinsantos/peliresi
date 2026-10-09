@@ -35,7 +35,7 @@ export function assertBrowserReuse(input: { baseline: Frozen; current: Frozen; c
   assert.deepEqual(sort(input.current.backendFiles), sort(input.baseline.backendFiles), 'Require byte-identical compiled backend, schema and generated runtime');
   for (const file of ['dist/index.js', 'dist/lib/prismaConnection.js', 'dist/controllers/monitor.controller.js', 'prisma/schema.prisma'])
     assert.ok(input.current.backendFiles.some(row => row.file === file));
-  assertFullE2EEvidence(input.report);
+  assertFullE2EEvidence(input.report, 'pinned-run138');
 }
 async function main() {
   assertCloudEnvironment(); assert.equal(process.env.QA_MULTIUSER, 'true'); assert.equal(process.env.QA_BROWSER_REUSE, 'true');

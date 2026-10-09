@@ -81,7 +81,7 @@ vi.mock('../../components/OnboardingWizard', () => ({
 // Import AFTER mocks are declared
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/auth.service';
-import { clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
+import { api, clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
 import { clearSyncQueue } from '../../services/indexeddb';
 import { OFFLINE_SESSION_KEY, MAX_OFFLINE_SESSION_MS } from '../../services/offlineSession';
 import type { Usuario } from '../../types/models';
@@ -112,6 +112,8 @@ function AuthConsumer() {
       <span data-testid="isAnyAdmin">{String(auth.isAnyAdmin)}</span>
       <span data-testid="isLoading">{String(auth.isLoading)}</span>
       <span data-testid="authError">{auth.authError ?? 'none'}</span>
+      <span data-testid="restricted">{String(auth.isRestricted)}</span>
+      <span data-testid="draft">{auth.solicitudId ?? 'none'}</span>
       <button data-testid="login-btn" onClick={() => auth.login('admin@test.com', 'pass123')}>Login</button>
       <button data-testid="logout-btn" onClick={() => auth.logout()}>Logout</button>
       <button data-testid="switch-btn" onClick={() => auth.switchUser(-1)}>Switch</button>
@@ -136,6 +138,20 @@ function renderWithProviders() {
 // ========================================
 
 describe('AuthContext', () => {
+  it('restores a draft-only registration via its protected draft, without asking for a forbidden full profile', async () => {
+    const token = `header.${btoa(JSON.stringify({ id: 'candidate', restricted: true, registrationDraft: 'draft-only' }))}.signature`;
+    vi.mocked(getAccessToken).mockReturnValue(token);
+    vi.mocked(api.get).mockResolvedValue({ data: { data: { solicitud: { id: 'draft-only' } } } });
+    vi.mocked(authService.getMe).mockRejectedValue({ response: { status: 403 } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(api.get).toHaveBeenCalledWith('/solicitudes/draft-only');
+    expect(authService.getMe).not.toHaveBeenCalled(); expect(clearTokens).not.toHaveBeenCalled();
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('true');
+    expect(screen.getByTestId('draft')).toHaveTextContent('draft-only');
+  });
+
   const inspector = { id: 'inspector-1', email: 'inspector@test.invalid', nombre: 'Inspectora', apellido: 'Uno', rol: 'AUDITOR', activo: true, esInspector: true } as Usuario;
   const networkError = { isAxiosError: true, code: 'ERR_NETWORK' };
   const tokenFor = (id = inspector.id, expiresAt = Date.now() + 24 * 60 * 60 * 1000) =>

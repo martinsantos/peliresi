@@ -50,6 +50,7 @@ const DOCUMENTOS_REQUERIDOS = [
   { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP', obligatorio: true, categoria: 'Doc. Fiscal' },
   { tipo: 'CONTRATO_ALQUILER', nombre: 'Contrato de Alquiler (si corresponde)', obligatorio: false, categoria: 'Doc. Legal' },
   { tipo: 'CERTIFICADO_ISO', nombre: 'Certificacion ISO 14000 o similar', obligatorio: false, categoria: 'Doc. Tecnica' },
+  { tipo: 'COMPROBANTE_PAGO', nombre: 'Recibo o comprobante de pago', obligatorio: false, categoria: 'Doc. Fiscal' },
 ];
 
 const CATEGORIAS = ['Grandes Generadores', 'Medianos Generadores', 'Pequenos Generadores'];
@@ -302,7 +303,8 @@ const NuevoGeneradorPage: React.FC = () => {
         let uploaded = 0;
         for (const [tipo, file] of filesToUpload) {
           try {
-            await uploadDocMutation.mutateAsync({ generadorId, file, tipo });
+            const document = await uploadDocMutation.mutateAsync({ generadorId, file, tipo });
+            if (document.analisis?.duplicado) toast.warning('Comprobante repetido', 'La huella coincide con un recibo ya cargado. No acredita un pago nuevo.');
             uploaded++;
             setUploadedDocs(prev => ({ ...prev, [tipo]: file.name }));
             setAdjuntos(prev => {

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Upload, FileText, Download, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
 import { Badge } from './ui/BadgeV2';
 import type { Documento } from '../services/generador-fiscal.service';
+import { DocumentAnalysis } from './DocumentAnalysis';
 
 const TIPO_LABELS: Record<string, string> = {
   CERTIFICADO_AMBIENTAL: 'Certificado Ambiental',
@@ -27,6 +28,7 @@ interface DocumentUploadProps {
   isAdmin: boolean;
   isPending?: boolean;
   readOnly?: boolean;
+  initialTipo?: string;
 }
 
 function formatSize(bytes: number): string {
@@ -36,25 +38,27 @@ function formatSize(bytes: number): string {
 }
 
 const DocumentUpload: React.FC<DocumentUploadProps> = ({
-  documentos, onUpload, onDownload, onRevisar, onDelete, isAdmin, isPending, readOnly = false
+  documentos, onUpload, onDownload, onRevisar, onDelete, isAdmin, isPending, readOnly = false, initialTipo = 'CERTIFICADO_AMBIENTAL'
 }) => {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [tipo, setTipo] = useState('CERTIFICADO_AMBIENTAL');
+  const [tipo, setTipo] = useState(initialTipo);
   const [anio, setAnio] = useState<number>(new Date().getFullYear());
   const [dragOver, setDragOver] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const handleFiles = (files: FileList | null) => {
-    if (readOnly || !files?.length) return;
+    if (readOnly || isPending || !files?.length) return;
     const file = files[0];
     const allowed = ['application/pdf', 'image/jpeg', 'image/png'];
     if (!allowed.includes(file.type)) {
-      alert('Solo se permiten archivos PDF, JPG o PNG');
+      setFileError('Elegí un PDF, JPG o PNG.');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      alert('El archivo no puede superar 10 MB');
+    if (!file.size || file.size > 10 * 1024 * 1024) {
+      setFileError('El archivo debe tener contenido y no superar 10 MB.');
       return;
     }
+    setFileError(null);
     onUpload(file, tipo, anio);
   };
 
@@ -97,7 +101,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-        onClick={() => fileRef.current?.click()}
+        role="button" tabIndex={isPending ? -1 : 0} aria-label="Adjuntar documento" aria-disabled={!!isPending}
+        onKeyDown={event => { if (!isPending && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); fileRef.current?.click(); } }}
+        onClick={() => { if (!isPending) fileRef.current?.click(); }}
       >
         <Upload size={24} className="text-neutral-400 mx-auto mb-2" />
         <p className="text-sm text-neutral-600">
@@ -109,9 +115,11 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
           className="hidden"
-          onChange={e => handleFiles(e.target.files)}
+          disabled={!!isPending}
+          onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}
         />
       </div>
+      {fileError && <p role="alert" className="text-sm text-error-700">{fileError}</p>}
 
       </>}
       {/* Documents list */}
@@ -123,7 +131,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
               const est = ESTADO_CONFIG[doc.estado as keyof typeof ESTADO_CONFIG] || ESTADO_CONFIG.PENDIENTE;
               const EstIcon = est.icon;
               return (
-                <div key={doc.id} className="grid grid-cols-[18px_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-3 bg-white hover:bg-neutral-50 transition-colors sm:flex sm:items-center sm:gap-3">
+                <div key={doc.id} className="grid grid-cols-[18px_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-3 bg-white hover:bg-neutral-50 transition-colors sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                   <FileText size={18} className="text-neutral-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-neutral-900 truncate">{doc.nombre}</p>
@@ -183,6 +191,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                     )}
                   </div>
                   </div>
+                  {doc.analisis && <div className="col-span-2 w-full sm:basis-full"><DocumentAnalysis analysis={doc.analisis} /></div>}
                 </div>
               );
             })}

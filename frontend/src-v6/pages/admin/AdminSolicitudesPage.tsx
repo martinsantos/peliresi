@@ -117,6 +117,7 @@ const AdminSolicitudesPage: React.FC = () => {
             { value: '', label: 'Todos los tipos' },
             { value: 'GENERADOR', label: 'Generadores' },
             { value: 'OPERADOR', label: 'Operadores' },
+            { value: 'TRANSPORTISTA', label: 'Transportistas' },
           ]}
           size="sm"
           isFullWidth={false}

@@ -56,6 +56,14 @@ export const solicitudService = {
   async deleteDocumento(solicitudId: string, docId: string): Promise<void> {
     await api.delete(`/solicitudes/${solicitudId}/documentos/${docId}`);
   },
+  async downloadDocumento(solicitudId: string, item: DocumentoSolicitud): Promise<void> {
+    const { data } = await api.get(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(item.id)}/download`, { responseType: 'blob' });
+    const url = URL.createObjectURL(data);
+    const link = document.createElement('a');
+    link.href = url; link.download = item.nombre;
+    try { document.body.appendChild(link); link.click(); }
+    finally { link.remove(); URL.revokeObjectURL(url); }
+  },
 
   async getMensajes(id: string): Promise<MensajeSolicitud[]> {
     const { data } = await api.get(`/solicitudes/${id}/mensajes`);
@@ -86,7 +94,7 @@ export const solicitudService = {
   },
 
   async observar(id: string, mensaje: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/observar`, { mensaje });
+    const { data } = await api.post(`/solicitudes/${id}/observar`, { observaciones: mensaje });
     return data.data.solicitud;
   },
 
