@@ -102,6 +102,12 @@ for (const actor of actors) test(`${actor.type}: administrative draft recovers w
   if (actor.type !== 'transportista') {
     await page.getByRole('button', { name: /^(?:\d+\. )?Domicilios$/ }).click();
     await expect(page.getByLabel('Coordenadas Geograficas', { exact: true })).toBeVisible();
+    const coordinates = page.getByLabel('Coordenadas Geograficas', { exact: true }), original = await coordinates.inputValue();
+    await coordinates.fill('not-a-number, -68');
+    await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+    await expect(coordinates).toHaveAttribute('aria-invalid', 'true');
+    await expect(coordinates).toHaveValue('not-a-number, -68');
+    await coordinates.fill(original);
     await layout(page); await page.screenshot({ path: info.outputPath(`${actor.type}-verified-location.png`), animations: 'disabled' });
   }
   expect(creations).toEqual([]); expect(errors).toEqual([]);

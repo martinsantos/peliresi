@@ -15,7 +15,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { MobileFormSteps } from '../../components/MobileFormSteps';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { initialPasswordError, vehicleCapacityError } from '../../utils/actorCreationValidation';
+import { initialPasswordError, vehicleCapacityError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
 import { toast } from '../../components/ui/Toast';
 import DocumentUpload from '../../components/DocumentUpload';
 import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
@@ -151,6 +151,7 @@ const NuevoTransportistaPage: React.FC = () => {
       if (!form.cuit.trim()) errors.push('CUIT es obligatorio');
       if (!form.email.trim()) errors.push('Email es obligatorio');
       if (!isEdit && passwordError) errors.push(passwordError);
+      if (parseActorCoordinates(form.coordenadas) === null) errors.push(COORDINATE_ERROR);
     }
     if (s === 3 && !isEdit) vehiculos.forEach((vehicle, i) => {
       if (!vehicle.patente.trim()) errors.push(`Vehículo ${i + 1}: la patente es obligatoria`);
@@ -178,13 +179,6 @@ const NuevoTransportistaPage: React.FC = () => {
     if (next <= step || validateStep(step)) setStep(next);
   };
 
-  const parseCoords = (coords: string) => {
-    const parts = coords?.split(',').map(s => s.trim()).filter(Boolean);
-    const lat = parts?.[0] ? Number(parts[0]) : undefined;
-    const lng = parts?.[1] ? Number(parts[1]) : undefined;
-    return lat && lng && !isNaN(lat) && !isNaN(lng) ? { latitud: lat, longitud: lng } : {};
-  };
-
   const handleSubmit = async () => {
     if (submitInFlight.current) return;
     if (!savedActorId && ![1, 3, 4].every(validateStep)) return;
@@ -195,7 +189,7 @@ const NuevoTransportistaPage: React.FC = () => {
       telefono: form.telefono, email: form.email,
       numeroHabilitacion: form.numeroHabilitacion,
       vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
-      ...parseCoords(form.coordenadas),
+      ...(parseActorCoordinates(form.coordenadas) || {}),
       corrientesAutorizadas: form.corrientesAutorizadas || undefined,
       expedienteDPA: form.expedienteDPA || undefined,
       resolucionDPA: form.resolucionDPA || undefined,
@@ -343,7 +337,7 @@ const NuevoTransportistaPage: React.FC = () => {
               <Input label="Domicilio" value={form.domicilio} onChange={e => up('domicilio', e.target.value)} placeholder="Av. Libertador 1234" />
               <Input label="Localidad" value={form.localidad} onChange={e => up('localidad', e.target.value)} placeholder="Godoy Cruz, Mendoza" />
             </div>
-            <Input label="Coordenadas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="-32.89, -68.83" />
+            <Input label="Coordenadas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="-32.89, -68.83" errorMessage={attempted.has(1) && parseActorCoordinates(form.coordenadas) === null ? COORDINATE_ERROR : undefined} />
             {!isEdit && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Nombre Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />

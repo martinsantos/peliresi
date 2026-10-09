@@ -1,5 +1,6 @@
 import { AppError } from '../middlewares/errorHandler';
 import { operatorModalitiesForType } from './operatorModalities';
+import { actorCoordinates } from './actorNumbers';
 
 const addresses = ['domicilioLegalCalle', 'domicilioLegalLocalidad', 'domicilioLegalDepto', 'domicilioRealCalle', 'domicilioRealLocalidad', 'domicilioRealDepto'] as const;
 const generatorFields = [...addresses, 'actividad', 'rubro', 'corrientesControl', 'expedienteInscripcion', 'resolucionInscripcion', 'categoriaIndividual'] as const;
@@ -46,16 +47,9 @@ export function registrationActorFields(type: string, data: Record<string, unkno
   const fields = type === 'GENERADOR' ? generatorFields : type === 'OPERADOR' ? operatorFields : transportFields;
   const strings: Record<string, string> = {};
   for (const field of fields) { const value = text(data[field]); if (value !== undefined) strings[field] = value; }
-  const coordinates: { latitud?: number; longitud?: number } = {};
   const pair = text(data.coordenadas)?.split(',').map(value => value.trim());
-  for (const [field, value, limit] of [
-    ['latitud', data.latitud ?? pair?.[0], 90], ['longitud', data.longitud ?? pair?.[1], 180],
-  ] as const) {
-    if (value == null || value === '') continue;
-    const number = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
-    if (!Number.isFinite(number) || Math.abs(number) > limit) throw new AppError(`${field}: coordenada inválida`, 400);
-    coordinates[field] = number;
-  }
+  if (pair && (pair.length !== 2 || pair.some(value => !value))) throw new AppError('Coordenadas: indicá latitud y longitud completas', 400);
+  const coordinates = actorCoordinates(pair?.[0] ?? data.latitud, pair?.[1] ?? data.longitud);
   const tefInputs = type === 'TRANSPORTISTA' ? undefined : registrationActivity(data);
   const certificacionISO = type === 'GENERADOR' ? date(data.certificacionISO, 'Certificación ISO') : undefined;
   const vencimientoHabilitacion = type !== 'GENERADOR' ? date(data.vencimientoHabilitacion, 'Vencimiento de habilitación') : undefined;

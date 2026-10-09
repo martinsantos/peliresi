@@ -57,6 +57,10 @@ describe('approved registration preserves declarations, not invented fiscal auth
     expect(mock.create.mock.calls[0][0].data).toMatchObject({ latitud: 0, longitud: -68.84, localidad: 'Capital' });
     expect(mock.create.mock.calls[0][0].data).not.toHaveProperty('tefInputs');
   });
+  it.each([', -68', '-32, ', '0, -68, 1', 'bad, -68'])('refuses incomplete or malformed declared coordinates %j', async coordenadas => {
+    mock.find.mockResolvedValue({ ...draft('TRANSPORTISTA'), datosActor: JSON.stringify({ ...declared, coordenadas }) });
+    expect((await approve()).error).toMatchObject({ statusCode: 400 }); expect(mock.create).not.toHaveBeenCalled();
+  });
   it('rechecks the state inside the transaction before creating an actor', async () => {
     mock.find.mockResolvedValueOnce(draft()).mockResolvedValue({ ...draft(), estado: 'RECHAZADA' });
     expect((await approve()).error).toMatchObject({ statusCode: 409 });

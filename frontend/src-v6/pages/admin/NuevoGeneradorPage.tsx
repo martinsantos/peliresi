@@ -20,7 +20,7 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { MobileFormSteps } from '../../components/MobileFormSteps';
-import { initialPasswordError } from '../../utils/actorCreationValidation';
+import { initialPasswordError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
@@ -198,6 +198,7 @@ const NuevoGeneradorPage: React.FC = () => {
       if (!form.cuit.trim()) errs.push('CUIT es obligatorio');
       if (!form.email.trim()) errs.push('Email es obligatorio');
     }
+    if (s === 2 && parseActorCoordinates(form.coordenadas) === null) errs.push(COORDINATE_ERROR);
     if (s === 5 && !isEdit) {
       const error = initialPasswordError(form.password, form.cuit);
       if (error) errs.push(error);
@@ -258,9 +259,7 @@ const NuevoGeneradorPage: React.FC = () => {
     }
 
     // Parse coordenadas "lat, long" back to separate fields for backend
-    const coordParts = form.coordenadas?.split(',').map(s => s.trim()).filter(Boolean);
-    const latitud = coordParts?.[0] ? Number(coordParts[0]) : undefined;
-    const longitud = coordParts?.[1] ? Number(coordParts[1]) : undefined;
+    const coordinates = parseActorCoordinates(form.coordenadas) || {};
 
     const regulatory: Record<string, any> = {
       expedienteInscripcion: form.expedienteInscripcion || undefined,
@@ -296,7 +295,7 @@ const NuevoGeneradorPage: React.FC = () => {
             actividad: form.actividad, rubro: form.rubro,
             corrientesControl: corrientesCodes.join(', '),
             ...regulatory,
-            ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
+            ...coordinates,
             ...(tefInputs && { tefInputs }),
           } as Partial<CreateGeneradorRequest>,
         });
@@ -312,7 +311,7 @@ const NuevoGeneradorPage: React.FC = () => {
           categoria: form.categoria, actividad: form.actividad,
           rubro: form.rubro, corrientesControl: corrientesCodes.join(', '),
           ...regulatory,
-          ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
+          ...coordinates,
           ...(tefInputs && { tefInputs }),
         } as CreateGeneradorRequest);
         // result is data.data from service — could be Generador or { generador: { id, ... } }
@@ -529,7 +528,7 @@ const NuevoGeneradorPage: React.FC = () => {
                     />
                   </div>
                 </>}
-                <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="lat -32.89, long -68.83" />
+                <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="-32.89, -68.83" errorMessage={attempted.has(2) && parseActorCoordinates(form.coordenadas) === null ? COORDINATE_ERROR : undefined} />
               </CardContent>
             </Card>
           </div>

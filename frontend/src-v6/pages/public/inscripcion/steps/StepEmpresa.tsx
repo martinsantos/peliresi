@@ -10,6 +10,7 @@ import {
 import { SectionTitle } from '../SectionTitle';
 import { FieldError } from '../FieldError';
 import { Select } from '../../../../components/ui/Select';
+import { parseActorCoordinates, COORDINATE_ERROR } from '../../../../utils/actorCreationValidation';
 import {
   DEPARTAMENTOS_MENDOZA,
   CATEGORIAS_GENERADOR,
@@ -352,7 +353,10 @@ function renderTransportistaStep(
           <div>
             <label htmlFor="registration-coordenadas" className={labelCls}>Coordenadas</label>
             <input id="registration-coordenadas" value={form.coordenadas || ''} onChange={e => up('coordenadas', e.target.value)}
-              placeholder="-32.89, -68.83" className={inputCls()} />
+              aria-invalid={attempted.has(1) && parseActorCoordinates(form.coordenadas || '') === null || undefined}
+              aria-describedby={attempted.has(1) && parseActorCoordinates(form.coordenadas || '') === null ? 'registration-coordinate-error' : undefined}
+              placeholder="-32.89, -68.83" className={inputCls(attempted.has(1) && parseActorCoordinates(form.coordenadas || '') === null)} />
+            <FieldError id="registration-coordinate-error" show={attempted.has(1) && parseActorCoordinates(form.coordenadas || '') === null} msg={COORDINATE_ERROR} />
           </div>
         </div>
       </div>

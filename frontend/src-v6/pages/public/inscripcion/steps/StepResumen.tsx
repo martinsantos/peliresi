@@ -189,7 +189,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
       </p>
 
       {regError && (
-        <div className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
+        <div role="alert" className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
           {regError}
         </div>
       )}

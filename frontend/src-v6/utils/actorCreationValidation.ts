@@ -16,3 +16,15 @@ export function vehicleCapacityError(value: string): string | undefined {
     ? 'La capacidad debe ser un número mayor que cero, en kg'
     : undefined;
 }
+
+export const COORDINATE_ERROR = 'Indicá latitud y longitud válidas, separadas por coma. Ejemplo: -32.89, -68.83';
+/** undefined = not supplied; null = invalid; zero remains a real coordinate. */
+export function parseActorCoordinates(value: string): { latitud: number; longitud: number } | null | undefined {
+  if (!value.trim()) return undefined;
+  const parts = value.split(',').map(part => part.trim());
+  const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+  if (parts.length !== 2 || !parts.every(part => decimal.test(part))) return null;
+  const [latitud, longitud] = parts.map(Number);
+  if (!Number.isFinite(latitud) || !Number.isFinite(longitud) || Math.abs(latitud) > 90 || Math.abs(longitud) > 180) return null;
+  return { latitud, longitud };
+}

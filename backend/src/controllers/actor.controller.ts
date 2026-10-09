@@ -5,6 +5,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
 import { approvedOperatorModeChange, operatorModalitiesForType } from '../domain/operatorModalities';
+import { actorCoordinates, actorNumber } from '../domain/actorNumbers';
 import { parsePagination } from '../utils/pagination';
 import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
 import {
@@ -294,6 +295,8 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
             certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
             latitud, longitud, tefInputs,
         } = req.body;
+        const coordinates = actorCoordinates(latitud, longitud);
+        const numericFactor = actorNumber(factorR, 'Factor R'), numericAmount = actorNumber(montoMxR, 'Monto M×R');
 
         if (!razonSocial || !cuit || !email) {
             throw new AppError('Razón social, CUIT y email son obligatorios', 400);
@@ -337,11 +340,10 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
                     domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
                     certificacionISO: certificacionISO ? new Date(certificacionISO) : undefined,
                     resolucionInscripcion,
-                    factorR: factorR !== undefined ? Number(factorR) : undefined,
-                    montoMxR: montoMxR !== undefined ? Number(montoMxR) : undefined,
+                    factorR: numericFactor,
+                    montoMxR: numericAmount,
                     categoriaIndividual, libroOperatoria,
-                    ...(latitud !== undefined && { latitud: Number(latitud) }),
-                    ...(longitud !== undefined && { longitud: Number(longitud) }),
+                    ...coordinates,
                     ...(tefInputs !== undefined && { tefInputs }),
                 },
                 include: {
@@ -372,6 +374,8 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
             certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
             latitud, longitud, tefInputs,
         } = req.body;
+        const coordinates = actorCoordinates(latitud, longitud);
+        const numericFactor = actorNumber(factorR, 'Factor R'), numericAmount = actorNumber(montoMxR, 'Monto M×R');
 
         const generador = await prisma.$transaction(async transaction => {
             await transaction.$queryRaw`SELECT id FROM generadores WHERE id = ${id} FOR UPDATE`;
@@ -385,11 +389,10 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
                 domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
                 certificacionISO: certificacionISO ? new Date(certificacionISO) : certificacionISO,
                 resolucionInscripcion,
-                factorR: factorR !== undefined ? Number(factorR) : undefined,
-                montoMxR: montoMxR !== undefined ? Number(montoMxR) : undefined,
+                factorR: numericFactor,
+                montoMxR: numericAmount,
                 categoriaIndividual, libroOperatoria,
-                ...(latitud !== undefined && { latitud: Number(latitud) }),
-                ...(longitud !== undefined && { longitud: Number(longitud) }),
+                ...coordinates,
                 ...(tefInputs !== undefined && { tefInputs }),
             }
         });
@@ -540,6 +543,7 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
             expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
             latitud, longitud,
         } = req.body;
+        const coordinates = actorCoordinates(latitud, longitud);
 
         if (!razonSocial || !cuit || !email) {
             throw new AppError('Razón social, CUIT y email son obligatorios', 400);
@@ -608,8 +612,7 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
                     ...(resolucionSSP !== undefined && { resolucionSSP }),
                     ...(actaInspeccion !== undefined && { actaInspeccion }),
                     ...(actaInspeccion2 !== undefined && { actaInspeccion2 }),
-                    ...(latitud !== undefined && { latitud: Number(latitud) }),
-                    ...(longitud !== undefined && { longitud: Number(longitud) }),
+                    ...coordinates,
                     vehiculos: vehiculos ? {
                         create: vehiculos.map((v: any) => ({
                             patente: v.patente,
@@ -658,6 +661,7 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
             expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
             latitud, longitud,
         } = req.body;
+        const coordinates = actorCoordinates(latitud, longitud);
 
         const transportista = await prisma.$transaction(async transaction => {
             await transaction.$queryRaw`SELECT id FROM transportistas WHERE id = ${id} FOR UPDATE`;
@@ -677,8 +681,7 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
                 ...(resolucionSSP !== undefined && { resolucionSSP }),
                 ...(actaInspeccion !== undefined && { actaInspeccion }),
                 ...(actaInspeccion2 !== undefined && { actaInspeccion2 }),
-                ...(latitud !== undefined && { latitud: Number(latitud) }),
-                ...(longitud !== undefined && { longitud: Number(longitud) }),
+                ...coordinates,
             }
         });
 
@@ -1095,6 +1098,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
             representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
             vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
         } = req.body;
+        const coordinates = actorCoordinates(latitud, longitud);
 
         if (!razonSocial || !cuit || !email) {
             throw new AppError('Razon social, CUIT y email son obligatorios', 400);
@@ -1137,8 +1141,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                     representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
                     vencimientoHabilitacion: vencimientoHabilitacion ? new Date(vencimientoHabilitacion) : undefined,
                     resolucionDPA,
-                    latitud: latitud !== undefined ? Number(latitud) : undefined,
-                    longitud: longitud !== undefined ? Number(longitud) : undefined,
+                    ...coordinates,
                     ...(tefInputs !== undefined && { tefInputs }),
                     ...(modalidades ? { modalidades } : {}),
                 },
@@ -1170,6 +1173,7 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
             representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
             vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
         } = req.body;
+        const coordinates = actorCoordinates(latitud, longitud);
 
         const operador = await prisma.$transaction(async transaction => {
             await transaction.$queryRaw`SELECT id FROM operadores WHERE id = ${id} FOR UPDATE`;
@@ -1187,8 +1191,7 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
                 representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
                 ...(vencimientoHabilitacion !== undefined && { vencimientoHabilitacion: vencimientoHabilitacion ? new Date(vencimientoHabilitacion) : null }),
                 ...(resolucionDPA !== undefined && { resolucionDPA }),
-                ...(latitud !== undefined && { latitud: Number(latitud) }),
-                ...(longitud !== undefined && { longitud: Number(longitud) }),
+                ...coordinates,
                 ...(tefInputs !== undefined && { tefInputs }),
                 ...mode,
             }

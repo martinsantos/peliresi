@@ -44,6 +44,7 @@ import { getApiErrorMessage } from '../../utils/api-error';
 import { solicitudService } from '../../services/solicitud.service';
 import type { DocumentoSolicitud, EstadoSolicitud } from '../../types/api';
 import { queryClient } from '../../lib/queryClient';
+import { parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
 
 type ReceivedState = Exclude<EstadoSolicitud, 'BORRADOR' | 'OBSERVADA'>;
 const RECEIVED_STATES: Record<ReceivedState, { title: string; detail: string }> = {
@@ -269,8 +270,7 @@ const InscripcionWizardPage: React.FC = () => {
       if (!form.domicilio?.trim()) errs.push('Domicilio es obligatorio');
       if (form.emailContacto?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.emailContacto.trim())) errs.push('Revisá el formato del email de contacto');
       if (isTransportista && form.coordenadas?.trim()) {
-        const pair = form.coordenadas.split(',').map(value => Number(value.trim()));
-        if (pair.length !== 2 || !pair.every(Number.isFinite) || Math.abs(pair[0]) > 90 || Math.abs(pair[1]) > 180) errs.push('Coordenadas: indicá latitud y longitud válidas, separadas por coma');
+        if (parseActorCoordinates(form.coordenadas) === null) errs.push(COORDINATE_ERROR);
       }
     }
     if (s === (isGenerador ? 5 : isOperador ? 6 : 0)) for (const [field, label] of [['tefPersonal', 'Personal'], ['tefPotencia', 'Potencia instalada'], ['tefSuperficie', 'Superficie'], ['tefCapacidad', 'Capacidad']]) {
