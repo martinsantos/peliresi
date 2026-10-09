@@ -553,19 +553,19 @@ const NuevoOperadorPage: React.FC = () => {
             </Card>
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between w-full">
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <MapPin size={20} className="text-warning-600" />
                     <h3 className="text-lg font-bold text-neutral-900">Direccion Real (Planta)</h3>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-neutral-500 cursor-pointer">
+                  <label className="flex min-h-11 items-center gap-2 text-sm text-neutral-700 cursor-pointer">
                     <input type="checkbox" checked={form.domicilioRealIgual} onChange={e => up('domicilioRealIgual', e.target.checked)} className="rounded border-neutral-300 text-primary-600" />
                     Igual a la fiscal
                   </label>
                 </div>
               </CardHeader>
-              {!form.domicilioRealIgual && (
-                <CardContent className="space-y-4">
+              <CardContent className="space-y-4">
+                {!form.domicilioRealIgual && <>
                   <Input label="Calle / Ruta" value={form.domicilioRealCalle} onChange={e => up('domicilioRealCalle', e.target.value)} placeholder="Ruta 40 km 3200" />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="Localidad" value={form.domicilioRealLocalidad} onChange={e => up('domicilioRealLocalidad', e.target.value)} placeholder="Lujan de Cuyo" />
@@ -580,9 +580,9 @@ const NuevoOperadorPage: React.FC = () => {
                       size="base"
                     />
                   </div>
-                  <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="lat -32.89, long -68.83" />
-                </CardContent>
-              )}
+                </>}
+                <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="lat -32.89, long -68.83" />
+              </CardContent>
             </Card>
           </div>
         )}

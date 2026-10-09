@@ -99,6 +99,11 @@ for (const actor of actors) test(`${actor.type}: administrative draft recovers w
   await expect(page).toHaveURL(new RegExp(`/admin/actores/${actor.plural}/[^/]+/editar$`));
   await expect(page.getByLabel('Razon Social *', { exact: true })).toHaveValue(`QA ${actor.label} 1`);
   await expect(page.getByLabel('CUIT *', { exact: true })).toHaveValue(actor.cuit);
+  if (actor.type !== 'transportista') {
+    await page.getByRole('button', { name: /^(?:\d+\. )?Domicilios$/ }).click();
+    await expect(page.getByLabel('Coordenadas Geograficas', { exact: true })).toBeVisible();
+    await layout(page); await page.screenshot({ path: info.outputPath(`${actor.type}-verified-location.png`), animations: 'disabled' });
+  }
   expect(creations).toEqual([]); expect(errors).toEqual([]);
 });
 

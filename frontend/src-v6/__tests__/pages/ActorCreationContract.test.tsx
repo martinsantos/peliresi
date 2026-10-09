@@ -133,7 +133,7 @@ describe('actor creation contract', () => {
     fill(/Razon Social/, 'QA current edit'); expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA current edit');
     expect(mock.update).not.toHaveBeenCalled();
   });
-  it.each(['generador', 'operador', 'transportista'] as const)('%s retains a valid zero coordinate during verified preload', type => {
+  it.each(['generador', 'operador', 'transportista'] as const)('%s exposes and retains coordinates even when real and fiscal addresses coincide', type => {
     mock.existing = { id: 'qa', razonSocial: 'QA coordenada', cuit: '30-12345678-9', email: 'qa@night-qa.invalid', latitud: 0, longitud: -68 };
     open(type, true); if (type !== 'transportista') step('Domicilios');
     expect(screen.getByLabelText(/Coordenadas/)).toHaveValue('0, -68'); expect(mock.update).not.toHaveBeenCalled();
