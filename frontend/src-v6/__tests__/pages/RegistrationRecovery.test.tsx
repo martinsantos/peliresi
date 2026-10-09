@@ -34,6 +34,24 @@ describe('a real registration UI protects the current step and account boundary'
     expect(mock.put.mock.calls[0][1]).toMatchObject({ datosActor: { razonSocial: 'QA recién escrito' }, expectedUpdatedAt: revision });
     expect(mock.post).not.toHaveBeenCalled(); expect(screen.getByPlaceholderText('Empresa S.A.')).toHaveValue('QA recién escrito');
   });
+  it.each(['ENVIADA', 'EN_REVISION', 'APROBADA'])('recovers the actual %s state instead of offering another registration', async state => {
+    const response = request(); response.data.data.solicitud.estado = state; mock.get.mockResolvedValue(response);
+    await open(); expect(screen.getByRole('heading', { name: state === 'APROBADA' ? 'Solicitud aprobada' : 'Solicitud enviada', exact: true })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Crear cuenta y continuar', exact: true })).toBeNull(); expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('does not display a submitted record from another owner', async () => {
+    const response = request('other'); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
+    await open(); expect(screen.queryByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeNull(); expect(screen.getByRole('button', { name: 'Iniciar sesión y recuperar' })).toBeVisible();
+  });
+  it('reconciles a lost submission acknowledgement against the owned server record without a second send', async () => {
+    const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA alta', domicilio: 'QA Registro 100' });
+    mock.get.mockImplementation(async () => response);
+    mock.post.mockImplementation(async () => { response.data.data.solicitud.estado = 'ENVIADA'; throw new Error('QA acknowledgement lost after commit'); });
+    await open(); fireEvent.click(screen.getByRole('button', { name: /^Paso 7 de 7: Resumen$/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitud', exact: true }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible());
+    expect(mock.post).toHaveBeenCalledOnce(); expect(mock.get.mock.calls.filter(call => call[0] === '/solicitudes/draft')).toHaveLength(2);
+  });
   it('recovers text typed without ever changing steps after a close/reopen', async () => {
     await open(); fireEvent.change(screen.getByPlaceholderText('Empresa S.A.'), { target: { value: 'QA sin navegar' } });
     await waitFor(() => expect(readRegistrationDraft('owner', 'public:GENERADOR:draft')?.data.form).toMatchObject({ razonSocial: 'QA sin navegar' }));

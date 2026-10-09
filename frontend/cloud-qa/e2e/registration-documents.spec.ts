@@ -97,6 +97,9 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
   await page.getByRole('button', { name: 'Enviar solicitud', exact: true }).click();
   expect((await send).status()).toBe(200);
   await expect(page.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Crear cuenta y continuar', exact: true })).toHaveCount(0);
   await login(page, info);
   await page.goto(`${prefix(info)}/admin/solicitudes/${candidate.id}`);
   if (actor !== 'transportista') {
