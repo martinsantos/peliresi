@@ -98,7 +98,7 @@ if (mode === 'freeze') {
   const apk = await readJson('apk/result.json');
   assert.equal(android.completed,true,'An interrupted Android suite cannot pass the package gate');
   assert.equal(android.failed + apk.failed, 0);
-  assert.equal(android.passed, 16);
+  assert.equal(android.passed, 17);
   assert.equal(apk.passed, 4);
   const androidSystemPackages = await readJson('android-system-packages.json');
   assert.equal(androidSystemPackages.stable, true, 'Require fixed Android dependency versions');

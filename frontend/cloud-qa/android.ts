@@ -371,6 +371,29 @@ try{
       await proof(route);
     }
   });
+  await check('registration-trial-saves-with-native-keyboard-and-recovers-without-business-write',async()=>{
+    const writes:string[]=[];
+    const observeWrite=(request:import('playwright').Request)=>{
+      const route=new URL(request.url()).pathname;
+      if(request.method()!=='GET'&&route.startsWith('/api/solicitudes')&&route!=='/api/solicitudes/analizar-documento')writes.push(route);
+    };
+    page.on('request',observeWrite);
+    try{
+      await page.goto('http://127.0.0.1:4177/app/inscripcion/transportista?modo=revision');
+      const reason=page.getByLabel('Razon Social *',{exact:true});
+      await reason.tap();
+      await keyboardProof(true,'registration-trial-native-keyboard');
+      await reason.fill('QA borrador Android sin trámite real');
+      await nativeButtonTap('Guardar borrador de prueba','registration-trial-native-save');
+      await page.getByRole('button',{name:'Paso 2 de 5: Habilitacion',exact:true}).tap();
+      await page.reload();
+      await expect(page.getByRole('button',{name:'Paso 2 de 5: Habilitacion',exact:true})).toHaveAttribute('aria-current','step');
+      await page.getByRole('button',{name:'Paso 1 de 5: Datos Basicos',exact:true}).tap();
+      await expect(reason).toHaveValue('QA borrador Android sin trámite real');
+      await proof('registration-trial-actual-android-recovered');
+      expect(writes).toEqual([]);
+    }finally{page.off('request',observeWrite);}
+  });
   await check('searchable-select-chooses-before-actual-Android-keyboard',async()=>{
     await page.goto('http://127.0.0.1:4177/app/manifiestos/nuevo');
     const trigger=page.getByRole('button',{name:'Generador *',exact:true});
@@ -716,7 +739,7 @@ try{
   });
 }finally{
   try{
-    await saveResults(results.length===16);
+    await saveResults(results.length===17);
     await closeContext();
     await driverStep('close-QA-device',()=>device.close(),10000);
   }finally{await stopSystemLog();}

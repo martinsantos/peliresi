@@ -77,6 +77,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
       { label: 'Expediente', value: form.expedienteInscripcion || '' },
       { label: 'Certificado N', value: form.certificadoNumero || '' },
       { label: 'Resolucion DPA', value: form.resolucionDPA || '' },
+      { label: 'Vencimiento habilitacion', value: form.vencimientoHabilitacion || '' },
     );
   }
   if (regFields.length > 0) {
@@ -152,6 +153,10 @@ export const StepResumen: React.FC<StepResumenProps> = ({
         { label: 'Resolucion DPA', value: form.resolucionDPA || '' },
         { label: 'Resolucion SSP', value: form.resolucionSSP || '' },
         { label: 'Corrientes', value: form.corrientesAutorizadas || '' },
+        { label: 'Acta Inspeccion', value: form.actaInspeccion || '' },
+        { label: 'Acta Inspeccion 2', value: form.actaInspeccion2 || '' },
+        { label: 'Localidad', value: form.localidad || '' },
+        { label: 'Coordenadas', value: form.coordenadas || '' },
       ],
     });
     if (form.vehiculosDesc || form.choferesDesc) {

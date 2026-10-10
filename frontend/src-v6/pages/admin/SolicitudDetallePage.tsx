@@ -32,6 +32,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { RegistrationFleetSummary } from '../../components/registration/RegistrationFleetSummary';
 import { RegistrationReviewEditor } from '../../components/registration/RegistrationReviewEditor';
+import { EMPTY_DRIVER, fleetRows, licenseDocumentType } from '../../services/registrationFleet';
 
 // ── Status config ──
 
@@ -197,6 +198,7 @@ const SolicitudDetallePage: React.FC = () => {
 
   const eCfg = ESTADO_CONFIG[solicitud.estado] || ESTADO_CONFIG.ENVIADA;
   const datosActor = parseDatosActor(solicitud.datosActor || '{}');
+  const declaredDrivers = fleetRows(datosActor.choferesJson, EMPTY_DRIVER);
   const documentos = solicitud.documentos || [];
   const canAct = !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)
     && (solicitud.estado === 'EN_REVISION' || solicitud.estado === 'OBSERVADA');
@@ -306,9 +308,13 @@ const SolicitudDetallePage: React.FC = () => {
                         <p className="text-sm font-medium text-neutral-800 truncate" title={doc.nombre}>
                           {doc.nombre}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-neutral-400">{doc.tipo}</span>
-                          <span className="text-[10px] text-neutral-400">{formatFileSize(doc.size)}</span>
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-600">
+                          <span className="min-w-0 break-words">{doc.tipo.startsWith('LICENCIA_CHOFER_') ? (() => {
+                            const index = declaredDrivers.findIndex(driver => licenseDocumentType(driver.key) === doc.tipo);
+                            const driver = declaredDrivers[index];
+                            return driver ? `Licencia · Chofer ${index + 1} · ${driver.nombre} ${driver.apellido}` : 'Licencia de chofer · declaración original';
+                          })() : doc.tipo.replaceAll('_', ' ')}</span>
+                          <span className="shrink-0">{formatFileSize(doc.size)}</span>
                         </div>
                       </div>
                       <Badge variant="soft" color={dCfg.color} size="sm">{dCfg.label}</Badge>
@@ -335,7 +341,8 @@ const SolicitudDetallePage: React.FC = () => {
                         <>
                           <button
                             onClick={() => handleDocReview(doc.id, 'APROBADO')}
-                            className="p-1.5 rounded-lg hover:bg-green-50"
+                            aria-label={`Aprobar documento ${doc.nombre}`}
+                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-green-800 hover:bg-green-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Aprobar documento"
                             disabled={revisarDocumento.isPending}
                           >
@@ -343,7 +350,8 @@ const SolicitudDetallePage: React.FC = () => {
                           </button>
                           <button
                             onClick={() => handleDocReview(doc.id, 'RECHAZADO')}
-                            className="p-1.5 rounded-lg hover:bg-red-50"
+                            aria-label={`Rechazar documento ${doc.nombre}`}
+                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-red-800 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Rechazar documento"
                             disabled={revisarDocumento.isPending}
                           >
