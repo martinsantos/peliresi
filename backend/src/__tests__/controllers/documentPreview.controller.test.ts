@@ -24,6 +24,27 @@ describe('bounded document reading is stateless and cleans only its own temporar
     const result = await read(); expect(result.res.json.mock.calls[0][0].data).toMatchObject({ persistido: false, campos: {}, analisis: { lectura: 'NO_DISPONIBLE' } });
     expect(result.res.json.mock.calls[0][0].data.analisis.aviso).toContain('manualmente'); expect(mock.unlink).toHaveBeenCalledOnce();
   });
+  it('does not disguise a busy reader as a photograph with no legible text', async () => {
+    mock.read.mockResolvedValue({ version: 1, lectura: 'NO_DISPONIBLE', texto: '',
+      aviso: 'La lectura automática está ocupada. El archivo se conserva para revisión manual.' });
+    const result = await read();
+    const data = result.res.json.mock.calls[0][0].data;
+    expect(data.analisis.lectura).toBe('NO_DISPONIBLE');
+    expect(data.analisis.aviso).toContain('ocupada');
+    expect(data.analisis.aviso).not.toContain('imagen más clara');
+    expect(data.analisis.aviso).not.toContain('El archivo se conserva');
+    expect(data.persistido).toBe(false);
+    expect(mock.unlink).toHaveBeenCalledWith(file.path);
+  });
+  it('distinguishes a completed image read with no text from an unavailable engine', async () => {
+    mock.read.mockResolvedValue({ version: 1, lectura: 'SIN_TEXTO', motor: 'TESSERACT', texto: '', aviso: null });
+    const result = await read();
+    const data = result.res.json.mock.calls[0][0].data;
+    expect(data.analisis).toMatchObject({ lectura: 'SIN_TEXTO', motor: 'TESSERACT' });
+    expect(data.analisis.aviso).toContain('texto legible');
+    expect(data.analisis.aviso).not.toContain('ocupada');
+    expect(data.campos).toEqual({});
+  });
   it('rejects type or content errors before OCR and still removes the uploaded temporary file', async () => {
     expect((await read('unsupported')).error).toMatchObject({ statusCode: 400 }); expect(mock.read).not.toHaveBeenCalled();
     mock.describe.mockImplementation(() => { throw new Error('QA invalid magic bytes'); });
