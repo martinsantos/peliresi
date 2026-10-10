@@ -15,7 +15,8 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { MobileFormSteps } from '../../components/MobileFormSteps';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { initialPasswordError, vehicleCapacityError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
+import { actorEmailError, initialPasswordError, vehicleCapacityError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
+import { useRegistrationValidationFocus } from '../../hooks/useRegistrationValidationFocus';
 import { toast } from '../../components/ui/Toast';
 import DocumentUpload from '../../components/DocumentUpload';
 import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
@@ -60,6 +61,7 @@ const NuevoTransportistaPage: React.FC = () => {
 
   const [step, setStep] = useState(1);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
+  const validationRef = useRegistrationValidationFocus(attempted);
   const submitInFlight = useRef(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [vehiculos, setVehiculos] = useState<VehiculoForm[]>([]);
@@ -134,7 +136,8 @@ const NuevoTransportistaPage: React.FC = () => {
     if (s === 1) {
       if (!form.razonSocial.trim()) errors.push('Razon Social es obligatoria');
       if (!form.cuit.trim()) errors.push('CUIT es obligatorio');
-      if (!form.email.trim()) errors.push('Email es obligatorio');
+      const emailError = actorEmailError(form.email, true);
+      if (emailError) errors.push(emailError);
       if (!isEdit && passwordError) errors.push(passwordError);
       if (parseActorCoordinates(form.coordenadas) === null) errors.push(COORDINATE_ERROR);
     }
@@ -254,7 +257,7 @@ const NuevoTransportistaPage: React.FC = () => {
   if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del transportista. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
+    <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
       {/* Header */}
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>

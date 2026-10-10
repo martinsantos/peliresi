@@ -17,6 +17,11 @@ export function vehicleCapacityError(value: string): string | undefined {
     : undefined;
 }
 
+export function actorEmailError(value: string, required = false): string | undefined {
+  if (!value.trim()) return required ? 'El email es obligatorio.' : undefined;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? undefined : 'Revisá el formato del email.';
+}
+
 export const COORDINATE_ERROR = 'Indicá latitud y longitud válidas, separadas por coma. Ejemplo: -32.89, -68.83';
 /** undefined = not supplied; null = invalid; zero remains a real coordinate. */
 export function parseActorCoordinates(value: string): { latitud: number; longitud: number } | null | undefined {

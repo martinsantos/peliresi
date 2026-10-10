@@ -101,6 +101,16 @@ describe('license profile is offline, bounded and isolated from payment OCR', ()
     expect(await readReceipt({ path: '/virtual/reverse.jpg', mimeType: 'image/jpeg' }, 'LICENCIA')).toMatchObject({ lectura: 'SIN_TEXTO', texto: '', motor: 'TESSERACT' });
     expect(mock.exec).toHaveBeenCalledTimes(2);
   });
+  it('returns only the exact whole labelled DNI from a cluttered provincial row, without inventing the missing identity fields', async () => {
+    const words = [['?', 16, 14, 19], ['D.U.', 94, 79, 86], ['90012345', 96, 203, 283], ['noise', 20, 1139, 134]];
+    const tsv = 'level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n'
+      + words.map(([text, confidence, left, width], index) => `5\t1\t1\t1\t1\t${index + 1}\t${left}\t630\t${width}\t50\t${confidence}\t${text}`).join('\n');
+    mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, tsv, ''));
+    expect(await readReceipt({ path: '/virtual/license.jpg', mimeType: 'image/jpeg' }, 'LICENCIA'))
+      .toMatchObject({ lectura: 'LEIDO', texto: 'DNI: 90012345', motor: 'TESSERACT' });
+    expect(mock.exec).toHaveBeenCalledTimes(2); // Missing names still trigger the bounded fallback.
+    expect(mock.exec.mock.calls[1][2].timeout).toBeLessThanOrEqual(mock.exec.mock.calls[0][2].timeout);
+  });
   it('retains safe partial fields when the second native pass fails, without claiming a complete read', async () => {
     let pass = 0;
     mock.exec.mockImplementation((_command, _args, _options, callback) => ++pass === 1

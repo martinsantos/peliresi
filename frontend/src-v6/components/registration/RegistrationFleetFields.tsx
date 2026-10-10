@@ -79,11 +79,13 @@ function DriverFields({ row, index, attempted, readOnly, allowLicenseUpload, onC
       <Remove name={`Quitar chofer ${index + 1}`} onClick={onRemove} />
       {allowLicenseUpload && <input ref={input} type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only" aria-label={`Archivo de licencia del chofer ${index + 1}`} onChange={event => { const original = event.target.files?.[0]; event.target.value = ''; if (original) void read(original); }} />}
     </div>}
+    {busy && <p role="status" className="text-sm text-primary-900">Leyendo licencia…</p>}
     {document && <p className="break-words text-sm text-neutral-700">{document.name} · {document.status}</p>}
     {document?.error && <p role="alert" className="text-sm text-error-800">{document.error}</p>}
     {error && <div role="alert" className="space-y-2 text-sm text-error-800"><p>{error}</p>{file && <Button variant="outline" disabled={busy} onClick={() => void read(file)}>Reintentar lectura de licencia</Button>}</div>}
     {proposal?.analisis.lectura === 'LEIDO' && <div className="space-y-3 border-l-4 border-primary-700 bg-primary-50 p-3">
-      <p className="font-semibold text-primary-950">Revisá los datos leídos</p><p className="text-sm text-neutral-700">Seleccioná lo que querés usar. Leer el documento no valida la licencia ni reemplaza tus datos automáticamente.</p>
+      <p className="font-semibold text-primary-950">Revisá los datos leídos</p><p className="text-sm text-neutral-700">Aplicá sólo los datos que confirmes. La lectura no valida la licencia.</p>
+      {proposal.analisis.aviso && <p role="status" className="text-sm font-medium text-primary-950">{proposal.analisis.aviso}</p>}
       {Object.entries(proposal.campos).map(([field, value]) => <label key={field} className="flex min-h-11 items-start gap-3 py-2 text-sm text-neutral-900"><input className="mt-1" type="checkbox" checked={selected.includes(field)} onChange={event => setSelected(previous => event.target.checked ? [...previous, field] : previous.filter(item => item !== field))} /><span>{DRIVER_LABELS[field as keyof typeof DRIVER_LABELS]}: <strong>{value}</strong>{row[field as keyof DriverDraft] && <span className="block text-neutral-600">Actual: {row[field as keyof DriverDraft]}</span>}</span></label>)}
       {!Object.keys(proposal.campos).length && <p className="text-sm text-neutral-700">Hay texto legible, pero no campos inequívocos. Completalos manualmente.</p>}
       {selected.length > 0 && <Button onClick={() => { onChange(Object.fromEntries(Object.entries(proposal.campos).filter(([key]) => selected.includes(key)))); setSelected([]); }}>Usar datos seleccionados</Button>}

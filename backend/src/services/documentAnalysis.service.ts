@@ -116,6 +116,10 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
         }
       }
       const text = mergeLicenseText(reads);
+      const fields = licenseFields(text);
+      if (text && (!fields.dni || !fields.nombre || !fields.apellido || !fields.vencimiento)) {
+        warning = 'Lectura parcial. Revisá las propuestas y completá manualmente los campos que falten.';
+      }
       return { ...result, lectura: text ? 'LEIDO' : 'SIN_TEXTO', motor: 'TESSERACT', texto: text,
         alcance: 'Sólo campos identificados de la licencia. Requiere revisión; no acredita identidad ni vigencia.', aviso: warning };
     }

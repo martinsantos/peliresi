@@ -21,7 +21,8 @@ import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { MobileFormSteps } from '../../components/MobileFormSteps';
-import { initialPasswordError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
+import { actorEmailError, initialPasswordError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
+import { useRegistrationValidationFocus } from '../../hooks/useRegistrationValidationFocus';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
@@ -106,6 +107,7 @@ const NuevoOperadorPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
   const [selectedY, setSelectedY] = useState<Set<string>>(new Set());
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
+  const validationRef = useRegistrationValidationFocus(attempted);
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [savedActorId, setSavedActorId] = useState<string | null>(null);
@@ -207,7 +209,8 @@ const NuevoOperadorPage: React.FC = () => {
     if (s === 1) {
       if (!form.razonSocial.trim()) errs.push('Razon Social es obligatoria');
       if (!form.cuit.trim()) errs.push('CUIT es obligatorio');
-      if (!form.email.trim()) errs.push('Email es obligatorio');
+      const emailError = actorEmailError(form.email, true);
+      if (emailError) errs.push(emailError);
     }
     if (s === 2 && parseActorCoordinates(form.coordenadas) === null) errs.push(COORDINATE_ERROR);
     if (s === 6 && !isEdit) {
@@ -259,7 +262,7 @@ const NuevoOperadorPage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (submissionInFlight.current) return;
-    for (const s of savedActorId ? [] : [1, 6]) {
+    for (const s of savedActorId ? [] : [1, 2, 6]) {
       const errs = getStepErrors(s);
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
@@ -402,7 +405,7 @@ const NuevoOperadorPage: React.FC = () => {
   if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del operador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
+    <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
       {/* Header */}
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Button variant="outline" size="sm" className="shrink-0" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>

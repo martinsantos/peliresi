@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { Input } from '../ui/Input';
+import { Button } from '../ui/ButtonV2';
 import { Select } from '../ui/Select';
 import { DEPARTAMENTOS_MENDOZA } from '../../pages/public/inscripcion/shared';
-import { COORDINATE_ERROR, parseActorCoordinates } from '../../utils/actorCreationValidation';
+import { actorEmailError, COORDINATE_ERROR, parseActorCoordinates } from '../../utils/actorCreationValidation';
 
 type Props = { form: Record<string, unknown>; up: (field: string, value: string) => void; attempted?: boolean };
 const value = (form: Props['form'], field: string) => typeof form[field] === 'string' ? form[field] as string : '';
@@ -16,9 +17,9 @@ export function ActorContactFields({ form, up, attempted = false, administrative
   return <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
     <Input id="registration-razonSocial" label="Razon Social *" autoComplete="organization" placeholder={placeholder} value={value(form, 'razonSocial')} onChange={event => up('razonSocial', event.target.value)} errorMessage={attempted && !value(form, 'razonSocial').trim() ? 'La razón social es obligatoria.' : undefined} />
     {identitySlot}
-    {domicile && <Input id="registration-domicilio" label="Domicilio" placeholder="Calle 123, Ciudad" value={value(form, 'domicilio')} onChange={event => up('domicilio', event.target.value)} />}
+    {domicile && <Input id="registration-domicilio" label="Domicilio" aria-required={!administrative} autoComplete="street-address" placeholder="Calle 123, Ciudad" value={value(form, 'domicilio')} onChange={event => up('domicilio', event.target.value)} errorMessage={attempted && !administrative && !value(form, 'domicilio').trim() ? 'Ingresá el domicilio.' : undefined} />}
     <Input id="registration-telefono" label="Telefono" type="tel" inputMode="tel" autoComplete="tel" placeholder="0261-4XXXXXX" value={value(form, 'telefono')} onChange={event => up('telefono', event.target.value)} />
-    <Input id="registration-emailContacto" label={administrative ? 'Email *' : 'Email de contacto'} type="email" autoComplete="email" placeholder="contacto@empresa.com" value={value(form, emailKey)} onChange={event => up(emailKey, event.target.value)} errorMessage={attempted && administrative && !value(form, emailKey).trim() ? 'El email es obligatorio.' : undefined} />
+    <Input id="registration-emailContacto" label={administrative ? 'Email *' : 'Email de contacto'} type="email" autoComplete="email" placeholder="contacto@empresa.com" value={value(form, emailKey)} onChange={event => up(emailKey, event.target.value)} errorMessage={attempted ? actorEmailError(value(form, emailKey), administrative) : undefined} />
   </div>;
 }
 
@@ -28,7 +29,12 @@ export function ActorAddressFields({ form, up, administrative = false, same, onS
   return <div className="space-y-6">
     {(['Legal', 'Real'] as const).map(part => <section key={part} className="space-y-4" aria-label={part === 'Legal' ? 'Domicilio legal' : 'Domicilio real'}>
       <div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold text-neutral-900">{part === 'Legal' ? 'Domicilio Legal' : 'Domicilio Real'}</h4>
-        {part === 'Real' && onSame && <label className="flex min-h-11 items-center gap-2 text-sm text-neutral-700"><input type="checkbox" checked={Boolean(same)} onChange={event => onSame(event.target.checked)} />Igual a la fiscal</label>}</div>
+        {part === 'Real' && onSame && <label className="flex min-h-11 items-center gap-2 text-sm text-neutral-700"><input type="checkbox" checked={Boolean(same)} onChange={event => onSame(event.target.checked)} />Igual al domicilio legal</label>}
+        {part === 'Legal' && !administrative && value(form, 'domicilio').trim() && !value(form, 'domicilioLegalCalle').trim()
+          && <Button variant="ghost" onClick={() => up('domicilioLegalCalle', value(form, 'domicilio'))}>Usar domicilio declarado</Button>}
+        {part === 'Real' && !onSame && value(form, 'domicilioLegalCalle').trim() && ['Calle', 'Localidad', 'Depto'].every(field => !value(form, `domicilioReal${field}`).trim())
+          && <Button variant="ghost" onClick={() => { for (const field of ['Calle', 'Localidad', 'Depto']) up(`domicilioReal${field}`, value(form, `domicilioLegal${field}`)); }}>Copiar domicilio legal</Button>}
+      </div>
       {!(part === 'Real' && same) && <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Input id={`registration-domicilio${part}Calle`} label={administrative ? 'Calle / Ruta' : 'Calle'} placeholder={part === 'Legal' ? 'Av. San Martin 123' : 'Ruta 40 km 5'} value={value(form, `domicilio${part}Calle`)} onChange={event => up(`domicilio${part}Calle`, event.target.value)} />
         <Input id={`registration-domicilio${part}Localidad`} label="Localidad" placeholder={part === 'Legal' ? 'Mendoza' : 'Lujan de Cuyo'} value={value(form, `domicilio${part}Localidad`)} onChange={event => up(`domicilio${part}Localidad`, event.target.value)} />

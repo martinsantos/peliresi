@@ -12,6 +12,15 @@ function Form({ onLicense, initialName = '' }: { onLicense: (key: string, file: 
 }
 const photo = new File(['QA'], 'license.png', { type: 'image/png' });
 describe('one structured driver control across public and administrative creation', () => {
+  it('explains a partial reading and lets the person complete it without losing the safe proposal', async () => {
+    render(<Form onLicense={vi.fn().mockResolvedValue({ ...read, campos: { dni: '30123456' }, analisis: { ...read.analisis, aviso: 'Lectura parcial. Revisá las propuestas y completá manualmente los campos que falten.' } })} />);
+    fireEvent.change(screen.getByLabelText('Archivo de licencia del chofer 1'), { target: { files: [photo] } });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Lectura parcial'));
+    fireEvent.click(screen.getByRole('button', { name: 'Usar datos seleccionados' }));
+    fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'QA completado a mano' } });
+    expect(screen.getByLabelText('DNI *')).toHaveValue('30123456');
+    expect(screen.getByLabelText('Nombre *')).toHaveValue('QA completado a mano');
+  });
   it('does not replace current data until the user reviews and applies selected OCR proposals', async () => {
     const reader = vi.fn().mockResolvedValue(read); render(<Form onLicense={reader} initialName="Nombre propio" />);
     fireEvent.change(screen.getByLabelText('Archivo de licencia del chofer 1'), { target: { files: [photo] } });

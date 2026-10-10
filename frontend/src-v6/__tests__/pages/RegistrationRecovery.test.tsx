@@ -13,8 +13,8 @@ const revision = '2026-10-09T10:00:00.000Z';
 function session(owner: string) { return `qa.${btoa(JSON.stringify({ id: owner, restricted: true, registrationDraft: 'draft' }))}.qa`; }
 function request(owner = 'owner') { return { data: { data: { solicitud: { id: 'draft', usuarioId: owner, tipoActor: 'GENERADOR', estado: 'BORRADOR', datosActor: '{}', updatedAt: revision,
   usuario: { nombre: 'QA responsable', cuit: '30-70987654-3', email: 'qa@night-qa.invalid' }, documentos: [] } } } }; }
-async function open() {
-  await act(async () => { render(<MemoryRouter initialEntries={['/inscripcion/generador']}><Routes><Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
+async function open(type = 'generador') {
+  await act(async () => { render(<MemoryRouter initialEntries={[`/inscripcion/${type}`]}><Routes><Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); queryClient.clear(); mock.token = session('owner'); mock.canWrite.mockReturnValue(true);
@@ -27,6 +27,33 @@ beforeEach(() => {
 afterEach(() => { cleanup(); queryClient.clear(); vi.restoreAllMocks(); });
 
 describe('a real registration UI protects the current step and account boundary', () => {
+  it.each(['generador', 'operador', 'transportista'])('%s points to the missing field, not session recovery, and keeps typing in place', async type => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase(); mock.get.mockResolvedValue(response);
+    await open(type);
+    fireEvent.change(screen.getByLabelText('Razon Social *'), { target: { value: 'QA datos conservados' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente', exact: true }));
+    const address = screen.getByLabelText('Domicilio');
+    await waitFor(() => expect(address).toHaveFocus());
+    expect(address).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('button', { name: 'Recuperar sesión', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Conciliar borrador', exact: true })).toBeNull();
+    const phone = screen.getByLabelText('Telefono'); phone.focus();
+    fireEvent.change(phone, { target: { value: '0261' } }); expect(phone).toHaveFocus();
+    expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA datos conservados');
+    expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
+  it.each(['generador', 'operador'])('%s keeps invalid location text visible and stops advancement', async type => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA', domicilio: 'QA 123' }); mock.get.mockResolvedValue(response);
+    await open(type);
+    fireEvent.click(screen.getByRole('button', { name: /Paso 3 de .*Domicilios/ }));
+    const coordinates = await screen.findByLabelText('Coordenadas Geograficas');
+    fireEvent.change(coordinates, { target: { value: '91, -68' } }); mock.put.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente', exact: true }));
+    await waitFor(() => expect(coordinates).toHaveFocus());
+    expect(coordinates).toHaveAttribute('aria-invalid', 'true'); expect(coordinates).toHaveValue('91, -68');
+    expect(mock.put).not.toHaveBeenCalled();
+  });
   it('allows saving an incomplete draft without submitting or moving the current step', async () => {
     await open(); fireEvent.change(screen.getByPlaceholderText('Empresa S.A.'), { target: { value: 'QA recién escrito' } });
     await waitFor(() => expect(readRegistrationDraft('owner', 'public:GENERADOR:draft')?.data.form).toMatchObject({ razonSocial: 'QA recién escrito' }));

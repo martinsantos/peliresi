@@ -54,6 +54,8 @@ export function licenseFields(text: string): LicenseFields {
       const match = lines[index].match(label); if (!match) continue;
       let value = (match[1] || lines[index + 1] || '').trim();
       if (!value || value.length > 100 || Object.values(labels).some(other => other.test(value))) continue;
+      // A combined/split printed caption is metadata, not a person's name.
+      if (/^(?:y\s+)?(?:apellidos?\s+y\s+)?nombres?$/i.test(value)) continue;
       if (field === 'dni') { value = value.replace(/[.\s-]/g, ''); if (!/^\d{6,9}$/.test(value)) continue; }
       else if (field === 'vencimiento') {
         const date = calendarDate(value); if (!date) continue; value = date;

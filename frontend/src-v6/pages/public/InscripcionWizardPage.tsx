@@ -27,6 +27,7 @@ import { RegistrationFleetFields } from '../../components/registration/Registrat
 import { previewDocument, type LicensePreview } from '../../services/documentPreview';
 import type { ReceiptAnalysis } from '../../types/documentAnalysis';
 import { useInspectionDraftOwnership } from '../../hooks/useInspectionDraftOwnership';
+import { useRegistrationValidationFocus } from '../../hooks/useRegistrationValidationFocus';
 
 // Shared constants & types
 import {
@@ -94,6 +95,8 @@ const InscripcionWizardPage: React.FC = () => {
   // Phase 2 - Wizard
   const [step, setStep] = useState(isReviewMode ? Math.min(totalSteps, Math.max(1, Number(trialInitial?.data.step) || 1)) : 1);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
+  const validationRef = useRegistrationValidationFocus(attempted);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>(() => trialInitial?.data.form && typeof trialInitial.data.form === 'object'
     ? Object.fromEntries(Object.entries(trialInitial.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : reviewFixture?.form || {});
   const [previewAnalyses, setPreviewAnalyses] = useState<Record<string, ReceiptAnalysis>>({});
@@ -161,6 +164,7 @@ const InscripcionWizardPage: React.FC = () => {
   }, [tipo, phase, step, submitSuccess]);
 
   const up = useCallback((field: string, value: string) => {
+    setValidationError(null);
     editRevision.current++;
     setDirty(true);
     setForm(prev => ({ ...prev, [field]: value }));
@@ -328,6 +332,7 @@ const InscripcionWizardPage: React.FC = () => {
         if (parseActorCoordinates(form.coordenadas) === null) errs.push(COORDINATE_ERROR);
       }
     }
+    if (!isTransportista && s === 3 && parseActorCoordinates(form.coordenadas || '') === null) errs.push(COORDINATE_ERROR);
     if (s === (isGenerador ? 5 : isOperador ? 6 : 0)) for (const [field, label] of [['tefPersonal', 'Personal'], ['tefPotencia', 'Potencia instalada'], ['tefSuperficie', 'Superficie'], ['tefCapacidad', 'Capacidad']]) {
       if (form[field]?.trim() && (!Number.isFinite(Number(form[field])) || Number(form[field]) < 0)) errs.push(`${label}: indicá un número mayor o igual a cero`);
     }
@@ -375,10 +380,12 @@ const InscripcionWizardPage: React.FC = () => {
 
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;
-    if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la operación del archivo. Los datos siguen en pantalla.'); return; }
+    setValidationError(null);
+    if (uploadsInFlight.current.size) { setValidationError('Esperá a que termine la operación del archivo.'); return; }
     setAttempted(prev => new Set(prev).add(step));
     if (target > step && getStepErrors(step).length > 0) {
-      setSaveError(getStepErrors(step).join('. '));
+      // Contact, location and fleet errors are shown at their own fields.
+      if (step !== 1 && step !== 3) setValidationError(getStepErrors(step).join('. '));
       return;
     }
     if (isReviewMode) {
@@ -554,7 +561,7 @@ const InscripcionWizardPage: React.FC = () => {
       const errs = getStepErrors(s);
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
-        setSaveError(errs.join('. '));
+        setValidationError(s !== 1 && s !== 3 ? errs.join('. ') : null);
         setStep(s);
         return;
       }
@@ -803,7 +810,7 @@ const InscripcionWizardPage: React.FC = () => {
         </nav>
 
         {/* Step Content */}
-        <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
+        <div ref={validationRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
           {isReviewMode && <section aria-label="Borrador de prueba" className="mb-4 space-y-2 border-b border-neutral-200 pb-3">
             <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-primary-900">Modo prueba · sin trámites reales</strong><Button aria-label="Guardar borrador de prueba" variant="outline" leftIcon={<Save size={16} />} onClick={() => persistTrial(step)}>Guardar prueba</Button></div>
             <p role="status" className="text-sm text-neutral-700">{localSaved ? 'Guardado en este navegador' : 'Prueba en pantalla · no se confirmó el guardado local'}</p>
@@ -818,6 +825,7 @@ const InscripcionWizardPage: React.FC = () => {
           {localConflict && <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p>El borrador de SITREP cambió desde tu copia local. Elegí qué conservar; no mezclamos ni sobrescribimos automáticamente.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setForm(localConflict); setLocalConflict(null); setDirty(true); editRevision.current++; }}>Recuperar mis cambios locales</Button><Button variant="outline" onClick={() => { clearRegistrationDraft(owner!, draftScope); setLocalConflict(null); }}>Conservar versión de SITREP</Button></div></div>}
           {missingLocalFiles.length > 0 && <p role="alert" className="mb-4 text-sm text-amber-900">{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : `Hay archivos que no llegaron a guardarse: ${missingLocalFiles.join(', ')}. Volvé a seleccionarlos en Documentos. Los originales ya guardados se recuperan.`}</p>}
           {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
+          {validationError && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
           {renderStepContent()}
         </div>
 

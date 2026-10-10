@@ -36,6 +36,23 @@ function vehicle() { step('Vehiculos'); step('Agregar'); fill(/Patente/, 'QA123Z
 
 describe('actor creation contract', () => {
   beforeEach(() => { vi.clearAllMocks(); mock.existing = undefined; mock.create.mockResolvedValue({ id: 'created' }); mock.update.mockResolvedValue({}); mock.uploadDoc.mockResolvedValue({ id: 'qa-doc', nombre: 'QA.pdf', tipo: 'OTRO', size: 100, estado: 'PENDIENTE' }); });
+  it.each(['generador', 'operador', 'transportista'] as const)('%s focuses the first invalid field without taking focus back while typing', async type => {
+    open(type); step(type === 'transportista' ? 'Siguiente' : 'Continuar');
+    await waitFor(() => expect(screen.getByLabelText('Razon Social *')).toHaveFocus());
+    const email = screen.getByLabelText('Email *'); email.focus();
+    fireEvent.change(email, { target: { value: 'qa@night-qa.invalid' } }); expect(email).toHaveFocus();
+    expect(mock.create).not.toHaveBeenCalled();
+  });
+  it.each(['generador', 'operador'] as const)('%s rechecks a skipped invalid location at final submission', async type => {
+    mock.existing = { id: 'qa', razonSocial: 'QA', cuit: '30-12345678-9', email: 'qa@night-qa.invalid' };
+    open(type, true); step('Domicilios'); fill(/Coordenadas/, '91, -68');
+    // Return to the first step, then jump past the invalid optional location.
+    fireEvent.click(screen.getByRole('button', { name: /^1\./ }));
+    step('Adjuntos'); step('Guardar Cambios');
+    await waitFor(() => expect(screen.getByLabelText(/Coordenadas/)).toHaveFocus());
+    expect(screen.getByLabelText(/Coordenadas/)).toHaveValue('91, -68');
+    expect(mock.update).not.toHaveBeenCalled();
+  });
   it('keeps already saved data read-only after a partial upload failure while allowing attachment replacement and retry', async () => {
     mock.uploadDoc.mockRejectedValueOnce(new Error('QA upload rejected'));
     open(); basics(); fill(/Contraseña inicial/, 'OnlyLocal-QA-secret!'); step('Confirmar');

@@ -100,7 +100,7 @@ function renderGeneradorStep(
       </div>
     );
 
-    case 3: return renderDomicilios(form, up);
+    case 3: return renderDomicilios(form, up, attempted.has(3));
 
     case 4: return (
       <div className="space-y-4">
@@ -198,7 +198,7 @@ function renderOperadorStep(
       </div>
     );
 
-    case 3: return renderDomicilios(form, up);
+    case 3: return renderDomicilios(form, up, attempted.has(3));
 
     case 4: return (
       <div className="space-y-4">
@@ -303,6 +303,6 @@ function renderTransportistaStep(
 }
 
 // ── Shared domicilios sub-step (generador step 3, operador step 3) ──
-function renderDomicilios(form: Record<string, string>, up: (f: string, v: string) => void): React.ReactNode {
-  return <div className="space-y-4"><SectionTitle icon={MapPin} title="Domicilios" /><ActorAddressFields form={form} up={up} /></div>;
+function renderDomicilios(form: Record<string, string>, up: (f: string, v: string) => void, attempted: boolean): React.ReactNode {
+  return <div className="space-y-4"><SectionTitle icon={MapPin} title="Domicilios" /><ActorAddressFields form={form} up={up} attempted={attempted} /></div>;
 }

@@ -43,7 +43,15 @@ for (const actor of actors) test(`${actor.type}: current-step recovery, incomple
   page.on('dialog', dialog => void dialog.accept());
   page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/enviar')) sends.push(request.url()); });
   const draft = await create(page, info, actor.type);
+  await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  await expect(page.getByLabel('Razon Social *', { exact: true })).toBeFocused();
   await page.getByLabel('Razon Social *', { exact: true }).fill('QA texto escrito sin cambiar de paso');
+  await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  await expect(page.getByLabel('Domicilio', { exact: true })).toBeFocused();
+  await expect(page.getByLabel('Domicilio', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByRole('button', { name: 'Recuperar sesión', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Conciliar borrador', exact: true })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath(`${actor.type}-field-validation.png`), animations: 'disabled' });
   await page.getByLabel('Domicilio', { exact: true }).fill('QA domicilio recuperable 900');
   await expect(page.getByRole('status').filter({ hasText: 'este dispositivo' })).toBeVisible();
   await page.reload();
@@ -75,6 +83,25 @@ for (const actor of actors) test(`${actor.type}: current-step recovery, incomple
   await page.getByRole('button', { name: 'Recuperar mis cambios locales', exact: true }).click();
   await save(page, draft.solicitudId);
   await layout(page); await page.screenshot({ path: info.outputPath(`${actor.type}-draft-recovered.png`), animations: 'disabled' });
+  if (actor.type !== 'transportista') {
+    await page.getByLabel('Domicilio', { exact: true }).fill('QA domicilio reutilizable 900');
+    await page.getByRole('button', { name: new RegExp(`^Paso 3 de ${actor.total}: Domicilios$`) }).click();
+    await page.getByRole('button', { name: 'Usar domicilio declarado', exact: true }).click();
+    await page.getByRole('button', { name: 'Copiar domicilio legal', exact: true }).click();
+    const legal = page.getByRole('region', { name: 'Domicilio legal', exact: true });
+    const real = page.getByRole('region', { name: 'Domicilio real', exact: true });
+    await real.getByLabel('Calle', { exact: true }).fill('QA planta diferente 901');
+    await expect(legal.getByLabel('Calle', { exact: true })).toHaveValue('QA domicilio reutilizable 900');
+    await page.getByLabel('Coordenadas Geograficas', { exact: true }).fill('91, -68');
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+    await expect(page.getByLabel('Coordenadas Geograficas', { exact: true })).toBeFocused();
+    await expect(page.getByLabel('Coordenadas Geograficas', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+    await page.getByLabel('Coordenadas Geograficas', { exact: true }).fill('0, -68');
+    await save(page, draft.solicitudId); await page.reload();
+    await expect(real.getByLabel('Calle', { exact: true })).toHaveValue('QA planta diferente 901');
+    await expect(legal.getByLabel('Calle', { exact: true })).toHaveValue('QA domicilio reutilizable 900');
+    await layout(page); await page.screenshot({ path: info.outputPath(`${actor.type}-address-reused.png`), animations: 'disabled' });
+  }
   expect(sends).toEqual([]); expect(errors).toEqual([]);
 });
 
@@ -84,6 +111,8 @@ for (const actor of actors) test(`${actor.type}: administrative draft recovers w
   page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === `/api/actores/${actor.plural}`) creations.push(request.url()); });
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`${prefix(info)}/admin/actores/${actor.plural}/nuevo`);
+  await page.getByRole('button', { name: actor.type === 'transportista' ? 'Siguiente' : 'Continuar', exact: true }).click();
+  await expect(page.getByLabel('Razon Social *', { exact: true })).toBeFocused();
   await page.getByLabel('Razon Social *', { exact: true }).fill(`QA borrador administrativo ${actor.type}`);
   await page.getByLabel('CUIT *', { exact: true }).fill('30-70876543-1');
   await page.getByLabel('Email *', { exact: true }).fill(`${actor.type}-draft@night-qa.invalid`);
@@ -117,6 +146,7 @@ for (const actor of actors) test(`${actor.type}: administrative draft recovers w
     await coordinates.fill('not-a-number, -68');
     await page.getByRole('button', { name: 'Continuar', exact: true }).click();
     await expect(coordinates).toHaveAttribute('aria-invalid', 'true');
+    await expect(coordinates).toBeFocused();
     await expect(coordinates).toHaveValue('not-a-number, -68');
     await coordinates.fill(original);
     await layout(page); await page.screenshot({ path: info.outputPath(`${actor.type}-verified-location.png`), animations: 'disabled' });

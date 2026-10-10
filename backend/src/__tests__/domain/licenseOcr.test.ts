@@ -8,8 +8,54 @@ function tsv(lines: Array<Array<[string, number]>>) {
   return [header, ...lines.flatMap((words, line) => words.map(([word, confidence], index) =>
     ['5', '1', '1', '1', String(line + 1), String(index + 1), '0', '0', '10', '10', String(confidence), word].join('\t')))].join('\n');
 }
+function spatialTsv(words: Array<[string, number, number, number, number?, number?]>) {
+  return [header, ...words.map(([word, confidence, left, width, top = 630, height = 50], index) =>
+    ['5', '1', '1', '1', '1', String(index + 1), String(left), String(top), String(width), String(height), String(confidence), word].join('\t'))].join('\n');
+}
+
+describe('explicit whole DNI beside its label survives unrelated image clutter', () => {
+  it.each(['D.U.', 'DU', 'DNI:', 'D.N.I.'])('recovers %s without removing uncertainty inside the identifier', label => {
+    const text = confidentLicenseText(spatialTsv([
+      ['?', 16, 14, 19], [label, 94, 79, 86], ['90012345', 96, 203, 283], ['noise', 20, 1139, 134],
+    ]));
+    expect(licenseFields(text)).toEqual({ dni: '90012345' });
+    expect(text).toContain('[?]'); // Distant noise is retained, not silently trusted.
+  });
+  it.each(([
+    [['D.U.', 94, 79, 86], ['900123', 96, 203, 200], ['45', 20, 410, 75]],
+    [['D.U.', 94, 79, 86], ['90012345', 96, 203, 283], ['6', 20, 490, 35]],
+    [['D.U.', 94, 79, 86], ['90012345', 40, 203, 283], ['noise', 20, 1139, 134]],
+    [['D.U.', 40, 79, 86], ['90012345', 96, 203, 283], ['noise', 20, 1139, 134]],
+  ] as Array<Array<[string, number, number, number]>>).map(words => ({ words })))('does not skip an uncertain label, value or adjacent continuation: $words', ({ words }) => {
+    expect(licenseFields(confidentLicenseText(spatialTsv(words))).dni).toBeUndefined();
+  });
+  it.each(([
+    [['D.U.', 94, 79, 86], ['90012345', 96, 900, 283], ['noise', 20, 1400, 134]],
+    [['D.U.', 94, 79, 86, 630, 50], ['90012345', 96, 203, 283, 720, 50], ['noise', 20, 1139, 134]],
+    [['D.U.', 94, -79, 86], ['90012345', 96, 203, 283], ['noise', 20, 1139, 134]],
+    [['D.U.', 94, 79, 86], ['90012345', 96, 203, Number.NaN], ['noise', 20, 1139, 134]],
+  ] as Array<Array<[string, number, number, number, number?, number?]>>).map(words => ({ words })))('does not recover unrelated or malformed spatial values: $words', ({ words }) => {
+    expect(licenseFields(confidentLicenseText(spatialTsv(words))).dni).toBeUndefined();
+  });
+  it('does not pick one of conflicting DNI labels or convert control/seal numbers into identity', () => {
+    const conflict = spatialTsv([['D.U.', 94, 79, 86], ['90012345', 96, 203, 283], ['DNI:', 94, 600, 90], ['90054321', 96, 730, 283]]);
+    expect(licenseFields(confidentLicenseText(conflict))).toEqual({});
+    const control = spatialTsv([['N°', 96, 79, 86], ['CONTROL', 96, 203, 200], ['90012345', 96, 500, 283], ['noise', 20, 1139, 134]]);
+    expect(licenseFields(confidentLicenseText(control))).toEqual({});
+  });
+  it('preserves conflict rejection between a recovered noisy line and another OCR pass', () => {
+    const recovered = confidentLicenseText(spatialTsv([['D.U.', 94, 79, 86], ['90012345', 96, 203, 283], ['noise', 20, 1139, 134]]));
+    expect(mergeLicenseText([recovered, 'DNI: 90054321'])).toBe('');
+  });
+});
 
 describe('license OCR retains only useful proposals, not apparent engine success', () => {
+  it('never interprets split provincial captions as somebody’s surname or given name', () => {
+    for (const caption of ['APELLIDO Y NOMBRE', 'APELLIDO\nY NOMBRE', 'DOCUMENTO,\nAPELLIDO\nY NOMBRE']) {
+      expect(licenseFields(caption)).toEqual({});
+      expect(mergeLicenseText([caption])).toBe('');
+    }
+  });
   it('groups actual TSV lines and reads provincial DU/captions, without license/control invention', () => {
     const text = confidentLicenseText(tsv([
       [['D.U.', 91], ['90012345', 96]], [['PEREZ,', 92], ['ANA', 96], ['QA', 89]],

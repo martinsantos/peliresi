@@ -1,9 +1,39 @@
 import { licenseFields, type LicenseFields } from './licenseReading';
 
+type LicenseWord = { text: string; confidence: number; left: number; top: number; width: number; height: number };
+
+/** Recover only a WHOLE labelled word, never fragments or skipped uncertainty. */
+function isolatedDni(words: LicenseWord[]): string | undefined {
+  const isLabel = (word: LicenseWord) => /^(?:d\.?u\.?|d\.?n\.?i\.?)[:.-]?$/i.test(word.text);
+  // Multiple labels on one OCR line are ambiguous; do not choose one identity.
+  const labels = words.filter(isLabel);
+  if (labels.length !== 1) return;
+  const index = words.indexOf(labels[0]), label = words[index], value = words[index + 1];
+  if (!value || !/^\d{6,9}$/.test(value.text)) return;
+  // Spatial recovery is stricter than the established plain-line reader. Its
+  // confidence floor (55) and uncertainty barriers remain unchanged below.
+  if (![label, value].every(word => Number.isFinite(word.confidence) && word.confidence >= 80 && word.confidence <= 100)) return;
+  const validBox = (word: LicenseWord) => [word.left, word.top, word.width, word.height].every(Number.isInteger)
+    && word.left >= 0 && word.top >= 0 && word.width > 0 && word.height > 0
+    && word.left + word.width <= 1800 && word.top + word.height <= 1800;
+  if (!words.every(validBox)) return;
+  const sameRow = (a: LicenseWord, b: LicenseWord) =>
+    Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top) >= Math.min(a.height, b.height) * 0.6;
+  const margin = Math.max(label.height, value.height) * 1.5;
+  const gap = value.left - label.left - label.width;
+  if (gap < 0 || gap > margin || !sameRow(label, value)) return;
+  // An adjacent extra token may be part of the identifier, even at low engine
+  // confidence. Only proven distant clutter may be outside the labelled region.
+  if (words.some((word, position) => position !== index && position !== index + 1
+    && sameRow(value, word) && word.left + word.width > label.left && word.left < value.left + value.width + margin)) return;
+  return value.text;
+}
+
 /** Confidence is an engine score, never an identity/validity guarantee. */
 export function confidentLicenseText(tsv: string): string {
   if (!tsv.startsWith('level\tpage_num\t')) throw new Error('INVALID_OCR_TSV');
   const lines = new Map<string, string[]>();
+  const spatialLines = new Map<string, LicenseWord[]>();
   for (const row of tsv.split(/\r?\n/).slice(1)) {
     const cells = row.split('\t');
     if (cells[0] !== '5') continue;
@@ -11,6 +41,9 @@ export function confidentLicenseText(tsv: string): string {
     const confidence = Number(cells[10]), word = cells[11].trim();
     if (!word) continue;
     const key = cells.slice(1, 5).join(':');
+    const tokens = spatialLines.get(key) || [];
+    tokens.push({ text: word, confidence, left: Number(cells[6]), top: Number(cells[7]), width: Number(cells[8]), height: Number(cells[9]) });
+    spatialLines.set(key, tokens);
     const accepted = Number.isFinite(confidence) && confidence >= 55 && confidence <= 100;
     // Removing an uncertain digit/name token could silently create a different
     // valid value. Keep a barrier instead; only stray punctuation can be dropped.
@@ -18,7 +51,10 @@ export function confidentLicenseText(tsv: string): string {
     const words = lines.get(key) || [];
     words.push(accepted ? word : '[?]'); lines.set(key, words);
   }
-  return [...lines.values()].map(words => words.join(' ')).join('\n').slice(0, 48_000);
+  const recovered = [...spatialLines.values()].map(isolatedDni).filter((value): value is string => Boolean(value));
+  // Keep original uncertainty and every candidate so existing conflict checks
+  // still reject different identities within a read or across native passes.
+  return [...lines.values()].map(words => words.join(' ')).concat(recovered.map(value => `DNI: ${value}`)).join('\n').slice(0, 48_000);
 }
 
 /** O(n), at most 1800² pixels; compensate local shadows without changing originals. */
