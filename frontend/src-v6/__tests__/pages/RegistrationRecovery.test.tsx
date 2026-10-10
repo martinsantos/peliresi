@@ -47,6 +47,60 @@ describe('a real registration UI protects the current step and account boundary'
     const response = request('other'); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
     await open(); expect(screen.queryByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeNull(); expect(screen.getByRole('button', { name: 'Iniciar sesión y recuperar' })).toBeVisible();
   });
+  it('refreshes the exact owned request without navigating a draft token to a protected account page', async () => {
+    const response = request(); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
+    await open(); mock.get.mockClear();
+    const approved = request(); approved.data.data.solicitud.estado = 'APROBADA'; mock.get.mockResolvedValue(approved);
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado', exact: true }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Solicitud aprobada', exact: true })).toBeVisible());
+    expect(mock.get).toHaveBeenCalledOnce(); expect(mock.get).toHaveBeenCalledWith('/solicitudes/draft');
+    expect(screen.queryByRole('button', { name: 'Ver mi solicitud', exact: true })).toBeNull();
+    expect(mock.post).not.toHaveBeenCalled(); expect(mock.put).not.toHaveBeenCalled();
+  });
+  it('keeps the last confirmed receipt and reports a failed refresh without inventing approval', async () => {
+    const response = request(); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
+    await open(); mock.get.mockRejectedValue(new Error('QA sin conexión'));
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado', exact: true }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo actualizar el estado'));
+    expect(screen.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Solicitud aprobada', exact: true })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Actualizar estado', exact: true })).toBeEnabled();
+    expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('rejects a refresh response that belongs to a different request', async () => {
+    const response = request(); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
+    await open(); const foreign = request(); foreign.data.data.solicitud.id = 'another'; foreign.data.data.solicitud.estado = 'APROBADA'; mock.get.mockResolvedValue(foreign);
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado', exact: true }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se pudo actualizar el estado'));
+    expect(screen.queryByRole('heading', { name: 'Solicitud aprobada', exact: true })).toBeNull();
+    expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('returns an observed request to its owned editable fields rather than claiming it was approved', async () => {
+    const response = request(); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
+    await open(); const observed = request(); observed.data.data.solicitud.estado = 'OBSERVADA'; observed.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA corregir datos' }); mock.get.mockResolvedValue(observed);
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estado', exact: true }));
+    await waitFor(() => expect(screen.getByPlaceholderText('Empresa S.A.')).toHaveValue('QA corregir datos'));
+    expect(screen.queryByRole('heading', { name: 'Solicitud aprobada', exact: true })).toBeNull();
+    expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('displays the rejection reason only from the verified owned request', async () => {
+    const response = request(); Object.assign(response.data.data.solicitud, { estado: 'RECHAZADA', motivoRechazo: 'QA documentación a corregir' }); mock.get.mockResolvedValue(response);
+    await open(); expect(screen.getByText('QA documentación a corregir', { exact: false })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Solicitud rechazada', exact: true })).toBeVisible();
+  });
+  it('blocks duplicate refreshes and discards a late receipt after the account changes', async () => {
+    const response = request(); response.data.data.solicitud.estado = 'ENVIADA'; mock.get.mockResolvedValue(response);
+    await open(); mock.get.mockClear(); let finish!: (value: unknown) => void;
+    mock.get.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const button = screen.getByRole('button', { name: 'Actualizar estado', exact: true });
+    act(() => { fireEvent.click(button); fireEvent.click(button); });
+    expect(mock.get).toHaveBeenCalledOnce(); expect(mock.get).toHaveBeenCalledWith('/solicitudes/draft');
+    mock.token = session('other'); fireEvent(window, new StorageEvent('storage', { key: 'sitrep_access_token' }));
+    const approved = request(); approved.data.data.solicitud.estado = 'APROBADA'; await act(async () => finish(approved));
+    expect(screen.queryByRole('heading', { name: 'Solicitud aprobada', exact: true })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Iniciar sesión y recuperar' })).toBeVisible();
+  });
   it('reconciles a lost submission acknowledgement against the owned server record without a second send', async () => {
     const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA alta', domicilio: 'QA Registro 100' });
     mock.get.mockImplementation(async () => response);

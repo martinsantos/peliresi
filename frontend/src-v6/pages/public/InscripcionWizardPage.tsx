@@ -50,8 +50,8 @@ type ReceivedState = Exclude<EstadoSolicitud, 'BORRADOR' | 'OBSERVADA'>;
 const RECEIVED_STATES: Record<ReceivedState, { title: string; detail: string }> = {
   ENVIADA: { title: 'Solicitud enviada', detail: 'SITREP recibió tu solicitud. No hace falta volver a enviarla.' },
   EN_REVISION: { title: 'Solicitud enviada', detail: 'Tu solicitud está en revisión por la administración. No hace falta volver a enviarla.' },
-  APROBADA: { title: 'Solicitud aprobada', detail: 'La administración aprobó tu solicitud. Podés consultar el resultado y continuar por el acceso de tu cuenta.' },
-  RECHAZADA: { title: 'Solicitud rechazada', detail: 'La administración registró un rechazo. Consultá el motivo y las comunicaciones de tu trámite.' },
+  APROBADA: { title: 'Solicitud aprobada', detail: 'La administración aprobó tu solicitud. La aprobación del trámite no reemplaza la verificación de acceso de tu cuenta.' },
+  RECHAZADA: { title: 'Solicitud rechazada', detail: 'La administración registró un rechazo. Revisá el motivo de tu trámite.' },
 };
 function receivedState(value: unknown): value is ReceivedState {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(RECEIVED_STATES, value);
@@ -114,6 +114,10 @@ const InscripcionWizardPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [confirmedState, setConfirmedState] = useState<ReceivedState | null>(null);
+  const [confirmedReason, setConfirmedReason] = useState<string | null>(null);
+  const [refreshingReceipt, setRefreshingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const receiptInFlight = useRef(false);
   const [regError, setRegError] = useState<string | null>(null);
   const activeStepRef = useRef<HTMLButtonElement>(null);
   const draftScope = `public:${tipoActor}:${solicitudId || ''}`;
@@ -183,6 +187,8 @@ const InscripcionWizardPage: React.FC = () => {
       if (!accountAtStart || solicitud.usuarioId !== accountAtStart || registrationSessionOwner(getAccessToken()) !== accountAtStart) throw new Error('La sesión no pertenece a este borrador');
       if (receivedState(solicitud.estado)) {
         setOwner(accountAtStart); setSolicitudId(solicitud.id); setConfirmedState(solicitud.estado);
+        setConfirmedReason(solicitud.estado === 'RECHAZADA' && typeof solicitud.motivoRechazo === 'string' ? solicitud.motivoRechazo : null);
+        setReceiptError(null);
         setDirty(false); setSubmitSuccess(true); setResumeStatus('loaded');
         void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
         clearRegistrationDraft(accountAtStart, `public:${tipoActor}:${solicitud.id}`);
@@ -233,21 +239,24 @@ const InscripcionWizardPage: React.FC = () => {
     }));
   }, [isReviewMode, submitSuccess, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
 
-  useEffect(() => {
-    if (!owner) return;
-    const accountChanged = () => {
-      if (registrationSessionOwner(getAccessToken()) === owner) return;
+  const clearVisibleAccount = useCallback(() => {
       setForm({}); setAdjuntos({}); setUploadedDocs({}); setOwner(null);
       serverExtraFields.current = {};
       setLocalConflict(null); setMissingLocalFiles([]); setDirty(false); setLocalSaved(false);
       setReg({ nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
-      setConfirmedState(null); setSubmitSuccess(false);
+      setConfirmedState(null); setConfirmedReason(null); setReceiptError(null); setSubmitSuccess(false); setSolicitudId(null);
       setResumeStatus('error'); setPhase(1);
+  }, []);
+  useEffect(() => {
+    if (!owner) return;
+    const accountChanged = () => {
+      if (registrationSessionOwner(getAccessToken()) === owner) return;
+      clearVisibleAccount();
     };
     window.addEventListener('storage', accountChanged);
     window.addEventListener('focus', accountChanged);
     return () => { window.removeEventListener('storage', accountChanged); window.removeEventListener('focus', accountChanged); };
-  }, [owner]);
+  }, [owner, clearVisibleAccount]);
 
   useEffect(() => {
     if (isReviewMode || submitSuccess || (!dirty && Object.keys(adjuntos).length === 0)) return undefined;
@@ -432,6 +441,32 @@ const InscripcionWizardPage: React.FC = () => {
     } finally { uploadsInFlight.current.delete(tipo); }
   };
 
+  // A pre-verification credential is limited to this exact request. It cannot
+  // open the private account dashboard or list other requests. Follow its real
+  // state here without pretending that account authentication is complete.
+  const handleRefreshReceipt = async () => {
+    if (receiptInFlight.current || isReviewMode || !owner || !solicitudId) return;
+    receiptInFlight.current = true; setRefreshingReceipt(true); setReceiptError(null);
+    try {
+      if (registrationSessionOwner(getAccessToken()) !== owner) { clearVisibleAccount(); return; }
+      const response = await api.get(`/solicitudes/${solicitudId}`);
+      if (registrationSessionOwner(getAccessToken()) !== owner) { clearVisibleAccount(); return; }
+      const actual = response.data?.data?.solicitud;
+      if (actual?.id !== solicitudId || actual.usuarioId !== owner || actual.tipoActor !== tipoActor) throw new Error('La respuesta no corresponde a tu solicitud');
+      if (['BORRADOR', 'OBSERVADA'].includes(actual.estado)) {
+        setResumeStatus('loading'); setSubmitSuccess(false); setConfirmedState(null); setConfirmedReason(null);
+        setResumeAttempt(value => value + 1);
+        return;
+      }
+      if (!receivedState(actual.estado)) throw new Error('Estado de solicitud no reconocido');
+      setConfirmedState(actual.estado);
+      setConfirmedReason(actual.estado === 'RECHAZADA' && typeof actual.motivoRechazo === 'string' ? actual.motivoRechazo : null);
+    } catch {
+      if (registrationSessionOwner(getAccessToken()) !== owner) { clearVisibleAccount(); return; }
+      setReceiptError('No se pudo actualizar el estado. Se muestra el último resultado confirmado por SITREP. Revisá la conexión y reintentá.');
+    } finally { receiptInFlight.current = false; setRefreshingReceipt(false); }
+  };
+
   const handleSubmit = async () => {
     if (saveInFlight.current || submitInFlight.current) return;
     if (uploadsInFlight.current.size) { setRegError('Esperá a que termine la carga de documentos antes de enviar.'); return; }
@@ -494,6 +529,7 @@ const InscripcionWizardPage: React.FC = () => {
           if (registrationSessionOwner(getAccessToken()) === owner && actual?.id === solicitudId
               && actual.usuarioId === owner && actual.tipoActor === tipoActor && receivedState(actual.estado)) {
             setConfirmedState(actual.estado); setSubmitSuccess(true); setDirty(false); setRegError(null);
+            setConfirmedReason(actual.estado === 'RECHAZADA' && typeof actual.motivoRechazo === 'string' ? actual.motivoRechazo : null);
             clearRegistrationDraft(owner, draftScope);
             void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
             return;
@@ -578,7 +614,7 @@ const InscripcionWizardPage: React.FC = () => {
     const CompletionIcon = isReviewMode || confirmedState === 'APROBADA' ? Check : confirmedState === 'RECHAZADA' ? AlertCircle : Send;
     return (
       <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-8 max-w-lg text-center">
+        <div className="min-w-0 w-full bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 sm:p-8 max-w-lg text-center">
           <div className="w-16 h-16 bg-[#0D8A4F]/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <CompletionIcon size={32} className={confirmedState === 'RECHAZADA' ? 'text-error-700' : 'text-[#0D8A4F]'} />
           </div>
@@ -588,8 +624,10 @@ const InscripcionWizardPage: React.FC = () => {
               ? 'Recorriste el formulario de prueba. No se creó ninguna cuenta, no se subieron archivos y no se envió ningún correo.'
               : receipt.detail}
           </p>
+          {confirmedReason && <p className="mb-4 break-words rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-800"><span className="font-semibold">Motivo del rechazo: </span>{confirmedReason}</p>}
+          {receiptError && <p role="alert" className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-800">{receiptError}</p>}
           <div className="flex flex-wrap justify-center gap-2">
-            {!isReviewMode && <Button variant="primary" onClick={() => navigate('/mi-solicitud')}>Ver mi solicitud</Button>}
+            {!isReviewMode && <Button variant="primary" disabled={refreshingReceipt} onClick={handleRefreshReceipt}>{refreshingReceipt ? 'Consultando estado…' : 'Actualizar estado'}</Button>}
             <Button variant={isReviewMode ? 'primary' : 'outline'} onClick={() => navigate(isReviewMode ? '/' : '/login')}>{isReviewMode ? 'Volver al inicio' : 'Ir al login'}</Button>
           </div>
         </div>

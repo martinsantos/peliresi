@@ -4,7 +4,9 @@ import { expect, test } from '@playwright/test';
 import { login, prefix } from './helpers';
 
 // These are UI actions against the isolated backend, not intercepted uploads.
-// The second PDF has an intentionally prohibited MIME; only that real 400 is expected.
+// The client rejects prohibited MIME before upload. The second selected PDF
+// instead has invalid bytes with an allowed MIME; that real server 400 must
+// leave the saved actor and the first confirmed document recoverable.
 for (const actor of [
   { path: 'generadores', key: 'generador', regulatory: 5, last: 6, second: 'Factura de Luz' },
   { path: 'operadores', key: 'operador', regulatory: 6, last: 7, second: 'Plan de Contingencia' },
@@ -38,6 +40,9 @@ for (const actor of [
   else await step.selectOption(String(actor.last));
   await page.getByLabel('Adjuntar Memoria Tecnica', { exact: true }).setInputFiles({ name: 'QA-valid.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\nQA synthetic upload') });
   await page.getByLabel(`Adjuntar ${actor.second}`, { exact: true }).setInputFiles({ name: 'QA-retry.pdf', mimeType: 'text/plain', buffer: Buffer.from('QA invalid MIME to reproduce partial failure') });
+  await expect(page.getByRole('alert', { name: 'Error al guardar' })).toContainText('PDF, JPG o PNG');
+  await expect(page.getByText('QA-retry.pdf', { exact: true })).toHaveCount(0);
+  await page.getByLabel(`Adjuntar ${actor.second}`, { exact: true }).setInputFiles({ name: 'QA-retry.pdf', mimeType: 'application/pdf', buffer: Buffer.from('QA invalid PDF signature to reproduce partial failure') });
   const response = page.waitForResponse(res => new URL(res.url()).pathname === `/api/actores/${actor.path}` && res.request().method() === 'POST');
   await page.getByRole('button', { name: 'Confirmar Registro', exact: true }).click();
   const registration = await response;

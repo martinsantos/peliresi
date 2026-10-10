@@ -100,11 +100,16 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Crear cuenta y continuar', exact: true })).toHaveCount(0);
-  const ownRequests = page.waitForResponse(response => new URL(response.url()).pathname === '/api/solicitudes/mis-solicitudes' && response.status() === 200);
-  await page.getByRole('button', { name: 'Ver mi solicitud', exact: true }).click();
-  const mine = (await (await ownRequests).json()).data.solicitudes;
-  expect(mine.some((record: { id: string; estado: string }) => record.id === candidate.id && record.estado === 'ENVIADA')).toBe(true);
-  await expect(page.getByRole('heading', { name: 'Mi Solicitud de Inscripcion', exact: true })).toBeVisible();
+  const ownRequest = page.waitForResponse(response => new URL(response.url()).pathname === `/api/solicitudes/${candidate.id}` && response.request().method() === 'GET');
+  await page.getByRole('button', { name: 'Actualizar estado', exact: true }).click();
+  const refreshed = await ownRequest; expect(refreshed.status()).toBe(200);
+  expect((await refreshed.json()).data.solicitud).toMatchObject({ id: candidate.id, estado: 'ENVIADA' });
+  await expect(page.getByRole('heading', { name: 'Solicitud enviada', exact: true })).toBeVisible();
+  // Do not broaden a pre-verification credential just to make a UI link work.
+  for (const endpoint of ['/api/solicitudes/mis-solicitudes', '/api/manifiestos']) {
+    const forbidden = await page.request.get(endpoint, { headers: { Authorization: candidate.authorization } });
+    expect(forbidden.status()).toBe(403);
+  }
   await login(page, info);
   await page.goto(`${prefix(info)}/admin/solicitudes/${candidate.id}`);
   if (actor !== 'transportista') {

@@ -100,7 +100,8 @@ for (const actor of actors) test(`${actor.type}: administrative draft recovers w
   await expect(page.getByLabel('Razon Social *', { exact: true })).toHaveValue(`QA ${actor.label} 1`);
   await expect(page.getByLabel('CUIT *', { exact: true })).toHaveValue(actor.cuit);
   if (actor.type !== 'transportista') {
-    await page.getByRole('button', { name: /^(?:\d+\. )?Domicilios$/ }).click();
+    if (info.project.name === 'web-desktop') await page.getByRole('button', { name: /^(?:\d+\. )?Domicilios$/ }).click();
+    else await page.getByRole('combobox', { name: 'Paso del registro', exact: true }).selectOption({ label: '2. Domicilios' });
     await expect(page.getByLabel('Coordenadas Geograficas', { exact: true })).toBeVisible();
     const coordinates = page.getByLabel('Coordenadas Geograficas', { exact: true }), original = await coordinates.inputValue();
     await coordinates.fill('not-a-number, -68');
