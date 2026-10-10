@@ -378,9 +378,13 @@ jobs:
           arch: x86_64
           profile: pixel_7
           emulator-boot-timeout: 600
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2
+          # Explicit DNS avoids inheriting an unreachable host stub resolver.
+          # No host rewriting, proxy, TLS bypass or ignored network errors.
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
           disable-animations: true
-          script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
+          script: |
+            adb shell dumpsys connectivity > "$QA_ARTIFACTS/android-emulator-network.txt"
+            node --experimental-strip-types frontend/cloud-qa/android-run.ts
       - name: Package the exact tested backend, web and app bytes only after every gate passes
         if: success() && inputs.unit && inputs.android && !inputs.multiuser && !inputs.context_only && !inputs.alert_only && !inputs.support_only && !inputs.inspection_only
         run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts package
