@@ -19,6 +19,14 @@ type Props = {
 
 export function RegistrationFleetFields({ vehicles, drivers, onVehicles, onDrivers, section, attempted = false, readOnly = false, allowLicenseUpload = true, onLicense, documents = {} }: Props) {
   return <div className="space-y-7">
+    {section !== 'vehicles' && <section aria-label="Choferes del alta" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="flex items-center gap-2 text-lg font-bold text-neutral-900"><UserRound size={20} className="text-primary-800" />Choferes</h3>
+        {!readOnly && <Button variant="outline" leftIcon={<Plus size={16} />} disabled={drivers.length >= 100} onClick={() => onDrivers([...drivers, { ...EMPTY_DRIVER, key: crypto.randomUUID() }])}>{section ? 'Agregar' : 'Agregar chofer'}</Button>}</div>
+      {!drivers.length && <p className="text-sm text-neutral-700">Agregá un chofer. Podés leer su licencia para evitar transcribir sus datos.</p>}
+      {drivers.map((row, index) => <DriverFields key={row.key} row={row} index={index} attempted={attempted} readOnly={readOnly} allowLicenseUpload={allowLicenseUpload} document={documents[row.key]} onLicense={onLicense}
+        onChange={change => onDrivers(drivers.map(item => item.key === row.key ? { ...item, ...change } : item))}
+        onRemove={() => onDrivers(drivers.filter(item => item.key !== row.key))} />)}
+    </section>}
     {section !== 'drivers' && <section aria-label="Vehículos del alta" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="flex items-center gap-2 text-lg font-bold text-neutral-900"><Car size={20} className="text-primary-800" />Vehículos</h3>
         {!readOnly && <Button variant="outline" leftIcon={<Plus size={16} />} disabled={vehicles.length >= 100} onClick={() => onVehicles([...vehicles, { ...EMPTY_VEHICLE, key: crypto.randomUUID() }])}>{section ? 'Agregar' : 'Agregar vehículo'}</Button>}</div>
@@ -33,14 +41,6 @@ export function RegistrationFleetFields({ vehicles, drivers, onVehicles, onDrive
             onChange={event => onVehicles(vehicles.map(item => item.key === row.key ? { ...item, [field]: event.target.value } : item))} />)}
         </div>
       </fieldset>)}
-    </section>}
-    {section !== 'vehicles' && <section aria-label="Choferes del alta" className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="flex items-center gap-2 text-lg font-bold text-neutral-900"><UserRound size={20} className="text-primary-800" />Choferes</h3>
-        {!readOnly && <Button variant="outline" leftIcon={<Plus size={16} />} disabled={drivers.length >= 100} onClick={() => onDrivers([...drivers, { ...EMPTY_DRIVER, key: crypto.randomUUID() }])}>{section ? 'Agregar' : 'Agregar chofer'}</Button>}</div>
-      {!drivers.length && <p className="text-sm text-neutral-700">Agregá un chofer. Podés leer su licencia para evitar transcribir sus datos.</p>}
-      {drivers.map((row, index) => <DriverFields key={row.key} row={row} index={index} attempted={attempted} readOnly={readOnly} allowLicenseUpload={allowLicenseUpload} document={documents[row.key]} onLicense={onLicense}
-        onChange={change => onDrivers(drivers.map(item => item.key === row.key ? { ...item, ...change } : item))}
-        onRemove={() => onDrivers(drivers.filter(item => item.key !== row.key))} />)}
     </section>}
   </div>;
 }
@@ -74,8 +74,8 @@ function DriverFields({ row, index, attempted, readOnly, allowLicenseUpload, onC
   };
   return <fieldset disabled={readOnly} className="min-w-0 space-y-4 rounded-xl border border-neutral-300 p-4" aria-label={`Chofer ${index + 1}`}>
     <legend className="px-2 font-semibold text-neutral-900">Chofer {index + 1}{row.nombre ? ` · ${row.nombre} ${row.apellido}` : ''}</legend>
-    {!readOnly && <div className="flex flex-wrap items-center justify-between gap-2">
-      {allowLicenseUpload && <Button variant="outline" isLoading={busy} leftIcon={<ScanLine size={18} />} onClick={() => input.current?.click()}>Adjuntar licencia y leer</Button>}
+    {!readOnly && <div className="flex items-center justify-between gap-2">
+      {allowLicenseUpload && <Button aria-label="Adjuntar licencia y leer" variant="outline" isLoading={busy} leftIcon={<ScanLine size={18} />} onClick={() => input.current?.click()}><span className="sm:hidden">Leer licencia</span><span className="hidden sm:inline">Adjuntar licencia y leer</span></Button>}
       <Remove name={`Quitar chofer ${index + 1}`} onClick={onRemove} />
       {allowLicenseUpload && <input ref={input} type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only" aria-label={`Archivo de licencia del chofer ${index + 1}`} onChange={event => { const original = event.target.files?.[0]; event.target.value = ''; if (original) void read(original); }} />}
     </div>}

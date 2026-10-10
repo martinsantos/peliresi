@@ -72,7 +72,8 @@ test('trial: real license OCR, all actor drafts recover, and no application or a
   await expect(driver.getByLabel('DNI *', { exact: true })).toHaveValue(fields.dni);
   await page.getByRole('button', { name: 'Guardar borrador de prueba', exact: true }).click(); await page.reload();
   await expect(page.getByRole('group', { name: 'Chofer 2', exact: true }).getByLabel('Nombre *', { exact: true })).toHaveValue('JUAN');
-  await expect(page.getByText(/Los datos se recuperaron. Los archivos de prueba no se almacenan/)).toBeVisible();
+  await expect(page.getByText('Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.', { exact: true })).toBeVisible();
+  await page.getByRole('group', { name: 'Chofer 2', exact: true }).scrollIntoViewIfNeeded();
   await cleanLayout(page); await page.screenshot({ path: info.outputPath('trial-license-recovered.png'), animations: 'disabled' });
   expect(businessWrites).toEqual([]); expect(errors).toEqual([]); expect(await trialCounts()).toEqual(before);
 });
@@ -142,5 +143,11 @@ test('administrative transport uses the same driver and license controls without
   await driver.getByRole('button', { name: 'Usar datos seleccionados', exact: true }).click();
   await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click(); await page.reload(); await page.getByRole('button', { name: 'Recuperar borrador', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Chofer 1', exact: true }).getByLabel('DNI *', { exact: true })).toHaveValue('90000000');
+  const recoveredDriver = page.getByRole('group', { name: 'Chofer 1', exact: true });
+  const reader = await recoveredDriver.getByRole('button', { name: 'Adjuntar licencia y leer', exact: true }).boundingBox();
+  const remove = await recoveredDriver.getByRole('button', { name: 'Quitar chofer 1', exact: true }).boundingBox();
+  expect(reader).not.toBeNull(); expect(remove).not.toBeNull();
+  expect(reader!.height).toBeGreaterThanOrEqual(44); expect(remove!.height).toBeGreaterThanOrEqual(44);
+  expect(Math.abs(reader!.y + reader!.height / 2 - remove!.y - remove!.height / 2)).toBeLessThanOrEqual(1);
   await cleanLayout(page); await page.screenshot({ path: info.outputPath('administrative-driver-recovered.png'), animations: 'disabled' }); expect(creates).toEqual([]);
 });
