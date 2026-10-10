@@ -92,6 +92,16 @@ for (const actor of actors) test(`${actor.type}: administrative draft recovers w
   await page.getByRole('button', { name: 'Recuperar borrador', exact: true }).click();
   await expect(page.getByLabel('Razon Social *', { exact: true })).toHaveValue(`QA borrador administrativo ${actor.type}`);
   await expect(page.getByLabel('Email *', { exact: true })).toHaveValue(`${actor.type}-draft@night-qa.invalid`);
+  if (info.project.name !== 'web-desktop') {
+    await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+    const field = (await page.getByLabel('Razon Social *', { exact: true }).boundingBox())!;
+    expect(field.height).toBeGreaterThanOrEqual(44);
+    expect(field.y + field.height).toBeLessThanOrEqual(page.viewportSize()!.height * 0.72);
+    const information = page.getByRole('button', { name: 'Información del borrador', exact: true });
+    await expect(information).toHaveAttribute('aria-expanded', 'false');
+    const target = (await information.boundingBox())!; expect(target.height).toBeGreaterThanOrEqual(44); expect(target.width).toBeGreaterThanOrEqual(44);
+    console.log(JSON.stringify({ mobileRegistrationFold: actor.type, surface: info.project.name, fieldBottom: field.y + field.height, viewportHeight: page.viewportSize()!.height, maximum: page.viewportSize()!.height * 0.72 }));
+  }
   await layout(page); await page.screenshot({ path: info.outputPath(`${actor.type}-admin-recovered.png`), animations: 'disabled' });
   await page.getByLabel('CUIT *', { exact: true }).fill(actor.cuit);
   await page.getByRole('button', { name: 'Buscar en padrón', exact: true }).click();

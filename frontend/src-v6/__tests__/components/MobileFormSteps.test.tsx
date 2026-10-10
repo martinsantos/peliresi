@@ -16,4 +16,14 @@ describe('compact form navigation', () => {
     expect(validate).toHaveBeenCalledExactlyOnceWith(2);
     expect(screen.getByRole('combobox')).toHaveValue('1');
   });
+  it('retains complete accessible step identity in the compact registration variant', () => {
+    const validate = vi.fn();
+    render(<MobileFormSteps compact steps={steps} currentStep={2} onSelect={validate} />);
+    expect(screen.getByText('Paso 2/3')).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Paso del registro' })).toHaveValue('2');
+    expect(screen.getByRole('option', { name: '3. Representantes' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } });
+    expect(validate).toHaveBeenCalledOnce(); expect(validate).toHaveBeenCalledWith(1);
+    expect(screen.getByRole('combobox')).toHaveValue('2');
+  });
 });

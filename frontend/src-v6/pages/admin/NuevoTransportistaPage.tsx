@@ -269,9 +269,9 @@ const NuevoTransportistaPage: React.FC = () => {
   if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del transportista. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
       {/* Header */}
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
           Volver
         </Button>
@@ -290,7 +290,7 @@ const NuevoTransportistaPage: React.FC = () => {
       {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
 
       {/* Stepper */}
-      <MobileFormSteps steps={STEPS} currentStep={step} onSelect={goStep} />
+      <MobileFormSteps compact steps={STEPS} currentStep={step} onSelect={goStep} />
       <div className="hidden md:flex items-center justify-between bg-white rounded-2xl border border-neutral-200 p-4">
         {STEPS.map((s, i) => {
           const Icon = s.icon;

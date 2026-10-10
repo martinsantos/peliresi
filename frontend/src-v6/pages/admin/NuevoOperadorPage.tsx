@@ -401,15 +401,15 @@ const NuevoOperadorPage: React.FC = () => {
   if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del operador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
       {/* Header */}
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Button variant="outline" size="sm" className="shrink-0" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
         <div className="flex min-w-0 items-center gap-3">
           <div className="shrink-0 p-2 bg-blue-100 rounded-xl"><FlaskConical size={22} className="text-blue-600" /></div>
           <div className="min-w-0">
-            <h2 className="text-xl sm:text-2xl font-bold text-neutral-900">{isEdit ? 'Editar Operador' : 'Registro Provincial de Operadores de RRPP'}</h2>
-            <p className="text-sm text-neutral-500">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
+            <h2 aria-label={isEdit ? 'Editar Operador' : 'Registro Provincial de Operadores de RRPP'} className="text-xl sm:text-2xl font-bold text-neutral-900"><span className="sm:hidden">{isEdit ? 'Editar operador' : 'Alta de operador'}</span><span className="hidden sm:inline">{isEdit ? 'Editar Operador' : 'Registro Provincial de Operadores de RRPP'}</span></h2>
+            <p className="text-xs leading-5 text-neutral-600 sm:text-sm">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
           </div>
         </div>
       </div>
@@ -418,8 +418,8 @@ const NuevoOperadorPage: React.FC = () => {
       {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos que estaban pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
 
       {/* Stepper */}
-      <fieldset disabled={isPending || Boolean(savedActorId)} className="min-w-0 bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
-        <MobileFormSteps steps={STEPS} currentStep={step} onSelect={goStep} />
+      <fieldset disabled={isPending || Boolean(savedActorId)} className="min-w-0 md:bg-white md:rounded-2xl md:border md:border-neutral-200 md:p-4 md:shadow-sm">
+        <MobileFormSteps compact steps={STEPS} currentStep={step} onSelect={goStep} />
         <div className="hidden items-center justify-between md:flex">
           {STEPS.map((s, i) => {
             const Icon = s.icon;
