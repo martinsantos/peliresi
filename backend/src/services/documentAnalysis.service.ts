@@ -92,9 +92,11 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
     const image = path.join(temporary, 'ocr.png');
     await sharp(file.path, { limitInputPixels: 16_000_000 }).rotate().resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true }).grayscale().png().toFile(image);
     if (profile === 'LICENCIA') {
-      const args = (raster: string) => [raster, 'stdout', '-l', 'spa', '--oem', '1', '--tessdata-dir',
+      const enhancedArgs = (raster: string) => [raster, 'stdout', '-l', 'spa', '--oem', '1', '--tessdata-dir',
         path.join(__dirname, '..', 'assets', 'ocr'), '--psm', '6', '-c', 'tessedit_create_tsv=1'];
-      const reads = [confidentLicenseText(await runLocked('tesseract', args(image), deadline))];
+      // Keep the established model/segmentation for already-readable cards.
+      // A more expensive model is not invariably more accurate on every font.
+      const reads = [confidentLicenseText(await runLocked('tesseract', [image, 'stdout', '-l', 'spa', '--psm', '3', '-c', 'tessedit_create_tsv=1'], deadline))];
       const first = licenseFields(reads[0]); let warning: string | null = null;
       // Only one extra pass, with the SAME overall deadline and cross-worker
       // engine slot. Blue provincial backgrounds need local shadow compensation.
@@ -107,7 +109,7 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
           const pixels = adaptiveLicensePixels(raw.data, raw.info.width, raw.info.height);
           const adaptive = path.join(temporary, 'license-adaptive.png');
           await sharp(Buffer.from(pixels), { raw: { width: raw.info.width, height: raw.info.height, channels: 1 } }).png().toFile(adaptive);
-          reads.push(confidentLicenseText(await runLocked('tesseract', args(adaptive), deadline)));
+          reads.push(confidentLicenseText(await runLocked('tesseract', enhancedArgs(adaptive), deadline)));
         } catch (error) {
           if (!Object.keys(first).length) throw error;
           warning = 'Lectura parcial. Revisá las propuestas y completá manualmente los campos que falten.';

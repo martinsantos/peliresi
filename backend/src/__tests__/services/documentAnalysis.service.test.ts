@@ -77,12 +77,13 @@ function nativeLicenseTsv(text: string) {
 }
 
 describe('license profile is offline, bounded and isolated from payment OCR', () => {
-  it('uses the pinned model/TSV only for licenses and skips fallback when identity fields are already readable', async () => {
+  it('preserves the established Spanish page reader and skips enhanced fallback when identity fields are already readable', async () => {
     mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, nativeLicenseTsv('APELLIDO: QA\nNOMBRE: ANA\nDNI: 90012345\nVENCIMIENTO: 31/12/2027'), ''));
     const result = await readReceipt({ path: '/virtual/license.png', mimeType: 'image/png' }, 'LICENCIA');
     expect(result).toMatchObject({ lectura: 'LEIDO', motor: 'TESSERACT', texto: expect.stringContaining('DNI: 90012345') });
     expect(mock.exec).toHaveBeenCalledTimes(1); expect(mock.toBuffer).not.toHaveBeenCalled();
-    expect(mock.exec.mock.calls[0][1]).toEqual(expect.arrayContaining(['--oem', '1', '--tessdata-dir', '--psm', '6', 'tessedit_create_tsv=1']));
+    expect(mock.exec.mock.calls[0][1]).toEqual(expect.arrayContaining(['--psm', '3', 'tessedit_create_tsv=1']));
+    expect(mock.exec.mock.calls[0][1]).not.toContain('--tessdata-dir');
     expect(result.alcance).toContain('no acredita identidad ni vigencia');
   });
   it('tries exactly one shadow-compensated pass, preserves the first read, and does not invent expiry/license number', async () => {
@@ -91,6 +92,8 @@ describe('license profile is offline, bounded and isolated from payment OCR', ()
     const result = await readReceipt({ path: '/virtual/license.jpg', mimeType: 'image/jpeg' }, 'LICENCIA');
     expect(result).toMatchObject({ lectura: 'LEIDO', texto: 'APELLIDO: PEREZ\nNOMBRE: ANA QA\nDNI: 90012345' });
     expect(mock.exec).toHaveBeenCalledTimes(2); expect(mock.toBuffer).toHaveBeenCalledTimes(1);
+    expect(mock.exec.mock.calls[0][1]).not.toContain('--tessdata-dir');
+    expect(mock.exec.mock.calls[1][1]).toEqual(expect.arrayContaining(['--oem', '1', '--tessdata-dir', '--psm', '6', 'tessedit_create_tsv=1']));
     expect(mock.exec.mock.calls[1][2].timeout).toBeLessThanOrEqual(mock.exec.mock.calls[0][2].timeout);
   });
   it('reports no usable fields from a reverse/noise instead of presenting garbage as success', async () => {
