@@ -20,6 +20,10 @@ import { toast } from '../../components/ui/Toast';
 import DocumentUpload from '../../components/DocumentUpload';
 import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
 import { ActorRegistrationDraftBar } from '../../components/ActorRegistrationDraftBar';
+import { ActorContactFields, TransportAuthorizationFields } from '../../components/registration/ActorFields';
+import { RegistrationFleetFields } from '../../components/registration/RegistrationFleetFields';
+import { EMPTY_VEHICLE as EMPTY_VEHICULO, EMPTY_DRIVER as EMPTY_CHOFER, fleetRows, licenseDocumentType, type VehicleDraft as VehiculoForm, type DriverDraft as ChoferForm } from '../../services/registrationFleet';
+import { previewDocument } from '../../services/documentPreview';
 import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
 import { restoreRegistrationForm } from '../../services/registrationDraft';
 import { generadorFiscalService, transportistaDocumentoService, type Documento } from '../../services/generador-fiscal.service';
@@ -29,27 +33,6 @@ import {
   useUpdateTransportista,
 } from '../../hooks/useActores';
 
-interface VehiculoForm {
-  patente: string;
-  marca: string;
-  modelo: string;
-  anio: string;
-  capacidad: string;
-  numeroHabilitacion: string;
-  vencimiento: string;
-}
-
-interface ChoferForm {
-  nombre: string;
-  apellido: string;
-  dni: string;
-  licencia: string;
-  vencimiento: string;
-  telefono: string;
-}
-
-const EMPTY_VEHICULO: VehiculoForm = { patente: '', marca: '', modelo: '', anio: '', capacidad: '', numeroHabilitacion: '', vencimiento: '' };
-const EMPTY_CHOFER: ChoferForm = { nombre: '', apellido: '', dni: '', licencia: '', vencimiento: '', telefono: '' };
 const INITIAL_FORM = {
   razonSocial: '', cuit: '', domicilio: '', localidad: '', telefono: '', email: '', password: '', nombre: '',
   numeroHabilitacion: '', vencimientoHabilitacion: '', coordenadas: '', corrientesAutorizadas: '', expedienteDPA: '',
@@ -91,8 +74,8 @@ const NuevoTransportistaPage: React.FC = () => {
   const draft = useActorRegistrationDraft('TRANSPORTISTA', id, draftData, data => {
     setPendingDocuments({}); setDocumentError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
-    setVehiculos(Array.isArray(data.vehiculos) ? data.vehiculos.map(value => restoreRegistrationForm(EMPTY_VEHICULO, value)) : []);
-    setChoferes(Array.isArray(data.choferes) ? data.choferes.map(value => restoreRegistrationForm(EMPTY_CHOFER, value)) : []);
+    setVehiculos(fleetRows(data.vehiculos, EMPTY_VEHICULO));
+    setChoferes(fleetRows(data.choferes, EMPTY_CHOFER));
     setSavedActorId(typeof data.savedActorId === 'string' ? data.savedActorId : null);
     setSavedDocuments(Array.isArray(data.savedDocuments) ? data.savedDocuments : []);
     setStep(data.savedActorId ? STEPS.length : Math.min(STEPS.length, Math.max(1, Number(data.step) || 1)));
@@ -124,7 +107,8 @@ const NuevoTransportistaPage: React.FC = () => {
       actaInspeccion2: t.actaInspeccion2 || '',
     });
     if (Array.isArray(t.vehiculos)) {
-      setVehiculos(t.vehiculos.map((v: any) => ({
+      setVehiculos(t.vehiculos.map((v: any, index: number) => ({
+        key: v.id || `legacy-vehicle-${index}`,
         patente: v.patente || '', marca: v.marca || '', modelo: v.modelo || '',
         anio: v.anio ? String(v.anio) : '', capacidad: v.capacidad != null ? String(v.capacidad) : '',
         numeroHabilitacion: v.numeroHabilitacion || '',
@@ -132,7 +116,8 @@ const NuevoTransportistaPage: React.FC = () => {
       })));
     }
     if (Array.isArray(t.choferes)) {
-      setChoferes(t.choferes.map((c: any) => ({
+      setChoferes(t.choferes.map((c: any, index: number) => ({
+        key: c.id || `legacy-driver-${index}`,
         nombre: c.nombre || '', apellido: c.apellido || '', dni: c.dni || '',
         licencia: c.licencia || '',
         vencimiento: c.vencimiento ? new Date(c.vencimiento).toISOString().split('T')[0] : '',
@@ -324,20 +309,9 @@ const NuevoTransportistaPage: React.FC = () => {
         {step === 1 && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Truck size={20} className="text-orange-600" /> Datos Basicos</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Razon Social *" value={form.razonSocial} onChange={e => up('razonSocial', e.target.value)} errorMessage={attempted.has(1) && !form.razonSocial.trim() ? 'La razón social es obligatoria' : undefined} placeholder="Transporte S.A." />
-              <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} errorMessage={attempted.has(1) && !form.cuit.trim() ? 'El CUIT es obligatorio' : undefined} placeholder="30-12345678-9" />
-            </div>
+            <ActorContactFields form={form} up={up} administrative attempted={attempted.has(1)} placeholder="Transporte S.A." identitySlot={<Input label="CUIT *" value={form.cuit} onChange={e => up("cuit", e.target.value)} errorMessage={attempted.has(1) && !form.cuit.trim() ? "El CUIT es obligatorio" : undefined} placeholder="30-12345678-9" />} />
             {!isEdit && !savedActorId && <ActorRegistryLookup type="TRANSPORTISTA" cuit={form.cuit} />}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Email *" type="email" value={form.email} onChange={e => up('email', e.target.value)} errorMessage={attempted.has(1) && !form.email.trim() ? 'El email es obligatorio' : undefined} placeholder="contacto@empresa.com" />
-              <Input label="Telefono" value={form.telefono} onChange={e => up('telefono', e.target.value)} placeholder="+54 261 ..." />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Domicilio" value={form.domicilio} onChange={e => up('domicilio', e.target.value)} placeholder="Av. Libertador 1234" />
-              <Input label="Localidad" value={form.localidad} onChange={e => up('localidad', e.target.value)} placeholder="Godoy Cruz, Mendoza" />
-            </div>
-            <Input label="Coordenadas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="-32.89, -68.83" errorMessage={attempted.has(1) && parseActorCoordinates(form.coordenadas) === null ? COORDINATE_ERROR : undefined} />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2"><Input label="Localidad" value={form.localidad} onChange={e => up("localidad", e.target.value)} placeholder="Godoy Cruz, Mendoza" /><Input label="Coordenadas" value={form.coordenadas} onChange={e => up("coordenadas", e.target.value)} placeholder="-32.89, -68.83" errorMessage={attempted.has(1) && parseActorCoordinates(form.coordenadas) === null ? COORDINATE_ERROR : undefined} /></div>
             {!isEdit && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Nombre Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />
@@ -347,27 +321,7 @@ const NuevoTransportistaPage: React.FC = () => {
           </div>
         )}
 
-        {step === 2 && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Shield size={20} className="text-orange-600" /> Habilitacion DPA</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="N Habilitacion" value={form.numeroHabilitacion} onChange={e => up('numeroHabilitacion', e.target.value)} placeholder="HAB-TR-XXXX" />
-              <Input label="Vencimiento Habilitacion" type="date" value={form.vencimientoHabilitacion} onChange={e => up('vencimientoHabilitacion', e.target.value)} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Expediente DPA" value={form.expedienteDPA} onChange={e => up('expedienteDPA', e.target.value)} placeholder="EXP-DPA-XXXX" />
-              <Input label="Resolucion DPA" value={form.resolucionDPA} onChange={e => up('resolucionDPA', e.target.value)} placeholder="0359/24" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Resolucion SSP" value={form.resolucionSSP} onChange={e => up('resolucionSSP', e.target.value)} placeholder="SSP-XXXX" />
-              <Input label="Corrientes Autorizadas" value={form.corrientesAutorizadas} onChange={e => up('corrientesAutorizadas', e.target.value)} placeholder="Y4, Y8, Y9" />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input label="Acta Inspeccion" value={form.actaInspeccion} onChange={e => up('actaInspeccion', e.target.value)} placeholder="rp-g000040" />
-              <Input label="Acta Inspeccion 2" value={form.actaInspeccion2} onChange={e => up('actaInspeccion2', e.target.value)} placeholder="" />
-            </div>
-          </div>
-        )}
+        {step === 2 && <div className="space-y-4"><h3 className="text-lg font-bold text-neutral-900">Habilitacion DPA</h3><TransportAuthorizationFields form={form} up={up} /></div>}
 
         {step === 3 && (isEdit ? (
           <section className="space-y-4" aria-label="Vehículos registrados">
@@ -380,36 +334,9 @@ const NuevoTransportistaPage: React.FC = () => {
             {vehiculos.length === 0 && <p className="text-sm text-neutral-600">Sin vehículos registrados.</p>}
           </section>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Car size={20} className="text-orange-600" /> Vehiculos</h3>
-              <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setVehiculos(prev => [...prev, { ...EMPTY_VEHICULO }])}>
-                Agregar
-              </Button>
-            </div>
-            {vehiculos.length === 0 && (
-              <p className="text-sm text-neutral-400 py-8 text-center">No hay vehiculos registrados. Presione "Agregar" para incluir uno.</p>
-            )}
-            {vehiculos.map((v, i) => (
-              <div key={i} className="border border-neutral-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-neutral-700">Vehiculo {i + 1}</span>
-                  <button onClick={() => setVehiculos(prev => prev.filter((_, j) => j !== i))} aria-label={`Quitar vehículo ${i + 1}`} type="button" className="min-h-11 min-w-11 inline-flex items-center justify-center text-error-700 hover:bg-error-50 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-error-700">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Input label="Patente *" value={v.patente} errorMessage={!isEdit && attempted.has(3) && !v.patente.trim() ? 'La patente es obligatoria' : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], patente: e.target.value }; setVehiculos(nv); }} placeholder="AB123CD" />
-                  <Input label="Marca" value={v.marca} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], marca: e.target.value }; setVehiculos(nv); }} placeholder="Mercedes" />
-                  <Input label="Modelo" value={v.modelo} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], modelo: e.target.value }; setVehiculos(nv); }} placeholder="Atego 1726" />
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Input label="Ano *" type="number" step="1" value={v.anio} errorMessage={!isEdit && attempted.has(3) && (!v.anio.trim() || !Number.isInteger(Number(v.anio))) ? 'El año debe ser un número entero' : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], anio: e.target.value }; setVehiculos(nv); }} placeholder="2024" />
-                  <Input label="Capacidad (kg) *" type="number" min="0" step="any" inputMode="decimal" value={v.capacidad} errorMessage={!isEdit && attempted.has(3) ? vehicleCapacityError(v.capacidad) : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], capacidad: e.target.value }; setVehiculos(nv); }} placeholder="10000" />
-                  <Input label="Habilitacion" value={v.numeroHabilitacion} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], numeroHabilitacion: e.target.value }; setVehiculos(nv); }} placeholder="VEH-XXXX" />
-                  <Input label="Vencimiento *" type="date" value={v.vencimiento} errorMessage={!isEdit && attempted.has(3) && (!v.vencimiento || !Number.isFinite(Date.parse(v.vencimiento))) ? 'Indicá el vencimiento' : undefined} onChange={e => { const nv = [...vehiculos]; nv[i] = { ...nv[i], vencimiento: e.target.value }; setVehiculos(nv); }} />
-                </div>
-              </div>
+          <RegistrationFleetFields section="vehicles" vehicles={vehiculos} drivers={choferes} onVehicles={setVehiculos} onDrivers={setChoferes} attempted={attempted.has(3)}
+            documents={Object.fromEntries(choferes.flatMap(driver => { const selected = pendingDocuments[licenseDocumentType(driver.key)]; return selected ? [[driver.key, { name: selected.file.name, status: 'Pendiente de guardar con el transportista' }]] : []; }))}
+            onLicense={async (key, file) => { if (!file.size || file.size > 10 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) throw new Error('Elegí un PDF, JPG o PNG de hasta 10 MB.'); setPendingDocuments(previous => ({ ...previous, [licenseDocumentType(key)]: { file } })); return previewDocument(file, 'LICENCIA'); }} />
             ))}
           </div>
         ))}
@@ -425,35 +352,9 @@ const NuevoTransportistaPage: React.FC = () => {
             {choferes.length === 0 && <p className="text-sm text-neutral-600">Sin choferes registrados.</p>}
           </section>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><User size={20} className="text-orange-600" /> Choferes</h3>
-              <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setChoferes(prev => [...prev, { ...EMPTY_CHOFER }])}>
-                Agregar
-              </Button>
-            </div>
-            {choferes.length === 0 && (
-              <p className="text-sm text-neutral-400 py-8 text-center">No hay choferes registrados. Presione "Agregar" para incluir uno.</p>
-            )}
-            {choferes.map((c, i) => (
-              <div key={i} className="border border-neutral-200 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-neutral-700">Chofer {i + 1}</span>
-                  <button onClick={() => setChoferes(prev => prev.filter((_, j) => j !== i))} aria-label={`Quitar chofer ${i + 1}`} type="button" className="min-h-11 min-w-11 inline-flex items-center justify-center text-error-700 hover:bg-error-50 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-error-700">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Input label="Nombre *" value={c.nombre} errorMessage={attempted.has(4) && !c.nombre.trim() ? 'El nombre es obligatorio' : undefined} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], nombre: e.target.value }; setChoferes(nc); }} placeholder="Juan" />
-                  <Input label="Apellido" value={c.apellido} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], apellido: e.target.value }; setChoferes(nc); }} placeholder="Perez" />
-                  <Input label="DNI *" value={c.dni} errorMessage={attempted.has(4) && !c.dni.trim() ? 'El DNI es obligatorio' : undefined} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], dni: e.target.value }; setChoferes(nc); }} placeholder="12345678" />
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Input label="Licencia" value={c.licencia} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], licencia: e.target.value }; setChoferes(nc); }} placeholder="LIC-XXXX" />
-                  <Input label="Vencimiento *" type="date" value={c.vencimiento} errorMessage={attempted.has(4) && (!c.vencimiento || !Number.isFinite(Date.parse(c.vencimiento))) ? 'Indicá el vencimiento' : undefined} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], vencimiento: e.target.value }; setChoferes(nc); }} />
-                  <Input label="Telefono" value={c.telefono} onChange={e => { const nc = [...choferes]; nc[i] = { ...nc[i], telefono: e.target.value }; setChoferes(nc); }} placeholder="261-XXXX" />
-                </div>
-              </div>
+          <RegistrationFleetFields section="drivers" vehicles={vehiculos} drivers={choferes} onVehicles={setVehiculos} onDrivers={setChoferes} attempted={attempted.has(4)}
+            documents={Object.fromEntries(choferes.flatMap(driver => { const selected = pendingDocuments[licenseDocumentType(driver.key)]; return selected ? [[driver.key, { name: selected.file.name, status: 'Pendiente de guardar con el transportista' }]] : []; }))}
+            onLicense={async (key, file) => { if (!file.size || file.size > 10 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) throw new Error('Elegí un PDF, JPG o PNG de hasta 10 MB.'); setPendingDocuments(previous => ({ ...previous, [licenseDocumentType(key)]: { file } })); return previewDocument(file, 'LICENCIA'); }} />
             ))}
           </div>
         ))}

@@ -8,18 +8,20 @@ import { SectionTitle } from '../SectionTitle';
 import type { DocDef } from '../shared';
 import type { DocumentoSolicitud } from '../../../../types/api';
 import { DocumentAnalysis } from '../../../../components/DocumentAnalysis';
+import type { ReceiptAnalysis } from '../../../../types/documentAnalysis';
 
 interface StepDocumentosProps {
   reviewMode?: boolean;
   docs: DocDef[];
   adjuntos: Record<string, File>;
   uploadedDocs: Record<string, DocumentoSolicitud>;
+  previewAnalyses?: Record<string, ReceiptAnalysis>;
   uploadStates: Record<string, 'uploading' | 'deleting' | 'reading' | 'downloading' | 'error' | undefined>;
   uploadErrors: Record<string, string | undefined>;
   requirementsStatus: 'loading' | 'loaded' | 'error';
   maxBytes: number;
   onRetryRequirements: () => void;
-  onAddFile: (tipo: string, file: File) => void | Promise<void>;
+  onAddFile: (tipo: string, file: File) => unknown | Promise<unknown>;
   onRemoveFile: (tipo: string) => void | Promise<void>;
   onRetryReading?: (tipo: string) => void | Promise<void>;
   onDownloadFile?: (tipo: string) => void | Promise<void>;
@@ -30,6 +32,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   docs,
   adjuntos,
   uploadedDocs,
+  previewAnalyses = {},
   uploadStates,
   uploadErrors,
   requirementsStatus,
@@ -60,8 +63,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   return (
     <div className="space-y-4">
       <SectionTitle icon={FileText} title="Documentos" />
-      <p className="text-sm leading-relaxed text-neutral-700">{reviewMode ? 'En esta revisión podés seleccionar archivos para recorrer el formulario. No se suben ni se guardan al salir.' : <>Los documentos marcados como <strong>Guardado</strong> quedan en tu solicitud y se recuperan al volver.</>}</p>
-      {reviewMode && <p className="text-sm leading-6 text-neutral-700">La lectura automática y el aviso de duplicados se ejecutan al guardar en un alta real; no se simulan en esta revisión.</p>}
+      <p className="text-sm leading-relaxed text-neutral-700">{reviewMode ? 'Probá la lectura real con un documento de prueba. El archivo se procesa temporalmente y se elimina: al volver se recuperan tus datos, no el archivo.' : <>Los documentos marcados como <strong>Guardado</strong> quedan en tu solicitud y se recuperan al volver.</>}</p>
+      {reviewMode && <p className="text-sm leading-6 text-neutral-700">La prueba no consulta recibos de otros usuarios ni registra pagos o avisos.</p>}
       <p className="text-sm text-neutral-500">Formatos aceptados: PDF, JPG y PNG. Máximo {(maxBytes / 1024 / 1024).toFixed(0)} MB por archivo.</p>
       <input
         ref={fileInputRef}
@@ -126,7 +129,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               {uploadErrors[doc.tipo] && <p className="mt-2 flex items-start gap-1.5 text-xs text-error-700" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{uploadErrors[doc.tipo]}</p>}
               {state === 'error' && pendingFile && <Button variant="outline" size="sm" className="mt-2" onClick={() => void onAddFile(doc.tipo, pendingFile)}>Reintentar {doc.nombre}</Button>}
               {doc.tipo === 'COMPROBANTE_PAGO' && !uploaded && <p className="mt-2 text-sm leading-6 text-neutral-700">Sellados tributarios: recibo de caja de banco o comprobante de transferencia. Se revisa el original; no se acredita automáticamente un pago de TEF.</p>}
-              <DocumentAnalysis analysis={pendingFile ? undefined : uploaded?.analisis} retrying={isBusy} onRetry={uploaded && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
+              <DocumentAnalysis analysis={reviewMode ? previewAnalyses[doc.tipo] : pendingFile ? undefined : uploaded?.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : 'document'} persisted={!reviewMode} retrying={isBusy} onRetry={(uploaded || reviewMode && pendingFile) && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
             </div>
           );
         })}

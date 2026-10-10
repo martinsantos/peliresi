@@ -7,6 +7,7 @@ import { SectionTitle } from '../SectionTitle';
 import type { RegistrationData, TipoActor } from '../shared';
 import type { DocumentoSolicitud } from '../../../../types/api';
 import { ZONAS } from '../../../../utils/calculoTEF';
+import { RegistrationFleetSummary } from '../../../../components/registration/RegistrationFleetSummary';
 
 interface StepResumenProps {
   reg: RegistrationData;
@@ -214,6 +215,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
           </div>
         </div>
       ))}
+      {isTransportista && <RegistrationFleetSummary form={form} />}
     </div>
   );
 };

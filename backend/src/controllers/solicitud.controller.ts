@@ -12,6 +12,8 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
 import { registrationActorFields } from '../domain/registrationActorData';
+import { registrationFleet, declaredLicenseDocument, isLicenseDocument } from '../domain/registrationFleet';
+import { licenseFields } from '../domain/licenseReading';
 import { describeDocument, readReceipt, mergeReceiptRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
 import {
   getMissingRequiredDocumentTypes,
@@ -294,9 +296,36 @@ export const updateSolicitud = async (req: AuthRequest, res: Response, next: Nex
 };
 
 /**
- * POST /solicitudes/:id/enviar
- * BORRADOR/OBSERVADA -> ENVIADA. Validate required fields.
+ * PATCH /solicitudes/:id/datos-revision
+ * Correct declarations during administrative review, with revision and history.
  */
+export const editarDatosRevision = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { datosActor, expectedUpdatedAt } = req.body;
+    if (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt))) throw new AppError('Recuperá la versión actual antes de corregir los datos.', 400);
+    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id }, include: { usuario: { select: { cuit: true } } } });
+    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
+    const changes = JSON.parse(jsonObject(datosActor));
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || current.estado !== 'EN_REVISION' || current.updatedAt.toISOString() !== expectedUpdatedAt) throw new AppError('La solicitud cambió o ya no está en revisión. Actualizá antes de guardar; tus cambios siguen en pantalla.', 409);
+      const previous = JSON.parse(jsonObject(current.datosActor));
+      const corrected = { ...previous, ...changes };
+      if (corrected.cuit && normalizeCuit(String(corrected.cuit)) !== solicitud.usuario.cuit) throw new AppError('El CUIT debe seguir correspondiendo a la cuenta solicitante.', 400);
+      registrationActorFields(solicitud.tipoActor, corrected);
+      const saved = await tx.solicitudInscripcion.update({ where: { id }, data: { datosActor: JSON.stringify(corrected), updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) } });
+      await tx.auditoria.create({ data: { accion: 'UPDATE', modulo: 'SOLICITUD', usuarioId: req.user!.id,
+        datosAntes: JSON.stringify({ solicitudId: id, datosActor: previous }), datosDespues: JSON.stringify({ solicitudId: id, datosActor: corrected }), ip: req.ip, userAgent: req.headers['user-agent'] } });
+      return saved;
+    });
+    res.json({ success: true, data: { solicitud: updated } });
+  } catch (error) { next(error); }
+};
+
+/** BORRADOR/OBSERVADA -> ENVIADA. Validate required data and documents. */
 export const enviarSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
@@ -327,6 +356,7 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
 
     const datosActor = JSON.parse(jsonObject(solicitud.datosActor));
     registrationActorFields(solicitud.tipoActor, datosActor);
+    if (solicitud.tipoActor === 'TRANSPORTISTA') registrationFleet(datosActor);
     if (!datosActor.razonSocial && !datosActor.nombre) {
       throw new AppError('La razon social o nombre es obligatorio', 400);
     }
@@ -412,26 +442,29 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
     if (solicitud.usuarioId !== req.user!.id) assertReviewPermission(req, solicitud);
 
     const requirement = getSolicitudRequirements(solicitud.tipoActor).find((item) => item.tipo === tipo);
-    if (!requirement) {
+    const license = isLicenseDocument(tipo) && solicitud.tipoActor === 'TRANSPORTISTA' && declaredLicenseDocument(JSON.parse(jsonObject(solicitud.datosActor)), tipo);
+    if (!requirement && !license) {
       throw new AppError('El tipo de documento no corresponde a esta inscripcion', 400);
     }
 
     const description = describeDocument(req.file);
-    const analysis = tipo === 'COMPROBANTE_PAGO' ? await readReceipt({ path: req.file.path, mimeType: description.mimeType }) : undefined;
+    const reading = tipo === 'COMPROBANTE_PAGO' || license ? await readReceipt({ path: req.file.path, mimeType: description.mimeType }) : undefined;
+    const analysis = reading && license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : reading;
     let previous: Array<{ id: string; path: string; sha256: string | null }> = [];
     const documento = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
       if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya fue enviada; no se reemplazó ningún archivo.', 409);
+      if (license && !declaredLicenseDocument(JSON.parse(jsonObject(current.datosActor)), tipo)) throw new AppError('El chofer cambió durante la carga. Guardá la lista y reintentá.', 409);
       previous = await tx.documentoSolicitud.findMany({ where: { solicitudId: id, tipo }, select: { id: true, path: true, sha256: true } });
       if (previous[0]?.sha256 === description.sha256) {
         const original = await tx.documentoSolicitud.findUniqueOrThrow({ where: { id: previous[0].id } });
         if (analysis && analysis.lectura === 'LEIDO' && (original.analisis as { lectura?: string } | null)?.lectura !== 'LEIDO') {
-          return tx.documentoSolicitud.update({ where: { id: original.id }, data: { analisis: mergeReceiptRead(original.analisis, analysis) } });
+          return tx.documentoSolicitud.update({ where: { id: original.id }, data: { analisis: license ? analysis : mergeReceiptRead(original.analisis, analysis) } });
         }
         return original;
       }
-      if (analysis) analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
+      if (analysis && !license) analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
       await tx.documentoSolicitud.deleteMany({ where: { solicitudId: id, tipo } });
       const saved = await tx.documentoSolicitud.create({
         data: {
@@ -444,7 +477,7 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
           estado: 'PENDIENTE',
         },
       });
-      if (analysis) await retainReceiptDigest(tx, description.sha256, saved.id, 'SOLICITUD');
+      if (analysis && !license) await retainReceiptDigest(tx, description.sha256, saved.id, 'SOLICITUD');
       if (analysis?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: saved.id });
       return saved;
     });
@@ -478,7 +511,8 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
     if (solicitud.usuarioId !== req.user?.id) assertReviewPermission(req, solicitud);
     const original = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
     if (!original || original.solicitudId !== id) throw new AppError('Documento no encontrado', 404);
-    if (original.tipo !== 'COMPROBANTE_PAGO') throw new AppError('La lectura automática corresponde a comprobantes de pago', 400);
+    const license = isLicenseDocument(original.tipo) && solicitud.tipoActor === 'TRANSPORTISTA';
+    if (original.tipo !== 'COMPROBANTE_PAGO' && !license) throw new AppError('La lectura automática corresponde a comprobantes o licencias de chofer', 400);
     if (!fs.existsSync(original.path)) throw new AppError('Archivo no disponible', 404);
     const description = describeDocument({ path: original.path, mimetype: original.mimeType });
     if (original.sha256 && original.sha256 !== description.sha256) throw new AppError('El archivo no coincide con su huella registrada; requiere revisión.', 409);
@@ -489,10 +523,10 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
       if (!current || current.solicitudId !== id || current.path !== original.path || current.sha256 !== original.sha256) {
         throw new AppError('El adjunto cambió durante la lectura. Actualizá la solicitud para continuar.', 409);
       }
-      reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
-      const analisis = mergeReceiptRead(current.analisis, reading);
+      if (!license) reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
+      const analisis = license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : mergeReceiptRead(current.analisis, reading);
       const saved = await tx.documentoSolicitud.update({ where: { id: docId }, data: { sha256: description.sha256, analisis } });
-      await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
+      if (!license) await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
       if (analisis.duplicado && !(current.analisis as { duplicado?: boolean } | null)?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: docId });
       return saved;
     });
@@ -883,6 +917,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
             email: contact,
             numeroHabilitacion: datosActor.numeroHabilitacion || 'PENDIENTE',
             ...declared,
+            ...registrationFleet(datosActor),
           },
         });
         transportistaId = transportista.id;

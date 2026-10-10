@@ -35,6 +35,7 @@ import { C_CORRIENTES } from '../../utils/calculoTEF';
 import CalculadoraTEF, { type TEFInputs } from '../../components/CalculadoraTEF';
 import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
 import { ActorRegistrationDraftBar } from '../../components/ActorRegistrationDraftBar';
+import { ActorContactFields, ActorAddressFields } from '../../components/registration/ActorFields';
 import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
 import { restoreRegistrationForm } from '../../services/registrationDraft';
 import { tefDeclaredInputs } from '../../utils/tefDeclaredInputs';
@@ -463,27 +464,8 @@ const NuevoOperadorPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Input label="Razon Social *" value={form.razonSocial} onChange={e => up('razonSocial', e.target.value)} placeholder="Planta de Tratamiento S.A."
-                    className={showError('razonSocial') ? 'border-error-400 bg-error-50' : ''} />
-                  <FieldError show={showError('razonSocial')} msg="La razon social es obligatoria" />
-                </div>
-                <div>
-                  <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9"
-                    className={showError('cuit') ? 'border-error-400 bg-error-50' : ''} />
-                  <FieldError show={showError('cuit')} msg="El CUIT es obligatorio" />
-                  {!isEdit && !savedActorId && <ActorRegistryLookup type="OPERADOR" cuit={form.cuit} />}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Input label="Email *" type="email" value={form.email} onChange={e => up('email', e.target.value)} placeholder="contacto@operador.com"
-                    className={showError('email') ? 'border-error-400 bg-error-50' : ''} />
-                  <FieldError show={showError('email')} msg="El email es obligatorio" />
-                </div>
-                <Input label="Telefono" value={form.telefono} onChange={e => up('telefono', e.target.value)} placeholder="+54 261 4XX-XXXX" />
-              </div>
+              <ActorContactFields form={form} up={up} administrative domicile={false} attempted={attempted.has(1)} placeholder="Planta de Tratamiento S.A." identitySlot={<div><Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9" errorMessage={showError('cuit') ? 'El CUIT es obligatorio' : undefined} />{!isEdit && !savedActorId && <ActorRegistryLookup type="OPERADOR" cuit={form.cuit} />}</div>} />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
                   label="Tipo de Operador"
@@ -515,76 +497,7 @@ const NuevoOperadorPage: React.FC = () => {
         )}
 
         {/* ===== PASO 2: Domicilios ===== */}
-        {step === 2 && (
-          <div className="space-y-6">
-            {form.tipoOperador === 'IN_SITU' && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-800">Operador In Situ</p>
-                  <p className="text-xs text-amber-700 mt-1">Los operadores In Situ trabajan en la ubicacion del generador. La Direccion Real corresponde a la sede administrativa.</p>
-                </div>
-              </div>
-            )}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Building2 size={20} className="text-info-600" />
-                  <h3 className="text-lg font-bold text-neutral-900">Direccion Fiscal</h3>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input label="Calle / Ruta" value={form.domicilioLegalCalle} onChange={e => up('domicilioLegalCalle', e.target.value)} placeholder="Av. San Martin 1234" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Localidad" value={form.domicilioLegalLocalidad} onChange={e => up('domicilioLegalLocalidad', e.target.value)} placeholder="Ciudad de Mendoza" />
-                  <Select
-                    label="Departamento"
-                    value={form.domicilioLegalDepto}
-                    onChange={(val) => up('domicilioLegalDepto', val)}
-                    options={[
-                      { value: '', label: 'Seleccionar...' },
-                      ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
-                    ]}
-                    size="base"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin size={20} className="text-warning-600" />
-                    <h3 className="text-lg font-bold text-neutral-900">Direccion Real (Planta)</h3>
-                  </div>
-                  <label className="flex min-h-11 items-center gap-2 text-sm text-neutral-700 cursor-pointer">
-                    <input type="checkbox" checked={form.domicilioRealIgual} onChange={e => up('domicilioRealIgual', e.target.checked)} className="rounded border-neutral-300 text-primary-600" />
-                    Igual a la fiscal
-                  </label>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {!form.domicilioRealIgual && <>
-                  <Input label="Calle / Ruta" value={form.domicilioRealCalle} onChange={e => up('domicilioRealCalle', e.target.value)} placeholder="Ruta 40 km 3200" />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Localidad" value={form.domicilioRealLocalidad} onChange={e => up('domicilioRealLocalidad', e.target.value)} placeholder="Lujan de Cuyo" />
-                    <Select
-                      label="Departamento"
-                      value={form.domicilioRealDepto}
-                      onChange={(val) => up('domicilioRealDepto', val)}
-                      options={[
-                        { value: '', label: 'Seleccionar...' },
-                        ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
-                      ]}
-                      size="base"
-                    />
-                  </div>
-                </>}
-                <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="-32.89, -68.83" errorMessage={attempted.has(2) && parseActorCoordinates(form.coordenadas) === null ? COORDINATE_ERROR : undefined} />
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {step === 2 && <Card><CardContent className="py-5"><ActorAddressFields form={form} up={up} administrative same={form.domicilioRealIgual} onSame={same => up('domicilioRealIgual', same)} attempted={attempted.has(2)} /></CardContent></Card>}
 
         {/* ===== PASO 3: Representantes ===== */}
         {step === 3 && (

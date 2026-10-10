@@ -57,6 +57,20 @@ describe('approved registration preserves declarations, not invented fiscal auth
     expect(mock.create.mock.calls[0][0].data).toMatchObject({ latitud: 0, longitud: -68.84, localidad: 'Capital' });
     expect(mock.create.mock.calls[0][0].data).not.toHaveProperty('tefInputs');
   });
+  it('creates operative driver and vehicle records from the exact structured declaration', async () => {
+    const data = { ...declared,
+      choferesJson: JSON.stringify([{ nombre: 'JUAN', apellido: 'QA', dni: '90000000', licencia: 'QA-001', vencimiento: '2027-12-31', key: 'driver-qa-001' }]),
+      vehiculosJson: JSON.stringify([{ patente: 'QA123ZZ', anio: '2026', capacidad: '12500', vencimiento: '2027-12-31' }]),
+    };
+    mock.find.mockResolvedValue({ ...draft('TRANSPORTISTA'), datosActor: JSON.stringify(data) });
+    expect((await approve()).error).toBeUndefined();
+    expect(mock.create.mock.calls[0][0].data).toMatchObject({ choferes: { create: [{ nombre: 'JUAN', dni: '90000000', licencia: 'QA-001' }] }, vehiculos: { create: [{ patente: 'QA123ZZ', capacidad: 12500 }] } });
+    expect(mock.create.mock.calls[0][0].data.choferes.create[0]).not.toHaveProperty('key');
+  });
+  it('refuses invalid fleet before creating or activating an actor', async () => {
+    mock.find.mockResolvedValue({ ...draft('TRANSPORTISTA'), datosActor: JSON.stringify({ ...declared, choferesJson: '[null]' }) });
+    expect((await approve()).error).toMatchObject({ statusCode: 400 }); expect(mock.create).not.toHaveBeenCalled(); expect(mock.activate).not.toHaveBeenCalled();
+  });
   it.each([', -68', '-32, ', '0, -68, 1', 'bad, -68'])('refuses incomplete or malformed declared coordinates %j', async coordenadas => {
     mock.find.mockResolvedValue({ ...draft('TRANSPORTISTA'), datosActor: JSON.stringify({ ...declared, coordenadas }) });
     expect((await approve()).error).toMatchObject({ statusCode: 400 }); expect(mock.create).not.toHaveBeenCalled();

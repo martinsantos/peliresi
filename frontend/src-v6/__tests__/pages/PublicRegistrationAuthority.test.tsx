@@ -1,10 +1,11 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import InscripcionWizardPage from '../../pages/public/InscripcionWizardPage';
 
-const requests = vi.hoisted(() => ({ getRequirements: vi.fn(), put: vi.fn(), post: vi.fn(), uploadDocumento: vi.fn() }));
+const requests = vi.hoisted(() => ({ getRequirements: vi.fn(), put: vi.fn(), post: vi.fn(), uploadDocumento: vi.fn(), preview: vi.fn() }));
+vi.mock('../../services/documentPreview', () => ({ previewDocument: requests.preview }));
 vi.mock('../../services/api', () => ({ default: { put: requests.put, post: requests.post } }));
 vi.mock('../../services/solicitud.service', () => ({ solicitudService: requests }));
 
@@ -26,6 +27,8 @@ async function openReview(actor: string) {
 describe('Public registration collects declarations, never calculates a tax for the applicant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    requests.preview.mockResolvedValue({ persistido: false, campos: {}, analisis: { version: 1, duplicado: false, lectura: 'LEIDO', texto: 'LECTURA QA', motor: 'PDF_TEXT', alcance: 'QA', aviso: null } });
     requests.getRequirements.mockResolvedValue({ documentos: requirements, maxBytes: 10 * 1024 * 1024 });
     vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
@@ -61,7 +64,7 @@ describe('Public registration collects declarations, never calculates a tax for 
     expect(requests.post).not.toHaveBeenCalled();
   });
 
-  it.each([['generador', 7, 6], ['operador', 8, 7], ['transportista', 5, 4]] as const)('%s Probar exposes the new receipt without pretending it was saved or read', async (actor, total, documentsStep) => {
+  it.each([['generador', 7, 6], ['operador', 8, 7], ['transportista', 5, 4]] as const)('%s Probar reads the receipt without pretending it was stored or creating an application', async (actor, total, documentsStep) => {
     await openReview(actor);
     fireEvent.click(screen.getByRole('button', { name: `Paso ${documentsStep} de ${total}: Documentos` }));
     const row = screen.getByTestId('registration-document-COMPROBANTE_PAGO');
@@ -71,7 +74,10 @@ describe('Public registration collects declarations, never calculates a tax for 
     expect(row).toHaveTextContent('recibo-prueba.pdf');
     expect(row).toHaveTextContent('Seleccionado para revisión');
     expect(row).not.toHaveTextContent('Guardado');
-    expect(screen.getByText(/La lectura automática y el aviso de duplicados se ejecutan al guardar en un alta real/)).toBeVisible();
+    expect(screen.getByText(/La prueba no consulta recibos de otros usuarios/)).toBeVisible();
+    await waitFor(() => expect(requests.preview).toHaveBeenCalledOnce());
+    expect(requests.preview.mock.calls[0][1]).toBe('DOCUMENTO');
+    await waitFor(() => expect(within(row).getByText('Ver texto leído del recibo')).toBeVisible());
     expect(requests.uploadDocumento).not.toHaveBeenCalled();
     expect(requests.put).not.toHaveBeenCalled();
     expect(requests.post).not.toHaveBeenCalled();

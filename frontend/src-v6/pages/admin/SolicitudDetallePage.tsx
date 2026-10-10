@@ -30,6 +30,8 @@ import { DocumentAnalysis } from '../../components/DocumentAnalysis';
 import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
+import { RegistrationFleetSummary } from '../../components/registration/RegistrationFleetSummary';
+import { RegistrationReviewEditor } from '../../components/registration/RegistrationReviewEditor';
 
 // ── Status config ──
 
@@ -94,6 +96,7 @@ const SolicitudDetallePage: React.FC = () => {
   const [rechazarText, setRechazarText] = useState('');
   const [confirmarAprobar, setConfirmarAprobar] = useState(false);
   const [readingReceipt, setReadingReceipt] = useState(false);
+  const [editingData, setEditingData] = useState(false);
   const readingInFlight = useRef(false);
 
   const { data: solicitud, isLoading, refetch } = useSolicitud(id || '');
@@ -239,15 +242,16 @@ const SolicitudDetallePage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Column 1: Datos del Actor */}
         <Card padding="none">
-          <div className="px-5 py-4 border-b border-neutral-200 flex items-center gap-2">
+          <div className="px-5 py-4 border-b border-neutral-200 flex flex-wrap items-center gap-2">
             <User size={16} className="text-neutral-500" />
             <h3 className="font-semibold text-neutral-800">Datos del Actor</h3>
+            {canAct && solicitud.estado === 'EN_REVISION' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => setEditingData(true)}>Corregir datos</Button>}
           </div>
           <div className="p-5 space-y-3">
             {Object.keys(datosActor).length === 0 ? (
               <p className="text-sm text-neutral-400">Sin datos cargados</p>
             ) : (
-              Object.entries(datosActor).map(([key, value]) => (
+              Object.entries(datosActor).filter(([key]) => !['choferesJson', 'vehiculosJson'].includes(key)).map(([key, value]) => (
                 <div key={key}>
                   <p className="text-xs text-neutral-500 mb-0.5">{fieldLabel(key)}</p>
                   <p className="text-sm font-medium text-neutral-800 break-words">{value || '-'}</p>
@@ -255,6 +259,7 @@ const SolicitudDetallePage: React.FC = () => {
               ))
             )}
 
+            <RegistrationFleetSummary form={datosActor} />
             {/* Extra JSON sections */}
             {solicitud.datosResiduos && (
               <div className="pt-3 border-t border-neutral-100">
@@ -314,7 +319,7 @@ const SolicitudDetallePage: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
-                    <DocumentAnalysis analysis={doc.analisis} retrying={readingReceipt} onRetry={canAct && doc.tipo === 'COMPROBANTE_PAGO' ? () => void handleRetryReading(doc.id) : undefined} />
+                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : 'document'} retrying={readingReceipt} onRetry={canAct && (doc.tipo === 'COMPROBANTE_PAGO' || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
 
                     <div className="flex items-center gap-1.5">
                       <button
@@ -422,6 +427,7 @@ const SolicitudDetallePage: React.FC = () => {
       </div>
 
       {/* Action Bar */}
+      {editingData && canAct && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor application={solicitud} onClose={() => setEditingData(false)} onSaved={() => refetch()} />}
       {canAct && (
         <Card className="!bg-neutral-50 flex items-center justify-end gap-3 flex-wrap">
           <Button

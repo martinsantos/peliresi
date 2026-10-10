@@ -80,6 +80,10 @@ export const solicitudService = {
   },
 
   // ── Admin ──
+  async corregirDatos(id: string, datosActor: Record<string, unknown>, expectedUpdatedAt: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.patch(`/solicitudes/${encodeURIComponent(id)}/datos-revision`, { datosActor, expectedUpdatedAt });
+    return data.data.solicitud;
+  },
   async list(filters?: SolicitudFilters): Promise<PaginatedData<SolicitudInscripcion>> {
     const { data } = await api.get('/solicitudes', { params: filters });
     const raw = data.data;

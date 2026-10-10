@@ -3,9 +3,10 @@ import { prefix, readableFixedAction, readableWholeWords } from './helpers';
 
 test('public actor wizards keep titles aligned, current steps visible and navigation at the heading without submitting records', async ({ page }, info) => {
   test.setTimeout(120000);
-  const writes: string[] = [], errors: string[] = [];
+  const writes: string[] = [], errors: string[] = [], readings: string[] = [];
   page.on('request', request => {
-    if (/\/api\/solicitudes(?:\/|\?|$)/.test(request.url()) && !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) writes.push(request.method() + ' ' + new URL(request.url()).pathname);
+    if (new URL(request.url()).pathname === '/api/solicitudes/analizar-documento') readings.push(request.url());
+    else if (/\/api\/solicitudes(?:\/|\?|$)/.test(request.url()) && !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) writes.push(request.method() + ' ' + new URL(request.url()).pathname);
   });
   page.on('pageerror', error => errors.push(error.message));
   for (const [actor, total] of [['Generador', 7], ['Transportista', 5], ['Operador', 8]] as const) {
@@ -49,11 +50,14 @@ test('public actor wizards keep titles aligned, current steps visible and naviga
         const receipt = page.getByTestId('registration-document-COMPROBANTE_PAGO');
         await expect(receipt).toBeVisible();
         await expect(receipt.getByLabel('obligatorio')).toHaveCount(0);
+        const processed = page.waitForResponse(response => response.url().endsWith('/api/solicitudes/analizar-documento') && response.request().method() === 'POST');
         const [chooser] = await Promise.all([page.waitForEvent('filechooser'), receipt.getByRole('button', { name: 'Adjuntar', exact: true }).click()]);
         await chooser.setFiles({ name: 'preview-only-QA.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 QA preview, never uploaded') });
         await expect(receipt).toContainText('Seleccionado para revisión');
         await expect(receipt).not.toContainText('Guardado');
-        await expect(page.getByText(/La lectura automática y el aviso de duplicados se ejecutan al guardar en un alta real/)).toBeVisible();
+        const response = await processed; expect(response.status()).toBe(200); expect((await response.json()).data.persistido).toBe(false);
+        await expect(receipt).not.toContainText('Leyendo…');
+        await expect(page.getByText(/La prueba no consulta recibos de otros usuarios/)).toBeVisible();
       }
       if (step === total && actor !== 'Transportista') {
         await expect(page.getByRole('heading', { name: 'Actividad', exact: true })).toBeVisible();
@@ -68,9 +72,10 @@ test('public actor wizards keep titles aligned, current steps visible and naviga
     }
     await page.getByRole('button', { name: 'Finalizar revisión', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Revisión finalizada', exact: true })).toBeVisible();
-    await expect(page.getByText('Recorriste el formulario de prueba. No se creó ninguna cuenta, no se subieron archivos y no se envió ningún correo.', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Tu borrador de prueba quedó en este navegador. No se creó ninguna cuenta ni trámite/)).toBeVisible();
   }
   expect(writes).toEqual([]);
+  expect(readings).toHaveLength(3);
   expect(errors).toEqual([]);
   await info.attach('public-wizard-safety', { body: JSON.stringify({ actors: 3, steps: 20, writes, errors, businessAPIIntercepted: false, productionDataWritten: false }), contentType: 'application/json' });
 });

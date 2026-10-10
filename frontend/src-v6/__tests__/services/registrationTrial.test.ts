@@ -21,4 +21,11 @@ describe('functional trial is local recovery, not a real application', () => {
     expect(readTrialDraft('GENERADOR')?.data.form).toEqual({ razonSocial: 'QA own' });
     expect(localStorage.getItem('sitrep_pending_solicitud')).toBe('REAL-ID');
   });
+  it('rejects a stale trial revision rather than overwrite another tab', () => {
+    saveTrialDraft('TRANSPORTISTA', { form: { razonSocial: 'QA first' }, step: 1 });
+    const revision = readTrialDraft('TRANSPORTISTA')!.data.revision as string;
+    expect(saveTrialDraft('TRANSPORTISTA', { form: { razonSocial: 'QA second' }, step: 2 }, revision)).toBe(true);
+    expect(saveTrialDraft('TRANSPORTISTA', { form: { razonSocial: 'QA stale' }, step: 3 }, revision)).toBe(false);
+    expect(readTrialDraft('TRANSPORTISTA')!.data.form).toEqual({ razonSocial: 'QA second' });
+  });
 });

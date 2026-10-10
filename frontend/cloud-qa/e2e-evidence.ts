@@ -9,10 +9,10 @@ export type FullE2EEvidence = {
   suites: Suite[];
 };
 
-// 88 journeys: previous 79 plus three current-step/concurrent draft journeys,
-// three administrative recovery/registry journeys and three verified owners.
+// 91 journeys: previous 88 plus functional trials, actual declared fleet
+// approval/correction and shared administrative license/draft recovery.
 // Keep exact denominators: adding a journey requires an explicit contract update.
-export const FULL_E2E_JOURNEYS_PER_SURFACE = 88;
+export const FULL_E2E_JOURNEYS_PER_SURFACE = 91;
 const surfaces = ['app', 'web-desktop', 'web-responsive'];
 
 /** A green aggregate alone must not authorize an incomplete or retried release. */
