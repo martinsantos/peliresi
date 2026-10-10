@@ -55,12 +55,12 @@ jobs:
         id: backend
         continue-on-error: true
         working-directory: backend
-        run: npm test -- src/__tests__/controllers/registrationApproval.controller.test.ts src/__tests__/controllers/registrationDocuments.controller.test.ts --maxWorkers=1 --reporter=json --outputFile=/tmp/sitrep-registration-unit-backend.json
+        run: npm test -- src/__tests__/controllers/registrationApproval.controller.test.ts src/__tests__/controllers/registrationDocuments.controller.test.ts src/__tests__/domain/licenseReading.test.ts src/__tests__/domain/registrationFleet.test.ts --maxWorkers=1 --reporter=json --outputFile=/tmp/sitrep-registration-unit-backend.json
       - name: Frontend registration contracts
         id: frontend
         continue-on-error: true
         working-directory: frontend
-        run: npm test -- src-v6/__tests__/services/registrationDraft.test.ts src-v6/__tests__/pages/RegistrationRecovery.test.tsx src-v6/__tests__/pages/InscripcionWizard.layout.test.tsx src-v6/__tests__/pages/ActorUploadRecovery.test.tsx src-v6/__tests__/pages/ActorCreationContract.test.tsx --maxWorkers=1 --reporter=json --outputFile=/tmp/sitrep-registration-unit-frontend.json
+        run: npm test -- src-v6/__tests__/services/registrationDraft.test.ts src-v6/__tests__/services/registrationTrial.test.ts src-v6/__tests__/pages/RegistrationRecovery.test.tsx src-v6/__tests__/pages/InscripcionWizard.layout.test.tsx src-v6/__tests__/pages/ActorUploadRecovery.test.tsx src-v6/__tests__/pages/ActorCreationContract.test.tsx --maxWorkers=1 --reporter=json --outputFile=/tmp/sitrep-registration-unit-frontend.json
       - name: Require both measured results, never publish a unit-only candidate
         if: always()
         run: |
