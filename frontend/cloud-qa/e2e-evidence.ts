@@ -18,7 +18,7 @@ const surfaces = ['app', 'web-desktop', 'web-responsive'];
 /** A green aggregate alone must not authorize an incomplete or retried release. */
 export function assertFullE2EEvidence(evidence: FullE2EEvidence, scope: 'current' | 'pinned-run138' = 'current'): void {
   // Historical evidence keeps 73 journeys; only the pinned reuse guard may
-  // accept it. A current release always requires the complete 88 journeys.
+  // accept it. A current release always requires all current journeys below.
   const journeys = scope === 'pinned-run138' ? 73 : FULL_E2E_JOURNEYS_PER_SURFACE;
   assert.equal(evidence.stats.expected, journeys * surfaces.length);
   assert.equal(evidence.stats.unexpected + evidence.stats.flaky + evidence.stats.skipped, 0);

@@ -337,8 +337,6 @@ const NuevoTransportistaPage: React.FC = () => {
           <RegistrationFleetFields section="vehicles" vehicles={vehiculos} drivers={choferes} onVehicles={setVehiculos} onDrivers={setChoferes} attempted={attempted.has(3)}
             documents={Object.fromEntries(choferes.flatMap(driver => { const selected = pendingDocuments[licenseDocumentType(driver.key)]; return selected ? [[driver.key, { name: selected.file.name, status: 'Pendiente de guardar con el transportista' }]] : []; }))}
             onLicense={async (key, file) => { if (!file.size || file.size > 10 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) throw new Error('Elegí un PDF, JPG o PNG de hasta 10 MB.'); setPendingDocuments(previous => ({ ...previous, [licenseDocumentType(key)]: { file } })); return previewDocument(file, 'LICENCIA'); }} />
-            ))}
-          </div>
         ))}
 
         {step === 4 && (isEdit ? (
@@ -355,8 +353,6 @@ const NuevoTransportistaPage: React.FC = () => {
           <RegistrationFleetFields section="drivers" vehicles={vehiculos} drivers={choferes} onVehicles={setVehiculos} onDrivers={setChoferes} attempted={attempted.has(4)}
             documents={Object.fromEntries(choferes.flatMap(driver => { const selected = pendingDocuments[licenseDocumentType(driver.key)]; return selected ? [[driver.key, { name: selected.file.name, status: 'Pendiente de guardar con el transportista' }]] : []; }))}
             onLicense={async (key, file) => { if (!file.size || file.size > 10 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) throw new Error('Elegí un PDF, JPG o PNG de hasta 10 MB.'); setPendingDocuments(previous => ({ ...previous, [licenseDocumentType(key)]: { file } })); return previewDocument(file, 'LICENCIA'); }} />
-            ))}
-          </div>
         ))}
 
         {step === 5 && (

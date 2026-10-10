@@ -5,7 +5,7 @@
 import React from 'react';
 import {
   Factory, FlaskConical, ClipboardList, MapPin, Users, Shield,
-  Truck, Car,
+  Truck,
 } from 'lucide-react';
 import { ActorContactFields, ActorAddressFields, TransportAuthorizationFields } from '../../../../components/registration/ActorFields';
 import { SectionTitle } from '../SectionTitle';
@@ -13,7 +13,6 @@ import { FieldError } from '../FieldError';
 import { Select } from '../../../../components/ui/Select';
 import { parseActorCoordinates, COORDINATE_ERROR } from '../../../../utils/actorCreationValidation';
 import {
-  DEPARTAMENTOS_MENDOZA,
   CATEGORIAS_GENERADOR,
   inputCls,
   labelCls,
@@ -113,7 +112,7 @@ function renderGeneradorStep(
               placeholder="Y1, Y2, Y3..." className={inputCls()} />
           </div>
           <div>
-            <Select label="Categoria Individual" value={form.categoriaIndividual || ''} onChange={(val) => up('categoriaIndividual', val)} options={[{ value: '', label: 'Seleccionar...' }, { value: 'MINIMA', label: 'Minima' }, { value: 'INDIVIDUAL', label: 'Individual' }, { value: '2000-3000', label: '2000-3000' }]} size="base" />
+            <Select label="Categoria Individual" value={form.categoriaIndividual || ''} onChange={(val) => up('categoriaIndividual', val)} options={[{ value: '', label: 'Seleccionar...' }, { value: 'MINIMA', label: 'Minima' }, { value: 'INDIVIDUAL', label: 'Individual' }, { value: '2000-3000', label: '2000-3000' }, ...(form.categoriaIndividual && !['MINIMA', 'INDIVIDUAL', '2000-3000'].includes(form.categoriaIndividual) ? [{ value: form.categoriaIndividual, label: `Dato previo: ${form.categoriaIndividual}` }] : [])]} size="base" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -191,6 +190,10 @@ function renderOperadorStep(
           <label htmlFor="registration-resolucionDPA" className={labelCls}>Resolucion DPA</label>
           <input id="registration-resolucionDPA" value={form.resolucionDPA || ''} onChange={e => up('resolucionDPA', e.target.value)}
             placeholder="RES-DPA-XXXX" className={inputCls()} />
+        </div>
+        <div>
+          <label htmlFor="registration-vencimientoHabilitacion" className={labelCls}>Vencimiento Habilitacion</label>
+          <input id="registration-vencimientoHabilitacion" type="date" value={form.vencimientoHabilitacion || ''} onChange={e => up('vencimientoHabilitacion', e.target.value)} className={inputCls()} />
         </div>
       </div>
     );

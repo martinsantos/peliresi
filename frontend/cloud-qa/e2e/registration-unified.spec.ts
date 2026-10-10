@@ -2,10 +2,18 @@ import { randomUUID, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { login, prefix } from './helpers';
+import { assertCloudDatabase } from '../safety';
 const require = createRequire(new URL('../../package.json', import.meta.url));
 const back = createRequire(new URL('../../../backend/package.json', import.meta.url));
 const { jsPDF } = require('jspdf');
 const sharp = back('sharp');
+const { PrismaClient } = back('@prisma/client');
+async function trialCounts() {
+  await assertCloudDatabase();
+  const db = new PrismaClient();
+  try { return await db.$transaction([db.usuario.count(), db.solicitudInscripcion.count(), db.documentoSolicitud.count()]); }
+  finally { await db.$disconnect(); }
+}
 const fields = { nombre: 'JUAN', apellido: 'QA', dni: '90000000', licencia: 'QA-12345', vencimiento: '2027-12-31' };
 async function license() {
   return sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750"><rect width="1200" height="750" fill="white"/><g font-family="DejaVu Sans" font-size="36" fill="black">${['LICENCIA DE PRUEBA - SIN VALIDEZ', 'APELLIDO: QA', 'NOMBRE: JUAN', 'DNI: 90000000', 'NRO LICENCIA: QA-12345', 'VENCIMIENTO: 31/12/2027'].map((text, i) => `<text x="50" y="${80 + i * 95}">${text}</text>`).join('')}</g></svg>`)).png().toBuffer();
@@ -38,6 +46,7 @@ async function administrativeStep(page: Page, step: number, label: string) {
 
 test('trial: real license OCR, all actor drafts recover, and no application or account is created', async ({ page }, info) => {
   test.setTimeout(120000); const businessWrites: string[] = [], errors: string[] = [];
+  const before = await trialCounts();
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => { const path = new URL(request.url()).pathname; if (path.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method()) && path !== '/api/solicitudes/analizar-documento') businessWrites.push(path); });
   for (const [type, total, second] of [['generador', 7, 'Regulatorio'], ['operador', 8, 'Regulatorio'], ['transportista', 5, 'Habilitacion']] as const) {
@@ -65,7 +74,7 @@ test('trial: real license OCR, all actor drafts recover, and no application or a
   await expect(page.getByRole('group', { name: 'Chofer 2', exact: true }).getByLabel('Nombre *', { exact: true })).toHaveValue('JUAN');
   await expect(page.getByText(/Los datos se recuperaron. Los archivos de prueba no se almacenan/)).toBeVisible();
   await cleanLayout(page); await page.screenshot({ path: info.outputPath('trial-license-recovered.png'), animations: 'disabled' });
-  expect(businessWrites).toEqual([]); expect(errors).toEqual([]);
+  expect(businessWrites).toEqual([]); expect(errors).toEqual([]); expect(await trialCounts()).toEqual(before);
 });
 
 test('public transport: original license, structured fleet, administrative correction and actual approval retain the same facts', async ({ page }, info) => {
@@ -99,6 +108,16 @@ test('public transport: original license, structured fleet, administrative corre
   await editor.getByLabel('Domicilio', { exact: true }).fill('QA domicilio corregido 200');
   await editor.getByRole('button', { name: 'Guardar corrección', exact: true }).click(); await expect(editor).not.toBeVisible();
   await expect(page.getByText('QA domicilio corregido 200', { exact: true })).toBeVisible();
+  await assertCloudDatabase();
+  const db = new PrismaClient();
+  try {
+    const history = await db.auditoria.findMany({ where: { modulo: 'SOLICITUD', accion: 'UPDATE' } });
+    const correction = history.find((item: { datosDespues: string }) => JSON.parse(item.datosDespues).solicitudId === candidate.solicitudId);
+    expect(correction).toBeDefined();
+    expect(JSON.parse(correction.datosAntes).datosActor.domicilio).toBe('QA domicilio declarado 100');
+    expect(JSON.parse(correction.datosDespues).datosActor.domicilio).toBe('QA domicilio corregido 200');
+    expect(correction.usuarioId).toBe((await db.usuario.findUnique({ where: { email: 'admin@night-qa.invalid' } })).id);
+  } finally { await db.$disconnect(); }
   await expect(page.getByRole('region', { name: 'Flota declarada' })).toContainText('QA-12345');
   const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Descargar LICENCIA-QA.png', exact: true }).click()]); expect(await download.failure()).toBeNull();
   await cleanLayout(page); await page.screenshot({ path: info.outputPath('administrative-fleet-correction.png'), animations: 'disabled' });

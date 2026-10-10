@@ -19,7 +19,14 @@ export function RegistrationReviewEditor({ application, onClose, onSaved }: { ap
     try {
       const source = JSON.parse(application.datosActor || '{}');
       if (!source || typeof source !== 'object' || Array.isArray(source)) throw new Error('Formato previo incompatible');
-      return { form: Object.fromEntries(Object.entries(source).filter(([, value]) => typeof value === 'string')) as Record<string, string>, error: null };
+      const form = Object.fromEntries(Object.entries(source).filter(([, value]) => typeof value === 'string')) as Record<string, string>;
+      for (const key of ['vehiculosJson', 'choferesJson']) {
+        if (Array.isArray(source[key])) form[key] = JSON.stringify(source[key]);
+        if (!form[key]) continue;
+        const rows = JSON.parse(form[key]);
+        if (!Array.isArray(rows) || rows.length > 100 || rows.some(row => !row || typeof row !== 'object' || Array.isArray(row))) throw new Error('Flota previa incompatible');
+      }
+      return { form, error: null };
     } catch { return { form: {} as Record<string, string>, error: 'No pudimos interpretar los datos originales. No se reemplazarán por un formulario vacío.' }; }
   });
   const [form, setForm] = useState(initial.form);

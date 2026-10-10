@@ -51,7 +51,7 @@ export const STEPS_OPERADOR: StepDef[] = [
 export const STEPS_TRANSPORTISTA: StepDef[] = [
   { id: 1, label: 'Datos Basicos', icon: Truck },
   { id: 2, label: 'Habilitacion', icon: Shield },
-  { id: 3, label: 'Vehiculos', icon: Car },
+  { id: 3, label: 'Flota y choferes', icon: Car },
   { id: 4, label: 'Documentos', icon: FileText },
   { id: 5, label: 'Resumen', icon: Check },
 ];

@@ -244,6 +244,9 @@ const InscripcionWizardPage: React.FC = () => {
         if (data && !Array.isArray(data)) {
           persistedForm = Object.fromEntries(Object.entries(data).filter(([, value]) => typeof value === 'string')) as Record<string, string>;
           serverExtraFields.current = Object.fromEntries(Object.entries(data).filter(([, value]) => typeof value !== 'string'));
+          for (const key of ['vehiculosJson', 'choferesJson']) {
+            if (Array.isArray(data[key])) { persistedForm[key] = JSON.stringify(data[key]); delete serverExtraFields.current[key]; }
+          }
         }
       } catch { /* keep blank fields */ }
       const local = readRegistrationDraft(accountAtStart, `public:${tipoActor}:${pending.id}`);

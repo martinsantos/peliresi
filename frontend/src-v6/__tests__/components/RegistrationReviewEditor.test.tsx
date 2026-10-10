@@ -26,4 +26,9 @@ describe('administrative declaration correction acknowledgement', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('QA versión conflictiva'));
     expect(screen.getByLabelText('Domicilio')).toHaveValue('QA todavía sin guardar'); expect(close).not.toHaveBeenCalled(); expect(refresh).not.toHaveBeenCalled();
   });
+  it('does not substitute a malformed saved fleet with an empty form', () => {
+    render(<RegistrationReviewEditor application={{ ...application, datosActor: JSON.stringify({ razonSocial: 'QA', choferesJson: '{invalid' }) } as never} onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('No se reemplazarán');
+    expect(screen.getByRole('button', { name: 'Guardar corrección' })).toBeDisabled(); expect(mock.save).not.toHaveBeenCalled();
+  });
 });
