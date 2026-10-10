@@ -9,10 +9,10 @@ export type FullE2EEvidence = {
   suites: Suite[];
 };
 
-// 91 journeys: previous 88 plus functional trials, actual declared fleet
-// approval/correction and shared administrative license/draft recovery.
+// 92 journeys: previous 91 plus native provincial-license proposals,
+// reverse/noise rejection and preservation of manual driver data.
 // Keep exact denominators: adding a journey requires an explicit contract update.
-export const FULL_E2E_JOURNEYS_PER_SURFACE = 91;
+export const FULL_E2E_JOURNEYS_PER_SURFACE = 92;
 const surfaces = ['app', 'web-desktop', 'web-responsive'];
 
 /** A green aggregate alone must not authorize an incomplete or retried release. */

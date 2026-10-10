@@ -19,6 +19,11 @@ async function license() {
   return sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750"><rect width="1200" height="750" fill="white"/><g font-family="DejaVu Sans" font-size="36" fill="black">${['LICENCIA DE PRUEBA - SIN VALIDEZ', 'APELLIDO: QA', 'NOMBRE: JUAN', 'DNI: 90000000', 'NRO LICENCIA: QA-12345', 'VENCIMIENTO: 31/12/2027'].map((text, i) => `<text x="50" y="${80 + i * 95}">${text}</text>`).join('')}</g></svg>`)).png().toBuffer();
 }
 function syntheticDocument() { const pdf = new jsPDF(); pdf.text(['DOCUMENTO SINTETICO QA - SIN VALIDEZ', randomUUID()], 15, 25); return Buffer.from(pdf.output('arraybuffer')); }
+async function provincialLicense(reverse = false) {
+  const lines = reverse ? ['REVERSO SINTETICO - SIN VALIDEZ', 'MINISTERIO DE SEGURIDAD', 'NRO DE CONTROL 87654321', 'DOMICILIO QA 100', 'EN EMERGENCIA AVISAR A 123456']
+    : ['LICENCIA SINTETICA - SIN VALIDEZ', 'PROVINCIA DE MENDOZA', 'D.U. 90012345', 'PEREZ, JUAN PRUEBA', 'DOCUMENTO, APELLIDO Y NOMBRE', '31-12-2027', 'VENCIMIENTO'];
+  return sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900"><defs><linearGradient id="blue" x2="0.2" y2="1"><stop stop-color="#73aad2"/><stop offset="0.5" stop-color="#e6f3fd"/><stop offset="1" stop-color="#71aadd"/></linearGradient></defs><rect width="1400" height="900" fill="url(#blue)"/><g font-family="DejaVu Sans" font-size="40" fill="#14202c">${lines.map((text, i) => `<text x="60" y="${90 + i * 110}">${text}</text>`).join('')}</g></svg>`)).jpeg({ quality: 85 }).toBuffer();
+}
 async function create(page: Page, info: TestInfo) {
   await page.context().addCookies([{ name: 'sitrep_qa_client', value: `127.12.${1 + Math.floor(Math.random() * 240)}.${1 + Math.floor(Math.random() * 240)}`, url: 'http://127.0.0.1:4177' }]);
   await page.goto(`${prefix(info)}/inscripcion/transportista`);
@@ -76,6 +81,34 @@ test('trial: real license OCR, all actor drafts recover, and no application or a
   await page.getByRole('group', { name: 'Chofer 2', exact: true }).scrollIntoViewIfNeeded();
   await cleanLayout(page); await page.screenshot({ path: info.outputPath('trial-license-recovered.png'), animations: 'disabled' });
   expect(businessWrites).toEqual([]); expect(errors).toEqual([]); expect(await trialCounts()).toEqual(before);
+});
+
+test('provincial photo license: labelled proposals need confirmation, reverse has none, and manual data is never cleared', async ({ page }, info) => {
+  test.setTimeout(120000); const before = await trialCounts(); const writes: string[] = [], errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => { const url = new URL(request.url()); if (url.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method()) && url.pathname !== '/api/solicitudes/analizar-documento') writes.push(url.pathname); });
+  await page.goto(`${prefix(info)}/inscripcion/transportista?modo=revision`);
+  await page.getByRole('button', { name: /^Paso 3 de 5:/ }).click();
+  await page.getByRole('button', { name: 'Agregar chofer', exact: true }).click();
+  const driver = page.getByRole('group', { name: 'Chofer 2', exact: true });
+  const read = page.waitForResponse(r => r.url().endsWith('/api/solicitudes/analizar-documento') && r.request().method() === 'POST');
+  await driver.getByLabel('Archivo de licencia del chofer 2').setInputFiles({ name: 'PROVINCIAL-QA-SIN-VALIDEZ.jpg', mimeType: 'image/jpeg', buffer: await provincialLicense() });
+  const response = await read; expect(response.status()).toBe(200);
+  const data = (await response.json()).data;
+  expect(data).toMatchObject({ persistido: false, campos: { dni: '90012345', apellido: 'PEREZ', nombre: 'JUAN PRUEBA', vencimiento: '2027-12-31' }, analisis: { lectura: 'LEIDO', motor: 'TESSERACT' } });
+  expect(data.campos).not.toHaveProperty('licencia');
+  await expect(driver.getByLabel('DNI *', { exact: true })).toHaveValue('');
+  await driver.getByRole('button', { name: 'Usar datos seleccionados', exact: true }).click();
+  await expect(driver.getByLabel('DNI *', { exact: true })).toHaveValue('90012345');
+  const reverseRead = page.waitForResponse(r => r.url().endsWith('/api/solicitudes/analizar-documento') && r.request().method() === 'POST');
+  await driver.getByLabel('Archivo de licencia del chofer 2').setInputFiles({ name: 'REVERSO-QA-SIN-VALIDEZ.jpg', mimeType: 'image/jpeg', buffer: await provincialLicense(true) });
+  const reverseResponse = await reverseRead; expect(reverseResponse.status()).toBe(200);
+  expect((await reverseResponse.json()).data).toMatchObject({ persistido: false, campos: {}, analisis: { lectura: 'SIN_TEXTO', texto: '' } });
+  await expect(driver.getByLabel('DNI *', { exact: true })).toHaveValue('90012345');
+  await expect(driver.getByLabel('Nombre *', { exact: true })).toHaveValue('JUAN PRUEBA');
+  await driver.scrollIntoViewIfNeeded(); await cleanLayout(page);
+  await page.screenshot({ path: info.outputPath('provincial-license-manual-preserved.png'), animations: 'disabled' });
+  expect(writes).toEqual([]); expect(errors).toEqual([]); expect(await trialCounts()).toEqual(before);
 });
 
 test('public transport: original license, structured fleet, administrative correction and actual approval retain the same facts', async ({ page }, info) => {

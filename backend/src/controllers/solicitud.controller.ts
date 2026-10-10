@@ -448,7 +448,8 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
     }
 
     const description = describeDocument(req.file);
-    const reading = tipo === 'COMPROBANTE_PAGO' || license ? await readReceipt({ path: req.file.path, mimeType: description.mimeType }) : undefined;
+    const input = { path: req.file.path, mimeType: description.mimeType };
+    const reading = license ? await readReceipt(input, 'LICENCIA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt(input) : undefined;
     const analysis = reading && license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : reading;
     let previous: Array<{ id: string; path: string; sha256: string | null }> = [];
     const documento = await prisma.$transaction(async (tx) => {
@@ -516,7 +517,8 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
     if (!fs.existsSync(original.path)) throw new AppError('Archivo no disponible', 404);
     const description = describeDocument({ path: original.path, mimetype: original.mimeType });
     if (original.sha256 && original.sha256 !== description.sha256) throw new AppError('El archivo no coincide con su huella registrada; requiere revisión.', 409);
-    const reading = await readReceipt({ path: original.path, mimeType: description.mimeType });
+    const input = { path: original.path, mimeType: description.mimeType };
+    const reading = license ? await readReceipt(input, 'LICENCIA') : await readReceipt(input);
     const documento = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });

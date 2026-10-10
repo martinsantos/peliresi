@@ -18,6 +18,7 @@ describe('bounded document reading is stateless and cleans only its own temporar
     expect(result.res.json.mock.calls[0][0].data).toMatchObject({ persistido: false, campos: { dni: '90000000', vencimiento: '2027-12-31' } });
     expect(result.res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store'); expect(mock.unlink).toHaveBeenCalledWith(file.path);
     expect(result.res.json.mock.calls[0][0].data).not.toHaveProperty('solicitudId');
+    expect(mock.read).toHaveBeenCalledWith({ path: file.path, mimeType: 'image/png' }, 'LICENCIA');
   });
   it('keeps a missing engine or unreadable file explicit, with manual completion available', async () => {
     mock.read.mockResolvedValue({ lectura: 'NO_DISPONIBLE', texto: '', version: 1 });
@@ -41,7 +42,7 @@ describe('bounded document reading is stateless and cleans only its own temporar
     const result = await read();
     const data = result.res.json.mock.calls[0][0].data;
     expect(data.analisis).toMatchObject({ lectura: 'SIN_TEXTO', motor: 'TESSERACT' });
-    expect(data.analisis.aviso).toContain('texto legible');
+    expect(data.analisis.aviso).toContain('campos legibles de la licencia');
     expect(data.analisis.aviso).not.toContain('ocupada');
     expect(data.campos).toEqual({});
   });

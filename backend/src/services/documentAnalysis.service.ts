@@ -7,6 +7,8 @@ import path from 'node:path';
 import sharp from 'sharp';
 import type { Prisma } from '@prisma/client';
 import { AppError } from '../middlewares/errorHandler';
+import { licenseFields } from '../domain/licenseReading';
+import { adaptiveLicensePixels, confidentLicenseText, mergeLicenseText } from '../domain/licenseOcr';
 
 export type ReceiptAnalysis = {
   version: 1;
@@ -67,7 +69,7 @@ function readable(text: string): string {
 }
 
 /** Bounded, free server-side extraction. Scanned PDFs explicitly cover page 1. */
-export async function readReceipt(file: { path: string; mimeType: string }): Promise<ReceiptAnalysis> {
+export async function readReceipt(file: { path: string; mimeType: string }, profile?: 'LICENCIA'): Promise<ReceiptAnalysis> {
   const result: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'SIN_TEXTO', motor: null,
     texto: '', alcance: file.mimeType === 'application/pdf' ? 'Hasta las primeras 3 páginas con texto; página 1 si es escaneado.' : 'Imagen adjunta.', aviso: null };
   if (receiptInFlight) return { ...result, lectura: 'NO_DISPONIBLE', aviso: 'La lectura automática está ocupada. El archivo se conserva para revisión manual.' };
@@ -77,7 +79,8 @@ export async function readReceipt(file: { path: string; mimeType: string }): Pro
   try {
     if (file.mimeType === 'application/pdf') {
       const text = readable(await runLocked('pdftotext', ['-f', '1', '-l', '3', '-layout', file.path, '-'], deadline));
-      if (/[\p{L}\p{N}]/u.test(text)) return { ...result, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: text };
+      const proposed = profile === 'LICENCIA' ? mergeLicenseText([text]) : text;
+      if (/[\p{L}\p{N}]/u.test(proposed)) return { ...result, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: proposed };
       temporary = await mkdtemp(path.join(os.tmpdir(), 'sitrep-receipt-'));
       const output = path.join(temporary, 'page');
       await runLocked('pdftoppm', ['-f', '1', '-l', '1', '-scale-to', '1800', '-png', '-singlefile', file.path, output], deadline);
@@ -88,11 +91,40 @@ export async function readReceipt(file: { path: string; mimeType: string }): Pro
     temporary ||= await mkdtemp(path.join(os.tmpdir(), 'sitrep-receipt-'));
     const image = path.join(temporary, 'ocr.png');
     await sharp(file.path, { limitInputPixels: 16_000_000 }).rotate().resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true }).grayscale().png().toFile(image);
+    if (profile === 'LICENCIA') {
+      const args = (raster: string) => [raster, 'stdout', '-l', 'spa', '--oem', '1', '--tessdata-dir',
+        path.join(__dirname, '..', 'assets', 'ocr'), '--psm', '6', '-c', 'tessedit_create_tsv=1'];
+      const reads = [confidentLicenseText(await runLocked('tesseract', args(image), deadline))];
+      const first = licenseFields(reads[0]); let warning: string | null = null;
+      // Only one extra pass, with the SAME overall deadline and cross-worker
+      // engine slot. Blue provincial backgrounds need local shadow compensation.
+      if (!first.dni || !first.nombre || !first.apellido) {
+        try {
+          const raw = await sharp(file.path, { limitInputPixels: 16_000_000 }).rotate()
+            .resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true })
+            .flatten({ background: '#fff' }).toColourspace('srgb').extractChannel(2).median(3).raw().toBuffer({ resolveWithObject: true });
+          if (raw.info.channels !== 1) throw new Error('INVALID_OCR_RASTER');
+          const pixels = adaptiveLicensePixels(raw.data, raw.info.width, raw.info.height);
+          const adaptive = path.join(temporary, 'license-adaptive.png');
+          await sharp(Buffer.from(pixels), { raw: { width: raw.info.width, height: raw.info.height, channels: 1 } }).png().toFile(adaptive);
+          reads.push(confidentLicenseText(await runLocked('tesseract', args(adaptive), deadline)));
+        } catch (error) {
+          if (!Object.keys(first).length) throw error;
+          warning = 'Lectura parcial. Revisá las propuestas y completá manualmente los campos que falten.';
+        }
+      }
+      const text = mergeLicenseText(reads);
+      return { ...result, lectura: text ? 'LEIDO' : 'SIN_TEXTO', motor: 'TESSERACT', texto: text,
+        alcance: 'Sólo campos identificados de la licencia. Requiere revisión; no acredita identidad ni vigencia.', aviso: warning };
+    }
     const text = readable(await runLocked('tesseract', [image, 'stdout', '-l', 'spa', '--psm', '3'], deadline));
     return { ...result, lectura: /[\p{L}\p{N}]/u.test(text) ? 'LEIDO' : 'SIN_TEXTO', motor: 'TESSERACT', texto: text };
-  } catch {
+  } catch (error) {
     // A busy/missing/failed OCR never means success and never discards the file.
-    return { ...result, lectura: 'NO_DISPONIBLE', aviso: 'No se pudo leer automáticamente. El archivo se conserva para revisión manual.' };
+    const busy = (error as { code?: number })?.code === 75;
+    return { ...result, lectura: 'NO_DISPONIBLE', aviso: busy
+      ? 'La lectura automática está ocupada. El archivo se conserva para revisión manual.'
+      : 'No se pudo leer automáticamente. El archivo se conserva para revisión manual.' };
   } finally {
     receiptInFlight = false;
     if (temporary) await rm(temporary, { recursive: true, force: true }).catch(() => undefined);

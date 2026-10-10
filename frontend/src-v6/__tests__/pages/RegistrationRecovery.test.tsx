@@ -151,6 +151,9 @@ describe('a real registration UI protects the current step and account boundary'
   it('blocks a same-tick double save and a second editor', async () => {
     await open(); const button = screen.getByRole('button', { name: 'Guardar borrador' });
     act(() => { fireEvent.click(button); fireEvent.click(button); }); await waitFor(() => expect(mock.put).toHaveBeenCalledOnce());
+    // The call count changes before its awaited confirmation/finally completes.
+    // Exercise the second-editor boundary after saving, not another in-flight click.
+    await waitFor(() => expect(button).toBeEnabled());
     mock.canWrite.mockReturnValue(false); fireEvent.click(button);
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('otra pestaña')); expect(mock.put).toHaveBeenCalledOnce();
   });

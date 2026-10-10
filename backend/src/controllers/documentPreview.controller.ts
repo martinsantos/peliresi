@@ -21,11 +21,12 @@ export async function previewDocument(req: Request, res: Response, next: NextFun
     if (!req.file) throw new AppError('Seleccioná un documento para leer.', 400);
     if (!['LICENCIA', 'DOCUMENTO'].includes(req.body.tipo)) throw new AppError('Tipo de lectura no permitido.', 400);
     const description = describeDocument(req.file);
-    const analisis = await readReceipt({ path: req.file.path, mimeType: description.mimeType });
+    const file = { path: req.file.path, mimeType: description.mimeType };
+    const analisis = req.body.tipo === 'LICENCIA' ? await readReceipt(file, 'LICENCIA') : await readReceipt(file);
     // Preserve the failure category. A busy/missing engine is not a poor photo,
     // and this stateless endpoint removes its temporary original after reading.
     if (analisis.lectura === 'SIN_TEXTO') {
-      analisis.aviso = 'No se encontró texto legible. Podés completar los campos manualmente o reintentar con una imagen más clara.';
+      analisis.aviso = `${req.body.tipo === 'LICENCIA' ? 'No se obtuvieron campos legibles de la licencia.' : 'No se encontró texto legible.'} Podés completar los campos manualmente o reintentar con una imagen más clara.`;
     } else if (analisis.lectura === 'NO_DISPONIBLE') {
       const reason = analisis.aviso?.replace('El archivo se conserva para revisión manual.', '').trim();
       analisis.aviso = `${reason || 'La lectura automática no está disponible.'} Tu formulario sigue intacto. Podés reintentar o completar los campos manualmente.`;
