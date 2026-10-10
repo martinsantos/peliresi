@@ -107,14 +107,20 @@ test('public transport: original license, structured fleet, administrative corre
   await page.getByRole('button', { name: 'Corregir datos', exact: true }).click();
   const editor = page.getByRole('dialog', { name: 'Corregir datos de la solicitud', exact: true });
   await editor.getByLabel('Domicilio', { exact: true }).fill('QA domicilio corregido 200');
+  const corrected = page.waitForResponse(response => response.url().endsWith(`/api/solicitudes/${candidate.solicitudId}/datos-revision`) && response.request().method() === 'PATCH');
   await editor.getByRole('button', { name: 'Guardar corrección', exact: true }).click(); await expect(editor).not.toBeVisible();
+  const correctionResponse = await corrected; expect(correctionResponse.status()).toBe(200);
+  const originalRevision = correctionResponse.request().postDataJSON().expectedUpdatedAt;
+  const token = await page.evaluate(() => localStorage.getItem('sitrep_access_token'));
+  const stale = await page.request.patch(`/api/solicitudes/${candidate.solicitudId}/datos-revision`, { headers: { Authorization: `Bearer ${token}` }, data: { expectedUpdatedAt: originalRevision, datosActor: { domicilio: 'QA no debe pisar la corrección' } } });
+  expect(stale.status()).toBe(409);
   await expect(page.getByText('QA domicilio corregido 200', { exact: true })).toBeVisible();
   await assertCloudDatabase();
   const db = new PrismaClient();
   try {
     const history = await db.auditoria.findMany({ where: { modulo: 'SOLICITUD', accion: 'UPDATE' } });
-    const correction = history.find((item: { datosDespues: string }) => JSON.parse(item.datosDespues).solicitudId === candidate.solicitudId);
-    expect(correction).toBeDefined();
+    const revisions = history.filter((item: { datosDespues: string }) => JSON.parse(item.datosDespues)?.solicitudId === candidate.solicitudId);
+    expect(revisions).toHaveLength(1); const correction = revisions[0];
     expect(JSON.parse(correction.datosAntes).datosActor.domicilio).toBe('QA domicilio declarado 100');
     expect(JSON.parse(correction.datosDespues).datosActor.domicilio).toBe('QA domicilio corregido 200');
     expect(correction.usuarioId).toBe((await db.usuario.findUnique({ where: { email: 'admin@night-qa.invalid' } })).id);
@@ -125,7 +131,6 @@ test('public transport: original license, structured fleet, administrative corre
   const approval = page.waitForResponse(response => response.url().endsWith(`/api/solicitudes/${candidate.solicitudId}/aprobar`) && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Aprobar', exact: true }).click(); await page.getByRole('dialog', { name: 'Confirmar Aprobacion', exact: true }).getByRole('button', { name: 'Confirmar Aprobacion', exact: true }).click();
   const approved = await approval; expect(approved.status()).toBe(200); const application = (await approved.json()).data.solicitud;
-  const token = await page.evaluate(() => localStorage.getItem('sitrep_access_token'));
   const actorResponse = await page.request.get(`/api/actores/transportistas/${application.transportistaId}`, { headers: { Authorization: `Bearer ${token}` } }); expect(actorResponse.status()).toBe(200);
   const actor = (await actorResponse.json()).data.transportista;
   expect(actor.domicilio).toBe('QA domicilio corregido 200'); expect(actor.vehiculos).toHaveLength(1); expect(actor.vehiculos[0]).toMatchObject({ patente: 'QA123ZZ', capacidad: 12500 });

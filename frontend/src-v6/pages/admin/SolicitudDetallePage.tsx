@@ -435,7 +435,7 @@ const SolicitudDetallePage: React.FC = () => {
       </div>
 
       {/* Action Bar */}
-      {editingData && canAct && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor application={solicitud} onClose={() => setEditingData(false)} onSaved={() => refetch()} />}
+      {editingData && canAct && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor key={solicitud.id} application={solicitud} onClose={() => setEditingData(false)} onSaved={() => refetch()} />}
       {canAct && (
         <Card className="!bg-neutral-50 flex items-center justify-end gap-3 flex-wrap">
           <Button

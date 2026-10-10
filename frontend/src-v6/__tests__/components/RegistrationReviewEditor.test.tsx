@@ -31,4 +31,13 @@ describe('administrative declaration correction acknowledgement', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('No se reemplazarán');
     expect(screen.getByRole('button', { name: 'Guardar corrección' })).toBeDisabled(); expect(mock.save).not.toHaveBeenCalled();
   });
+  it('retains the revision of the loaded fields when a background refresh delivers a newer application', async () => {
+    mock.save.mockRejectedValue(new Error('QA revisión cambió')); const close = vi.fn(), refresh = vi.fn();
+    const view = render(<RegistrationReviewEditor application={application as never} onClose={close} onSaved={refresh} />);
+    fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA edición local anterior' } });
+    view.rerender(<RegistrationReviewEditor application={{ ...application, updatedAt: '2026-10-10T10:01:00.000Z', datosActor: JSON.stringify({ domicilio: 'QA modificación concurrente' }) } as never} onClose={close} onSaved={refresh} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
+    await waitFor(() => expect(mock.save).toHaveBeenCalledWith(application.id, expect.objectContaining({ domicilio: 'QA edición local anterior' }), application.updatedAt));
+    expect(screen.getByLabelText('Domicilio')).toHaveValue('QA edición local anterior'); expect(close).not.toHaveBeenCalled();
+  });
 });

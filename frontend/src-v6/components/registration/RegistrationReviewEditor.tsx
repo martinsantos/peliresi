@@ -26,8 +26,8 @@ export function RegistrationReviewEditor({ application, onClose, onSaved }: { ap
         const rows = JSON.parse(form[key]);
         if (!Array.isArray(rows) || rows.length > 100 || rows.some(row => !row || typeof row !== 'object' || Array.isArray(row))) throw new Error('Flota previa incompatible');
       }
-      return { form, error: null };
-    } catch { return { form: {} as Record<string, string>, error: 'No pudimos interpretar los datos originales. No se reemplazarán por un formulario vacío.' }; }
+      return { form, version: application.updatedAt, error: null };
+    } catch { return { form: {} as Record<string, string>, version: application.updatedAt, error: 'No pudimos interpretar los datos originales. No se reemplazarán por un formulario vacío.' }; }
   });
   const [form, setForm] = useState(initial.form);
   const [step, setStep] = useState(1), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(initial.error);
@@ -39,7 +39,7 @@ export function RegistrationReviewEditor({ application, onClose, onSaved }: { ap
     if (pending.current || initial.error) return;
     pending.current = true; setBusy(true); setError(null);
     try {
-      await solicitudService.corregirDatos(application.id, form, application.updatedAt);
+      await solicitudService.corregirDatos(application.id, form, initial.version);
       // A failed refresh is not a failed write. Do not offer to repeat an
       // acknowledged correction against the previous revision.
       onClose();
