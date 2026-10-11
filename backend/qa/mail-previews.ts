@@ -8,7 +8,11 @@ mkdirSync(directory, { recursive: true });
 const ids = ['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'];
 process.env.FRONTEND_URL = 'https://sitrep.example.invalid';
 for (const id of ids) {
-  const mail = renderMail(id, { name: 'Persona de capacitación', role: 'Generador', message: 'Revisá el domicilio del establecimiento y adjuntá el documento solicitado.', token: 'solo-vista-previa-sin-validez' });
+  const mail = renderMail(id, { name: 'Persona de capacitación',
+    ...(['pending', 'newAccount', 'application', 'modification'].includes(id) ? { role: 'Generador' } : {}),
+    ...(['observed', 'rejected', 'modificationRejected'].includes(id) ? { message: 'Revisá el domicilio del establecimiento y adjuntá el documento solicitado.' } : {}),
+    ...(['verify', 'reset'].includes(id) ? { token: 'solo-vista-previa-sin-validez' } : {}),
+  });
   writeFileSync(`${directory}/${id}.html`, mail.html);
   writeFileSync(`${directory}/${id}.txt`, mail.text);
 }

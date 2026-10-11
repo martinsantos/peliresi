@@ -108,6 +108,20 @@ describe('SMTP receipt and retry safety (mock provider only)', () => {
 afterEach(() => { vi.unstubAllEnvs(); });
 
 describe('mail safety regressions', () => {
+  it('renders the actual digest with the institutional brand, a usable action and no embedded private bodies', async () => {
+    const { digestTemplate } = await import('../../services/email.service');
+    const html = digestTemplate([{ subject: '<script>unsafe</script>', html: 'PRIVATE_BODY_NOT_FOR_DIGEST' }], '11/10/2026 10:00 (Mendoza)');
+    expect(html).toContain('alt="Gobierno de Mendoza"');
+    expect(html).toContain('<h1');
+    expect(html).toContain('1 alerta en este periodo');
+    expect(html).toContain('&lt;script&gt;unsafe&lt;/script&gt;');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('PRIVATE_BODY_NOT_FOR_DIGEST');
+    expect(html).toContain('Revisar alertas</a>');
+    expect(html).toContain('line-height:24px');
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+    expect(mocks.queue.create).not.toHaveBeenCalled();
+  });
   it.each([{ isDemoData: true }, { modo: 'revision' }, { modo: 'prueba' }])('does not enqueue alerts from training context %j', async context => {
     const { emailService } = await import('../../services/email.service');
     await emailService.sendAlertEmail(['qa@example.invalid'], { nombre: 'QA' }, null, context);

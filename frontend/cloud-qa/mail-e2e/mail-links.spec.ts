@@ -87,7 +87,11 @@ test('forwarded support link does not reveal another actor ticket', async ({ pag
   await page.screenshot({ path: info.outputPath('denied-ticket.png'), animations: 'disabled' });
 });
 test('all templates and operational variants fit with institutional brand and readable actions', async ({ page }, info) => {
-  expect(fixture.templates).toHaveLength(30);
+  test.setTimeout(120_000);
+  expect(fixture.templates).toHaveLength(58);
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   for (const item of fixture.templates) {
     await page.setContent(item.html);
     await expect(page.locator('h1')).toBeVisible();
@@ -102,6 +106,7 @@ test('all templates and operational variants fit with institutional brand and re
     }
     await page.screenshot({ path: info.outputPath('template-' + item.id + '.png'), fullPage: true });
   }
+  expect(errors).toEqual([]);
 });
 
 test('public email verification preserves a local draft through real login and recovers the owned application', async ({ page }, info) => {

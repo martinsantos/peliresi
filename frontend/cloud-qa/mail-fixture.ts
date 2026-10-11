@@ -8,7 +8,8 @@ await assertCloudDatabase();
 const fixture = await loadSeed().seedNightDatabase();
 const { PrismaClient } = backendRequire('@prisma/client');
 const { notificationMailContent } = backendRequire(path.join(root, 'backend/dist/services/notification-mail.service.js'));
-const { renderMail } = backendRequire(path.join(root, 'backend/dist/services/email-templates.js'));
+const { renderMail, renderDigest } = backendRequire(path.join(root, 'backend/dist/services/email-templates.js'));
+const { digestTemplate } = backendRequire(path.join(root, 'backend/dist/services/email.service.js'));
 const { renderAccountMail } = backendRequire(path.join(root, 'backend/dist/services/account-mail.service.js'));
 const db = new PrismaClient();
 const output = process.env.QA_ARTIFACTS!;
@@ -62,10 +63,30 @@ try {
     rol: item.user === 'admin' ? 'ADMIN' : 'GENERADOR', datos: JSON.stringify(item.datos),
   }) }));
   const templates = ['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'].map(id => ({ id,
-    ...renderMail(id, { name: 'Persona de capacitación', role: 'Generador', message: 'Revisá el domicilio del establecimiento.', token: 'solo-qa-sin-validez' }),
+    ...renderMail(id, { name: 'Persona de capacitación',
+      ...(['pending', 'newAccount', 'application', 'modification'].includes(id) ? { role: 'Generador' } : {}),
+      ...(['observed', 'rejected', 'modificationRejected'].includes(id) ? { message: 'Revisá el domicilio del establecimiento.' } : {}),
+      ...(['verify', 'reset'].includes(id) ? { token: 'solo-qa-sin-validez' } : {}),
+    }),
   }));
   templates.push(...['created', 'enabled', 'disabled', 'deleted', 'roleChanged', 'emailChanged', 'passwordChanged'].map(id => ({ id: 'account-' + id, ...renderAccountMail(id) })));
   templates.push(...mails.map(item => ({ id: 'notice-' + item.id, subject: item.subject, html: item.html })));
+  // Preview every controlled event label, not just the role/destination samples.
+  // Pure renderers only: these synthetic previews never enqueue or send mail.
+  const preview = (id: string, tipo: string, datos: Record<string, string>, manifiestoId?: string) => {
+    const content = notificationMailContent({ tipo, datos: JSON.stringify(datos), manifiestoId, rol: 'ADMIN' });
+    if (!content) throw new Error('Missing synthetic preview: ' + id);
+    templates.push({ id, subject: content.subject, html: content.html });
+  };
+  for (const event of ['ENVIADA', 'MENSAJE', 'APROBADA']) preview('application-' + event.toLowerCase(), 'SOLICITUD_' + event, { solicitudId: application.id });
+  for (const event of ['SOLICITADA', 'APROBADA', 'RECHAZADA']) preview('padron-' + event.toLowerCase(), 'MODIFICACION_' + event, { renovacionId: 'qa-preview' });
+  for (const event of ['FIRMADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'TRATADO', 'RECHAZADO']) preview('manifest-' + event.toLowerCase(), 'MANIFIESTO_' + event, {}, 'qa-preview');
+  for (const event of ['INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA']) preview('alert-' + event.toLowerCase(), event, {});
+  for (const event of ['CREADO', 'EN_NOMBRE', 'RESPONDER', 'DERIVAR', 'TOMAR', 'ESPERAR', 'CERRAR', 'REABRIR']) preview('support-' + event.toLowerCase(), 'INFO_GENERAL', { tipo: 'soporte', ticketId: ticket.id, evento: event });
+  preview('inspection-assigned', 'INFO_GENERAL', { inspeccionId: inspection.id, evento: 'ASIGNADA' });
+  const alertSamples = [{ subject: 'Vencimiento próximo: revisar la habilitación', html: '<p>Ejemplo de capacitación.</p>' }, { subject: 'Manifiesto pendiente de cierre', html: '<p>Ejemplo de capacitación.</p>' }];
+  for (const count of [1, 2]) templates.push({ id: 'digest-' + count, subject: '[SITREP] Resumen de alertas', html: digestTemplate(alertSamples.slice(0, count), '11/10/2026 10:00 (Mendoza)') });
+  templates.push({ id: 'digest-helper', subject: '[SITREP] Resumen de alertas', html: renderDigest(alertSamples) });
   const verifications: Record<string, unknown> = {};
   for (const project of ['web-desktop', 'web-responsive', 'app']) {
     const pairs = [];

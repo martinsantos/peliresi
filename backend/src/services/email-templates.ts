@@ -67,5 +67,5 @@ ${link ? `<p><a href="${escapeMail(link)}" style="display:inline-block;padding:1
 }
 
 export function renderDigest(items: { subject: string; html: string }[]): string {
-  return mailShell(`<h1 style="font-size:22px;color:#1B5E3C">Resumen de alertas</h1><ul>${items.map(item => `<li style="margin-bottom:16px"><strong>${escapeMail(item.subject)}</strong><p>${escapeMail(mailText(item.html))}</p></li>`).join('')}</ul><p><a style="color:#1B5E3C" href="${escapeMail(mailLink('/alertas'))}">Revisar alertas en SITREP</a></p>`);
+  return mailShell(`<h1 style="font-size:22px;color:#1B5E3C">Resumen de alertas</h1><ul>${items.map(item => `<li style="margin-bottom:16px"><strong>${escapeMail(item.subject)}</strong><p>${escapeMail(mailText(item.html))}</p></li>`).join('')}</ul>${mailAction('/alertas', 'Revisar alertas en SITREP')}`);
 }

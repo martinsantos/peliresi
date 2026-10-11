@@ -15,7 +15,7 @@ import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { mailPolicy, mendozaDayStart, retryableSmtpFailure, externalAlertRecipientAllowed } from './email-policy';
-import { escapeMail, mailText, mailShell, mailLink, renderMail } from './email-templates';
+import { escapeMail, mailText, mailShell, mailAction, renderMail } from './email-templates';
 import { queueCommittedNotificationEmails, queuedNoticeStillEligible } from './notification-mail.service';
 
 // ── Config ──────────────────────────────────────────────────────────
@@ -43,18 +43,16 @@ function baseTemplate(contenido: string): string {
   return mailShell(contenido);
 }
 
-function digestTemplate(items: { subject: string; html: string }[], hour: string): string {
+export function digestTemplate(items: { subject: string; html: string }[], hour: string): string {
   const listItems = items.map(i =>
     `<li style="margin:8px 0;padding:8px 12px;background:#fff;border-left:3px solid #1B5E3C;border-radius:0 4px 4px 0">${escapeMail(i.subject)}</li>`
   ).join('');
   return baseTemplate(`
-    <h3 style="color:#1B5E3C">Resumen de alertas — ${escapeMail(hour)}</h3>
+    <h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">Resumen de alertas</h1>
+    <p style="font-size:13px;color:#526359">${escapeMail(hour)}</p>
     <p>${items.length} alerta${items.length > 1 ? 's' : ''} en este periodo:</p>
     <ul style="list-style:none;padding:0">${listItems}</ul>
-    <p style="font-size:13px;color:#6b7280;margin-top:16px">
-      Para configurar tus preferencias de notificacion, ingresa a
-      <a href="${escapeMail(mailLink('/alertas'))}" style="color:#1B5E3C">Alertas de SITREP</a>.
-    </p>
+    ${mailAction('/alertas', 'Revisar alertas')}
   `);
 }
 
