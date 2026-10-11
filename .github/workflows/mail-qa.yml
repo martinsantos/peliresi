@@ -313,6 +313,11 @@ jobs:
         with:
           name: sitrep-final-original-apk-${{ github.run_id }}
           path: ${{ runner.temp }}/sitrep-apk-transfer
+      - name: Enable hardware acceleration only in the disposable cloud VM
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Android 15 synthetic journeys and unchanged original APK production session
         env:
           QA_APK_AUTHENTICATED: 'true'
