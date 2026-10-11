@@ -162,6 +162,7 @@ jobs:
           fi
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+          node --experimental-strip-types cloud-qa/brand-fixture.ts
       - name: Freeze release bytes before real HTTP and E2E
         if: ${{ !inputs.design_review }}
         run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts freeze
@@ -182,7 +183,7 @@ jobs:
         working-directory: frontend
         run: |
           if test '${{ inputs.design_review }}' = true; then
-            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'brand|all templates|verification|verifying'
+            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'brand|all templates|verification|verifying|clean browser'
           else
             npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
           fi
