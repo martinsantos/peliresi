@@ -24,6 +24,18 @@ test('public actor wizards keep titles aligned, current steps visible and naviga
     await readableFixedAction(page.getByRole('button', { name: 'Volver a la pantalla anterior', exact: true }), page.getByTestId('registration-identity'));
     await expect(rail.getByRole('button')).toHaveCount(total);
     await expect(rail.getByRole('button', { name: /Calculo TEF/i })).toHaveCount(0);
+    const draft = page.getByRole('region', { name: 'Borrador de prueba', exact: true });
+    const help = draft.getByRole('button', { name: 'Información del modo prueba', exact: true });
+    await expect(help).toHaveAttribute('aria-expanded', 'false');
+    await expect(draft.getByRole('note')).toHaveCount(0);
+    expect((await draft.boundingBox())!.height).toBeLessThanOrEqual(88);
+    for (const button of await draft.getByRole('button').all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    if (info.project.name !== 'web-desktop') {
+      const first = (await page.getByLabel('Razon Social *', { exact: true }).boundingBox())!;
+      expect(first.y + first.height).toBeLessThanOrEqual(page.viewportSize()!.height * 0.58);
+    }
+    await help.click(); await expect(draft.getByRole('note')).toContainText('No crea cuentas, trámites ni avisos');
+    await help.click(); await expect(draft.getByRole('note')).toHaveCount(0);
     for (let step = 1; step <= total; step++) {
       const active = rail.locator('[aria-current="step"]');
       await expect(active).toHaveAttribute('aria-label', new RegExp(`^Paso ${step} de ${total}: `));
@@ -35,6 +47,11 @@ test('public actor wizards keep titles aligned, current steps visible and naviga
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
       await expect(page.getByTestId('tef-calculator')).toHaveCount(0);
       await expect(page.getByText('Monto MxR', { exact: true })).toHaveCount(0);
+      for (const section of await page.getByTestId('registration-section-title').all()) {
+        const icon = (await section.locator('svg').boundingBox())!, heading = (await section.getByRole('heading').boundingBox())!;
+        expect(icon.width).toBeGreaterThanOrEqual(20);
+        expect(heading.x - icon.x - icon.width).toBeGreaterThanOrEqual(8);
+      }
       if ((actor === 'Generador' && step === 5) || (actor === 'Operador' && step === 6)) {
         await expect(page.getByRole('heading', { name: 'Datos de la actividad', exact: true })).toBeVisible();
         await page.getByLabel('Personal en planta', { exact: true }).fill('32');

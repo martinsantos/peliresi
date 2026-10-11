@@ -24,6 +24,7 @@ import { clearRegistrationDraft, readRegistrationDraft, writeRegistrationDraft }
 import { readTrialDraft, saveTrialDraft } from '../../services/registrationTrial';
 import { EMPTY_DRIVER, EMPTY_VEHICLE, fleetRows, fleetErrors, licenseDocumentType } from '../../services/registrationFleet';
 import { RegistrationFleetFields } from '../../components/registration/RegistrationFleetFields';
+import { RegistrationTrialDraftBar } from '../../components/registration/RegistrationTrialDraftBar';
 import { previewDocument, type LicensePreview } from '../../services/documentPreview';
 import type { ReceiptAnalysis } from '../../types/documentAnalysis';
 import { useInspectionDraftOwnership } from '../../hooks/useInspectionDraftOwnership';
@@ -811,11 +812,7 @@ const InscripcionWizardPage: React.FC = () => {
 
         {/* Step Content */}
         <div ref={validationRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
-          {isReviewMode && <section aria-label="Borrador de prueba" className="mb-4 space-y-2 border-b border-neutral-200 pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm text-primary-900">Modo prueba · sin trámites reales</strong><Button aria-label="Guardar borrador de prueba" variant="outline" leftIcon={<Save size={16} />} onClick={() => persistTrial(step)}>Guardar prueba</Button></div>
-            <p role="status" className="text-sm text-neutral-700">{localSaved ? 'Guardado en este navegador' : 'Prueba en pantalla · no se confirmó el guardado local'}</p>
-            <details className="text-sm text-neutral-700"><summary className="min-h-11 cursor-pointer py-3 font-medium text-primary-900">Cómo funciona esta prueba</summary><p className="pb-2 leading-6">Usa los mismos campos y lectura de documentos. No crea cuentas, trámites ni avisos. El borrador queda sólo en este navegador; los archivos se procesan temporalmente y se eliminan. Usá documentos de prueba, no datos sensibles.</p></details>
-          </section>}
+          {isReviewMode && <RegistrationTrialDraftBar saved={localSaved} onSave={() => { persistTrial(step); }} />}
           {!isReviewMode && <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 pb-3">
             <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Cambios guardados en este dispositivo · pendientes de guardar en SITREP' : 'Cambios en pantalla · no se pudo guardar en este dispositivo') : 'Borrador guardado en SITREP · todavía no enviado'}</p>
             <Button variant="outline" leftIcon={<Save size={16} />} isLoading={saving} disabled={submitting || Boolean(localConflict)} onClick={() => void persistDraft(step)}>Guardar borrador</Button>

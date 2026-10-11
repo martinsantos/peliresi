@@ -14,6 +14,20 @@ function Navigation() {
   return <><button onClick={() => go('/inscripcion/operador?modo=revision')}>Cambiar a operador QA</button><button onClick={() => go('/inscripcion/generador?modo=revision')}>Volver a generador QA</button><InscripcionWizardPage /></>;
 }
 describe('trial recovery is visible and isolated from real registration', () => {
+  it.each(['generador', 'operador', 'transportista'])('%s keeps help contextual without hiding save or local storage truth', async type => {
+    await open(type);
+    const help = screen.getByRole('button', { name: 'Información del modo prueba', exact: true });
+    expect(help).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('note')).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Guardado en este navegador');
+    expect(screen.getByRole('button', { name: 'Guardar borrador de prueba', exact: true })).toBeVisible();
+    fireEvent.click(help);
+    expect(help).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('note')).toHaveTextContent('No crea cuentas, trámites ni avisos');
+    expect(help.getAttribute('aria-controls')).toBe(screen.getByRole('note').id);
+    fireEvent.click(help); expect(screen.queryByRole('note')).toBeNull();
+    expect(requests.get).not.toHaveBeenCalled(); expect(requests.post).not.toHaveBeenCalled(); expect(requests.put).not.toHaveBeenCalled();
+  });
   it.each([['generador', 7, 'Regulatorio'], ['operador', 8, 'Regulatorio'], ['transportista', 5, 'Habilitacion']] as const)('%s restores values and step without any business write', async (type, total, second) => {
     await open(type); fireEvent.change(screen.getByLabelText('Razon Social *'), { target: { value: 'QA borrador recuperado' } });
     fireEvent.click(screen.getByRole('button', { name: `Paso 2 de ${total}: ${second}` }));
@@ -30,17 +44,17 @@ describe('trial recovery is visible and isolated from real registration', () => 
     fireEvent.change(screen.getByLabelText('Razon Social *'), { target: { value: 'QA dato no perdido' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador de prueba' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('No se guardó la prueba'));
-    expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA dato no perdido'); expect(screen.getByRole('status')).toHaveTextContent('no se confirmó');
+    expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA dato no perdido'); expect(screen.getByRole('status')).toHaveTextContent('No se confirmó el guardado local');
   });
   it('does not copy a draft into another actor type when the same route component is reused', async () => {
     await act(async () => { render(<MemoryRouter initialEntries={['/inscripcion/generador?modo=revision']}><Routes><Route path="/inscripcion/:tipo" element={<Navigation />} /></Routes></MemoryRouter>); });
     fireEvent.change(screen.getByLabelText('Razon Social *'), { target: { value: 'QA sólo generador' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador de prueba' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Cambiar a operador QA' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cambiar a operador QA' })); });
     expect(screen.getByLabelText('Razon Social *')).not.toHaveValue('QA sólo generador');
     fireEvent.change(screen.getByLabelText('Razon Social *'), { target: { value: 'QA sólo operador' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador de prueba' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Volver a generador QA' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Volver a generador QA' })); });
     expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA sólo generador');
     expect((readTrialDraft('OPERADOR')?.data.form as Record<string, string>).razonSocial).toBe('QA sólo operador');
     expect(requests.post).not.toHaveBeenCalled(); expect(requests.put).not.toHaveBeenCalled();
