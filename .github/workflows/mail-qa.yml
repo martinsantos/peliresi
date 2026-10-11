@@ -69,6 +69,8 @@ jobs:
       - name: Backend type check
         working-directory: backend
         run: npx --no-install tsc --noEmit -p tsconfig.build.json
+      - name: Brand vector and raster derivatives remain identical
+        run: node --experimental-strip-types scripts/qa/brand-assets.ts --check
       - name: Real queue and SMTP capture, cloud loopback only
         working-directory: backend
         env:

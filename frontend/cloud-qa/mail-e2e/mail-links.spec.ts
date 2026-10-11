@@ -98,6 +98,17 @@ test('all templates and operational variants fit with institutional brand and re
     const logo = page.getByRole('img', { name: 'Gobierno de Mendoza' });
     await expect(logo).toBeVisible();
     await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+    const masthead = page.locator('[data-mail-masthead]');
+    const brand = page.locator('[data-mail-brand]');
+    await expect(masthead).toContainText('Fiscalización Ambiental');
+    await expect(brand.locator('[data-mail-wordmark]')).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(brand.locator('[data-mail-wordmark]')).toHaveCSS('font-size', '32px');
+    await expect.poll(() => brand.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+    const governmentBox = (await logo.boundingBox())!;
+    const markBox = (await brand.locator('img').boundingBox())!;
+    const titleBox = (await page.locator('h1').boundingBox())!;
+    expect(Math.abs(governmentBox.x - markBox.x), item.id + ' brand axis').toBeLessThanOrEqual(1);
+    expect(Math.abs(titleBox.x - markBox.x), item.id + ' content axis').toBeLessThanOrEqual(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), item.id).toBe(true);
     for (const link of await page.getByRole('link').all()) {
       expect(await link.evaluate(element => element.getBoundingClientRect().height), item.id).toBeGreaterThanOrEqual(44);
