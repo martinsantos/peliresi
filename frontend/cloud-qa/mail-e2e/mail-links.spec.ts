@@ -125,7 +125,7 @@ test('public email verification preserves a local draft through real login and r
   await page.goto(prefix(info) + '/verificar-email?token=' + item.token);
   expect((await verified).status()).toBe(200);
   await expect(page.getByRole('heading', { name: 'Email verificado' })).toBeVisible();
-  await page.screenshot({ path: info.outputPath('verification-before-login.png') });
+  await page.screenshot({ path: info.outputPath('verification-before-login.png'), animations: 'disabled' });
   await page.getByRole('link', { name: 'Continuar en SITREP' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.reload(); // Browser history must preserve the protected destination.
@@ -138,7 +138,7 @@ test('public email verification preserves a local draft through real login and r
   await expect(page.getByPlaceholder('Empresa S.A.')).toHaveValue('QA edición local sin perder');
   await page.getByPlaceholder('Empresa S.A.').click({ trial: true });
   expect(await page.evaluate(() => localStorage.getItem('qa-unrelated-draft'))).toBe('Do not remove');
-  await page.screenshot({ path: info.outputPath('verification-draft-recovered.png') });
+  await page.screenshot({ path: info.outputPath('verification-draft-recovered.png'), animations: 'disabled' });
   expect(errors).toEqual([]);
 });
 
@@ -160,7 +160,7 @@ test('verifying another email does not replace a signed-in account or delete its
   const profile = await page.request.get('/api/auth/profile', { headers: { Authorization: 'Bearer ' + before } });
   expect(profile.status()).toBe(200);
   expect((await profile.json()).data.user.email).toBe('generador@night-qa.invalid');
-  await page.screenshot({ path: info.outputPath('verification-another-account.png') });
+  await page.screenshot({ path: info.outputPath('verification-another-account.png'), animations: 'disabled' });
 });
 
 test('email opened in a clean browser recovers only the server-saved application after login', async ({ page }, info) => {
@@ -177,5 +177,5 @@ test('email opened in a clean browser recovers only the server-saved application
   if (await welcome.isVisible()) await welcome.click();
   await expect(page.getByPlaceholder('Empresa S.A.')).toHaveValue('QA borrador guardado en SITREP');
   await page.getByPlaceholder('Empresa S.A.').click({ trial: true });
-  await page.screenshot({ path: info.outputPath('verification-server-draft.png') });
+  await page.screenshot({ path: info.outputPath('verification-server-draft.png'), animations: 'disabled' });
 });
