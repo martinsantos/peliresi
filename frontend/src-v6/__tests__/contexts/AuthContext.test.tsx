@@ -178,6 +178,29 @@ describe('AuthContext', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it('restores the restricted UI after server validation and clears it after a full session', async () => {
+    localStorage.setItem('sitrep_access_token', `header.${btoa(JSON.stringify({ id: inspector.id, restricted: true }))}.signature`);
+    vi.mocked(authService.getMe).mockResolvedValue({ ...inspector, activo: false });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('restricted')).toHaveTextContent('true'));
+    expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno');
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValue(inspector);
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('restricted')).toHaveTextContent('false'));
+  });
+
+  it('does not authorize a restricted token hint when the server rejects its profile', async () => {
+    localStorage.setItem('sitrep_access_token', `header.${btoa(JSON.stringify({ id: inspector.id, restricted: true }))}.signature`);
+    vi.mocked(authService.getMe).mockRejectedValue({ response: { status: 401 } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('false');
+    expect(clearTokens).toHaveBeenCalled();
+  });
+
   it('does not request a profile with stale credentials before durable recovery completes', async () => {
     localStorage.setItem('sitrep_access_token', 'old-administrator');
     let restored!: () => void;

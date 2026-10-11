@@ -9,10 +9,10 @@ import type { Usuario } from '../types/models';
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const { data } = await api.post<{ success: true; data: { user: any; tokens: { accessToken: string; refreshToken: string } } }>('/auth/login', credentials);
-    const { tokens, user } = data.data;
+    const { data } = await api.post<{ success: true; data: { user: Usuario; tokens: { accessToken: string; refreshToken: string }; restricted?: boolean; solicitudId?: string | null } }>('/auth/login', credentials);
+    const { tokens, user, restricted, solicitudId } = data.data;
     await setTokensDurably(tokens.accessToken, tokens.refreshToken);
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user };
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user, restricted, solicitudId };
   },
 
   async logout(): Promise<void> {
