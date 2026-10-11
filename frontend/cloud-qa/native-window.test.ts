@@ -142,6 +142,18 @@ test('failed or incomplete native XML read is not accepted as an empty passing w
   await assert.rejects(collectNativeWindow(async args => args[1] === 'cat' ? '<hierarchy><node/>' : 'UI hierchary dumped to: /data/local/tmp/sitrep-cloud-qa-window.xml'));
 });
 
+test('zero-exit empty stdout retains Android stderr without reading stale XML', async () => {
+  let calls = 0;
+  await assert.rejects(collectNativeWindow(async () => {
+    calls++;
+    return { stdout: '', stderr: 'ERROR: could not get idle state.' };
+  }), error => {
+    assert.match(String(error), /could not get idle state/);
+    return true;
+  });
+  assert.equal(calls, 1);
+});
+
 test('zero-exit native errors cannot reuse a complete but stale previous window', async () => {
   for (const message of ['ERROR: could not get idle state.', '', 'UI hierchary dumped to: /another/window.xml']) {
     const calls: string[][] = [];

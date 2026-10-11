@@ -210,12 +210,14 @@ const login=async(user:string)=>{
     page.getByRole('button',{name:'Ingresar',exact:true}).tap(),
   ]);
   expect(response.status()).toBe(200);
+  // A 200 response precedes React's route transition. Read the native window
+  // only after that transition, not while Chrome is replacing the login view.
+  await expect(page).not.toHaveURL(/\/login$/);
   // Chrome may raise its own notification introduction immediately after the
   // navigation. Dismiss only that observed OS prompt before reading web roles;
   // the native dialog hides the page accessibility tree, not the login result.
   await settleNativeChrome();
   await expect(page.getByRole('banner')).toBeVisible();
-  await expect(page).not.toHaveURL(/\/login$/);
   await settleNativeChrome();
   // The user-approved first-login welcome is a real UI step, not an error.
   const welcome=page.getByRole('button',{name:'Saltar introducción',exact:true});

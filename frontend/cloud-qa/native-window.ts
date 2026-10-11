@@ -75,7 +75,8 @@ export function pixelLauncherAnrClosePoint(xml: string): { x: number; y: number 
   assert.ok(right > left && bottom > top, 'Never tap zero-area or inverted ANR bounds');
   return { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) };
 }
-type NativeCommand = (args: string[], timeout: number) => Promise<string>;
+type NativeOutput = string | { stdout: string; stderr: string };
+type NativeCommand = (args: string[], timeout: number) => Promise<NativeOutput>;
 const execute = promisify(execFile);
 
 /** Collect one fresh dump without blocking CDP and the Android ADB poll. */
@@ -83,9 +84,12 @@ export async function collectNativeWindow(run: NativeCommand): Promise<string> {
   const file = '/data/local/tmp/sitrep-cloud-qa-window.xml';
   const started = Date.now();
   try {
-    const message = await run(['shell', 'uiautomator', 'dump', file], 20000);
-    assert.ok(message.includes('UI hierchary dumped to: ' + file) && !message.includes('ERROR:'),
-      'Native UI dump did not confirm a fresh window: ' + message.trim());
+    const output = await run(['shell', 'uiautomator', 'dump', file], 20000);
+    const message = typeof output === 'string' ? output : output.stdout;
+    const stderr = typeof output === 'string' ? '' : output.stderr;
+    assert.ok(message.includes('UI hierchary dumped to: ' + file)
+      && !message.includes('ERROR:') && !stderr.includes('ERROR:'),
+      'Native UI dump did not confirm a fresh window: ' + message.trim() + '\n' + stderr.trim());
   } catch (error) {
     const failure = error as Error & { stdout?: string; stderr?: string; code?: string | number; signal?: string; killed?: boolean };
     // Run89 emitted a dump acknowledgement but exited unsuccessfully. Keep the
@@ -95,13 +99,14 @@ export async function collectNativeWindow(run: NativeCommand): Promise<string> {
     throw new Error('Native UI dump failed: ' + failure.message + '\nNative command diagnostic: '
       + JSON.stringify(diagnostic) + '\n' + (failure.stdout || '') + (failure.stderr || ''));
   }
-  const xml = await run(['shell', 'cat', file], 5000);
+  const output = await run(['shell', 'cat', file], 5000);
+  const xml = typeof output === 'string' ? output : output.stdout;
   nativeNodes(xml);
   return xml;
 }
 export async function readNativeWindow(): Promise<string> {
   assertCloudEnvironment();
-  return collectNativeWindow(async (args, timeout) => (await execute('adb', args, { encoding: 'utf8', timeout })).stdout);
+  return collectNativeWindow(async (args, timeout) => execute('adb', args, { encoding: 'utf8', timeout }));
 }
 export async function dismissObservedChromePrompts(output: string): Promise<void> {
   // Do not mix a long-running Playwright UIAutomator instrumentation with the
