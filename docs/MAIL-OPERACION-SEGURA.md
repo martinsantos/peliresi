@@ -148,3 +148,86 @@ DNS público consultado para ultimamilla.com.ar: SPF incluye la IP del servidor,
 Google y Zedmail con cierre `-all`; DMARC declara `p=quarantine`, `pct=100`.
 No se validó selector/firma DKIM ni alineación de un correo recibido. Completar
 Reply-To, DKIM y canario autorizado antes de habilitar entregas reales.
+
+### Actualización 11/10 22:00 UTC: canario real y TLS
+
+Una prueba exclusivamente autorizada a `santosma@gmail.com` fue recibida en
+**Spam**, SPF/DMARC pass, sin firma DKIM. No habilitar entregas automáticas por
+esa sola recepción. El primer intento había fallado antes de MAIL/RCPT/DATA;
+se conservan ambos recibos y se verificó una sola aceptación de mensaje.
+
+Postfix ya presenta el certificado vigente de `umbot.com.ar`, por defecto y
+por SNI umbot/www.umbot; otras entradas preservadas y renovación comprobada.
+Detalles, respaldo y rollback en `DEPLOY-CORREOS-20261011.md`.
+
+**Pendiente reproducido antes de activar**: el cliente publicado conecta a
+127.0.0.1 y necesita indicar/verificar `umbot.com.ar` como nombre TLS. El canario
+aislado lo hizo explícitamente; no se cambió la configuración ni binario del
+cliente automático. No usar `rejectUnauthorized=false`, `ignoreTLS` ni plaintext
+para resolverlo. Revisar también TLS de salida del relay (política actualmente
+vacía), firma DKIM, Reply-To y reputación/entrega. No hay autorización de nuevos
+canarios ni de activar la cola general. `DISABLE_EMAILS=true` se conserva.
+
+## Candidato institucional y continuidad de sesión
+
+Versión de plantilla `20261011.2`, todavía sin publicar. Todas las familias
+usan la marca oficial de Mendoza existente en SITREP, estructura de tablas
+de presentación y estilos en línea. Acciones principales verdes, texto claro
+y asunto específico por evento. Los resúmenes no reproducen cuerpos privados.
+El canal de respuesta de soporte es el ticket autenticado, no responder al email.
+Contraste de la paleta declarada sobre blanco: verde `#1B5E3C` 7,74:1,
+cuerpo `#172C24` 14,77:1 y secundario `#526359` 6,39:1. No extrapolar estos
+valores a transformaciones de modo oscuro de los clientes de correo.
+
+El catálogo de QA comprende 58 ejemplos, no 58 envíos distintos: 12 plantillas
+transaccionales, 7 de seguridad, 11 variantes de destinatario, 25 eventos y 3
+resúmenes. Se conservan las piezas históricas desconectadas; no se activan por
+haber actualizado su diseño. Las reglas de elegibilidad y los cierres de envío
+no se modificaron. Un PNG remoto puede ser bloqueado por el cliente de correo;
+el texto alternativo y la identificación institucional siguen presentes.
+
+### Verificación sin sesión y borradores
+
+- `/verificar-email` y `/app/verificar-email` son rutas públicas de verificación.
+  La llamada no adjunta la sesión abierta ni ejecuta el interceptor de refresh.
+- Verificar no crea una sesión, no cambia tokens ni elimina borradores.
+- Después de verificar, un visitante sin sesión debe ingresar con la cuenta
+  correspondiente; se conserva el destino hacia la inscripción y se revalidan
+  los permisos en la API.
+- Si ya hay otra cuenta abierta, se informa la diferencia y se conserva esa
+  sesión. No se muestra el borrador ajeno ni se hace logout automático.
+- En el mismo navegador se conserva el borrador local vinculado a su cuenta.
+  Desde otro navegador sólo puede recuperarse lo guardado en el servidor;
+  no se prometen campos o archivos locales que nunca se sincronizaron.
+- Una verificación inválida o vencida no borra el borrador. El enlace de
+  recuperación exige ingreso; no concede acceso sólo por conocer una URL.
+
+Las capturas y pruebas Chromium no certifican el render de Gmail/Outlook, modo
+oscuro, imágenes bloqueadas ni asociación de enlaces del APK. Continúan aparte
+los pendientes de transporte TLS, DKIM, Reply-To y entrega a Inbox.
+
+### Evidencia del candidato institucional
+
+Corrida `38181837507`, commit `5522c0f4a38009fdfcc80fd95de781c810ebde93`,
+cerrada **SUCCESS** el 11/10/2026. Backend 917 unit, frontend 1395 unit,
+90 E2E sin fallos, omitidos ni flaky. Tres superficies: Chromium escritorio
+1440x900, web responsive 360x800 y `/app` 360x800. No emulador local ni APK
+nuevo en esta tanda. Las 58 variantes se renderizaron en las tres superficies;
+se comprobó logo cargado, ausencia de overflow lateral y acciones de al menos
+44px, con texto blanco sobre verde. Los destinos se validaron con login real.
+
+Integración de correo: 17 grupos aprobados, 52 mensajes capturados exclusivamente
+en SMTP loopback y cero destinatarios externos. HTTP real: ocho grupos de ciclo
+de cuentas/solicitudes/padrón con avisos suprimidos. Compilaciones backend,
+web y app aprobadas; paquete de bytes probado sin reconstrucción ni despliegue.
+
+La primera corrida `38180387394` aprobó 915 BE / 1395 FE / 87 E2E. La revisión
+de capturas detectó que una bienvenida tapaba el borrador recuperado aunque el
+dato sí estuviera presente. La prueba final cierra esa bienvenida mediante su
+botón real y comprueba hit-testing del campo. La captura espera el fin de la
+animación. No se deshabilitó ni cambió la bienvenida del producto. La tanda
+intermedia `38181575247` se canceló antes del E2E para incluir esos controles;
+no se cuenta como aprobada. No hubo VMs de pruebas solapadas.
+
+Alcance aprobado: candidato de diseño y continuidad de verificación en navegador.
+**No publicado. No es autorización ni GO de entrega de correos automáticos.**
