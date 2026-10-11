@@ -293,6 +293,8 @@ jobs:
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
           npx --no-install playwright install --with-deps chromium
+      - name: Freeze exact build evidence required by Android icon integrity checks
+        run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts freeze
       - name: Synthetic QA only, no copied production database
         run: |
           /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-final-pg" --username=qa --auth-local=trust --auth-host=trust

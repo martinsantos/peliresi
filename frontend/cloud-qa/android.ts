@@ -81,7 +81,7 @@ const settleNativeChrome=()=>dismissObservedChromePrompts(output);
 const keyboardProof=async(shown:boolean,name:string)=>{
   let dump='';
   await expect.poll(async()=>{
-    dump=await new Promise<string>((resolve,reject)=>execFile('adb',['shell','dumpsys','input_method'],{timeout:5000,encoding:'utf8'},(error,stdout)=>error?reject(error):resolve(stdout)));
+    dump=await new Promise<string>((resolve,reject)=>execFile('adb',['shell','dumpsys','input_method'],{timeout:5000,maxBuffer:4*1024*1024,encoding:'utf8'},(error,stdout)=>error?reject(new Error('Android keyboard diagnostic '+error.code+': '+error.message)):resolve(stdout)));
     await writeFile(path.join(output,name+'-input-method.txt'),dump);
     return nativeKeyboardShown(dump);
   },{timeout:10000,message:'Actual OS keyboard visibility: '+name}).toBe(shown);
