@@ -142,6 +142,8 @@ jobs:
           npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+      - name: Freeze release bytes before real HTTP and E2E
+        run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts freeze
       - name: Synthetic PostgreSQL on VM loopback
         run: |
           /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-mail-pg" --username=qa --auth-local=trust --auth-host=trust
@@ -158,6 +160,8 @@ jobs:
       - name: Real login and destinations, desktop and mobile web and app, one browser worker
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
+      - name: Package the exact tested bytes, no rebuild or deployment
+        run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts package
       - name: Stop only this QA runtime
         if: always()
         run: |
