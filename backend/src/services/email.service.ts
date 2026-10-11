@@ -53,6 +53,7 @@ export function digestTemplate(items: { subject: string; html: string }[], hour:
     <p>${items.length} alerta${items.length > 1 ? 's' : ''} en este periodo:</p>
     <ul style="list-style:none;padding:0">${listItems}</ul>
     ${mailAction('/alertas', 'Revisar alertas')}
+    <p style="font-size:13px;color:#526359">El enlace requiere una cuenta de SITREP. Si no tenés acceso, consultá al equipo que autorizó este aviso.</p>
   `);
 }
 

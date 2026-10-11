@@ -156,3 +156,17 @@ test('verifying another email does not replace a signed-in account or delete its
   expect((await profile.json()).data.user.email).toBe('generador@night-qa.invalid');
   await page.screenshot({ path: info.outputPath('verification-another-account.png') });
 });
+
+test('email opened in a clean browser recovers only the server-saved application after login', async ({ page }, info) => {
+  const item = fixture.verifications[info.project.name][2];
+  await page.goto(prefix(info) + '/verificar-email?token=' + item.token);
+  await expect(page.getByRole('heading', { name: 'Email verificado' })).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('sitrep-registration:')))).toBe(false);
+  await page.getByRole('link', { name: 'Continuar en SITREP' }).click();
+  await page.getByLabel('Correo electrónico o CUIT').fill(item.email);
+  await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + '/inscripcion/generador');
+  await expect(page.getByPlaceholder('Empresa S.A.')).toHaveValue('QA borrador guardado en SITREP');
+  await page.screenshot({ path: info.outputPath('verification-server-draft.png') });
+});

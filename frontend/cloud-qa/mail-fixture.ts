@@ -90,7 +90,7 @@ try {
   const verifications: Record<string, unknown> = {};
   for (const project of ['web-desktop', 'web-responsive', 'app']) {
     const pairs = [];
-    for (const kind of ['anonymous', 'other-session']) {
+    for (const kind of ['anonymous', 'other-session', 'new-browser']) {
       const token = `synthetic-verification-${project}-${kind}`;
       const email = `verify-${project}-${kind}@night-qa.invalid`;
       const user = await db.usuario.create({ data: { email, nombre: 'QA verificación y borrador', password: seedUser.password,

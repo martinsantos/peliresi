@@ -41,7 +41,7 @@ type Fields = { name: string; role?: string; message?: string; token?: string };
 type Spec = { title: string; body: string; action?: string; path?: string; required?: 'role' | 'message' | 'token' };
 const specs: Record<MailTemplateId, Spec> = {
   verify: { title: 'Verificá tu cuenta', body: 'Confirmá tu dirección de correo para continuar. El enlace vence en 24 horas. Si no solicitaste el registro, ignorá este mensaje.', action: 'Verificar correo', path: '/verificar-email', required: 'token' },
-  pending: { title: 'Cuenta pendiente de aprobación', body: 'Tu correo fue verificado. La administración debe revisar tu cuenta antes de habilitar el ingreso.', required: 'role' },
+  pending: { title: 'Cuenta pendiente de aprobación', body: 'Tu correo fue verificado. Podés ingresar para completar y seguir tu inscripción. Las funciones operativas se habilitan después de la aprobación.', action: 'Continuar mi inscripción', path: '/mi-solicitud', required: 'role' },
   approved: { title: 'Tu cuenta está activa', body: 'Ya podés ingresar a SITREP con tu cuenta.', action: 'Ingresar a SITREP', path: '/login' },
   newAccount: { title: 'Registro pendiente de revisión', body: 'Hay una cuenta nueva para revisar.', action: 'Revisar usuarios', path: '/admin/usuarios', required: 'role' },
   reset: { title: 'Restablecer contraseña', body: 'Recibimos una solicitud de recuperación. El enlace vence en una hora. Si no lo solicitaste, ignorá este mensaje.', action: 'Restablecer contraseña', path: '/reset-password', required: 'token' },

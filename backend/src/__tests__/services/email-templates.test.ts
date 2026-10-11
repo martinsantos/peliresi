@@ -24,6 +24,13 @@ describe('mail template catalogue', () => {
   it('rejects absent name instead of rendering undefined', () => {
     expect(() => renderMail('approved', { name: '' })).toThrow();
   });
+  it('lets a verified pending applicant continue the application without claiming operational access', () => {
+    const mail = renderMail('pending', { name: 'QA', role: 'Generador' });
+    expect(mail.html).toContain('Continuar mi inscripción');
+    expect(mail.html).toContain('/mi-solicitud');
+    expect(mail.text).toContain('Las funciones operativas se habilitan después de la aprobación');
+    expect(mail.text).not.toContain('antes de habilitar el ingreso');
+  });
   it.each(['//attacker.invalid', 'https://attacker.invalid', 'javascript:alert(1)', '/\\attacker.invalid'])('rejects nonlocal action %s', path => {
     expect(() => mailLink(path)).toThrow();
   });
