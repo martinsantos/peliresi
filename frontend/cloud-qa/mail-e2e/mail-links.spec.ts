@@ -62,7 +62,10 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
     await expect(page.getByRole('button', { name: /^Notificaciones/ })).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Mi solicitud', exact: true })).toBeInViewport({ ratio: 1 });
     await expect(page.getByRole('button', { name: 'Salir', exact: true })).toBeInViewport({ ratio: 1 });
-    if (item.id.endsWith('-rejected')) await expect(page.getByPlaceholder('Escribe un mensaje...')).toHaveCount(0);
+    if (item.id.endsWith('-rejected')) {
+      await expect(page.getByPlaceholder('Escribe un mensaje...')).toHaveCount(0);
+      await expect(page.getByText(/Enviada pendiente/)).toHaveCount(0);
+    }
   }
   await expect(page).toHaveTitle(/SITREP/);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);

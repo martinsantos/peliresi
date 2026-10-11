@@ -123,6 +123,9 @@ const MiSolicitudPage: React.FC = () => {
 
   const cfg = ESTADO_CONFIG[solicitud.estado];
   const currentStep = cfg.stepIndex;
+  const sentAt = solicitud.fechaEnvio ? new Date(solicitud.fechaEnvio) : null;
+  const sentDate = sentAt && Number.isFinite(sentAt.getTime())
+    ? sentAt.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) : null;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -134,9 +137,7 @@ const MiSolicitudPage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-neutral-900">Mi Solicitud de Inscripcion</h2>
           <p className="text-sm text-neutral-500">
-            Tipo: {solicitud.tipoActor} &middot; Enviada {solicitud.fechaEnvio
-              ? new Date(solicitud.fechaEnvio).toLocaleDateString('es-AR')
-              : 'pendiente'}
+            Tipo: {solicitud.tipoActor}{sentDate ? <> &middot; Enviada {sentDate}</> : null}
           </p>
         </div>
       </div>
