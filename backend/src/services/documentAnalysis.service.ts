@@ -126,7 +126,9 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
             reads.push(confidentLicenseText(await runLocked('tesseract', enhancedArgs(region), deadline)));
           }
         } catch (error) {
-          if (!Object.keys(first).length) throw error;
+          // Any completed pass may contain safe fields, not only the first.
+          // Still merge conflicts before retaining a partial result.
+          if (!Object.keys(licenseFields(mergeLicenseText(reads))).length) throw error;
           warning = 'Lectura parcial. Revisá las propuestas y completá manualmente los campos que falten.';
         }
       }

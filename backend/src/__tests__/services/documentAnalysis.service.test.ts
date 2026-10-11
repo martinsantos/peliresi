@@ -109,6 +109,16 @@ describe('license profile is offline, bounded and isolated from payment OCR', ()
       .toMatchObject({ lectura: 'LEIDO', texto: 'DNI: 90012345', aviso: expect.stringContaining('parcial') });
     expect(mock.exec).toHaveBeenCalledTimes(3);
   });
+  it('retains safe fields recovered only by the second pass when the optional third pass times out', async () => {
+    mock.toBuffer.mockResolvedValue({ data: Buffer.alloc(600 * 400, 180), info: { width: 600, height: 400, channels: 1 } });
+    let pass = 0;
+    mock.exec.mockImplementation((_command, _args, _options, callback) => ++pass < 3
+      ? callback(null, nativeLicenseTsv(pass === 1 ? 'PROVINCIA DE MENDOZA' : 'D.U. 90012345'), '')
+      : callback(new Error('OCR_DEADLINE'), '', ''));
+    expect(await readReceipt({ path: '/virtual/provincial-shadow.jpg', mimeType: 'image/jpeg' }, 'LICENCIA'))
+      .toMatchObject({ lectura: 'LEIDO', texto: 'DNI: 90012345', aviso: expect.stringContaining('parcial') });
+    expect(mock.exec).toHaveBeenCalledTimes(3);
+  });
   it('preserves the established Spanish page reader and skips enhanced fallback when identity fields are already readable', async () => {
     mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, nativeLicenseTsv('APELLIDO: QA\nNOMBRE: ANA\nDNI: 90012345\nVENCIMIENTO: 31/12/2027'), ''));
     const result = await readReceipt({ path: '/virtual/license.png', mimeType: 'image/png' }, 'LICENCIA');
