@@ -31,7 +31,7 @@ try {
     datosActor: JSON.stringify({ razonSocial: 'QA solicitante correo', domicilio: 'QA sin domicilio real' }),
     observaciones: 'QA completar domicilio',
   } });
-  const cases = [
+  const cases: Array<{ id: string; user: string; tipo: string; datos: Record<string, string>; expected: string; visible: string }> = [
     { id: 'support-owner', user: 'generador', tipo: 'INFO_GENERAL', datos: { tipo: 'soporte', ticketId: ticket.id }, expected: '/soporte/' + ticket.id, visible: ticket.asunto },
     { id: 'support-staff', user: 'admin', tipo: 'INFO_GENERAL', datos: { tipo: 'soporte', ticketId: ticket.id }, expected: '/soporte/' + ticket.id, visible: ticket.asunto },
     { id: 'inspection-inspector', user: 'inspector', tipo: 'INFO_GENERAL', datos: { inspeccionId: inspection.id }, expected: '/inspecciones/' + inspection.id, visible: inspection.numero },
@@ -46,6 +46,17 @@ try {
     datosActor: '{}', observaciones: 'QA observación pendiente verificado' } });
   cases.push({ id: 'application-pending', user: 'pending-mail', tipo: 'SOLICITUD_OBSERVADA', datos: { solicitudId: pendingApplication.id },
     expected: '/mi-solicitud', visible: 'QA observación pendiente verificado' });
+  const rejected = await db.usuario.create({ data: { email: 'rejected-mail@night-qa.invalid', nombre: 'QA rejected mail', password: seedUser.password,
+    rol: 'GENERADOR', activo: false, motivoInactividad: 'PENDIENTE_APROBACION', emailVerified: true } });
+  const rejectedApplication = await db.solicitudInscripcion.create({ data: { usuarioId: rejected.id, tipoActor: 'GENERADOR', estado: 'RECHAZADA',
+    datosActor: '{}', motivoRechazo: 'QA rechazo consultable sin habilitación' } });
+  cases.push({ id: 'application-pending-rejected', user: 'rejected-mail', tipo: 'SOLICITUD_RECHAZADA', datos: { solicitudId: rejectedApplication.id },
+    expected: '/mi-solicitud', visible: 'QA rechazo consultable sin habilitación' });
+  for (const actor of ['generador', 'operador', 'transportista']) cases.push({
+    id: 'certificate-' + actor, user: actor, tipo: 'INFO_GENERAL',
+    datos: { tipo: 'certificado_ambiental', documentoId: 'qa-certificate', actorTipo: actor, actorId: fixture.actors[actor] },
+    expected: '/mi-perfil', visible: 'Certificados ambientales oficiales',
+  });
   const mails = cases.map(item => ({ ...item, ...notificationMailContent({ ...item,
     rol: item.user === 'admin' ? 'ADMIN' : 'GENERADOR', datos: JSON.stringify(item.datos),
   }) }));

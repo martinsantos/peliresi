@@ -246,12 +246,13 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     if (!user.activo && user.motivoInactividad === 'SUSPENDIDA') {
       throw new AppError('Tu cuenta está suspendida. Contactá a la administración de SITREP.', 403);
     }
-    // Restricted access for candidates with pending solicitudes
+    // Candidates can also consult their rejected result, without operational access.
+    // Only the explicit pending-account state grants this additional read-only case.
     if (!user.activo && user.emailVerified && user.motivoInactividad !== 'SUSPENDIDA') {
       const solicitudPendiente = await prisma.solicitudInscripcion.findFirst({
         where: {
           usuarioId: user.id,
-          estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA'] },
+          estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA', ...(user.motivoInactividad === 'PENDIENTE_APROBACION' ? ['RECHAZADA' as const] : [])] },
         },
         select: { id: true },
       });

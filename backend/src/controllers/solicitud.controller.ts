@@ -652,6 +652,9 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const autorRol = isAdmin(req.user!.rol) ? 'ADMIN' : 'CANDIDATO';
+    if (req.user!.restricted && solicitud.estado === 'RECHAZADA') {
+      throw new AppError('La solicitud rechazada sólo permite consultar el resultado', 403);
+    }
 
     const mensaje = await prisma.mensajeSolicitud.create({
       data: {

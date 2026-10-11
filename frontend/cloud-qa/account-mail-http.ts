@@ -75,6 +75,17 @@ try {
   const observation = await db.notificacion.findFirst({ where: { usuarioId: candidate.id, tipo: 'SOLICITUD_OBSERVADA' } });
   assert.equal(JSON.parse(observation.datos).solicitudId, registration.data.solicitudId);
   checks.push('real administrative review and observation emit a private applicant notice for the correct application');
+  await db.solicitudInscripcion.update({ where: { id: registration.data.solicitudId }, data: { estado: 'EN_REVISION' } });
+  await request('/solicitudes/' + registration.data.solicitudId + '/rechazar', 'POST', { motivoRechazo: 'QA resultado consultable sin permiso operativo' }, token);
+  const rejectedLogin = await request('/auth/login', 'POST', { email: candidateEmail, password });
+  assert.equal(rejectedLogin.data.restricted, true);
+  const rejectedToken = rejectedLogin.data.tokens.accessToken;
+  const rejected = await request('/solicitudes/' + registration.data.solicitudId, 'GET', undefined, rejectedToken);
+  assert.equal(rejected.data.solicitud.estado, 'RECHAZADA');
+  await request('/solicitudes/' + registration.data.solicitudId, 'PUT', { datosActor: {} }, rejectedToken, 400);
+  await request('/solicitudes/' + registration.data.solicitudId + '/mensajes', 'POST', { contenido: 'No reabrir por mensaje' }, rejectedToken, 403);
+  await request('/manifiestos', 'GET', undefined, rejectedToken, 403);
+  checks.push('rejected verified applicant can consult own result, but cannot edit, send messages or access manifests');
   // Explicit suspension must also invalidate an already-issued restricted session.
   await request('/admin/usuarios/' + candidate.id, 'PUT', { activo: false }, token);
   assert.equal((await db.usuario.findUniqueOrThrow({ where: { id: candidate.id } })).motivoInactividad, 'SUSPENDIDA');
@@ -82,5 +93,25 @@ try {
   await request('/solicitudes/' + registration.data.solicitudId, 'GET', undefined, candidateToken, 401);
   await request('/auth/refresh-token', 'POST', { refreshToken: candidateLogin.data.tokens.refreshToken }, undefined, 401);
   checks.push('public applicant starts pending; verified login is restricted; explicit suspension denies login, existing session and refresh');
+  const generator = await db.generador.findFirstOrThrow({ where: { usuario: { email: 'generador@night-qa.invalid' } } });
+  const generatorLogin = await request('/auth/login', 'POST', { email: 'generador@night-qa.invalid', password });
+  const generatorToken = generatorLogin.data.tokens.accessToken;
+  const noticeCount = (renewalId: string, tipo: string) => db.notificacion.count({ where: { tipo, datos: { contains: renewalId } } });
+  for (const [year, decision] of [[2091, 'aprobar'], [2092, 'rechazar']] as const) {
+    const submitted = await request('/renovaciones', 'POST', { anio: year, tipoActor: 'GENERADOR', generadorId: generator.id, modalidad: 'CON_CAMBIOS', datosNuevos: { telefono: '00000111' } }, generatorToken, 201);
+    const renewalId = submitted.data.renovacion.id;
+    const reviewers = await db.notificacion.findMany({ where: { tipo: 'MODIFICACION_SOLICITADA', datos: { contains: renewalId } }, include: { usuario: true } });
+    assert.ok(reviewers.length > 0);
+    assert.ok(reviewers.every((row: { usuario: { rol: string } }) => ['ADMIN', 'ADMIN_GENERADOR'].includes(row.usuario.rol)));
+    await request('/renovaciones/' + renewalId + '/' + decision, 'POST', { motivoRechazo: 'QA rechazo con resultado en bandeja' }, generatorToken, 403);
+    await request('/renovaciones/' + renewalId + '/' + decision, 'POST', { motivoRechazo: 'QA rechazo con resultado en bandeja' }, token);
+    const event = decision === 'aprobar' ? 'MODIFICACION_APROBADA' : 'MODIFICACION_RECHAZADA';
+    assert.equal(await noticeCount(renewalId, event), 1);
+    const resultNotice = await db.notificacion.findFirstOrThrow({ where: { tipo: event, datos: { contains: renewalId } } });
+    assert.equal(resultNotice.usuarioId, generator.usuarioId);
+    await request('/renovaciones/' + renewalId + '/' + decision, 'POST', { motivoRechazo: 'No repetir' }, token, 400);
+    assert.equal(await noticeCount(renewalId, event), 1);
+  }
+  checks.push('real renewal submission scopes reviewers; approval/rejection notify only owner; self-approval and repeated decision emit no notice');
   await writeFile(path.join(process.env.QA_ARTIFACTS!, 'account-mail-http.json'), JSON.stringify({ passed: true, checks, smtpEnabled: false, database: 'sitrep_night_qa_20260926' }, null, 2));
 } finally { await db.$disconnect(); }

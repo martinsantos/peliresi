@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert } } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal } } }));
 import { notificationMailContent, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
@@ -12,6 +12,28 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each([
+    ['MODIFICACION_SOLICITADA', 'ADMIN_GENERADOR', 'PENDIENTE', 'other', true],
+    ['MODIFICACION_SOLICITADA', 'ADMIN_OPERADOR', 'PENDIENTE', 'other', false],
+    ['MODIFICACION_SOLICITADA', 'ADMIN', 'APROBADA', 'other', false],
+    ['MODIFICACION_APROBADA', 'GENERADOR', 'APROBADA', 'owner', true],
+    ['MODIFICACION_RECHAZADA', 'GENERADOR', 'RECHAZADA', 'owner', true],
+    ['MODIFICACION_APROBADA', 'GENERADOR', 'APROBADA', 'reassigned', false],
+    ['MODIFICACION_RECHAZADA', 'GENERADOR', 'PENDIENTE', 'owner', false],
+  ])('renewal %s revalidates %s / %s / %s', async (tipo, rol, estado, owner, expected) => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'padron');
+    const renewalNotice = { ...notice, tipo, rol, usuarioId: 'owner', datos: '{"renovacionId":"renewal"}' };
+    mocks.notice.mockResolvedValue({ ...renewalNotice, usuario: renewalNotice });
+    mocks.renewal.mockResolvedValue({ tipoActor: 'GENERADOR', estado, generador: { usuarioId: owner } });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(expected);
+  });
+  it('a rejection notice requires the own rejected result, not an old observation', async () => {
+    const rejected = { ...notice, tipo: 'SOLICITUD_RECHAZADA', activo: false, rol: 'GENERADOR', usuarioId: 'applicant', motivoInactividad: 'PENDIENTE_APROBACION' };
+    mocks.query.mockResolvedValue([rejected]); mocks.application.mockResolvedValue({ id: 'sol-qa' });
+    await queueCommittedNotificationEmails();
+    expect(mocks.application).toHaveBeenCalledWith({ where: { id: 'sol-qa', usuarioId: 'applicant', estado: { in: ['RECHAZADA'] } }, select: { id: true } });
+    expect(mocks.insert.mock.calls[0][0].data[0].estado).toBe('PENDIENTE');
+  });
   const certificate = { ...notice, tipo: 'INFO_GENERAL', usuarioId: 'owner', rol: 'GENERADOR', datos: JSON.stringify({ tipo: 'certificado_ambiental', documentoId: 'doc', actorTipo: 'generador', actorId: 'actor' }) };
   const document = { tipo: 'CERTIFICADO_AMBIENTAL', estado: 'APROBADO', generadorId: 'actor', generador: { usuarioId: 'owner' }, operador: null, transportista: null };
   it('queues the official certificate once and points to the owner-readable record', async () => {

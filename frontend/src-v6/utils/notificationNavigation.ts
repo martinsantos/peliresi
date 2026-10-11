@@ -32,6 +32,7 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
 
   if (explicitPath?.startsWith('/')) return withBasePath(explicitPath, basePath);
   if (data.tipo === 'nuevo_registro') return withBasePath('/admin/usuarios', basePath);
+  if (String(notificacion.tipo) === 'MODIFICACION_SOLICITADA' && typeof data.renovacionId === 'string') return withBasePath('/admin/renovaciones', basePath);
   if (data.tipo === 'certificado_ambiental' && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     return withBasePath('/mi-perfil', basePath);
   }

@@ -16,12 +16,22 @@ export type NoticeForMail = {
 const MANIFEST_TYPES = ['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO', 'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'];
 const ALERT_TYPES = ['INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA'];
 function enabledFamilies(): string[] {
-  return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').map(item => item.trim()).filter(item => ['solicitudes', 'soporte', 'inspecciones', 'certificados', 'manifiestos', 'alertas'].includes(item));
+  return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').map(item => item.trim()).filter(item => ['solicitudes', 'soporte', 'inspecciones', 'certificados', 'manifiestos', 'alertas', 'padron'].includes(item));
 }
 
 /** Recheck the source at enqueue AND delivery, including reassignment/revocation. */
 async function sourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
   const data = JSON.parse(notice.datos || '{}');
+  if (family === 'padron') {
+    const renewal = await prisma.renovacion.findUnique({ where: { id: data.renovacionId }, include: {
+      generador: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
+    } });
+    if (!renewal) return false;
+    if (notice.tipo === 'MODIFICACION_SOLICITADA') return renewal.estado === 'PENDIENTE' && ['ADMIN', 'ADMIN_' + renewal.tipoActor].includes(notice.rol);
+    const owner = renewal.tipoActor === 'GENERADOR' ? renewal.generador : renewal.operador;
+    const expected = notice.tipo === 'MODIFICACION_APROBADA' ? 'APROBADA' : 'RECHAZADA';
+    return Boolean(notice.usuarioId && owner?.usuarioId === notice.usuarioId && renewal.estado === expected);
+  }
   if (notice.manifiestoId) {
     const manifest = await prisma.manifiesto.findUnique({ where: { id: notice.manifiestoId }, select: {
       isDemoData: true, generador: { select: { usuarioId: true } },
@@ -51,14 +61,14 @@ async function sourceEligible(notice: NoticeForMail, family: string): Promise<bo
   return true;
 }
 
-/** Pending is explicit and limited to the applicant's own still-open application. */
+/** Pending is explicit and limited to the applicant's own application/result. */
 async function recipientEligible(notice: NoticeForMail, family: string): Promise<boolean> {
   if (!notice.emailVerified || !notice.notifEmail) return false;
   if (notice.activo) return true;
   if (family !== 'solicitudes' || notice.motivoInactividad !== 'PENDIENTE_APROBACION' || !notice.usuarioId) return false;
   const { solicitudId } = JSON.parse(notice.datos!);
   return Boolean(await prisma.solicitudInscripcion.findFirst({
-    where: { id: solicitudId, usuarioId: notice.usuarioId, estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA'] } },
+    where: { id: solicitudId, usuarioId: notice.usuarioId, estado: { in: notice.tipo === 'SOLICITUD_RECHAZADA' ? ['RECHAZADA'] : ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA'] } },
     select: { id: true },
   }));
 }
@@ -86,6 +96,9 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     family = 'certificados'; title = 'Certificado ambiental disponible';
     path = '/mi-perfil';
+  } else if (['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(notice.tipo) && typeof data.renovacionId === 'string' && data.renovacionId) {
+    family = 'padron'; title = 'Novedad en una solicitud de padrón';
+    path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones' : '/notificaciones';
   } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto'; path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
   } else if (ALERT_TYPES.includes(notice.tipo) || (notice.tipo === 'INFO_GENERAL' && data.familia === 'catalogo_verificable' && typeof data.casoId === 'string')) {
@@ -113,7 +126,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     FROM notificaciones n JOIN usuarios u ON u.id = n."usuarioId"
     LEFT JOIN email_queue q ON q.id = 'notification:' || n.id
     WHERE q.id IS NULL AND n."createdAt" >= $1
-      AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%'
+      AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
         OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
