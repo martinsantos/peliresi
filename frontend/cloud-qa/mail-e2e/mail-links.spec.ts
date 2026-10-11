@@ -34,6 +34,12 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
   await signInAtDestination(page, item.user);
   await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + item.expected);
   await expect(page.getByText(item.visible, { exact: true }).first()).toBeVisible();
+  if (item.id.startsWith('certificate-')) {
+    const certificates = page.getByRole('region', { name: 'Certificados ambientales oficiales', exact: true });
+    await expect(certificates).toBeVisible();
+    await expect(certificates.getByRole('heading', { name: 'Certificado ambiental anual', exact: true })).toBeVisible();
+    await expect(certificates.getByText('Cargar certificado oficial', { exact: true })).toHaveCount(0);
+  }
   const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
   if (await welcome.isVisible()) await welcome.click();
   // Hit-testing proves the destination is usable, not just rendered behind a modal.

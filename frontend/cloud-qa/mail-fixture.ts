@@ -55,7 +55,7 @@ try {
   for (const actor of ['generador', 'operador', 'transportista']) cases.push({
     id: 'certificate-' + actor, user: actor, tipo: 'INFO_GENERAL',
     datos: { tipo: 'certificado_ambiental', documentoId: 'qa-certificate', actorTipo: actor, actorId: fixture.actors[actor] },
-    expected: '/mi-perfil', visible: 'Certificados ambientales oficiales',
+    expected: '/mi-perfil', visible: 'Certificado ambiental anual',
   });
   const mails = cases.map(item => ({ ...item, ...notificationMailContent({ ...item,
     rol: item.user === 'admin' ? 'ADMIN' : 'GENERADOR', datos: JSON.stringify(item.datos),
