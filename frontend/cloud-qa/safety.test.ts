@@ -12,6 +12,12 @@ const safe: NodeJS.ProcessEnv = {
   ...Object.fromEntries(externalKeys.map(key=>[key,''])),
 };
 test('the explicitly isolated cloud target is accepted',()=>assert.doesNotThrow(()=>assertCloudEnvironment(safe)));
+test('mail QA branch uses the same isolated target and delivery locks', () => {
+  const mail = { ...safe, GITHUB_REF: 'refs/heads/codex/sitrep-mail-safety-20261011' };
+  assert.doesNotThrow(() => assertCloudEnvironment(mail));
+  assert.throws(() => assertCloudEnvironment({ ...mail, DISABLE_EMAILS: 'false' }));
+  assert.throws(() => assertCloudEnvironment({ ...mail, SMTP_HOST: 'smtp.example.invalid' }));
+});
 for(const[key,value] of Object.entries({
   CI:'false', GITHUB_ACTIONS:'false', GITHUB_REPOSITORY:'martinsantos/another-project',
   GITHUB_REF:'refs/heads/main', ALLOW_SYNTHETIC_QA:'0', NODE_ENV:'production', NODE_APP_INSTANCE:'0',

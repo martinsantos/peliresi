@@ -14,7 +14,8 @@ export function assertCloudEnvironment(env = process.env) {
   assert.equal(env.CI, 'true');
   assert.equal(env.GITHUB_ACTIONS, 'true');
   assert.equal(env.GITHUB_REPOSITORY, 'martinsantos/peliresi');
-  assert.equal(env.GITHUB_REF, 'refs/heads/codex/sitrep-cloud-qa-20261002');
+  assert.ok(['refs/heads/codex/sitrep-cloud-qa-20261002',
+    'refs/heads/codex/sitrep-mail-safety-20261011'].includes(env.GITHUB_REF || ''), 'Unapproved QA branch');
   assert.equal(env.ALLOW_SYNTHETIC_QA, '1');
   const database = new URL(env.DATABASE_URL || '');
   assert.equal(database.hostname, '127.0.0.1');
