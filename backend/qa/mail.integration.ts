@@ -157,9 +157,11 @@ if (process.argv[2] === 'worker') {
       await prisma.$transaction((tx: typeof prisma) => recordAccountMail(tx, accountRecipient, event));
     }
     await assert.rejects(prisma.$transaction(async (tx: typeof prisma) => {
+      await tx.usuario.update({ where: { id: user.id }, data: { nombre: 'must-roll-back' } });
       await recordAccountMail(tx, { ...accountRecipient, email: 'rollback-account@qa.invalid' }, 'created');
       throw new Error('account rollback');
     }), /account rollback/);
+    assert.equal((await prisma.usuario.findUniqueOrThrow({ where: { id: user.id } })).nombre, 'Mail QA');
     await Promise.all([worker(), worker()]);
     assert.equal(messages.length - accountBaseline, 7);
     assert.equal(await prisma.emailQueue.count({ where: { to: 'rollback-account@qa.invalid' } }), 0);

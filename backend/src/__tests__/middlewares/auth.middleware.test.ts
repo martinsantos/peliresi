@@ -236,6 +236,15 @@ describe('isAuthenticated middleware', () => {
     }));
   });
 
+  it.each([false, true])('blocks suspended accounts even with a restricted token=%s', async restricted => {
+    const token = createToken({ id: 'suspended', restricted });
+    mockFindUnique.mockResolvedValue({ id: 'suspended', rol: 'GENERADOR', activo: false, motivoInactividad: 'SUSPENDIDA' });
+    const { req, res, next } = createMocks(`Bearer ${token}`);
+    await isAuthenticated(req, res, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+    expect(req.user).toBeUndefined();
+  });
+
   it('limits a new registration token to its own application', async () => {
     const token = createToken({ id: 'user-456', restricted: true, registrationDraft: 'draft-123' });
     mockFindUnique.mockResolvedValue({ id: 'user-456', rol: 'GENERADOR', activo: false });

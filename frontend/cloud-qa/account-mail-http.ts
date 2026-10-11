@@ -68,6 +68,13 @@ try {
   assert.equal(candidateLogin.data.restricted, true);
   const candidateToken = candidateLogin.data.tokens.accessToken;
   await request('/solicitudes/' + registration.data.solicitudId, 'GET', undefined, candidateToken);
+  // Fixture prerequisite only: actual review and observation use the HTTP API.
+  await db.solicitudInscripcion.update({ where: { id: registration.data.solicitudId }, data: { estado: 'ENVIADA' } });
+  await request('/solicitudes/' + registration.data.solicitudId + '/revisar', 'POST', {}, token);
+  await request('/solicitudes/' + registration.data.solicitudId + '/observar', 'POST', { observaciones: 'QA completar domicilio declarado' }, token);
+  const observation = await db.notificacion.findFirst({ where: { usuarioId: candidate.id, tipo: 'SOLICITUD_OBSERVADA' } });
+  assert.equal(JSON.parse(observation.datos).solicitudId, registration.data.solicitudId);
+  checks.push('real administrative review and observation emit a private applicant notice for the correct application');
   // Explicit suspension must also invalidate an already-issued restricted session.
   await request('/admin/usuarios/' + candidate.id, 'PUT', { activo: false }, token);
   assert.equal((await db.usuario.findUniqueOrThrow({ where: { id: candidate.id } })).motivoInactividad, 'SUSPENDIDA');
