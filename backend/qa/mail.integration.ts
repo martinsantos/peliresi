@@ -101,6 +101,25 @@ if (process.argv[2] === 'worker') {
     assert.equal(await prisma.emailQueue.count({ where: { estado: 'SUPRIMIDO' } }), 2);
     checks.push('two independent workers: 20 retries and 10 digest entries claimed once; subsequent pass sends nothing');
     checks.push('historical row preserved and disabled entries never replayed');
+    process.env.EMAIL_NOTIFICATION_FAMILIES = 'solicitudes,soporte,inspecciones';
+    const user = await prisma.usuario.create({ data: { nombre: 'Mail QA', email: 'notices@qa.invalid', password: 'not-a-login-credential', rol: 'ADMIN', activo: true, emailVerified: true } });
+    const sourceNotices = [];
+    for (const datos of [{ solicitudId: 'qa-application' }, { tipo: 'soporte', ticketId: 'qa-ticket' }, { inspeccionId: 'qa-inspection' }]) {
+      sourceNotices.push(await prisma.notificacion.create({ data: { usuarioId: user.id, tipo: 'solicitudId' in datos ? 'SOLICITUD_ENVIADA' : 'INFO_GENERAL', titulo: 'QA', mensaje: 'No debe copiar contenido sensible', datos: JSON.stringify(datos) } }));
+    }
+    let rolledBackId = '';
+    await assert.rejects(prisma.$transaction(async (tx: typeof prisma) => {
+      const row = await tx.notificacion.create({ data: { usuarioId: user.id, tipo: 'SOLICITUD_ENVIADA', titulo: 'rollback', mensaje: 'rollback', datos: JSON.stringify({ solicitudId: 'rolled-back' }) } });
+      rolledBackId = row.id; throw new Error('intentional QA rollback');
+    }), /intentional QA rollback/);
+    const beforeNotices = messages.length;
+    await Promise.all([worker(), worker()]);
+    assert.equal(messages.length - beforeNotices, 3);
+    for (const source of sourceNotices) assert.equal((await prisma.emailQueue.findUnique({ where: { id: 'notification:' + source.id } })).estado, 'ENVIADO');
+    assert.equal(await prisma.emailQueue.findUnique({ where: { id: 'notification:' + rolledBackId } }), null);
+    await Promise.all([worker(), worker()]);
+    assert.equal(messages.length - beforeNotices, 3);
+    checks.push('committed application/support/inspection notices relayed once across two workers; transaction rollback produces no email');
     writeFileSync('/tmp/sitrep-mail-integration.json', JSON.stringify({ passed: true, checks, smtpMessages: messages.length, externalRecipients: 0, database: url.pathname, deployment: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks, smtpMessages: messages.length }));
   } finally {

@@ -13,6 +13,7 @@ beforeEach(() => {
   vi.resetModules(); vi.resetAllMocks();
   vi.stubEnv('DISABLE_EMAILS', 'true');
   vi.stubEnv('EMAIL_DELIVERY_NOT_BEFORE', '');
+  vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', '');
   mocks.queue.create.mockImplementation(async ({ data }) => ({ id: 'qa-mail', createdAt: new Date(), intentos: 0, maxIntentos: 3, ...data }));
   mocks.queue.count.mockResolvedValue(0);
   mocks.queue.update.mockResolvedValue({});

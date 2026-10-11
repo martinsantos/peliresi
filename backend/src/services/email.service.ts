@@ -16,6 +16,7 @@ import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { mailPolicy, mendozaDayStart, retryableSmtpFailure } from './email-policy';
 import { escapeMail, mailText, mailShell, mailLink, renderMail } from './email-templates';
+import { queueCommittedNotificationEmails } from './notification-mail.service';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -166,10 +167,11 @@ export async function flushEmailQueue(): Promise<void> {
   if (!policy.enabled || flushing) return;
   flushing = true;
   try {
+    await queueCommittedNotificationEmails();
     // Step 1: Retry failed transactional emails
     const failed = await prisma.$queryRawUnsafe<{ id: string }[]>(`
       SELECT id FROM email_queue
-      WHERE estado = 'FALLIDO'
+      WHERE (estado = 'FALLIDO' OR (estado = 'PENDIENTE' AND error = 'NOTIFICATION_READY'))
         AND tipo = 'TRANSACCIONAL'
         AND "createdAt" >= $1
         AND intentos < "maxIntentos"
@@ -181,9 +183,9 @@ export async function flushEmailQueue(): Promise<void> {
 
     for (const { id } of failed) {
       const row = await prisma.emailQueue.findUnique({ where: { id } });
-      if (!row || row.estado !== 'FALLIDO' || row.createdAt < policy.notBefore || row.intentos >= row.maxIntentos) continue;
+      if (!row || !(row.estado === 'FALLIDO' || (row.estado === 'PENDIENTE' && row.error === 'NOTIFICATION_READY')) || row.createdAt < policy.notBefore || row.intentos >= row.maxIntentos) continue;
       const claim = await prisma.emailQueue.updateMany({
-        where: { id, estado: 'FALLIDO', intentos: row.intentos },
+        where: { id, estado: row.estado, intentos: row.intentos, ...(row.estado === 'PENDIENTE' ? { error: 'NOTIFICATION_READY' } : {}) },
         data: { estado: 'PENDIENTE', error: 'DELIVERY_IN_PROGRESS_OR_UNCERTAIN', nextRetryAt: null },
       });
       if (claim.count !== 1) continue;
