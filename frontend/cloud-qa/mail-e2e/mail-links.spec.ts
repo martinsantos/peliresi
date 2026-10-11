@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { prefix } from './helpers';
+import { prefix } from '../e2e/helpers';
 const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'mail-fixture.json'), 'utf8'));
 test.beforeEach(async ({ page }) => {
   expect(fixture.database).toBe('sitrep_night_qa_20260926');
@@ -34,6 +34,10 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
   await signInAtDestination(page, item.user);
   await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + item.expected);
   await expect(page.getByText(item.visible, { exact: true }).first()).toBeVisible();
+  const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+  if (await welcome.isVisible()) await welcome.click();
+  // Hit-testing proves the destination is usable, not just rendered behind a modal.
+  await page.getByText(item.visible, { exact: true }).first().click({ trial: true });
   if (item.id === 'support-owner') {
     await expect(page.getByText('QA respuesta pública: revisamos el acceso.', { exact: true })).toBeVisible();
     await expect(page.getByText('QA NOTA INTERNA NO EXPONER', { exact: true })).toHaveCount(0);
@@ -50,10 +54,13 @@ test('forwarded support link does not reveal another actor ticket', async ({ pag
   await signInAtDestination(page, 'generador2');
   expect([403, 404]).toContain((await denied).status());
   await expect(page.getByText('QA respuesta de soporte por correo', { exact: true })).toHaveCount(0);
+  const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+  if (await welcome.isVisible()) await welcome.click();
   await expect(page.getByRole('button', { name: 'Reintentar ticket', exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('denied-ticket.png'), animations: 'disabled' });
 });
-test('all twelve templates fit the viewport with readable actions', async ({ page }, info) => {
+test('all nineteen templates fit the viewport with readable actions', async ({ page }, info) => {
+  expect(fixture.templates).toHaveLength(19);
   for (const item of fixture.templates) {
     await page.setContent(item.html);
     await expect(page.locator('h1')).toBeVisible();

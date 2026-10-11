@@ -149,11 +149,14 @@ jobs:
           cd backend
           npx --no-install prisma db push --skip-generate
           cd ..
+          node --experimental-strip-types frontend/cloud-qa/prepare.ts
           node --experimental-strip-types frontend/cloud-qa/mail-fixture.ts
           node --experimental-strip-types frontend/cloud-qa/start.ts
+      - name: Account lifecycle through real HTTP, suppressed outbox only
+        run: node --experimental-strip-types frontend/cloud-qa/account-mail-http.ts
       - name: Real login and destinations, desktop and mobile web and app, one browser worker
         working-directory: frontend
-        run: npx --no-install playwright test --config cloud-qa/playwright.config.ts mail-links.spec.ts
+        run: npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
       - name: Stop only this QA runtime
         if: always()
         run: |

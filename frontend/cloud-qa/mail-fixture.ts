@@ -8,6 +8,7 @@ const fixture = await loadSeed().seedNightDatabase();
 const { PrismaClient } = backendRequire('@prisma/client');
 const { notificationMailContent } = backendRequire(path.join(root, 'backend/dist/services/notification-mail.service.js'));
 const { renderMail } = backendRequire(path.join(root, 'backend/dist/services/email-templates.js'));
+const { renderAccountMail } = backendRequire(path.join(root, 'backend/dist/services/account-mail.service.js'));
 const db = new PrismaClient();
 const output = process.env.QA_ARTIFACTS!;
 await mkdir(output, { recursive: true });
@@ -44,5 +45,6 @@ try {
   const templates = ['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'].map(id => ({ id,
     ...renderMail(id, { name: 'Persona de capacitación', role: 'Generador', message: 'Revisá el domicilio del establecimiento.', token: 'solo-qa-sin-validez' }),
   }));
+  templates.push(...['created', 'enabled', 'disabled', 'deleted', 'roleChanged', 'emailChanged', 'passwordChanged'].map(id => ({ id: 'account-' + id, ...renderAccountMail(id) })));
   await writeFile(path.join(output, 'mail-fixture.json'), JSON.stringify({ mails, templates, ticketId: ticket.id, database: 'sitrep_night_qa_20260926', externalDelivery: false }));
 } finally { await db.$disconnect(); }

@@ -9,6 +9,7 @@ import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
 import { verifiedImpersonator } from '../services/impersonationIdentity.service';
+import { recordAccountMail } from '../services/account-mail.service';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -390,11 +391,14 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
     // Lookup alone cannot consume a proof: a second request may have read it.
-    const consumed = await prisma.usuario.updateMany({
+    await prisma.$transaction(async tx => {
+    const consumed = await tx.usuario.updateMany({
       where: { id: user.id, passwordResetToken: hashedToken, passwordResetExpires: { gt: new Date() } },
       data: { password: hashedPassword, passwordResetToken: null, passwordResetExpires: null },
     });
     if (consumed.count !== 1) throw new AppError('El enlace de recuperación es inválido o expiró', 400);
+    await recordAccountMail(tx, user, 'passwordChanged');
+    });
 
     res.json({ success: true, message: 'Contraseña restablecida correctamente.' });
   } catch (error) {
@@ -448,7 +452,11 @@ export const changePassword = async (req: Request & { user?: any }, res: Respons
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await prisma.usuario.update({ where: { id: req.user.id }, data: { password: hashedPassword } });
+    await prisma.$transaction(async tx => {
+      const changed = await tx.usuario.updateMany({ where: { id: user.id, password: user.password }, data: { password: hashedPassword } });
+      if (changed.count !== 1) throw new AppError('La contraseña cambió durante la operación. Volvé a iniciar sesión.', 409);
+      await recordAccountMail(tx, user, 'passwordChanged');
+    });
     res.json({ success: true, message: 'Contraseña actualizada correctamente' });
   } catch (error) {
     next(error);

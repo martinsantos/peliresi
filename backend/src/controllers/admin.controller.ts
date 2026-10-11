@@ -5,10 +5,10 @@ import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { verificarVencimientos } from '../jobs/vencimiento.job';
-import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
 import { parseDateRange } from '../utils/dateRange';
 import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
+import { recordAccountMail, recordAccountChanges } from '../services/account-mail.service';
 
 // ============== USUARIOS CRUD (Admin) ==============
 
@@ -180,7 +180,8 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      usuario = await prisma.usuario.create({
+      usuario = await prisma.$transaction(async tx => {
+      const created = await tx.usuario.create({
         data: {
           email,
           password: hashedPassword,
@@ -193,6 +194,9 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
           activo: activo ?? true,
           emailVerified: emailVerified ?? true,
         },
+      });
+      await recordAccountMail(tx, created, 'created');
+      return created;
       });
     }
 
@@ -226,7 +230,10 @@ export const updateUsuario = async (req: AuthRequest, res: Response, next: NextF
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const usuario = await prisma.usuario.update({
+    const usuario = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${id} FOR UPDATE`;
+    const before = await tx.usuario.findUniqueOrThrow({ where: { id } });
+    const updated = await tx.usuario.update({
       where: { id },
       data: parsed.data,
       select: {
@@ -242,6 +249,9 @@ export const updateUsuario = async (req: AuthRequest, res: Response, next: NextF
       },
     });
 
+    await recordAccountChanges(tx, before, updated);
+    return updated;
+    });
     res.json({ success: true, data: { usuario } });
   } catch (error) {
     next(error);
@@ -283,6 +293,7 @@ export const deleteUsuario = async (req: AuthRequest, res: Response, next: NextF
 
     // Eliminar actor asociado primero, luego usuario
     await deleteAccountPreservingSupport(id, async db => {
+      await recordAccountMail(db, usuario, 'deleted');
       if (usuario.generador) await db.generador.delete({ where: { id: usuario.generador.id } });
       if (usuario.transportista) await db.transportista.delete({ where: { id: usuario.transportista.id } });
       if (usuario.operador) await db.operador.delete({ where: { id: usuario.operador.id } });
@@ -298,12 +309,14 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
   try {
     const { id } = req.params;
 
-    const usuario = await prisma.usuario.findUnique({ where: { id } });
+    const updated = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${id} FOR UPDATE`;
+    const usuario = await tx.usuario.findUnique({ where: { id } });
     if (!usuario) {
       throw new AppError('Usuario no encontrado', 404);
     }
 
-    const updated = await prisma.usuario.update({
+    const changed = await tx.usuario.update({
       where: { id },
       data: { activo: !usuario.activo },
       select: {
@@ -319,10 +332,9 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
       },
     });
 
-    // Si se activa la cuenta (false → true), notificar al usuario
-    if (!usuario.activo && updated.activo) {
-      emailService.sendCuentaAprobadaEmail(updated.email, updated.nombre).catch(console.error);
-    }
+    await recordAccountChanges(tx, usuario, changed);
+    return changed;
+    });
 
     res.json({ success: true, data: { usuario: updated } });
   } catch (error) {

@@ -190,7 +190,7 @@ export async function flushEmailQueue(): Promise<void> {
       });
       if (claim.count !== 1) continue;
 
-      if (!await queuedNoticeStillEligible(id, row.to)) {
+      if ((id.startsWith('account:') && !(process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').includes('cuentas')) || !await queuedNoticeStillEligible(id, row.to)) {
         await prisma.emailQueue.update({ where: { id }, data: { estado: 'SUPRIMIDO', error: 'RECIPIENT_OR_EVENT_NO_LONGER_ELIGIBLE', nextRetryAt: null } });
         continue;
       }
