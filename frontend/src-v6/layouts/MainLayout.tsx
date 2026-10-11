@@ -56,6 +56,7 @@ import { useImpersonation } from '../contexts/ImpersonationContext';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { SupportEntry } from '../components/SupportReportDialog';
 import { SupportBubble } from '../components/SupportBubble';
+import { ApplicantLayout } from './ApplicantLayout';
 
 // ========================================
 // COMPONENT
@@ -80,7 +81,7 @@ export const MainLayout: React.FC = () => {
   const location = useLocation();
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
 
   // Items de administración según rol. Hooks must stay before loading/null guards.
@@ -142,6 +143,8 @@ export const MainLayout: React.FC = () => {
     // Will be handled by router redirect, but guard against null access
     return null;
   }
+
+  if (isRestricted) return <ApplicantLayout />;
 
   // Configuración de colores según rol (para header badges)
   const inspectionLabel = inspectionContextLabel(currentUser, location.pathname);

@@ -62,6 +62,7 @@ import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 import { SupportEntry } from '../components/SupportReportDialog';
 import { SupportBubble } from '../components/SupportBubble';
+import { ApplicantLayout } from './ApplicantLayout';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -123,7 +124,7 @@ export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
   const mp = useMobilePrefix();
   const isInspector = Boolean(currentUser?.esInspector);
@@ -298,6 +299,7 @@ export const MobileLayout: React.FC = () => {
   // Auth is handled by AuthGate in AppMobile — this is a safety net.
   // Returns null while loading or if no user (AuthGate will redirect to /login).
   if (isLoading || !currentUser) return null;
+  if (isRestricted) return <ApplicantLayout />;
 
   const inspectionLabel = inspectionContextLabel(currentUser, location.pathname);
   const config = inspectionLabel ? { label: inspectionLabel, color: 'text-teal-700', bgColor: 'bg-teal-700' } : roleConfig[currentUser.rol];

@@ -42,6 +42,12 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
     await expect(page.getByText('QA respuesta pública: revisamos el acceso.', { exact: true })).toBeVisible();
     await expect(page.getByText('QA NOTA INTERNA NO EXPONER', { exact: true })).toHaveCount(0);
   }
+  if (item.id === 'application-pending') {
+    await expect(page.getByRole('heading', { name: 'Mi solicitud', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salir', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^(Manifiestos|Reportes|Avisos)$/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Notificaciones/ })).toHaveCount(0);
+  }
   await expect(page).toHaveTitle(/SITREP/);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
