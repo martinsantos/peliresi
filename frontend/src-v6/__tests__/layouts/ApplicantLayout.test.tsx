@@ -7,9 +7,9 @@ vi.mock('../../components/ui/Toast', () => ({ ToastContainer: () => null }));
 import { ApplicantLayout } from '../../layouts/ApplicantLayout';
 beforeEach(() => logout.mockClear());
 it.each(['', '/app'])('keeps the own application and logout usable without unavailable navigation (%s)', prefix => {
-  render(<MemoryRouter initialEntries={[prefix + '/mi-solicitud']}><Routes>
-    <Route element={<ApplicantLayout />}><Route path={prefix + '/mi-solicitud'} element={<p>Observación para corregir</p>} /></Route>
-    <Route path={prefix + '/login'} element={<p>Ingreso</p>} />
+  render(<MemoryRouter basename={prefix || '/'} initialEntries={[prefix + '/mi-solicitud']}><Routes>
+    <Route element={<ApplicantLayout />}><Route path="/mi-solicitud" element={<p>Observación para corregir</p>} /></Route>
+    <Route path="/login" element={<p>Ingreso</p>} />
   </Routes></MemoryRouter>);
   expect(screen.getByRole('heading', { name: 'Mi solicitud' })).toBeVisible();
   expect(screen.getByText('Observación para corregir')).toBeVisible();
