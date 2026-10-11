@@ -2,6 +2,11 @@ name: SITREP Isolated Cloud QA
 on:
   workflow_dispatch:
     inputs:
+      apk_authenticated:
+        description: Explicitly authorized temporary production QA account; session/read-only APK checks, no business writes
+        type: boolean
+        required: true
+        default: false
       unit:
         description: Repeat unit suites; false only reuses measured unchanged product-source gates
         type: boolean
@@ -171,6 +176,7 @@ jobs:
       - name: Verify isolation before installing or writing data
         run: |
           node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/apk-auth-policy.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/native-window.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/deadline.test.ts
           node --experimental-strip-types --test frontend/cloud-qa/android-connection.test.ts
@@ -371,6 +377,9 @@ jobs:
           path: ${{ runner.temp }}/sitrep-apk-transfer
       - name: Android 15 actual OS and Chrome, no local emulator
         if: always() && !cancelled() && inputs.android && steps.qa-start.outcome == 'success'
+        env:
+          QA_APK_AUTHENTICATED: ${{ inputs.apk_authenticated }}
+          QA_APK_CREDENTIALS: ${{ inputs.apk_authenticated && secrets.SITREP_APK_TEMP_QA || '' }}
         uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
         with:
           api-level: 35

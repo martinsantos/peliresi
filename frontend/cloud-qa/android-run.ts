@@ -11,8 +11,10 @@ const results = [];
 // Sequential on the one temporary emulator. Preserve functional evidence even
 // when original APK staging fails, and preserve APK smoke if a flow fails.
 for (const file of ['android.ts', 'apk.ts']) {
+  const env = { ...process.env };
+  if (file !== 'apk.ts') { delete env.QA_APK_CREDENTIALS; delete env.QA_APK_AUTHENTICATED; }
   const result = spawnSync(process.execPath, ['--experimental-strip-types', path.join('frontend/cloud-qa', file)],
-    { stdio: 'inherit', timeout: 12 * 60 * 1000 });
+    { stdio: 'inherit', timeout: 12 * 60 * 1000, env });
   results.push({ file, status: result.status, error: result.error?.message, signal: result.signal });
 }
 await writeFile(path.join(process.env.QA_ARTIFACTS!, 'android-run.json'), JSON.stringify(results, null, 2));
