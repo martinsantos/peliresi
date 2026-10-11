@@ -3,6 +3,11 @@ on:
   push:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
+    inputs:
+      production_readonly:
+        description: Public final URL checks only, no authentication or production writes
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -10,6 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   isolated-mail:
+    if: ${{ !inputs.production_readonly }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
@@ -174,3 +180,29 @@ jobs:
           path: /tmp/sitrep-mail-browser/
           retention-days: 3
           if-no-files-found: warn
+  production-readonly:
+    if: ${{ inputs.production_readonly }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      NODE_OPTIONS: --max-old-space-size=1536
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Single browser on cloud VM only
+        run: |
+          npm ci --prefix frontend --no-audit --no-fund
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Read-only final web and app URL checks
+        run: node --experimental-strip-types scripts/qa/mail-production-readonly.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-mail-production-${{ github.run_id }}
+          path: /tmp/sitrep-mail-production/
+          retention-days: 3
