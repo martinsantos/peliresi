@@ -4,7 +4,7 @@
  * Layout optimizado para dispositivos móviles - Adaptado por rol
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -129,6 +129,35 @@ export const MobileLayout: React.FC = () => {
   const isInspector = Boolean(currentUser?.esInspector);
   const isInspectionRoute = /\/inspecciones(?:\/|$)/.test(location.pathname);
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
+  const inspectionShell = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const shell = inspectionShell.current, viewport = window.visualViewport;
+    if (!isInspectionCase || !shell || !viewport) return;
+    let frame = 0;
+    const reset = () => {
+      for (const property of ['position', 'top', 'left', 'width', 'height']) shell.style.removeProperty(property);
+    };
+    const measure = () => {
+      // Android pans the visual viewport to the focused editor. Moving only
+      // the footer leaves the header and server confirmation above the screen.
+      // Keep the same mounted flex shell in the visible frame, not an overlay
+      // toast or a focus/scroll reset. Do not counteract deliberate pinch zoom.
+      if (viewport.scale !== 1) { reset(); return; }
+      const { height, width, offsetTop, offsetLeft } = viewport;
+      if (![height, width, offsetTop, offsetLeft].every(Number.isFinite) || height <= 0 || width <= 0) return;
+      Object.assign(shell.style, { position: 'fixed', top: `${offsetTop}px`, left: `${offsetLeft}px`, width: `${width}px`, height: `${height}px` });
+    };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    measure();
+    viewport.addEventListener('resize', schedule, { passive: true });
+    viewport.addEventListener('scroll', schedule, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport.removeEventListener('resize', schedule);
+      viewport.removeEventListener('scroll', schedule);
+      reset();
+    };
+  }, [isInspectionCase, isLoading, currentUser?.id]);
   const canInspect = Boolean(isInspector || currentUser?.rol === 'ADMIN' || currentUser?.rol.startsWith('ADMIN_'));
   const { data: unreadNotificationCount = 0 } = useNotificacionesNoLeidas();
 
@@ -314,7 +343,7 @@ export const MobileLayout: React.FC = () => {
   const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
 
   return (
-    <div data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
+    <div ref={inspectionShell} data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
       <NotificacionesPoller />
       {/* Demo mode banner */}
       {isDemo && (

@@ -47,7 +47,8 @@ describe('help bubble opens from the current task without automatic delivery', (
     const view = render(<SupportBubble mobile aboveTrip />);
     expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' }).textContent).toBe('');
     expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' })).toHaveClass('h-12', 'w-12', 'p-0');
-    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' }).parentElement).toHaveStyle({ bottom: 'calc(148px + env(safe-area-inset-bottom, 0px))' });
+    // FAB: 96px bottom + 56px height, then a real 12px gap.
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico' }).parentElement).toHaveStyle({ bottom: 'calc(164px + env(safe-area-inset-bottom, 0px))' });
     view.rerender(<SupportBubble mobile hidden />); expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico' })).not.toBeInTheDocument();
   });
   it('can live in the inspection header without floating over save controls', async () => {

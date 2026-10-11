@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileLayout } from '../../layouts/MobileLayout';
 
 const authState = vi.hoisted(() => ({
@@ -102,7 +102,7 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="manifiestos/:id" element={<div>Detalle del manifiesto</div>} />
           <Route path="transporte/viaje/:id" element={<div data-testid="trip-content">Trip</div>} />
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
-          <Route path="inspecciones/:id" element={<div>Expediente de campo</div>} />
+          <Route path="inspecciones/:id" element={<div>Expediente de campo<textarea aria-label="Observación QA" /></div>} />
           <Route path="mis-inspecciones/:id" element={<div>Inspección del actor</div>} />
           <Route path="soporte/:id" element={<div>Ticket confirmado</div>} />
         </Route>
@@ -113,6 +113,7 @@ function renderMobileLayout(initialPath = '/dashboard') {
 }
 
 describe('MobileLayout Android shell', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: String(authState.currentUser.id) })) + '.not-a-credential');
@@ -148,6 +149,40 @@ describe('MobileLayout Android shell', () => {
     expect(button.closest('header')).toBe(screen.getByRole('banner'));
     expect(button.parentElement).not.toHaveClass('fixed');
     expect(screen.queryByRole('navigation', { name: /principal/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the inspection header and notice outlet in the panned keyboard viewport without replacing the editor', () => {
+    const viewport = Object.assign(new EventTarget(), { height: 783, width: 393, offsetTop: 0, offsetLeft: 0, scale: 1 });
+    vi.stubGlobal('visualViewport', viewport);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+    const remove = vi.spyOn(viewport, 'removeEventListener');
+    const view = renderMobileLayout('/inspecciones/qa-expediente');
+    const shell = screen.getByRole('banner').closest('[data-app-shell]') as HTMLElement;
+    const input = screen.getByRole('textbox', { name: 'Observación QA' }); input.focus();
+    fireEvent.change(input, { target: { value: 'Comentario conservado' } });
+    act(() => { viewport.height = 471; viewport.offsetTop = 190; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell).toHaveStyle({ position: 'fixed', top: '190px', height: '471px' });
+    expect(input).toHaveFocus(); expect(input).toHaveValue('Comentario conservado');
+    act(() => { viewport.offsetTop = 120; viewport.dispatchEvent(new Event('scroll')); });
+    expect(shell.style.top).toBe('120px');
+    act(() => { viewport.height = 0; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell.style.height).toBe('471px');
+    act(() => { viewport.height = 783; viewport.offsetTop = 0; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell).toHaveStyle({ top: '0px', height: '783px' });
+    expect(screen.getByRole('textbox', { name: 'Observación QA' })).toBe(input);
+    view.unmount(); expect(remove).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function));
+    expect(shell.style.height).toBe('');
+  });
+
+  it('leaves ordinary pages and pinch zoom under browser control', () => {
+    const viewport = Object.assign(new EventTarget(), { height: 471, width: 393, offsetTop: 90, offsetLeft: 0, scale: 2 });
+    vi.stubGlobal('visualViewport', viewport);
+    const view = renderMobileLayout('/inspecciones/qa-expediente');
+    expect(screen.getByRole('banner').closest('[data-app-shell]')).not.toHaveStyle({ position: 'fixed' });
+    view.unmount(); viewport.scale = 1;
+    renderMobileLayout('/dashboard');
+    expect(screen.getByRole('banner').closest('[data-app-shell]')).not.toHaveStyle({ position: 'fixed' });
   });
 
   it('keeps the original drawer and work when reporting is deferred without acknowledgement', () => {

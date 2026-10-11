@@ -98,8 +98,8 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
       // A more expensive model is not invariably more accurate on every font.
       const reads = [confidentLicenseText(await runLocked('tesseract', [image, 'stdout', '-l', 'spa', '--psm', '3', '-c', 'tessedit_create_tsv=1'], deadline))];
       const first = licenseFields(reads[0]); let warning: string | null = null;
-      // Only one extra pass, with the SAME overall deadline and cross-worker
-      // engine slot. Blue provincial backgrounds need local shadow compensation.
+      // Bounded fallback with the SAME overall deadline and cross-worker slot.
+      // Blue provincial backgrounds need local shadow compensation.
       if (!first.dni || !first.nombre || !first.apellido) {
         try {
           const raw = await sharp(file.path, { limitInputPixels: 16_000_000 }).rotate()
@@ -110,6 +110,21 @@ export async function readReceipt(file: { path: string; mimeType: string }, prof
           const adaptive = path.join(temporary, 'license-adaptive.png');
           await sharp(Buffer.from(pixels), { raw: { width: raw.info.width, height: raw.info.height, channels: 1 } }).png().toFile(adaptive);
           reads.push(confidentLicenseText(await runLocked('tesseract', enhancedArgs(adaptive), deadline)));
+          const partial = licenseFields(mergeLicenseText(reads));
+          // Old Mendoza cards place identity below a large emblem/photo. Only
+          // a confidently labelled DU on a landscape card enables this final
+          // region pass. The same label/conflict checks still apply; no guessed
+          // names, expiry or number from the reverse, and no extra time budget.
+          if (partial.dni && (!partial.nombre || !partial.apellido)
+              && reads.some(read => /\bD\.?U\.?\s+\d{6,9}(?:\s|$)/i.test(read))
+              && raw.info.width >= 200 && raw.info.height >= 200
+              && raw.info.width / raw.info.height >= 1.2 && raw.info.width / raw.info.height <= 2) {
+            const region = path.join(temporary, 'license-identity.png');
+            await sharp(raw.data, { raw: { width: raw.info.width, height: raw.info.height, channels: 1 } })
+              .extract({ left: 0, top: Math.floor(raw.info.height * 0.44), width: Math.floor(raw.info.width * 0.68), height: Math.floor(raw.info.height * 0.35) })
+              .normalize().png().toFile(region);
+            reads.push(confidentLicenseText(await runLocked('tesseract', enhancedArgs(region), deadline)));
+          }
         } catch (error) {
           if (!Object.keys(first).length) throw error;
           warning = 'Lectura parcial. Revisá las propuestas y completá manualmente los campos que falten.';

@@ -10,7 +10,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   const pipeline = { rotate: vi.fn().mockReturnThis(), resize: vi.fn().mockReturnThis(), grayscale: vi.fn().mockReturnThis(),
     flatten: vi.fn().mockReturnThis(), toColourspace: vi.fn().mockReturnThis(), extractChannel: vi.fn().mockReturnThis(),
-    median: vi.fn().mockReturnThis(), raw: vi.fn().mockReturnThis(), png: vi.fn().mockReturnThis(), toFile: mock.toFile, toBuffer: mock.toBuffer };
+    median: vi.fn().mockReturnThis(), extract: vi.fn().mockReturnThis(), normalize: vi.fn().mockReturnThis(), raw: vi.fn().mockReturnThis(), png: vi.fn().mockReturnThis(), toFile: mock.toFile, toBuffer: mock.toBuffer };
   mock.image.mockReturnValue(pipeline); mock.toFile.mockResolvedValue(undefined);
   mock.toBuffer.mockResolvedValue({ data: Buffer.from([255]), info: { width: 1, height: 1, channels: 1 } });
   mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, 'RECIBO QA 2026 pago para revisar', ''));
@@ -77,6 +77,38 @@ function nativeLicenseTsv(text: string) {
 }
 
 describe('license profile is offline, bounded and isolated from payment OCR', () => {
+  it('recovers the explicitly captioned provincial identity region only after a safe DU and incomplete full-card reads', async () => {
+    mock.toBuffer.mockResolvedValue({ data: Buffer.alloc(600 * 400, 180), info: { width: 600, height: 400, channels: 1 } });
+    let pass = 0;
+    mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, nativeLicenseTsv(++pass < 3
+      ? 'D.U. 90012345' : 'D.U. 90012345\nPEREZ, ANA QA\nDOCUMENTO, APELLIDO Y NOMBRE'), ''));
+    const result = await readReceipt({ path: '/virtual/provincial.jpg', mimeType: 'image/jpeg' }, 'LICENCIA');
+    expect(result).toMatchObject({ lectura: 'LEIDO', texto: 'APELLIDO: PEREZ\nNOMBRE: ANA QA\nDNI: 90012345', aviso: expect.stringContaining('parcial') });
+    expect(mock.exec).toHaveBeenCalledTimes(3);
+    expect(mock.image.mock.results[0].value.extract).toHaveBeenCalledWith({ left: 0, top: 176, width: 408, height: 140 });
+    expect(mock.exec.mock.calls[2][2].timeout).toBeLessThanOrEqual(mock.exec.mock.calls[0][2].timeout);
+    expect(mock.exec.mock.calls[2][2].env.OMP_THREAD_LIMIT).toBe('1');
+  });
+
+  it('does not use a region to override conflicting identity or fabricate unreadable names', async () => {
+    mock.toBuffer.mockResolvedValue({ data: Buffer.alloc(600 * 400, 180), info: { width: 600, height: 400, channels: 1 } });
+    let pass = 0;
+    mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, nativeLicenseTsv(++pass < 3
+      ? 'D.U. 90012345' : 'D.U. 90054321\nPEREZ [?], ANA [?]\nDOCUMENTO, APELLIDO Y NOMBRE'), ''));
+    const result = await readReceipt({ path: '/virtual/uncertain.jpg', mimeType: 'image/jpeg' }, 'LICENCIA');
+    expect(mock.exec).toHaveBeenCalledTimes(3);
+    expect(result).toMatchObject({ lectura: 'SIN_TEXTO', texto: '' });
+  });
+
+  it('keeps confirmed full-card partial fields if the optional identity region times out', async () => {
+    mock.toBuffer.mockResolvedValue({ data: Buffer.alloc(600 * 400, 180), info: { width: 600, height: 400, channels: 1 } });
+    let pass = 0;
+    mock.exec.mockImplementation((_command, _args, _options, callback) => ++pass < 3
+      ? callback(null, nativeLicenseTsv('D.U. 90012345'), '') : callback(new Error('OCR_DEADLINE'), '', ''));
+    expect(await readReceipt({ path: '/virtual/provincial.jpg', mimeType: 'image/jpeg' }, 'LICENCIA'))
+      .toMatchObject({ lectura: 'LEIDO', texto: 'DNI: 90012345', aviso: expect.stringContaining('parcial') });
+    expect(mock.exec).toHaveBeenCalledTimes(3);
+  });
   it('preserves the established Spanish page reader and skips enhanced fallback when identity fields are already readable', async () => {
     mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, nativeLicenseTsv('APELLIDO: QA\nNOMBRE: ANA\nDNI: 90012345\nVENCIMIENTO: 31/12/2027'), ''));
     const result = await readReceipt({ path: '/virtual/license.png', mimeType: 'image/png' }, 'LICENCIA');

@@ -200,6 +200,20 @@ test('visual inventory: authenticated workspaces, ABM and actor forms', async ({
   ];
   for (const surface of surfaces) await test.step(surface.name, async () => {
     await capture(page, info, surface);
+    if (surface.name === 'manifests' && info.project.name === 'app') {
+      const help = page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+      const create = page.getByRole('button', { name: 'Nuevo manifiesto', exact: true });
+      await expect(help).toBeVisible(); await expect(create).toBeVisible();
+      const helpBox = (await help.boundingBox())!, createBox = (await create.boundingBox())!;
+      expect(createBox.y - helpBox.y - helpBox.height, 'Help must leave a real touch gap above the create action').toBeGreaterThanOrEqual(12);
+      await help.tap();
+      await expect(page.getByRole('dialog', { name: 'Reportar un problema' })).toBeVisible();
+      await page.getByRole('button', { name: 'Continuar luego', exact: true }).click();
+      await expect(page.getByRole('dialog', { name: 'Reportar un problema' })).toHaveCount(0);
+      await create.tap();
+      await expect(page).toHaveURL(/\/app\/manifiestos\/nuevo$/);
+      await page.goto(prefix(info) + surface.route);
+    }
     if (['generators', 'operators', 'transporters', 'wastes', 'treatments'].includes(surface.name)) {
       const summary = page.getByRole('group', { name: 'Resumen de registros', exact: true });
       await expect(summary).toBeVisible();

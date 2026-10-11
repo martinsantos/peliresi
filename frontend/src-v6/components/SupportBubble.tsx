@@ -51,7 +51,7 @@ function Bubble({ owner, mobile, aboveTrip, hidden, inline }: { owner: string; m
       if (mounted.current) { setCapturing(false); if (supportSessionMatches(owner)) setOpen(true); }
     }
   };
-  const bottom = mobile ? `calc(${aboveTrip ? 148 : 88}px + env(safe-area-inset-bottom, 0px))` : '24px';
+  const bottom = mobile ? `calc(${aboveTrip ? 164 : 88}px + env(safe-area-inset-bottom, 0px))` : '24px';
   return <>
     {!hidden && !keyboard && <div data-support-ui className={inline ? 'relative flex shrink-0 items-center' : 'fixed right-4 z-[45] flex flex-col items-end gap-2'} style={inline ? undefined : { bottom }} hidden={open && !inline}>
       {sent && !inline && <p role="status" className="max-w-[240px] rounded-lg border border-primary-200 bg-white p-3 text-sm text-primary-900 shadow-sm">Reporte enviado a soporte. Podés continuar.</p>}
