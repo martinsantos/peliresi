@@ -1,11 +1,58 @@
 # Correos SITREP — backlog prioritario para producción
 
 Alta del pendiente: 11/10/2026. Hito solicitado: martes 13/10/2026, Mendoza.
-ID: **MAIL-PROD-01**. Estado: **IMPLEMENTACIÓN PARCIAL CON QA CLOUD; envío real deshabilitado**.
+ID: **MAIL-PROD-01**. Estado: **GO DEL BLOQUE IMPLEMENTADO EN QA CLOUD; publicación y envío real pendientes**.
 Alcance de este registro: matriz/planilla de eventos y plantillas de correo,
 destinatarios, ejecución, trazabilidad y pruebas. No habilita envíos reales.
 
-## Ampliación del 11/10 — candidato 68d2ac5 validado en QA
+## Ampliación validada — 11/10, candidato 32e32c4
+
+- CAA oficial: carga DGFA y aviso al titular atómicos; acceso desde la bandeja
+  a Mi perfil. Correo opcional, sin PDF adjunto; revalidación de propiedad,
+  aprobación y existencia antes de entregar.
+- Manifiestos/alertas: se elimina el envío directo paralelo del dispatcher;
+  se reutiliza el aviso confirmado y una sola fila de cola. Incluye cambios
+  de estado, incidentes, huella repetida, catálogo de vencimientos y
+  requerimientos, y seguimiento de cierre. No se añaden reglas legales.
+- Padrón: solicitud y resolución emiten avisos transaccionales, con revisión
+  sectorial y resolución sólo al titular. Se revalida destinatario/estado.
+- Rechazados: el solicitante explícitamente pendiente y verificado puede
+  consultar su resultado con sesión restringida. Edición, mensajes y acceso
+  operativo denegados; suspendidos siguen sin acceso.
+- Direcciones externas de reglas antiguas: canal separado, bloqueado por
+  defecto (`EMAIL_EXTERNAL_ALERTS_ENABLED`). Decisión del usuario aplicada:
+  autorización individual mediante lista exacta de Operaciones y revalidación
+  antes de entregar. No se agregó ningún destinatario real.
+- Cupo: avisos operativos y cuenta/recuperación separados, ambos limitados;
+  agotar los avisos no bloquea la recuperación de contraseña.
+
+### Matriz vigente de conexión
+
+| Familia | Productor y destinatario | Evidencia exigida / límite |
+|---|---|---|
+| Alta y solicitudes | Solicitud confirmada; solicitante propio y revisor competente | HTTP de presentación/observación/rechazo, login restringido y E2E de destino |
+| Cuenta y seguridad | Siete eventos atómicos de cuenta; dirección previamente verificada | HTTP de cambios, consumo único de token, rollback, SMTP sólo capturado |
+| Soporte | Aviso persistido de ticket; participante autorizado | E2E de respuesta, derivación, nota interna privada y rechazo de enlace ajeno |
+| Inspecciones | Avisos persistidos de asignación e intercambio | E2E de inspector/actor, enlace autenticado; sin crear formalidades nuevas |
+| CAA oficial | Documento DGFA y aviso en una transacción; titular del actor | Carga/descarga real de los tres actores, propiedad y revocación |
+| Padrón | Renovación presentada/aprobada/rechazada | HTTP real, destinatario sectorial/titular, decisión repetida sin aviso duplicado |
+| Manifiestos | Cambios de estado ya notificables | Ciclo E2E y relay SMTP; sin envío paralelo ni datos demo |
+| Alertas existentes | Catálogo verificable, incidentes, cierre y huellas repetidas | Revalidación de caso/regla/destinatario; no inferir nueva regla fiscal |
+| Destinatarios externos legados | Direcciones manuales de reglas, autorizadas individualmente por Operaciones | Canal y lista exacta separados; se revalida al enviar y revocación suprime cola sin replay |
+| Nuevas discrepancias DDJJ/TEF | No basta tener plantilla | Pendiente fuente y criterio de negocio; fuera del GO de este bloque |
+
+Las secciones históricas siguientes preservan el avance y las reproducciones;
+sus pendientes resueltos no prevalecen sobre esta matriz ni el último informe QA.
+
+Corrida 38165246711 **SUCCESS**, cerrada 11/10 a las 19:02:27 UTC.
+Backend: 901 unit y 17 grupos DB/SMTP, 52 capturas dentro de la VM, cero
+destinatarios externos. Migración exacta ensayada y revertida en base sintética.
+Frontend: 1380 unit, ambos builds, ocho grupos HTTP y 81/81 E2E aprobados,
+sin omitidos ni flaky; conteos y capturas en
+[cierre QA](QA-CORREOS-20261011.md). Runtime, servidor y PostgreSQL QA detenidos.
+No se publicaron cambios ni se modificaron envíos o datos de producción.
+
+## Histórico del 11/10 — candidato 68d2ac5 validado en QA
 
 La decisión del usuario ya está implementada: pendientes con correo verificado
 reciben observaciones propias; suspendidos no. La columna aditiva
@@ -212,7 +259,7 @@ Los cambios de correo aún no están desplegados. Producción conserva
   notas, adjuntos, observaciones libres ni datos de terceros al mensaje.
   Se excluyen señales de prueba/revisión y actas de capacitación reconocidas.
 
-### Inventario de conexión actual, no confundir plantilla con disparador
+### Inventario histórico del lote inicial, sustituido por la matriz vigente
 
 | Plantilla o familia | Disparador comprobado en código | Estado del candidato |
 |---|---|---|

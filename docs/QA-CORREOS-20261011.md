@@ -1,6 +1,148 @@
 # Correos SITREP — corte verificable del 11/10/2026
 
-## Ampliación: candidato 68d2ac5 — GO del bloque en QA
+## Cierre ampliado — candidato 32e32c4, GO del bloque en QA
+
+Producto `32e32c498bd3bb0afa0c7cdf14fcc22c070a852a` en
+`codex/sitrep-mail-safety-20261011`.
+[Corrida del candidato](https://github.com/martinsantos/peliresi/actions/runs/38165246711).
+**SUCCESS**, finalizada 11/10/2026 a las 19:02:27 UTC (16:02:27 Mendoza).
+**GO técnico de este bloque en QA, no autorización de entregas reales ni GO
+global de toda la aplicación.** Este cierre sustituye los cortes históricos
+conservados más abajo.
+No publicación, migración ni activación de correo/push en producción.
+No se tocó el formulario humano ni se abrió navegador/emulador/Docker local.
+
+### Gates del candidato exacto
+
+| Comprobación | Resultado |
+|---|---|
+| Unit backend completas | 901 aprobadas, 0 fallidas, 0 omitidas |
+| TypeScript backend | Aprobado |
+| PostgreSQL y SMTP loopback | 17 grupos aprobados; 52 mensajes capturados, 0 destinatarios externos |
+| Migración SQL exacta | Aprobada; históricos conservados sin inferencia, CHECK válido y rollback total |
+| Unit frontend completas | 1380 aprobadas, 0 fallidas, 0 omitidas |
+| Builds web y `/app` | Ambos aprobados |
+| HTTP real | Ocho grupos aprobados; ocho avisos de cuenta SUPRIMIDO, SMTP deshabilitado |
+| E2E escritorio, web móvil y `/app` | 81/81 aprobados; 0 omitidos, 0 inesperados, 0 flaky; un worker, cero reintentos |
+| Plantillas | 19 HTML/texto revisadas por E2E en las tres vistas |
+| Cierre QA | runtime/server cerrados 19:02:21 UTC; PostgreSQL detenido; ambos jobs finalizados |
+
+Artefactos backend del mismo run: `mail-qa-20261011/final-approved-backend/`
+en el disco SDTERA; no reutilizar métricas de candidatos cancelados.
+Artefactos frontend y HTTP del mismo run: `mail-qa-20261011/final-approved-browser/`.
+
+### Revisión renderizada e interacción
+
+Flujo: enlace de aviso → login real → destino autorizado → consulta de solicitud,
+ticket, inspección o certificado. CAA incluye descarga del original; los casos
+de soporte, inspecciones y manifiestos ejercitan sus acciones contra la API real.
+Los 81 casos comprenden 39 de destinos/plantillas/denegación, 24 de soporte,
+seis de intercambio de inspección, nueve de CAA y tres de ciclo de manifiesto.
+
+| Control del lote de destinos | Resultado |
+|---|---|
+| Identidad de página | URL esperada y contenido específico comprobados; título del documento no es un gate separado |
+| Pantalla no vacía | Contenido y controles esperados presentes |
+| Overlay de error | Ausencia de `vite-error-overlay` comprobada |
+| Consola | Sin `pageerror` ni errores de consola en destinos positivos; 403 del caso ajeno es negativo intencional |
+| Interacción | Login real, enlace y resultado esperado; no sesiones inyectadas ni API de negocio interceptada |
+| Capturas | Revisión directa de seis estados finales, descritos abajo |
+
+Se inspeccionaron rechazo en escritorio/responsive/app y CAA de operador
+responsive, transportista app y generador escritorio. Encabezado y salida
+completos, sin «Enviada pendiente», sin controles administrativos en el perfil
+del titular y sin recorte horizontal visible. Esto no certifica toda la UI.
+
+Capturas en SDTERA, dentro de `final-approved-browser/e2e/`:
+
+- `mail-e2e-mail-links-mail-d-32f3c-pplication-pending-rejected-web-desktop/application-pending-rejected.png`
+- `mail-e2e-mail-links-mail-d-32f3c-pplication-pending-rejected-web-responsive/application-pending-rejected.png`
+- `mail-e2e-mail-links-mail-d-32f3c-pplication-pending-rejected-app/application-pending-rejected.png`
+- `mail-e2e-mail-links-mail-d-094e2--login-certificate-operador-web-responsive/certificate-operador.png`
+- `mail-e2e-mail-links-mail-d-228a3-n-certificate-transportista-app/certificate-transportista.png`
+- `mail-e2e-mail-links-mail-d-793c0-login-certificate-generador-web-desktop/certificate-generador.png`
+
+Comandos del workflow: suites `npm test` con un worker, build backend, build
+frontend y `vite build --config vite.config.app.ts`, HTTP mediante
+`frontend/cloud-qa/account-mail-http.ts` y
+`playwright test --config cloud-qa/mail.playwright.config.ts`.
+
+### Alcance conectado y comprobaciones nuevas
+
+- CAA oficial: carga del PDF y aviso al titular en la misma transacción.
+  El propietario abre desde su bandeja y descarga el archivo original;
+  las pruebas comparan SHA-256, incluidos anexos y distintos años, en los
+  tres tipos de actor. El correo enlaza al perfil y no adjunta el certificado.
+- Renovación de padrón: presentación avisa al revisor del sector y resolución
+  al titular. Se comprueban aprobación/rechazo por HTTP, autoaprobación denegada,
+  decisión repetida sin nuevos avisos y rollback conjunto.
+- Manifiestos y alertas: los avisos confirmados pasan por un único relay;
+  se elimina el digest paralelo del dispatcher de usuarios. Se revalida
+  titular, cuenta, preferencia, fuente real y caso/regla vigente cuando aplica.
+- Solicitante rechazado: consulta del resultado propio con sesión restringida,
+  incluyendo recarga. No edición, mensajes ni acceso a manifiestos. Suspensión
+  sigue bloqueando login, sesión previa y refresh.
+- Recuperación: cupo separado de avisos operativos; ambos límites se mantienen.
+  La prueba de DB/SMTP agota el cupo operativo y comprueba recuperación válida,
+  luego agotamiento del cupo de seguridad y ausencia de nuevos envíos.
+- Externos: decisión humana aplicada, autorización individual por dirección
+  exacta en Operaciones, independiente de las reglas y del interruptor general.
+  Revocar antes de enviar suprime el digest; reautorizar no lo resucita. Una
+  cuenta registrada nunca puede usar este canal para evitar sus restricciones,
+  ni siquiera si se registró después de encolar. No se autorizó una dirección real.
+- Migración: ensayo del SQL exacto sobre esquema sintético precolumna, conservación
+  de cuenta histórica sin clasificación inferida, CHECK rechaza estado inválido;
+  ambas pruebas revierten todos los cambios. No prueba restauración de un respaldo
+  real de producción ni autoriza ejecutar la migración allí.
+
+### Reproducciones y correcciones de esta ampliación
+
+`38161687656` aprobó 69 E2E del lote inicial ampliado. La corrida posterior
+`38162622626` aprobó 888 unit backend, 1376 frontend, 13 grupos DB/SMTP con
+50 capturas y ocho grupos HTTP, pero **72/81 E2E**. Los nueve fallos eran una
+expectativa incorrecta en la fixture de CAA: el nombre accesible de la región
+era «Certificados ambientales oficiales», pero su texto visible es «Certificado
+ambiental anual». DOM y captura mostraban los certificados. Se corrigió el test
+para comprobar ambos nombres y ausencia de controles administrativos al titular,
+sin cambiar el producto para satisfacer la expectativa ni omitir los casos.
+
+La revisión directa de la captura de rechazo encontró «Enviada pendiente»
+cuando no existía fecha de envío. Se corrigió el producto: fecha sólo si existe
+y es válida, formateada en Mendoza, sin texto que sugiera un estado inexistente.
+Cuatro unit y el E2E en las tres vistas cubren ausencia, fecha inválida y zona
+horaria. La guía de revisión frontend exigió contrastar capturas además de
+asserts; la de React orientó la derivación simple sin efectos ni nuevas consultas.
+
+Corridas supersedidas fueron canceladas para evitar repetir trabajo obsoleto;
+no se cuentan como aprobaciones completas ni como fallos de producto.
+La decisión sobre externos se recibió durante QA y se incorporó al candidato
+final, no sólo al documento.
+
+### Entorno y límites
+
+Chromium de GitHub Actions: escritorio 1440×900, web responsive y `/app`
+360×800. Un worker, cero reintentos automáticos. Login y APIs reales con DB
+sintética loopback, sin sesión inyectada ni interceptación de API de negocio.
+Browser plugin no disponible; se usa Playwright cloud ya autorizado para no
+consumir RAM local ni intervenir el formulario del usuario.
+
+Separar este GO técnico del GO de entrega real: producción no se modifica.
+Su archivo de entorno leído conserva correo apagado, familias/corte ausentes
+y falta Reply-To. DNS público tiene SPF/DMARC; DKIM/alineación, buzones reales
+y canario requieren configuración/autorización antes de activar. La lectura
+del archivo no demuestra el entorno de cada proceso PM2 ni entregas históricas.
+
+No se certifican Gmail/Outlook, enlaces nativos del APK, teléfonos físicos,
+ni el circuito de nueva solicitud después de rechazo mediante este lote.
+Nuevas reglas de discrepancias DDJJ/TEF necesitan fuente y criterio aprobado;
+no se presentan como implementadas por disponer de plantilla.
+Autorizaciones externas se gestionan por Operaciones; no se agregó un ABM
+de esas autorizaciones en la interfaz. `ENVIADO` es aceptación SMTP, no
+recepción, lectura ni notificación legal. Ver [operación segura](MAIL-OPERACION-SEGURA.md).
+
+---
+
+## Histórico: candidato 68d2ac5 — GO del bloque anterior en QA
 
 Producto: `68d2ac5dab933bd0ae0c460d51562db391f7a294`.
 Rama: `codex/sitrep-mail-safety-20261011`.
