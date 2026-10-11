@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      final_go:
+        description: Published authenticated web/app and Android gates; temporary QA only, no deployment
+        type: boolean
+        default: false
       production_readonly:
         description: Public final URL checks only, no authentication or production writes
         type: boolean
@@ -15,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   isolated-mail:
-    if: ${{ !inputs.production_readonly }}
+    if: ${{ !inputs.production_readonly && !inputs.final_go }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
@@ -181,7 +185,7 @@ jobs:
           retention-days: 3
           if-no-files-found: warn
   production-readonly:
-    if: ${{ inputs.production_readonly }}
+    if: ${{ inputs.production_readonly && !inputs.final_go }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -206,3 +210,135 @@ jobs:
           name: sitrep-mail-production-${{ github.run_id }}
           path: /tmp/sitrep-mail-production/
           retention-days: 3
+  stage-final-apk:
+    if: ${{ inputs.final_go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env: &final_qa_env
+      CI: 'true'
+      NODE_ENV: test
+      NODE_APP_INSTANCE: qa
+      ALLOW_SYNTHETIC_QA: '1'
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=3
+      PORT: '3037'
+      DISABLE_EMAILS: 'true'
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      VITE_API_URL: /api
+      QA_ARTIFACTS: /tmp/sitrep-final-go
+      NODE_OPTIONS: --max-old-space-size=2048
+      JWT_SECRET: cloud-only-final-go-not-production-20261011
+      INSPECTION_TRACE_SECRET: cloud-only-final-trace-20261011
+      QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
+      QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
+      UPLOADS_DIR: /tmp/sitrep-final-go/uploads
+      PGUSER: qa
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Original fixed APK, no production credential in transfer job
+        env:
+          QA_GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types frontend/cloud-qa/apk-download.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sitrep-final-original-apk-${{ github.run_id }}
+          path: ${{ runner.temp }}/sitrep-original-candidate.apk
+          retention-days: 1
+          if-no-files-found: error
+  final-go:
+    if: ${{ inputs.final_go }}
+    needs: stage-final-apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env: *final_qa_env
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Require published product unchanged and safety policies
+        run: |
+          test -z "$(git diff --name-only dc7e521cf5beff87e7973e88e2ae9862919eb5f5 HEAD -- backend frontend/src frontend/src-v6 frontend/public frontend/package.json frontend/package-lock.json frontend/vite.config.ts frontend/vite.config.app.ts)"
+          node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts frontend/cloud-qa/apk-auth-policy.test.ts
+          mkdir -p "$QA_ARTIFACTS"
+      - name: Dependencies and builds on cloud only
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-16 poppler-utils tesseract-ocr tesseract-ocr-spa
+          cd backend
+          npx --no-install prisma generate
+          npm run build
+          cd ../frontend
+          NODE_ENV=production npm run build
+          NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+          npx --no-install playwright install --with-deps chromium
+      - name: Synthetic QA only, no copied production database
+        run: |
+          /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-final-pg" --username=qa --auth-local=trust --auth-host=trust
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-final-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=20" -w start
+          /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
+          cd backend
+          npx --no-install prisma db push --skip-generate
+          cd ..
+          node --experimental-strip-types frontend/cloud-qa/prepare.ts
+          node --experimental-strip-types frontend/cloud-qa/start.ts
+      - name: Published web and app authentication, one temporary account
+        id: production-session
+        continue-on-error: true
+        env:
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        run: node --experimental-strip-types frontend/cloud-qa/production-session.ts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: sitrep-final-original-apk-${{ github.run_id }}
+          path: ${{ runner.temp }}/sitrep-apk-transfer
+      - name: Android 15 synthetic journeys and unchanged original APK production session
+        env:
+          QA_APK_AUTHENTICATED: 'true'
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: true
+          script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
+      - name: Require final URL authentication
+        if: always()
+        run: test '${{ steps.production-session.outcome }}' = success
+      - name: Stop owned QA processes and database
+        if: always()
+        run: |
+          if test -f "$QA_ARTIFACTS/processes.json"; then node --experimental-strip-types frontend/cloud-qa/close.ts; fi
+          if test -f "$RUNNER_TEMP/sitrep-final-pg/postmaster.pid"; then /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-final-pg" -m fast -w stop; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-final-go-${{ github.run_id }}
+          path: /tmp/sitrep-final-go/
+          retention-days: 3
+          if-no-files-found: warn
