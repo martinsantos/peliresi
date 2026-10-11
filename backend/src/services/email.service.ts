@@ -6,16 +6,16 @@
  * - ALERTA: batched into hourly digests per recipient, flushed every 5 min.
  *
  * Rate limits per recipient per day prevent quota exhaustion.
- * Kill switch: DISABLE_EMAILS=true suppresses sends but still queues.
+ * Disabled mail is terminal SUPRIMIDO. Activation needs an explicit ISO cutoff.
  *
- * Migration to Brevo: change SMTP_HOST/SMTP_USER/SMTP_PASS in .env. No code changes.
+ * ENVIADO means SMTP accepted, not delivered/read. Uncertain attempts need review.
  */
 
 import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { mailPolicy, mendozaDayStart, retryableSmtpFailure } from './email-policy';
-import { escapeMail, mailText, mailShell, renderMail } from './email-templates';
+import { escapeMail, mailText, mailShell, mailLink, renderMail } from './email-templates';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -24,7 +24,6 @@ const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_HOST = process.env.SMTP_HOST || 'localhost';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '25');
 const FROM = process.env.SMTP_FROM || 'SITREP <no-reply@sitrep.ultimamilla.com.ar>';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://sitrep.ultimamilla.com.ar';
 const DISABLE_EMAILS = !mailPolicy(process.env).enabled;
 const LIMIT_TRANSACCIONAL = parseInt(process.env.EMAIL_DAILY_LIMIT_TRANSACCIONAL || '10');
 const LIMIT_ALERTA = parseInt(process.env.EMAIL_DAILY_LIMIT_ALERTA || '6');
@@ -48,12 +47,12 @@ function digestTemplate(items: { subject: string; html: string }[], hour: string
     `<li style="margin:8px 0;padding:8px 12px;background:#fff;border-left:3px solid #1B5E3C;border-radius:0 4px 4px 0">${escapeMail(i.subject)}</li>`
   ).join('');
   return baseTemplate(`
-    <h3 style="color:#1B5E3C">Resumen de alertas — ${hour}</h3>
+    <h3 style="color:#1B5E3C">Resumen de alertas — ${escapeMail(hour)}</h3>
     <p>${items.length} alerta${items.length > 1 ? 's' : ''} en este periodo:</p>
     <ul style="list-style:none;padding:0">${listItems}</ul>
     <p style="font-size:13px;color:#6b7280;margin-top:16px">
       Para configurar tus preferencias de notificacion, ingresa a
-      <a href="${FRONTEND_URL}" style="color:#1B5E3C">SITREP</a>.
+      <a href="${escapeMail(mailLink('/alertas'))}" style="color:#1B5E3C">Alertas de SITREP</a>.
     </p>
   `);
 }
@@ -82,7 +81,7 @@ async function smtpSend(to: string, subject: string, html: string): Promise<void
   if (DISABLE_EMAILS) {
     throw new Error('EMAIL_DISABLED');
   }
-  const result = await transporter.sendMail({ from: FROM, to, subject: subject.replace(/[\r\n]/g, ' '), html, text: mailText(html) });
+  const result = await transporter.sendMail({ from: FROM, ...(process.env.SMTP_REPLY_TO ? { replyTo: process.env.SMTP_REPLY_TO } : {}), to, subject: subject.replace(/[\r\n]/g, ' '), html, text: mailText(html) });
   if (!result.accepted?.some((address: string | { address: string }) => (typeof address === 'string' ? address : address.address).toLowerCase() === to.toLowerCase())) {
     throw Object.assign(new Error('SMTP_RECIPIENT_NOT_ACCEPTED'), { code: 'EREJECTED' });
   }
@@ -94,7 +93,7 @@ async function smtpSend(to: string, subject: string, html: string): Promise<void
 function digestKeyFor(to: string): string {
   const now = new Date();
   const date = now.toISOString().slice(0, 10);
-  const hour = String(now.getHours()).padStart(2, '0');
+  const hour = String(now.getUTCHours()).padStart(2, '0');
   return `alerta:${to}:${date}:${hour}`;
 }
 
@@ -105,7 +104,7 @@ async function enqueueTransaccional(
   prioridad: 'CRITICA' | 'NORMAL' = 'NORMAL',
 ): Promise<void> {
   const row = await prisma.emailQueue.create({
-    data: { to, subject, html, tipo: 'TRANSACCIONAL', prioridad, estado: DISABLE_EMAILS ? 'SUPRIMIDO' : 'PENDIENTE', maxIntentos: MAX_RETRIES, error: DISABLE_EMAILS ? mailPolicy(process.env).reason : null },
+    data: { to, subject, html, tipo: 'TRANSACCIONAL', prioridad, estado: DISABLE_EMAILS ? 'SUPRIMIDO' : 'PENDIENTE', maxIntentos: MAX_RETRIES, error: DISABLE_EMAILS ? mailPolicy(process.env).reason : 'DELIVERY_IN_PROGRESS_OR_UNCERTAIN' },
   });
   if (DISABLE_EMAILS) return;
 
@@ -126,7 +125,7 @@ async function enqueueTransaccional(
     accepted = true;
     await prisma.emailQueue.update({
       where: { id: row.id },
-      data: { estado: 'ENVIADO', sentAt: new Date() },
+      data: { estado: 'ENVIADO', sentAt: new Date(), intentos: { increment: 1 }, error: null, nextRetryAt: null },
     });
   } catch (err: any) {
     // Never retry when SMTP accepted but saving its receipt failed.

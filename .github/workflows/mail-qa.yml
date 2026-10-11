@@ -12,6 +12,18 @@ jobs:
   isolated-mail:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: qa
+          POSTGRES_PASSWORD: synthetic-mail-qa
+          POSTGRES_DB: sitrep_night_qa_20260926
+        ports:
+          - 55440:5432
+        options: >-
+          --health-cmd "pg_isready -U qa -d sitrep_night_qa_20260926"
+          --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       NODE_ENV: test
       NODE_OPTIONS: --max-old-space-size=1536
@@ -45,6 +57,14 @@ jobs:
       - name: Backend type check
         working-directory: backend
         run: npx --no-install tsc --noEmit -p tsconfig.build.json
+      - name: Real queue and SMTP capture, cloud loopback only
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://qa:synthetic-mail-qa@127.0.0.1:55440/sitrep_night_qa_20260926
+        run: |
+          npx --no-install prisma db push --skip-generate
+          npx --no-install tsc -p tsconfig.build.json
+          node --experimental-strip-types qa/mail.integration.ts
       - name: Require units
         if: always()
         run: test '${{ steps.units.outcome }}' = success
