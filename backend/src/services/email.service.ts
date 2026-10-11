@@ -60,7 +60,7 @@ function digestTemplate(items: { subject: string; html: string }[], hour: string
 
 // ── Rate Limiting ───────────────────────────────────────────────────
 
-async function checkDailyLimit(to: string, tipo: 'TRANSACCIONAL' | 'ALERTA'): Promise<boolean> {
+async function checkDailyLimit(to: string, tipo: 'TRANSACCIONAL' | 'ALERTA', queueId = ''): Promise<boolean> {
   const limit = tipo === 'TRANSACCIONAL' ? LIMIT_TRANSACCIONAL : LIMIT_ALERTA;
   const today = mendozaDayStart();
 
@@ -68,6 +68,11 @@ async function checkDailyLimit(to: string, tipo: 'TRANSACCIONAL' | 'ALERTA'): Pr
     where: {
       to,
       tipo,
+      // Operational notices must never consume the account/recovery allowance.
+      // Both buckets retain the same configured cap; neither becomes unlimited.
+      ...(tipo === 'TRANSACCIONAL' ? queueId.startsWith('notification:')
+        ? { id: { startsWith: 'notification:' } }
+        : { NOT: { id: { startsWith: 'notification:' } } } : {}),
       estado: 'ENVIADO',
       sentAt: { gte: today },
     },
@@ -195,7 +200,7 @@ export async function flushEmailQueue(): Promise<void> {
         continue;
       }
 
-      const withinLimit = await checkDailyLimit(row.to, row.tipo);
+      const withinLimit = await checkDailyLimit(row.to, row.tipo, id);
       if (!withinLimit) {
         await prisma.emailQueue.update({
           where: { id },

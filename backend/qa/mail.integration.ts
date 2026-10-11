@@ -218,6 +218,22 @@ if (process.argv[2] === 'worker') {
     await worker(); assert.equal(messages.length - renewalBaseline, 3);
     assert.ok(messages.slice(renewalBaseline).every(message => !message.includes('Texto sólo dentro')));
     checks.push('renewal requested/approved/rejected transactional notices reach only eligible recipients, once, with no decision text in email');
+    // Reproduce a busy inbox using real persisted receipts, not a mocked count.
+    process.env.EMAIL_DAILY_LIMIT_TRANSACCIONAL = '1';
+    process.env.EMAIL_NOTIFICATION_FAMILIES = 'soporte';
+    const quotaUser = await prisma.usuario.create({ data: { nombre: 'Quota QA', email: 'quota@qa.invalid', password: 'not-a-login', rol: 'ADMIN', activo: true, emailVerified: true } });
+    await prisma.emailQueue.create({ data: { id: 'notification:quota-already-sent', to: quotaUser.email, subject: 'QA receipt', html: '<p>QA</p>', tipo: 'TRANSACCIONAL', estado: 'ENVIADO', sentAt: new Date() } });
+    const quotaBaseline = messages.length;
+    const quotaService = reload();
+    await quotaService.emailService.sendPasswordResetEmail(quotaUser.email, 'QA', 'synthetic-token');
+    assert.equal(messages.length, quotaBaseline + 1, 'operational quota must not starve recovery');
+    await quotaService.emailService.sendPasswordResetEmail(quotaUser.email, 'QA', 'synthetic-token');
+    assert.equal(messages.length, quotaBaseline + 1, 'security quota remains enforced');
+    const cappedNotice = await prisma.notificacion.create({ data: { usuarioId: quotaUser.id, tipo: 'INFO_GENERAL', titulo: 'QA', mensaje: 'QA', datos: JSON.stringify({ tipo: 'soporte', ticketId: 'qa-ticket' }) } });
+    await worker();
+    assert.equal(messages.length, quotaBaseline + 1, 'operational quota remains enforced');
+    assert.equal((await prisma.emailQueue.findUniqueOrThrow({ where: { id: 'notification:' + cappedNotice.id } })).estado, 'SUPRIMIDO');
+    checks.push('operational quota cannot starve password recovery; independent security and operational limits both enforced');
     writeFileSync('/tmp/sitrep-mail-integration.json', JSON.stringify({ passed: true, checks, smtpMessages: messages.length, externalRecipients: 0, database: url.pathname, deployment: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks, smtpMessages: messages.length }));
   } finally {

@@ -68,6 +68,13 @@ describe('SMTP receipt and retry safety (mock provider only)', () => {
     expect(mocks.sendMail).not.toHaveBeenCalled();
     expect(mocks.queue.update.mock.calls[0][0].data.estado).toBe('SUPRIMIDO');
   });
+  it('keeps recovery available when operational notices have exhausted their allowance', async () => {
+    mocks.queue.count.mockImplementation(async ({ where }) => where.NOT?.id?.startsWith === 'notification:' ? 0 : 100);
+    const { emailService } = await import('../../services/email.service');
+    await emailService.sendPasswordResetEmail('qa@example.invalid', 'QA', 'synthetic-token');
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
+    expect(mocks.queue.count).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ NOT: { id: { startsWith: 'notification:' } } }) }));
+  });
   it('does not send a retry already claimed by another worker', async () => {
     mocks.query.mockResolvedValueOnce([{ id: 'qa-mail' }]);
     mocks.queue.findUnique.mockResolvedValue({ id: 'qa-mail', estado: 'FALLIDO', intentos: 1, maxIntentos: 3, createdAt: new Date(), to: 'qa@example.invalid', tipo: 'TRANSACCIONAL' });
