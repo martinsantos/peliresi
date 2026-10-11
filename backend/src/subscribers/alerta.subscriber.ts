@@ -136,7 +136,9 @@ async function dispararReglasAlerta(
       });
     }
 
-    if (emails.length > 0) {
+    // Explicit legacy addresses are a distinct channel, not registered-user
+    // subscriptions. Never activate it as a side effect of enabling other mail.
+    if (emails.length > 0 && process.env.EMAIL_EXTERNAL_ALERTS_ENABLED === 'true') {
       await emailService.sendAlertEmail(emails, regla, manifiestoId ?? '', datos);
     }
   }

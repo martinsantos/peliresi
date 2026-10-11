@@ -12,6 +12,17 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('includes actionable closure follow-up and rechecks its case and manifest', async () => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'alertas');
+    const followup = { ...notice, usuarioId: 'owner', tipo: 'INFO_GENERAL', manifiestoId: 'manifest', datos: '{"tipo":"seguimiento_cierre","casoId":"case"}' };
+    mocks.notice.mockResolvedValue({ ...followup, usuario: followup });
+    mocks.manifest.mockResolvedValue({ isDemoData: false });
+    mocks.alert.mockResolvedValue({ estado: 'PENDIENTE', regla: { activa: true } });
+    expect(notificationMailContent(followup)?.family).toBe('alertas');
+    expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(true);
+    mocks.alert.mockResolvedValue({ estado: 'DESCARTADA', regla: { activa: true } });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(false);
+  });
   it.each([
     ['MODIFICACION_SOLICITADA', 'ADMIN_GENERADOR', 'PENDIENTE', 'other', true],
     ['MODIFICACION_SOLICITADA', 'ADMIN_OPERADOR', 'PENDIENTE', 'other', false],
