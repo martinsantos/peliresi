@@ -51,7 +51,7 @@ try {
   const rejectedApplication = await db.solicitudInscripcion.create({ data: { usuarioId: rejected.id, tipoActor: 'GENERADOR', estado: 'RECHAZADA',
     datosActor: '{}', motivoRechazo: 'QA rechazo consultable sin habilitación' } });
   cases.push({ id: 'application-pending-rejected', user: 'rejected-mail', tipo: 'SOLICITUD_RECHAZADA', datos: { solicitudId: rejectedApplication.id },
-    expected: '/mi-solicitud', visible: 'QA rechazo consultable sin habilitación' });
+    expected: '/mi-solicitud', visible: 'Motivo: QA rechazo consultable sin habilitación' });
   for (const actor of ['generador', 'operador', 'transportista']) cases.push({
     id: 'certificate-' + actor, user: actor, tipo: 'INFO_GENERAL',
     datos: { tipo: 'certificado_ambiental', documentoId: 'qa-certificate', actorTipo: actor, actorId: fixture.actors[actor] },
