@@ -46,6 +46,8 @@ jobs:
           node-version: '22'
       - name: Locked dependencies in cloud only
         run: npm ci --prefix backend --no-audit --no-fund
+      - name: PDF regression dependency in cloud only
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
       - name: Generate types, no database connection or server
         working-directory: backend
         run: npx --no-install prisma generate

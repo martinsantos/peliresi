@@ -20,7 +20,7 @@ export function mailText(html: string): string {
 }
 
 export function mailShell(content: string): string {
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+  return `<!doctype html><!-- SITREP mail template ${MAIL_TEMPLATE_VERSION} --><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="margin:0;background:#f3f6f4;color:#172c24;font:16px/1.55 Arial,sans-serif">
 <div style="max-width:600px;margin:0 auto;padding:16px">
 <div style="background:#1B5E3C;color:#ffffff;padding:20px 24px;border-radius:8px 8px 0 0"><strong style="color:#ffffff;font-size:20px">SITREP</strong><br><span style="color:#ffffff;font-size:13px">Trazabilidad de Residuos Peligrosos</span></div>
