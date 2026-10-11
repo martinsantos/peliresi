@@ -5,6 +5,61 @@ ID: **MAIL-PROD-01**. Estado: **IMPLEMENTACIÓN PARCIAL CON QA CLOUD; envío rea
 Alcance de este registro: matriz/planilla de eventos y plantillas de correo,
 destinatarios, ejecución, trazabilidad y pruebas. No habilita envíos reales.
 
+## Ampliación del 11/10 — candidato 68d2ac5 validado en QA
+
+La decisión del usuario ya está implementada: pendientes con correo verificado
+reciben observaciones propias; suspendidos no. La columna aditiva
+`usuarios.motivoInactividad` distingue ambos estados. Los históricos NULL no
+se reclasifican por inferencia. Administrar activo=false marca suspensión;
+el alta pública marca pendiente; aprobar limpia ese motivo.
+
+Implementados siete eventos de cuenta en la misma transacción que la mutación:
+creación, habilitación, suspensión, baja, cambio de rol, cambio de dirección
+y contraseña (autenticada o recuperada). Se comprueba consumo único del token,
+ausencia de secretos en esos mensajes y rollback conjunto. Familia `cuentas`
+separada y apagada; los avisos críticos van al correo previamente verificado.
+
+El relay revalida destinatario, preferencia, dirección y familia antes de
+entregar. Se corrigió el destino de inspector con rol base de actor tras login.
+Los E2E adicionales reprodujeron 403 en sesiones pendientes: servicios de
+avisos/manifiestos arrancaban sin permiso. El candidato los desactiva para
+esa sesión y muestra una vista de solicitud sin menús operativos inaccesibles.
+
+Evidencia previa a esa última reparación: run38154113734,
+847 unit backend, 1360 frontend, HTTP de cuentas y nueve grupos de integración
+aprobados, 44 mensajes en SMTP loopback, cero externos; **54/57 E2E**, tres
+fallidos por esos 403. No contar esa corrida como GO. La repetición final
+`38155938709` aprobó 849 backend, 1366 frontend y seis grupos HTTP, pero
+54/57 E2E: la vista restringida seguía ausente porque el adaptador de login
+descartaba los campos `restricted` y `solicitudId`. Reparados en `158eb21`,
+incluida restauración tras recarga, con cinco unit adicionales y E2E ampliado.
+`38157429619` aprobó 849 backend, 1371 frontend y57/57E2E. La revisión de
+capturas detectó scroll automático del panel de mensajes que cortaba el título
+móvil. Reparado en68d2ac5 con dos unit y E2E de encabezado/salida en viewport.
+Repetición final38158621314 **SUCCESS**: 849 unit backend, 1373 frontend,
+nueve grupos DB/SMTP, seis grupos HTTP y57/57E2E, sin omitidos ni flaky.
+Revisión directa de las tres capturas finales confirma encabezado completo,
+salida visible y ausencia de navegación inaccesible. Cierre QA confirmado.
+GO de este bloque en QA, no de toda la matriz ni de envíos externos.
+
+### Pendientes que no quedan ocultos por el éxito de una suite
+
+- Aviso de rechazo para solicitantes inactivos: su destino debe permitir
+  consultar el resultado sin acceso operativo. Todavía fuera de la excepción
+  de solicitudes BORRADOR/ENVIADA/EN_REVISION/OBSERVADA.
+- Modificaciones de padrón, disponibilidad CAA y reglas específicas de
+  vencimientos/DDJJ/TEF: conciliar por evento y destinatario; una plantilla
+  existente no es una conexión funcional.
+- Dispatcher legado de alertas/manifiestos: no afirmar uniformidad completa
+  de verificación/preferencias por sus diferentes canales.
+- Conciliar históricos inactivos, remitente/Reply-To, DNS y canario autorizado.
+- Clientes reales de correo y asociación de enlaces del APK no quedan
+  certificados por Chromium ni por la ruta /app.
+
+No publicación ni activación. Ver [operación segura](MAIL-OPERACION-SEGURA.md)
+y el [corte QA](QA-CORREOS-20261011.md). Las secciones posteriores conservan
+el inventario y resultados del lote inicial; no reemplazan esta actualización.
+
 ## Objetivo y límites
 
 Que cada evento que necesita comunicación tenga destinatario autorizado,
