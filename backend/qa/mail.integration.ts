@@ -134,6 +134,22 @@ if (process.argv[2] === 'worker') {
       assert.equal((await prisma.emailQueue.findUnique({ where: { id: 'notification:' + notice.id } })).error, 'RECIPIENT_OR_EVENT_NO_LONGER_ELIGIBLE');
     }
     checks.push('queued notice suppressed after suspension, unverified email, opt-out or address change; zero SMTP attempts');
+    const { recordAccountMail } = require('../dist/services/account-mail.service.js');
+    process.env.EMAIL_NOTIFICATION_FAMILIES = 'cuentas';
+    const accountRecipient = { id: 'synthetic-account', email: 'account-events@qa.invalid', emailVerified: true };
+    const accountBaseline = messages.length;
+    for (const event of ['created', 'enabled', 'disabled', 'deleted', 'roleChanged', 'emailChanged', 'passwordChanged']) {
+      await prisma.$transaction((tx: typeof prisma) => recordAccountMail(tx, accountRecipient, event));
+    }
+    await assert.rejects(prisma.$transaction(async (tx: typeof prisma) => {
+      await recordAccountMail(tx, { ...accountRecipient, email: 'rollback-account@qa.invalid' }, 'created');
+      throw new Error('account rollback');
+    }), /account rollback/);
+    await Promise.all([worker(), worker()]);
+    assert.equal(messages.length - accountBaseline, 7);
+    assert.equal(await prisma.emailQueue.count({ where: { to: 'rollback-account@qa.invalid' } }), 0);
+    await worker(); assert.equal(messages.length - accountBaseline, 7);
+    checks.push('seven account templates accepted only by loopback SMTP, two workers once each, rolled-back account has no outbox');
     writeFileSync('/tmp/sitrep-mail-integration.json', JSON.stringify({ passed: true, checks, smtpMessages: messages.length, externalRecipients: 0, database: url.pathname, deployment: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks, smtpMessages: messages.length }));
   } finally {

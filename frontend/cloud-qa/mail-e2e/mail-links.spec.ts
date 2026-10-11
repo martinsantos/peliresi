@@ -51,7 +51,9 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
 test('forwarded support link does not reveal another actor ticket', async ({ page }, info) => {
   await page.goto(prefix(info) + '/soporte/' + fixture.ticketId);
   const denied = page.waitForResponse(res => res.url().endsWith('/api/soporte/' + fixture.ticketId));
-  await signInAtDestination(page, 'generador2');
+  // The support lifecycle deliberately grants *2 users staff rights. Use the
+  // ordinary, ungranted applicant fixture so this remains a genuine denial.
+  await signInAtDestination(page, 'sin-actor');
   expect([403, 404]).toContain((await denied).status());
   await expect(page.getByText('QA respuesta de soporte por correo', { exact: true })).toHaveCount(0);
   const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
