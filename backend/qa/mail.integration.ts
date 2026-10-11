@@ -199,6 +199,25 @@ if (process.argv[2] === 'worker') {
     await worker(); assert.equal(messages.length - operationalBaseline, 2);
     for (const notice of [withdrawn, demoNotice, alertNotice]) assert.equal((await prisma.emailQueue.findUniqueOrThrow({ where: { id: 'notification:' + notice.id } })).estado, 'SUPRIMIDO');
     checks.push('withdrawn CAA, synthetic manifest and resolved expiry case suppressed before SMTP');
+    const currentAlert = await prisma.alertaGenerada.create({ data: { reglaId: rule.id, datos: '{}' } });
+    await prisma.notificacion.create({ data: { usuarioId: user.id, tipo: 'INFO_GENERAL', titulo: 'QA', mensaje: 'QA', datos: JSON.stringify({ familia: 'catalogo_verificable', casoId: currentAlert.id }) } });
+    await worker();
+    assert.equal(messages.length - operationalBaseline, 3);
+    checks.push('current enabled catalogue case delivered once through the verified recipient relay');
+    process.env.EMAIL_NOTIFICATION_FAMILIES = 'padron';
+    const { notifyRenovacion } = require('../dist/services/renovacion-notification.service.js');
+    const renewalBaseline = messages.length;
+    for (const [year, estado, tipo] of [[2091, 'PENDIENTE', 'MODIFICACION_SOLICITADA'], [2092, 'APROBADA', 'MODIFICACION_APROBADA'], [2093, 'RECHAZADA', 'MODIFICACION_RECHAZADA']]) {
+      await prisma.$transaction(async (tx: typeof prisma) => {
+        const renewal = await tx.renovacion.create({ data: { anio: year, tipoActor: 'GENERADOR', generadorId: generator.id, modalidad: 'SIN_CAMBIOS', estado, motivoRechazo: 'Texto sólo dentro de SITREP' } });
+        await notifyRenovacion(tx, renewal, tipo);
+      });
+      await Promise.all([worker(), worker()]);
+    }
+    assert.equal(messages.length - renewalBaseline, 3);
+    await worker(); assert.equal(messages.length - renewalBaseline, 3);
+    assert.ok(messages.slice(renewalBaseline).every(message => !message.includes('Texto sólo dentro')));
+    checks.push('renewal requested/approved/rejected transactional notices reach only eligible recipients, once, with no decision text in email');
     writeFileSync('/tmp/sitrep-mail-integration.json', JSON.stringify({ passed: true, checks, smtpMessages: messages.length, externalRecipients: 0, database: url.pathname, deployment: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks, smtpMessages: messages.length }));
   } finally {
