@@ -15,6 +15,13 @@ export function mendozaDayStart(now = new Date()): Date {
   return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), 3));
 }
 
+/** External rule recipients need individual operations approval, not just a rule entry. */
+export function externalAlertRecipientAllowed(email: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  const recipient = email.trim().toLowerCase();
+  if (env.EMAIL_EXTERNAL_ALERTS_ENABLED !== 'true' || !/^[^\s@,<>*]+@[^\s@,<>*]+\.[^\s@,<>*]+$/.test(recipient)) return false;
+  return (env.EMAIL_EXTERNAL_ALERTS_ALLOWLIST || '').split(',').some(item => item.trim().toLowerCase() === recipient);
+}
+
 /** Only failures known to occur before SMTP acceptance are automatically retried. */
 export function retryableSmtpFailure(error: unknown): boolean {
   const value = error as { code?: string; responseCode?: number } | null;

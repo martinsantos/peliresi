@@ -14,7 +14,7 @@
 import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
-import { mailPolicy, mendozaDayStart, retryableSmtpFailure } from './email-policy';
+import { mailPolicy, mendozaDayStart, retryableSmtpFailure, externalAlertRecipientAllowed } from './email-policy';
 import { escapeMail, mailText, mailShell, mailLink, renderMail } from './email-templates';
 import { queueCommittedNotificationEmails, queuedNoticeStillEligible } from './notification-mail.service';
 
@@ -148,6 +148,7 @@ async function enqueueTransaccional(
 }
 
 async function enqueueAlerta(to: string, subject: string, html: string): Promise<void> {
+  const suppressed = DISABLE_EMAILS || !externalAlertRecipientAllowed(to);
   await prisma.emailQueue.create({
     data: {
       to,
@@ -155,13 +156,13 @@ async function enqueueAlerta(to: string, subject: string, html: string): Promise
       html,
       tipo: 'ALERTA',
       prioridad: 'BAJA',
-      estado: DISABLE_EMAILS ? 'SUPRIMIDO' : 'DIGEST_PENDIENTE',
+      estado: suppressed ? 'SUPRIMIDO' : 'DIGEST_PENDIENTE',
       maxIntentos: MAX_RETRIES,
-      error: DISABLE_EMAILS ? mailPolicy(process.env).reason : null,
-      digestKey: DISABLE_EMAILS ? null : digestKeyFor(to),
+      error: DISABLE_EMAILS ? mailPolicy(process.env).reason : suppressed ? 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED' : null,
+      digestKey: suppressed ? null : digestKeyFor(to),
     },
   });
-  logger.info({ suppressed: DISABLE_EMAILS }, 'Email alert recorded');
+  logger.info({ suppressed }, 'Email alert recorded');
 }
 
 // ── Flush (called by timer) ─────────────────────────────────────────
@@ -268,6 +269,12 @@ export async function flushEmailQueue(): Promise<void> {
 
       const ids = items.map(i => i.id);
 
+      if (!externalAlertRecipientAllowed(to)) {
+        await prisma.emailQueue.updateMany({ where: { id: { in: ids } },
+          data: { estado: 'SUPRIMIDO', error: 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED', nextRetryAt: null } });
+        continue;
+      }
+
       if (!withinLimit) {
         await prisma.emailQueue.updateMany({
           where: { id: { in: ids } },
@@ -337,7 +344,7 @@ export const emailService = {
     const summary = `${regla.nombre}${manifiestoNumero ? ` — ${manifiestoNumero}` : ''}`;
     const detail = datos?.descripcion || (manifiestoNumero ? `Manifiesto ${manifiestoNumero}` : regla.nombre);
 
-    for (const email of emails) {
+    for (const email of new Set(emails.map(value => value.trim().toLowerCase()))) {
       await enqueueAlerta(email, summary, detail);
     }
   },

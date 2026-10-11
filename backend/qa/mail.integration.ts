@@ -70,6 +70,8 @@ if (process.argv[2] === 'worker') {
     checks.push('turning off kill switch alone does not release history');
 
     process.env.EMAIL_DELIVERY_NOT_BEFORE = new Date().toISOString();
+    process.env.EMAIL_EXTERNAL_ALERTS_ENABLED = 'true';
+    process.env.EMAIL_EXTERNAL_ALERTS_ALLOWLIST = 'digest@qa.invalid';
     const service = reload();
     const calls: Array<[string, string[]]> = [
       ['sendEmailVerification', ['QA', 'synthetic-token']], ['sendRegistroPendienteEmail', ['QA', 'GENERADOR']],
@@ -234,6 +236,22 @@ if (process.argv[2] === 'worker') {
     assert.equal(messages.length, quotaBaseline + 1, 'operational quota remains enforced');
     assert.equal((await prisma.emailQueue.findUniqueOrThrow({ where: { id: 'notification:' + cappedNotice.id } })).estado, 'SUPRIMIDO');
     checks.push('operational quota cannot starve password recovery; independent security and operational limits both enforced');
+    process.env.EMAIL_EXTERNAL_ALERTS_ALLOWLIST = 'approved-external@qa.invalid';
+    const externalBaseline = messages.length;
+    await quotaService.emailService.sendAlertEmail(['unapproved@qa.invalid', 'approved-external@qa.invalid', ' APPROVED-EXTERNAL@qa.invalid '], { nombre: 'QA autorización individual' }, null, {});
+    assert.equal((await prisma.emailQueue.findFirstOrThrow({ where: { to: 'unapproved@qa.invalid' } })).estado, 'SUPRIMIDO');
+    await worker();
+    assert.equal(messages.length, externalBaseline + 1);
+    assert.equal(await prisma.emailQueue.count({ where: { to: 'approved-external@qa.invalid' } }), 1);
+    checks.push('external recipients require exact individual approval; duplicate casing coalesces and unapproved address is terminal without SMTP');
+    await quotaService.emailService.sendAlertEmail(['approved-external@qa.invalid'], { nombre: 'QA revocación antes del envío' }, null, {});
+    process.env.EMAIL_EXTERNAL_ALERTS_ALLOWLIST = '';
+    await worker();
+    assert.equal(messages.length, externalBaseline + 1);
+    assert.equal(await prisma.emailQueue.count({ where: { to: 'approved-external@qa.invalid', estado: 'SUPRIMIDO', error: 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED' } }), 1);
+    process.env.EMAIL_EXTERNAL_ALERTS_ALLOWLIST = 'approved-external@qa.invalid';
+    await worker(); assert.equal(messages.length, externalBaseline + 1);
+    checks.push('individual external approval is rechecked at delivery; revoked queued digest is suppressed and not replayed by reapproval');
     writeFileSync('/tmp/sitrep-mail-integration.json', JSON.stringify({ passed: true, checks, smtpMessages: messages.length, externalRecipients: 0, database: url.pathname, deployment: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks, smtpMessages: messages.length }));
   } finally {

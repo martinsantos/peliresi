@@ -2,6 +2,7 @@ import { EventoAlerta, TipoNotificacion, PrioridadNotificacion } from '@prisma/c
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { emailService } from '../services/email.service';
+import { externalAlertRecipientAllowed } from '../services/email-policy';
 import { notificationService } from '../controllers/notification.controller';
 import { DomainEvent } from '../services/domainEvent.service';
 import { matchesAlertCondition } from '../services/alertRuleCondition.service';
@@ -138,8 +139,9 @@ async function dispararReglasAlerta(
 
     // Explicit legacy addresses are a distinct channel, not registered-user
     // subscriptions. Never activate it as a side effect of enabling other mail.
-    if (emails.length > 0 && process.env.EMAIL_EXTERNAL_ALERTS_ENABLED === 'true') {
-      await emailService.sendAlertEmail(emails, regla, manifiestoId ?? '', datos);
+    const authorizedEmails = [...new Set(emails.map(email => email.trim().toLowerCase()))].filter(email => externalAlertRecipientAllowed(email));
+    if (authorizedEmails.length > 0) {
+      await emailService.sendAlertEmail(authorizedEmails, regla, manifiestoId ?? '', datos);
     }
   }
 }

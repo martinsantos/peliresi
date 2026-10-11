@@ -36,9 +36,19 @@ it('deduplicates a repeated subject/date but preserves a changed date, entity ty
 it.each(['', 'false', 'true'])('external rule addresses require their separate explicit switch: %s', async enabled => {
   vi.stubEnv('DISABLE_EMAILS', 'false');
   vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ENABLED', enabled);
+  vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ALLOWLIST', 'external@qa.invalid');
   vi.mocked(prisma.reglaAlerta.findMany).mockResolvedValueOnce([{ id: 'qa-external', nombre: 'QA', evento: 'VENCIMIENTO', activa: true,
     condicion: '{"diasRestantes":{"lte":7}}', destinatarios: '["email:external@qa.invalid"]' }] as never);
   await alertaSubscriber(event('qa-external'));
   expect(state.rows).toHaveLength(1);
   expect(state.email).toHaveBeenCalledTimes(enabled === 'true' ? 1 : 0);
+});
+it('a rule cannot authorize an external address merely by naming it', async () => {
+  vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ENABLED', 'true');
+  vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ALLOWLIST', 'different@qa.invalid');
+  vi.mocked(prisma.reglaAlerta.findMany).mockResolvedValueOnce([{ id: 'qa-external', nombre: 'QA', evento: 'VENCIMIENTO', activa: true,
+    condicion: '{"diasRestantes":{"lte":7}}', destinatarios: '["email:external@qa.invalid"]' }] as never);
+  await alertaSubscriber(event('qa-external'));
+  expect(state.rows).toHaveLength(1);
+  expect(state.email).not.toHaveBeenCalled();
 });
