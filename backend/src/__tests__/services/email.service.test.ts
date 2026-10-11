@@ -4,9 +4,10 @@ const mocks = vi.hoisted(() => ({
   sendMail: vi.fn(),
   queue: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
   query: vi.fn(),
+  manifest: vi.fn(),
 }));
 vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail: mocks.sendMail }) } }));
-vi.mock('../../lib/prisma', () => ({ default: { emailQueue: mocks.queue, $queryRawUnsafe: mocks.query } }));
+vi.mock('../../lib/prisma', () => ({ default: { emailQueue: mocks.queue, $queryRawUnsafe: mocks.query, manifiesto: { findUnique: mocks.manifest } } }));
 vi.mock('../../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {
@@ -89,6 +90,17 @@ describe('SMTP receipt and retry safety (mock provider only)', () => {
 afterEach(() => { vi.unstubAllEnvs(); });
 
 describe('mail safety regressions', () => {
+  it.each([{ isDemoData: true }, { modo: 'revision' }, { modo: 'prueba' }])('does not enqueue alerts from training context %j', async context => {
+    const { emailService } = await import('../../services/email.service');
+    await emailService.sendAlertEmail(['qa@example.invalid'], { nombre: 'QA' }, null, context);
+    expect(mocks.queue.create).not.toHaveBeenCalled();
+  });
+  it('checks the persisted manifest training flag before enqueueing', async () => {
+    mocks.manifest.mockResolvedValue({ numero: 'DEMO-001', isDemoData: true });
+    const { emailService } = await import('../../services/email.service');
+    await emailService.sendAlertEmail(['qa@example.invalid'], { nombre: 'QA' }, 'manifest-qa', {});
+    expect(mocks.queue.create).not.toHaveBeenCalled();
+  });
   it('records suppressed transactional mail, never ENVIADO or a future retry', async () => {
     const { emailService } = await import('../../services/email.service');
     await emailService.sendCuentaAprobadaEmail('qa@example.invalid', 'Persona QA');

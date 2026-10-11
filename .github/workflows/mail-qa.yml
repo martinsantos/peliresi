@@ -67,6 +67,7 @@ jobs:
           npx --no-install prisma db push --skip-generate
           npx --no-install tsc -p tsconfig.build.json
           node --experimental-strip-types qa/mail.integration.ts
+          node --experimental-strip-types qa/mail-previews.ts
       - name: Require units
         if: always()
         run: test '${{ steps.units.outcome }}' = success
@@ -74,6 +75,8 @@ jobs:
         if: always()
         with:
           name: sitrep-mail-qa-${{ github.run_id }}
-          path: /tmp/sitrep-mail-*.json
+          path: |
+            /tmp/sitrep-mail-*.json
+            /tmp/sitrep-mail-templates/
           retention-days: 3
           if-no-files-found: error

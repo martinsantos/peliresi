@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert } } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection } } }));
 import { notificationMailContent, queueCommittedNotificationEmails, type NoticeForMail } from '../../services/notification-mail.service';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
@@ -29,6 +29,15 @@ describe('committed notice mail relay', () => {
   });
   it.each(['not-json', 'null', '{}', '{"interno":true,"solicitudId":"hidden"}'])('does not render unsafe/unknown notice %s', datos => {
     expect(notificationMailContent({ ...notice, datos })).toBeNull();
+  });
+  it.each([{ isDemoData: true }, { modo: 'revision' }, { modo: 'prueba' }])('excludes training context %j', context => {
+    expect(notificationMailContent({ ...notice, datos: JSON.stringify({ solicitudId: 'qa', ...context }) })).toBeNull();
+  });
+  it.each([null, { numeroActa: 'ARP-DEMO-099' }, { numeroActa: 'DEMO/099' }])('does not mail training or missing inspection %j', async inspection => {
+    mocks.query.mockResolvedValue([{ ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ inspeccionId: 'qa' }) }]);
+    mocks.inspection.mockResolvedValue(inspection);
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert.mock.calls[0][0].data[0]).toMatchObject({ estado: 'SUPRIMIDO', error: 'TRAINING_OR_MISSING_RESOURCE' });
   });
   it('persists a deterministic ID and unique conflict handling, never sends here', async () => {
     expect(await queueCommittedNotificationEmails()).toBe(1);

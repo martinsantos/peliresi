@@ -13,7 +13,7 @@ export type NoticeForMail = {
 export function notificationMailContent(notice: NoticeForMail): { family: string; subject: string; html: string } | null {
   let data: Record<string, unknown>;
   try { data = JSON.parse(notice.datos || '{}'); } catch { return null; }
-  if (!data || typeof data !== 'object' || data.interno === true) return null;
+  if (!data || typeof data !== 'object' || data.interno === true || data.isDemoData === true || data.modo === 'revision' || data.modo === 'prueba') return null;
   let family: string, path: string, title: string;
   if (notice.tipo.startsWith('SOLICITUD_') && typeof data.solicitudId === 'string' && data.solicitudId) {
     family = 'solicitudes'; title = 'Novedad en una solicitud';
@@ -45,14 +45,20 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
   let inserted = 0;
   for (const notice of notices) {
     const content = notificationMailContent(notice);
-    const eligible = content && families.includes(content.family) && notice.activo && notice.emailVerified && notice.notifEmail;
+    let trainingOrMissing = false;
+    if (content?.family === 'inspecciones') {
+      const { inspeccionId } = JSON.parse(notice.datos!);
+      const inspection = await prisma.inspeccion.findUnique({ where: { id: inspeccionId }, select: { numeroActa: true } });
+      trainingOrMissing = !inspection || /^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || '');
+    }
+    const eligible = content && families.includes(content.family) && !trainingOrMissing && notice.activo && notice.emailVerified && notice.notifEmail;
     // Inactive applicants are deliberately not silently treated as active; activation policy must distinguish suspension first.
     const result = await prisma.emailQueue.createMany({ skipDuplicates: true, data: [{
       id: 'notification:' + notice.id, to: notice.email,
       subject: content?.subject || '[SITREP] Aviso no habilitado', html: content?.html || '',
       tipo: 'TRANSACCIONAL', prioridad: 'NORMAL',
       estado: eligible ? 'PENDIENTE' : 'SUPRIMIDO',
-      error: eligible ? 'NOTIFICATION_READY' : !content || !families.includes(content.family) ? 'EVENT_NOT_ENABLED' : 'RECIPIENT_NOT_ELIGIBLE',
+      error: eligible ? 'NOTIFICATION_READY' : trainingOrMissing ? 'TRAINING_OR_MISSING_RESOURCE' : !content || !families.includes(content.family) ? 'EVENT_NOT_ENABLED' : 'RECIPIENT_NOT_ELIGIBLE',
     }] });
     inserted += result.count;
   }

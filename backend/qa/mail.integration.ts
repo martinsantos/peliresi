@@ -103,6 +103,7 @@ if (process.argv[2] === 'worker') {
     checks.push('historical row preserved and disabled entries never replayed');
     process.env.EMAIL_NOTIFICATION_FAMILIES = 'solicitudes,soporte,inspecciones';
     const user = await prisma.usuario.create({ data: { nombre: 'Mail QA', email: 'notices@qa.invalid', password: 'not-a-login-credential', rol: 'ADMIN', activo: true, emailVerified: true } });
+    await prisma.inspeccion.create({ data: { id: 'qa-inspection', numero: 'QA-MAIL-001', inspectorId: user.id } });
     const sourceNotices = [];
     for (const datos of [{ solicitudId: 'qa-application' }, { tipo: 'soporte', ticketId: 'qa-ticket' }, { inspeccionId: 'qa-inspection' }]) {
       sourceNotices.push(await prisma.notificacion.create({ data: { usuarioId: user.id, tipo: 'solicitudId' in datos ? 'SOLICITUD_ENVIADA' : 'INFO_GENERAL', titulo: 'QA', mensaje: 'No debe copiar contenido sensible', datos: JSON.stringify(datos) } }));

@@ -92,7 +92,7 @@ async function smtpSend(to: string, subject: string, html: string): Promise<void
 // ── Queue helpers ───────────────────────────────────────────────────
 
 function digestKeyFor(to: string): string {
-  const now = new Date();
+  const now = new Date(Date.now() - 3 * 3600000); // Mendoza, consistent date/hour independent of host TZ.
   const date = now.toISOString().slice(0, 10);
   const hour = String(now.getUTCHours()).padStart(2, '0');
   return `alerta:${to}:${date}:${hour}`;
@@ -156,7 +156,7 @@ async function enqueueAlerta(to: string, subject: string, html: string): Promise
       digestKey: DISABLE_EMAILS ? null : digestKeyFor(to),
     },
   });
-  logger.info({ to, subject }, 'Email alert digest queued');
+  logger.info({ suppressed: DISABLE_EMAILS }, 'Email alert recorded');
 }
 
 // ── Flush (called by timer) ─────────────────────────────────────────
@@ -205,7 +205,7 @@ export async function flushEmailQueue(): Promise<void> {
         accepted = true;
         await prisma.emailQueue.update({
           where: { id },
-          data: { estado: 'ENVIADO', sentAt: new Date() },
+          data: { estado: 'ENVIADO', sentAt: new Date(), intentos: { increment: 1 }, error: null, nextRetryAt: null },
         });
       } catch (err: any) {
         if (accepted) { logger.error({ queueId: id }, 'SMTP accepted; receipt persistence failed, manual review required'); continue; }
@@ -266,8 +266,8 @@ export async function flushEmailQueue(): Promise<void> {
         continue;
       }
 
-      const digestHtml = digestTemplate(items, `${dateLabel} ${hourLabel}`);
-      const digestSubject = `[SITREP] Resumen de alertas — ${dateLabel} ${hourLabel}`;
+      const digestHtml = digestTemplate(items, `${dateLabel} ${hourLabel} (Mendoza)`);
+      const digestSubject = `[SITREP] Resumen de alertas — ${dateLabel} ${hourLabel} (Mendoza)`;
 
       let accepted = false;
       try {
@@ -275,7 +275,7 @@ export async function flushEmailQueue(): Promise<void> {
         accepted = true;
         await prisma.emailQueue.updateMany({
           where: { id: { in: ids } },
-          data: { estado: 'ENVIADO', sentAt: new Date() },
+          data: { estado: 'ENVIADO', sentAt: new Date(), intentos: { increment: 1 }, error: null, nextRetryAt: null },
         });
       } catch (err: any) {
         if (accepted) { logger.error({ queueIds: ids }, 'SMTP digest accepted; receipt persistence failed, manual review required'); continue; }
@@ -310,16 +310,18 @@ export const emailService = {
     datos: Record<string, any>
   ): Promise<void> {
     if (emails.length === 0) return;
+    if (datos?.isDemoData === true || datos?.modo === 'revision' || datos?.modo === 'prueba') return;
 
     let manifiestoNumero = manifiestoId;
     if (manifiestoId) {
       try {
         const m = await prisma.manifiesto.findUnique({
           where: { id: manifiestoId },
-          select: { numero: true }
+          select: { numero: true, isDemoData: true }
         });
+        if (m?.isDemoData) return;
         if (m) manifiestoNumero = m.numero;
-      } catch { /* skip */ }
+      } catch { return; /* Cannot verify a real vs training resource: do not send. */ }
     }
 
     const summary = `${regla.nombre}${manifiestoNumero ? ` — ${manifiestoNumero}` : ''}`;
