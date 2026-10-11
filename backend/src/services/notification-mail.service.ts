@@ -5,14 +5,50 @@
 import prisma from '../lib/prisma';
 import { mailPolicy } from './email-policy';
 import { escapeMail, mailLink, mailShell } from './email-templates';
+import { isFullAccess } from '../utils/roleFilter';
 
 export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
   email: string; activo: boolean; emailVerified: boolean; notifEmail: boolean; rol: string;
   usuarioId?: string; motivoInactividad?: string | null;
+  manifiestoId?: string | null; esInspector?: boolean;
 };
+const MANIFEST_TYPES = ['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO', 'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'];
+const ALERT_TYPES = ['INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA'];
 function enabledFamilies(): string[] {
-  return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').filter(item => ['solicitudes', 'soporte', 'inspecciones'].includes(item));
+  return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').map(item => item.trim()).filter(item => ['solicitudes', 'soporte', 'inspecciones', 'certificados', 'manifiestos', 'alertas'].includes(item));
+}
+
+/** Recheck the source at enqueue AND delivery, including reassignment/revocation. */
+async function sourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
+  const data = JSON.parse(notice.datos || '{}');
+  if (notice.manifiestoId) {
+    const manifest = await prisma.manifiesto.findUnique({ where: { id: notice.manifiestoId }, select: {
+      isDemoData: true, generador: { select: { usuarioId: true } },
+      transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
+    } });
+    if (!manifest || manifest.isDemoData) return false;
+    const owner = notice.rol === 'GENERADOR' ? manifest.generador : notice.rol === 'TRANSPORTISTA' ? manifest.transportista : notice.rol === 'OPERADOR' ? manifest.operador : null;
+    if (!isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) return false;
+  }
+  if (family === 'certificados') {
+    const document = await prisma.documento.findUnique({ where: { id: data.documentoId }, include: {
+      generador: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } },
+    } });
+    if (!document || document.tipo !== 'CERTIFICADO_AMBIENTAL' || document.estado !== 'APROBADO') return false;
+    const owners = [document.generador, document.operador, document.transportista].filter(Boolean);
+    const actorId = data.actorTipo === 'generador' ? document.generadorId : data.actorTipo === 'operador' ? document.operadorId : document.transportistaId;
+    return owners.length === 1 && owners[0]?.usuarioId === notice.usuarioId && actorId === data.actorId;
+  }
+  if (family === 'alertas' && typeof data.casoId === 'string') {
+    const alert = await prisma.alertaGenerada.findUnique({ where: { id: data.casoId }, select: { estado: true, regla: { select: { activa: true } } } });
+    return Boolean(alert?.regla.activa && ['PENDIENTE', 'EN_REVISION'].includes(alert.estado));
+  }
+  if (family === 'inspecciones') {
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: data.inspeccionId }, select: { numeroActa: true } });
+    return Boolean(inspection && !/^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || ''));
+  }
+  return true;
 }
 
 /** Pending is explicit and limited to the applicant's own still-open application. */
@@ -32,7 +68,7 @@ export async function queuedNoticeStillEligible(queueId: string, recipient: stri
   if (!queueId.startsWith('notification:')) return true;
   const notice = await prisma.notificacion.findUnique({
     where: { id: queueId.slice('notification:'.length) },
-    include: { usuario: { select: { email: true, activo: true, motivoInactividad: true, emailVerified: true, notifEmail: true, rol: true } } },
+    include: { usuario: { select: { email: true, activo: true, motivoInactividad: true, emailVerified: true, notifEmail: true, rol: true, esInspector: true } } },
   });
   if (!notice?.usuario) return false;
   const user = notice.usuario;
@@ -40,19 +76,21 @@ export async function queuedNoticeStillEligible(queueId: string, recipient: stri
   const content = notificationMailContent({ ...notice, ...user });
   if (!content || !enabledFamilies().includes(content.family)) return false;
   if (!await recipientEligible({ ...notice, ...user }, content.family)) return false;
-  if (content.family === 'inspecciones') {
-    const { inspeccionId } = JSON.parse(notice.datos!);
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: inspeccionId }, select: { numeroActa: true } });
-    if (!inspection || /^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || '')) return false;
-  }
-  return true;
+  return sourceEligible({ ...notice, ...user }, content.family);
 }
 export function notificationMailContent(notice: NoticeForMail): { family: string; subject: string; html: string } | null {
   let data: Record<string, unknown>;
   try { data = JSON.parse(notice.datos || '{}'); } catch { return null; }
   if (!data || typeof data !== 'object' || data.interno === true || data.isDemoData === true || data.modo === 'revision' || data.modo === 'prueba') return null;
   let family: string, path: string, title: string;
-  if (notice.tipo.startsWith('SOLICITUD_') && typeof data.solicitudId === 'string' && data.solicitudId) {
+  if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
+    family = 'certificados'; title = 'Certificado ambiental disponible';
+    path = '/mi-perfil';
+  } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {
+    family = 'manifiestos'; title = 'Novedad en un manifiesto'; path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
+  } else if (ALERT_TYPES.includes(notice.tipo) || (notice.tipo === 'INFO_GENERAL' && data.familia === 'catalogo_verificable' && typeof data.casoId === 'string')) {
+    family = 'alertas'; title = 'Aviso de seguimiento'; path = '/notificaciones';
+  } else if (notice.tipo.startsWith('SOLICITUD_') && typeof data.solicitudId === 'string' && data.solicitudId) {
     family = 'solicitudes'; title = 'Novedad en una solicitud';
     path = notice.rol.startsWith('ADMIN') ? '/admin/solicitudes/' + encodeURIComponent(data.solicitudId) : '/mi-solicitud';
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'soporte' && typeof data.ticketId === 'string' && data.ticketId) {
@@ -71,23 +109,19 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
   if (!policy.enabled || !families.length) return 0;
   // LEFT JOIN prevents repeated scans of already processed IDs, including suppressed recipients.
   const notices = await prisma.$queryRawUnsafe<NoticeForMail[]>(`
-    SELECT n.id, n.tipo, n.datos, n."createdAt", n."usuarioId", u.email, u.activo, u."motivoInactividad", u."emailVerified", u."notifEmail", u.rol
+    SELECT n.id, n.tipo, n.datos, n."createdAt", n."usuarioId", n."manifiestoId", u.email, u.activo, u."motivoInactividad", u."emailVerified", u."notifEmail", u.rol, u."esInspector"
     FROM notificaciones n JOIN usuarios u ON u.id = n."usuarioId"
     LEFT JOIN email_queue q ON q.id = 'notification:' || n.id
     WHERE q.id IS NULL AND n."createdAt" >= $1
-      AND (n.tipo::text LIKE 'SOLICITUD_%' OR (n.tipo::text = 'INFO_GENERAL'
-        AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%')))
+      AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%'
+        OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;
   for (const notice of notices) {
     const content = notificationMailContent(notice);
-    let trainingOrMissing = false;
-    if (content?.family === 'inspecciones') {
-      const { inspeccionId } = JSON.parse(notice.datos!);
-      const inspection = await prisma.inspeccion.findUnique({ where: { id: inspeccionId }, select: { numeroActa: true } });
-      trainingOrMissing = !inspection || /^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || '');
-    }
+    const trainingOrMissing = Boolean(content && !await sourceEligible(notice, content.family));
     const eligible = content && families.includes(content.family) && !trainingOrMissing && await recipientEligible(notice, content.family);
     const result = await prisma.emailQueue.createMany({ skipDuplicates: true, data: [{
       id: 'notification:' + notice.id, to: notice.email,

@@ -49,7 +49,9 @@ for (const actor of [
   const context = await browser.newContext({ viewport: info.project.name === 'web-desktop' ? { width: 1440, height: 900 } : { width: 360, height: 800 } });
   try {
     const owner = await context.newPage(); await login(owner, info, actor.key);
-    await owner.goto(`${prefix(info)}/mi-perfil`);
+    await owner.goto(`${prefix(info)}/notificaciones`);
+    await owner.getByText('Certificado ambiental disponible', { exact: true }).first().click();
+    await expect(owner).toHaveURL(new RegExp(prefix(info) + '/mi-perfil$'));
     const ownCertificates = owner.getByRole('region', { name: 'Certificados ambientales oficiales', exact: true });
     await expect(ownCertificates).toBeVisible();
     await expect(ownCertificates.getByText('Cargar certificado oficial', { exact: true })).toHaveCount(0);

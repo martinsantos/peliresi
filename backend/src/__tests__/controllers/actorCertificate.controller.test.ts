@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const mock = vi.hoisted(() => ({ actor: vi.fn(), save: vi.fn(), audit: vi.fn(), transaction: vi.fn(), exists: vi.fn(), read: vi.fn(), unlink: vi.fn() }));
+const mock = vi.hoisted(() => ({ actor: vi.fn(), save: vi.fn(), notice: vi.fn(), audit: vi.fn(), transaction: vi.fn(), exists: vi.fn(), read: vi.fn(), unlink: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   generador: { findUnique: mock.actor }, operador: { findUnique: mock.actor }, transportista: { findUnique: mock.actor }, $transaction: mock.transaction,
 } }));
@@ -12,9 +12,9 @@ import { uploadDocumento } from '../../controllers/documento.controller';
 
 describe('original CAA publication belongs to DGFA and retains its actor and year', () => {
   beforeEach(() => {
-    vi.clearAllMocks(); mock.actor.mockResolvedValue({ id: 'actor' }); mock.exists.mockReturnValue(true); mock.read.mockReturnValue(Buffer.from('%PDF-1.4\nOriginal bytes'));
+    vi.clearAllMocks(); mock.actor.mockResolvedValue({ id: 'actor', usuarioId: 'owner' }); mock.exists.mockReturnValue(true); mock.read.mockReturnValue(Buffer.from('%PDF-1.4\nOriginal bytes'));
     mock.save.mockImplementation(async ({ data }) => ({ ...data, id: 'certificate' })); mock.audit.mockResolvedValue({ id: 'audit' });
-    mock.transaction.mockImplementation(callback => callback({ documento: { create: mock.save }, auditoria: { create: mock.audit } }));
+    mock.transaction.mockImplementation(callback => callback({ documento: { create: mock.save }, auditoria: { create: mock.audit }, notificacion: { create: mock.notice } }));
   });
   for (const [kind, route] of [['GENERADOR', 'generadores'], ['OPERADOR', 'operadores'], ['TRANSPORTISTA', 'transportistas']] as const) {
     const invoke = async (rol: string, year: string | undefined = '2026', mimeType = 'application/pdf') => {
@@ -27,10 +27,12 @@ describe('original CAA publication belongs to DGFA and retains its actor and yea
       const { next } = await invoke(`ADMIN_${kind}`); expect(next).not.toHaveBeenCalled();
       expect(mock.save).toHaveBeenCalledWith({ data: expect.objectContaining({ [kind.toLowerCase() + 'Id']: 'actor', nombre: 'original.pdf', path: '/virtual/caa.pdf', anio: 2026, estado: 'APROBADO', subidoPor: 'staff', revisadoPor: 'staff' }) });
       expect(mock.audit).toHaveBeenCalled(); expect(mock.unlink).not.toHaveBeenCalled();
+      expect(mock.notice).toHaveBeenCalledWith({ data: expect.objectContaining({ usuarioId: 'owner', tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'certificado_ambiental', documentoId: 'certificate', actorTipo: kind.toLowerCase(), actorId: 'actor' }) }) });
     });
     it(`${kind}: rejects actor self-publication and deletes only the rejected temporary upload`, async () => {
       const { next } = await invoke(kind); expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 403 });
       expect(mock.save).not.toHaveBeenCalled(); expect(mock.unlink).toHaveBeenCalledWith('/virtual/caa.pdf');
+      expect(mock.notice).not.toHaveBeenCalled();
     });
     it(`${kind}: rejects a missing year or non-PDF without publishing`, async () => {
       expect((await invoke('ADMIN', '')).next.mock.calls[0][0]).toMatchObject({ statusCode: 400 });

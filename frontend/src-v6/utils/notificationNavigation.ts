@@ -32,6 +32,9 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
 
   if (explicitPath?.startsWith('/')) return withBasePath(explicitPath, basePath);
   if (data.tipo === 'nuevo_registro') return withBasePath('/admin/usuarios', basePath);
+  if (data.tipo === 'certificado_ambiental' && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
+    return withBasePath('/mi-perfil', basePath);
+  }
   if (typeof data.solicitudId === 'string') return withBasePath(`/admin/solicitudes/${data.solicitudId}`, basePath);
   if (typeof data.inspeccionId === 'string') return withBasePath(`/inspecciones/${data.inspeccionId}`, basePath);
   if (notificacion.manifiestoId) return withBasePath(`/manifiestos/${notificacion.manifiestoId}`, basePath);

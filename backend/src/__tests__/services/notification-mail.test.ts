@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application } } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert } } }));
 import { notificationMailContent, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
@@ -12,6 +12,51 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  const certificate = { ...notice, tipo: 'INFO_GENERAL', usuarioId: 'owner', rol: 'GENERADOR', datos: JSON.stringify({ tipo: 'certificado_ambiental', documentoId: 'doc', actorTipo: 'generador', actorId: 'actor' }) };
+  const document = { tipo: 'CERTIFICADO_AMBIENTAL', estado: 'APROBADO', generadorId: 'actor', generador: { usuarioId: 'owner' }, operador: null, transportista: null };
+  it('queues the official certificate once and points to the owner-readable record', async () => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'certificados');
+    mocks.query.mockResolvedValue([certificate]); mocks.document.mockResolvedValue(document);
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert.mock.calls[0][0].data[0]).toMatchObject({ estado: 'PENDIENTE', id: 'notification:qa-notice' });
+    expect(notificationMailContent(certificate)?.html).toContain('/mi-perfil');
+    expect(notificationMailContent(certificate)?.html).not.toContain('/api/');
+  });
+  it.each([null, { ...document, estado: 'RECHAZADO' }, { ...document, tipo: 'COMPROBANTE_PAGO' },
+    { ...document, generadorId: 'other' }, { ...document, generador: { usuarioId: 'other' } },
+    { ...document, operador: { usuarioId: 'owner' } },
+  ])('suppresses a missing, revoked, unrelated or ambiguous certificate: %j', async current => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'certificados');
+    mocks.document.mockResolvedValue(current); mocks.query.mockResolvedValue([certificate]);
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert.mock.calls[0][0].data[0].estado).toBe('SUPRIMIDO');
+    mocks.notice.mockResolvedValue({ ...certificate, usuario: certificate });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', certificate.email)).toBe(false);
+  });
+  const manifestNotice = { ...notice, tipo: 'MANIFIESTO_FIRMADO', manifiestoId: 'manifest', usuarioId: 'owner', rol: 'TRANSPORTISTA', datos: null };
+  it.each(['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO', 'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'])('routes %s to the actual manifest, without copying free text', tipo => {
+    expect(notificationMailContent({ ...manifestNotice, tipo })?.html).toContain('/manifiestos/manifest');
+    expect(notificationMailContent({ ...manifestNotice, tipo, manifiestoId: null })).toBeNull();
+  });
+  it.each([null, { isDemoData: true }, { isDemoData: false, transportista: { usuarioId: 'reassigned' } }])('suppresses deleted, synthetic or reassigned manifest %j', async current => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'manifiestos');
+    mocks.manifest.mockResolvedValue(current); mocks.notice.mockResolvedValue({ ...manifestNotice, usuario: manifestNotice });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', manifestNotice.email)).toBe(false);
+  });
+  it.each([{ rol: 'TRANSPORTISTA' }, { rol: 'ADMIN_OPERADOR' }, { rol: 'GENERADOR', esInspector: true }])('rechecks legitimate manifest participant or staff %j', async user => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'manifiestos');
+    mocks.manifest.mockResolvedValue({ isDemoData: false, transportista: { usuarioId: 'owner' } });
+    mocks.notice.mockResolvedValue({ ...manifestNotice, usuario: { ...manifestNotice, ...user } });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', manifestNotice.email)).toBe(true);
+  });
+  it.each([null, { estado: 'RESUELTA', regla: { activa: true } }, { estado: 'PENDIENTE', regla: { activa: false } }])('does not mail a resolved or disabled catalogue case %j', async current => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'alertas');
+    mocks.alert.mockResolvedValue(current);
+    const alert = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ familia: 'catalogo_verificable', casoId: 'case', inspeccionId: 'inspection' }) };
+    mocks.notice.mockResolvedValue({ ...alert, usuario: alert });
+    expect(notificationMailContent(alert)?.family).toBe('alertas');
+    expect(await queuedNoticeStillEligible('notification:qa-notice', alert.email)).toBe(false);
+  });
   it('queues a verified pending applicant only for their own open application', async () => {
     const pending = { ...notice, activo: false, rol: 'GENERADOR', usuarioId: 'applicant', motivoInactividad: 'PENDIENTE_APROBACION' };
     mocks.query.mockResolvedValue([pending]); mocks.application.mockResolvedValue({ id: 'sol-qa' });

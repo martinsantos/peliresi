@@ -115,6 +115,12 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
             ...ownership, usuarioId: req.user!.id, datosDespues: { documentoId: saved.id, tipo, anio: saved.anio, nombre: saved.nombre, estado: saved.estado }, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
           if (analysis) await retainReceiptDigest(transaction, description.sha256, saved.id, 'ACTOR');
           if (analysis?.duplicado) await receiptNotice(transaction, actor.usuarioId, { actorTipo: actorType, actorId: id, documentoId: saved.id });
+          if (official) await transaction.notificacion.create({ data: {
+            usuarioId: actor.usuarioId, tipo: 'INFO_GENERAL',
+            titulo: 'Certificado ambiental disponible',
+            mensaje: 'DGFA cargó tu certificado oficial. Podés descargarlo desde tu ficha.',
+            datos: JSON.stringify({ tipo: 'certificado_ambiental', documentoId: saved.id, actorTipo: actorType, actorId: id }),
+          } });
           return saved;
         });
 
