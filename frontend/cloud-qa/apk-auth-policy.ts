@@ -17,7 +17,8 @@ export function apkRequestAllowed(url: string, method: string, body: string | nu
   if (target.origin !== apkOrigin || target.username || target.password) return false;
   const route = target.pathname.replace(/\/$/, '');
   const reads = ['/api/health', '/api/auth/profile', '/api/auth/roles', '/api/manifiestos',
-    '/api/manifiestos/dashboard', '/api/notificaciones', '/api/actores/generadores', '/api/actores/operadores'];
+    '/api/manifiestos/dashboard', '/api/notificaciones', '/api/actores/generadores', '/api/actores/operadores',
+    '/api/push/vapid-key'];
   if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return reads.includes(route);
   if (!authenticated || method !== 'POST') return false;
   if (route === '/api/auth/login') {

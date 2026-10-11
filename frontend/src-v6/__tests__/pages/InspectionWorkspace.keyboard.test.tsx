@@ -76,11 +76,15 @@ describe('inspection workspace follows the keyboard without floating save contro
     expect(panel.className).toContain('overflow-y-auto');
     expect(content.className).toContain('shrink-0 overflow-visible');
     expect(screen.getByTestId('inspection-navigation').className).not.toContain('sticky');
+    // Regression: the real Android keyboard left Save below the scrolled
+    // editor after the success notice changed the available height.
+    expect(screen.getByTestId('inspection-action-bar')).toHaveClass('sticky', 'bottom-0', 'z-20');
     panel.scrollTop = 37; fireEvent.scroll(panel);
     // Parent layout can settle after the visualViewport event. Observe that
     // geometry rather than retaining the obsolete keyboard cap indefinitely.
     act(() => { viewport.height = 783; parentHeight = 600; notify!([], {} as ResizeObserver); });
     expect(panel).not.toHaveAttribute('data-constrained-viewport');
+    expect(screen.getByTestId('inspection-action-bar').className).not.toMatch(/\b(sticky|fixed|absolute)\b/);
     expect(content).toHaveAttribute('data-inspection-scroll');
     expect(content.scrollTop).toBe(37);
     expect(screen.getByRole('textbox', { name: 'Observación de campo' })).toBe(input);

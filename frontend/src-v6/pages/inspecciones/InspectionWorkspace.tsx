@@ -171,6 +171,6 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
       {(step.id === active.id || visited.has(step.id)) && step.content}
     </section>)}
     </div>
-    {editableSection && saveAction && <footer data-testid="inspection-action-bar" className="shrink-0 rounded-b-xl border-t border-neutral-300 bg-white px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6">{saveAction}</footer>}
+    {editableSection && saveAction && <footer data-testid="inspection-action-bar" className={'shrink-0 rounded-b-xl border-t border-neutral-300 bg-white px-3 py-3 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6' + (constrainedViewport ? ' sticky bottom-0 z-20' : '')}>{saveAction}</footer>}
   </div>;
 }

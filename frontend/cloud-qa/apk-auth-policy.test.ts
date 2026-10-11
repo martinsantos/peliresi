@@ -30,3 +30,11 @@ test('missing, wrong-account or weak credentials fail closed', () => {
     JSON.stringify({ ...valid, password: 'short' }), JSON.stringify({ ...valid, id: '' })])
     assert.throws(() => apkCredentials(value));
 });
+
+test('reads public push configuration without permitting subscription or delivery', () => {
+  assert.equal(apkRequestAllowed(apkOrigin + '/api/push/vapid-key', 'GET', null, true), true);
+  for (const route of ['/api/push/vapid-key', '/api/push/subscribe', '/api/push/unsubscribe', '/api/push/send'])
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'])
+      assert.equal(apkRequestAllowed(apkOrigin + route, method, '{}', true), false);
+  assert.equal(apkRequestAllowed(apkOrigin + '/api/push/vapid-key/extra', 'GET', null, true), false);
+});
