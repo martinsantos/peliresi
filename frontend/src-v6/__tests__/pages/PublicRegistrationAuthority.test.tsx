@@ -74,7 +74,12 @@ describe('Public registration collects declarations, never calculates a tax for 
     expect(row).toHaveTextContent('recibo-prueba.pdf');
     expect(row).toHaveTextContent('Seleccionado para revisión');
     expect(row).not.toHaveTextContent('Guardado');
-    expect(screen.getByText(/La prueba no consulta recibos de otros usuarios/)).toBeVisible();
+    expect(screen.getByText('En prueba los archivos no se conservan al salir.')).toBeVisible();
+    const filesHelp = screen.getByText('PDF, JPG o PNG · hasta 10 MB').closest('details')!;
+    expect(filesHelp.open).toBe(false);
+    // JSDOM does not perform the native summary toggle; the cloud E2E clicks it.
+    fireEvent.click(screen.getByText('PDF, JPG o PNG · hasta 10 MB'));
+    expect(screen.getByText(/La prueba no consulta recibos de otros usuarios/)).toBeInTheDocument();
     await waitFor(() => expect(requests.preview).toHaveBeenCalledOnce());
     expect(requests.preview.mock.calls[0][1]).toBe('DOCUMENTO');
     await waitFor(() => expect(within(row).getByText('Ver texto leído del recibo')).toBeVisible());

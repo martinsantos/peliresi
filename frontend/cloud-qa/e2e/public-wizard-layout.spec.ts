@@ -43,6 +43,10 @@ test('public actor wizards keep titles aligned, current steps visible and naviga
       const label = active.locator('span');
       await expect(label).toBeVisible();
       await readableWholeWords(label);
+      const railLabels = await rail.getByRole('button').locator('span').evaluateAll(elements => elements.map(element => {
+        const box = element.getBoundingClientRect(); return { left: box.left, right: box.right };
+      }));
+      for (let index = 1; index < railLabels.length; index++) expect(railLabels[index].left - railLabels[index - 1].right).toBeGreaterThanOrEqual(8);
       await expect.poll(() => title.evaluate(element => element.getBoundingClientRect().top)).toBeGreaterThanOrEqual(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
       await expect(page.getByTestId('tef-calculator')).toHaveCount(0);
@@ -74,7 +78,21 @@ test('public actor wizards keep titles aligned, current steps visible and naviga
         await expect(receipt).not.toContainText('Guardado');
         const response = await processed; expect(response.status()).toBe(200); expect((await response.json()).data.persistido).toBe(false);
         await expect(receipt).not.toContainText('Leyendo…');
+        await expect(page.getByText('En prueba los archivos no se conservan al salir.', { exact: true })).toBeVisible();
+        const filesHelp = page.locator('summary').filter({ hasText: 'PDF, JPG o PNG' });
+        expect((await filesHelp.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        await filesHelp.click();
         await expect(page.getByText(/La prueba no consulta recibos de otros usuarios/)).toBeVisible();
+        await filesHelp.click();
+        await expect(page.getByText(/La prueba no consulta recibos de otros usuarios/)).not.toBeVisible();
+      }
+      if (step === total) {
+        const fullValues = await page.locator('dl dd').evaluateAll(elements => elements.map(element => ({
+          text: element.textContent, clipped: element.scrollWidth > element.clientWidth + 1,
+          ellipsis: getComputedStyle(element).textOverflow === 'ellipsis',
+        })));
+        expect(fullValues.some(value => value.text?.includes('Av. de Acceso 1234'))).toBe(true);
+        expect(fullValues.filter(value => value.clipped || value.ellipsis)).toEqual([]);
       }
       if (step === total && actor !== 'Transportista') {
         await expect(page.getByRole('heading', { name: 'Actividad', exact: true })).toBeVisible();

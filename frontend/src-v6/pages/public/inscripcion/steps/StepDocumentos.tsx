@@ -2,7 +2,7 @@
  * Step Documentos — File upload step for required documents
  */
 import React, { useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Download, FileText, Loader2, Paperclip, RefreshCw, Upload, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, Download, FileText, Loader2, Paperclip, RefreshCw, Upload, X } from 'lucide-react';
 import { Button } from '../../../../components/ui/ButtonV2';
 import { SectionTitle } from '../SectionTitle';
 import type { DocDef } from '../shared';
@@ -63,9 +63,11 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   return (
     <div className="space-y-4">
       <SectionTitle icon={FileText} title="Documentos" />
-      <p className="text-sm leading-relaxed text-neutral-700">{reviewMode ? 'Probá la lectura real con un documento de prueba. El archivo se procesa temporalmente y se elimina: al volver se recuperan tus datos, no el archivo.' : <>Los documentos marcados como <strong>Guardado</strong> quedan en tu solicitud y se recuperan al volver.</>}</p>
-      {reviewMode && <p className="text-sm leading-6 text-neutral-700">La prueba no consulta recibos de otros usuarios ni registra pagos o avisos.</p>}
-      <p className="text-sm text-neutral-500">Formatos aceptados: PDF, JPG y PNG. Máximo {(maxBytes / 1024 / 1024).toFixed(0)} MB por archivo.</p>
+      <details className="group text-sm text-neutral-700">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">PDF, JPG o PNG · hasta {(maxBytes / 1024 / 1024).toFixed(0)} MB<ChevronDown size={16} aria-hidden="true" className="shrink-0 group-open:rotate-180" /></summary>
+        <p className="pb-2 leading-6">{reviewMode ? 'Usá documentos de prueba. La prueba no consulta recibos de otros usuarios ni registra pagos o avisos.' : <>Los archivos marcados como <strong>Guardado</strong> se recuperan al volver.</>}</p>
+      </details>
+      {reviewMode && <p className="text-sm text-neutral-700">En prueba los archivos no se conservan al salir.</p>}
       <input
         ref={fileInputRef}
         type="file"
@@ -128,7 +130,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               {rejected && <p className="mt-2 text-sm text-error-800" role="alert">Documento rechazado: {uploaded.observaciones || 'Reemplazalo para corregir la solicitud antes de enviarla.'}</p>}
               {uploadErrors[doc.tipo] && <p className="mt-2 flex items-start gap-1.5 text-xs text-error-700" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{uploadErrors[doc.tipo]}</p>}
               {state === 'error' && pendingFile && <Button variant="outline" size="sm" className="mt-2" onClick={() => void onAddFile(doc.tipo, pendingFile)}>Reintentar {doc.nombre}</Button>}
-              {doc.tipo === 'COMPROBANTE_PAGO' && !uploaded && <p className="mt-2 text-sm leading-6 text-neutral-700">Sellados tributarios: recibo de caja de banco o comprobante de transferencia. Se revisa el original; no se acredita automáticamente un pago de TEF.</p>}
+              {doc.tipo === 'COMPROBANTE_PAGO' && !uploaded && <p className="mt-2 text-sm leading-6 text-neutral-700">Caja de banco o transferencia. El OCR no acredita el pago.</p>}
               <DocumentAnalysis analysis={reviewMode ? previewAnalyses[doc.tipo] : pendingFile ? undefined : uploaded?.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : 'document'} persisted={!reviewMode} retrying={isBusy} onRetry={(uploaded || reviewMode && pendingFile) && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
             </div>
           );

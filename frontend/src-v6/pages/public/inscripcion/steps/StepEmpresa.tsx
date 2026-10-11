@@ -246,11 +246,8 @@ function renderOperadorStep(
     case 5: return (
       <div className="space-y-4">
         <SectionTitle icon={Shield} title="Corrientes de Residuos (Y)" />
-        <p className="text-sm text-neutral-500">
-          Indique las corrientes de residuos que el operador esta habilitado a recibir y tratar.
-        </p>
         <div>
-          <label htmlFor="registration-corrientesY" className={labelCls}>Corrientes Y</label>
+          <label htmlFor="registration-corrientesY" className={labelCls}>Corrientes Y autorizadas</label>
           <textarea id="registration-corrientesY"
             value={form.corrientesY || ''}
             onChange={e => up('corrientesY', e.target.value)}

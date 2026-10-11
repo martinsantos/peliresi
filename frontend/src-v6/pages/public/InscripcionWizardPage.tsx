@@ -788,7 +788,7 @@ const InscripcionWizardPage: React.FC = () => {
               const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
               return (
                 <React.Fragment key={s.id}>
-                  <button ref={isActive ? activeStepRef : undefined} type="button" onClick={() => void goStep(s.id)} disabled={saving || submitting} aria-current={isActive ? 'step' : undefined} aria-label={`Paso ${s.id} de ${totalSteps}: ${s.label}`} className="group flex min-h-11 w-[112px] shrink-0 flex-col items-center justify-start gap-1.5 rounded-lg px-1 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700">
+                  <button ref={isActive ? activeStepRef : undefined} type="button" onClick={() => void goStep(s.id)} disabled={saving || submitting} aria-current={isActive ? 'step' : undefined} aria-label={`Paso ${s.id} de ${totalSteps}: ${s.label}`} className="group flex min-h-11 min-w-[112px] shrink-0 flex-col items-center justify-start gap-1.5 rounded-lg px-2 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700">
                     <div aria-hidden="true" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
                       hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
                       isActive ? 'bg-primary-700 text-white' :

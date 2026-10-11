@@ -191,7 +191,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
     <div className="space-y-4">
       <SectionTitle icon={Check} title="Resumen de la Solicitud" />
       <p className="text-sm text-neutral-500">
-        Revise los datos antes de enviar. Podra volver a pasos anteriores para corregir.
+        Revisá los datos; podés corregirlos en cada paso.
       </p>
 
       {regError && (
@@ -205,19 +205,19 @@ export const StepResumen: React.FC<StepResumenProps> = ({
           <div className="bg-neutral-50 px-4 py-2 border-b border-neutral-200">
             <h4 className="text-sm font-semibold text-neutral-700">{section.label}</h4>
           </div>
-          <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+          <dl className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
             {section.fields
               .filter(f => f.value)
               .map(f => (
-                <div key={f.label} className="flex justify-between text-sm py-0.5">
-                  <span className="text-neutral-500">{f.label}</span>
-                  <span className="text-neutral-900 font-medium text-right max-w-[60%] truncate">{f.value}</span>
+                <div key={f.label} className="grid min-w-0 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 text-sm py-0.5">
+                  <dt className="text-neutral-600">{f.label}</dt>
+                  <dd className="min-w-0 text-neutral-900 font-medium text-right [overflow-wrap:anywhere]">{f.value}</dd>
                 </div>
               ))}
             {section.fields.every(f => !f.value) && (
-              <p className="text-sm text-neutral-400 italic col-span-2">Sin datos ingresados</p>
+              <div className="text-sm text-neutral-600 italic sm:col-span-2"><dt className="sr-only">Datos de {section.label}</dt><dd>Sin datos ingresados</dd></div>
             )}
-          </div>
+          </dl>
         </div>
       ))}
       {isTransportista && <RegistrationFleetSummary form={form} />}
