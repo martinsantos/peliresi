@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice } } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application } } }));
 import { notificationMailContent, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
@@ -12,6 +12,34 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('queues a verified pending applicant only for their own open application', async () => {
+    const pending = { ...notice, activo: false, rol: 'GENERADOR', usuarioId: 'applicant', motivoInactividad: 'PENDIENTE_APROBACION' };
+    mocks.query.mockResolvedValue([pending]); mocks.application.mockResolvedValue({ id: 'sol-qa' });
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert.mock.calls[0][0].data[0].estado).toBe('PENDIENTE');
+    expect(mocks.application).toHaveBeenCalledWith({ where: { id: 'sol-qa', usuarioId: 'applicant', estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA'] } }, select: { id: true } });
+    mocks.notice.mockResolvedValue({ ...pending, usuario: pending });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', pending.email)).toBe(true);
+  });
+  it.each([
+    { motivoInactividad: 'SUSPENDIDA' }, { motivoInactividad: null }, { emailVerified: false },
+    { notifEmail: false }, { tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"qa"}' },
+  ])('never treats this inactive recipient as an approved applicant: %j', async changes => {
+    const pending = { ...notice, activo: false, usuarioId: 'applicant', motivoInactividad: 'PENDIENTE_APROBACION', ...changes };
+    mocks.query.mockResolvedValue([pending]); mocks.application.mockResolvedValue({ id: 'sol-qa' });
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert.mock.calls[0][0].data[0].estado).toBe('SUPRIMIDO');
+    mocks.notice.mockResolvedValue({ ...pending, usuario: pending });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', pending.email)).toBe(false);
+  });
+  it('suppresses a pending applicant if the application closed, disappeared or belongs to someone else', async () => {
+    const pending = { ...notice, activo: false, usuarioId: 'applicant', motivoInactividad: 'PENDIENTE_APROBACION' };
+    mocks.query.mockResolvedValue([pending]); mocks.application.mockResolvedValue(null);
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert.mock.calls[0][0].data[0].estado).toBe('SUPRIMIDO');
+    mocks.notice.mockResolvedValue({ ...pending, usuario: pending });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', pending.email)).toBe(false);
+  });
   it('rechecks the current recipient before sending an eligible queued notice', async () => {
     mocks.notice.mockResolvedValue({ ...notice, usuario: notice });
     expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(true);

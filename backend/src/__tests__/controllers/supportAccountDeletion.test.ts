@@ -11,6 +11,7 @@ vi.mock('../../lib/prisma', () => {
     operador: { findUnique: mocks.findActor, delete: mocks.deleteActor },
     vehiculo: { deleteMany: mocks.deleteChildren }, chofer: { deleteMany: mocks.deleteChildren },
     agenteSoporte: { deleteMany: mocks.deleteAgent },
+    emailQueue: { create: vi.fn() },
     manifiesto: { count: mocks.businessCount }, ticketSoporte: { count: mocks.ticketCount },
     mensajeSoporte: { count: mocks.messageCount }, eventoSoporte: { count: mocks.eventCount }, $queryRaw: mocks.lock };
   mocks.transaction.mockImplementation(callback => callback(db));

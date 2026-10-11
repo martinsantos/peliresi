@@ -192,6 +192,7 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
           telefono,
           cuit,
           activo: activo ?? true,
+          motivoInactividad: activo === false ? 'SUSPENDIDA' : null,
           emailVerified: emailVerified ?? true,
         },
       });
@@ -235,7 +236,7 @@ export const updateUsuario = async (req: AuthRequest, res: Response, next: NextF
     const before = await tx.usuario.findUniqueOrThrow({ where: { id } });
     const updated = await tx.usuario.update({
       where: { id },
-      data: parsed.data,
+      data: { ...parsed.data, ...(parsed.data.activo !== undefined ? { motivoInactividad: parsed.data.activo ? null : 'SUSPENDIDA' } : {}) },
       select: {
         id: true,
         email: true,
@@ -318,7 +319,7 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
 
     const changed = await tx.usuario.update({
       where: { id },
-      data: { activo: !usuario.activo },
+      data: { activo: !usuario.activo, motivoInactividad: usuario.activo ? 'SUSPENDIDA' : null },
       select: {
         id: true,
         email: true,

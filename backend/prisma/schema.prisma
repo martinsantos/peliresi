@@ -22,6 +22,8 @@ model Usuario {
   empresa                String?
   telefono               String?
   activo                 Boolean   @default(true)
+  // NULL: legacy/unspecified. Never infer pending-mail eligibility from activo=false.
+  motivoInactividad      String?
   esInspector            Boolean   @default(false)
   dosFaSecret            String?
   dosFaVerificado        Boolean   @default(false)

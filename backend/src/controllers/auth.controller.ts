@@ -103,6 +103,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           telefono,
           cuit: normalizedCuit || cuit,
           activo: false,
+          motivoInactividad: 'PENDIENTE_APROBACION',
           emailVerified: false,
           emailVerificationToken: hashedToken,
         },
@@ -242,8 +243,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Verificá tu email antes de iniciar sesión', 403);
     }
 
+    if (!user.activo && user.motivoInactividad === 'SUSPENDIDA') {
+      throw new AppError('Tu cuenta está suspendida. Contactá a la administración de SITREP.', 403);
+    }
     // Restricted access for candidates with pending solicitudes
-    if (!user.activo && user.emailVerified) {
+    if (!user.activo && user.emailVerified && user.motivoInactividad !== 'SUSPENDIDA') {
       const solicitudPendiente = await prisma.solicitudInscripcion.findFirst({
         where: {
           usuarioId: user.id,
@@ -480,7 +484,7 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     if (!user) throw new AppError('Usuario no encontrado o inactivo', 401);
 
     // Allow refresh for restricted tokens (inactive users with pending solicitudes)
-    if (!user.activo && !decoded.restricted) {
+    if (!user.activo && (!decoded.restricted || user.motivoInactividad === 'SUSPENDIDA')) {
       throw new AppError('Usuario no encontrado o inactivo', 401);
     }
 

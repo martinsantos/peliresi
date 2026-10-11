@@ -54,5 +54,26 @@ try {
   assert.ok((await mails()).every((row: { estado: string; sentAt: unknown; html: string }) => row.estado === 'SUPRIMIDO' && row.sentAt === null && !row.html.includes(proof) && !row.html.includes(password)));
   assert.equal(await db.usuario.findUnique({ where: { id } }), null);
   checks.push('all eight messages terminal SUPRIMIDO, no secrets in content, no SMTP credentials or active delivery');
+  const candidateEmail = 'pending-policy@night-qa.invalid';
+  const registration = await request('/solicitudes/iniciar', 'POST', { email: candidateEmail, password, nombre: 'QA pending policy', cuit: '30711235961', tipoActor: 'GENERADOR' }, undefined, 201);
+  const candidate = await db.usuario.findUniqueOrThrow({ where: { email: candidateEmail } });
+  assert.equal(candidate.activo, false);
+  assert.equal(candidate.motivoInactividad, 'PENDIENTE_APROBACION');
+  await request('/auth/login', 'POST', { email: candidateEmail, password }, undefined, 403);
+  // Synthetic verification proof in isolated QA; never a production user's session.
+  const verificationProof = 'qa-pending-verification-proof';
+  await db.usuario.update({ where: { id: candidate.id }, data: { emailVerificationToken: createHash('sha256').update(verificationProof).digest('hex') } });
+  await request('/auth/verify-email?token=' + verificationProof, 'GET');
+  const candidateLogin = await request('/auth/login', 'POST', { email: candidateEmail, password });
+  assert.equal(candidateLogin.data.restricted, true);
+  const candidateToken = candidateLogin.data.tokens.accessToken;
+  await request('/solicitudes/' + registration.data.solicitudId, 'GET', undefined, candidateToken);
+  // Explicit suspension must also invalidate an already-issued restricted session.
+  await request('/admin/usuarios/' + candidate.id, 'PUT', { activo: false }, token);
+  assert.equal((await db.usuario.findUniqueOrThrow({ where: { id: candidate.id } })).motivoInactividad, 'SUSPENDIDA');
+  await request('/auth/login', 'POST', { email: candidateEmail, password }, undefined, 403);
+  await request('/solicitudes/' + registration.data.solicitudId, 'GET', undefined, candidateToken, 401);
+  await request('/auth/refresh-token', 'POST', { refreshToken: candidateLogin.data.tokens.refreshToken }, undefined, 401);
+  checks.push('public applicant starts pending; verified login is restricted; explicit suspension denies login, existing session and refresh');
   await writeFile(path.join(process.env.QA_ARTIFACTS!, 'account-mail-http.json'), JSON.stringify({ passed: true, checks, smtpEnabled: false, database: 'sitrep_night_qa_20260926' }, null, 2));
 } finally { await db.$disconnect(); }

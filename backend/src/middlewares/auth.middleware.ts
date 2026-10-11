@@ -63,6 +63,7 @@ export const isAuthenticated = async (
         nombre: true,
         rol: true,
         activo: true,
+        motivoInactividad: true,
         esInspector: true,
         generador: true,
         transportista: true,
@@ -75,7 +76,7 @@ export const isAuthenticated = async (
     }
 
     // Block inactive users UNLESS they have a restricted token
-    if (!user.activo && !decoded.restricted) {
+    if (!user.activo && (!decoded.restricted || user.motivoInactividad === 'SUSPENDIDA')) {
       throw new AppError('Usuario no autorizado o inactivo', 401);
     }
 

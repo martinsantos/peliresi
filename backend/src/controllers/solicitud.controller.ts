@@ -162,6 +162,7 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
           nombre,
           cuit: normalizedCuit,
           activo: false,
+          motivoInactividad: 'PENDIENTE_APROBACION',
           emailVerified: false,
           emailVerificationToken: hashedToken,
         },
@@ -944,6 +945,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         where: { id: solicitud.usuarioId },
         data: {
           activo: true,
+          motivoInactividad: null,
           rol: solicitud.tipoActor as Rol,
         },
       });

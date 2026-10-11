@@ -39,6 +39,13 @@ try {
     { id: 'application-staff', user: 'admin', tipo: 'SOLICITUD_OBSERVADA', datos: { solicitudId: application.id }, expected: '/admin/solicitudes/' + application.id, visible: 'QA sin-actor' },
     { id: 'application-owner', user: 'sin-actor', tipo: 'SOLICITUD_OBSERVADA', datos: { solicitudId: application.id }, expected: '/mi-solicitud', visible: 'QA completar domicilio' },
   ];
+  const seedUser = await db.usuario.findUniqueOrThrow({ where: { id: fixture.users['sin-actor'] } });
+  const pending = await db.usuario.create({ data: { email: 'pending-mail@night-qa.invalid', nombre: 'QA pending mail', password: seedUser.password,
+    rol: 'GENERADOR', activo: false, motivoInactividad: 'PENDIENTE_APROBACION', emailVerified: true } });
+  const pendingApplication = await db.solicitudInscripcion.create({ data: { usuarioId: pending.id, tipoActor: 'GENERADOR', estado: 'OBSERVADA',
+    datosActor: '{}', observaciones: 'QA observación pendiente verificado' } });
+  cases.push({ id: 'application-pending', user: 'pending-mail', tipo: 'SOLICITUD_OBSERVADA', datos: { solicitudId: pendingApplication.id },
+    expected: '/mi-solicitud', visible: 'QA observación pendiente verificado' });
   const mails = cases.map(item => ({ ...item, ...notificationMailContent({ ...item,
     rol: item.user === 'admin' ? 'ADMIN' : 'GENERADOR', datos: JSON.stringify(item.datos),
   }) }));

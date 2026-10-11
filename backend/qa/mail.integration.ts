@@ -134,6 +134,21 @@ if (process.argv[2] === 'worker') {
       assert.equal((await prisma.emailQueue.findUnique({ where: { id: 'notification:' + notice.id } })).error, 'RECIPIENT_OR_EVENT_NO_LONGER_ELIGIBLE');
     }
     checks.push('queued notice suppressed after suspension, unverified email, opt-out or address change; zero SMTP attempts');
+    const applicant = await prisma.usuario.create({ data: { nombre: 'Pending QA', email: 'pending@qa.invalid', password: 'not-a-login', rol: 'GENERADOR', activo: false, motivoInactividad: 'PENDIENTE_APROBACION', emailVerified: true } });
+    const application = await prisma.solicitudInscripcion.create({ data: { usuarioId: applicant.id, tipoActor: 'GENERADOR', estado: 'OBSERVADA', datosActor: '{}' } });
+    const makeNotice = () => prisma.notificacion.create({ data: { usuarioId: applicant.id, tipo: 'SOLICITUD_OBSERVADA', titulo: 'QA', mensaje: 'No copiar texto', datos: JSON.stringify({ solicitudId: application.id }) } });
+    const pendingBaseline = messages.length;
+    const pendingNotice = await makeNotice();
+    await worker();
+    assert.equal(messages.length - pendingBaseline, 1);
+    assert.equal((await prisma.emailQueue.findUnique({ where: { id: 'notification:' + pendingNotice.id } })).estado, 'ENVIADO');
+    const later = await makeNotice();
+    await queueCommittedNotificationEmails();
+    await prisma.usuario.update({ where: { id: applicant.id }, data: { motivoInactividad: 'SUSPENDIDA' } });
+    await worker();
+    assert.equal(messages.length - pendingBaseline, 1);
+    assert.equal((await prisma.emailQueue.findUnique({ where: { id: 'notification:' + later.id } })).estado, 'SUPRIMIDO');
+    checks.push('verified pending applicant receives observation; suspension before delivery suppresses queued observation');
     const { recordAccountMail } = require('../dist/services/account-mail.service.js');
     process.env.EMAIL_NOTIFICATION_FAMILIES = 'cuentas';
     const accountRecipient = { id: 'synthetic-account', email: 'account-events@qa.invalid', emailVerified: true };

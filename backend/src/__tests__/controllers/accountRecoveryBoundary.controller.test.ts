@@ -3,10 +3,11 @@ import type { Request, Response } from 'express';
 import { createHash } from 'node:crypto';
 
 const mocks = vi.hoisted(() => ({ findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), audit: vi.fn(), resetEmail: vi.fn(), verifyEmail: vi.fn(), hash: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: {
+vi.mock('../../lib/prisma', () => { const db = {
   usuario: { findFirst: mocks.findFirst, findUnique: mocks.findUnique, update: mocks.update, updateMany: mocks.updateMany, findMany: mocks.findMany },
   auditoria: { create: mocks.audit }, notificacion: { create: vi.fn() },
-} }));
+  emailQueue: { create: vi.fn() },
+}; return { default: { ...db, $transaction: (callback: (tx: typeof db) => unknown) => callback(db) } }; });
 vi.mock('../../config/config', () => ({ config: { JWT_SECRET: 'unit-recovery-only', JWT_EXPIRES_IN: '15m' } }));
 vi.mock('bcryptjs', () => ({ default: { genSalt: vi.fn().mockResolvedValue('salt'), hash: mocks.hash } }));
 vi.mock('../../services/email.service', () => ({ emailService: { sendPasswordResetEmail: mocks.resetEmail, sendEmailVerification: mocks.verifyEmail } }));

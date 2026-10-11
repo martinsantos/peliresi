@@ -9,9 +9,22 @@ import { escapeMail, mailLink, mailShell } from './email-templates';
 export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
   email: string; activo: boolean; emailVerified: boolean; notifEmail: boolean; rol: string;
+  usuarioId?: string; motivoInactividad?: string | null;
 };
 function enabledFamilies(): string[] {
   return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').filter(item => ['solicitudes', 'soporte', 'inspecciones'].includes(item));
+}
+
+/** Pending is explicit and limited to the applicant's own still-open application. */
+async function recipientEligible(notice: NoticeForMail, family: string): Promise<boolean> {
+  if (!notice.emailVerified || !notice.notifEmail) return false;
+  if (notice.activo) return true;
+  if (family !== 'solicitudes' || notice.motivoInactividad !== 'PENDIENTE_APROBACION' || !notice.usuarioId) return false;
+  const { solicitudId } = JSON.parse(notice.datos!);
+  return Boolean(await prisma.solicitudInscripcion.findFirst({
+    where: { id: solicitudId, usuarioId: notice.usuarioId, estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA'] } },
+    select: { id: true },
+  }));
 }
 
 /** Eligibility can change while an item waits or retries; never send to an old address. */
@@ -19,13 +32,14 @@ export async function queuedNoticeStillEligible(queueId: string, recipient: stri
   if (!queueId.startsWith('notification:')) return true;
   const notice = await prisma.notificacion.findUnique({
     where: { id: queueId.slice('notification:'.length) },
-    include: { usuario: { select: { email: true, activo: true, emailVerified: true, notifEmail: true, rol: true } } },
+    include: { usuario: { select: { email: true, activo: true, motivoInactividad: true, emailVerified: true, notifEmail: true, rol: true } } },
   });
   if (!notice?.usuario) return false;
   const user = notice.usuario;
-  if (!user.activo || !user.emailVerified || !user.notifEmail || user.email.toLowerCase() !== recipient.toLowerCase()) return false;
+  if (user.email.toLowerCase() !== recipient.toLowerCase()) return false;
   const content = notificationMailContent({ ...notice, ...user });
   if (!content || !enabledFamilies().includes(content.family)) return false;
+  if (!await recipientEligible({ ...notice, ...user }, content.family)) return false;
   if (content.family === 'inspecciones') {
     const { inspeccionId } = JSON.parse(notice.datos!);
     const inspection = await prisma.inspeccion.findUnique({ where: { id: inspeccionId }, select: { numeroActa: true } });
@@ -57,7 +71,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
   if (!policy.enabled || !families.length) return 0;
   // LEFT JOIN prevents repeated scans of already processed IDs, including suppressed recipients.
   const notices = await prisma.$queryRawUnsafe<NoticeForMail[]>(`
-    SELECT n.id, n.tipo, n.datos, n."createdAt", u.email, u.activo, u."emailVerified", u."notifEmail", u.rol
+    SELECT n.id, n.tipo, n.datos, n."createdAt", n."usuarioId", u.email, u.activo, u."motivoInactividad", u."emailVerified", u."notifEmail", u.rol
     FROM notificaciones n JOIN usuarios u ON u.id = n."usuarioId"
     LEFT JOIN email_queue q ON q.id = 'notification:' || n.id
     WHERE q.id IS NULL AND n."createdAt" >= $1
@@ -74,8 +88,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
       const inspection = await prisma.inspeccion.findUnique({ where: { id: inspeccionId }, select: { numeroActa: true } });
       trainingOrMissing = !inspection || /^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || '');
     }
-    const eligible = content && families.includes(content.family) && !trainingOrMissing && notice.activo && notice.emailVerified && notice.notifEmail;
-    // Inactive applicants are deliberately not silently treated as active; activation policy must distinguish suspension first.
+    const eligible = content && families.includes(content.family) && !trainingOrMissing && await recipientEligible(notice, content.family);
     const result = await prisma.emailQueue.createMany({ skipDuplicates: true, data: [{
       id: 'notification:' + notice.id, to: notice.email,
       subject: content?.subject || '[SITREP] Aviso no habilitado', html: content?.html || '',
