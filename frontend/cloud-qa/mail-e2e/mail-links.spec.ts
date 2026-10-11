@@ -133,7 +133,10 @@ test('public email verification preserves a local draft through real login and r
   await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + '/inscripcion/generador');
+  const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+  if (await welcome.isVisible()) await welcome.click();
   await expect(page.getByPlaceholder('Empresa S.A.')).toHaveValue('QA edición local sin perder');
+  await page.getByPlaceholder('Empresa S.A.').click({ trial: true });
   expect(await page.evaluate(() => localStorage.getItem('qa-unrelated-draft'))).toBe('Do not remove');
   await page.screenshot({ path: info.outputPath('verification-draft-recovered.png') });
   expect(errors).toEqual([]);
@@ -144,11 +147,14 @@ test('verifying another email does not replace a signed-in account or delete its
   await page.goto(prefix(info) + '/manifiestos');
   await signInAtDestination(page, 'generador');
   await expect(page).toHaveURL(/\/manifiestos$/);
+  const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+  if (await welcome.isVisible()) await welcome.click();
   const before = await page.evaluate(() => { localStorage.setItem('qa-existing-draft', 'Keep current form'); return localStorage.getItem('sitrep_access_token'); });
   await page.goto(prefix(info) + '/verificar-email?token=' + item.token);
   await expect(page.getByRole('heading', { name: 'Email verificado' })).toBeVisible();
   await expect(page.getByRole('status')).toContainText('otra cuenta');
   await expect(page.getByRole('link', { name: 'Volver a mi sesión' })).toBeVisible();
+  await page.getByRole('link', { name: 'Volver a mi sesión' }).click({ trial: true });
   expect(await page.evaluate(() => localStorage.getItem('sitrep_access_token'))).toBe(before);
   expect(await page.evaluate(() => localStorage.getItem('qa-existing-draft'))).toBe('Keep current form');
   const profile = await page.request.get('/api/auth/profile', { headers: { Authorization: 'Bearer ' + before } });
@@ -167,6 +173,9 @@ test('email opened in a clean browser recovers only the server-saved application
   await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + '/inscripcion/generador');
+  const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+  if (await welcome.isVisible()) await welcome.click();
   await expect(page.getByPlaceholder('Empresa S.A.')).toHaveValue('QA borrador guardado en SITREP');
+  await page.getByPlaceholder('Empresa S.A.').click({ trial: true });
   await page.screenshot({ path: info.outputPath('verification-server-draft.png') });
 });
