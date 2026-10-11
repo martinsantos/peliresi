@@ -37,13 +37,13 @@ function inputBody(req: AuthRequest) {
 function checkHash(old: { huella: string }, fingerprint: string) {
   if (old.huella !== fingerprint) throw new AppError('La clave de envío ya se usó para otro contenido', 409);
 }
-async function notices(db: Db, ticket: { id: string; numero: number }, recipients: string[], actorId: string, title: string) {
+async function notices(db: Db, ticket: { id: string; numero: number }, recipients: string[], actorId: string, title: string, evento = 'ACTUALIZACION') {
   const ids = Array.from(new Set(recipients)).filter(id => id !== actorId);
   if (!ids.length) return;
   // Deliberately direct durable in-app writes. No dispatcher, SMTP, push or jobs.
   await db.notificacion.createMany({ data: ids.map(usuarioId => ({ usuarioId, tipo: 'INFO_GENERAL', titulo: title,
     mensaje: supportNumber(ticket.numero) + ' · Consultá el ticket en Soporte.',
-    datos: JSON.stringify({ tipo: 'soporte', ticketId: ticket.id, ruta: '/soporte/' + ticket.id }), prioridad: 'NORMAL' })) });
+    datos: JSON.stringify({ tipo: 'soporte', evento, interno: evento === 'NOTA' || evento === 'CLASIFICAR', ticketId: ticket.id, ruta: '/soporte/' + ticket.id }), prioridad: 'NORMAL' })) });
 }
 async function team(db: Db = prisma) {
   // Directory is staff-only. Keep the public ticket/author projection unchanged.
@@ -166,8 +166,8 @@ export async function crearTicket(req: AuthRequest, res: Response, next: NextFun
         const ticket = await db.ticketSoporte.create({ data: { autorId: req.user.id, registradoPorId: req.user.impersonatedBy?.id || null, clienteId, huella, asunto: payload.asunto, categoria: payload.categoria, contexto: payload.contexto } });
         await db.mensajeSoporte.create({ data: { ticketId: ticket.id, autorId: operatorId, cuerpo: payload.descripcion,
           adjuntos: { create: stored } } });
-        await notices(db, ticket, (await team(db)).map(user => user.id), operatorId, 'Nuevo ticket de soporte');
-        if (req.user.impersonatedBy) await notices(db, ticket, [req.user.id], operatorId, 'Ticket registrado a tu nombre');
+        await notices(db, ticket, (await team(db)).map(user => user.id), operatorId, 'Nuevo ticket de soporte', 'CREADO');
+        if (req.user.impersonatedBy) await notices(db, ticket, [req.user.id], operatorId, 'Ticket registrado a tu nombre', 'EN_NOMBRE');
         return ticket;
       });
       committed = true;
@@ -264,7 +264,7 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
           ...(input.accion === 'DERIVAR' ? { desde: ticket.responsable?.nombre || 'Sin asignar', hacia: (await db.usuario.findUnique({ where: { id: responsableId! }, select: userSelect }))?.nombre || 'Responsable' } : {}) } } });
       const recipients = internal ? [responsableId].filter((id): id is string => !!id) : [ticket.autorId, responsableId].filter((id): id is string => !!id);
       if (own && !responsableId && !internal) recipients.push(...(await team(db)).map(user => user.id));
-      await notices(db, ticket, recipients, req.user.id, input.accion === 'DERIVAR' ? 'Ticket derivado a tu atención' : 'Actualización de soporte');
+      await notices(db, ticket, recipients, req.user.id, input.accion === 'DERIVAR' ? 'Ticket derivado a tu atención' : 'Actualización de soporte', input.accion);
       return { id: ticket.id, version: updated.version, replay: false };
     });
     committed = !result.replay;

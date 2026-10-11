@@ -15,7 +15,7 @@ import { postLoginDestination } from './utils/authRedirect';
 
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
-  LoginPage, ReclamarCuentaPage, RegistroPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
+  LoginPage, ReclamarCuentaPage, RegistroPage, VerificarEmailPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
   MobileDashboardPage, CentroControlPage, WarRoomPage,
   InspeccionesPage, InspeccionDetallePage,
   InspeccionadoParticipacionPage,
@@ -83,7 +83,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
+  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
@@ -130,6 +130,7 @@ function AppMobile() {
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
           <Route element={<AuthLayout />}>
             <Route path="/registro" element={<RegistroPage />} />
+            <Route path="/verificar-email" element={<VerificarEmailPage />} />
             <Route path="/recuperar" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
           </Route>

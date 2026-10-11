@@ -3,6 +3,7 @@ import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 import { loadSeed } from './load-seed.ts';
+import { createHash } from 'node:crypto';
 await assertCloudDatabase();
 const fixture = await loadSeed().seedNightDatabase();
 const { PrismaClient } = backendRequire('@prisma/client');
@@ -64,5 +65,21 @@ try {
     ...renderMail(id, { name: 'Persona de capacitación', role: 'Generador', message: 'Revisá el domicilio del establecimiento.', token: 'solo-qa-sin-validez' }),
   }));
   templates.push(...['created', 'enabled', 'disabled', 'deleted', 'roleChanged', 'emailChanged', 'passwordChanged'].map(id => ({ id: 'account-' + id, ...renderAccountMail(id) })));
-  await writeFile(path.join(output, 'mail-fixture.json'), JSON.stringify({ mails, templates, ticketId: ticket.id, database: 'sitrep_night_qa_20260926', externalDelivery: false }));
+  templates.push(...mails.map(item => ({ id: 'notice-' + item.id, subject: item.subject, html: item.html })));
+  const verifications: Record<string, unknown> = {};
+  for (const project of ['web-desktop', 'web-responsive', 'app']) {
+    const pairs = [];
+    for (const kind of ['anonymous', 'other-session']) {
+      const token = `synthetic-verification-${project}-${kind}`;
+      const email = `verify-${project}-${kind}@night-qa.invalid`;
+      const user = await db.usuario.create({ data: { email, nombre: 'QA verificación y borrador', password: seedUser.password,
+        rol: 'GENERADOR', activo: false, motivoInactividad: 'PENDIENTE_APROBACION', emailVerified: false,
+        emailVerificationToken: createHash('sha256').update(token).digest('hex') } });
+      const draft = await db.solicitudInscripcion.create({ data: { usuarioId: user.id, tipoActor: 'GENERADOR', estado: 'BORRADOR',
+        datosActor: JSON.stringify({ razonSocial: 'QA borrador guardado en SITREP', domicilio: 'QA domicilio conservado', telefono: '02615550101' }) } });
+      pairs.push({ token, email, userId: user.id, draftId: draft.id, revision: draft.updatedAt.toISOString() });
+    }
+    verifications[project] = pairs;
+  }
+  await writeFile(path.join(output, 'mail-fixture.json'), JSON.stringify({ mails, templates, verifications, ticketId: ticket.id, database: 'sitrep_night_qa_20260926', externalDelivery: false }));
 } finally { await db.$disconnect(); }

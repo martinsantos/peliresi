@@ -12,6 +12,23 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each(['SOLICITUD_ENVIADA', 'SOLICITUD_OBSERVADA', 'SOLICITUD_MENSAJE', 'SOLICITUD_APROBADA', 'SOLICITUD_RECHAZADA'])('names the actual application event %s without private text', tipo => {
+    const rendered = notificationMailContent({ ...notice, tipo, datos: JSON.stringify({ solicitudId: 'sol-qa', mensaje: 'PRIVATE DO NOT COPY' }) })!;
+    expect(rendered.subject).not.toContain('Novedad');
+    expect(rendered.html).toContain('Abrir inscripción');
+    expect(rendered.html).toContain('Gobierno de Mendoza');
+    expect(rendered.html).not.toContain('PRIVATE DO NOT COPY');
+  });
+  it.each(['CREADO', 'EN_NOMBRE', 'RESPONDER', 'DERIVAR', 'TOMAR', 'ESPERAR', 'CERRAR', 'REABRIR'])('names support event %s without exposing its content', evento => {
+    const rendered = notificationMailContent({ ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'soporte', ticketId: 'ticket', evento, cuerpo: 'PRIVATE' }) })!;
+    expect(rendered.subject).not.toContain('Actualización');
+    expect(rendered.html).toContain('Abrir ticket');
+    expect(rendered.html).not.toContain('PRIVATE');
+  });
+  it('uses a safe fallback for unknown events and excludes internal support notices', () => {
+    expect(notificationMailContent({ ...notice, tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"ticket","evento":"__proto__"}' })?.subject).toBe('[SITREP] Actualización en tu ticket de soporte');
+    expect(notificationMailContent({ ...notice, tipo: 'INFO_GENERAL', datos: '{"tipo":"soporte","ticketId":"ticket","evento":"NOTA","interno":true}' })).toBeNull();
+  });
   it('includes actionable closure follow-up and rechecks its case and manifest', async () => {
     vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'alertas');
     const followup = { ...notice, usuarioId: 'owner', tipo: 'INFO_GENERAL', manifiestoId: 'manifest', datos: '{"tipo":"seguimiento_cierre","casoId":"case"}' };

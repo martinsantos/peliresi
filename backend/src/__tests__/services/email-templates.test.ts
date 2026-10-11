@@ -6,9 +6,12 @@ afterEach(() => vi.unstubAllEnvs());
 describe('mail template catalogue', () => {
   it.each<MailTemplateId>(['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'])('%s has useful safe HTML, text and no interpolated subject', id => {
     const mail = renderMail(id, { name: '<img src=x onerror=bad>', role: '<admin>', message: '<script>bad()</script>\nCorregir domicilio', token: 'a"&b#c' });
-    expect(mail.version).toBe('20261011.1');
+    expect(mail.version).toBe('20261011.2');
     expect(mail.html).toContain('lang="es"');
-    expect(mail.html).not.toContain('<img');
+    expect(mail.html.match(/<img /g)).toHaveLength(1);
+    expect(mail.html).toContain('alt="Gobierno de Mendoza"');
+    expect(mail.html).toContain('/mendoza-marca-horizontal-transparente.png');
+    expect(mail.html).not.toContain('<img src=x');
     expect(mail.html).not.toContain('<script');
     expect(mail.html).toContain('&lt;admin&gt;');
     expect(mail.text).toContain('Corregir domicilio');

@@ -4,7 +4,7 @@
  */
 import prisma from '../lib/prisma';
 import { mailPolicy } from './email-policy';
-import { escapeMail, mailLink, mailShell } from './email-templates';
+import { escapeMail, mailAction, mailShell } from './email-templates';
 import { isFullAccess } from '../utils/roleFilter';
 
 export type NoticeForMail = {
@@ -111,9 +111,54 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   } else if (notice.tipo === 'INFO_GENERAL' && typeof data.inspeccionId === 'string' && data.inspeccionId) {
     family = 'inspecciones'; title = 'Novedad en una inspección'; path = '/inspecciones/' + encodeURIComponent(data.inspeccionId);
   } else return null;
-  // Do not embed free text, internal notes, attachments, identity data or amounts in email.
-  const link = escapeMail(mailLink(path));
-  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px">${title}</h1><p>Tenés una actualización disponible. Ingresá con tu cuenta para revisarla.</p><p><a href="${link}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:8px">Ver en SITREP</a></p><p style="word-break:break-all;font-size:12px">${link}</p>`) };
+  // Only controlled event labels. Never copy free text, notes, attachments or amounts.
+  const labels: Record<string, [string, string]> = {
+    SOLICITUD_ENVIADA: ['Inscripción presentada para revisar', 'Hay una inscripción presentada. Revisá sus datos y documentación en SITREP.'],
+    SOLICITUD_OBSERVADA: ['La inscripción tiene observaciones', 'Revisá las observaciones y la documentación solicitada en el trámite.'],
+    SOLICITUD_MENSAJE: ['Nuevo mensaje en la inscripción', 'Hay un mensaje nuevo en el trámite. Abrilo para leerlo y responder.'],
+    SOLICITUD_APROBADA: ['Inscripción aprobada', 'La administración aprobó la inscripción. Consultá el resultado en el trámite.'],
+    SOLICITUD_RECHAZADA: ['Inscripción rechazada', 'Consultá el motivo de la resolución en el trámite.'],
+    MODIFICACION_SOLICITADA: ['Cambio de padrón pendiente de revisión', 'Hay una modificación de datos para revisar.'],
+    MODIFICACION_APROBADA: ['Cambio de padrón aprobado', 'La modificación fue aprobada. Consultá la resolución en tus avisos.'],
+    MODIFICACION_RECHAZADA: ['Cambio de padrón rechazado', 'Revisá el motivo de la resolución en tus avisos.'],
+    MANIFIESTO_FIRMADO: ['Manifiesto firmado', 'El manifiesto fue firmado. Revisá su estado y las acciones disponibles para tu perfil.'],
+    MANIFIESTO_EN_TRANSITO: ['Manifiesto en tránsito', 'El retiro fue confirmado. Podés consultar el seguimiento del viaje.'],
+    MANIFIESTO_ENTREGADO: ['Carga entregada', 'La entrega fue registrada. Revisá la recepción y las acciones disponibles en el manifiesto.'],
+    MANIFIESTO_RECIBIDO: ['Carga recibida', 'La recepción fue registrada. Consultá el manifiesto para seguir el tratamiento.'],
+    MANIFIESTO_TRATADO: ['Tratamiento finalizado', 'El manifiesto fue cerrado como tratado. Podés consultar su certificado de disposición.'],
+    MANIFIESTO_RECHAZADO: ['Carga rechazada', 'Se registró un rechazo de carga. Revisá el motivo y su seguimiento en el manifiesto.'],
+    INCIDENTE_REPORTADO: ['Incidente reportado', 'Revisá el incidente y su seguimiento en SITREP.'],
+    ANOMALIA_DETECTADA: ['Anomalía detectada', 'Hay una anomalía para revisar. Consultá los datos antes de tomar una decisión.'],
+    VENCIMIENTO_PROXIMO: ['Vencimiento próximo', 'Revisá qué documento vence y la fecha indicada en tus avisos.'],
+    ALERTA_SISTEMA: ['Alerta para revisar', 'Hay una alerta para tu perfil. Consultá su causa y el seguimiento requerido.'],
+  };
+  const families: Record<string, [string, string, string]> = {
+    solicitudes: ['Novedad en la inscripción', 'Revisá el estado y los mensajes del trámite.', 'Abrir inscripción'],
+    soporte: ['Actualización en tu ticket de soporte', 'Revisá la actividad del ticket. Podés responder dentro de SITREP; las notas internas no se incluyen en este correo.', 'Abrir ticket'],
+    inspecciones: ['Actualización de inspección', 'Revisá la agenda, los controles y las acciones pendientes en el expediente.', 'Abrir inspección'],
+    certificados: ['Certificado ambiental disponible', 'El certificado oficial está disponible en tu perfil. Ingresá para consultarlo o descargarlo.', 'Ver certificado'],
+    manifiestos: ['Novedad en el manifiesto', 'Revisá el estado y las acciones disponibles para tu perfil.', 'Abrir manifiesto'],
+    alertas: ['Aviso de seguimiento', 'Revisá la causa del aviso y su seguimiento en SITREP.', 'Revisar aviso'],
+    padron: ['Novedad en el padrón', 'Revisá la resolución de la modificación de datos.', 'Revisar modificación'],
+  };
+  const fallback = families[family];
+  const supportEvents: Record<string, [string, string]> = {
+    CREADO: ['Nuevo ticket de soporte', 'Hay un reporte nuevo para atender. Abrí el ticket para tomarlo o derivarlo.'],
+    EN_NOMBRE: ['Registraron un ticket a tu nombre', 'El equipo registró tu consulta. Podés seguirla y responder dentro del ticket.'],
+    RESPONDER: ['Nueva respuesta en el ticket', 'Hay una respuesta nueva. Abrí el ticket para leerla y continuar la conversación.'],
+    DERIVAR: ['Ticket derivado', 'Se derivó la atención del ticket. Consultá quién lo atiende y los próximos pasos.'],
+    TOMAR: ['El ticket tiene responsable', 'Se asignó un responsable para atender el ticket. Podés consultar su seguimiento.'],
+    ESPERAR: ['Ticket en espera', 'El ticket pasó a espera. Revisá qué información o acción falta para continuar.'],
+    CERRAR: ['Ticket cerrado', 'El ticket fue cerrado. Consultá la respuesta y el motivo del cierre.'],
+    REABRIR: ['Ticket reabierto', 'El ticket volvió a estar abierto. Consultá la conversación para continuar su atención.'],
+    CLASIFICAR: ['Clasificación del ticket actualizada', 'Se actualizó la clasificación del ticket. Revisá su seguimiento.'],
+  };
+  const event = typeof data.evento === 'string' ? data.evento : '';
+  const message = family === 'soporte' && Object.prototype.hasOwnProperty.call(supportEvents, event) ? supportEvents[event]
+    : family === 'inspecciones' && event === 'ASIGNADA' ? ['Tenés una inspección asignada', 'Revisá la ubicación, la agenda y los controles antes de iniciar la visita.']
+    : labels[notice.tipo] || fallback;
+  title = message[0];
+  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">${escapeMail(title)}</h1><p>${escapeMail(message[1])}</p>${mailAction(path, fallback[2])}<p style="font-size:13px;color:#526359;margin-top:20px">Ingresá con tu cuenta para ver los detalles.</p>`) };
 }
 
 export async function queueCommittedNotificationEmails(): Promise<number> {

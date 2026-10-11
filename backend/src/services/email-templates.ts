@@ -1,4 +1,4 @@
-export const MAIL_TEMPLATE_VERSION = '20261011.1';
+export const MAIL_TEMPLATE_VERSION = '20261011.2';
 export function escapeMail(value: string): string {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 }
@@ -14,19 +14,26 @@ export function mailLink(path: string, origin = process.env.FRONTEND_URL || 'htt
 /** Conversion of our controlled HTML only; not a general-purpose HTML sanitizer. */
 export function mailText(html: string): string {
   return html.replace(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '$2 ($1)')
-    .replace(/<\/(?:p|h[1-6]|div|li|ul)>|<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/(?:p|h[1-6]|div|li|ul|td|tr)>|<br\s*\/?\s*>/gi, '\n')
     .replace(/<[^>]*>/g, '').replace(/&(?:amp|lt|gt|quot|#39);/g, entity => ({ '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" }[entity]!))
     .replace(/[ \t]+/g, ' ').replace(/\n\s*\n/g, '\n\n').trim();
 }
 
 export function mailShell(content: string): string {
+  const logo = escapeMail(mailLink('/mendoza-marca-horizontal-transparente.png'));
   return `<!doctype html><!-- SITREP mail template ${MAIL_TEMPLATE_VERSION} --><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="margin:0;background:#f3f6f4;color:#172c24;font:16px/1.55 Arial,sans-serif">
-<div style="max-width:600px;margin:0 auto;padding:16px">
-<div style="background:#1B5E3C;color:#ffffff;padding:20px 24px;border-radius:8px 8px 0 0"><strong style="color:#ffffff;font-size:20px">SITREP</strong><br><span style="color:#ffffff;font-size:13px">Trazabilidad de Residuos Peligrosos</span></div>
-<div style="padding:24px;background:#ffffff;border:1px solid #dce5df;border-radius:0 0 8px 8px;overflow-wrap:anywhere">${content}
-<hr style="border:0;border-top:1px solid #dce5df;margin:24px 0"><p style="font-size:12px;color:#526359">Provincia de Mendoza — Dirección General de Fiscalización Ambiental<br>Este aviso informativo no reemplaza las notificaciones formales del trámite.</p></div>
-</div></body></html>`;
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:16px 8px">
+<table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #dce5df;border-radius:10px">
+<tr><td style="padding:24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td><img src="${logo}" width="146" height="47" alt="Gobierno de Mendoza" style="display:block;width:146px;height:47px;color:#174a7e;font-size:12px"></td><td align="right" style="color:#1B5E3C;font-size:22px;font-weight:bold">SITREP</td></tr></table></td></tr>
+<tr><td style="background:#1B5E3C;color:#ffffff;padding:10px 24px;font-size:13px">Trazabilidad de Residuos Peligrosos</td></tr>
+<tr><td style="padding:24px;overflow-wrap:anywhere">${content}</td></tr>
+<tr><td style="padding:20px 24px;border-top:1px solid #dce5df;font-size:12px;line-height:1.6;color:#526359">Provincia de Mendoza<br>Dirección General de Fiscalización Ambiental<p style="margin:12px 0 0">Este aviso informativo no reemplaza las notificaciones formales del trámite.</p></td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+export function mailAction(path: string, label: string): string {
+  return `<p style="margin:24px 0 8px"><a href="${escapeMail(mailLink(path))}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;line-height:24px">${escapeMail(label)}</a></p>`;
 }
 
 export type MailTemplateId = 'verify' | 'pending' | 'approved' | 'newAccount' | 'reset' | 'application' | 'observed' | 'response' | 'rejected' | 'modification' | 'modificationApproved' | 'modificationRejected';

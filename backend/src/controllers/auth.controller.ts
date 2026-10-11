@@ -214,7 +214,15 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
       });
     } catch { /* ignore audit errors */ }
 
-    res.json({ success: true, message: 'Email verificado. Tu cuenta está pendiente de aprobación del administrador.' });
+    const application = await prisma.solicitudInscripcion.findFirst({
+      where: { usuarioId: user.id }, orderBy: { createdAt: 'desc' },
+      select: { tipoActor: true, estado: true },
+    });
+    const nextPath = application && ['BORRADOR', 'OBSERVADA'].includes(application.estado)
+      ? `/inscripcion/${application.tipoActor.toLowerCase()}` : application ? '/mi-solicitud' : '/dashboard';
+    // Navigation only: verification never creates/replaces a login session.
+    res.json({ success: true, message: application ? 'Tu correo quedó verificado. Podés continuar con tu inscripción.' : 'Email verificado. Tu cuenta está pendiente de aprobación del administrador.',
+      verifiedUserId: user.id, nextPath });
   } catch (error) {
     next(error);
   }

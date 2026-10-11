@@ -24,7 +24,7 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.setContent(item.html);
-  const action = page.getByRole('link', { name: 'Ver en SITREP', exact: true });
+  const action = page.getByRole('link').first();
   const href = await action.getAttribute('href');
   expect(new URL(href!).origin).toBe('http://127.0.0.1:4177');
   // Email actions are canonical web URLs. App proves the equivalent /app route,
@@ -86,11 +86,14 @@ test('forwarded support link does not reveal another actor ticket', async ({ pag
   await expect(page.getByRole('button', { name: 'Reintentar ticket', exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('denied-ticket.png'), animations: 'disabled' });
 });
-test('all nineteen templates fit the viewport with readable actions', async ({ page }, info) => {
-  expect(fixture.templates).toHaveLength(19);
+test('all templates and operational variants fit with institutional brand and readable actions', async ({ page }, info) => {
+  expect(fixture.templates).toHaveLength(30);
   for (const item of fixture.templates) {
     await page.setContent(item.html);
     await expect(page.locator('h1')).toBeVisible();
+    const logo = page.getByRole('img', { name: 'Gobierno de Mendoza' });
+    await expect(logo).toBeVisible();
+    await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), item.id).toBe(true);
     for (const link of await page.getByRole('link').all()) {
       expect(await link.evaluate(element => element.getBoundingClientRect().height), item.id).toBeGreaterThanOrEqual(44);
@@ -99,4 +102,52 @@ test('all nineteen templates fit the viewport with readable actions', async ({ p
     }
     await page.screenshot({ path: info.outputPath('template-' + item.id + '.png'), fullPage: true });
   }
+});
+
+test('public email verification preserves a local draft through real login and recovers the owned application', async ({ page }, info) => {
+  const item = fixture.verifications[info.project.name][0];
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(prefix(info) + '/login');
+  await page.evaluate(item => {
+    localStorage.setItem('qa-unrelated-draft', 'Do not remove');
+    localStorage.setItem(`sitrep-registration:v1:${encodeURIComponent(item.userId)}:${encodeURIComponent('public:GENERADOR:' + item.draftId)}`, JSON.stringify({
+      version: 1, owner: item.userId, scope: 'public:GENERADOR:' + item.draftId, savedAt: Date.now(),
+      data: { form: { razonSocial: 'QA edición local sin perder', domicilio: 'QA domicilio conservado', telefono: '02615550101' }, step: 1, serverRevision: item.revision },
+    }));
+  }, item);
+  const verified = page.waitForResponse(response => response.url().includes('/api/auth/verify-email?'));
+  await page.goto(prefix(info) + '/verificar-email?token=' + item.token);
+  expect((await verified).status()).toBe(200);
+  await expect(page.getByRole('heading', { name: 'Email verificado' })).toBeVisible();
+  await page.screenshot({ path: info.outputPath('verification-before-login.png') });
+  await page.getByRole('link', { name: 'Continuar en SITREP' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.reload(); // Browser history must preserve the protected destination.
+  await page.getByLabel('Correo electrónico o CUIT').fill(item.email);
+  await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + '/inscripcion/generador');
+  await expect(page.getByPlaceholder('Empresa S.A.')).toHaveValue('QA edición local sin perder');
+  expect(await page.evaluate(() => localStorage.getItem('qa-unrelated-draft'))).toBe('Do not remove');
+  await page.screenshot({ path: info.outputPath('verification-draft-recovered.png') });
+  expect(errors).toEqual([]);
+});
+
+test('verifying another email does not replace a signed-in account or delete its draft', async ({ page }, info) => {
+  const item = fixture.verifications[info.project.name][1];
+  await page.goto(prefix(info) + '/manifiestos');
+  await signInAtDestination(page, 'generador');
+  await expect(page).toHaveURL(/\/manifiestos$/);
+  const before = await page.evaluate(() => { localStorage.setItem('qa-existing-draft', 'Keep current form'); return localStorage.getItem('sitrep_access_token'); });
+  await page.goto(prefix(info) + '/verificar-email?token=' + item.token);
+  await expect(page.getByRole('heading', { name: 'Email verificado' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('otra cuenta');
+  await expect(page.getByRole('link', { name: 'Volver a mi sesión' })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('sitrep_access_token'))).toBe(before);
+  expect(await page.evaluate(() => localStorage.getItem('qa-existing-draft'))).toBe('Keep current form');
+  const profile = await page.request.get('/api/auth/profile', { headers: { Authorization: 'Bearer ' + before } });
+  expect(profile.status()).toBe(200);
+  expect((await profile.json()).data.user.email).toBe('generador@night-qa.invalid');
+  await page.screenshot({ path: info.outputPath('verification-another-account.png') });
 });

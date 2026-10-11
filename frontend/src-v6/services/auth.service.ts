@@ -42,9 +42,12 @@ export const authService = {
     return { message: data.message };
   },
 
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    const { data } = await api.get<{ success: true; message: string }>(`/auth/verify-email?token=${token}`);
-    return { message: data.message };
+  async verifyEmail(token: string): Promise<{ message: string; verifiedUserId?: string; nextPath?: string }> {
+    // Public one-time link: do not attach/refresh/clear an unrelated active session.
+    const { data } = await axios.get<{ success: true; message: string; verifiedUserId?: string; nextPath?: string }>('/auth/verify-email', {
+      baseURL: api.defaults.baseURL, timeout: api.defaults.timeout, params: { token },
+    });
+    return { message: data.message, verifiedUserId: data.verifiedUserId, nextPath: data.nextPath };
   },
 
   async forgotPassword(payload: { email?: string; cuit?: string }): Promise<void> {

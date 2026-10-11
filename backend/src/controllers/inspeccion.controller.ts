@@ -563,7 +563,7 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
         await tx.notificacion.create({ data: {
           usuarioId: inspectorId, tipo: 'INFO_GENERAL', titulo: `Inspección asignada · ${numero}`,
           mensaje: input.fechaProgramada ? 'Tiene una inspección programada. Revise la fecha y el expediente.' : 'Tiene una nueva inspección asignada.',
-          datos: JSON.stringify({ inspeccionId: inspection.id }),
+          datos: JSON.stringify({ inspeccionId: inspection.id, evento: 'ASIGNADA' }),
         } });
       }
       return inspection;
