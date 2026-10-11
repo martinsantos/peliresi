@@ -1,0 +1,37 @@
+name: SITREP Final URL Registration Proof
+on:
+  push:
+    branches: [codex/sitrep-production-forms-20261011]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sitrep-final-url-registration-20261011
+  cancel-in-progress: false
+jobs:
+  public-trials:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      NODE_OPTIONS: --max-old-space-size=1536
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+      - name: Cloud-only locked browser dependencies
+        run: npm ci --prefix frontend --ignore-scripts --no-audit --no-fund
+      - name: One cloud Chromium, no Android emulator or backend
+        working-directory: frontend
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Real public production URLs, throwaway storage, synthetic OCR only
+        run: node --experimental-strip-types frontend/cloud-qa/production-registration-proof.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-final-url-registration-proof
+          path: /tmp/sitrep-production-registration-proof/
+          retention-days: 3
+          if-no-files-found: error
