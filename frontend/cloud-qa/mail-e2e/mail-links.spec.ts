@@ -47,12 +47,15 @@ for (const item of fixture.mails) test(`mail destination survives login: ${item.
     await expect(page.getByRole('button', { name: 'Salir', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: /^(Manifiestos|Reportes|Avisos)$/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Notificaciones/ })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Mi solicitud', exact: true })).toBeInViewport({ ratio: 1 });
     await page.reload();
     await expect(page.getByText(item.visible, { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Mi solicitud', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Salir', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: /^(Manifiestos|Reportes|Avisos)$/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Notificaciones/ })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Mi solicitud', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole('button', { name: 'Salir', exact: true })).toBeInViewport({ ratio: 1 });
   }
   await expect(page).toHaveTitle(/SITREP/);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);

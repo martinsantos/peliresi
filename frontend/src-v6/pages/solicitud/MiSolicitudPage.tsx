@@ -50,7 +50,7 @@ const MiSolicitudPage: React.FC = () => {
   const navigate = useNavigate();
   const [replyText, setReplyText] = useState('');
   const [messageText, setMessageText] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesPanelRef = useRef<HTMLDivElement>(null);
 
   const { data: solicitudes, isLoading } = useMisSolicitudes();
   const solicitud = solicitudes?.[0] as SolicitudInscripcion | undefined;
@@ -60,7 +60,10 @@ const MiSolicitudPage: React.FC = () => {
   const enviarSolicitud = useEnviarSolicitud();
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Updating the conversation must not scroll the whole application past
+    // its heading and observations, especially when arriving from an email.
+    const panel = messagesPanelRef.current;
+    if (panel) panel.scrollTop = panel.scrollHeight;
   }, [mensajes]);
 
   // ── Handlers ──
@@ -276,7 +279,7 @@ const MiSolicitudPage: React.FC = () => {
           )}
         </div>
 
-        <div className="max-h-80 overflow-y-auto p-4 space-y-3">
+        <div ref={messagesPanelRef} role="region" aria-label="Mensajes de la solicitud" className="max-h-80 overflow-y-auto p-4 space-y-3">
           {(!mensajes || mensajes.length === 0) ? (
             <p className="text-center text-sm text-neutral-400 py-6">No hay mensajes aun</p>
           ) : (
@@ -307,7 +310,6 @@ const MiSolicitudPage: React.FC = () => {
               );
             })
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Compose */}
