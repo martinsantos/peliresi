@@ -5,9 +5,10 @@ const mocks = vi.hoisted(() => ({
   queue: { create: vi.fn(), update: vi.fn(), updateMany: vi.fn(), count: vi.fn(), findUnique: vi.fn(), findMany: vi.fn() },
   query: vi.fn(),
   manifest: vi.fn(),
+  user: vi.fn(),
 }));
 vi.mock('nodemailer', () => ({ default: { createTransport: () => ({ sendMail: mocks.sendMail }) } }));
-vi.mock('../../lib/prisma', () => ({ default: { emailQueue: mocks.queue, $queryRawUnsafe: mocks.query, manifiesto: { findUnique: mocks.manifest } } }));
+vi.mock('../../lib/prisma', () => ({ default: { emailQueue: mocks.queue, $queryRawUnsafe: mocks.query, manifiesto: { findUnique: mocks.manifest }, usuario: { findFirst: mocks.user } } }));
 vi.mock('../../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {
@@ -17,6 +18,7 @@ beforeEach(() => {
   vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', '');
   mocks.queue.create.mockImplementation(async ({ data }) => ({ id: 'qa-mail', createdAt: new Date(), intentos: 0, maxIntentos: 3, ...data }));
   mocks.queue.count.mockResolvedValue(0);
+  mocks.user.mockResolvedValue(null);
   mocks.queue.update.mockResolvedValue({});
   mocks.queue.updateMany.mockResolvedValue({ count: 1 });
   mocks.queue.findMany.mockResolvedValue([]);
@@ -74,6 +76,15 @@ describe('SMTP receipt and retry safety (mock provider only)', () => {
     await emailService.sendPasswordResetEmail('qa@example.invalid', 'QA', 'synthetic-token');
     expect(mocks.sendMail).toHaveBeenCalledTimes(1);
     expect(mocks.queue.count).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ NOT: { id: { startsWith: 'notification:' } } }) }));
+  });
+  it('does not let an individually approved legacy address bypass registered-user eligibility', async () => {
+    vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ENABLED', 'true');
+    vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ALLOWLIST', 'qa@example.invalid');
+    mocks.user.mockResolvedValue({ id: 'registered-user' });
+    const { emailService } = await import('../../services/email.service');
+    await emailService.sendAlertEmail(['qa@example.invalid'], { nombre: 'QA' }, null, {});
+    expect(mocks.queue.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ estado: 'SUPRIMIDO', error: 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED', digestKey: null }) }));
+    expect(mocks.sendMail).not.toHaveBeenCalled();
   });
   it('does not send a retry already claimed by another worker', async () => {
     mocks.query.mockResolvedValueOnce([{ id: 'qa-mail' }]);

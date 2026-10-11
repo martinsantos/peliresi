@@ -147,8 +147,15 @@ async function enqueueTransaccional(
   }
 }
 
+async function externalRecipientStillAllowed(to: string): Promise<boolean> {
+  if (!externalAlertRecipientAllowed(to)) return false;
+  // Registered users use the verified relay. A legacy address must not bypass
+  // suspension, email verification, preferences or actor permissions.
+  return !await prisma.usuario.findFirst({ where: { email: { equals: to, mode: 'insensitive' } }, select: { id: true } });
+}
+
 async function enqueueAlerta(to: string, subject: string, html: string): Promise<void> {
-  const suppressed = DISABLE_EMAILS || !externalAlertRecipientAllowed(to);
+  const suppressed = DISABLE_EMAILS || !await externalRecipientStillAllowed(to);
   await prisma.emailQueue.create({
     data: {
       to,
@@ -269,7 +276,7 @@ export async function flushEmailQueue(): Promise<void> {
 
       const ids = items.map(i => i.id);
 
-      if (!externalAlertRecipientAllowed(to)) {
+      if (!await externalRecipientStillAllowed(to)) {
         await prisma.emailQueue.updateMany({ where: { id: { in: ids } },
           data: { estado: 'SUPRIMIDO', error: 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED', nextRetryAt: null } });
         continue;

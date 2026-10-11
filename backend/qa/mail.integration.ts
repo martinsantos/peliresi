@@ -252,6 +252,12 @@ if (process.argv[2] === 'worker') {
     process.env.EMAIL_EXTERNAL_ALERTS_ALLOWLIST = 'approved-external@qa.invalid';
     await worker(); assert.equal(messages.length, externalBaseline + 1);
     checks.push('individual external approval is rechecked at delivery; revoked queued digest is suppressed and not replayed by reapproval');
+    await quotaService.emailService.sendAlertEmail(['approved-external@qa.invalid'], { nombre: 'QA registered after enqueue' }, null, {});
+    await prisma.usuario.create({ data: { nombre: 'QA no bypass', email: 'approved-external@qa.invalid', password: 'not-a-login', rol: 'GENERADOR', activo: false, motivoInactividad: 'SUSPENDIDA', emailVerified: false, notifEmail: false } });
+    await worker(); assert.equal(messages.length, externalBaseline + 1);
+    await quotaService.emailService.sendAlertEmail(['approved-external@qa.invalid'], { nombre: 'QA registered before enqueue' }, null, {});
+    assert.equal(await prisma.emailQueue.count({ where: { to: 'approved-external@qa.invalid', estado: 'SUPRIMIDO', error: 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED' } }), 3);
+    checks.push('external channel cannot bypass a registered account: suspension, verification and preference gates remain under the user relay, including registration after enqueue');
     writeFileSync('/tmp/sitrep-mail-integration.json', JSON.stringify({ passed: true, checks, smtpMessages: messages.length, externalRecipients: 0, database: url.pathname, deployment: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks, smtpMessages: messages.length }));
   } finally {
