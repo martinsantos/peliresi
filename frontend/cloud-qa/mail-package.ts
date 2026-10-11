@@ -35,9 +35,9 @@ if (mode === 'freeze') {
 } else {
   assert.deepEqual(snapshot, read('mail-build-frozen.json'), 'No rebuild or modified bytes after HTTP/E2E');
   const unit = read('frontend-unit.json'), http = read('account-mail-http.json'), e2e = read('e2e.json');
-  assert.equal(unit.numPassedTests, 1395); assert.equal(unit.numFailedTests + unit.numPendingTests, 0);
+  assert.equal(unit.numPassedTests, 1396); assert.equal(unit.numFailedTests + unit.numPendingTests, 0);
   assert.equal(http.passed, true); assert.equal(http.smtpEnabled, false); assert.equal(http.checks.length, 8);
-  assert.equal(e2e.stats.expected, 90); assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
+  assert.equal(e2e.stats.expected, 96); assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   const archives = [];
   for (const [name, directory, files] of [['frontend', 'frontend', front], ['backend', 'backend', back]] as const) {
     const archive = `mail-tested-${name}.tar.gz`;
@@ -46,7 +46,7 @@ if (mode === 'freeze') {
   }
   const sourceHashes = ['package.json', 'package-lock.json', 'prisma/schema.prisma'].map(file => ({ file, sha256: hash(path.join(root, 'backend', file)) }));
   writeFileSync(path.join(output, 'mail-tested-build.json'), JSON.stringify({ ...snapshot, archives, sourceHashes,
-    frontendUnits: 1395, httpGroups: 8, e2e: e2e.stats, builtInCloud: true, rebuiltAfterTesting: false,
+    frontendUnits: 1396, httpGroups: 8, e2e: e2e.stats, builtInCloud: true, rebuiltAfterTesting: false,
     containsEnvironment: false, containsUploads: false, containsDependencies: 'prisma-client-only', deployment: false }, null, 2), { flag: 'wx' });
 }
 console.log(`Mail release ${mode}: exact byte inventories recorded; no production access`);

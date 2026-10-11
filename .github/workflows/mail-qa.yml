@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      design_review:
+        description: Targeted identity/header regression only; no release package or deployment
+        type: boolean
+        default: false
       final_go:
         description: Published authenticated web/app and Android gates; temporary QA only, no deployment
         type: boolean
@@ -151,10 +155,15 @@ jobs:
           npx --no-install prisma generate
           npm run build
           cd ../frontend
-          npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          if test '${{ inputs.design_review }}' = true; then
+            npm test -- src-v6/__tests__/components/InspectionBrand.test.tsx src-v6/__tests__/pages/ActorIdentity.test.tsx src-v6/__tests__/pages/VerificarEmail.test.tsx --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          else
+            npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          fi
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
       - name: Freeze release bytes before real HTTP and E2E
+        if: ${{ !inputs.design_review }}
         run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts freeze
       - name: Synthetic PostgreSQL on VM loopback
         run: |
@@ -171,8 +180,14 @@ jobs:
         run: node --experimental-strip-types frontend/cloud-qa/account-mail-http.ts
       - name: Real login and destinations, desktop and mobile web and app, one browser worker
         working-directory: frontend
-        run: npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
+        run: |
+          if test '${{ inputs.design_review }}' = true; then
+            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'brand|all templates|verification|verifying'
+          else
+            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
+          fi
       - name: Package the exact tested bytes, no rebuild or deployment
+        if: ${{ !inputs.design_review }}
         run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts package
       - name: Stop only this QA runtime
         if: always()

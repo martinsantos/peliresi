@@ -4,6 +4,23 @@ import { test, expect } from '@playwright/test';
 import { MapCategorySymbol, type MapCategory } from '../../src-v6/components/ui/MapLayerToggle';
 import { prefix } from '../e2e/helpers';
 
+test('public inspection masthead uses the same brand and keeps the invalid-code recovery actionable', async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(prefix(info) + '/verificar/inspecciones/qa-brand-invalid');
+  await expect(page.getByRole('heading', { name: 'Código no válido' })).toBeVisible();
+  const mark = page.locator('[data-sitrep-mark]');
+  await expect(mark).toHaveAttribute('src', prefix(info) + '/favicon.svg');
+  await expect.poll(() => mark.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.locator('.lucide-leaf')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ir a SITREP' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: info.outputPath('brand-inspection.png'), fullPage: true });
+  await page.getByRole('link', { name: 'Ir a SITREP' }).click();
+  await expect(page).not.toHaveURL(/qa-brand-invalid/);
+  expect(errors).toEqual([]);
+});
+
 test('brand is legible at small sizes and belongs to the real actor icon family', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
