@@ -1,5 +1,16 @@
 # Correos SITREP — corte verificable del 11/10/2026
 
+## Estado vigente — publicado y comprobado, correos apagados
+
+Release `20261011-mail-safety-r1`, producto `dc7e521`, activada el 11/10 a
+las 20:22:50 UTC. Repetición completa aprobada: 901 unit backend, 1380 frontend,
+17 grupos DB/SMTP, ocho HTTP y 81 E2E. Binarios exactos publicados sin rebuild.
+Comprobación adicional de URL final: 314 hashes, ocho rutas SPA, cuatro
+fronteras 401 y 12 grupos browser públicos en escritorio/responsive/app.
+Backup y versión anterior conservados; dos procesos online, email/push apagados.
+Ver [cierre, capturas, rollback y límites](DEPLOY-CORREOS-20261011.md).
+Las menciones «no publicado» siguientes son históricas del corte previo.
+
 ## Cierre ampliado — candidato 32e32c4, GO del bloque en QA
 
 Producto `32e32c498bd3bb0afa0c7cdf14fcc22c070a852a` en

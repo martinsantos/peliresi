@@ -1,9 +1,14 @@
 # Correos SITREP — backlog prioritario para producción
 
 Alta del pendiente: 11/10/2026. Hito solicitado: martes 13/10/2026, Mendoza.
-ID: **MAIL-PROD-01**. Estado: **GO DEL BLOQUE IMPLEMENTADO EN QA CLOUD; publicación y envío real pendientes**.
+ID: **MAIL-PROD-01**. Estado: **PUBLICADO Y COMPROBADO; envío real apagado y pendiente de habilitación separada**.
 Alcance de este registro: matriz/planilla de eventos y plantillas de correo,
 destinatarios, ejecución, trazabilidad y pruebas. No habilita envíos reales.
+
+Release `20261011-mail-safety-r1` publicada el 11/10 20:22:50 UTC, candidato
+`dc7e521`, con respaldo y rollback. QA completa repetida y comprobación pública
+web/app final aprobadas. Ver [cierre de publicación](DEPLOY-CORREOS-20261011.md).
+Las menciones de publicación pendiente/no realizada debajo son históricas.
 
 ## Ampliación validada — 11/10, candidato 32e32c4
 
