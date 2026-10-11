@@ -10,6 +10,29 @@ export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
   email: string; activo: boolean; emailVerified: boolean; notifEmail: boolean; rol: string;
 };
+function enabledFamilies(): string[] {
+  return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').filter(item => ['solicitudes', 'soporte', 'inspecciones'].includes(item));
+}
+
+/** Eligibility can change while an item waits or retries; never send to an old address. */
+export async function queuedNoticeStillEligible(queueId: string, recipient: string): Promise<boolean> {
+  if (!queueId.startsWith('notification:')) return true;
+  const notice = await prisma.notificacion.findUnique({
+    where: { id: queueId.slice('notification:'.length) },
+    include: { usuario: { select: { email: true, activo: true, emailVerified: true, notifEmail: true, rol: true } } },
+  });
+  if (!notice?.usuario) return false;
+  const user = notice.usuario;
+  if (!user.activo || !user.emailVerified || !user.notifEmail || user.email.toLowerCase() !== recipient.toLowerCase()) return false;
+  const content = notificationMailContent({ ...notice, ...user });
+  if (!content || !enabledFamilies().includes(content.family)) return false;
+  if (content.family === 'inspecciones') {
+    const { inspeccionId } = JSON.parse(notice.datos!);
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: inspeccionId }, select: { numeroActa: true } });
+    if (!inspection || /^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || '')) return false;
+  }
+  return true;
+}
 export function notificationMailContent(notice: NoticeForMail): { family: string; subject: string; html: string } | null {
   let data: Record<string, unknown>;
   try { data = JSON.parse(notice.datos || '{}'); } catch { return null; }
@@ -30,7 +53,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
 
 export async function queueCommittedNotificationEmails(): Promise<number> {
   const policy = mailPolicy(process.env);
-  const families = (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').filter(item => ['solicitudes', 'soporte', 'inspecciones'].includes(item));
+  const families = enabledFamilies();
   if (!policy.enabled || !families.length) return 0;
   // LEFT JOIN prevents repeated scans of already processed IDs, including suppressed recipients.
   const notices = await prisma.$queryRawUnsafe<NoticeForMail[]>(`

@@ -36,7 +36,7 @@ const LoginPage: React.FC = () => {
     try {
       const authenticatedUser = await login(email, password);
       const requestedPath = (location.state as { from?: unknown } | null)?.from;
-      navigate(postLoginDestination(requestedPath, authenticatedUser?.rol), { replace: true });
+      navigate(postLoginDestination(requestedPath, authenticatedUser?.rol, authenticatedUser?.esInspector), { replace: true });
     } catch (err: unknown) {
       setError(authError || getApiErrorMessage(err, 'Error al iniciar sesión. Verificá tus credenciales.'));
     } finally {

@@ -16,7 +16,7 @@ import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { mailPolicy, mendozaDayStart, retryableSmtpFailure } from './email-policy';
 import { escapeMail, mailText, mailShell, mailLink, renderMail } from './email-templates';
-import { queueCommittedNotificationEmails } from './notification-mail.service';
+import { queueCommittedNotificationEmails, queuedNoticeStillEligible } from './notification-mail.service';
 
 // ── Config ──────────────────────────────────────────────────────────
 
@@ -189,6 +189,11 @@ export async function flushEmailQueue(): Promise<void> {
         data: { estado: 'PENDIENTE', error: 'DELIVERY_IN_PROGRESS_OR_UNCERTAIN', nextRetryAt: null },
       });
       if (claim.count !== 1) continue;
+
+      if (!await queuedNoticeStillEligible(id, row.to)) {
+        await prisma.emailQueue.update({ where: { id }, data: { estado: 'SUPRIMIDO', error: 'RECIPIENT_OR_EVENT_NO_LONGER_ELIGIBLE', nextRetryAt: null } });
+        continue;
+      }
 
       const withinLimit = await checkDailyLimit(row.to, row.tipo);
       if (!withinLimit) {

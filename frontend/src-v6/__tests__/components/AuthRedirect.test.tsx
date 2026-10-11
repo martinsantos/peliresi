@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loginMock = vi.fn();
 let authState = {
-  currentUser: null as null | { rol: string },
+  currentUser: null as null | { rol: string; esInspector?: boolean },
   isLoading: false,
   isRestricted: false,
   login: loginMock,
@@ -95,6 +95,20 @@ describe('authenticated redirect destination', () => {
     expect(loginMock).toHaveBeenCalledWith('qa@example.com', 'secret123');
   });
 
+  it('preserves the assigned inspection for a designated inspector with an actor base role', async () => {
+    loginMock.mockResolvedValue({ rol: 'GENERADOR', esInspector: true });
+    renderLogin('/inspecciones/INS-ASSIGNED?origen=correo#visita');
+    await submitLogin();
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/inspecciones/INS-ASSIGNED?origen=correo#visita'));
+  });
+
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('keeps ordinary %s in actor participation, not inspector workspace', async rol => {
+    loginMock.mockResolvedValue({ rol, esInspector: false });
+    renderLogin('/inspecciones/INS-ASSIGNED?origen=correo#trazabilidad');
+    await submitLogin();
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/mis-inspecciones/INS-ASSIGNED?origen=correo#trazabilidad'));
+  });
+
   it.each([
     ['protocol-relative URL', '//evil.example/phishing'],
     ['absolute URL', 'https://evil.example/phishing'],
@@ -119,6 +133,14 @@ describe('standalone PWA AuthGate redirect destination', () => {
       login: loginMock,
       authError: null,
     };
+  });
+
+  it('does not downgrade an assigned inspector to actor participation after login', async () => {
+    authState.currentUser = { rol: 'GENERADOR', esInspector: true };
+    render(<MemoryRouter initialEntries={[{ pathname: '/login', state: { from: '/inspecciones/INS-ASSIGNED#visita' } }]}>
+      <AuthGate><LocationProbe /></AuthGate>
+    </MemoryRouter>);
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/inspecciones/INS-ASSIGNED#visita'));
   });
 
   it('preserves pathname, search and hash when a private deep link requires login', async () => {

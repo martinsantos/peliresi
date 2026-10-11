@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection } } }));
-import { notificationMailContent, queueCommittedNotificationEmails, type NoticeForMail } from '../../services/notification-mail.service';
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice } } }));
+import { notificationMailContent, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
   vi.resetAllMocks();
@@ -12,6 +12,26 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('rechecks the current recipient before sending an eligible queued notice', async () => {
+    mocks.notice.mockResolvedValue({ ...notice, usuario: notice });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(true);
+    expect(mocks.notice).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'qa-notice' } }));
+  });
+  it.each([{ activo: false }, { emailVerified: false }, { notifEmail: false }, { email: 'changed@example.invalid' }])('does not send after recipient changed: %j', async changes => {
+    mocks.notice.mockResolvedValue({ ...notice, usuario: { ...notice, ...changes } });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(false);
+  });
+  it('does not reinterpret account-verification or reset mail as optional notifications', async () => {
+    expect(await queuedNoticeStillEligible('ordinary-transactional', notice.email)).toBe(true);
+    expect(mocks.notice).not.toHaveBeenCalled();
+  });
+  it('suppresses deleted notices and a family disabled since enqueue', async () => {
+    mocks.notice.mockResolvedValue(null);
+    expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(false);
+    mocks.notice.mockResolvedValue({ ...notice, usuario: notice });
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'soporte');
+    expect(await queuedNoticeStillEligible('notification:qa-notice', notice.email)).toBe(false);
+  });
   it('links a reviewer to the exact application, without embedding applicant free text', () => {
     const mail = notificationMailContent({ ...notice, datos: JSON.stringify({ solicitudId: 'sol-qa', mensaje: 'secreto <img>' }) })!;
     expect(mail.html).toContain('/admin/solicitudes/sol-qa');

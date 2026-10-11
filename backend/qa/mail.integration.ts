@@ -121,6 +121,19 @@ if (process.argv[2] === 'worker') {
     await Promise.all([worker(), worker()]);
     assert.equal(messages.length - beforeNotices, 3);
     checks.push('committed application/support/inspection notices relayed once across two workers; transaction rollback produces no email');
+    const { queueCommittedNotificationEmails } = require('../dist/services/notification-mail.service.js');
+    for (const change of [{ activo: false }, { emailVerified: false }, { notifEmail: false }, { email: 'changed@qa.invalid' }]) {
+      await prisma.usuario.update({ where: { id: user.id }, data: { activo: true, emailVerified: true, notifEmail: true, email: 'notices@qa.invalid' } });
+      const notice = await prisma.notificacion.create({ data: { usuarioId: user.id, tipo: 'INFO_GENERAL', titulo: 'QA current recipient', mensaje: 'QA', datos: JSON.stringify({ tipo: 'soporte', ticketId: 'qa-ticket' }) } });
+      await queueCommittedNotificationEmails();
+      assert.equal((await prisma.emailQueue.findUnique({ where: { id: 'notification:' + notice.id } })).estado, 'PENDIENTE');
+      await prisma.usuario.update({ where: { id: user.id }, data: change });
+      const count = messages.length;
+      await worker();
+      assert.equal(messages.length, count);
+      assert.equal((await prisma.emailQueue.findUnique({ where: { id: 'notification:' + notice.id } })).error, 'RECIPIENT_OR_EVENT_NO_LONGER_ELIGIBLE');
+    }
+    checks.push('queued notice suppressed after suspension, unverified email, opt-out or address change; zero SMTP attempts');
     writeFileSync('/tmp/sitrep-mail-integration.json', JSON.stringify({ passed: true, checks, smtpMessages: messages.length, externalRecipients: 0, database: url.pathname, deployment: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks, smtpMessages: messages.length }));
   } finally {

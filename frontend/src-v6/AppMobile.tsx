@@ -93,7 +93,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   // Logged-in user on /login → resume a safe local deep link when available
   if (currentUser && location.pathname === '/login') {
     const requestedPath = (location.state as { from?: unknown } | null)?.from;
-    return <Navigate to={postLoginDestination(requestedPath, currentUser.rol)} replace />;
+    return <Navigate to={postLoginDestination(requestedPath, currentUser.rol, currentUser.esInspector)} replace />;
   }
 
   // Public route → render
