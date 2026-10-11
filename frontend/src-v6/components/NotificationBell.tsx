@@ -108,9 +108,9 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
   const buttonRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { currentUser } = useAuth();
+  const { currentUser, isRestricted } = useAuth();
 
-  const hasToken = !!getAccessToken();
+  const hasToken = !!getAccessToken() && !isRestricted;
 
   // Fetch últimas 5 sin filtrar por leída; badge usa noLeidas del response
   const { data, isPending, isError, refetch } = useQuery({
@@ -174,6 +174,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
     navigate(resolveNotificationPath({ manifiestoId: null, datos: null } as Notificacion, basePath));
   }, [navigate, basePath]);
 
+  if (isRestricted) return null;
   return (
     <div className="relative">
       {/* Bell Button */}

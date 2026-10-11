@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 import { toast } from './ui/Toast';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Notificacion {
   id: string;
@@ -23,6 +24,11 @@ async function fetchNoLeidas(): Promise<Notificacion[]> {
 // Muestra toast para notificaciones nuevas que llegan vía polling
 // (complementa el push nativo — cubre el caso en que el push no llegó)
 export function NotificacionesPoller() {
+  const { currentUser, isRestricted } = useAuth();
+  return currentUser && !isRestricted ? <AuthorizedNotificationsPoller /> : null;
+}
+
+function AuthorizedNotificationsPoller() {
   usePushNotifications();
   const seen = useRef<Set<string>>(new Set());
   const initialized = useRef(false);

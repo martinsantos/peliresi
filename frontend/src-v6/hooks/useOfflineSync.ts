@@ -20,14 +20,14 @@ export interface OfflineSyncStatus extends SyncQueueResult {
 const EMPTY_RESULT: SyncQueueResult = { processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
 
 export function useOfflineSync({ downloadManifests = true }: { downloadManifests?: boolean } = {}): OfflineSyncStatus {
-  const { currentUser } = useAuth();
+  const { currentUser, isRestricted } = useAuth();
   const { isOnline } = useConnectivity({ enablePing: false });
   const syncingRef = useRef(false);
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncQueueResult>(EMPTY_RESULT);
 
   const doSync = useCallback(async (manual = false) => {
-    if (!currentUser?.id || !isOnline) return;
+    if (!currentUser?.id || !isOnline || isRestricted) return;
       if (syncingRef.current) return;
       syncingRef.current = true;
       setSyncing(true);
@@ -40,10 +40,10 @@ export function useOfflineSync({ downloadManifests = true }: { downloadManifests
         syncingRef.current = false;
         setSyncing(false);
       }
-  }, [currentUser?.id, isOnline, downloadManifests]);
+  }, [currentUser?.id, isOnline, isRestricted, downloadManifests]);
 
   useEffect(() => {
-    if (!currentUser?.id || !isOnline) return;
+    if (!currentUser?.id || !isOnline || isRestricted) return;
 
     // Sync immediately on mount (login)
     void doSync();
@@ -51,7 +51,7 @@ export function useOfflineSync({ downloadManifests = true }: { downloadManifests
     // Re-sync every 5 minutes while online
     const interval = setInterval(() => void doSync(), SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [currentUser?.id, isOnline, doSync]);
+  }, [currentUser?.id, isOnline, isRestricted, doSync]);
 
   return { ...result, syncing, retry: async () => { await doSync(true); } };
 }

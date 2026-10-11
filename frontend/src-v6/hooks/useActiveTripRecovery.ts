@@ -12,10 +12,10 @@ import { manifiestoService } from '../services/manifiesto.service';
 import { EstadoManifiesto } from '../types/models';
 
 export function useActiveTripRecovery() {
-  const { currentUser, isTransportista } = useAuth();
+  const { currentUser, isTransportista, isRestricted } = useAuth();
 
   useEffect(() => {
-    if (!isTransportista || !currentUser) return;
+    if (!isTransportista || !currentUser || isRestricted) return;
 
     // Only recover if there's no active trip in localStorage already
     const existingTripId = localStorage.getItem('sitrep_active_trip_id');
@@ -48,5 +48,5 @@ export function useActiveTripRecovery() {
 
     recover();
     return () => { cancelled = true; };
-  }, [isTransportista, currentUser?.id]);
+  }, [isTransportista, currentUser?.id, isRestricted]);
 }

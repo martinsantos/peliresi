@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificacionService } from '../services/notificacion.service';
 import { getAccessToken } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import type { NotificacionFilters } from '../types/api';
 
 const KEYS = {
@@ -24,7 +25,8 @@ export function useNotificaciones(filters?: NotificacionFilters) {
 }
 
 export function useNotificacionesNoLeidas() {
-  const hasToken = !!getAccessToken();
+  const { currentUser, isRestricted } = useAuth();
+  const hasToken = !!getAccessToken() && !!currentUser && !isRestricted;
   return useQuery({
     queryKey: KEYS.noLeidas(),
     queryFn: () => notificacionService.getNoLeidas(),

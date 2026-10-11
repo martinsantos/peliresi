@@ -4,10 +4,10 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationBell } from '../../components/NotificationBell';
 
-const service = vi.hoisted(() => ({ list: vi.fn(), marcarLeida: vi.fn() }));
+const service = vi.hoisted(() => ({ list: vi.fn(), marcarLeida: vi.fn(), restricted: false }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: service }));
 vi.mock('../../services/api', () => ({ getAccessToken: () => 'unit-token' }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'inspector' } }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'inspector' }, isRestricted: service.restricted }) }));
 const notice = { id: 'notice', titulo: 'Inspección asignada · GRP-2026-00001', mensaje: 'Visita programada', leida: false, tipo: 'INFO_GENERAL', createdAt: new Date().toISOString(), datos: JSON.stringify({ inspeccionId: 'assigned' }) };
 function Path() { return <output data-testid="path">{useLocation().pathname}</output>; }
 function setup() {
@@ -16,7 +16,13 @@ function setup() {
   return client;
 }
 describe('assignment notification delivery', () => {
-  beforeEach(() => { service.list.mockReset().mockResolvedValue({ items: [], noLeidas: 0 }); service.marcarLeida.mockReset().mockResolvedValue({}); });
+  beforeEach(() => { service.restricted = false; service.list.mockReset().mockResolvedValue({ items: [], noLeidas: 0 }); service.marcarLeida.mockReset().mockResolvedValue({}); });
+  it('does not mount an unusable inbox or query full-access notices for a restricted applicant', () => {
+    service.restricted = true;
+    setup();
+    expect(screen.queryByRole('button', { name: /^Notificaciones/ })).toBeNull();
+    expect(service.list).not.toHaveBeenCalled();
+  });
   it('uses the same support symbol and opens its native ticket', async () => {
     service.list.mockResolvedValue({ items: [{ ...notice, titulo: 'Ticket derivado a tu atención', datos: JSON.stringify({ tipo: 'soporte', ruta: '/soporte/native-ticket' }) }], noLeidas: 1 });
     setup(); fireEvent.click(screen.getByRole('button', { name: 'Notificaciones', exact: true }));
