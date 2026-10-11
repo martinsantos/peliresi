@@ -55,7 +55,7 @@ try {
   assert.equal(await db.usuario.findUnique({ where: { id } }), null);
   checks.push('all eight messages terminal SUPRIMIDO, no secrets in content, no SMTP credentials or active delivery');
   const candidateEmail = 'pending-policy@night-qa.invalid';
-  const registration = await request('/solicitudes/iniciar', 'POST', { email: candidateEmail, password, nombre: 'QA pending policy', cuit: '30711235961', tipoActor: 'GENERADOR' }, undefined, 201);
+  const registration = await request('/solicitudes/iniciar', 'POST', { email: candidateEmail, password, nombre: 'QA pending policy', cuit: '99099099099', tipoActor: 'GENERADOR' }, undefined, 201);
   const candidate = await db.usuario.findUniqueOrThrow({ where: { email: candidateEmail } });
   assert.equal(candidate.activo, false);
   assert.equal(candidate.motivoInactividad, 'PENDIENTE_APROBACION');
