@@ -33,7 +33,7 @@ describe('applicant conversation scroll', () => {
   });
   it('does not replace received data or typed messages during refetch or a background failure', () => {
     const view = render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
-    const input = screen.getByPlaceholder('Escribe un mensaje...');
+    const input = screen.getByPlaceholderText('Escribe un mensaje...');
     fireEvent.change(input, { target: { value: 'Mi respuesta todavía sin enviar' } });
     state.loading = true; state.error = true;
     view.rerender(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
