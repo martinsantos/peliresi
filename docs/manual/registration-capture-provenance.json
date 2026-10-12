@@ -1,0 +1,16 @@
+{
+  "run": "38257301438",
+  "capturedAt": "2026-10-12T14:13:15.917Z",
+  "origin": "https://sitrep.ultimamilla.com.ar",
+  "route": "/app/inscripcion/generador?modo=revision",
+  "authenticated": false,
+  "synthetic": true,
+  "businessDataWritten": false,
+  "edited": false,
+  "file": "mobile/registration-trial-20261012.png",
+  "source": "production-public/app-generador.png",
+  "sha256": "cfdb52d67ba6e54a3f827f605b3ad9e3e46ca2ef60d732aae7ce8b05d714028a",
+  "width": 360,
+  "height": 800,
+  "bytes": 63068
+}

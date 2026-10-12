@@ -36,7 +36,7 @@ export function chromeScrollGesture(xml: string) {
   assert.ok(match);
   const [left, top, right, bottom] = match.slice(1).map(Number);
   assert.ok(right - left >= 200 && bottom - top >= 300, 'Refuse clipped or empty content bounds');
-  return { x: Math.floor(left + (right-left)*0.96), fromY: Math.floor(top+(bottom-top)*0.8), toY: Math.floor(top+(bottom-top)*0.45) };
+  return { x: Math.floor(left + (right-left)*0.5), fromY: Math.floor(top+(bottom-top)*0.8), toY: Math.floor(top+(bottom-top)*0.45) };
 }
 function pointFromObservedBounds(observed: string): { x: number; y: number } {
   const bounds = observed?.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/);

@@ -13,7 +13,7 @@ const { profiles, guides } = context.window.SITREP_HELP;
 
 test('new operational guides include relevant reusable captures, not text-only walkthroughs', () => {
   const minimums: Record<string, number> = {
-    'capacitacion-por-rol': 5, 'alta-borradores-ocr': 2,
+    'capacitacion-por-rol': 5, 'alta-borradores-ocr': 3,
     'soporte-enviar-seguir': 3, 'soporte-gestionar': 3,
     'actor-mis-inspecciones': 3, 'inspector-completar-inspeccion': 7,
   };
@@ -43,6 +43,18 @@ test('actor inspection guide does not grant access to general inspections or aut
   assert.match(JSON.stringify(guide), /No ve los borradores/);
   assert.match(JSON.stringify(guide), /no aprueba ni cierra/);
   assert.match(JSON.stringify(guide), /no habilita nuevas respuestas/);
+});
+
+test('public trial screenshot is unedited, anonymous and explicitly separate from an actual application', () => {
+  const p = JSON.parse(read('registration-capture-provenance.json'));
+  assert.equal(p.authenticated, false); assert.equal(p.synthetic, true);
+  assert.equal(p.businessDataWritten, false); assert.equal(p.edited, false);
+  const bytes = readFileSync(new URL('screenshots/' + p.file, root));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), p.sha256);
+  assert.equal(bytes.readUInt32BE(16), p.width); assert.equal(bytes.readUInt32BE(20), p.height);
+  const step = guides.find((g: any) => g.id === 'alta-borradores-ocr').steps[0];
+  assert.equal(step.image, 'screenshots/' + p.file);
+  assert.match(step.caption, /Datos sintéticos/); assert.match(step.alt, /Prueba sin envío/);
 });
 
 test('guides have unique identities, useful steps and existing evidence', () => {

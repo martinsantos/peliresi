@@ -14,7 +14,7 @@ const node = (extra = '', bounds = '[40,100][240,180]') => `<node package="com.a
 const window = (nodes: string) => '<?xml version="1.0"?><hierarchy>' + nodes + '</hierarchy>';
 test('scroll gesture stays inside fresh Chrome content and rejects missing or clipped windows', () => {
   const content = '<node package="com.android.chrome" resource-id="com.android.chrome:id/compositor_view_holder" bounds="[0,100][1000,2100]"/>';
-  assert.deepEqual(chromeScrollGesture(window(content)), {x:960,fromY:1700,toY:1000});
+  assert.deepEqual(chromeScrollGesture(window(content)), {x:500,fromY:1700,toY:1000});
   for (const invalid of ['', content+content, content.replace('com.android.chrome"','other"'), content.replace('[0,100][1000,2100]','[0,100][0,100]')])
     assert.throws(() => chromeScrollGesture(window(invalid)));
 });

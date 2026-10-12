@@ -32,6 +32,14 @@ export async function tapApkSubmit(page: Page, evidence: string) {
       && r.bottom <= (viewport ? viewport.offsetTop + viewport.height : innerHeight)
       && element.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
   });
+  const geometry = async (stage: string) => writeFile(path.join(output, `${evidence}-${stage}-geometry.json`), JSON.stringify(await button.evaluate(element => {
+    const r = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+    const ancestors = []; let p: Element | null = element;
+    while (p) { const s=getComputedStyle(p); const box=p.getBoundingClientRect(); ancestors.push({tag:p.tagName,class:p.className,top:box.top,bottom:box.bottom,height:box.height,client:p.clientHeight,scroll:p.scrollHeight,scrollTop:p.scrollTop,overflow:s.overflowY,touch:s.touchAction}); p=p.parentElement; }
+    return {button:{x:r.x,y:r.y,width:r.width,height:r.height},hit:hit?.outerHTML.slice(0,600),viewport:visualViewport?{height:visualViewport.height,offsetTop:visualViewport.offsetTop,scale:visualViewport.scale}:null,innerHeight,ancestors};
+  }), null, 2));
+  await geometry('before-scroll');
   // CDP layout scrolling on this TWA did not move the Android visual surface.
   // Use bounded, ordinary touch scrolling; never force a covered button.
   for (let attempt = 0; attempt < 3 && !await reachable(); attempt++) {
@@ -39,6 +47,7 @@ export async function tapApkSubmit(page: Page, evidence: string) {
     const gesture = chromeScrollGesture(observed);
     await writeFile(path.join(output, `${evidence}-scroll-${attempt}.xml`), observed);
     execFileSync('adb', ['shell', 'input', 'swipe', String(gesture.x), String(gesture.fromY), String(gesture.x), String(gesture.toY), '350'], { timeout: 5000 });
+    await geometry(`after-scroll-${attempt}`);
   }
   await expect.poll(reachable).toBe(true);
   const xml = await readNativeWindow();
