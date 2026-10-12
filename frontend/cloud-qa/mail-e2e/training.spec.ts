@@ -58,7 +58,7 @@ for (const [category, role] of [['Transportistas', 'TRANSPORTISTA'], ['Generador
     await leave(page);
     await enter(page, info, 'Administradores', index);
     await page.goto(prefix(info) + '/inspecciones/' + id);
-    await page.getByRole('navigation', { name: 'Secciones del expediente' }).getByRole('link', { name: 'Comunicaciones y respuestas', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Secciones del expediente' }).getByRole('link', { name: 'Comunicaciones', exact: true }).click();
     await page.getByRole('button', { name: 'Cerrar conforme', exact: true }).click();
     await page.getByLabel('Fundamento de la decisión').fill('CAP Ejercicio revisado: se acepta la respuesta ficticia, sin validez oficial.');
     const closed = page.waitForResponse(r => r.url().endsWith('/intercambios/decision') && r.request().method() === 'POST');
