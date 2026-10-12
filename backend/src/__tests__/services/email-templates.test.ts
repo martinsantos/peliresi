@@ -30,6 +30,7 @@ describe('mail template catalogue', () => {
     expect(() => renderMail('approved', { name: '' })).toThrow();
   });
   it('keeps the institutional identity and action when a mail client strips images', () => {
+    vi.stubEnv('FRONTEND_URL', 'https://sitrep.ultimamilla.com.ar');
     const mail = renderMail('approved', { name: 'QA' });
     const withoutImages = mailText(mail.html.replace(/<img\b[^>]*>/gi, ''));
     expect(withoutImages).toContain('Gobierno de Mendoza');
