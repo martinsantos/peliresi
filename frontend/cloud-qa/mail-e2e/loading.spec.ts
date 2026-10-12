@@ -20,9 +20,16 @@ test('branded loading yields to real application data and respects reduced motio
     await page.getByLabel('Correo electrónico o CUIT').fill('pending-mail@night-qa.invalid');
     await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+    // First-login welcome is intentional. Dismiss it through the actual UI,
+    // not by hiding the overlay or relying on an obsolete localStorage key.
+    const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+    await expect(welcome).toBeVisible();
+    await welcome.click();
+    await expect(welcome).toHaveCount(0);
     const loading = page.locator('[data-form-skeleton]');
     await expect(loading).toBeVisible();
     await expect(loading.getByRole('status')).toHaveText('Cargando tu solicitud…');
+    await loading.getByRole('status').click({ trial: true });
     await expect(loading.locator('input,textarea,button')).toHaveCount(0);
     await expect(loading.locator('[data-sitrep-cycle] path')).toHaveCount(3);
     await expect(loading.locator('.sitrep-spinner')).toHaveCSS('animation-name', 'sitrep-loading-turn');
@@ -36,6 +43,7 @@ test('branded loading yields to real application data and respects reduced motio
     await expect(loading).toHaveCount(0);
     await expect(page.getByText('QA observación pendiente verificado', { exact: true })).toBeVisible();
     const message = page.getByPlaceholder('Escribe un mensaje...');
+    await message.click({ trial: true });
     await message.fill('Respuesta de prueba todavía sin enviar');
     await expect(message).toHaveValue('Respuesta de prueba todavía sin enviar');
     await page.screenshot({ path: info.outputPath('loaded-application.png'), animations: 'disabled' });
