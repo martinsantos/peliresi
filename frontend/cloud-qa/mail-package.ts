@@ -4,11 +4,13 @@ import { execFileSync } from 'node:child_process';
 import { lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudEnvironment, root } from './safety.ts';
+import { synchronizeManual } from './manual-build.ts';
 
 assertCloudEnvironment();
 const output = process.env.QA_ARTIFACTS!;
 const mode = process.argv[2];
 assert.ok(['freeze', 'package'].includes(mode));
+await synchronizeManual(path.join(root, 'docs/manual'), path.join(root, 'frontend/dist/manual'), mode === 'freeze');
 const hash = (file: string) => createHash('sha256').update(readFileSync(file)).digest('hex');
 type Item = { file: string; sha256: string };
 function inventory(directory: string, prefix: string): Item[] {
@@ -38,6 +40,13 @@ if (mode === 'freeze') {
   assert.ok(unit.numPassedTests >= 1396); assert.equal(unit.numFailedTests + unit.numPendingTests, 0);
   assert.equal(http.passed, true); assert.equal(http.smtpEnabled, false); assert.equal(http.checks.length, 8);
   assert.ok(e2e.stats.expected >= 114); assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
+  const training = read('training-fixture.json');
+  assert.equal(training.publicAccessDenied, true);
+  assert.equal(training.repeatPreservedData, true);
+  assert.equal(training.productionConnected, false);
+  assert.equal(training.accounts, 40);
+  assert.equal(read('training-after.json').passed, true);
+  const trainingSchema = { file: 'training-schema.sql', sha256: hash(path.join(output, 'training-schema.sql')) };
   const archives = [];
   for (const [name, directory, files] of [['frontend', 'frontend', front], ['backend', 'backend', back]] as const) {
     const archive = `mail-tested-${name}.tar.gz`;
@@ -46,7 +55,7 @@ if (mode === 'freeze') {
   }
   const sourceHashes = ['package.json', 'package-lock.json', 'prisma/schema.prisma'].map(file => ({ file, sha256: hash(path.join(root, 'backend', file)) }));
   writeFileSync(path.join(output, 'mail-tested-build.json'), JSON.stringify({ ...snapshot, archives, sourceHashes,
-    frontendUnits: unit.numPassedTests, httpGroups: 8, e2e: e2e.stats, builtInCloud: true, rebuiltAfterTesting: false,
+    frontendUnits: unit.numPassedTests, httpGroups: 8, e2e: e2e.stats, trainingSchema, builtInCloud: true, rebuiltAfterTesting: false,
     containsEnvironment: false, containsUploads: false, containsDependencies: 'prisma-client-only', deployment: false }, null, 2), { flag: 'wx' });
 }
 console.log(`Mail release ${mode}: exact byte inventories recorded; no production access`);

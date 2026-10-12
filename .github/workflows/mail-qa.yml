@@ -134,6 +134,7 @@ jobs:
       UPLOADS_DIR: /tmp/sitrep-mail-browser/uploads
       PGUSER: qa
       TRAINING_DATABASE_URL: postgresql://sitrep_training_role@127.0.0.1:55440/sitrep_night_qa_20260926?schema=sitrep_training
+      QA_MANUAL_ROOT: ${{ github.workspace }}/frontend/dist/manual
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -193,7 +194,9 @@ jobs:
           fi
       - name: Package the exact tested bytes, no rebuild or deployment
         if: ${{ !inputs.design_review }}
-        run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts package
+        run: |
+          node --experimental-strip-types frontend/cloud-qa/training-after.ts
+          node --experimental-strip-types frontend/cloud-qa/mail-package.ts package
       - name: Stop only this QA runtime
         if: always()
         run: |

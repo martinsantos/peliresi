@@ -79,8 +79,15 @@ export async function seedTrainingCohort(db: PrismaClient) {
           ...(estado === 'TRATADO' ? { fechaCierre: new Date() } : {}),
           residuos: { create: [{ tipoResiduoId: waste.id, cantidad: 100, unidad: 'kg', estado: 'SOLIDO' }] },
         } });
+        if (estado === 'EN_TRANSITO') for (let point = 0; point < 5; point++) {
+          await tx.trackingGPS.upsert({ where: { id: `${id}-gps-${point}` }, update: {}, create: {
+            id: `${id}-gps-${point}`, manifiestoId: id, isDemoData: true,
+            latitud: common.latitud + point * .001, longitud: common.longitud + point * .001,
+            velocidad: 0, timestamp: new Date(Date.now() - (4 - point) * 60000),
+          } });
+        }
       }
     }
-    return { users, accounts: 40, actors: 15, vehicles: 5, drivers: 5, manifests: 35, inspections: 15, tickets: 15, schema: 'sitrep_training', sentMail: 0 };
+    return { users, accounts: 40, actors: 15, vehicles: 5, drivers: 5, manifests: 35, inspections: 15, tickets: 15, syntheticGpsPoints: 25, schema: 'sitrep_training', sentMail: 0 };
   }, { timeout: 30000 });
 }

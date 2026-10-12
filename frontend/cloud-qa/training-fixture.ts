@@ -28,9 +28,16 @@ try {
   assert.equal(await training.manifiesto.count(), 35);
   assert.equal(await training.inspeccion.count(), 15);
   assert.equal(await training.ticketSoporte.count(), 15);
+  assert.equal(await training.trackingGPS.count(), 25);
   assert.equal(await operational.usuario.count(), before);
   assert.deepEqual(first.users, repeat.users);
   await assert.rejects(() => seedTrainingCohort(operational), /outside the training schema/);
+  // Schema-only artifact for additive provisioning; never carries classroom or real rows.
+  const schema = execFileSync('/usr/lib/postgresql/16/bin/pg_dump', ['-h', '127.0.0.1', '-p', '55440', '-U', 'qa',
+    '-d', 'sitrep_night_qa_20260926', '--schema=sitrep_training', '--schema-only', '--no-owner', '--no-privileges'], { encoding: 'utf8' });
+  assert.ok(schema.includes('CREATE SCHEMA sitrep_training;'));
+  assert.ok(!/^(?:COPY |INSERT |DROP |CREATE DATABASE|ALTER ROLE)/m.test(schema));
+  writeFileSync(path.join(process.env.QA_ARTIFACTS!, 'training-schema.sql'), schema, { flag: 'wx' });
   writeFileSync(path.join(process.env.QA_ARTIFACTS!, 'training-fixture.json'), JSON.stringify({
     ...first, database: 'sitrep_night_qa_20260926', externalDelivery: false,
     publicAccessDenied: true, repeatPreservedData: true, productionConnected: false,

@@ -12,7 +12,7 @@ async function enter(page: Page, info: TestInfo, category: string, index = 1) {
   expect(response.status()).toBe(200);
   const result = (await response.json()).data;
   await expect(page.getByText('Capacitación · sin validez oficial', { exact: false }).first()).toBeVisible();
-  return result.tokens.accessToken as string;
+  return result.tokens as { accessToken: string; refreshToken: string };
 }
 async function leave(page: Page) {
   await page.getByRole('button', { name: 'Volver a mi cuenta', exact: true }).click();
@@ -20,10 +20,12 @@ async function leave(page: Page) {
 }
 
 test('training selector: five per category, collapse, each role can reopen and return to administrator', async ({ page }, info) => {
+  test.setTimeout(120_000);
   await login(page, info);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  for (const category of ['Generadores', 'Transportistas', 'Operadores', 'Inspectores', 'Administradores']) {
+  for (const category of ['Generadores', 'Transportistas', 'Operadores', 'Inspectores', 'Administradores',
+    'Administradores de generadores', 'Administradores de transporte', 'Administradores de operadores']) {
     await enter(page, info, category);
     await page.reload();
     await expect(page.getByText('Capacitación · sin validez oficial', { exact: false }).first()).toBeVisible();
@@ -42,15 +44,15 @@ test('training selector: five per category, collapse, each role can reopen and r
 
 test('training bearer cannot read an operational record, emit a certificate or lose its realm on refresh', async ({ page }, info) => {
   await login(page, info);
-  const token = await enter(page, info, 'Administradores');
-  const headers = { Authorization: 'Bearer ' + token };
+  const tokens = await enter(page, info, 'Administradores');
+  const headers = { Authorization: 'Bearer ' + tokens.accessToken };
   const denied = await page.request.get('/api/manifiestos/cloud-qa-report-0', { headers });
   expect(denied.status()).toBe(404);
   const certificate = await page.request.get('/api/pdf/certificado/cap-20261012-manifiesto-1-TRATADO', { headers });
   expect(certificate.status()).toBe(403);
   const jobs = await page.request.post('/api/admin/jobs/vencimientos', { headers });
   expect(jobs.status()).toBe(403);
-  const refresh = await page.request.post('/api/auth/refresh-token', { data: { refreshToken: token } });
+  const refresh = await page.request.post('/api/auth/refresh-token', { data: { refreshToken: tokens.refreshToken } });
   expect(refresh.status()).toBe(200);
   const renewed = (await refresh.json()).data.accessToken;
   const profile = await page.request.get('/api/auth/profile', { headers: { Authorization: 'Bearer ' + renewed } });

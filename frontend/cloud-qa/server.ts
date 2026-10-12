@@ -1,4 +1,4 @@
-import { assertCloudEnvironment } from './safety.ts';
+import { assertCloudEnvironment, root as projectRoot } from './safety.ts';
 assertCloudEnvironment();
 import http from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
@@ -7,7 +7,7 @@ import path from 'node:path';
 // Serve real release assets and proxy API bytes unchanged to the isolated backend.
 const web = process.env.QA_WEB_BUILD;
 const app = process.env.QA_APP_BUILD;
-const manual = process.env.QA_MANUAL_ROOT || path.resolve('../docs/manual');
+const manual = process.env.QA_MANUAL_ROOT || path.join(projectRoot, 'docs/manual');
 if (!web || !app || !existsSync(path.join(web, 'index.html')) || !existsSync(path.join(app, 'index.html'))) {
   throw new Error('QA_WEB_BUILD and QA_APP_BUILD must point to compiled release artifacts');
 }
@@ -37,7 +37,10 @@ http.createServer((req, res) => {
     if (path.extname(relative)) { res.writeHead(404); res.end('Asset not found'); return; }
     file = path.join(root, 'index.html');
   }
+  if (!existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); res.end('Asset not found'); return; }
   res.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream');
   res.setHeader('Cache-Control', 'no-cache');
-  createReadStream(file).pipe(res);
+  const stream = createReadStream(file);
+  stream.on('error', () => { if (!res.headersSent) res.writeHead(500); res.end('QA asset read failed'); });
+  stream.pipe(res);
 }).listen(4177, '127.0.0.1', () => console.log('QA web and app: http://127.0.0.1:4177'));
