@@ -11,12 +11,21 @@ import { apkCredentials, apkRequestAllowed } from './apk-auth-policy.ts';
 import { trainingCredentials, trainingRequestAllowed } from './apk-training-policy.ts';
 import { trainingJourney } from './apk-training-journey.ts';
 import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
+import { withinDeadline } from './deadline.ts';
 
 const training = process.env.QA_APK_TRAINING === 'true';
 if (training) assertCloudEnvironment(); else await assertCloudDatabase();
 const output = path.join(process.env.QA_ARTIFACTS!, 'apk');
 await mkdir(output, { recursive: true });
 const packageBaseline = training ? freezeCloudPlayStore() : undefined;
+if (training) {
+  // android-run.ts previously provided this preparation before apk.ts.
+  // A standalone run needs it too: Chrome ignores its temporary CDP socket
+  // arguments without the debug-app setting on this Play Store emulator.
+  // freezeCloudPlayStore above has already rejected physical/local devices.
+  execFileSync('adb', ['shell', 'am', 'set-debug-app', '--persistent', 'com.android.chrome'], { timeout: 5000 });
+  execFileSync('adb', ['shell', 'svc', 'power', 'stayon', 'true'], { timeout: 5000 });
+}
 const pkg = 'ar.com.ultimamilla.sitrep';
 const activity = pkg + '/ar.com.ultimamilla.sitrep.LauncherActivity';
 const transfer = path.join(process.env.RUNNER_TEMP!, 'sitrep-apk-transfer');
@@ -46,14 +55,18 @@ const devices = await android.devices();
 assert.equal(devices.length, 1);
 const device = devices[0];
 device.setDefaultTimeout(25000);
+android.setDefaultTimeout(25000);
 const check = async (name: string, task: () => Promise<void>) => {
+  console.log('START signed APK ' + name);
   try { await task(); results.push({ name, status: 'PASS' }); console.log('PASS signed APK ' + name); }
   catch (error) {
     const rawMessage = error instanceof Error ? error.message : String(error);
     const message = credentials ? rawMessage.replaceAll(credentials.password, '[REDACTED]') : rawMessage;
     results.push({ name, status: 'FAIL', error: message }); console.error('FAIL signed APK ' + name + ': ' + message);
-    await device.screenshot({ path: path.join(output, name + '-FAIL.png') }).catch(() => {});
+    await withinDeadline('APK failure screenshot', 5000, () =>
+      device.screenshot({ path: path.join(output, name + '-FAIL.png') })).catch(() => {});
   }
+  await writeFile(path.join(output, 'progress.json'), JSON.stringify({ results, attemptedWrites, pageErrors }, null, 2));
 };
 const openOriginal = async (state: 'login' | 'authenticated' = 'login') => {
   const launched = adb('shell', 'am', 'start', '-W', '-n', activity);
@@ -110,7 +123,12 @@ try {
   });
   await check('original-launch-public-login-brand-and-TLS', async () => {
     assert.ok(results.find(item => item.name === 'original-signature-and-Android-installation' && item.status === 'PASS'));
-    context = await device.launchBrowser({ hasTouch: true, args: ['--no-first-run', '--no-default-browser-check'] });
+    console.log('APK driver: attaching Chrome');
+    context = await withinDeadline('APK Chrome attachment', 30000, () =>
+      device.launchBrowser({ hasTouch: true, args: ['--no-first-run', '--no-default-browser-check'] }));
+    context.setDefaultTimeout(25000);
+    context.setDefaultNavigationTimeout(30000);
+    console.log('APK driver: Chrome attached');
     context.on('page', target => target.on('pageerror', error => pageErrors.push(error.message)));
     // Production safety guard. Allowed responses are real, never mocked.
     // Synthetic functional tests in android.ts do not intercept business APIs.
@@ -258,6 +276,7 @@ try {
       'Synthetic end-to-end uses Chrome on the same actual Android OS, not a modified or re-signed APK',
       'Emulator, not physical phone, microphone, noisy environment or battery validation'],
   }, null, 2));
-  await context?.close().catch(() => {}); await device.close();
+  await withinDeadline('APK context cleanup', 5000, async () => { await context?.close(); }).catch(() => {});
+  await withinDeadline('APK device cleanup', 5000, () => device.close()).catch(() => {});
 }
 if (results.some(item => item.status === 'FAIL')) process.exitCode = 1;

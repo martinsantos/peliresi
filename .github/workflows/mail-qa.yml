@@ -427,7 +427,7 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
           disable-animations: true
-          script: node --experimental-strip-types frontend/cloud-qa/apk.ts
+          script: timeout --signal=TERM --kill-after=20s 8m node --experimental-strip-types frontend/cloud-qa/apk.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
