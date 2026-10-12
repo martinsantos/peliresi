@@ -7,6 +7,7 @@ import path from 'node:path';
 import { _android } from 'playwright';
 import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
 import { dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
+import { stopSitrepProcess } from './apk-relaunch.ts';
 const run = promisify(execFile);
 const baseline = freezeCloudPlayStore();
 const output = path.join(process.env.RUNNER_TEMP!, 'sitrep-brand-review');
@@ -63,9 +64,10 @@ await writeFile(path.join(evidence, name + '.png'), execFileSync('adb', ['exec-o
 assert.ok(xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar'), 'Actual public login must render');
 }
 await requireLogin('login');
-// Record the real second cold launch; no activity substituted for the splash.
-adb('shell', 'am', 'force-stop', pkg);
-adb('shell', 'am', 'force-stop', 'com.android.chrome');
+// Same cold-app boundary as the original signed APK test. Killing the shared
+// Chrome host destroyed the ephemeral Playwright setup and opened Chrome's
+// first-run screen, not a SITREP failure. Browser-process recovery is separate.
+stopSitrepProcess(adb);
 await recordLaunch('cold-launch');
 await requireLogin('reopened-login');
 const config = await readFile(path.join(output, 'android/app/build.gradle'), 'utf8');
@@ -75,6 +77,8 @@ await writeFile(path.join(evidence, 'result.json'), JSON.stringify({
   run: process.env.GITHUB_RUN_ID, commit: process.env.GITHUB_SHA, launch: 'PASS', reopen: 'PASS',
   originalReleaseSignature: false, distributionAllowed: false,
   trustBypassed: false, authenticated: false, emailsSent: 0,
+  reopenScope: 'SITREP process stopped and absence verified; Chrome host retained',
+  browserProcessRecoveryTested: false,
   limitation: 'Debug key is VM-only. Chrome Custom Tab fallback is expected until original release signature is available; not a signed production upgrade.',
   system: assertStableSystemPackages(baseline), visualReview: 'Pending inspection of recorded cold-launch frames',
 }, null, 2));
