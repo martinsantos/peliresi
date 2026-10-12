@@ -27,6 +27,17 @@ export function chromeButtonPoint(xml: string, text: string): { x: number; y: nu
   assert.equal(matches.length, 1, 'Tap only one currently observed native Chrome button: ' + text);
   return pointFromObservedBounds(matches[0].bounds);
 }
+/** Ordinary upward swipe inside the observed Chrome content, away from text inputs. */
+export function chromeScrollGesture(xml: string) {
+  const nodes = nativeNodes(xml).filter(node => node.package === 'com.android.chrome'
+    && node['resource-id'] === 'com.android.chrome:id/compositor_view_holder');
+  assert.equal(nodes.length, 1, 'Require one visible Chrome compositor for scrolling');
+  const match = nodes[0].bounds?.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/);
+  assert.ok(match);
+  const [left, top, right, bottom] = match.slice(1).map(Number);
+  assert.ok(right - left >= 200 && bottom - top >= 300, 'Refuse clipped or empty content bounds');
+  return { x: Math.floor(left + (right-left)*0.96), fromY: Math.floor(top+(bottom-top)*0.8), toY: Math.floor(top+(bottom-top)*0.45) };
+}
 function pointFromObservedBounds(observed: string): { x: number; y: number } {
   const bounds = observed?.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/);
   assert.ok(bounds, 'Native bounds must be present, never guessed');

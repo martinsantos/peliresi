@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chromeButtonPoint, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
+import { chromeButtonPoint, chromeScrollGesture, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
 
 test('reads explicit OS keyboard visibility rather than inferring it from DOM focus or viewport size', () => {
   assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=true mShowRequested=true'), true);
@@ -12,6 +12,12 @@ test('unknown, incomplete and ambiguous keyboard dumps cannot pass as a hidden k
 
 const node = (extra = '', bounds = '[40,100][240,180]') => `<node package="com.android.chrome" text="No thanks" enabled="true" clickable="true" bounds="${bounds}" ${extra}/>`;
 const window = (nodes: string) => '<?xml version="1.0"?><hierarchy>' + nodes + '</hierarchy>';
+test('scroll gesture stays inside fresh Chrome content and rejects missing or clipped windows', () => {
+  const content = '<node package="com.android.chrome" resource-id="com.android.chrome:id/compositor_view_holder" bounds="[0,100][1000,2100]"/>';
+  assert.deepEqual(chromeScrollGesture(window(content)), {x:960,fromY:1700,toY:1000});
+  for (const invalid of ['', content+content, content.replace('com.android.chrome"','other"'), content.replace('[0,100][1000,2100]','[0,100][0,100]')])
+    assert.throws(() => chromeScrollGesture(window(invalid)));
+});
 test('uses the observed native button bounds, not fixed emulator coordinates', () => {
   assert.deepEqual(chromeButtonPoint(window(node()), 'No thanks'), { x: 140, y: 140 });
   assert.deepEqual(chromeButtonPoint(window(node('', '[700,1600][1040,1710]')), 'No thanks'), { x: 870, y: 1655 });
