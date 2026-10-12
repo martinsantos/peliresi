@@ -54,9 +54,15 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
       await page.getByRole('button', { name: 'Responder esta actuación', exact: true }).last().tap();
       const text = `CAP Android ${process.env.GITHUB_RUN_ID}: respuesta sintética del ${role}. Sin actuación real ni correo.`;
       await page.getByLabel('Contenido', { exact: true }).fill(text);
-      const sent = page.waitForResponse(r => r.url().endsWith('/' + id + '/intercambios') && r.request().method() === 'POST');
-      await page.getByRole('button', { name: 'Presentar en expediente', exact: true }).tap();
-      assert.equal((await sent).status(), 201);
+      await proof('training-' + role + '-before-submit');
+      // Observe both promises immediately: a response timeout must reach the
+      // diagnostic wrapper instead of becoming an unhandled rejection while
+      // Android's touch driver is still waiting.
+      const [sent] = await Promise.all([
+        page.waitForResponse(r => r.url().endsWith('/' + id + '/intercambios') && r.request().method() === 'POST'),
+        page.getByRole('button', { name: 'Presentar en expediente', exact: true }).tap(),
+      ]);
+      assert.equal(sent.status(), 201);
       await page.reload();
       await expect(page.getByText(text, { exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

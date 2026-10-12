@@ -65,6 +65,14 @@ const check = async (name: string, task: () => Promise<void>) => {
     results.push({ name, status: 'FAIL', error: message }); console.error('FAIL signed APK ' + name + ': ' + message);
     await withinDeadline('APK failure screenshot', 5000, () =>
       device.screenshot({ path: path.join(output, name + '-FAIL.png') })).catch(() => {});
+    if (training && page) {
+      await withinDeadline('APK failure DOM', 5000, async () => {
+        await writeFile(path.join(output, name + '-DOM.txt'), await page!.locator('body').ariaSnapshot());
+        await writeFile(path.join(output, name + '-form.json'), JSON.stringify(await page!.locator('main input:invalid,main textarea:invalid,main select:invalid').evaluateAll(elements =>
+          elements.map(el => ({ name: el.getAttribute('name'), label: el.getAttribute('aria-label'),
+            message: (el as HTMLInputElement).validationMessage }))), null, 2));
+      }).catch(() => {});
+    }
   }
   await writeFile(path.join(output, 'progress.json'), JSON.stringify({ results, attemptedWrites, pageErrors }, null, 2));
 };
@@ -75,8 +83,16 @@ const openOriginal = async (state: 'login' | 'authenticated' = 'login') => {
   // native splash is foreground. Require the actual OS Chrome compositor, then choose a
   // live DOM target that has finished rendering the same login form.
   await expect.poll(async () => {
-    await dismissObservedChromePrompts(output);
-    return nativeNodes(await readNativeWindow()).some(node=>node['resource-id']==='com.android.chrome:id/compositor_view_holder');
+    try {
+      await dismissObservedChromePrompts(output);
+      return nativeNodes(await readNativeWindow()).some(node=>node['resource-id']==='com.android.chrome:id/compositor_view_holder');
+    } catch (error) {
+      // The signed APK's launch splash temporarily has no accessibility root.
+      // This is not a ready window: keep the same bounded readiness check,
+      // never restart the app or treat missing native evidence as a pass.
+      if (String(error).includes('null root node returned by UiTestAutomationBridge')) return false;
+      throw error;
+    }
   }, { timeout: 45000 }).toBe(true);
   await expect.poll(async () => {
     const candidates = context!.pages().filter(item => !item.isClosed()
