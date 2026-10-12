@@ -102,7 +102,7 @@ jobs:
   authenticated-links:
     needs: isolated-mail
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       CI: 'true'
       NODE_ENV: test
@@ -110,7 +110,7 @@ jobs:
       NODE_APP_INSTANCE: qa
       PORT: '3037'
       ALLOW_SYNTHETIC_QA: '1'
-      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=8&pool_timeout=10
       DISABLE_EMAILS: 'true'
       EMAIL_DELIVERY_NOT_BEFORE: ''
       EMAIL_NOTIFICATION_FAMILIES: ''

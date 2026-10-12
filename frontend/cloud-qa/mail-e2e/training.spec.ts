@@ -10,9 +10,16 @@ async function enter(page: Page, info: TestInfo, category: string, index = 1) {
   await group.getByRole('button', { name: /^Ver como CAP/ }).nth(index - 1).click();
   const response = await entry;
   expect(response.status()).toBe(200);
-  const result = (await response.json()).data;
   await expect(page.getByText('Capacitación · sin validez oficial', { exact: false }).first()).toBeVisible();
-  return result.tokens as { accessToken: string; refreshToken: string };
+  // Read only the real credentials issued by that UI action, after its full
+  // navigation. CDP can no longer retrieve the previous page's response body.
+  // No injected session, intercepted business API or production account.
+  const tokens = await page.evaluate(() => ({
+    accessToken: localStorage.getItem('sitrep_access_token') || '',
+    refreshToken: localStorage.getItem('sitrep_refresh_token') || '',
+  }));
+  expect(Boolean(tokens.accessToken && tokens.refreshToken)).toBe(true);
+  return tokens;
 }
 async function leave(page: Page) {
   await page.getByRole('button', { name: 'Volver a mi cuenta', exact: true }).click();
@@ -29,6 +36,9 @@ test('training selector: five per category, collapse, each role can reopen and r
     await enter(page, info, category);
     await page.reload();
     await expect(page.getByText('Capacitación · sin validez oficial', { exact: false }).first()).toBeVisible();
+    const band = await page.getByTestId('impersonation-banner').boundingBox();
+    const header = await page.getByRole('banner').boundingBox();
+    expect(band && header && band.y + band.height <= header.y + 1, 'Training banner must not cover navigation').toBe(true);
     await leave(page);
   }
   await page.getByRole('button', { name: 'Capacitación', exact: true }).click();
@@ -93,6 +103,38 @@ test('school transport and operator complete a persisted manifest through real b
   await expect(page.getByText('Capacitación: no se emiten documentos oficiales.')).toBeVisible();
   await page.screenshot({ path: info.outputPath('training-manifest-finished.png'), fullPage: true });
   await leave(page);
+});
+
+test('school inspector starts and resumes field work without exposing it to the operational administrator', async ({ page }, info) => {
+  await login(page, info);
+  const index = ['web-desktop', 'web-responsive', 'app'].indexOf(info.project.name) + 1;
+  const id = `cap-20261012-inspeccion-${index}-GENERADOR`;
+  await enter(page, info, 'Inspectores', index);
+  await page.goto(prefix(info) + '/inspecciones/' + id);
+  await expect(page.getByRole('button', { name: 'Descargar expediente', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Otras descargas', exact: true })).toBeDisabled();
+  const nav = page.getByRole('navigation', { name: 'Secciones del expediente' });
+  await nav.getByRole('link', { name: 'Visita', exact: true }).click();
+  const started = page.waitForResponse(r => r.url().endsWith('/inspecciones/' + id + '/estado') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Iniciar visita', exact: true }).click();
+  expect((await started).status()).toBe(200);
+  await nav.getByRole('link', { name: 'Controles', exact: true }).click();
+  const control = page.locator('[id^="control-"]').first();
+  const trigger = control.locator('button[aria-expanded]').first();
+  if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+  await control.getByRole('button', { name: 'Cumple', exact: true }).click();
+  const saved = page.waitForResponse(r => r.url().includes('/inspecciones/' + id) && r.request().method() === 'PATCH');
+  await page.getByTestId('inspection-field-save-bar').getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  expect((await saved).status()).toBe(200);
+  await page.reload();
+  await nav.getByRole('link', { name: 'Controles', exact: true }).click();
+  if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+  await expect(control.getByRole('button', { name: 'Cumple', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.screenshot({ path: info.outputPath('training-inspection-resumed.png'), fullPage: true });
+  await leave(page);
+  const denied = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspecciones/' + id);
+  await page.goto(prefix(info) + '/inspecciones/' + id);
+  expect((await denied).status()).toBe(404);
 });
 
 test('school support upload and handoff stay invisible to the operational administrator', async ({ page }, info) => {

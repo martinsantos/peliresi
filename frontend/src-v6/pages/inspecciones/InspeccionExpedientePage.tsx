@@ -819,9 +819,9 @@ const InspeccionExpedientePage: React.FC = () => {
         <div data-testid="inspection-case-actions" className="flex shrink-0 items-center justify-between gap-1 sm:justify-end">
           <Button variant="ghost" size="sm" aria-label="Volver al listado" title="Volver al listado" leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} disabled={dictating} className="min-h-11 shrink-0 px-2"><span>Listado</span></Button>
           <div className="flex shrink-0 items-center gap-1">
-          <Button variant="outline" size="sm" aria-label="Descargar expediente" title="Descargar expediente" className="max-lg:w-11 max-lg:px-0" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
+          <Button variant="outline" size="sm" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="max-lg:w-11 max-lg:px-0" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
           <DropdownMenu>
-            <DropdownTrigger asChild><Button variant="ghost" size="sm" aria-label="Otras descargas" rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span className="sr-only">Documentos por separado</span></Button></DropdownTrigger>
+            <DropdownTrigger asChild><Button variant="ghost" size="sm" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span className="sr-only">Documentos por separado</span></Button></DropdownTrigger>
             <DropdownContent className="w-72">
               <DropdownLabel>Versión guardada en el servidor</DropdownLabel>
               <DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('expediente')}>Expediente completo · PDF<span className="block text-[11px] font-normal text-neutral-500">Acta, evaluación y fotos en un documento</span></DropdownItem>
@@ -833,6 +833,7 @@ const InspeccionExpedientePage: React.FC = () => {
           </div>
         </div>
     </header>
+    {currentUser?.training && <p className="text-xs text-neutral-600">Capacitación: sin documentos oficiales.</p>}
     {(query.offlineCacheProblem || (guided && draftOwnership.status !== 'owned') || (pendingEvidenceReadFailed && guided) || !isOnline || pendingEvidence.length > 0 || storageFailed) && <details data-testid="inspection-storage-status" className="rounded-lg border border-neutral-200 bg-white px-4 text-sm">
       <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 font-medium text-neutral-700"><span>{storageFailed ? 'Guardado local no confirmado · no cierres esta pantalla' : guided && draftOwnership.status !== 'owned' ? draftOwnership.status === 'blocked' ? 'Solo lectura · otra pestaña está editando' : draftOwnership.status === 'checking' ? 'Comprobando disponibilidad de edición' : 'Solo lectura · edición no disponible en este navegador' : query.offlineCacheProblem ? 'No se pudo preparar la copia sin conexión.' : pendingEvidenceReadFailed && guided ? 'Capturas locales sin verificar · cierre de campo no disponible' : !isOnline ? 'Sin conexión · trabajando en este dispositivo' : pendingEvidence.length + ' capturas pendientes de enviar'}</span><ChevronDown size={16} className="shrink-0" /></summary>
       <div className="space-y-2 pb-2">

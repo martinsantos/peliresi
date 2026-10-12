@@ -208,7 +208,7 @@ export const MainLayout: React.FC = () => {
   const currentPage = isInspectionCase ? 'Inspección' : currentItem?.label || 'SITREP';
 
   return (
-    <div data-app-shell className={`h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-12' : ''}`}>
+    <div data-app-shell className="h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden">
       <NotificacionesPoller />
       {/* Impersonation banner — amber bar above everything */}
       {impersonationData && (

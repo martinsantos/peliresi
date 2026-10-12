@@ -39,7 +39,7 @@ if (mode === 'freeze') {
   const unit = read('frontend-unit.json'), http = read('account-mail-http.json'), e2e = read('e2e.json');
   assert.ok(unit.numPassedTests >= 1396); assert.equal(unit.numFailedTests + unit.numPendingTests, 0);
   assert.equal(http.passed, true); assert.equal(http.smtpEnabled, false); assert.equal(http.checks.length, 8);
-  assert.ok(e2e.stats.expected >= 114); assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
+  assert.ok(e2e.stats.expected >= 117); assert.equal(e2e.stats.unexpected + e2e.stats.flaky + e2e.stats.skipped, 0);
   const training = read('training-fixture.json');
   assert.equal(training.publicAccessDenied, true);
   assert.equal(training.repeatPreservedData, true);

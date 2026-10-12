@@ -8,10 +8,11 @@ import { toast } from '../../components/ui/Toast';
 import { startLocalDictation } from '../../services/localDictation';
 
 const queryMock = vi.hoisted(() => vi.fn());
+const auth = vi.hoisted(() => ({ training: false }));
 const checkpoint = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
 vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: checkpoint.read, writeInspectionFieldCheckpoint: checkpoint.write }));
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'inspector-1', rol: 'ADMIN' } }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'inspector-1', rol: 'ADMIN', training: auth.training } }) }));
 vi.mock('../../hooks/useInspecciones', () => ({
   useInspection: queryMock,
   useInspectionMutation: (fn: (input: unknown) => Promise<unknown>) => ({ mutateAsync: fn, isPending: false }),
@@ -49,6 +50,7 @@ const inline = () => within(screen.getByTestId('inspection-field-save-bar'));
 describe('shared explicit save for the complete inspection draft', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    auth.training = false;
     checkpoint.read.mockResolvedValue(undefined); checkpoint.write.mockResolvedValue(undefined);
     localStorage.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
@@ -56,6 +58,20 @@ describe('shared explicit save for the complete inspection draft', () => {
     vi.mocked(inspeccionService.saveDraft).mockResolvedValue({ version: 2 } as Inspection);
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('does not offer official documents during training, while retaining operational downloads', async () => {
+    auth.training = true;
+    const view = render(page());
+    expect(await screen.findByRole('button', { name: 'Descargar expediente' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Otras descargas' })).toBeDisabled();
+    expect(screen.getByText('Capacitación: sin documentos oficiales.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Descargar expediente' }));
+    expect(inspeccionService.downloadPdf).not.toHaveBeenCalled();
+    auth.training = false;
+    view.rerender(page());
+    expect(screen.getByRole('button', { name: 'Descargar expediente' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Otras descargas' })).toBeEnabled();
+  });
 
   it('waits for a durable local copy before leaving, without claiming a server save', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });

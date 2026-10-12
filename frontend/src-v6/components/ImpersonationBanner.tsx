@@ -21,7 +21,7 @@ export const ImpersonationBanner: React.FC<ImpersonationBannerProps> = ({ user, 
   const rolLabel = ROL_LABELS[user.rol] || user.rol;
 
   return (
-    <div className="fixed inset-x-0 top-0 z-[60] flex min-h-12 items-center justify-between gap-3 border-b border-amber-300 bg-amber-100 px-4 py-1 text-amber-950">
+    <div data-testid="impersonation-banner" className="relative z-[60] flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-amber-300 bg-amber-100 px-4 py-1 text-amber-950">
       <div className="flex min-w-0 items-center gap-2">
         <Eye size={18} className="shrink-0" aria-hidden="true" />
         <span className="min-w-0 text-sm font-semibold">
