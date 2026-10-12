@@ -38,7 +38,7 @@ for (const [category, role] of [['Transportistas', 'TRANSPORTISTA'], ['Generador
     await page.goto(prefix(info) + '/mis-inspecciones');
     const rows = (await (await listing).json()).data;
     expect(rows.map((row: { id: string }) => row.id).sort()).toEqual([id, id.replace('abierta', 'cerrada')].sort());
-    await expect(page.getByRole('heading', { name: 'Mis inspecciones', exact: true })).toBeVisible();
+    await expect(page.locator('main').getByRole('heading', { name: 'Mis inspecciones', exact: true })).toBeVisible();
     for (const forbidden of [`cap-20261012-inspeccion-${index}-${role}`, `cap-20261012-participacion-5-${role}-abierta`]) {
       const denied = await page.request.get('/api/inspecciones/' + forbidden + '/intercambios', { headers });
       expect(denied.status()).toBe(403);

@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      training_review:
+        description: Focused repeat of classroom journeys after test-only corrections; prior full suites remain separate evidence
+        type: boolean
+        default: false
       training_apk:
         description: Original APK on Android 15, temporary instructor and isolated school only
         type: boolean
@@ -163,7 +167,9 @@ jobs:
           npx --no-install prisma generate
           npm run build
           cd ../frontend
-          if test '${{ inputs.design_review }}' = true; then
+          if test '${{ inputs.training_review }}' = true; then
+            npm test -- src-v6/__tests__/pages/InspeccionesPage.test.tsx --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          elif test '${{ inputs.design_review }}' = true; then
             npm test -- src-v6/__tests__/components/InspectionBrand.test.tsx src-v6/__tests__/pages/ActorIdentity.test.tsx src-v6/__tests__/pages/VerificarEmail.test.tsx --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
           else
             npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
@@ -191,7 +197,9 @@ jobs:
       - name: Real login and destinations, desktop and mobile web and app, one browser worker
         working-directory: frontend
         run: |
-          if test '${{ inputs.design_review }}' = true; then
+          if test '${{ inputs.training_review }}' = true; then
+            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'training|school'
+          elif test '${{ inputs.design_review }}' = true; then
             npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'brand|all templates|verification|verifying|clean browser'
           else
             npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
