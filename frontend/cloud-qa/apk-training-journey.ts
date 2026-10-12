@@ -33,6 +33,7 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
     if (role === 'INSPECTOR') {
       await page.getByRole('button', { name: 'Abrir menu', exact: true }).tap();
       await page.getByRole('navigation', { name: 'Menú de la aplicación', exact: true }).getByRole('link', { name: 'Inspecciones', exact: true }).tap();
+      await page.getByRole('textbox', { name: 'Buscar inspección', exact: true }).fill('CAP-I-5-GENERADOR');
       await expect(page.getByText('CAP-I-5-GENERADOR', { exact: true }).first()).toBeVisible();
       await proof('training-inspector-list');
     } else {
