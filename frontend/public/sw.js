@@ -1,7 +1,7 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v113';
-const RUNTIME_CACHE = 'runtime-cache-v113';
+const CACHE_NAME = 'trazabilidad-rrpp-v114';
+const RUNTIME_CACHE = 'runtime-cache-v114';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
