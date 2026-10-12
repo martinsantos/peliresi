@@ -12,6 +12,9 @@ test('packaged manual: home -> real alert tutorial -> captured sources -> mobile
   await page.goto('/manual/');
   await expect(page.getByRole('heading', { name: '¿Cómo podemos ayudarte?', exact: true })).toBeVisible();
   await expect(page).toHaveTitle(/SITREP/);
+  const mark = page.locator('img[src="sitrep-mark.svg"]');
+  await expect(mark).toBeVisible();
+  await expect.poll(() => mark.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   const tutorial = page.locator('#popularList').getByRole('link', { name: 'Configurar alertas y seguir sus avisos', exact: true });
   await expect(tutorial).toBeVisible();
   await tutorial.click();

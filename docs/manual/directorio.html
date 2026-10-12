@@ -7985,7 +7985,8 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 <!-- ============================================================ -->
 <section id="capacitacion-qa" data-role="all">
 <h2>17. Capacitación por rol y práctica segura</h2>
-<div class="callout callout-info"><strong>Primero, el entorno:</strong> en producción la demostración es de <strong>solo lectura</strong>. Las acciones de firma, retiro, recepción, cierre, aprobación o envío de tickets requieren un entorno de práctica y registros escuela expresamente autorizados. <code>isDemoData=true</code> no constituye aislamiento ni autorización.</div>
+<div class="callout callout-info"><strong>Primero, el modo:</strong> en <strong>Operación real</strong> la demostración es de <strong>solo lectura</strong>. Para practicar en este mismo SITREP, el administrador abre <strong>Ver como otro usuario → Capacitación</strong> y elige una cuenta CAP. Comprobar siempre la banda <strong>Capacitación · sin validez oficial</strong> antes de actuar. Si esta opción no está habilitada, no usar registros reales. Una etiqueta demo por sí sola no aísla los datos.</div>
+<p>El selector muestra hasta cinco usuarios por categoría, con búsqueda y paginación propias. Para el relevo, elegir el mismo número de equipo en generador, transportista y operador. <strong>Volver a mi cuenta</strong> restaura al administrador. Las cuentas escuela son para impersonación, sin contraseñas compartidas. No se envían correos, push ni registros a blockchain; no se emiten documentos oficiales. Usar otro perfil del navegador si hay formularios de trabajo abiertos.</p>
 <p><a href="tutorial.html?guide=capacitacion-por-rol">Abrir el recorrido guiado de 90 minutos</a> · <a href="tutorial.html?guide=alta-borradores-ocr">Alta, OCR y borradores</a> · <a href="tutorial.html?guide=soporte-enviar-seguir">Tickets y respuestas</a>.</p>
 
 <h3 id="cap-dataset">17.1 Datos sintéticos necesarios</h3>
@@ -8002,7 +8003,7 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 <h3 id="cap-recorrido">17.2 Recorrido guiado por rol</h3>
 <table class="training-table"><thead><tr><th>Equipo</th><th>Ejercicio en entorno autorizado</th><th>Resultado de salida</th></tr></thead><tbody>
 <tr><td>Todos · 25 min</td><td>Acceso, identidad y modo prueba del alta. Revisar OCR y recuperar borrador en el mismo navegador.</td><td>Distinguir guardar, presentar y aprobar; saber qué archivos hay que volver a elegir.</td></tr>
-<tr><td>Generador / transporte / operador · 20 min</td><td>Relevo sobre un manifiesto escuela: firma → retiro → entrega → recepción y pesaje → tratamiento → cierre.</td><td>Cada parte encuentra su próxima acción y la trazabilidad; documento final disponible.</td></tr>
+<tr><td>Generador / transporte / operador · 20 min</td><td>Relevo sobre un manifiesto CAP: firma → retiro → entrega → recepción y pesaje → tratamiento → cierre.</td><td>Cada parte encuentra su próxima acción y la trazabilidad. En capacitación, las descargas oficiales permanecen deshabilitadas.</td></tr>
 <tr><td>Inspector / autoridad / actor · 20 min</td><td>Visita y controles, foto vinculada, guardado, acta e informe; revisar requerimiento y respuesta del actor.</td><td>Distinguir constatación, análisis técnico y decisión de la autoridad.</td></tr>
 <tr><td>Administración / soporte · 15 min</td><td>Consultar solicitudes, padrón, CAA y Monitor. Ticket escuela: tomar, clasificar, derivar, nota interna y respuesta pública.</td><td>El responsable y el autor encuentran el mismo ticket con la visibilidad que corresponde.</td></tr>
 <tr><td>Todos · 10 min</td><td>Explicar la siguiente tarea, dónde pedir ayuda y qué hacer sin conexión.</td><td>Registrar lo comprobado y los pendientes del teléfono, sin prometer funcionamiento físico por una prueba emulada.</td></tr>
@@ -8012,7 +8013,7 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 <ul>
 <li>Confirmar URL autorizada, conectividad del lugar y acceso de cada participante; no compartir contraseñas ni usar impersonación para eludir permisos.</li>
 <li>Mantener los correos automáticos apagados según la configuración de la jornada. La creación de cuentas que necesitan verificación por correo no forma parte de una demostración con envíos deshabilitados.</li>
-<li>Preparar estados de respaldo en el entorno escuela. En producción, sólo consultar; no ejecutar cargas, borrados ni pruebas de estrés para entrenar.</li>
+<li>Elegir los registros CAP del equipo con la banda de capacitación visible. En Operación real, sólo consultar; no ejecutar cargas, borrados ni pruebas de estrés para entrenar.</li>
 <li>Verificar en teléfonos reales cámara/QR, GPS, permiso denegado y recuperación de conexión. El APK, la PWA y el navegador no son una única validación.</li>
 <li>No cerrar formularios de trabajo abiertos ni borrar almacenamiento del navegador para iniciar la capacitación.</li>
 </ul>

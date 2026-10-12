@@ -8,6 +8,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest, canReadActorRecord } from '../middlewares/auth.middleware';
 import { auditarActor } from '../utils/auditoria';
 import { describeDocument, readReceipt, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { scopedUploadRoot } from '../lib/trainingScope';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/var/www/sitrep-uploads';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -46,7 +47,7 @@ const storage = multer.diskStorage({
         if (!/^[a-zA-Z0-9_-]{1,100}$/.test(actorId)) return cb(new AppError('Identificador de actor inválido', 400), '');
         // Determine actor type from route path
         const actorType = routeActor(req as AuthRequest) === 'operador' ? 'operadores' : routeActor(req as AuthRequest) === 'transportista' ? 'transportistas' : 'generadores';
-        const dir = path.join(UPLOADS_DIR, actorType, actorId);
+        const dir = path.join(scopedUploadRoot(UPLOADS_DIR), actorType, actorId);
         ensureDir(dir);
         cb(null, dir);
     },

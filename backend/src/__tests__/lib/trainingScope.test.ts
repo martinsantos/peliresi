@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { contextualClient, inTrainingSession, inOperationalSession, isTrainingSession, trainingConnectionUrl } from '../../lib/trainingScope';
+import { contextualClient, inTrainingSession, inOperationalSession, isTrainingSession, trainingConnectionUrl, scopedUploadRoot } from '../../lib/trainingScope';
 
 describe('training datastore boundary', () => {
+  it('keeps school attachments in their own directory without changing the operational root', () => {
+    expect(scopedUploadRoot('/tmp/uploads')).toBe('/tmp/uploads');
+    expect(inTrainingSession(() => scopedUploadRoot('/tmp/uploads'))).toBe('/tmp/uploads/capacitacion');
+    expect(scopedUploadRoot('/tmp/uploads')).toBe('/tmp/uploads');
+  });
   const prod = 'postgresql://operational:secret@127.0.0.1:55440/qa?schema=public';
   const school = 'postgresql://school:secret@127.0.0.1:55440/qa?schema=sitrep_training';
   it('requires a different principal and exact schema; limits the pool', () => {

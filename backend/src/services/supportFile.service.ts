@@ -4,6 +4,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { AppError } from '../middlewares/errorHandler';
+import { scopedUploadRoot } from '../lib/trainingScope';
 
 const root = path.resolve(process.env.UPLOADS_DIR || '/var/www/sitrep-uploads');
 const execFileAsync = promisify(execFile);
@@ -11,7 +12,7 @@ export const SUPPORT_FILE_LIMIT = 5 * 1024 * 1024;
 export type SupportFile = { nombre: string; mime: string; bytes: number; sha256: string; storageKey: string };
 export function resolveSupportFile(key: string): string {
   if (!/^soporte\/[a-f0-9-]{36}\.(png|jpg|webp|pdf|webm|ogg|wav|m4a)$/.test(key)) throw new AppError('Adjunto inválido', 400);
-  return path.join(root, key);
+  return path.join(scopedUploadRoot(root), key);
 }
 export function supportFileType(buffer: Buffer): { mime: string; extension: string } {
   if (buffer.length > SUPPORT_FILE_LIMIT || !buffer.length) throw new AppError('Cada adjunto debe tener entre 1 byte y 5 MB', 400);

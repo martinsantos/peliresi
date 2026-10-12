@@ -92,3 +92,35 @@ test('school transport and operator complete a persisted manifest through real b
   await page.screenshot({ path: info.outputPath('training-manifest-finished.png'), fullPage: true });
   await leave(page);
 });
+
+test('school support upload and handoff stay invisible to the operational administrator', async ({ page }, info) => {
+  await login(page, info);
+  await enter(page, info, 'Generadores', 4);
+  await page.goto(prefix(info) + '/soporte');
+  await page.getByRole('region', { name: 'Soporte de SITREP', exact: true }).getByRole('button', { name: 'Reportar problema', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
+  await dialog.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('CAP consulta de práctica ' + info.project.name);
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'cap-practica.png', mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+  });
+  const posted = page.waitForResponse(r => r.url().endsWith('/api/soporte') && r.request().method() === 'POST');
+  await dialog.getByRole('button', { name: 'Enviar ticket', exact: true }).click();
+  const result = await posted;
+  expect(result.status()).toBe(201);
+  const ticket = (await result.json()).data;
+  await expect(page.getByRole('heading', { name: 'CAP consulta de práctica ' + info.project.name, exact: true })).toBeVisible();
+  await leave(page);
+  const denied = page.waitForResponse(r => new URL(r.url()).pathname === '/api/soporte/' + ticket.id);
+  await page.goto(prefix(info) + '/soporte/' + ticket.id);
+  expect((await denied).status()).toBe(404);
+  await enter(page, info, 'Administradores', 4);
+  await page.goto(prefix(info) + '/soporte/' + ticket.id);
+  await expect(page.getByRole('heading', { name: 'CAP consulta de práctica ' + info.project.name, exact: true })).toBeVisible();
+  const claimed = page.waitForResponse(r => r.url().endsWith('/acciones') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Asignarme', exact: true }).click();
+  expect((await claimed).status()).toBe(200);
+  await expect(page.getByText('Responsable', { exact: true }).locator('..')).toContainText('CAP · ADMIN 4');
+  await page.screenshot({ path: info.outputPath('training-support.png'), fullPage: true });
+  await leave(page);
+});

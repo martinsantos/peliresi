@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import path from 'node:path';
 
 // Scope is established only from a verified JWT, never a query string/header flag.
 export const TRAINING_REALM = 'sitrep-capacitacion-v1';
@@ -6,6 +7,8 @@ const scope = new AsyncLocalStorage<{ training: boolean }>();
 export const isTrainingSession = () => scope.getStore()?.training === true;
 export const inTrainingSession = <T>(operation: () => T): T => scope.run({ training: true }, operation);
 export const inOperationalSession = <T>(operation: () => T): T => scope.run({ training: false }, operation);
+/** Resolve per request; never retain a training root in a process-global value. */
+export const scopedUploadRoot = (root: string) => path.resolve(root, isTrainingSession() ? 'capacitacion' : '.');
 
 /** Same PostgreSQL server/database; separate schema and restricted DB principal.
  * Never permit falling back to public when the training configuration is absent.
