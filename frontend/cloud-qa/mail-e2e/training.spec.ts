@@ -77,11 +77,16 @@ test('school transport and operator complete a persisted manifest through real b
   const id = `cap-20261012-manifiesto-${index}-APROBADO`;
   await enter(page, info, 'Transportistas', index);
   await page.goto(prefix(info) + '/manifiestos/' + id);
-  for (const [name, endpoint] of [['Confirmar Retiro', 'confirmar-retiro'], ['Confirmar Entrega', 'confirmar-entrega']]) {
-    const response = page.waitForResponse(r => r.url().endsWith('/' + endpoint) && r.request().method() === 'POST');
-    await page.getByRole('button', { name, exact: true }).click();
-    expect((await response).status()).toBe(200);
-  }
+  // Transportistas use the trip screen, not the administrator's action strip.
+  // Delivery has its own explicit confirmation; exercise both real clicks.
+  const retired = page.waitForResponse(r => r.url().endsWith('/confirmar-retiro') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Confirmar retiro', exact: true }).click();
+  expect((await retired).status()).toBe(200);
+  await page.getByRole('button', { name: 'Confirmar entrega', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Confirmar Entrega?', exact: true })).toBeVisible();
+  const delivered = page.waitForResponse(r => r.url().endsWith('/confirmar-entrega') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Sí, Confirmar Entrega', exact: true }).click();
+  expect((await delivered).status()).toBe(200);
   await leave(page);
   await enter(page, info, 'Operadores', index);
   await page.goto(prefix(info) + '/manifiestos/' + id);
