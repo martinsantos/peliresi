@@ -7,9 +7,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, CheckCircle, Clock, AlertTriangle, XCircle, Send,
-  Loader2, ArrowRight, Eye, MessageSquare,
+  ArrowRight, Eye, MessageSquare,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
+import { FormSkeleton } from '../../components/ui/LoadingState';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
@@ -52,7 +53,7 @@ const MiSolicitudPage: React.FC = () => {
   const [messageText, setMessageText] = useState('');
   const messagesPanelRef = useRef<HTMLDivElement>(null);
 
-  const { data: solicitudes, isLoading } = useMisSolicitudes();
+  const { data: solicitudes, isLoading, isError, refetch } = useMisSolicitudes();
   const solicitud = solicitudes?.[0] as SolicitudInscripcion | undefined;
 
   const { data: mensajes } = useMensajesSolicitud(solicitud?.id || '');
@@ -92,11 +93,16 @@ const MiSolicitudPage: React.FC = () => {
 
   // ── Loading / Empty ──
 
-  if (isLoading) {
+  if (isLoading && !solicitudes) {
+    return <FormSkeleton label="Cargando tu solicitud…" />;
+  }
+
+  if (isError && !solicitudes) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-primary-500" />
-      </div>
+      <Card><div role="alert" className="space-y-3">
+        <p>No se pudo cargar tu solicitud.</p>
+        <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
+      </div></Card>
     );
   }
 

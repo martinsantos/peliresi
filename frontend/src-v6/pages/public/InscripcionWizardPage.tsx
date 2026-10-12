@@ -18,6 +18,7 @@ import {
   Factory, FlaskConical, AlertCircle, Loader2, Truck, Save,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
+import { FormSkeleton } from '../../components/ui/LoadingState';
 import api, { getAccessToken } from '../../services/api';
 import { registrationDraftHint, registrationSessionOwner } from '../../services/registrationSession';
 import { clearRegistrationDraft, readRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
@@ -726,11 +727,16 @@ const InscripcionWizardPage: React.FC = () => {
   // ========================================
 
   if (phase === 1) {
-    if (resumeStatus === 'loading' || resumeStatus === 'error') {
+    if (resumeStatus === 'loading') {
+      return <div className="mx-auto w-full max-w-4xl p-4 sm:p-6">
+        <FormSkeleton label="Recuperando tu solicitud…" />
+      </div>;
+    }
+    if (resumeStatus === 'error') {
       return <div className="flex min-h-[60vh] items-center justify-center p-4">
-        <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm" role={resumeStatus === 'error' ? 'alert' : 'status'}>
-          <h2 className="text-lg font-bold">{resumeStatus === 'loading' ? 'Recuperando tu solicitud' : 'No se pudo recuperar tu solicitud'}</h2>
-          <p className="mt-2 text-sm text-neutral-600">{resumeStatus === 'loading' ? 'Estamos leyendo el borrador guardado.' : 'No se perdió el borrador. Revisá la conexión o iniciá sesión con la cuenta creada.'}</p>
+        <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm" role="alert">
+          <h2 className="text-lg font-bold">No se pudo recuperar tu solicitud</h2>
+          <p className="mt-2 text-sm text-neutral-600">No se perdió el borrador. Revisá la conexión o iniciá sesión con la cuenta creada.</p>
           {resumeStatus === 'error' && <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button><Button onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Iniciar sesión y recuperar</Button></div>}
         </div>
       </div>;

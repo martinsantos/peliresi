@@ -5,6 +5,7 @@
  */
 
 import React, { Suspense } from 'react';
+import { PageLoader } from './components/ui/LoadingState';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 
 // ========================================
@@ -47,14 +48,6 @@ import {
 // ========================================
 // COMPONENTE DE CARGA
 // ========================================
-const PageLoader: React.FC = () => (
-  <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-    <div className="flex flex-col items-center gap-4">
-      <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
-      <p className="text-neutral-600 font-medium">Cargando SITREP v6...</p>
-    </div>
-  </div>
-);
 
 // ========================================
 // TRACKING REDIRECT (legacy routes → centro-control)

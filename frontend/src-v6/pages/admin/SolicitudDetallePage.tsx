@@ -7,9 +7,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FileText, CheckCircle, XCircle, AlertTriangle, Eye,
-  Send, Download, Loader2, MessageSquare, User, File, Clock,
+  Send, Download, MessageSquare, User, File, Clock,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
+import { FormSkeleton } from '../../components/ui/LoadingState';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal } from '../../components/ui/Modal';
@@ -188,11 +189,19 @@ const SolicitudDetallePage: React.FC = () => {
 
   // ── Loading ──
 
-  if (isLoading || !solicitud) {
+  if (isLoading && !solicitud) {
+    return <FormSkeleton label="Cargando solicitud…" fields={8} />;
+  }
+
+  if (!solicitud) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-primary-500" />
-      </div>
+      <Card><div role="alert" className="space-y-3">
+        <p>No se pudo cargar la solicitud.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
+          <Button variant="ghost" onClick={() => navigate('/admin/solicitudes')}>Volver a solicitudes</Button>
+        </div>
+      </div></Card>
     );
   }
 

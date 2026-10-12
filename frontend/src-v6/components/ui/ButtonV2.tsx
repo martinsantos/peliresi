@@ -5,7 +5,7 @@
  */
 
 import React, { forwardRef } from 'react';
-import { Loader2 } from 'lucide-react';
+import { BrandSpinner } from './LoadingState';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -123,8 +123,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {isLoading && (
-          <Loader2 
-            className="animate-spin shrink-0" 
+          <BrandSpinner
             size={size === 'sm' ? 14 : size === 'base' ? 16 : 18} 
           />
         )}

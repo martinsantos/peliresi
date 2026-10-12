@@ -304,6 +304,15 @@
   50% { opacity: 0.65; }
 }
 
+/* Loading moves only paint/compositor-safe properties; no JS frame loop. */
+@keyframes sitrep-loading-turn { to { transform: rotate(360deg); } }
+@keyframes sitrep-loading-breathe { 50% { opacity: 0.55; } }
+.sitrep-spinner { animation: sitrep-loading-turn 1.8s linear infinite; }
+.sitrep-skeleton { animation: sitrep-loading-breathe 2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .sitrep-spinner, .sitrep-skeleton { animation: none; opacity: 1; }
+}
+
 @keyframes bounce-subtle {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
