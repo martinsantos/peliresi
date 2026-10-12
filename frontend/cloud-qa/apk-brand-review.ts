@@ -13,7 +13,9 @@ const evidence = path.join(output, 'native');
 await mkdir(evidence, { recursive: true });
 const adb = (...args: string[]) => execFileSync('adb', args, { encoding: 'utf8', timeout: 20000 });
 const pkg = 'ar.com.ultimamilla.sitrep';
-assert.equal(adb('shell', 'pm', 'path', pkg).trim(), '', 'Never replace an installed app with a debug signature');
+// `pm path` exits 1 for an absent package on Android 15; list is successful
+// for both empty and populated results while preserving the no-replacement guard.
+assert.ok(!adb('shell', 'pm', 'list', 'packages', pkg).split(/\r?\n/).includes(`package:${pkg}`), 'Never replace an installed app with a debug signature');
 adb('install', path.join(output, 'android/app/build/outputs/apk/debug/app-debug.apk'));
 const identity = adb('shell', 'dumpsys', 'package', pkg);
 assert.match(identity, /versionCode=4\b/); assert.match(identity, /versionName=1\.0\.2\b/);

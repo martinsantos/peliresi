@@ -13,7 +13,7 @@ const { profiles, guides } = context.window.SITREP_HELP;
 
 test('new operational guides include relevant reusable captures, not text-only walkthroughs', () => {
   const minimums: Record<string, number> = {
-    'capacitacion-por-rol': 5, 'alta-borradores-ocr': 3,
+    'capacitacion-por-rol': 5, 'alta-borradores-ocr': 4,
     'soporte-enviar-seguir': 3, 'soporte-gestionar': 3,
     'actor-mis-inspecciones': 3, 'inspector-completar-inspeccion': 7,
   };
@@ -55,6 +55,22 @@ test('public trial screenshot is unedited, anonymous and explicitly separate fro
   const step = guides.find((g: any) => g.id === 'alta-borradores-ocr').steps[0];
   assert.equal(step.image, 'screenshots/' + p.file);
   assert.match(step.caption, /Datos sintéticos/); assert.match(step.alt, /Prueba sin envío/);
+});
+
+test('OCR evidence is an unedited real trial with synthetic data, not approval or persistent upload', () => {
+  const p = JSON.parse(read('ocr-capture-provenance.json'));
+  assert.equal(p.flowStatus, 'PASS');
+  assert.equal(p.synthetic, true); assert.equal(p.edited, false);
+  assert.equal(p.businessDataWritten, false); assert.equal(p.persistido, false);
+  assert.equal(p.authenticated, false); assert.equal(p.ocr, 'TESSERACT');
+  assert.equal(p.draftRecovered, true);
+  const bytes = readFileSync(new URL('screenshots/' + p.file, root));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), p.sha256);
+  assert.equal(bytes.readUInt32BE(16), p.width); assert.equal(bytes.readUInt32BE(20), p.height);
+  const step = guides.find((g: any) => g.id === 'alta-borradores-ocr').steps[1];
+  assert.equal(step.image, 'screenshots/' + p.file);
+  assert.match(step.caption, /Datos sintéticos/); assert.match(step.caption, /no aprueba/);
+  assert.match(step.alt, /seleccionables/);
 });
 
 test('guides have unique identities, useful steps and existing evidence', () => {

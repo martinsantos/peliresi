@@ -1,0 +1,22 @@
+{
+  "run": "38308353726",
+  "commit": "8b7612040b22c7c2a715f1fb5c8c27a1ab6e2320",
+  "at": "2026-10-12T21:05:58.481Z",
+  "flowStatus": "PASS",
+  "workflowConclusion": "cancelled-after-OCR-passed-Android-generator-stalled",
+  "source": "ocr/mobile-ocr-proposals.png",
+  "file": "mobile/registration-ocr-20261012.png",
+  "width": 360,
+  "height": 800,
+  "sha256": "af68991047daec525a6dde8679cdde813bddbd3c736721320eb729a9889bcbb0",
+  "synthetic": true,
+  "edited": false,
+  "authenticated": false,
+  "businessDataWritten": false,
+  "ocr": "TESSERACT",
+  "persistido": false,
+  "draftRecovered": true,
+  "route": "/app/inscripcion/transportista?modo=revision",
+  "viewportChecks": ["desktop-1440x900", "mobile-360x800"],
+  "note": "Only synthetic licence bytes were processed within SITREP. This screenshot is not evidence of real identity or licence validity."
+}
