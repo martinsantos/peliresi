@@ -46,7 +46,7 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
       const result = await list; assert.equal(result.status(), 200);
       const rows = (await result.json()).data;
       assert.deepEqual(rows.map((row: { id: string }) => row.id).sort(), [id, id.replace('abierta', 'cerrada')].sort());
-      await expect(page.getByRole('heading', { name: 'Mis inspecciones', exact: true })).toBeVisible();
+      await expect(page.locator('main').getByRole('heading', { name: 'Mis inspecciones', exact: true })).toBeVisible();
       await proof('training-' + role + '-own-list');
       await page.getByRole('button', { name: new RegExp(`CAP-P-5-${role}-A`) }).tap();
       await expect(page.getByText('Vista: Inspeccionado', { exact: true })).toBeVisible();
