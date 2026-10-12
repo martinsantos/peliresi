@@ -461,6 +461,7 @@ jobs:
       - name: Manual OCR through real public trial, no persistent upload
         run: node --experimental-strip-types frontend/cloud-qa/manual-ocr-capture.ts
       - name: Generate Android resources from approved brand
+        timeout-minutes: 2
         run: |
           node --experimental-strip-types scripts/qa/brand-assets.ts --check
           node --experimental-strip-types android-twa/scripts/generate-sitrep-brand.ts
