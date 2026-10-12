@@ -5,11 +5,14 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { assertCloudDatabase } from './safety.ts';
+import { assertCloudDatabase, assertCloudEnvironment } from './safety.ts';
 import { dismissObservedChromePrompts, nativeNodes, readNativeWindow } from './native-window.ts';
 import { apkCredentials, apkRequestAllowed } from './apk-auth-policy.ts';
+import { trainingCredentials, trainingRequestAllowed } from './apk-training-policy.ts';
+import { trainingJourney } from './apk-training-journey.ts';
 
-await assertCloudDatabase();
+const training = process.env.QA_APK_TRAINING === 'true';
+if (training) assertCloudEnvironment(); else await assertCloudDatabase();
 const output = path.join(process.env.QA_ARTIFACTS!, 'apk');
 await mkdir(output, { recursive: true });
 const pkg = 'ar.com.ultimamilla.sitrep';
@@ -31,7 +34,7 @@ const results: Array<{ name: string; status: string; error?: string }> = [];
 const attemptedWrites: string[] = [];
 const pageErrors: string[] = [];
 const authenticated = process.env.QA_APK_AUTHENTICATED === 'true';
-const credentials = authenticated ? apkCredentials(process.env.QA_APK_CREDENTIALS) : undefined;
+const credentials = authenticated ? (training ? trainingCredentials : apkCredentials)(process.env.QA_APK_CREDENTIALS) : undefined;
 delete process.env.QA_APK_CREDENTIALS;
 if (credentials) console.log('::add-mask::' + credentials.password);
 const blockedRequests: Array<{ method: string; path: string }> = [];
@@ -111,7 +114,9 @@ try {
     // Synthetic functional tests in android.ts do not intercept business APIs.
     await context.route('https://sitrep.ultimamilla.com.ar/api/**', async route => {
       const request = route.request();
-      if (!apkRequestAllowed(request.url(), request.method(), request.postData(), authenticated)) {
+      const allowed = training && credentials ? trainingRequestAllowed(request.url(), request.method(), request.postData(), request.headers().authorization, credentials.id)
+        : apkRequestAllowed(request.url(), request.method(), request.postData(), authenticated);
+      if (!allowed) {
         const pathname = new URL(request.url()).pathname;
         blockedRequests.push({ method: request.method(), path: pathname });
         if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) attemptedWrites.push(request.method() + ' ' + pathname);
@@ -148,7 +153,25 @@ try {
     assert.ok(page && new URL(page.url()).origin === 'https://sitrep.ultimamilla.com.ar', 'Public launch must actually have happened');
     expect(attemptedWrites).toEqual([]); expect(pageErrors).toEqual([]);
   });
-  if (credentials) {
+  if (credentials && training) {
+    await check('original-apk-training-roles-and-own-inspection-exchanges', async () => {
+      assert.ok(page && context);
+      await trainingJourney(page, credentials, async name => {
+        await device.screenshot({ path: path.join(output, name + '-device.png') });
+      }, async () => {
+        adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+        adb('shell', 'am', 'force-stop', pkg);
+        await openOriginal('authenticated');
+        return page!;
+      });
+    });
+    await check('training-no-operational-business-writes-or-page-errors', async () => {
+      expect(attemptedWrites).toEqual([]); expect(pageErrors).toEqual([]);
+      // Default selector reads operational users before its training tab is chosen.
+      // Those reads are deliberately denied; never load real people into QA artifacts.
+      expect(blockedRequests.every(r => r.method === 'GET')).toBe(true);
+    });
+  } else if (credentials) {
     await check('original-authenticated-login-own-identity', async () => {
       assert.ok(page && context);
       await page.getByLabel('Correo electrónico o CUIT').fill(credentials.email);
@@ -221,11 +244,12 @@ try {
   }
 } finally {
   await writeFile(path.join(output, 'result.json'), JSON.stringify({ commit: process.env.GITHUB_SHA,
-    installedOriginalCandidate: results[0]?.status === 'PASS', authenticated, results, attemptedWrites, blockedRequests, pageErrors,
+    installedOriginalCandidate: results[0]?.status === 'PASS', authenticated, training, results, attemptedWrites, blockedRequests, pageErrors,
     passed: results.filter(item => item.status === 'PASS').length,
     failed: results.filter(item => item.status === 'FAIL').length,
     limitations: ['Candidate in Downloads; installed version on human phone remains unknown',
-      credentials ? 'Original APK authenticated with temporary GENERADOR account without actor: session and own empty list only; no business mutations'
+      training ? 'Original APK training with exclusive temporary teacher: synthetic school replies only, no operational business mutations'
+        : credentials ? 'Original APK authenticated with temporary GENERADOR account without actor: session and own empty list only; no business mutations'
         : 'Original APK production origin: anonymous read-only launch, not authenticated production writes',
       'Synthetic end-to-end uses Chrome on the same actual Android OS, not a modified or re-signed APK',
       'Emulator, not physical phone, microphone, noisy environment or battery validation'],

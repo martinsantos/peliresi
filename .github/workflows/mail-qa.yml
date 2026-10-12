@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      training_apk:
+        description: Original APK on Android 15, temporary instructor and isolated school only
+        type: boolean
+        default: false
       design_review:
         description: Targeted identity/header regression only; no release package or deployment
         type: boolean
@@ -23,7 +27,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   isolated-mail:
-    if: ${{ !inputs.production_readonly && !inputs.final_go }}
+    if: ${{ !inputs.production_readonly && !inputs.final_go && !inputs.training_apk }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
@@ -236,7 +240,7 @@ jobs:
           path: /tmp/sitrep-mail-production/
           retention-days: 3
   stage-final-apk:
-    if: ${{ inputs.final_go }}
+    if: ${{ inputs.final_go || inputs.training_apk }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -372,5 +376,53 @@ jobs:
         with:
           name: sitrep-final-go-${{ github.run_id }}
           path: /tmp/sitrep-final-go/
+          retention-days: 3
+          if-no-files-found: warn
+  training-apk:
+    if: ${{ inputs.training_apk }}
+    needs: stage-final-apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env: *final_qa_env
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Guard policy and frontend dependencies, cloud only
+        run: |
+          node --experimental-strip-types --test frontend/cloud-qa/apk-training-policy.test.ts
+          npm ci --prefix frontend --no-audit --no-fund
+          mkdir -p "$QA_ARTIFACTS"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: sitrep-final-original-apk-${{ github.run_id }}
+          path: ${{ runner.temp }}/sitrep-apk-transfer
+      - name: Hardware acceleration on disposable cloud VM only
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Signed production APK, no operational business writes
+        env:
+          QA_APK_TRAINING: 'true'
+          QA_APK_AUTHENTICATED: 'true'
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: true
+          script: node --experimental-strip-types frontend/cloud-qa/apk.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-training-apk-${{ github.run_id }}
+          path: /tmp/sitrep-final-go/apk/
           retention-days: 3
           if-no-files-found: warn
