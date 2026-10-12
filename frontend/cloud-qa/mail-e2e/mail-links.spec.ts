@@ -123,6 +123,34 @@ test('all templates and operational variants fit with institutional brand and re
   expect(errors).toEqual([]);
 });
 
+test('all templates retain identity and actions when email images are blocked', async ({ page }, info) => {
+  test.setTimeout(120_000);
+  expect(fixture.templates).toHaveLength(58);
+  for (const item of fixture.templates) {
+    // Reproduce the received Gmail DOM: image elements remain, but src is stripped.
+    // This is graceful degradation, not a claim that Gmail delivery is repaired.
+    const blocked = item.html.replace(/(<img\b[^>]*?)\s+src="[^"]*"/gi, '$1');
+    await page.setContent(blocked);
+    await expect(page.locator('[data-mail-institution]')).toHaveText('Gobierno de Mendoza');
+    await expect(page.locator('[data-mail-institution]')).toBeVisible();
+    await expect(page.locator('[data-mail-wordmark]')).toHaveText('SITREP');
+    await expect(page.locator('h1')).toBeVisible();
+    for (const image of await page.locator('img').all()) {
+      expect(await image.getAttribute('src')).toBeNull();
+      expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(0);
+    }
+    for (const link of await page.getByRole('link').all()) {
+      await expect(link).toBeVisible();
+      await link.click({ trial: true });
+      expect(new URL((await link.getAttribute('href'))!).origin).toBe('http://127.0.0.1:4177');
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), item.id).toBe(true);
+    if (item.id === 'inspection-assigned' || item.id === 'verify') {
+      await page.screenshot({ path: info.outputPath('blocked-images-' + item.id + '.png'), fullPage: true });
+    }
+  }
+});
+
 test('public email verification preserves a local draft through real login and recovers the owned application', async ({ page }, info) => {
   const item = fixture.verifications[info.project.name][0];
   const errors: string[] = [];

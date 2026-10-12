@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mailPolicy, mendozaDayStart, retryableSmtpFailure } from '../../services/email-policy';
-import { mailLink, renderMail, renderDigest, type MailTemplateId } from '../../services/email-templates';
+import { mailLink, mailText, renderMail, renderDigest, type MailTemplateId } from '../../services/email-templates';
 
 afterEach(() => vi.unstubAllEnvs());
 describe('mail template catalogue', () => {
   it.each<MailTemplateId>(['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'])('%s has useful safe HTML, text and no interpolated subject', id => {
     const mail = renderMail(id, { name: '<img src=x onerror=bad>', role: '<admin>', message: '<script>bad()</script>\nCorregir domicilio', token: 'a"&b#c' });
-    expect(mail.version).toBe('20261012.2');
+    expect(mail.version).toBe('20261012.3');
     expect(mail.html).toContain('lang="es"');
     expect(mail.html.match(/<img /g)).toHaveLength(2);
     expect(mail.html).toContain('alt="Gobierno de Mendoza"');
@@ -28,6 +28,16 @@ describe('mail template catalogue', () => {
   });
   it('rejects absent name instead of rendering undefined', () => {
     expect(() => renderMail('approved', { name: '' })).toThrow();
+  });
+  it('keeps the institutional identity and action when a mail client strips images', () => {
+    const mail = renderMail('approved', { name: 'QA' });
+    const withoutImages = mailText(mail.html.replace(/<img\b[^>]*>/gi, ''));
+    expect(withoutImages).toContain('Gobierno de Mendoza');
+    expect(withoutImages).toContain('SITREP');
+    expect(withoutImages).toContain('Ingresar a SITREP (https://sitrep.ultimamilla.com.ar/login)');
+  });
+  it('separates paragraph starts from preceding institutional text in plain-text mail', () => {
+    expect(mailText('Fiscalización Ambiental<p>Este aviso informativo</p>')).toBe('Fiscalización Ambiental\nEste aviso informativo');
   });
   it('lets a verified pending applicant continue the application without claiming operational access', () => {
     const mail = renderMail('pending', { name: 'QA', role: 'Generador' });
