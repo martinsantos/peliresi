@@ -204,11 +204,12 @@ jobs:
           else
             npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
           fi
-      - name: Package the exact tested bytes, no rebuild or deployment
+      - name: Verify training separation after real browser journeys
         if: ${{ !inputs.design_review }}
-        run: |
-          node --experimental-strip-types frontend/cloud-qa/training-after.ts
-          node --experimental-strip-types frontend/cloud-qa/mail-package.ts package
+        run: node --experimental-strip-types frontend/cloud-qa/training-after.ts
+      - name: Package the exact tested bytes, full suites only
+        if: ${{ !inputs.design_review && !inputs.training_review }}
+        run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts package
       - name: Stop only this QA runtime
         if: always()
         run: |
