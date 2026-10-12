@@ -87,6 +87,8 @@ test('school transport and operator complete a persisted manifest through real b
   expect((await closed).status()).toBe(200);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeDisabled();
+  await expect(page.getByText('Capacitación: no se emiten documentos oficiales.')).toBeVisible();
   await page.screenshot({ path: info.outputPath('training-manifest-finished.png'), fullPage: true });
   await leave(page);
 });

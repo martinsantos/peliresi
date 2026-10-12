@@ -32,13 +32,15 @@ export async function impersonateTrainingUser(req: AuthRequest, res: Response, n
     const targetId = String(req.params.userId);
     const result = await inTrainingSession(async () => {
       const user = await prisma.usuario.findUnique({ where: { id: targetId }, include: { generador: true, transportista: true, operador: true } });
-      if (!user?.activo) throw new AppError('Cuenta de capacitación no disponible', 404);
+      if (!user?.activo || !user.email.endsWith('@capacitacion.invalid')) throw new AppError('Cuenta de capacitación no disponible', 404);
       // FK placeholder for support/audit. No password or personal data is copied
       // from production; this inactive placeholder cannot log in.
-      await prisma.usuario.upsert({ where: { id: operator.id }, update: {},
-        create: { id: operator.id, email: 'supervisor-' + operator.id + '@capacitacion.invalid',
+      const supervisorEmail = 'supervisor-' + operator.id + '@capacitacion.invalid';
+      const supervisor = await prisma.usuario.upsert({ where: { id: operator.id }, update: {},
+        create: { id: operator.id, email: supervisorEmail,
           password: randomBytes(48).toString('hex'), rol: 'ADMIN', nombre: 'Supervisor de capacitación',
           activo: false, emailVerified: false, notifEmail: false, notifNuevoRegistro: false } });
+      if (supervisor.activo || supervisor.email !== supervisorEmail) throw new AppError('Conflicto de identidad de capacitación; no se inició la sesión', 409);
       const tokens = generateTokens(user.id, false, undefined, operator.id);
       return { user: { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, training: true }, tokens };
     });

@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import { isTrainingSession } from '../lib/trainingScope';
 
 /**
  * Generate a unique manifiesto number in format YYYY-NNNNNN.
@@ -8,13 +9,14 @@ import type { Prisma } from '@prisma/client';
  */
 export async function generarNumeroManifiesto(tx: Pick<Prisma.TransactionClient, 'manifiesto'>): Promise<string> {
   const año = new Date().getFullYear();
+  const prefix = `${isTrainingSession() ? 'CAP-' : ''}${año}-`;
   const latest = await tx.manifiesto.findFirst({
-    where: { numero: { startsWith: `${año}-` } },
+    where: { numero: { startsWith: prefix } },
     orderBy: { numero: 'desc' },
     select: { numero: true },
   });
   const maxNum = latest
-    ? parseInt(latest.numero.replace(`${año}-`, ''), 10) || 0
+    ? parseInt(latest.numero.replace(prefix, ''), 10) || 0
     : 0;
-  return `${año}-${(maxNum + 1).toString().padStart(6, '0')}`;
+  return `${prefix}${(maxNum + 1).toString().padStart(6, '0')}`;
 }

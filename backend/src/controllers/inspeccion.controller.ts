@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
 import type { AuthRequest } from '../middlewares/auth.middleware';
 import {
@@ -352,7 +353,7 @@ async function nextInspectionNumber(tx: Prisma.TransactionClient, tipoActor?: Ti
     create: { serie, anio, ultimo: 1 },
     update: { ultimo: { increment: 1 } },
   });
-  return `${serie}-${anio}-${String(next.ultimo).padStart(5, '0')}`;
+  return `${isTrainingSession() ? 'CAP-' : ''}${serie}-${anio}-${String(next.ultimo).padStart(5, '0')}`;
 }
 
 export async function listarInspecciones(req: AuthRequest, res: Response, next: NextFunction) {

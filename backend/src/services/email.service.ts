@@ -109,10 +109,11 @@ async function enqueueTransaccional(
   html: string,
   prioridad: 'CRITICA' | 'NORMAL' = 'NORMAL',
 ): Promise<void> {
+  const training = isTrainingSession();
   const row = await prisma.emailQueue.create({
-    data: { to, subject, html, tipo: 'TRANSACCIONAL', prioridad, estado: DISABLE_EMAILS ? 'SUPRIMIDO' : 'PENDIENTE', maxIntentos: MAX_RETRIES, error: DISABLE_EMAILS ? mailPolicy(process.env).reason : 'DELIVERY_IN_PROGRESS_OR_UNCERTAIN' },
+    data: { to, subject, html, tipo: 'TRANSACCIONAL', prioridad, estado: training || DISABLE_EMAILS ? 'SUPRIMIDO' : 'PENDIENTE', maxIntentos: MAX_RETRIES, error: training ? 'TRAINING_NO_DELIVERY' : DISABLE_EMAILS ? mailPolicy(process.env).reason : 'DELIVERY_IN_PROGRESS_OR_UNCERTAIN' },
   });
-  if (DISABLE_EMAILS) return;
+  if (training || DISABLE_EMAILS) return;
 
   // Attempt immediate send
   const withinLimit = await checkDailyLimit(to, 'TRANSACCIONAL');
@@ -155,7 +156,7 @@ async function externalRecipientStillAllowed(to: string): Promise<boolean> {
 }
 
 async function enqueueAlerta(to: string, subject: string, html: string): Promise<void> {
-  const suppressed = DISABLE_EMAILS || !await externalRecipientStillAllowed(to);
+  const suppressed = isTrainingSession() || DISABLE_EMAILS || !await externalRecipientStillAllowed(to);
   await prisma.emailQueue.create({
     data: {
       to,
@@ -165,7 +166,7 @@ async function enqueueAlerta(to: string, subject: string, html: string): Promise
       prioridad: 'BAJA',
       estado: suppressed ? 'SUPRIMIDO' : 'DIGEST_PENDIENTE',
       maxIntentos: MAX_RETRIES,
-      error: DISABLE_EMAILS ? mailPolicy(process.env).reason : suppressed ? 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED' : null,
+      error: isTrainingSession() ? 'TRAINING_NO_DELIVERY' : DISABLE_EMAILS ? mailPolicy(process.env).reason : suppressed ? 'EXTERNAL_RECIPIENT_NOT_AUTHORIZED' : null,
       digestKey: suppressed ? null : digestKeyFor(to),
     },
   });

@@ -23,6 +23,7 @@ interface ManifiestoActionsProps {
   userRol: string;
   isActionPending: boolean;
   isInSitu?: boolean;
+  training?: boolean;
   mutations: {
     firmar: MutationState;
     confirmarRetiro: MutationState;
@@ -60,6 +61,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   userRol,
   isActionPending,
   isInSitu,
+  training,
   mutations,
   onFirmar,
   onConfirmarRetiro,
@@ -120,6 +122,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             onOpenCancelModal={() => setShowCancelModal(true)}
             onOpenReversionModal={() => setShowReversionModal(true)}
             onDescargarPDF={onDescargarPDF}
+            training={training}
             onDescargarCertificado={onDescargarCertificado}
           />
         </CardContent>

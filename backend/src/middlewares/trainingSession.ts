@@ -27,7 +27,10 @@ export function trainingSession(req: Request, res: Response, next: NextFunction)
   let path: string;
   try { path = decodeURIComponent(req.path); } catch { return next(new AppError('Ruta inválida', 400)); }
   const allowed = /^\/api\/(?:auth\/(?:profile|logout|refresh-token)|manifiestos|catalogos|actores|reportes|analytics|centro-control|inspecciones|soporte|notificaciones|search)(?:\/|$)/;
-  if (!allowed.test(path) || /\.pdf(?:\/|$)/i.test(path) || /(?:\/pdf|\/certificado|\/blockchain|\/verificar|\/email|\/push)(?:\/|$)/.test(path)) {
+  // Navigation badges and read-only administrative lists use the same scoped
+  // store. Do not grant account mutation, nested impersonation or job execution.
+  const scopedRead = req.method === 'GET' && /^\/api\/(?:admin\/usuarios|solicitudes|renovaciones|alertas|anomalias)(?:\/|$)/.test(path);
+  if ((!allowed.test(path) && !scopedRead) || /\.pdf(?:\/|$)/i.test(path) || /(?:\/pdf|\/certificado|\/blockchain|\/verificar|\/email|\/push)(?:\/|$)/.test(path)) {
     return next(new AppError('Esta función no está habilitada en capacitación; no se modificaron datos reales.', 403));
   }
   res.setHeader('X-SITREP-Training', 'true');

@@ -31,6 +31,17 @@ describe('SMTP receipt and retry safety (mock provider only)', () => {
     vi.stubEnv('DISABLE_EMAILS', 'false');
     vi.stubEnv('EMAIL_DELIVERY_NOT_BEFORE', new Date(Date.now() - 60000).toISOString());
   });
+  it('suppresses school mail even if operational mail is enabled and never flushes its queue', async () => {
+    const { emailService, flushEmailQueue } = await import('../../services/email.service');
+    const { inTrainingSession } = await import('../../lib/trainingScope');
+    await inTrainingSession(async () => {
+      await emailService.sendCuentaAprobadaEmail('qa@example.invalid', 'CAP');
+      await flushEmailQueue();
+    });
+    expect(mocks.queue.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ estado: 'SUPRIMIDO', error: 'TRAINING_NO_DELIVERY' }) }));
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+    expect(mocks.query).not.toHaveBeenCalled();
+  });
   it('sends HTML and plain text and marks SMTP accepted only after acceptance', async () => {
     const { emailService } = await import('../../services/email.service');
     await emailService.sendCuentaAprobadaEmail('qa@example.invalid', '<QA>');

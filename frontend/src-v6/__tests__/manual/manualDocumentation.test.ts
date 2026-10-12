@@ -31,7 +31,7 @@ describe('manual documentation stays usable and truthful', () => {
   });
   it('distinguishes simulation, internal delivery, reading, legal decisions and unimplemented families', () => {
     const text = catalogue.steps.flatMap(step => step.body).join(' ');
-    expect(catalogue.safety).toContain('pendiente de publicación');
+    expect(catalogue.safety).toContain('datos sintéticos y no acreditan la configuración actual');
     for (const phrase of ['No crea la regla, casos ni avisos', 'inactivas', 'no un vencimiento legal', 'no significa aceptación legal', 'hasta finalizar el 10 en Mendoza', 'nunca todo el padrón', 'No se envía correo ni push', 'no cierra un manifiesto', 'todavía no son reglas operativas']) {
       expect(text).toContain(phrase);
     }
@@ -48,15 +48,15 @@ describe('manual documentation stays usable and truthful', () => {
     }
     for (const step of catalogue.steps) {
       expect(step.caption).toContain('Datos sintéticos');
-      expect(step.caption).toContain('pendiente de publicación');
+      expect(step.caption).toContain('No acredita el estado actual de esta instalación');
       expect(receipt.files.some((item: { file: string }) => step.image === 'screenshots/' + item.file)).toBe(true);
     }
   });
   it('exposes the tutorial in all entry pages and escapes the explicit capture caption', () => {
     for (const file of ['index.html', 'search.html', 'tutorial.html']) {
       const html = readFileSync(manual + file, 'utf8');
-      expect(html).toContain('help-data.js?v=2026.16.1');
-      expect(html).toContain('manual.js?v=2026.16.2');
+      expect(html).toContain('help-data.js?v=2026.17.1');
+      expect(html).toContain('manual.js?v=2026.17.1');
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');
     expect(script).toContain("'administrador-alertas-proactivas'");

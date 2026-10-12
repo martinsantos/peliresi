@@ -6,10 +6,10 @@ import { isTrainingSession, TRAINING_REALM } from '../../lib/trainingScope';
 const sign = (claims: object) => jwt.sign(claims, 'qa-only-training-signature');
 beforeEach(() => { vi.stubEnv('TRAINING_DATABASE_URL', 'postgresql://school@localhost/test?schema=sitrep_training'); });
 afterEach(() => vi.unstubAllEnvs());
-function run(path: string, token?: string, body?: object) {
+function run(path: string, token?: string, body?: object, method = 'GET') {
   const next = vi.fn(() => isTrainingSession());
   const header = vi.fn();
-  trainingSession({ path, headers: { authorization: token ? 'Bearer ' + token : undefined }, body } as never, { setHeader: header } as never, next);
+  trainingSession({ path, method, headers: { authorization: token ? 'Bearer ' + token : undefined }, body } as never, { setHeader: header } as never, next);
   return { next, header };
 }
 it('ignores an unsigned request flag', () => {
@@ -35,4 +35,9 @@ it('does not fall back to production when school configuration is absent', () =>
   vi.stubEnv('TRAINING_DATABASE_URL', '');
   expect(run('/api/manifiestos', sign({ realm: TRAINING_REALM, impersonatedBy: 'real-admin' })).next)
     .toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+});
+it.each(['/api/admin/usuarios', '/api/solicitudes', '/api/alertas'])('allows scoped reading but not unreviewed mutations: %s', path => {
+  const token = sign({ realm: TRAINING_REALM, impersonatedBy: 'real-admin' });
+  expect(run(path, token).next.mock.results[0].value).toBe(true);
+  expect(run(path, token, {}, 'POST').next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
 });

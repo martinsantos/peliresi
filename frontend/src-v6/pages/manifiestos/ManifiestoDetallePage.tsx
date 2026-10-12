@@ -424,6 +424,7 @@ const ManifiestoDetailPage: React.FC = () => {
         onCancelar={handleCancelar}
         onRevertir={handleRevertir}
         onDescargarPDF={handleDescargarPDF}
+        training={currentUser?.training}
         onDescargarCertificado={handleDescargarCertificado}
         isCancelling={isCancelling}
       />
