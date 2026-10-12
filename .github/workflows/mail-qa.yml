@@ -453,6 +453,9 @@ jobs:
           node-version: '22'
       - name: Dependencies in disposable VM only
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ffmpeg
+          ffmpeg -version | head -1
           npm ci --prefix backend --no-audit --no-fund
           npm ci --prefix frontend --no-audit --no-fund
           npm install --prefix "$RUNNER_TEMP/sitrep-bubblewrap" --save-exact @bubblewrap/core@1.24.1 --no-audit --no-fund
