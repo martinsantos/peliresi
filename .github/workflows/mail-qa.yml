@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      branding_review:
+        description: Synthetic OCR manual evidence and unsigned Android branding candidate; cloud only, no release or mail
+        type: boolean
+        default: false
       training_review:
         description: Focused repeat of classroom journeys after test-only corrections; prior full suites remain separate evidence
         type: boolean
@@ -31,7 +35,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   isolated-mail:
-    if: ${{ !inputs.production_readonly && !inputs.final_go && !inputs.training_apk }}
+    if: ${{ !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
@@ -435,3 +439,64 @@ jobs:
           path: /tmp/sitrep-final-go/apk/
           retention-days: 3
           if-no-files-found: warn
+  branding-review:
+    if: ${{ inputs.branding_review }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env: *final_qa_env
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Dependencies in disposable VM only
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+          npm install --prefix "$RUNNER_TEMP/sitrep-bubblewrap" --save-exact @bubblewrap/core@1.24.1 --no-audit --no-fund
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Manual OCR through real public trial, no persistent upload
+        run: node --experimental-strip-types frontend/cloud-qa/manual-ocr-capture.ts
+      - name: Generate Android resources from approved brand
+        run: |
+          node --experimental-strip-types scripts/qa/brand-assets.ts --check
+          node --experimental-strip-types android-twa/scripts/generate-sitrep-brand.ts
+      - name: Build unsigned release and isolated VM debug candidate
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          cd "$RUNNER_TEMP/sitrep-brand-review/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=1 assembleDebug assembleRelease
+          tar czf "$RUNNER_TEMP/sitrep-brand-review/android-source.tar.gz" app/src app/build.gradle build.gradle settings.gradle gradle.properties gradle gradlew twa-manifest.json
+      - name: Acceleration only in cloud
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Observe new splash and real login, never override domain trust
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: false
+          script: timeout --signal=TERM --kill-after=20s 4m node --experimental-strip-types frontend/cloud-qa/apk-brand-review.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-brand-review-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sitrep-brand-review/ocr/
+            ${{ runner.temp }}/sitrep-brand-review/native/
+            ${{ runner.temp }}/sitrep-brand-review/candidate.json
+            ${{ runner.temp }}/sitrep-brand-review/android-source.tar.gz
+            ${{ runner.temp }}/sitrep-brand-review/android/app/build/outputs/apk/release/*unsigned.apk
+            ${{ runner.temp }}/sitrep-brand-review/android/app/src/main/res/drawable-xxhdpi/splash.png
+          retention-days: 3
+          if-no-files-found: error
