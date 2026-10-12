@@ -95,6 +95,8 @@ test('all templates and operational variants fit with institutional brand and re
   for (const item of fixture.templates) {
     await page.setContent(item.html);
     await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('h1')).toHaveCSS('font-family', 'Arial, Helvetica, sans-serif');
+    await expect(page.locator('h1 + p')).toHaveCSS('font-family', 'Arial, Helvetica, sans-serif');
     const logo = page.getByRole('img', { name: 'Gobierno de Mendoza' });
     await expect(logo).toBeVisible();
     await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
