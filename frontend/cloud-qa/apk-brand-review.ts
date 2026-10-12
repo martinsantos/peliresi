@@ -21,25 +21,40 @@ const identity = adb('shell', 'dumpsys', 'package', pkg);
 assert.match(identity, /versionCode=4\b/); assert.match(identity, /versionName=1\.0\.2\b/);
 await writeFile(path.join(evidence, 'package.txt'), identity);
 let xml = '';
-adb('shell', 'am', 'start', '-W', '-n', pkg + '/.LauncherActivity');
+async function recordLaunch(name: string) {
+  const remote = '/sdcard/sitrep-brand-' + name + '.mp4';
+  const video = path.join(evidence, name + '.mp4');
+  const recording = run('adb', ['shell', 'screenrecord', '--time-limit', '8', remote], { timeout: 15000 });
+  await new Promise(resolve => setTimeout(resolve, 800));
+  adb('shell', 'am', 'start', '-W', '-n', pkg + '/.LauncherActivity');
+  await recording;
+  adb('pull', remote, video);
+  execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', video, '-vf', 'fps=5,scale=360:-1', '-frames:v', '40', path.join(evidence, name + '-%02d.png')], { timeout: 20000 });
+}
+// Record before requesting an accessibility tree: the native splash may not
+// expose one. Evidence survives a later login failure, never a mocked splash.
+await recordLaunch('first-launch');
 for (let i=0;i<12;i++) {
-  await dismissObservedChromePrompts(evidence);
-  xml = await readNativeWindow();
+  try {
+    await dismissObservedChromePrompts(evidence);
+    xml = await readNativeWindow();
+  } catch (error) {
+    // Same observed launch transition as apk.ts; never use an old XML dump.
+    if (!String(error).includes('null root node') || i >= 3) throw error;
+    console.log('Waiting for a fresh native tree after splash transition');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    continue;
+  }
   if (xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar')) break;
   await new Promise(resolve => setTimeout(resolve, 1000));
 }
-assert.ok(xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar'), 'Actual public login must render');
 await writeFile(path.join(evidence, 'login.xml'), xml);
 await writeFile(path.join(evidence, 'login.png'), execFileSync('adb', ['exec-out', 'screencap', '-p'], { timeout: 10000 }));
+assert.ok(xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar'), 'Actual public login must render');
 // Record the real second cold launch; no activity substituted for the splash.
 adb('shell', 'am', 'force-stop', pkg);
 adb('shell', 'am', 'force-stop', 'com.android.chrome');
-const recording = run('adb', ['shell', 'screenrecord', '--time-limit', '8', '/sdcard/sitrep-brand-review.mp4'], { timeout: 15000 });
-await new Promise(resolve => setTimeout(resolve, 800));
-adb('shell', 'am', 'start', '-W', '-n', pkg + '/.LauncherActivity');
-await recording;
-adb('pull', '/sdcard/sitrep-brand-review.mp4', path.join(evidence, 'cold-launch.mp4'));
-execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', path.join(evidence, 'cold-launch.mp4'), '-vf', 'fps=5,scale=360:-1', '-frames:v', '25', path.join(evidence, 'launch-%02d.png')], { timeout: 20000 });
+await recordLaunch('cold-launch');
 xml = await readNativeWindow();
 assert.ok(xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar'));
 const config = await readFile(path.join(output, 'android/app/build.gradle'), 'utf8');
