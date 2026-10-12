@@ -55,7 +55,7 @@ describe('manual documentation stays usable and truthful', () => {
   it('exposes the tutorial in all entry pages and escapes the explicit capture caption', () => {
     for (const file of ['index.html', 'search.html', 'tutorial.html']) {
       const html = readFileSync(manual + file, 'utf8');
-      expect(html).toContain('help-data.js?v=2026.18.1');
+      expect(html).toContain('help-data.js?v=2026.19.1');
       expect(html).toContain('manual.js?v=2026.17.1');
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');

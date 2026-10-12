@@ -3,12 +3,47 @@ import { test } from 'node:test';
 import { readFileSync, existsSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const root = new URL('../../docs/manual/', import.meta.url);
 const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+
+test('new operational guides include relevant reusable captures, not text-only walkthroughs', () => {
+  const minimums: Record<string, number> = {
+    'capacitacion-por-rol': 5, 'alta-borradores-ocr': 2,
+    'soporte-enviar-seguir': 3, 'soporte-gestionar': 3,
+    'actor-mis-inspecciones': 3, 'inspector-completar-inspeccion': 7,
+  };
+  for (const [id, minimum] of Object.entries(minimums)) {
+    const guide = guides.find((g: any) => g.id === id);
+    assert.ok(guide.steps.filter((s: any) => s.image && s.alt).length >= minimum, id);
+  }
+  const provenance = JSON.parse(read('training-capture-provenance.json'));
+  assert.equal(provenance.synthetic, true);
+  assert.equal(provenance.productionCapture, false);
+  assert.equal(provenance.edited, false);
+  assert.equal(provenance.files.length, 13);
+  for (const item of provenance.files) {
+    const bytes = readFileSync(new URL('screenshots/' + item.file, root));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), item.sha256);
+    assert.equal(bytes.readUInt32BE(16), item.width);
+    assert.equal(bytes.readUInt32BE(20), item.height);
+    const steps = guides.flatMap((g: any) => g.steps).filter((s: any) => s.image === 'screenshots/' + item.file);
+    assert.ok(steps.length, item.file + ' must be used');
+    for (const step of steps) assert.match(step.caption, /Datos sintéticos/);
+  }
+});
+
+test('actor inspection guide does not grant access to general inspections or authority decisions', () => {
+  const guide = guides.find((g: any) => g.id === 'actor-mis-inspecciones');
+  assert.deepEqual(Array.from(guide.audiences), ['generador', 'transportista', 'operador']);
+  assert.match(JSON.stringify(guide), /No ve los borradores/);
+  assert.match(JSON.stringify(guide), /no aprueba ni cierra/);
+  assert.match(JSON.stringify(guide), /no habilita nuevas respuestas/);
+});
 
 test('guides have unique identities, useful steps and existing evidence', () => {
   assert.equal(new Set(guides.map((g: any) => g.id)).size, guides.length);
