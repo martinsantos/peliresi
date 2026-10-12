@@ -31,13 +31,17 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
     const intro = page.getByRole('button', { name: 'Saltar introducción', exact: true });
     if (await intro.isVisible()) await intro.tap();
     if (role === 'INSPECTOR') {
-      await page.goto(apkOrigin + '/app/inspecciones');
+      await page.getByRole('button', { name: 'Abrir menu', exact: true }).tap();
+      await page.getByRole('navigation', { name: 'Menú de la aplicación', exact: true }).getByRole('link', { name: 'Inspecciones', exact: true }).tap();
       await expect(page.getByText('CAP-I-5-GENERADOR', { exact: true }).first()).toBeVisible();
       await proof('training-inspector-list');
     } else {
       const id = `cap-20261012-participacion-5-${role}-abierta`;
       const list = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspecciones/participacion');
-      await page.goto(apkOrigin + '/app/mis-inspecciones');
+      await page.getByRole('button', { name: 'Abrir menu', exact: true }).tap();
+      const menu = page.getByRole('navigation', { name: 'Menú de la aplicación', exact: true });
+      await expect(menu.getByRole('link', { name: 'Inspecciones', exact: true })).toHaveCount(0);
+      await menu.getByRole('link', { name: 'Mis inspecciones', exact: true }).tap();
       const result = await list; assert.equal(result.status(), 200);
       const rows = (await result.json()).data;
       assert.deepEqual(rows.map((row: { id: string }) => row.id).sort(), [id, id.replace('abierta', 'cerrada')].sort());
