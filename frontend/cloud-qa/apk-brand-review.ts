@@ -4,6 +4,7 @@ import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { _android } from 'playwright';
 import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
 import { dismissObservedChromePrompts, readNativeWindow } from './native-window.ts';
 const run = promisify(execFile);
@@ -13,6 +14,13 @@ const evidence = path.join(output, 'native');
 await mkdir(evidence, { recursive: true });
 const adb = (...args: string[]) => execFileSync('adb', args, { encoding: 'utf8', timeout: 20000 });
 const pkg = 'ar.com.ultimamilla.sitrep';
+// Same disposable-browser setup as apk.ts. Do not click/accept Chrome terms,
+// add Google accounts, disable TLS, or override Digital Asset Links.
+adb('shell', 'am', 'set-debug-app', '--persistent', 'com.android.chrome');
+const devices = await _android.devices();
+assert.equal(devices.length, 1, 'Only the isolated cloud emulator');
+const device = devices[0];
+const browser = await device.launchBrowser({ args: ['--no-first-run', '--no-default-browser-check'] });
 // `pm path` exits 1 for an absent package on Android 15; list is successful
 // for both empty and populated results while preserving the no-replacement guard.
 assert.ok(!adb('shell', 'pm', 'list', 'packages', pkg).split(/\r?\n/).includes(`package:${pkg}`), 'Never replace an installed app with a debug signature');
@@ -67,3 +75,5 @@ await writeFile(path.join(evidence, 'result.json'), JSON.stringify({
   limitation: 'Debug key is VM-only. Chrome Custom Tab fallback is expected until original release signature is available; not a signed production upgrade.',
   system: assertStableSystemPackages(baseline), visualReview: 'Pending inspection of recorded cold-launch frames',
 }, null, 2));
+await browser.close();
+await device.close();
