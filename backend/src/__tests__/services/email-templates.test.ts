@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe('mail template catalogue', () => {
   it.each<MailTemplateId>(['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'])('%s has useful safe HTML, text and no interpolated subject', id => {
     const mail = renderMail(id, { name: '<img src=x onerror=bad>', role: '<admin>', message: '<script>bad()</script>\nCorregir domicilio', token: 'a"&b#c' });
-    expect(mail.version).toBe('20261012.3');
+    expect(mail.version).toBe('20261012.4');
     expect(mail.html).toContain('lang="es"');
     expect(mail.html.match(/<img /g)).toHaveLength(2);
     expect(mail.html).toContain('alt="Gobierno de Mendoza"');
@@ -39,6 +39,16 @@ describe('mail template catalogue', () => {
   });
   it('separates paragraph starts from preceding institutional text in plain-text mail', () => {
     expect(mailText('Fiscalización Ambiental<p>Este aviso informativo</p>')).toBe('Fiscalización Ambiental\nEste aviso informativo');
+  });
+  it('keeps both identities in one header row, government left and SITREP right', () => {
+    const { html } = renderMail('approved', { name: 'QA' });
+    expect(html).toMatch(/<tr data-mail-header-row>\s*<td data-mail-masthead/);
+    expect(html).toMatch(/<td data-mail-masthead[^>]*align="left"/);
+    expect(html).toMatch(/<td data-mail-brand[^>]*align="right"/);
+    const row = html.split('<tr data-mail-header-row>')[1].split('<!-- mail-header-end -->')[0];
+    expect(row).toContain('Gobierno de Mendoza');
+    expect(row).toContain('Fiscalización Ambiental');
+    expect(row).toContain('data-mail-wordmark');
   });
   it('lets a verified pending applicant continue the application without claiming operational access', () => {
     const mail = renderMail('pending', { name: 'QA', role: 'Generador' });
