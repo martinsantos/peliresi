@@ -26,6 +26,53 @@ async function leave(page: Page) {
   await expect(page).toHaveURL(/\/switch-user$/);
 }
 
+for (const [category, role] of [['Transportistas', 'TRANSPORTISTA'], ['Generadores', 'GENERADOR'], ['Operadores', 'OPERADOR']]) {
+  test(`school ${role}: own inspections, private drafts, response and authority closure`, async ({ page }, info) => {
+    test.setTimeout(90000);
+    await login(page, info);
+    const index = ['web-desktop', 'web-responsive', 'app'].indexOf(info.project.name) + 1;
+    const tokens = await enter(page, info, category, index);
+    const headers = { Authorization: 'Bearer ' + tokens.accessToken };
+    const id = `cap-20261012-participacion-${index}-${role}-abierta`;
+    const listing = page.waitForResponse(r => new URL(r.url()).pathname === '/api/inspecciones/participacion');
+    await page.goto(prefix(info) + '/mis-inspecciones');
+    const rows = (await (await listing).json()).data;
+    expect(rows.map((row: { id: string }) => row.id).sort()).toEqual([id, id.replace('abierta', 'cerrada')].sort());
+    await expect(page.getByRole('heading', { name: 'Mis inspecciones', exact: true })).toBeVisible();
+    for (const forbidden of [`cap-20261012-inspeccion-${index}-${role}`, `cap-20261012-participacion-5-${role}-abierta`]) {
+      const denied = await page.request.get('/api/inspecciones/' + forbidden + '/intercambios', { headers });
+      expect(denied.status()).toBe(403);
+    }
+    expect((await page.request.get('/api/inspecciones', { headers })).status()).toBe(403);
+    await page.getByRole('button', { name: new RegExp(`CAP-P-${index}-${role}-A`) }).click();
+    await expect(page.getByText('Vista: Inspeccionado', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cerrar conforme', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Responder esta actuación', exact: true }).last().click();
+    await page.getByLabel('Contenido', { exact: true }).fill('CAP respuesta del participante: control ficticio completado, sin actuación real.');
+    const posted = page.waitForResponse(r => r.url().endsWith('/' + id + '/intercambios') && r.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Presentar en expediente', exact: true }).click();
+    expect((await posted).status()).toBe(201);
+    await page.reload();
+    await expect(page.getByText('CAP respuesta del participante: control ficticio completado, sin actuación real.', { exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`training-${role}-response.png`), fullPage: true });
+    await leave(page);
+    await enter(page, info, 'Administradores', index);
+    await page.goto(prefix(info) + '/inspecciones/' + id);
+    await page.getByRole('navigation', { name: 'Secciones del expediente' }).getByRole('link', { name: 'Comunicaciones y respuestas', exact: true }).click();
+    await page.getByRole('button', { name: 'Cerrar conforme', exact: true }).click();
+    await page.getByLabel('Fundamento de la decisión').fill('CAP Ejercicio revisado: se acepta la respuesta ficticia, sin validez oficial.');
+    const closed = page.waitForResponse(r => r.url().endsWith('/intercambios/decision') && r.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Confirmar cierre conforme', exact: true }).click();
+    expect((await closed).status()).toBe(200);
+    await leave(page);
+    await enter(page, info, category, index);
+    await page.goto(prefix(info) + '/mis-inspecciones/' + id);
+    await expect(page.getByText('CAP Ejercicio revisado: se acepta la respuesta ficticia, sin validez oficial.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Responder esta actuación', exact: true })).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath(`training-${role}-closed.png`), fullPage: true });
+  });
+}
+
 test('training selector: five per category, collapse, each role can reopen and return to administrator', async ({ page }, info) => {
   test.setTimeout(120_000);
   await login(page, info);

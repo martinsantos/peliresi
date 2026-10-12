@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { CHECKLIST_BY_ACTOR } from '../controllers/inspeccion.controller';
 import { buildDeclaredInspectionSnapshot } from '../services/inspectionDeclaredSnapshot.service';
+import { seedTrainingParticipation } from './seedTrainingParticipation';
 
 export async function seedTrainingCohort(db: PrismaClient) {
   const location = await db.$queryRaw<{ schema: string }[]>`SELECT current_schema() AS schema`;
@@ -14,7 +15,7 @@ export async function seedTrainingCohort(db: PrismaClient) {
   const roles = ['ADMIN', 'INSPECTOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] as const;
   // These users are impersonation-only. No default or shared classroom password.
   const password = await bcrypt.hash(randomBytes(48).toString('base64url'), 10);
-  return db.$transaction(async tx => {
+  const cohort = await db.$transaction(async tx => {
     const waste = await tx.tipoResiduo.upsert({ where: { codigo: 'Y-CAP' }, update: {},
       create: { codigo: 'Y-CAP', nombre: 'CAPACITACIÓN · Residuo ficticio', categoria: 'PRACTICA', peligrosidad: 'SIN VALIDEZ OFICIAL' } });
     const users: { id: string; category: string; name: string }[] = [];
@@ -90,4 +91,6 @@ export async function seedTrainingCohort(db: PrismaClient) {
     }
     return { users, accounts: 40, actors: 15, vehicles: 5, drivers: 5, manifests: 35, inspections: 15, tickets: 15, syntheticGpsPoints: 25, schema: 'sitrep_training', sentMail: 0 };
   }, { timeout: 30000 });
+  await seedTrainingParticipation(db);
+  return { ...cohort, inspections: 45, participationExamples: 30 };
 }

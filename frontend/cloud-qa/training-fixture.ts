@@ -26,7 +26,8 @@ try {
   const repeat = await seedTrainingCohort(training);
   assert.equal(await training.usuario.count(), 40);
   assert.equal(await training.manifiesto.count(), 35);
-  assert.equal(await training.inspeccion.count(), 15);
+  assert.equal(await training.inspeccion.count(), 45);
+  assert.equal(await training.intercambioInspeccion.count(), 90);
   assert.equal(await training.ticketSoporte.count(), 15);
   assert.equal(await training.trackingGPS.count(), 25);
   assert.equal(await operational.usuario.count(), before);

@@ -99,6 +99,24 @@ describe('inspection participant exchange controller', () => {
     }));
   });
 
+  it.each([['TRANSPORTISTA', 'transportista', 'transportistaId'], ['OPERADOR', 'operador', 'operadorId'], ['GENERADOR', 'generador', 'generadorId']])('scopes %s independently of requested filters and hides internal drafts', async (rol, relation, field) => {
+    const next = vi.fn();
+    await listarParticipacionInspeccionado({ user: { id: 'owner', rol, [relation]: { id: 'own' } },
+      query: { actorId: 'other', estado: 'BORRADOR' } } as any, response() as any, next);
+    expect(next).not.toHaveBeenCalled();
+    const where = mocks.inspections.mock.calls[0][0].where;
+    expect(where[field]).toBe('own');
+    expect(where.estado.in).toContain('NOTIFICADA');
+    expect(where.estado.in).not.toContain('BORRADOR');
+    for (const state of ['BORRADOR', 'EN_CAMPO', 'EN_REVISION']) {
+      mocks.inspection.mockResolvedValue({ ...actorInspection, tipoActor: rol, [field]: 'own', estado: state });
+      await obtenerIntercambiosInspeccion({ params: { id: 'inspection-1' }, user: { rol, [relation]: { id: 'own' } } } as any, response() as any, next);
+      expect(next).toHaveBeenLastCalledWith(expect.objectContaining({ statusCode: 403 }));
+    }
+    expect(mocks.markViewed).not.toHaveBeenCalled();
+    expect(mocks.exchanges).not.toHaveBeenCalled();
+  });
+
   it('shows the formal timeline to the inspected actor linked to the case', async () => {
     const res = response();
     const next = vi.fn();
