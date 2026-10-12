@@ -34,7 +34,13 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
     if (role === 'INSPECTOR') {
       await page.getByRole('button', { name: 'Abrir menu', exact: true }).tap();
       await page.getByRole('navigation', { name: 'Menú de la aplicación', exact: true }).getByRole('link', { name: 'Inspecciones', exact: true }).tap();
+      const filtered = page.waitForResponse(r => {
+        const url = new URL(r.url());
+        return url.pathname === '/api/inspecciones' && url.searchParams.get('search') === 'CAP-I-5-GENERADOR' && r.request().method() === 'GET';
+      });
       await page.getByRole('textbox', { name: 'Buscar inspección', exact: true }).fill('CAP-I-5-GENERADOR');
+      assert.equal((await filtered).status(), 200);
+      await expect(page.getByText('Cargando inspecciones…', { exact: true })).toHaveCount(0);
       await expect(page.getByText('CAP-I-5-GENERADOR', { exact: true }).first()).toBeVisible();
       await proof('training-inspector-list');
     } else {

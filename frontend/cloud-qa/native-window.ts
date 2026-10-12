@@ -27,7 +27,7 @@ export function chromeButtonPoint(xml: string, text: string): { x: number; y: nu
   assert.equal(matches.length, 1, 'Tap only one currently observed native Chrome button: ' + text);
   return pointFromObservedBounds(matches[0].bounds);
 }
-/** Ordinary upward swipe inside the observed Chrome content, away from text inputs. */
+/** Ordinary upward swipe inside the observed Chrome content. */
 export function chromeScrollGesture(xml: string) {
   const nodes = nativeNodes(xml).filter(node => node.package === 'com.android.chrome'
     && node['resource-id'] === 'com.android.chrome:id/compositor_view_holder');
