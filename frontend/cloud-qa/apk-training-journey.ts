@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { expect } from '@playwright/test';
 import type { Page } from 'playwright';
 import { apkOrigin } from './apk-auth-policy.ts';
+import { tapApkSubmit } from './apk-native-submit.ts';
 
 /** Called only after the original signed APK has launched its production TWA. */
 export async function trainingJourney(page: Page, credentials: { id: string; email: string; password: string },
@@ -60,7 +61,7 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
       // Android's touch driver is still waiting.
       const [sent] = await Promise.all([
         page.waitForResponse(r => r.url().endsWith('/' + id + '/intercambios') && r.request().method() === 'POST'),
-        page.getByRole('button', { name: 'Presentar en expediente', exact: true }).tap(),
+        tapApkSubmit(page, role),
       ]);
       assert.equal(sent.status(), 201);
       await page.reload();
