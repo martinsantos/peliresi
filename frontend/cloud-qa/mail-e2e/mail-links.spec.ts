@@ -100,6 +100,7 @@ test('all templates and operational variants fit with institutional brand and re
     await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
     const masthead = page.locator('[data-mail-masthead]');
     const brand = page.locator('[data-mail-brand]');
+    await expect(brand.locator('img')).toHaveAttribute('src', /\/mail-sitrep-rotonda\.png$/);
     await expect(masthead).toContainText('Fiscalización Ambiental');
     await expect(brand.locator('[data-mail-wordmark]')).toHaveCSS('color', 'rgb(255, 255, 255)');
     await expect(brand.locator('[data-mail-wordmark]')).toHaveCSS('font-size', '32px');
