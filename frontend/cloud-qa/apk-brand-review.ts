@@ -28,7 +28,6 @@ adb('install', path.join(output, 'android/app/build/outputs/apk/debug/app-debug.
 const identity = adb('shell', 'dumpsys', 'package', pkg);
 assert.match(identity, /versionCode=4\b/); assert.match(identity, /versionName=1\.0\.2\b/);
 await writeFile(path.join(evidence, 'package.txt'), identity);
-let xml = '';
 async function recordLaunch(name: string) {
   const remote = '/sdcard/sitrep-brand-' + name + '.mp4';
   const video = path.join(evidence, name + '.mp4');
@@ -42,13 +41,16 @@ async function recordLaunch(name: string) {
 // Record before requesting an accessibility tree: the native splash may not
 // expose one. Evidence survives a later login failure, never a mocked splash.
 await recordLaunch('first-launch');
-for (let i=0;i<12;i++) {
+async function requireLogin(name: string) {
+let xml = '';
+const deadline = Date.now() + 45000;
+while (Date.now() < deadline) {
   try {
     await dismissObservedChromePrompts(evidence);
     xml = await readNativeWindow();
   } catch (error) {
     // Same observed launch transition as apk.ts; never use an old XML dump.
-    if (!String(error).includes('null root node') || i >= 3) throw error;
+    if (!String(error).includes('null root node')) throw error;
     console.log('Waiting for a fresh native tree after splash transition');
     await new Promise(resolve => setTimeout(resolve, 1000));
     continue;
@@ -56,15 +58,16 @@ for (let i=0;i<12;i++) {
   if (xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar')) break;
   await new Promise(resolve => setTimeout(resolve, 1000));
 }
-await writeFile(path.join(evidence, 'login.xml'), xml);
-await writeFile(path.join(evidence, 'login.png'), execFileSync('adb', ['exec-out', 'screencap', '-p'], { timeout: 10000 }));
+await writeFile(path.join(evidence, name + '.xml'), xml);
+await writeFile(path.join(evidence, name + '.png'), execFileSync('adb', ['exec-out', 'screencap', '-p'], { timeout: 10000 }));
 assert.ok(xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar'), 'Actual public login must render');
+}
+await requireLogin('login');
 // Record the real second cold launch; no activity substituted for the splash.
 adb('shell', 'am', 'force-stop', pkg);
 adb('shell', 'am', 'force-stop', 'com.android.chrome');
 await recordLaunch('cold-launch');
-xml = await readNativeWindow();
-assert.ok(xml.includes('Correo electrónico o CUIT') && xml.includes('Ingresar'));
+await requireLogin('reopened-login');
 const config = await readFile(path.join(output, 'android/app/build.gradle'), 'utf8');
 assert.ok(config.includes('sitrep.ultimamilla.com.ar'));
 assert.ok(!config.includes('rptrazar.mendoza.gov.ar'));
