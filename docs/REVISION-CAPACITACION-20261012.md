@@ -33,9 +33,11 @@ mensaje entregado normalmente a la bandeja de entrada.
 - El test sin `-k` falla por una ruta de clave por defecto ausente; la comprobación
   específica anterior es la relevante para el dominio.
 
-No se modificaron SMTP, DNS, claves ni otros sitios del servidor compartido.
-Se pidió autorización específica para TLS/firma; cambios de DNS y otro envío
-necesitan acordar su alcance. No se promete Inbox por modificar una plantilla.
+Estado al diagnóstico inicial: no se habían modificado SMTP, DNS ni claves.
+Actualización 09:42 UTC: el usuario autorizó TLS/DKIM y un TXT exclusivo;
+reparación aplicada y verificada, con respaldo y rollback. Ver
+[REPARACION-MTA-20261012.md](REPARACION-MTA-20261012.md). No hubo nuevos envíos
+ni cambios del selector anterior. No se promete Inbox por modificar una plantilla.
 Guía de remitentes: https://support.google.com/mail/answer/81126
 
 ## Corrección acotada del candidato
@@ -105,8 +107,9 @@ fue retirada y su secreto eliminado. No se la reactivó en esta revisión.
 
 No declarar GO global ni correo operativo. Los accesos públicos revisados pasan.
 Para una jornada que dependa de verificar nuevas cuentas por email, el correo
-es un pendiente bloqueante: resolver transporte/firma y demostrar recepción y
-marcas en Gmail. Para los roles existentes, falta reconfirmar acceso autenticado
+es un pendiente bloqueante: transporte/firma MTA ya reparados; aún hay que cerrar
+el cliente SMTP automático y demostrar recepción y marcas en Gmail.
+Para los roles existentes, falta reconfirmar acceso autenticado
 con las cuentas de capacitación. Mantener separado ese control de la QA sintética.
 
 Formularios personales, borradores, trámites y sesiones ajenas preservados.
