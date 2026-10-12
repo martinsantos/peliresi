@@ -42,6 +42,7 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
       assert.equal((await filtered).status(), 200);
       await expect(page.getByText('Cargando inspecciones…', { exact: true })).toHaveCount(0);
       await expect(page.getByText('CAP-I-5-GENERADOR', { exact: true }).first()).toBeVisible();
+      await page.getByRole('link', { name: /^Abrir expediente CAP-I-5-GENERADOR$/ }).scrollIntoViewIfNeeded();
       await proof('training-inspector-list');
     } else {
       const id = `cap-20261012-participacion-5-${role}-abierta`;
@@ -91,5 +92,7 @@ export async function trainingJourney(page: Page, credentials: { id: string; ema
   assert.equal(await page.evaluate(() => localStorage.getItem('sitrep_access_token')), null);
   await page.goto(apkOrigin + '/app/mis-inspecciones');
   await expect(page).toHaveURL(/\/app\/login$/);
+  await expect(page.getByLabel('Correo electrónico o CUIT')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ingresar', exact: true })).toBeVisible();
   await proof('training-apk-logout');
 }

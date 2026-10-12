@@ -193,6 +193,7 @@ try {
     await check('original-apk-training-roles-and-own-inspection-exchanges', async () => {
       assert.ok(page && context);
       await trainingJourney(page, credentials, async name => {
+        await writeFile(path.join(output, name + '-native.xml'), await readNativeWindow());
         await device.screenshot({ path: path.join(output, name + '-device.png') });
       }, async () => {
         adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
