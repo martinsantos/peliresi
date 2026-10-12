@@ -1,5 +1,11 @@
 # Correos institucionales — rotonda aprobada
 
+**Corrección posterior del cierre:** la recepción de ambos adjuntos CID no
+demostró su visualización. Se reprodujo en Gmail que las imágenes no aparecen
+en el encabezado. El TLS comprobado en el emisor correspondía al primer salto,
+no al transporte saliente a Gmail. Ver hallazgos y validación correctiva en
+[Revisión de capacitación](REVISION-CAPACITACION-20261012.md). No reenviar el lote.
+
 El usuario aprobó el símbolo de reciclaje circular para los correos y autorizó
 un lote de diez ejemplos a su dirección personal. Este trabajo no despliega
 la aplicación ni habilita avisos automáticos.
