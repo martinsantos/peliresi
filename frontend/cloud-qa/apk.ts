@@ -10,11 +10,13 @@ import { dismissObservedChromePrompts, nativeNodes, readNativeWindow } from './n
 import { apkCredentials, apkRequestAllowed } from './apk-auth-policy.ts';
 import { trainingCredentials, trainingRequestAllowed } from './apk-training-policy.ts';
 import { trainingJourney } from './apk-training-journey.ts';
+import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
 
 const training = process.env.QA_APK_TRAINING === 'true';
 if (training) assertCloudEnvironment(); else await assertCloudDatabase();
 const output = path.join(process.env.QA_ARTIFACTS!, 'apk');
 await mkdir(output, { recursive: true });
+const packageBaseline = training ? freezeCloudPlayStore() : undefined;
 const pkg = 'ar.com.ultimamilla.sitrep';
 const activity = pkg + '/ar.com.ultimamilla.sitrep.LauncherActivity';
 const transfer = path.join(process.env.RUNNER_TEMP!, 'sitrep-apk-transfer');
@@ -170,6 +172,8 @@ try {
       // Default selector reads operational users before its training tab is chosen.
       // Those reads are deliberately denied; never load real people into QA artifacts.
       expect(blockedRequests.every(r => r.method === 'GET')).toBe(true);
+      assert.ok(packageBaseline);
+      await writeFile(path.join(output, 'system-packages.json'), JSON.stringify(assertStableSystemPackages(packageBaseline), null, 2));
     });
   } else if (credentials) {
     await check('original-authenticated-login-own-identity', async () => {
