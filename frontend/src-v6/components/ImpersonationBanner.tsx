@@ -25,7 +25,7 @@ export const ImpersonationBanner: React.FC<ImpersonationBannerProps> = ({ user, 
       <div className="flex min-w-0 items-center gap-2">
         <Eye size={18} className="shrink-0" aria-hidden="true" />
         <span className="min-w-0 text-sm font-semibold">
-          Vista temporal · <strong>{user.nombre}</strong>
+          {user.training ? 'Capacitación · sin validez oficial' : 'Vista temporal'} · <strong>{user.nombre}</strong>
           <span className="ml-1 font-normal">({rolLabel})</span>
         </span>
       </div>

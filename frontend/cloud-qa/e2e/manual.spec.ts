@@ -17,8 +17,8 @@ test('packaged manual: home -> real alert tutorial -> captured sources -> mobile
   await tutorial.click();
   await expect(page).toHaveURL(/tutorial\.html\?guide=administrador-alertas-proactivas/);
   await expect(page.locator('#tutorialTitle')).toHaveText('Configurar alertas y seguir sus avisos');
-  await expect(page.locator('#safetyNote')).toContainText('pendiente de publicación');
-  await expect(page.locator('#safetyNote')).toContainText('No activa correo ni push');
+  await expect(page.locator('#safetyNote')).toContainText('Durante la capacitación no activar reglas ni envíos');
+  await expect(page.locator('#safetyNote')).toContainText('Simular no envía ni crea casos');
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   await expect(page.locator('.guide-step')).toHaveCount(7);
   await page.screenshot({ path: info.outputPath('manual-alerts-first-step.png'), animations: 'disabled' });

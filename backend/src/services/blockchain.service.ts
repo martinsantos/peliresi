@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import crypto from 'crypto';
 import prisma from '../lib/prisma';
+import { isTrainingSession } from '../lib/trainingScope';
 import logger from '../utils/logger';
 import { config } from '../config/config';
 import SitrepRegistryABI from '../contracts/SitrepRegistry.json';
@@ -150,7 +151,7 @@ export async function registrarSello(
   tipo: 'GENESIS' | 'CIERRE',
   hash: string,
 ): Promise<void> {
-  if (!config.BLOCKCHAIN_ENABLED) return;
+  if (isTrainingSession() || !config.BLOCKCHAIN_ENABLED) return;
 
   try {
     // Create or update the sello record

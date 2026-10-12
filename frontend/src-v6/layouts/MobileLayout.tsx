@@ -371,7 +371,7 @@ export const MobileLayout: React.FC = () => {
         <div data-testid="impersonation-banner" className="flex shrink-0 items-center gap-2 border-b border-amber-300 bg-amber-100 px-3 py-2 text-amber-950">
           <Eye size={18} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1 text-sm font-semibold leading-tight">
-            <span className="block">Vista temporal</span>
+            <span className="block">{impersonationData.impersonatedUser.training ? 'Capacitación · sin validez oficial' : 'Vista temporal'}</span>
             <span className="block truncate text-xs font-medium">{impersonationData.impersonatedUser.nombre}</span>
           </span>
           <button type="button" data-testid="exit-impersonation" onClick={exitImpersonation} className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-700 bg-white px-3 text-sm font-bold text-amber-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-900">

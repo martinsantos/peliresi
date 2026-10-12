@@ -231,3 +231,52 @@ no se cuenta como aprobada. No hubo VMs de pruebas solapadas.
 
 Alcance aprobado: candidato de diseño y continuidad de verificación en navegador.
 **No publicado. No es autorización ni GO de entrega de correos automáticos.**
+
+## Actualización: diseño publicado el 12/10/2026
+
+El estado histórico anterior queda actualizado para el **diseño** por este
+despliegue autorizado: release `20261012-mail-design-r1`, plantilla `20261012.8`,
+activada a las 07:40:21 de Mendoza. Se mantiene `DISABLE_EMAILS=true`.
+No es autorización para activar avisos, modificar destinatarios ni enviar muestras.
+
+El encabezado compartido muestra Mendoza a izquierda y SITREP a derecha,
+ambos alineados a izquierda dentro de su mitad. Referencias al costado en
+escritorio; a 560 px o menos se ocultan sólo esas referencias para conservar
+isologos legibles. La identificación completa permanece en el pie.
+El diseño alcanza renderMail, cuentas, notificaciones, plantilla base y resúmenes.
+No se cambian asuntos, elegibilidad, permisos ni destinos de los enlaces.
+
+Se reemplazó exclusivamente `dist/services/email-templates.js` y se publicaron
+los dos PNG de marca. La release anterior se conservó; el resto de los archivos
+se verificó por inventario/hash. No hubo migraciones ni reinstalaciones.
+Formularios, sesiones, service workers y archivos JS/CSS web/app sin cambios.
+
+Validación: 167 unit de correo, 6 pruebas de guardas del despliegue y paridad de
+12 variantes entre TypeScript y JS compilado. Dos workers saludables; raíz,
+app, health y ambos logos responden 200; soporte sin sesión devuelve 401.
+HTML público igual al de la release anterior. Configuración efectiva y .env
+idénticos; correos y push apagados. Cero envíos y ninguna interacción con el
+formulario del usuario durante el despliegue. No se repitió E2E global ni se
+certifica Gmail móvil físico con estas pruebas.
+
+### Respaldo y reversión del diseño
+
+Respaldo remoto: `/opt/sitrep-backups/20261012-mail-design-r1` contiene baseline,
+payload exacto, módulo anterior y recibo de activación. Releases previas:
+
+- Web: `/var/www/sitrep-releases/20261011-mail-safety-r1`.
+- Backend: `/var/www/sitrep-backend-releases/20261011-mail-safety-r1`.
+
+Script revisado de esta tarea:
+`/Users/santosma/.codex/visualizations/2026/09/24/01a0d460-1c47-70f1-b7bf-4ea3463f0746/sitrep-cloud-qa-20261002/deploy-mail-design.ts`.
+Modo `verify` comprueba la release; modo `rollback` devuelve ambos enlaces a
+las versiones anteriores, recarga únicamente SITREP y vuelve a comprobar
+salud y avisos apagados. Requiere conservar source/baseline de este despliegue;
+si detecta diferencias se detiene sin sobreescribirlas. El rollback automático
+también está preparado ante fallos de activación; no fue necesario ejecutarlo.
+
+```sh
+node --max-old-space-size=192 --experimental-strip-types deploy-mail-design.ts verify
+# Sólo ante una decisión explícita de revertir este despliegue:
+node --max-old-space-size=192 --experimental-strip-types deploy-mail-design.ts rollback
+```

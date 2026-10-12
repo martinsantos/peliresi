@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { isTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
 import { StringValue } from 'ms';
 import { z } from 'zod';
 import { config } from '../config/config';
@@ -47,7 +48,7 @@ function validatePasswordStrength(password: string): string | null {
 
 // Generar tokens JWT
 export const generateTokens = (userId: string, restricted = false, registrationDraft?: string, impersonatedBy?: string) => {
-  const payload = { id: userId, ...(restricted ? { restricted: true } : {}), ...(registrationDraft ? { registrationDraft } : {}), ...(impersonatedBy ? { impersonatedBy } : {}) };
+  const payload = { id: userId, ...(isTrainingSession() ? { realm: TRAINING_REALM } : {}), ...(restricted ? { restricted: true } : {}), ...(registrationDraft ? { registrationDraft } : {}), ...(impersonatedBy ? { impersonatedBy } : {}) };
   const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
   const accessToken = jwt.sign(payload, config.JWT_SECRET as string, options);
   const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
@@ -432,7 +433,7 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
       },
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);
-    res.json({ success: true, data: { user } });
+    res.json({ success: true, data: { user: { ...user, ...(isTrainingSession() ? { training: true } : {}) } } });
   } catch (error) {
     next(error);
   }

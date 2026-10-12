@@ -81,7 +81,9 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
     const adminUser = currentUser;
     const adminReturnPath = currentAppLocation(window.location);
 
-    const resp = await api.post(`/admin/impersonate/${userId}`);
+    const training = userId.startsWith('training:');
+    const target = training ? userId.slice('training:'.length) : userId;
+    const resp = await api.post(`/admin/${training ? 'training/' : ''}impersonate/${encodeURIComponent(target)}`);
     const { tokens } = resp.data.data;
 
     // Persist admin tokens in localStorage BEFORE reload (survives page unload)

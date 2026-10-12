@@ -1,6 +1,24 @@
 # Identidad SITREP — candidato vectorial
 
+## Actualización 12/10/2026: reciclaje / rotonda aprobado
+
+El usuario autorizó extender al sistema y al manual la marca ya utilizada en los
+correos: tres segmentos iguales en giro, sin el monograma S. La fuente aprobada
+es `frontend/public/mail-sitrep-rotonda.svg`; `favicon.svg` conserva exactamente
+su geometría. `scripts/qa/brand-assets.ts` genera los íconos web/PWA y la copia
+portátil `docs/manual/sitrep-mark.svg`, y comprueba su igualdad con `--check`.
+Los isologos gubernamentales y los pictogramas de actores no cambian.
+Esta integración está pendiente de verificación y publicación; no actualiza
+por sí sola los íconos nativos de un APK instalado.
+
+El resto de este documento conserva la exploración anterior como antecedente;
+sus referencias a la S no describen la marca vigente del candidato.
+
 Rediseño solicitado el 11/10/2026. No publicado ni aplicado a un APK distribuido.
+
+**Propuesta S RECHAZADA por el usuario.** Este documento conserva el diseño
+evaluado como antecedente, no autoriza su integración o publicación. Las nuevas
+exploraciones están fuera del producto, pendientes de elección estética.
 
 ## Marca del sistema
 
@@ -32,6 +50,12 @@ lenguaje de contorno Lucide, retícula y trazo; no copia su significado. No se
 debe sustituir Operador por un edificio ni girar el camión junto con su rombo.
 El control de inspección conserva el símbolo que usan los inspectores; no se
 introduce otra categoría ni permiso por una decisión gráfica.
+
+Contraste calculado de los símbolos blancos contra sus fondos sólidos: SITREP
+7,74:1; generador 5,70:1; transporte 3,56:1; operador 5,17:1; inspección 5,47:1.
+Todos superan 3:1 para gráficos. El naranja no alcanza 4,5:1 para texto pequeño
+blanco: las etiquetas se mantienen oscuras fuera del símbolo, no dentro del rombo.
+Color, pictograma y etiqueta se complementan; no se depende sólo del color.
 
 ## Encabezado de correos
 

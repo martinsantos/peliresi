@@ -32,6 +32,12 @@
     return data.guides.find(function (guide) { return guide.id === id; });
   }
 
+  function guideProfileLabel(guide) {
+    if (guide.audiences && guide.audiences.length > 1) return 'Varios perfiles';
+    var profile = profileById(guide.profile);
+    return profile ? profile.label : guide.profile;
+  }
+
   function readProgress() {
     try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); }
     catch (_error) { return {}; }
@@ -73,7 +79,7 @@
     var nativeHashes = ['perfiles', 'frecuentes', 'tutoriales', 'main'];
     if (nativeHashes.indexOf(hash) >= 0) return;
     var mapped = {
-      capacitacion: 'index.html#tutoriales',
+      capacitacion: 'tutorial.html?guide=capacitacion-por-rol',
       'ft-5': 'tutorial.html?guide=transportista-confirmar-retiro#paso-3-confirmar-el-retiro',
       'ft-9': 'tutorial.html?guide=transportista-confirmar-entrega#paso-3-confirmar-la-entrega',
       'fg-3': 'tutorial.html?guide=generador-crear-manifiesto#paso-1-iniciar-un-manifiesto',
@@ -107,6 +113,9 @@
     });
 
     var popularIds = [
+      'capacitacion-por-rol',
+      'alta-borradores-ocr',
+      'soporte-enviar-seguir',
       'administrador-alertas-proactivas',
       'inspector-completar-inspeccion',
       'generador-crear-manifiesto',
@@ -132,7 +141,7 @@
       link.href = tutorialURL(guide);
       link.innerHTML = '<span class="tutorial-card-icon"><span class="material-symbols-rounded" aria-hidden="true">' + escapeHTML(guide.icon) + '</span></span>' +
         '<h3>' + escapeHTML(guide.title) + '</h3><p>' + escapeHTML(guide.summary) + '</p>' +
-        '<span class="tutorial-card-meta"><span>' + escapeHTML(profile ? profile.label : guide.profile) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span>';
+        '<span class="tutorial-card-meta"><span>' + escapeHTML(guideProfileLabel(guide)) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span>';
       tutorialGrid.appendChild(link);
     });
 
@@ -143,7 +152,7 @@
       var profile = profileById(guide.profile);
       var nextStep = Math.min(recent.step || 0, guide.steps.length - 1);
       var percent = Math.round(((nextStep + 1) / guide.steps.length) * 100);
-      document.getElementById('continueDescription').textContent = (profile ? profile.label + ' · ' : '') + guide.title + ' · Paso ' + (nextStep + 1) + ' de ' + guide.steps.length;
+      document.getElementById('continueDescription').textContent = (guideProfileLabel(guide) + ' · ') + guide.title + ' · Paso ' + (nextStep + 1) + ' de ' + guide.steps.length;
       document.getElementById('continueProgress').style.width = percent + '%';
       document.getElementById('continueLink').href = tutorialURL(guide, nextStep);
       continuePanel.hidden = false;
@@ -211,7 +220,7 @@
       });
       var profile = profileById(guide.profile);
       var preview = document.getElementById('searchPreview');
-      preview.innerHTML = '<p class="preview-profile">' + escapeHTML(profile ? profile.label : guide.profile) + '</p>' +
+      preview.innerHTML = '<p class="preview-profile">' + escapeHTML(guideProfileLabel(guide)) + '</p>' +
         '<h2>' + escapeHTML(guide.title) + '</h2>' +
         '<div class="preview-meta"><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></div>' +
         '<p class="preview-summary">' + escapeHTML(guide.summary) + '</p>' +
@@ -226,7 +235,7 @@
 
     function drawResults() {
       var ranked = data.guides.map(function (guide) { return { guide: guide, score: scoreGuide(guide, query) }; })
-        .filter(function (item) { return item.score > 0 && (activeProfile === 'all' || item.guide.profile === activeProfile); })
+        .filter(function (item) { return item.score > 0 && (activeProfile === 'all' || item.guide.profile === activeProfile || (item.guide.audiences || []).indexOf(activeProfile) !== -1); })
         .sort(function (a, b) { return b.score - a.score || a.guide.title.localeCompare(b.guide.title); });
       var results = document.getElementById('searchResults');
       results.innerHTML = '';
@@ -240,7 +249,7 @@
         result.className = 'search-result';
         result.href = tutorialURL(guide);
         result.setAttribute('data-guide', guide.id);
-        result.innerHTML = '<span class="result-number">' + (index + 1) + '</span><span><h2>' + escapeHTML(guide.title) + '</h2><p>' + escapeHTML(guide.summary) + '</p><span class="result-meta"><span>' + escapeHTML(profile ? profile.label : guide.profile) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span></span><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>';
+        result.innerHTML = '<span class="result-number">' + (index + 1) + '</span><span><h2>' + escapeHTML(guide.title) + '</h2><p>' + escapeHTML(guide.summary) + '</p><span class="result-meta"><span>' + escapeHTML(guideProfileLabel(guide)) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span></span><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>';
         result.addEventListener('click', function (event) {
           var modifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
           var keyboardActivation = event.detail === 0;
@@ -278,12 +287,12 @@
     if (!guide) return;
     var profile = profileById(guide.profile) || { label: guide.profile, icon: guide.icon };
     document.title = guide.title + ' — Centro de Ayuda SITREP';
-    document.getElementById('sidebarProfile').textContent = profile.label;
+    document.getElementById('sidebarProfile').textContent = guideProfileLabel(guide);
     document.getElementById('sidebarProfileIcon').textContent = profile.icon;
-    document.getElementById('breadcrumbProfile').textContent = profile.label;
-    document.getElementById('breadcrumbProfile').href = 'search.html?profile=' + encodeURIComponent(profile.id || guide.profile);
+    document.getElementById('breadcrumbProfile').textContent = guideProfileLabel(guide);
+    document.getElementById('breadcrumbProfile').href = guide.audiences && guide.audiences.length > 1 ? 'search.html' : 'search.html?profile=' + encodeURIComponent(profile.id || guide.profile);
     document.getElementById('breadcrumbTitle').textContent = guide.title;
-    document.getElementById('tutorialProfile').textContent = profile.label;
+    document.getElementById('tutorialProfile').textContent = guideProfileLabel(guide);
     document.getElementById('tutorialTitle').textContent = guide.title;
     document.getElementById('tutorialSummary').textContent = guide.summary;
     document.getElementById('stepCount').textContent = guide.steps.length + ' pasos';

@@ -40,7 +40,13 @@ const updateUsuarioSchema = z.object({
 
 export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { search, rol, roles, activo, emailVerified, page = 1, limit = 10, sortBy, sortOrder } = req.query;
+    const { search, rol, roles, activo, emailVerified, esInspector, excludeSelf, page = 1, limit = 10, sortBy, sortOrder } = req.query;
+    if (!/^\d+$/.test(String(page)) || !/^\d+$/.test(String(limit)) || !Number.isSafeInteger(Number(page)) || !Number.isSafeInteger(Number(limit)) || Number(page) < 1 || Number(limit) < 1) {
+      throw new AppError('Paginación inválida', 400);
+    }
+    for (const value of [esInspector, excludeSelf]) {
+      if (value !== undefined && value !== 'true' && value !== 'false') throw new AppError('Filtro de usuarios inválido', 400);
+    }
     const skip = (Number(page) - 1) * Number(limit);
     const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
     const USR_SORT: Record<string, any> = {
@@ -60,9 +66,20 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
         { apellido: { contains: term, mode: 'insensitive' } },
         { email: { contains: term, mode: 'insensitive' } },
         { empresa: { contains: term, mode: 'insensitive' } },
+        { generador: { razonSocial: { contains: term, mode: 'insensitive' } } },
+        { transportista: { razonSocial: { contains: term, mode: 'insensitive' } } },
+        { operador: { razonSocial: { contains: term, mode: 'insensitive' } } },
       ] }));
     }
-    if (rol) where.rol = rol;
+    if (rol) {
+      if (!createUsuarioSchema.shape.rol.safeParse(rol).success) throw new AppError('Rol inválido', 400);
+      where.rol = rol;
+    }
+    if (esInspector !== undefined) where.esInspector = esInspector === 'true';
+    if (excludeSelf === 'true') {
+      if (!req.user?.id) throw new AppError('Sesión requerida', 401);
+      where.id = { not: req.user.id };
+    }
     if (roles !== undefined) {
       if (typeof roles !== 'string') throw new AppError('Filtro de roles inválido', 400);
       const selectedRoles = roles.split(',');
@@ -99,7 +116,7 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
           transportista: { select: { id: true, razonSocial: true } },
           operador: { select: { id: true, razonSocial: true } },
         },
-        orderBy,
+        orderBy: [orderBy, { id: 'asc' }],
       }),
       prisma.usuario.count({ where }),
     ]);

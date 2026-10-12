@@ -5,11 +5,11 @@ import UserSwitcherPage from '../../pages/auth/UserSwitcherPage';
 
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'admin', rol: 'ADMIN' } }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonateUser: vi.fn() }) }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: [
+vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: { usuarios: [
   { id: 'g', nombre: 'QA Generador', rol: 'GENERADOR', email: 'g@qa.invalid', activo: true },
   { id: 'o', nombre: 'QA Operador', rol: 'OPERADOR', email: 'o@qa.invalid', activo: true },
   { id: 'ao', nombre: 'QA Jefe', rol: 'ADMIN_OPERADOR', email: 'ao@qa.invalid', activo: true },
-] }) }));
+] , pagination: { total: 3, pages: 1 } } }) }));
 
 it('uses readable Spanish group names instead of mechanically appending s', () => {
   render(<MemoryRouter><UserSwitcherPage /></MemoryRouter>);

@@ -93,6 +93,7 @@ export enum TipoDiferencia {
 // ========================================
 
 export interface Usuario {
+  training?: boolean;
   id: string;
   email: string;
   rol: Rol;

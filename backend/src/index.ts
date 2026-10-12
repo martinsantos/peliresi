@@ -37,6 +37,7 @@ import inspeccionRoutes from './routes/inspeccion.routes';
 import supportRoutes from './routes/support.routes';
 import { startEmailFlushTimer } from './services/email.service';
 import { createAuthenticationLimiters } from './middlewares/authRateLimit';
+import { trainingSession } from './middlewares/trainingSession';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -61,6 +62,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use(trainingSession);
 
 // Rate limiting - General API (600 req/min to support 50+ phones behind shared NAT/CGNAT)
 const generalLimiter = rateLimit({

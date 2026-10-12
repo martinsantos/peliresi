@@ -22,7 +22,7 @@
     <span></span><span></span><span></span>
   </button>
   <a class="directory-brand" href="./" aria-label="SITREP Mendoza, Centro de Ayuda">
-    <img src="screenshots/escudo-mendoza-blanco.webp" width="42" height="42" alt="">
+      <img src="sitrep-mark.svg" width="42" height="42" alt="">
     <span class="directory-brand-name">SITREP <strong>Mendoza</strong></span>
     <span class="directory-brand-divider" aria-hidden="true"></span>
     <span class="directory-brand-product">Centro de Ayuda</span>
@@ -393,7 +393,7 @@ timedatectl set-timezone America/Argentina/Mendoza
   <div class="wm-body">
     <h4>Paso 1: Servidor Web <span class="wm-badge pass">Completado</span></h4>
     <p>Si estas viendo esta pagina, Nginx esta funcionando correctamente.</p>
-    <table class="wm-tbl"><tr><td><strong>Dominio</strong></td><td>rptrazar.mendoza.gov.ar</td></tr><tr><td><strong>Protocolo</strong></td><td>https: <span class="wm-badge pass">SSL Activo</span></td></tr></table>
+    <table class="wm-tbl"><tr><td><strong>Dominio</strong></td><td>el dominio de esta instalación</td></tr><tr><td><strong>Protocolo</strong></td><td>https: <span class="wm-badge pass">SSL Activo</span></td></tr></table>
   </div>
 </div>
 
@@ -592,6 +592,7 @@ pm2 restart sitrep-backend</pre></td><td>Habilita verificacion de email, alertas
 
 <section id="que-es-sitrep" data-role="all">
 <h2>1. Vision General</h2>
+<div class="callout callout-info"><strong>Dominio de esta instalación.</strong> Los enlaces a web, app y manual permanecen en el sitio donde abriste esta ayuda. El destino previsto <code>sitrep.mendoza.gov.ar</code> se usará cuando se anuncie y verifique la migración; este manual no lo da por habilitado. <a href="tutorial.html?guide=cambio-dominio">Preparar el cambio sin perder trabajo</a>. Las referencias técnicas e históricas no certifican el despliegue actual: en ejemplos de comandos, <code>SITREP_BASE_URL</code> debe definirse expresamente con la URL autorizada del entorno. No ejecutar scripts de diagnóstico o carga contra producción durante la capacitación.</div>
 <h3>1.1 Que es SITREP</h3>
 <div class="section-intro">
 SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital del Gobierno de Mendoza para el seguimiento completo de manifiestos de residuos peligrosos. Desarrollado para la Direccion General de Fiscalizacion Ambiental (DGFA), permite digitalizar y automatizar el proceso completo de gestion de residuos peligrosos en la provincia.
@@ -701,10 +702,10 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <table>
 <thead><tr><th>Servicio</th><th>URL</th></tr></thead>
 <tbody>
-<tr><td>Aplicacion Web</td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
-<tr><td>App Movil (PWA)</td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
-<tr><td>API REST</td><td><code>https://rptrazar.mendoza.gov.ar/api/</code></td></tr>
-<tr><td>Manual</td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
+<tr><td>Aplicacion Web</td><td><a href="/" data-installation-url="/">/ (esta instalación)</a></td></tr>
+<tr><td>App Movil (PWA)</td><td><a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a></td></tr>
+<tr><td>API REST</td><td><a href="/api/" data-installation-url="/api/">/api/ (esta instalación)</a></td></tr>
+<tr><td>Manual</td><td><a href="/manual/" data-installation-url="/manual/">/manual/ (esta instalación)</a></td></tr>
 </tbody>
 </table>
 <h4>Credenciales de Demostracion</h4>
@@ -730,7 +731,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <p><strong>Rol:</strong> Administrador DGFA &mdash; Acceso completo a todos los modulos del sistema.</p>
 </div>
 <ol>
-<li>Ingresar a <code>rptrazar.mendoza.gov.ar</code> con credenciales de administrador.</li>
+<li>Ingresar a <a href="/" data-installation-url="/">/ (esta instalación)</a> con credenciales de administrador.</li>
 <li>El <strong>Dashboard</strong> muestra KPIs principales: manifiestos activos, en transito, completados, alertas pendientes.</li>
 <li>Navegar a <strong>Centro de Control</strong> para ver el mapa de transportes activos en tiempo real.</li>
 <li>Consultar <strong>Reportes</strong> con 8 pestanas de analisis (manifiestos, residuos, transporte, generadores, operadores, tratamientos, departamentos, mapa de actores).</li>
@@ -798,7 +799,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <h4>Consejos para el Transportista</h4>
 <div class="info-card role-card-transportista">
 <ul>
-<li><strong>Instalar la PWA:</strong> Para la mejor experiencia en campo, instalar SITREP como aplicacion en el telefono desde <code>https://rptrazar.mendoza.gov.ar/app/</code>. Esto habilita el modo offline y acceso rapido desde la pantalla de inicio.</li>
+<li><strong>Instalar la PWA:</strong> Para la mejor experiencia en campo, instalar SITREP como aplicacion en el telefono desde <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a>. Esto habilita el modo offline y acceso rapido desde la pantalla de inicio.</li>
 <li><strong>Permisos GPS:</strong> Al confirmar el retiro, el navegador solicitara permisos de ubicacion. Es imprescindible aceptar para que el tracking funcione correctamente. Si se deniegan por error, ir a configuracion del navegador para habilitarlos manualmente.</li>
 <li><strong>Mantener la aplicacion abierta:</strong> El GPS se envia cada 30 segundos mientras la aplicacion esta activa. Si se cierra o se pone en segundo plano, los puntos pendientes se guardan localmente y se envian al reabrir la app.</li>
 <li><strong>Usar pausa en paradas:</strong> Si se realizan paradas intermedias (combustible, descanso), usar el boton de Pausa para registrar el incidente. Reanudar al continuar el viaje.</li>
@@ -1443,7 +1444,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <p>Una alerta conserva su regla y la situación detectada. Leer o eliminar el aviso personal no resuelve el caso ni elimina esa evidencia. La autoridad habilitada gestiona el estado con motivo; resolver el caso no cambia el estado del manifiesto o de la inspección.</p>
 
 <h4 id="alertas-catalogo">Catálogo proactivo: reglas, casos y avisos</h4>
-<div class="callout callout-warning"><strong>Estado de esta novedad al 04/10/2026:</strong> validada en QA y pendiente de publicación. Las capturas de este apartado son reales, con datos sintéticos; no prueban que el catálogo esté habilitado en tu instalación. <a href="tutorial.html?guide=administrador-alertas-proactivas">Abrir la guía paso a paso</a>.</div>
+<div class="callout callout-warning"><strong>Capturas históricas de QA (04/10/2026):</strong> los datos son sintéticos y no acreditan la configuración actual de tu instalación. Durante la capacitación no activar reglas ni envíos. <a href="tutorial.html?guide=administrador-alertas-proactivas">Abrir la guía paso a paso</a>.</div>
 <table>
 <thead><tr><th>Familia</th><th>Fuente y criterio</th><th>Acción útil</th></tr></thead>
 <tbody>
@@ -1729,7 +1730,7 @@ SITREP ofrece dos vias para dar de alta actores en el sistema: <strong>auto-insc
 <!-- ============================================================ -->
 <h4 id="inscr-gen">3.12.2 Wizard de Generador — Inscripcion Publica (7 pasos)</h4>
 
-<p>Tras completar la Fase 1, el wizard de generador presenta 7 pasos con stepper visual de progreso. Cada paso valida sus campos antes de permitir avanzar al siguiente.</p>
+<p>Tras completar la Fase 1, el wizard de generador presenta 7 pasos. Podés completar y guardar el borrador por partes; el envío real requiere corregir los campos y documentos obligatorios. Avanzar no equivale a presentar ni aprobar.</p>
 
 <div class="cu-screenshot"><a href="screenshots/desktop/W02_pub_gen_paso1.png" target="_blank"><img src="screenshots/desktop/W02_pub_gen_paso1.png" alt="Generador — Paso 1 Establecimiento" loading="lazy"></a><div class="cu-screenshot-caption">Paso 1: Establecimiento — datos basicos del generador</div></div>
 
@@ -2281,16 +2282,15 @@ Donde: R = Z x A x D x C</pre>
 <!-- ============================================================ -->
 <!-- TABLA RESUMEN COMPARATIVA DE LOS 6 WIZARDS                   -->
 <!-- ============================================================ -->
-<h4 id="inscr-resumen">Resumen Comparativo de Wizards</h4>
+<h4 id="inscr-resumen">Alta pública y revisión administrativa</h4>
 <table>
-<thead><tr><th>Wizard</th><th>Via</th><th>Pasos</th><th>TEF</th><th>Corrientes Y</th><th>Representantes</th><th>Vehiculos/Choferes</th><th>Documentos</th></tr></thead>
+<thead><tr><th>Recorrido</th><th>Qué se carga o revisa</th><th>Resultado</th></tr></thead>
 <tbody>
-<tr><td>Generador</td><td>Publica</td><td>7</td><td>Campos manuales</td><td>No</td><td>No</td><td>No</td><td>3 obligatorios</td></tr>
-<tr><td>Operador</td><td>Publica</td><td>8</td><td>Campos manuales</td><td>Textarea</td><td>Si (legal + tecnico)</td><td>No</td><td>3 obligatorios</td></tr>
-<tr><td>Transportista</td><td>Publica</td><td>5</td><td>No</td><td>No</td><td>No</td><td>Texto libre</td><td>3 obligatorios</td></tr>
-<tr><td>Generador</td><td>Admin</td><td>6</td><td>CalculadoraTEF interactivo</td><td>Checkboxes + badge C</td><td>No</td><td>No</td><td>6 (4 oblig + 2 opc)</td></tr>
-<tr><td>Operador</td><td>Admin</td><td>7</td><td>CalculadoraTEF interactivo</td><td>Checkboxes + badge C</td><td>Si (legal + tecnico)</td><td>No</td><td>7 (5 oblig + 2 opc)</td></tr>
-<tr><td>Transportista</td><td>Admin</td><td>5</td><td>No</td><td>No</td><td>No</td><td>Listas dinamicas</td><td>No</td></tr>
+<tr><td>Generador</td><td>Identificación, actividad, establecimiento y documentación requerida por el formulario.</td><td>Borrador o solicitud presentada; no hay calculadora dinámica TEF para el solicitante.</td></tr>
+<tr><td>Operador</td><td>Identificación, categoría, representantes, residuos, tratamientos y documentación aplicable.</td><td>Información disponible para revisión de la autoridad, no aprobación automática.</td></tr>
+<tr><td>Transportista</td><td>Datos de la empresa, vehículos y choferes detallados; licencia y OCR con revisión de sugerencias.</td><td>Flota y conductores asociados, no una nómina de texto libre.</td></tr>
+<tr><td>Administración</td><td>Revisar solicitud y adjuntos; corregir datos cuando el estado y los permisos lo permitan. TEF en la vista administrativa.</td><td>Corrección trazable; observar o aprobar son decisiones separadas del guardado.</td></tr>
+<tr><td>Modo prueba</td><td>Los mismos apartados del alta, con recuperación local de campos y paso. Los archivos deben elegirse de nuevo.</td><td>No crea solicitudes, cuentas ni aprobaciones reales.</td></tr>
 </tbody>
 </table>
 
@@ -2666,7 +2666,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 
 <h4>Instalacion en Android (Chrome)</h4>
 <ol>
-<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Google Chrome.</li>
+<li>Abrir <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a> en Google Chrome.</li>
 <li>El navegador mostrara automaticamente un banner de instalacion despues de 45 segundos de uso (puede descartarse por 7 dias).</li>
 <li>Alternativamente, tocar el menu de tres puntos y seleccionar <strong>&quot;Agregar a pantalla de inicio&quot;</strong>.</li>
 <li>La aplicacion se instala como icono independiente en el launcher.</li>
@@ -2674,7 +2674,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 
 <h4>Instalacion en iOS (Safari)</h4>
 <ol>
-<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Safari.</li>
+<li>Abrir <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a> en Safari.</li>
 <li>Tocar el boton <strong>Compartir</strong> (icono de flecha hacia arriba).</li>
 <li>Seleccionar <strong>&quot;Agregar a la pantalla de inicio&quot;</strong>.</li>
 <li>Confirmar el nombre y tocar <strong>Agregar</strong>.</li>
@@ -3485,7 +3485,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <thead><tr><th>Componente</th><th>Configuracion</th></tr></thead>
 <tbody>
 <tr><td>Servidor</td><td>VPS en 23.105.176.45</td></tr>
-<tr><td>Dominio</td><td><code>rptrazar.mendoza.gov.ar</code></td></tr>
+<tr><td>Dominio</td><td><a href="/" data-installation-url="/">/ (esta instalación)</a></td></tr>
 <tr><td>PM2</td><td>Modo cluster, 2 instancias, puerto 3010, 512MB por instancia</td></tr>
 <tr><td>Nginx</td><td>Reverse proxy <code>/api/</code> hacia <code>localhost:3010</code>, SPA fallback para frontend</td></tr>
 <tr><td>SSL</td><td>Let's Encrypt (renovacion automatica)</td></tr>
@@ -3501,7 +3501,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tr><td>PWA App mobile</td><td><code>/var/www/sitrep/app/</code></td></tr>
 <tr><td>Backend (codigo compilado)</td><td><code>/var/www/sitrep-backend/</code></td></tr>
 <tr><td>Backend .env</td><td><code>/var/www/sitrep-backend/.env</code> (symlink)</td></tr>
-<tr><td>Configuracion Nginx</td><td><code>/etc/nginx/sites-available/rptrazar.mendoza.gov.ar</code></td></tr>
+<tr><td>Configuracion Nginx</td><td><code>RUTA_VHOST_DE_ESTA_INSTALACION</code></td></tr>
 <tr><td>Logs PM2</td><td><code>/root/.pm2/logs/sitrep-backend-*.log</code></td></tr>
 </tbody>
 </table>
@@ -3714,7 +3714,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <section id="arq-api" data-role="all">
 <h3>5.3 Esquema de Servicios API</h3>
 
-<a href="https://rptrazar.mendoza.gov.ar/api/docs" target="_blank" class="api-docs-card">
+<a href="/api/docs" target="_blank" class="api-docs-card">
   <span class="api-icon">&#128218;</span>
   <div class="api-info">
     <h4>Documentacion Interactiva de la API (OpenAPI/Swagger)</h4>
@@ -3812,7 +3812,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <tbody>
 <tr><td><strong>Helmet</strong></td><td>Headers de seguridad HTTP</td><td>CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy</td></tr>
 <tr><td><strong>Compression</strong></td><td>Compresion gzip</td><td>~7x reduccion de payload. Aplicado a todas las respuestas JSON y HTML.</td></tr>
-<tr><td><strong>CORS</strong></td><td>Control de origen cruzado</td><td>Configurado exclusivamente para el dominio de produccion (<code>rptrazar.mendoza.gov.ar</code>).</td></tr>
+<tr><td><strong>CORS</strong></td><td>Control de origen cruzado</td><td>Configurado exclusivamente para el dominio de produccion (<a href="/" data-installation-url="/">/ (esta instalación)</a>).</td></tr>
 <tr><td><strong>Rate Limiting</strong></td><td>Proteccion contra abuso</td><td>600 solicitudes por minuto por direccion IP. Soporta CGNAT (multiples usuarios detras de misma IP).</td></tr>
 <tr><td><strong>Auth JWT</strong></td><td>Autenticacion y autorizacion</td><td>Verificacion de token Bearer en rutas protegidas. Roles verificados por endpoint.</td></tr>
 <tr><td><strong>Analytics</strong></td><td>Registro de metricas</td><td>Registra endpoint, metodo, status, tiempo de respuesta, userId. Excluye rutas GPS (<code>/ubicacion</code>, <code>/gps</code>) para evitar volumen excesivo.</td></tr>
@@ -5538,7 +5538,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">Como accedo al sistema por primera vez?</div>
 <div class="collapsible-body">
-<p>El administrador del sistema (DGFA) debe crear su cuenta de usuario y asignarle el rol correspondiente (Generador, Transportista u Operador). Una vez creada la cuenta, acceda a <code>https://rptrazar.mendoza.gov.ar/</code> con el email y contrasena proporcionados. Para la version mobile, acceda a <code>https://rptrazar.mendoza.gov.ar/app/</code> desde el navegador de su telefono.</p>
+<p>El administrador del sistema (DGFA) debe crear su cuenta de usuario y asignarle el rol correspondiente (Generador, Transportista u Operador). Una vez creada la cuenta, acceda a <a href="/" data-installation-url="/">/ (esta instalación)</a> con el email y contrasena proporcionados. Para la version mobile, acceda a <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a> desde el navegador de su telefono.</p>
 </div>
 
 <div class="collapsible-header" onclick="toggleCollapsible(this)">Que navegadores son compatibles?</div>
@@ -5557,7 +5557,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="collapsible-body">
 <p>El tracking GPS requiere que se concedan permisos de ubicacion al navegador. Si el GPS no funciona:</p>
 <ol>
-<li><strong>Verificar permisos:</strong> En la configuracion del navegador, asegurarse de que <code>rptrazar.mendoza.gov.ar</code> tenga permiso de ubicacion &quot;Permitir&quot;.</li>
+<li><strong>Verificar permisos:</strong> En la configuracion del navegador, asegurarse de que <a href="/" data-installation-url="/">/ (esta instalación)</a> tenga permiso de ubicacion &quot;Permitir&quot;.</li>
 <li><strong>Verificar GPS del dispositivo:</strong> Asegurarse de que el GPS del telefono este activado (Configuracion &gt; Ubicacion).</li>
 <li><strong>Modo de alta precision:</strong> Activar el modo de ubicacion de alta precision que combina GPS, WiFi y datos moviles.</li>
 <li><strong>Reiniciar el navegador:</strong> Cerrar completamente el navegador y volver a abrir la aplicacion.</li>
@@ -5581,13 +5581,13 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <div class="collapsible-body">
 <p><strong>Android (Chrome):</strong></p>
 <ol>
-<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Google Chrome.</li>
+<li>Abrir <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a> en Google Chrome.</li>
 <li>Esperar 45 segundos hasta que aparezca el banner de instalacion, o abrir el menu (tres puntos) y seleccionar &quot;Agregar a pantalla de inicio&quot;.</li>
 <li>Confirmar la instalacion. La app aparecera como icono en el launcher.</li>
 </ol>
 <p><strong>iOS (Safari):</strong></p>
 <ol>
-<li>Abrir <code>https://rptrazar.mendoza.gov.ar/app/</code> en Safari (no Chrome).</li>
+<li>Abrir <a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a> en Safari (no Chrome).</li>
 <li>Tocar el boton Compartir (cuadrado con flecha hacia arriba).</li>
 <li>Seleccionar &quot;Agregar a la pantalla de inicio&quot;.</li>
 <li>Confirmar el nombre y tocar Agregar.</li>
@@ -5705,7 +5705,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Caracteristica</th><th>Version Web</th><th>Version Mobile (PWA)</th></tr></thead>
 <tbody>
-<tr><td><strong>URL</strong></td><td><code>rptrazar.mendoza.gov.ar/</code></td><td><code>rptrazar.mendoza.gov.ar/app/</code></td></tr>
+<tr><td><strong>URL</strong></td><td><a href="/" data-installation-url="/">/ (esta instalación)</a></td><td><a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a></td></tr>
 <tr><td><strong>Orientacion</strong></td><td>Desktop (horizontal)</td><td>Portrait (vertical)</td></tr>
 <tr><td><strong>Navegacion</strong></td><td>Sidebar lateral + header</td><td>Bottom nav bar + drawer lateral</td></tr>
 <tr><td><strong>Instalable</strong></td><td>No</td><td>Si (PWA con icono en home screen)</td></tr>
@@ -5930,7 +5930,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Problema</th><th>Causa Probable</th><th>Solucion</th></tr></thead>
 <tbody>
-<tr><td>GPS no se activa al confirmar retiro</td><td>Permisos de ubicacion denegados</td><td>Ir a Configuracion del navegador &gt; Permisos &gt; Ubicacion &gt; Permitir para rptrazar.mendoza.gov.ar</td></tr>
+<tr><td>GPS no se activa al confirmar retiro</td><td>Permisos de ubicacion denegados</td><td>Ir a Configuracion del navegador &gt; Permisos &gt; Ubicacion &gt; Permitir para el dominio de esta instalación</td></tr>
 <tr><td>Estado &quot;acquiring&quot; indefinido</td><td>GPS del dispositivo desactivado</td><td>Activar GPS en Configuracion &gt; Ubicacion del telefono. Usar modo alta precision.</td></tr>
 <tr><td>Puntos GPS no se envian</td><td>Sin conexion a internet</td><td>Los puntos se almacenan localmente (max 5). Se enviaran automaticamente al reconectar.</td></tr>
 <tr><td>GPS muestra ubicacion incorrecta</td><td>Baja precision de senial</td><td>Moverse a un area abierta. Verificar que el modo de alta precision este activado.</td></tr>
@@ -6033,9 +6033,9 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tbody>
 <tr><td><strong>Administrador del Sistema</strong></td><td><code>admin@dgfa.mendoza.gov.ar</code></td></tr>
 <tr><td><strong>Soporte Tecnico</strong></td><td>Contactar a la Direccion General de Fiscalizacion Ambiental (DGFA)</td></tr>
-<tr><td><strong>Aplicacion Web</strong></td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
-<tr><td><strong>Aplicacion Movil</strong></td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
-<tr><td><strong>Manual en linea</strong></td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
+<tr><td><strong>Aplicacion Web</strong></td><td><a href="/" data-installation-url="/">/ (esta instalación)</a></td></tr>
+<tr><td><strong>Aplicacion Movil</strong></td><td><a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a></td></tr>
+<tr><td><strong>Manual en linea</strong></td><td><a href="/manual/" data-installation-url="/manual/">/manual/ (esta instalación)</a></td></tr>
 </tbody>
 </table>
 
@@ -6084,11 +6084,11 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <table>
 <thead><tr><th>Recurso</th><th>URL</th></tr></thead>
 <tbody>
-<tr><td>Aplicacion Web (Desktop)</td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
-<tr><td>Aplicacion Mobile (PWA)</td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
-<tr><td>API REST</td><td><code>https://rptrazar.mendoza.gov.ar/api/</code></td></tr>
-<tr><td>Health Check</td><td><code>https://rptrazar.mendoza.gov.ar/api/health</code></td></tr>
-<tr><td>Manual en linea</td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
+<tr><td>Aplicacion Web (Desktop)</td><td><a href="/" data-installation-url="/">/ (esta instalación)</a></td></tr>
+<tr><td>Aplicacion Mobile (PWA)</td><td><a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a></td></tr>
+<tr><td>API REST</td><td><a href="/api/" data-installation-url="/api/">/api/ (esta instalación)</a></td></tr>
+<tr><td>Health Check</td><td><a href="/api/health" data-installation-url="/api/health">/api/health (esta instalación)</a></td></tr>
+<tr><td>Manual en linea</td><td><a href="/manual/" data-installation-url="/manual/">/manual/ (esta instalación)</a></td></tr>
 </tbody>
 </table>
 </section>
@@ -7045,7 +7045,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <tr><td>Backend (codigo)</td><td><code>/var/www/sitrep-backend/</code> (symlink a release activo)</td></tr>
 <tr><td>Backend .env</td><td><code>/home/demoambiente/.env</code> (symlink desde cada release)</td></tr>
 <tr><td>Releases</td><td><code>/var/www/sitrep-backend-releases/YYYYMMDD-HHMMSS/</code></td></tr>
-<tr><td>Nginx config</td><td><code>/etc/nginx/sites-available/rptrazar.mendoza.gov.ar</code></td></tr>
+<tr><td>Nginx config</td><td><code>RUTA_VHOST_DE_ESTA_INSTALACION</code></td></tr>
 <tr><td>PM2 logs</td><td><code>/root/.pm2/logs/sitrep-backend-*.log</code></td></tr>
 <tr><td>Deploy scripts</td><td><code>/opt/scripts-cicd/deploy_sitrep_backend.sh</code></td></tr>
 </tbody>
@@ -7055,12 +7055,12 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <table>
 <thead><tr><th>Recurso</th><th>URL</th></tr></thead>
 <tbody>
-<tr><td>Frontend</td><td><code>https://rptrazar.mendoza.gov.ar/</code></td></tr>
-<tr><td>PWA App</td><td><code>https://rptrazar.mendoza.gov.ar/app/</code></td></tr>
-<tr><td>API REST</td><td><code>https://rptrazar.mendoza.gov.ar/api/</code></td></tr>
-<tr><td>API Docs (Swagger)</td><td><code>https://rptrazar.mendoza.gov.ar/api/docs</code></td></tr>
-<tr><td>Health Check</td><td><code>https://rptrazar.mendoza.gov.ar/api/health</code></td></tr>
-<tr><td>Manual</td><td><code>https://rptrazar.mendoza.gov.ar/manual/</code></td></tr>
+<tr><td>Frontend</td><td><a href="/" data-installation-url="/">/ (esta instalación)</a></td></tr>
+<tr><td>PWA App</td><td><a href="/app/" data-installation-url="/app/">/app/ (esta instalación)</a></td></tr>
+<tr><td>API REST</td><td><a href="/api/" data-installation-url="/api/">/api/ (esta instalación)</a></td></tr>
+<tr><td>API Docs (Swagger)</td><td><a href="/api/docs" data-installation-url="/api/docs">/api/docs (esta instalación)</a></td></tr>
+<tr><td>Health Check</td><td><a href="/api/health" data-installation-url="/api/health">/api/health (esta instalación)</a></td></tr>
+<tr><td>Manual</td><td><a href="/manual/" data-installation-url="/manual/">/manual/ (esta instalación)</a></td></tr>
 </tbody>
 </table>
 </section>
@@ -7324,7 +7324,7 @@ checking → acquiring → active
     <li><code>pm2 restart sitrep-backend</code></li>
   </ul>
 </li>
-<li><strong>Health check:</strong> <code>curl https://rptrazar.mendoza.gov.ar/api/health</code>
+<li><strong>Health check:</strong> <code>curl ${SITREP_BASE_URL}/api/health</code>
   <ul>
     <li>Espera respuesta <code>{"status":"ok","db":"connected"}</code></li>
     <li>Si falla → <strong>ROLLBACK automatico</strong> al release anterior (2 segundos)</li>
@@ -7393,7 +7393,7 @@ ssh root@23.105.176.45 "pm2 logs sitrep-backend --lines 100"
 ssh root@23.105.176.45 "pm2 show sitrep-backend"
 
 # Health check
-curl -s https://rptrazar.mendoza.gov.ar/api/health | jq .
+curl -s ${SITREP_BASE_URL}/api/health | jq .
 
 # Estado de PostgreSQL
 ssh root@23.105.176.45 "docker exec directus-admin-database-1 \
@@ -7457,7 +7457,7 @@ find $BACKUP_DIR -name "env-*.bak" -mtime +30 -delete
 <li><strong>Restaurar .env:</strong> <code>cp env-backup.bak /home/demoambiente/.env</code></li>
 <li><strong>Re-deploy backend:</strong> Usar ultimo release en <code>/var/www/sitrep-backend-releases/</code> o CI/CD</li>
 <li><strong>Re-deploy frontend:</strong> Build local + scp + tar</li>
-<li><strong>Verificar:</strong> <code>curl https://rptrazar.mendoza.gov.ar/api/health</code></li>
+<li><strong>Verificar:</strong> <code>curl ${SITREP_BASE_URL}/api/health</code></li>
 </ol>
 </section>
 
@@ -7706,7 +7706,7 @@ npm run test:coverage          # con cobertura</pre>
 </li>
 <li><strong>Como correr contra produccion:</strong>
 <pre>cd frontend
-PLAYWRIGHT_BASE_URL=https://rptrazar.mendoza.gov.ar \
+PLAYWRIGHT_BASE_URL=${SITREP_BASE_URL} \
   npx playwright test --project=chromium</pre>
 </li>
 </ul>
@@ -7909,7 +7909,7 @@ if (dateFilter) where.createdAt = dateFilter;</pre>
 <pre># puertos abiertos pero apps no responden
 nc -zv 23.105.176.45 80   # OK
 nc -zv 23.105.176.45 443  # OK
-curl https://rptrazar.mendoza.gov.ar/api/health  # timeout
+curl ${SITREP_BASE_URL}/api/health  # timeout
 ssh root@23.105.176.45 "systemctl status nginx"
 # nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
 
@@ -7926,7 +7926,7 @@ ssh root@23.105.176.45 "ss -tlnp | grep -E ':80|:443'"
   systemctl disable lshttpd
 "</pre>
 
-<p>Verificacion: <code>curl https://rptrazar.mendoza.gov.ar/api/health</code> &rarr; <code>{"status":"ok","db":"connected"}</code>. Smoke test 48/48 PASS.</p>
+<p>Verificacion: <code>curl ${SITREP_BASE_URL}/api/health</code> &rarr; <code>{"status":"ok","db":"connected"}</code>. Smoke test 48/48 PASS.</p>
 
 <h4>Runbook — Recuperacion rapida</h4>
 <table>
@@ -7953,7 +7953,7 @@ docker exec directus-admin-database-1 pg_isready -U directus -d trazabilidad_rrp
 ls -lt /opt/sitrep-backups/sitrep-db-*.sql.gz | head -3
 
 # Smoke test produccion
-bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
+bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 
 <div class="warn-box">
 <strong>Atencion:</strong> el disco esta al 91% (7.2GB libres). Los backups crecen ~120MB/dia. Monitorear con cron, considerar limpieza agresiva o cross-server rsync.
@@ -7984,125 +7984,42 @@ bash backend/tests/smoke-test.sh https://rptrazar.mendoza.gov.ar</pre>
 <!-- SECTION 17: CAPACITACION Y QA CONTROLADA                     -->
 <!-- ============================================================ -->
 <section id="capacitacion-qa" data-role="all">
-<h2>17. Capacitacion y QA Controlada</h2>
+<h2>17. Capacitación por rol y práctica segura</h2>
+<div class="callout callout-info"><strong>Primero, el entorno:</strong> en producción la demostración es de <strong>solo lectura</strong>. Las acciones de firma, retiro, recepción, cierre, aprobación o envío de tickets requieren un entorno de práctica y registros escuela expresamente autorizados. <code>isDemoData=true</code> no constituye aislamiento ni autorización.</div>
+<p><a href="tutorial.html?guide=capacitacion-por-rol">Abrir el recorrido guiado de 90 minutos</a> · <a href="tutorial.html?guide=alta-borradores-ocr">Alta, OCR y borradores</a> · <a href="tutorial.html?guide=soporte-enviar-seguir">Tickets y respuestas</a>.</p>
 
-<div class="training-hero">
-  <div>
-    <span class="training-eyebrow">Produccion Gobierno</span>
-    <h3>Guion operativo para entrenar sin tocar datos reales</h3>
-    <p>Esta seccion complementa la capacitacion presencial y las corridas E2E sobre <code>https://rptrazar.mendoza.gov.ar/app/</code>. El recorrido vigente usa manifiestos con prefijo <code>CAP-20260923</code> y marca <code>isDemoData=true</code>; confirmá su presencia y estado antes de iniciar cada ejercicio.</p>
-  </div>
-  <div class="training-status">
-    <strong>Estado recomendado</strong>
-    <span>Dataset CAP-20260923 verificado</span>
-    <small>El 23/09/2026 se comprobaron 9/9 manifiestos sinteticos en Gobierno, tres cuentas escuela con login valido y cero correos CAP en cola. Revalidar antes de cada curso.</small>
-  </div>
-</div>
-
-<div class="callout callout-info">
-<strong>Regla principal:</strong> todos los ejercicios deben hacerse con usuarios de capacitacion y manifiestos sinteticos comprobados, nunca con registros reales. Usar exclusivamente el conjunto <code>CAP-20260923-*</code>, marcado <code>isDemoData=true</code>. El conjunto <code>CAP-20260702-*</code> fue historico y no debe darse por disponible. Al finalizar cada bloque, resetear el dataset aislado para volver a la matriz base.
-</div>
-
-<h3 id="cap-dataset">17.1 Dataset CAP</h3>
-<p>La siguiente matriz se creó y verificó en la base Gobierno el 23/09/2026. <strong>Antes de operar:</strong> confirmar otra vez cada codigo, estado y marca <code>isDemoData=true</code>, porque los ejercicios cambian los estados.</p>
-
-<table class="training-table">
-<thead><tr><th>Manifiesto</th><th>Estado base</th><th>Uso recomendado</th></tr></thead>
-<tbody>
-<tr><td><code>CAP-20260923-0001</code></td><td><span class="workflow-state ws-borrador">BORRADOR</span></td><td>Ejercicio completo guiado: firma, retiro, GPS, entrega, recepcion, tratamiento y cierre.</td></tr>
-<tr><td><code>CAP-20260923-0002</code></td><td><span class="workflow-state ws-aprobado">APROBADO</span></td><td>Practica de transportista: tomar viaje y confirmar retiro.</td></tr>
-<tr><td><code>CAP-20260923-0003</code></td><td><span class="workflow-state ws-transito">EN_TRANSITO</span></td><td>Centro de Control, GPS, viaje activo, PDF, QR y smoke seguro.</td></tr>
-<tr><td><code>CAP-20260923-0004</code></td><td><span class="workflow-state ws-entregado">ENTREGADO</span></td><td>Practica operador: recepcion o rechazo controlado.</td></tr>
-<tr><td><code>CAP-20260923-0005</code></td><td><span class="workflow-state ws-recibido">RECIBIDO</span></td><td>Pesaje y registro de tratamiento.</td></tr>
-<tr><td><code>CAP-20260923-0006</code></td><td><span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span></td><td>Cierre y emision de certificado.</td></tr>
-<tr><td><code>CAP-20260923-0007</code></td><td><span class="workflow-state ws-tratado">TRATADO</span></td><td>Descarga de certificado y consulta historica.</td></tr>
-<tr><td><code>CAP-20260923-0008</code></td><td><span class="workflow-state ws-rechazado">RECHAZADO</span></td><td>Revision de casos rechazados.</td></tr>
-<tr><td><code>CAP-20260923-0009</code></td><td><span class="workflow-state ws-cancelado">CANCELADO</span></td><td>Revision de casos cancelados.</td></tr>
-</tbody>
-</table>
-
-<div class="summary-grid training-summary">
-  <div class="summary-card"><div class="number">3</div><div class="label">Usuarios escuela: login verificado el 23/09</div></div>
-  <div class="summary-card"><div class="number">9</div><div class="label">Manifiestos sinteticos verificados</div></div>
-  <div class="summary-card"><div class="number">0</div><div class="label">Emails CAP en cola al preparar el curso</div></div>
-  <div class="summary-card"><div class="number">—</div><div class="label">Notificaciones CAP: comprobar en el cierre</div></div>
-</div>
+<h3 id="cap-dataset">17.1 Datos sintéticos necesarios</h3>
+<p>Esta es una lista de preparación, <strong>no un inventario de registros ya cargados</strong>. El instructor debe identificar cuentas, registros y estados de su instalación antes de la jornada. No reutilizar identificadores de capturas ni de otro servidor.</p>
+<table class="training-table"><thead><tr><th>Conjunto escuela</th><th>Preparación</th><th>Comprobación</th></tr></thead><tbody>
+<tr><td>Cuentas y actores</td><td>Administrador, inspector habilitado, dos generadores, transportista, operador fijo e in situ y agente de soporte; cuentas separadas y previamente verificadas.</td><td>Cada persona entra con el rol correcto; el segundo actor permite comprobar límites de acceso.</td></tr>
+<tr><td>Altas y documentos</td><td>Solicitud en borrador, en revisión y observada; recibo ficticio y copia idéntica; licencia ficticia legible y otra borrosa.</td><td>Recuperación, corrección administrativa, OCR con aceptación explícita y aviso de duplicado. No usar documentos personales de asistentes.</td></tr>
+<tr><td>Manifiestos</td><td>Uno para el relevo completo y ejemplos en aprobado, tránsito, entregado, recibido, tratamiento y tratado; rechazo y cancelación en casos separados.</td><td>Estado y eventos comprobados en cada relevo. No repetir un cierre sobre un registro ya terminado.</td></tr>
+<tr><td>Flota y mapa</td><td>Dos vehículos y dos choferes ficticios; licencia vigente y vencida. Ruta sintética con fechas conocidas dentro del período mostrado.</td><td>Distinguir posición simulada de GPS físico; revisar Monitor en un día, 7 y 30 días.</td></tr>
+<tr><td>Inspecciones</td><td>Expediente de cada categoría de actor; un hallazgo conforme y otro con requerimiento y respuesta pendiente.</td><td>Asignación, evidencia guardada, revisión de autoridad, respuesta vinculada y decisión final sin confundirla con notificación legal.</td></tr>
+<tr><td>Soporte y CAA</td><td>Ticket nuevo, esperando respuesta y cerrado; PDF de certificado de práctica marcado SIN VALIDEZ.</td><td>Derivación, nota interna, respuesta visible al autor y descarga del archivo correcto; un PDF de práctica no es un certificado oficial.</td></tr>
+</tbody></table>
 
 <h3 id="cap-recorrido">17.2 Recorrido guiado por rol</h3>
+<table class="training-table"><thead><tr><th>Equipo</th><th>Ejercicio en entorno autorizado</th><th>Resultado de salida</th></tr></thead><tbody>
+<tr><td>Todos · 25 min</td><td>Acceso, identidad y modo prueba del alta. Revisar OCR y recuperar borrador en el mismo navegador.</td><td>Distinguir guardar, presentar y aprobar; saber qué archivos hay que volver a elegir.</td></tr>
+<tr><td>Generador / transporte / operador · 20 min</td><td>Relevo sobre un manifiesto escuela: firma → retiro → entrega → recepción y pesaje → tratamiento → cierre.</td><td>Cada parte encuentra su próxima acción y la trazabilidad; documento final disponible.</td></tr>
+<tr><td>Inspector / autoridad / actor · 20 min</td><td>Visita y controles, foto vinculada, guardado, acta e informe; revisar requerimiento y respuesta del actor.</td><td>Distinguir constatación, análisis técnico y decisión de la autoridad.</td></tr>
+<tr><td>Administración / soporte · 15 min</td><td>Consultar solicitudes, padrón, CAA y Monitor. Ticket escuela: tomar, clasificar, derivar, nota interna y respuesta pública.</td><td>El responsable y el autor encuentran el mismo ticket con la visibilidad que corresponde.</td></tr>
+<tr><td>Todos · 10 min</td><td>Explicar la siguiente tarea, dónde pedir ayuda y qué hacer sin conexión.</td><td>Registrar lo comprobado y los pendientes del teléfono, sin prometer funcionamiento físico por una prueba emulada.</td></tr>
+</tbody></table>
 
-<div class="training-flow">
-  <div class="training-step">
-    <div class="training-step-num">1</div>
-    <div>
-      <h4>Administrador</h4>
-      <p>Ingresar a la web, abrir Dashboard, Centro de Control, Reportes y Busqueda. Usar el filtro <code>CAP-20260923</code> para no mezclar datos reales con datos escuela.</p>
-    </div>
-  </div>
-  <div class="training-step">
-    <div class="training-step-num">2</div>
-    <div>
-      <h4>Generador</h4>
-      <p>Entrar por <code>/app/</code>, revisar sus manifiestos y firmar <code>CAP-20260923-0001</code> solo durante el ejercicio guiado.</p>
-    </div>
-  </div>
-  <div class="training-step">
-    <div class="training-step-num">3</div>
-    <div>
-      <h4>Transportista</h4>
-      <p>Tomar el viaje aprobado, confirmar retiro, revisar viaje activo, registrar ubicacion GPS e incidente simulado. Luego confirmar entrega.</p>
-    </div>
-  </div>
-  <div class="training-step">
-    <div class="training-step-num">4</div>
-    <div>
-      <h4>Operador</h4>
-      <p>Confirmar recepcion, registrar tratamiento, cerrar manifiesto y descargar certificado. Para rechazo, usar <code>CAP-20260923-0004</code> y resetear al finalizar.</p>
-    </div>
-  </div>
-  <div class="training-step">
-    <div class="training-step-num">5</div>
-    <div>
-      <h4>Cierre de instructor</h4>
-      <p>Ejecutar reset del dataset, verificar estados base, confirmar que no queden emails ni notificaciones CAP, y registrar el reporte de test-run.</p>
-    </div>
-  </div>
-</div>
+<h3 id="cap-comandos">17.3 Lista previa del instructor</h3>
+<ul>
+<li>Confirmar URL autorizada, conectividad del lugar y acceso de cada participante; no compartir contraseñas ni usar impersonación para eludir permisos.</li>
+<li>Mantener los correos automáticos apagados según la configuración de la jornada. La creación de cuentas que necesitan verificación por correo no forma parte de una demostración con envíos deshabilitados.</li>
+<li>Preparar estados de respaldo en el entorno escuela. En producción, sólo consultar; no ejecutar cargas, borrados ni pruebas de estrés para entrenar.</li>
+<li>Verificar en teléfonos reales cámara/QR, GPS, permiso denegado y recuperación de conexión. El APK, la PWA y el navegador no son una única validación.</li>
+<li>No cerrar formularios de trabajo abiertos ni borrar almacenamiento del navegador para iniciar la capacitación.</li>
+</ul>
 
-<h3 id="cap-comandos">17.3 Comandos seguros</h3>
-<p>Estos comandos estan pensados para ejecutarse desde la estacion tecnica con VPN activa.</p>
-
-<h4>Perfil seguro idempotente</h4>
-<pre><code>RUN_PROFILE=produccion-seguro \
-TARGET_URL=https://rptrazar.mendoza.gov.ar \
-API_URL=https://rptrazar.mendoza.gov.ar/api \
-bash scripts/certification/run-certification-suite.sh produccion-seguro</code></pre>
-
-<h4>Smoke productivo con auth y cooldown</h4>
-<pre><code>RUN_PROFILE=production-smoke \
-TARGET_URL=https://rptrazar.mendoza.gov.ar \
-API_URL=https://rptrazar.mendoza.gov.ar/api \
-NETWORK_TIMEOUT=12 \
-NETWORK_RETRIES=1 \
-CERT_AUTH_COOLDOWN_SECONDS=65 \
-bash scripts/certification/run-certification-suite.sh production-smoke</code></pre>
-
-<h4>E2E demo-only con reset antes y despues</h4>
-<p>El perfil de capacitacion debe ejecutarse desde la estacion tecnica autorizada, usando el comando de reset definido en el runbook interno de QA/DevOps. No publicar comandos SSH ni rutas de servidor en este manual.</p>
-
-<h3 id="cap-cierre">17.4 Cierre de sesion</h3>
-<ol>
-<li>Resetear dataset CAP en el servidor.</li>
-<li>Confirmar que los nueve manifiestos vuelvan a sus estados base.</li>
-<li>Confirmar <code>email_cap_rows|0</code>.</li>
-<li>Confirmar <code>notificaciones_cap_rows|0</code>.</li>
-<li>Guardar el enlace al reporte generado en <code>reports/test-runs/</code>.</li>
-</ol>
-
-<p>El reset final del dataset CAP se ejecuta desde el runbook interno de QA/DevOps.</p>
-
-<div class="callout callout-warning">
-<strong>No ejecutar en produccion real:</strong> <code>certification</code>, <code>workflow-e2e</code>, <code>data-integrity</code>, <code>stress</code> ni pruebas que creen, aprueben, transporten, reciban, traten, rechacen, cancelen, borren o editen registros fuera de <code>CAP-20260923</code>.
-</div>
+<h3 id="cap-cierre">17.4 Cierre y evidencia</h3>
+<p>Registrar por rol: cuenta escuela, identificadores autorizados, estado inicial/final, resultado esperado/obtenido y pendientes. No limpiar avisos ni reiniciar datos productivos para ocultar el ejercicio. Cualquier restauración del entorno escuela pertenece al runbook autorizado de ese entorno.</p>
+<p>El recorrido de <strong>consulta y auditoría</strong> es una función de capacitación para personal con permisos existentes; no crea un rol nuevo ni amplía acceso a expedientes.</p>
 </section>
 
 <!-- ============================================================ -->
@@ -8115,11 +8032,7 @@ bash scripts/certification/run-certification-suite.sh production-smoke</code></p
 <strong>Una sola entrada de trabajo:</strong> la inspeccion se crea desde <a href="/inspecciones">Inspecciones en la web</a> o <a href="/app/inspecciones">Inspecciones en la app</a>, con una cuenta habilitada. La ficha del generador, transportista u operador permite consultar las inspecciones relacionadas; no abre un segundo formulario de alta. En la inspeccion, el nombre del actor abre su ficha.
 </div>
 
-<p><strong>Expedientes escuela disponibles en Gobierno (requieren cuenta administrativa habilitada):</strong>
-<a href="https://rptrazar.mendoza.gov.ar/inspecciones/cmuegqikz00023gdmfzbocir2">generador con comentario y foto de prueba</a>,
-<a href="https://rptrazar.mendoza.gov.ar/inspecciones/cmuegqimd000t3gdme27wkpzx">transportista</a> y
-<a href="https://rptrazar.mendoza.gov.ar/inspecciones/cmuegqina001k3gdmolxh5p0k">operador</a>.
-En la app, anteponé <code>/app</code> a la ruta de cada expediente. Todos tienen acta <code>DEMO-INS-…-20260923</code>; no son inspecciones reales.</p>
+<p><strong>Expedientes de capacitación:</strong> abrir <a href="/inspecciones">Inspecciones en esta instalación</a> o <a href="/app/inspecciones">la vista de la app</a> y seleccionar únicamente el registro escuela indicado por el instructor. No se presume que haya expedientes sintéticos disponibles ni se reutilizan enlaces de otro servidor. En producción, consultar sin cambiar estados.</p>
 
 <p>El inspector asignado prepara y documenta la visita. El formulario presenta un paso a la vez; la guia superior en movil y el indice lateral en escritorio indican el paso y el control actual. Los enlaces a un control concreto conservan el punto de trabajo al volver. <strong>Avanzar de paso no equivale a guardar ni a enviar el expediente.</strong></p>
 

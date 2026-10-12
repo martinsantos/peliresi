@@ -103,9 +103,11 @@ test('all templates and operational variants fit with institutional brand and re
     const masthead = page.locator('[data-mail-masthead]');
     const brand = page.locator('[data-mail-brand]');
     await expect(brand.locator('img')).toHaveAttribute('src', /\/mail-sitrep-rotonda\.png$/);
-    await expect(masthead).toContainText('Fiscalización Ambiental');
+    await expect(page.locator('[data-mail-institution]')).toHaveText('Gobierno de Mendoza');
     await expect(brand.locator('[data-mail-wordmark]')).toHaveCSS('color', 'rgb(255, 255, 255)');
-    await expect(brand.locator('[data-mail-wordmark]')).toHaveCSS('font-size', '24px');
+    await expect(brand.locator('[data-mail-wordmark]')).toHaveCSS('font-size', '20px');
+    await expect(masthead.locator('[data-mail-government-reference]')).toContainText('Fiscalización Ambiental');
+    await expect(brand.locator('[data-mail-system-reference]')).toContainText('Sistema de Trazabilidad');
     await expect.poll(() => brand.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
     const governmentBox = (await logo.boundingBox())!;
     const markBox = (await brand.locator('img').boundingBox())!;
@@ -115,6 +117,26 @@ test('all templates and operational variants fit with institutional brand and re
     expect(Math.abs(governmentCell.y - brandCell.y), item.id + ' shared header row').toBeLessThanOrEqual(1);
     expect(governmentBox.x + governmentBox.width, item.id + ' government left').toBeLessThan(markBox.x);
     expect(Math.abs(governmentCell.height - brandCell.height), item.id + ' balanced cells').toBeLessThanOrEqual(1);
+    expect(governmentCell.height, item.id + ' compact explained header').toBeLessThanOrEqual(70);
+    expect(Math.abs((governmentBox.x - governmentCell.x) - (markBox.x - brandCell.x)), item.id + ' equal left inset').toBeLessThanOrEqual(1);
+    expect(governmentBox.width).toBe(100);
+    expect(markBox.width).toBe(22);
+    if (page.viewportSize()!.width <= 560) {
+      await expect(masthead.locator('[data-mail-government-reference]')).toBeHidden();
+      await expect(brand.locator('[data-mail-system-reference]')).toBeHidden();
+      expect(governmentCell.height, item.id + ' mobile logos only').toBeLessThanOrEqual(56);
+    } else {
+      await expect(masthead.locator('[data-mail-government-reference]')).toBeVisible();
+      await expect(brand.locator('[data-mail-system-reference]')).toBeVisible();
+      await expect(brand.locator('[data-mail-system-reference]')).toHaveCSS('font-size', '12px');
+      const governmentReference = (await masthead.locator('[data-mail-government-reference]').boundingBox())!;
+      const systemReference = (await brand.locator('[data-mail-system-reference]').boundingBox())!;
+      const wordmarkBox = (await brand.locator('[data-mail-wordmark]').boundingBox())!;
+      expect(governmentReference.x, item.id + ' institution right of mark').toBeGreaterThan(governmentBox.x + governmentBox.width);
+      expect(systemReference.x, item.id + ' system right of wordmark').toBeGreaterThan(wordmarkBox.x + wordmarkBox.width);
+      expect(Math.abs(governmentReference.y + governmentReference.height / 2 - governmentBox.y - governmentBox.height / 2), item.id + ' institution vertically centered').toBeLessThanOrEqual(1);
+      expect(Math.abs(systemReference.y + systemReference.height / 2 - markBox.y - markBox.height / 2), item.id + ' system vertically centered').toBeLessThanOrEqual(1);
+    }
     expect(titleBox.y, item.id + ' content below both identities').toBeGreaterThan(governmentCell.y + governmentCell.height);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), item.id).toBe(true);
     for (const link of await page.getByRole('link').all()) {

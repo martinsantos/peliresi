@@ -1,4 +1,5 @@
 import webpush from 'web-push';
+import { isTrainingSession } from '../lib/trainingScope';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 
@@ -30,7 +31,7 @@ const urgencyMap: Record<PushPrioridad, webpush.Urgency> = {
 };
 
 export async function enviarPushAlUsuario(usuarioId: string, payload: PushPayload): Promise<void> {
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  if (isTrainingSession() || !VAPID_PUBLIC || !VAPID_PRIVATE) return;
 
   const subs = await prisma.pushSubscripcion.findMany({ where: { usuarioId } });
   if (subs.length === 0) return;

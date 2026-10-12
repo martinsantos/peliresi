@@ -133,6 +133,7 @@ jobs:
       QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
       UPLOADS_DIR: /tmp/sitrep-mail-browser/uploads
       PGUSER: qa
+      TRAINING_DATABASE_URL: postgresql://sitrep_training_role@127.0.0.1:55440/sitrep_night_qa_20260926?schema=sitrep_training
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -178,6 +179,7 @@ jobs:
           cd ..
           node --experimental-strip-types frontend/cloud-qa/prepare.ts
           node --experimental-strip-types frontend/cloud-qa/mail-fixture.ts
+          node --experimental-strip-types frontend/cloud-qa/training-fixture.ts
           node --experimental-strip-types frontend/cloud-qa/start.ts
       - name: Account lifecycle through real HTTP, suppressed outbox only
         run: node --experimental-strip-types frontend/cloud-qa/account-mail-http.ts

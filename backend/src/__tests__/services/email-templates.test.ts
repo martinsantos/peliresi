@@ -6,7 +6,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe('mail template catalogue', () => {
   it.each<MailTemplateId>(['verify', 'pending', 'approved', 'newAccount', 'reset', 'application', 'observed', 'response', 'rejected', 'modification', 'modificationApproved', 'modificationRejected'])('%s has useful safe HTML, text and no interpolated subject', id => {
     const mail = renderMail(id, { name: '<img src=x onerror=bad>', role: '<admin>', message: '<script>bad()</script>\nCorregir domicilio', token: 'a"&b#c' });
-    expect(mail.version).toBe('20261012.4');
+    expect(mail.version).toBe('20261012.8');
     expect(mail.html).toContain('lang="es"');
     expect(mail.html.match(/<img /g)).toHaveLength(2);
     expect(mail.html).toContain('alt="Gobierno de Mendoza"');
@@ -16,6 +16,8 @@ describe('mail template catalogue', () => {
     expect(mail.html).toContain('data-mail-masthead');
     expect(mail.html).toContain('data-mail-brand');
     expect(mail.text).toContain('SITREP');
+    expect(mail.text).not.toContain('@media');
+    expect(mail.text).not.toContain('display:none');
     expect(mail.html).not.toContain('<img src=x');
     expect(mail.html).not.toContain('<script');
     expect(mail.html).toContain('&lt;admin&gt;');
@@ -40,14 +42,27 @@ describe('mail template catalogue', () => {
   it('separates paragraph starts from preceding institutional text in plain-text mail', () => {
     expect(mailText('Fiscalización Ambiental<p>Este aviso informativo</p>')).toBe('Fiscalización Ambiental\nEste aviso informativo');
   });
-  it('keeps both identities in one header row, government left and SITREP right', () => {
+  it('omits responsive styles from the plain-text alternative without losing descriptions', () => {
+    expect(mailText('<style>@media(max-width:560px){.ref{display:none}}</style><p>Gobierno de Mendoza</p>')).toBe('Gobierno de Mendoza');
+    const { html, text } = renderMail('approved', { name: 'QA' });
+    expect(html).toContain('@media only screen and (max-width:560px)');
+    expect(html.match(/class="mail-header-reference"/g)).toHaveLength(2);
+    expect(text).toContain('Sistema de Trazabilidad de Residuos Peligrosos');
+    expect(text).toContain('Dirección General de Fiscalización Ambiental');
+  });
+  it('left-aligns both identities within their columns with references alongside', () => {
     const { html } = renderMail('approved', { name: 'QA' });
     expect(html).toMatch(/<tr data-mail-header-row>\s*<td data-mail-masthead/);
     expect(html).toMatch(/<td data-mail-masthead[^>]*align="left"/);
-    expect(html).toMatch(/<td data-mail-brand[^>]*align="right"/);
+    expect(html).toMatch(/<td data-mail-brand[^>]*align="left"/);
     const row = html.split('<tr data-mail-header-row>')[1].split('<!-- mail-header-end -->')[0];
     expect(row).toContain('Gobierno de Mendoza');
-    expect(row).toContain('Fiscalización Ambiental');
+    expect(row).toContain('data-mail-government-reference');
+    expect(row).toContain('Dirección General de Fiscalización Ambiental');
+    expect(row).toContain('data-mail-system-reference');
+    expect(row).toContain('Sistema de Trazabilidad de Residuos Peligrosos');
+    expect(row).not.toContain('align="right"');
+    expect(html).toContain('Dirección General de Fiscalización Ambiental');
     expect(row).toContain('data-mail-wordmark');
   });
   it('lets a verified pending applicant continue the application without claiming operational access', () => {

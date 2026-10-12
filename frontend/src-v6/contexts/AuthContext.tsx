@@ -22,6 +22,7 @@ import type { Usuario } from '../types/models';
 export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 export interface User {
+  training?: boolean;
   id: number | string;
   nombre: string;
   email: string;
@@ -106,6 +107,7 @@ function apiUserToUser(u: Usuario): User {
     ubicacion: '',
     permisos: rolPermisos[u.rol] || [],
     esInspector: u.esInspector ?? false,
+    training: u.training === true,
   };
 }
 

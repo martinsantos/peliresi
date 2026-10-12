@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
+import { isTrainingSession } from '../lib/trainingScope';
 import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
 import { canAccessManifiesto } from '../utils/roleFilter';
@@ -32,11 +33,12 @@ type GpsCacheEntry = {
 const _enTransitoCache = new Map<string, GpsCacheEntry>(); // manifiestoId -> entry
 const EN_TRANSITO_CACHE_TTL = 30_000; // 30s — matches GPS send interval
 const _gpsUpdateCounter = new Map<string, number>(); // manifiestoId -> GPS update count for anomaly sampling
+const cacheKey = (id: string) => (isTrainingSession() ? 'training:' : 'operational:') + id;
 
 /** Invalidate GPS cache for a given manifiesto (called when trip ends). */
 export function invalidateGpsCache(manifiestoId: string): void {
-  _enTransitoCache.delete(manifiestoId);
-  _gpsUpdateCounter.delete(manifiestoId);
+  _enTransitoCache.delete(cacheKey(manifiestoId));
+  _gpsUpdateCounter.delete(cacheKey(manifiestoId));
 }
 
 // Actualizar ubicacion GPS — optimized for high-frequency calls (30 clients x every 30s)
@@ -54,9 +56,9 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
     const { latitud, longitud, velocidad, direccion } = parsed.data;
 
     // Check cache — skip DB lookup if we verified EN_TRANSITO recently
-    let cacheEntry = _enTransitoCache.get(id);
+    let cacheEntry = _enTransitoCache.get(cacheKey(id));
     const cacheExpired = !cacheEntry || Date.now() - cacheEntry.ts > EN_TRANSITO_CACHE_TTL;
-    if (cacheExpired && cacheEntry) _enTransitoCache.delete(id); // evict stale entry
+    if (cacheExpired && cacheEntry) _enTransitoCache.delete(cacheKey(id)); // evict stale entry
     if (cacheEntry && !cacheExpired && !canAccessManifiesto(req.user, cacheEntry)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
@@ -77,12 +79,12 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
       });
 
       if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {
-        _enTransitoCache.delete(id);
+        _enTransitoCache.delete(cacheKey(id));
         throw new AppError('Manifiesto no encontrado', 404);
       }
 
       if (manifiesto.estado !== 'EN_TRANSITO') {
-        _enTransitoCache.delete(id);
+        _enTransitoCache.delete(cacheKey(id));
         throw new AppError('Manifiesto no encontrado o no esta en transito', 404);
       }
       cacheEntry = {
@@ -97,7 +99,7 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
         opLat: manifiesto.operador?.latitud ?? null,
         opLon: manifiesto.operador?.longitud ?? null,
       };
-      _enTransitoCache.set(id, cacheEntry);
+      _enTransitoCache.set(cacheKey(id), cacheEntry);
     }
 
     // A PM2 worker cannot invalidate another worker's memory. Check live
@@ -161,8 +163,8 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
     }
 
     // Sample every 10 GPS updates for anomaly detection (avoids overhead on every update)
-    const gpsCount = (_gpsUpdateCounter.get(id) ?? 0) + 1;
-    _gpsUpdateCounter.set(id, gpsCount);
+    const gpsCount = (_gpsUpdateCounter.get(cacheKey(id)) ?? 0) + 1;
+    _gpsUpdateCounter.set(cacheKey(id), gpsCount);
     if (gpsCount % 10 === 0) {
       setImmediate(() => anomaliaDetector.detectarAnomalias(id, userId).catch(() => {}));
     }

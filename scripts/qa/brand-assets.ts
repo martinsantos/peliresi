@@ -12,9 +12,13 @@ sharp.concurrency(1);
 sharp.cache(false);
 const dir = path.join(root, 'frontend/public');
 const source = await readFile(path.join(dir, 'favicon.svg'), 'utf8');
-assert(source.includes('viewBox="0 0 24 24"') && source.includes('stroke-width="2.5"'));
+const approved = await readFile(path.join(dir, 'mail-sitrep-rotonda.svg'), 'utf8');
+assert.equal(source.trim(), approved.trim(), 'Use the approved recycling/roundabout mark');
 assert(!/<(?:script|image|foreignObject)\b|href=/.test(source));
 const check = process.argv.includes('--check');
+const manualMark = path.join(root, 'docs/manual/sitrep-mark.svg');
+if (check) assert.equal((await readFile(manualMark, 'utf8')).trim(), source.trim());
+else await writeFile(manualMark, source);
 for (const [name, bytes] of [
   ['icon.svg', Buffer.from(source)],
   ['icon-192.svg', Buffer.from(source.replace('<svg ', '<svg width="192" height="192" '))],

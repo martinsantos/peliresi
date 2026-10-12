@@ -9,6 +9,23 @@ import { getUsuarios } from '../../controllers/admin.controller';
 
 describe('admin user list: complete server-side filtering', () => {
   beforeEach(() => { vi.clearAllMocks(); db.usuario.findMany.mockResolvedValue([]); db.usuario.count.mockResolvedValue(23); });
+  it('paginates five per category and excludes the signed-in administrator before counting', async () => {
+    await getUsuarios({ user: { id: 'admin' }, query: { rol: 'GENERADOR', esInspector: 'false', excludeSelf: 'true', activo: 'true', page: '2', limit: '5', sortBy: 'nombre' } } as never, { json: vi.fn() } as never, vi.fn());
+    const request = db.usuario.findMany.mock.calls[0][0];
+    expect(request).toMatchObject({ take: 5, skip: 5, where: { id: { not: 'admin' }, activo: true, rol: 'GENERADOR', esInspector: false } });
+    expect(request.orderBy).toEqual([{ nombre: 'asc' }, { id: 'asc' }]);
+    expect(db.usuario.count).toHaveBeenCalledWith({ where: request.where });
+  });
+  it('finds inspectors independently of their underlying role', async () => {
+    await getUsuarios({ query: { esInspector: 'true' } } as never, { json: vi.fn() } as never, vi.fn());
+    expect(db.usuario.findMany.mock.calls[0][0].where).toEqual({ esInspector: true });
+  });
+  it.each([{ esInspector: 'perhaps' }, { excludeSelf: 'perhaps' }, { page: '0' }, { limit: '-1' }, { rol: 'AUDITOR' }])('rejects invalid pagination or category %j', async query => {
+    const next = vi.fn();
+    await getUsuarios({ query } as never, { json: vi.fn() } as never, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(db.usuario.findMany).not.toHaveBeenCalled();
+  });
   it('uses identical filters for the result and total, including grouped roles and pending activation', async () => {
     const json = vi.fn();
     const next = vi.fn();

@@ -349,6 +349,7 @@ p { margin: 0; }
 /* Tutorial */
 .tutorial-header { position: sticky; top: 0; }
 .mobile-index-toggle { display: none; }
+.mobile-search-link { display: none; }
 .tutorial-shell { min-height: calc(100vh - var(--header-height)); display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
 .tutorial-sidebar {
   position: sticky;
@@ -602,6 +603,13 @@ p { margin: 0; }
   .header-link-primary { min-width: 44px; border: 0; padding: 0; justify-content: center; }
   .tutorial-header .header-search { margin-left: auto; width: 44px; min-height: 44px; border: 0; background: transparent; padding: 0; justify-content: center; }
   .tutorial-header .header-search input, .tutorial-header .header-search button { display: none; }
+  body[data-page="tutorial"] .header-search { display: none; }
+  .mobile-search-link { display: flex; align-items: center; justify-content: center; margin-left: auto; min-width: 44px; min-height: 44px; color: #fff; text-decoration: none; }
+  /* Search must remain usable on phones, not collapse into an inert icon. */
+  body[data-page="search"] .help-header { flex-wrap: wrap; gap: 8px; padding-block: 8px; }
+  body[data-page="search"] .search-page-form { order: 3; width: 100%; margin: 0; padding: 0 10px; background: rgba(255,255,255,.12); }
+  body[data-page="search"] .search-page-form input { display: block; min-height: 44px; }
+  body[data-page="search"] .search-page-form button { display: block; min-height: 44px; }
   .home-container { width: min(100% - 36px, var(--content-max)); }
   .help-hero { padding: 38px 0 34px; }
   .help-hero h1 { font-size: clamp(32px, 9vw, 42px); }

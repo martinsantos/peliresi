@@ -12,6 +12,7 @@
  */
 
 import nodemailer from 'nodemailer';
+import { isTrainingSession } from '../lib/trainingScope';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { mailPolicy, mendozaDayStart, retryableSmtpFailure, externalAlertRecipientAllowed } from './email-policy';
@@ -83,7 +84,7 @@ async function checkDailyLimit(to: string, tipo: 'TRANSACCIONAL' | 'ALERTA', que
 // ── Low-level send (SMTP) ───────────────────────────────────────────
 
 async function smtpSend(to: string, subject: string, html: string): Promise<void> {
-  if (DISABLE_EMAILS) {
+  if (isTrainingSession() || DISABLE_EMAILS) {
     throw new Error('EMAIL_DISABLED');
   }
   const result = await transporter.sendMail({ from: FROM, ...(process.env.SMTP_REPLY_TO ? { replyTo: process.env.SMTP_REPLY_TO } : {}), to, subject: subject.replace(/[\r\n]/g, ' '), html, text: mailText(html) });
@@ -175,6 +176,7 @@ async function enqueueAlerta(to: string, subject: string, html: string): Promise
 
 let flushing = false;
 export async function flushEmailQueue(): Promise<void> {
+  if (isTrainingSession()) return;
   const policy = mailPolicy(process.env);
   if (!policy.enabled || flushing) return;
   flushing = true;

@@ -2,7 +2,7 @@
   'use strict';
 
   var S = 'screenshots/';
-  var QA_ALERTS = 'Captura real de QA · Datos sintéticos · Catálogo pendiente de publicación al 04/10/2026';
+  var QA_ALERTS = 'Captura de QA del 04/10/2026 · Datos sintéticos · No acredita el estado actual de esta instalación';
 
   window.SITREP_HELP = {
     profiles: [
@@ -11,10 +11,70 @@
       { id: 'transportista', label: 'Transportista', icon: 'local_shipping', description: 'Retiros, GPS, incidentes y entregas.' },
       { id: 'operador', label: 'Operador', icon: 'science', description: 'Recepción, pesaje, tratamiento y cierre.' },
       { id: 'inspector', label: 'Inspector', icon: 'fact_check', description: 'Visita, controles, fotos, acta e informe técnico.' },
-      { id: 'auditor', label: 'Auditor', icon: 'policy', description: 'Consulta de actividad, evidencia y trazabilidad.' }
+      { id: 'auditor', label: 'Consulta y auditoría', icon: 'policy', description: 'Recorrido para personal autorizado; no concede un rol adicional.' }
     ],
 
     guides: [
+      {
+        id: 'capacitacion-por-rol', profile: 'administrador',
+        audiences: ['administrador', 'generador', 'transportista', 'operador', 'inspector', 'auditor'],
+        title: 'Capacitación: recorrido por rol', summary: 'Una jornada de 90 minutos con un resultado comprobable por equipo.',
+        duration: '90 min', icon: 'school', keywords: ['capacitación', 'taller', 'tour', 'recorrido', 'datos sintéticos', 'demo'],
+        safety: 'En producción, solo lectura. Las acciones que cambian estados se practican exclusivamente en un entorno y con cuentas escuela autorizados. Una marca demo no aísla por sí sola los datos.',
+        steps: [
+          { title: 'Preparación · 10 min', body: ['El instructor confirma dominio, cuenta y permisos de cada participante, sin compartir contraseñas. Identifica los registros escuela antes de empezar.', 'Con correos apagados, no dependas de altas nuevas ni recuperación por email: usá cuentas escuela previamente verificadas. No cierres sesiones con formularios pendientes.'], expected: 'Cada persona identifica su cuenta, su rol y qué registros puede usar.' },
+          { title: 'Alta y recuperación · 15 min', body: ['Desde Probar, completá un alta con datos ficticios, revisá una sugerencia OCR y corregila si hace falta.', 'Guardá el borrador de prueba y recuperalo en el mismo navegador. No envíes un trámite real; los archivos no se conservan en el borrador de prueba.'], expected: 'Se recuperan los campos y el paso; se identifica qué documentos hay que volver a elegir.' },
+          { title: 'Generador → transportista → operador · 20 min', body: ['Sobre un único manifiesto escuela autorizado: generador revisa y firma; transportista confirma retiro y entrega; operador recibe, pesa, registra tratamiento y cierra.', 'Cada equipo verifica el estado y la línea de tiempo antes de entregar el turno al siguiente. En producción, mostrar registros existentes sin accionar.'], expected: 'Las tres partes comprenden el relevo y localizan el PDF final, sin alterar un manifiesto real.' },
+          { title: 'Inspector y autoridad · 20 min', body: ['El inspector identifica Visita, Controles, Registro y Expediente; contrasta lo declarado, documenta un hallazgo y verifica el guardado de su evidencia.', 'La autoridad revisa el expediente; el actor localiza el requerimiento que le corresponde. En el entorno escuela, demostrar respuesta vinculada y decisión autorizada. Una respuesta no equivale a conformidad.'], expected: 'Se distinguen acta, informe, respuesta del actor y decisión de la autoridad.' },
+          { title: 'Administración y soporte · 15 min', body: ['Administración localiza una solicitud, sus documentos y correcciones; consulta el padrón, el CAA oficial y Monitor con el período del ejercicio.', 'El equipo de soporte muestra un ticket escuela: Asignarme, Derivar, nota interna y respuesta pública. El autor verifica el aviso y la respuesta en el mismo ticket.'], expected: 'Se identifica quién debe actuar y qué ve el usuario final; las notas internas quedan separadas.' },
+          { title: 'Comprobación final · 10 min', body: ['Cada participante encuentra su próxima tarea y explica cómo pedir ayuda. Registrar dudas con pantalla, rol y resultado esperado.', 'GPS, cámara QR y recuperación de conexión deben comprobarse en los teléfonos de la jornada; una prueba en navegador o emulador no certifica batería ni segundo plano. No borrar ni reiniciar datos productivos para repetir ejercicios.'], expected: 'El instructor registra resultados y pendientes reales, sin declarar un GO global por completar el tour.' }
+        ]
+      },
+      {
+        id: 'alta-borradores-ocr', profile: 'generador', audiences: ['generador', 'transportista', 'operador', 'administrador'],
+        title: 'Alta: documentos, OCR y borradores', summary: 'Probá el formulario, recuperá lo guardado y distinguí una práctica de una solicitud real.',
+        duration: '6 min', icon: 'edit_document', keywords: ['alta', 'inscripción', 'OCR', 'licencia', 'choferes', 'recibos', 'borrador', 'precarga', 'TEF'],
+        safety: 'Probar (modo revisión) no crea trámites reales. El OCR propone datos: no valida pagos, identidad ni habilitación. La precarga del padrón requiere verificar el acceso; un CUIT público no autoriza consultar datos privados.',
+        steps: [
+          { title: 'Elegir el alta correcta', body: ['Entrá desde Probar en Generador, Transportista u Operador y comprobá el aviso de modo revisión.', 'Completá los datos de la actividad. El cálculo dinámico de TEF no se muestra al solicitante; su revisión corresponde a administración.'], expected: 'Sabés si estás practicando o completando una solicitud real.' },
+          { title: 'Cargar documentos y revisar OCR', body: ['Elegí el documento en su apartado y esperá el resultado de lectura. Compará cada sugerencia con el original antes de aceptarla.', 'En transportistas, cargá cada chofer con sus datos y licencia. Si la foto es borrosa o no se lee, completá los campos manualmente: no inventes lo ilegible. Una huella duplicada detecta el mismo archivo, no necesariamente otra foto del mismo recibo.'], expected: 'La información aceptada coincide con el documento; los errores de lectura no se confunden con una aprobación.' },
+          { title: 'Guardar y recuperar', body: ['En modo prueba, guardá el borrador y recuperalo en el mismo navegador y dispositivo. Los archivos no se guardan en ese borrador: hay que volver a seleccionarlos.', 'En un trámite real, esperá la confirmación de guardado del servidor. Un borrador local o un archivo pendiente no garantiza recuperación desde otro dispositivo.'], expected: 'Campos y paso se recuperan; sabés qué está guardado y qué sigue pendiente.' },
+          { title: 'Revisar antes de presentar', body: ['Podés completar el formulario por partes; antes del envío real revisá los campos y documentos requeridos.', 'La solicitud presentada pasa a revisión administrativa. Si está observada, corregí lo solicitado en ese mismo trámite. Con los correos apagados no se entregan enlaces de verificación o recuperación.'], expected: 'No confundís guardar, presentar y aprobar; en modo prueba no se crea una solicitud real.' }
+        ]
+      },
+      {
+        id: 'soporte-enviar-seguir', profile: 'generador', audiences: ['administrador', 'generador', 'transportista', 'operador', 'inspector', 'auditor'],
+        title: 'Enviar un ticket y leer la respuesta', summary: 'Pedí ayuda técnica desde la pantalla del problema y seguí el mismo ticket.',
+        duration: '3 min', icon: 'support_agent', keywords: ['ticket', 'soporte', 'ayuda', 'problema', 'respuesta', 'audio'],
+        safety: 'Un ticket no modifica ni reemplaza el trámite. No adjuntes contraseñas ni información de otras personas. Durante una capacitación en producción, consultá tickets autorizados sin enviar pruebas.',
+        steps: [
+          { title: 'Reportar desde Ayuda', body: ['Abrí Ayuda → Reportar problema o Soporte. Describí qué intentabas hacer y qué pasó.', 'Las capturas y documentos son opcionales. Si continuás luego, el borrador queda en ese dispositivo y cuenta; no se envía automáticamente.'], expected: 'El reporte explica el problema sin exigir un adjunto innecesario.' },
+          { title: 'Confirmar el envío', body: ['Enviá una sola vez y esperá el número de ticket. Si falla, conservá el texto y revisá el mensaje antes de reintentar.', 'Mis tickets permite volver al reporte desde web o app. No lo des por enviado si sólo ves un borrador.'], expected: 'El ticket tiene número y puede abrirse desde Mis tickets.' },
+          { title: 'Seguir la respuesta', body: ['Consultá la campana de avisos o Mis tickets y abrí el mismo reporte. Los correos apagados no impiden consultar una respuesta guardada dentro del sistema.', 'Respondé con el dato solicitado; podés usar los adjuntos o audio cuando estén disponibles y autorices el micrófono. Cerrá con un motivo cuando esté resuelto o reabrí si persiste.'], expected: 'El autor encuentra la respuesta pública y puede continuar la conversación.' }
+        ]
+      },
+      {
+        id: 'soporte-gestionar', profile: 'administrador',
+        title: 'Soporte: asignar, derivar y responder', summary: 'Separá la conversación con el usuario del trabajo interno del equipo.',
+        duration: '4 min', icon: 'assignment_ind', keywords: ['ticket', 'soporte', 'derivar', 'asignarme', 'clasificar', 'nota interna', 'impersonado'],
+        safety: 'Requiere acceso habilitado a Mesa de soporte. Estos permisos no conceden acceso adicional a trámites. Para practicar, usar tickets escuela en un entorno autorizado.',
+        steps: [
+          { title: 'Ubicar y tomar el ticket', body: ['Entrá en Mesa de soporte y filtrá por número, estado o clasificación. Asignarme toma un ticket disponible.', 'Comprobá el autor y, si se creó durante un acceso temporal, la identidad representada. La respuesta pública debe llegar al autor del ticket, no confundirse con una nota al administrador.'], expected: 'El ticket correcto tiene un responsable identificado.' },
+          { title: 'Clasificar o derivar', body: ['Clasificar define área, tipo y prioridad; no cierra el ticket.', 'Derivar permite elegir otro responsable activo. Si no aparece ningún destino, administración debe revisar Equipo de soporte. No compartas credenciales para resolver una derivación.'], expected: 'El responsable y la clasificación quedan visibles; la derivación conserva su historial.' },
+          { title: 'Responder y cerrar', body: ['Elegí Responder para un mensaje visible al usuario; Nota interna sólo la ve soporte. Revisá esa distinción antes de enviar.', 'Pedí respuesta si faltan datos y cerrá con una resolución cuando corresponda. Verificá con el autor que puede abrir el aviso y leer la respuesta.'], expected: 'El usuario ve la solución, no las notas internas; el estado refleja el trabajo pendiente.' }
+        ]
+      },
+      {
+        id: 'cambio-dominio', profile: 'administrador', audiences: ['administrador', 'generador', 'transportista', 'operador', 'inspector', 'auditor'],
+        title: 'Acceder a SITREP y preparar el cambio de dominio', summary: 'Usá la instalación actual; el dominio final se habilitará mediante una migración anunciada.',
+        duration: '3 min', icon: 'language', keywords: ['dominio', 'migración', 'sesión', 'Mendoza', 'borradores', 'app', 'APK', 'PWA'],
+        safety: 'El destino previsto es sitrep.mendoza.gov.ar. Mencionarlo aquí no significa que ya esté habilitado. Este manual no cambia DNS, servidores, cuentas ni formularios abiertos.',
+        steps: [
+          { title: 'Usar la instalación actual', body: ['Los enlaces del manual a web, app y ayuda permanecen en el dominio donde abriste este manual.', 'Usá el enlace institucional confirmado para la jornada. No pruebes credenciales en un dominio distinto sólo porque aparece en una captura histórica.'], expected: 'Manual, web y app apuntan a la misma instalación autorizada.' },
+          { title: 'Conservar el trabajo antes de migrar', body: ['Las sesiones, borradores locales, colas sin sincronizar y permisos de cámara/GPS no se trasladan automáticamente entre dominios.', 'Antes del corte, confirmá los guardados del servidor y la sincronización. No borres datos del sitio anterior ni cierres un formulario pendiente. Un enlace recibido por correo tampoco transporta el borrador del otro navegador.'], expected: 'No queda trabajo sólo local que se dé por recuperable en el dominio nuevo.' },
+          { title: 'Validar el nuevo acceso', body: ['Tras el anuncio de la migración, ingresá por el enlace oficial y verificá cuenta, rol, trámites y documentos. La conservación de datos del servidor debe comprobarla el equipo de migración.', 'La PWA anterior puede seguir abriendo el dominio anterior y el APK necesita verificar su destino y versión. El equipo técnico debe validar TLS, enlaces de correo, autenticación, GPS, QR y offline antes de declarar el cambio completo.'], expected: 'Se confirma el acceso en web y app; no se presume que una redirección migra sesiones o instalaciones.' }
+        ]
+      },
       {
         id: 'administrador-alertas-proactivas',
         profile: 'administrador',
@@ -23,7 +83,7 @@
         duration: '6 min',
         icon: 'notifications_active',
         keywords: ['alertas', 'avisos', 'reglas', 'vencimientos', 'habilitación', 'licencia', 'inspección', 'requerimiento', 'respuesta', 'DDJJ', 'TEF', 'OCR'],
-        safety: 'Catálogo validado en QA, pendiente de publicación al 04/10/2026. Las capturas usan datos sintéticos. Simular no envía ni crea casos; evaluar reglas activas sí genera casos y avisos internos. No activa correo ni push.',
+        safety: 'Las capturas de QA usan datos sintéticos y no acreditan la configuración actual. Simular no envía ni crea casos; evaluar reglas activas sí genera casos y avisos internos. Durante la capacitación no activar reglas ni envíos. Consultá los permisos y la configuración de esta instalación.',
         steps: [
           { title: 'Abrir Reglas y simular sin enviar', body: ['En Alertas → Reglas → Nueva Regla, elegí una familia, su nombre y los destinatarios permitidos.', 'Usá Simular sin enviar: muestra la cantidad real y hasta 20 ejemplos. No crea la regla, casos ni avisos. Las reglas nuevas se crean inactivas.'], image: S + 'desktop/alerts_simulation_qa.png', caption: QA_ALERTS, alt: 'QA: simulación de manifiestos pendientes sin enviar avisos', expected: 'Podés revisar la fuente y el alcance antes de guardar o activar.' },
           { title: 'Seguir manifiestos recibidos', body: ['Manifiesto pendiente de tratamiento o cierre usa estados Recibido o En tratamiento y la fecha de recepción registrada.', 'Los días son un umbral operativo, no un vencimiento legal. Cero incluye todos los recibidos o en tratamiento; una fecha ausente se identifica, no se inventa.'], image: S + 'desktop/alerts_simulation_qa.png', caption: QA_ALERTS, alt: 'QA: umbral operativo desde la recepción de un manifiesto', expected: 'La alerta identifica el manifiesto que necesita una acción permitida.' },
