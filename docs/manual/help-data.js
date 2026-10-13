@@ -319,4 +319,77 @@
       }
     ]
   };
+
+  // Classroom links identify existing synthetic records; they never switch
+  // identity, enable training, create records or bypass the application's ACL.
+  var workshop = window.SITREP_HELP.guides[0];
+  workshop.summary = '90 minutos · Un caso completo, cinco equipos y accesos directos para web y app.';
+  workshop.keywords.push('golden path', 'guion', 'CAP', 'equipos');
+  workshop.steps[0].body = [
+    'Antes del taller: comprobá tu ingreso y usá un perfil de navegador separado de los formularios reales. Con correos apagados, no dependas de recuperar la contraseña durante la clase. Conservá el APK instalado; no borres sus datos.',
+    'Administrador → Ver como otro usuario → Capacitación. Elegí CAP · GENERADOR 1 y comprobá «Capacitación · sin validez oficial». Practicá Volver a mi cuenta antes de continuar. Estos enlaces no inician sesión ni cambian el rol: elegilo primero en el selector.',
+    'Equipo 1: demostración. Equipos 2–4: práctica. Equipo 5: reserva con respuestas de QA ya cargadas. Mantené el mismo número al cambiar de rol y un solo responsable por registro. No compartas contraseñas.',
+    'Las cuentas se llaman CAP · ADMIN N, INSPECTOR N, GENERADOR N, TRANSPORTISTA N y OPERADOR N. También hay ADMIN_GENERADOR N, ADMIN_TRANSPORTISTA N y ADMIN_OPERADOR N para consulta sectorial. Reemplazá N por tu equipo, del 1 al 5.'
+  ];
+  workshop.steps[0].resources = [{ label: 'Elegir cuenta CAP · requiere administrador', path: '/switch-user' }];
+  workshop.steps[1].body = [
+    'Abrí un alta en modo revisión. Para la demostración, usá Transportista: completá datos ficticios y agregá un chofer en Flota y choferes. No uses documentos personales.',
+    'Descargá la licencia sintética de abajo y elegila en el campo de licencia. Compará las propuestas OCR con el original antes de usar los datos seleccionados. OCR no aprueba identidad, pagos ni habilitación.',
+    'Guardá, salí del alta de práctica y recuperá el borrador en ese mismo navegador. Comprobá campos y paso; los archivos deben volver a elegirse. No presentes un trámite real. El TEF dinámico no se muestra al solicitante.'
+  ];
+  workshop.steps[1].resources = ['generador', 'transportista', 'operador'].map(function (role) {
+    return { label: 'Probar alta · ' + role, path: '/inscripcion/' + role + '?modo=revision' };
+  }).concat([{ label: 'Licencia sintética · sin validez', href: '/manual/fixtures/licencia-capacitacion.png', action: 'Descargar PNG', download: true }]);
+  workshop.steps[2].body = [
+    'Generador N: abrí CAP-N-BORRADOR, revisá actores y residuo y firmá. Verificá APROBADO. El número conserva «BORRADOR» aunque cambie el estado.',
+    'Volvé al administrador y elegí TRANSPORTISTA N. Abrí el mismo manifiesto: confirmá retiro y entrega. Verificá EN_TRANSITO y ENTREGADO antes de pasar el turno.',
+    'Elegí OPERADOR N: recibí, revisá pesaje, registrá tratamiento y cerrá. Verificá TRATADO y la cronología. Las descargas oficiales están deshabilitadas en capacitación.',
+    'Si falta tiempo, CAP-N-APROBADO es otro caso para empezar desde retiro. CAP-N-TRATADO sirve de consulta. No finjas continuidad entre ellos ni reinicies un caso ya utilizado.'
+  ];
+  workshop.steps[3].body = [
+    'Campo: INSPECTOR N abre CAP-I-N-GENERADOR → Visita → Iniciar visita → Controles. Marcá un control, guardá y reabrí. Es trabajo de campo, todavía no el expediente publicado que verá el actor.',
+    'Intercambio: GENERADOR, TRANSPORTISTA u OPERADOR N abre su CAP-P-N-ROL-A en Mis inspecciones. Leé el último requerimiento → Responder esta actuación → Presentar en expediente. Reabrí para verificar el guardado.',
+    'Autoridad: ADMIN N abre ese mismo CAP-P en Expediente → Comunicaciones, revisa y registra una decisión con fundamento. Volvé al actor para comprobarla. Responder no significa aprobar.',
+    'Son dos ejercicios distintos: visita de campo e intercambio preparado. El actor no ve inspecciones generales ni borradores del inspector. Si el caso ya cambió de estado, seguí su historial; no lo restablezcas.'
+  ];
+  workshop.steps[4].body = [
+    'Actor CAP: Ayuda → Reportar problema. Describí el problema; adjunto opcional. Esperá la confirmación y anotá el número. Los tickets de abajo son reservas ya creadas, no el ticket nuevo.',
+    'Volvé como ADMIN N de Capacitación, no como administrador operativo. Abrí el ticket del autor → Asignarme → Derivar a otro ADMIN CAP habilitado → Nota interna → Responder. Los tickets de reserva ya tienen responsable; no des por demostrado Asignarme con uno que ya era tuyo.',
+    'Volvé al autor: abrí el mismo número, leé la respuesta pública y cerrá sólo después de comprobarla. Las notas internas quedan reservadas a soporte. No esperes un correo.'
+  ];
+  workshop.steps[4].resources = [{ label: 'Mis tickets / Mesa de soporte · según cuenta CAP', path: '/soporte' }];
+  workshop.steps[5].body = [
+    'ADMIN CAP: consultá Centro de Control y Monitor con un rango que incluya el 12/10/2026. Los puntos preparados no necesariamente aparecen en «Hoy». Son ubicaciones sintéticas, no un viaje físico en vivo.',
+    'Cada participante encuentra su próxima tarea y sabe volver al manual o pedir ayuda. En los teléfonos, comprobar cámara QR, permisos GPS y recuperación de red. Navegador y emulador no certifican batería ni segundo plano.',
+    'Si falta confirmación, conservá el formulario y consultá estado/historial antes de reintentar. Si desaparece la banda CAP, detené las modificaciones. No borres almacenamiento ni reinicies registros.',
+    'Anotá cualquier pendiente con rol, pantalla, número CAP, hora y resultado esperado. No activar correos, push, reglas masivas ni documentos oficiales durante el taller.'
+  ];
+  workshop.steps[5].resources = [{ label: 'Centro de Control · consulta CAP', path: '/centro-control' }, { label: 'Monitor · consulta CAP', path: '/monitor' }];
+
+  function teams(records) {
+    return [1, 2, 3, 4, 5].map(function (n) {
+      return { label: 'Equipo ' + n, note: n === 1 ? 'Demostración' : n === 5 ? 'Reserva · contiene pruebas previas' : 'Práctica', records: records(n) };
+    });
+  }
+  workshop.steps[2].teams = teams(function (n) {
+    return [
+      { label: 'CAP-' + n + '-BORRADOR', role: 'Generador → Transportista → Operador · mismo número', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-BORRADOR' },
+      { label: 'CAP-' + n + '-APROBADO', role: 'Alternativa desde retiro · otro caso', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-APROBADO' },
+      { label: 'CAP-' + n + '-TRATADO', role: 'Cierre preparado · sólo consulta', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-TRATADO' }
+    ];
+  });
+  workshop.steps[3].teams = teams(function (n) {
+    var records = [{ label: 'CAP-I-' + n + '-GENERADOR', role: 'Inspector · trabajo de campo', path: '/inspecciones/cap-20261012-inspeccion-' + n + '-GENERADOR' }];
+    ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].forEach(function (role) {
+      var id = 'cap-20261012-participacion-' + n + '-' + role + '-abierta';
+      records.push({ label: 'CAP-P-' + n + '-' + role + '-A', role: role + ' · Mis inspecciones', path: '/mis-inspecciones/' + id });
+      records.push({ label: 'CAP-P-' + n + '-' + role + '-A', role: 'ADMIN · revisar respuesta de ' + role, path: '/inspecciones/' + id });
+    });
+    return records;
+  });
+  workshop.steps[4].teams = teams(function (n) {
+    return ['generador', 'transportista', 'operador'].map(function (role) {
+      return { label: 'CAP · Consulta de ' + role + ' ' + n, role: 'Reserva · autor ' + role + ' ' + n + ' / ADMIN ' + n, path: '/soporte/cap-20261012-ticket-' + role + '-' + n };
+    });
+  });
 })();

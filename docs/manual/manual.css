@@ -720,6 +720,27 @@ p { margin: 0; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+.practice-records { list-style: none; padding: 0; margin: 20px 0; }
+.practice-records li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.practice-records li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.practice-records strong { display: block; font-size: 15px; }
+.practice-records span { display: block; color: var(--ink-600); font-size: 14px; }
+.practice-actions { display: flex; flex: 0 0 auto; gap: 8px; }
+.practice-actions a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 48px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--green-800); text-decoration: none; font-weight: 600; }
+.practice-actions a:hover { background: var(--green-50); border-color: var(--green-700); }
+.practice-actions a:focus-visible, .practice-team summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.practice-hint { color: var(--ink-600); font-size: 14px; margin: 20px 0 12px; }
+.practice-team { border-bottom: 1px solid var(--line); }
+.practice-team summary { cursor: pointer; min-height: 52px; padding: 12px 4px; }
+.practice-team summary span { margin-left: 12px; font-size: 14px; color: var(--ink-600); }
+.practice-team[open] summary { color: var(--green-800); }
+.practice-team .practice-records { margin-top: 0; padding-left: 20px; }
+@media (max-width: 480px) {
+  .practice-records li { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .practice-team summary span { display: block; margin-left: 20px; }
+  .practice-team .practice-records { padding-left: 0; }
+}
+
 @media print {
   .help-header, .tutorial-sidebar, .mobile-index-toggle, .tutorial-footer-nav, .copy-step-link, .help-footer { display: none !important; }
   body[data-page="tutorial"] { padding: 0; }

@@ -124,3 +124,46 @@ test('training does not present another server dataset or destructive resets as 
   assert.doesNotMatch(html, /href="[^"]*cmuegqi/);
   assert.doesNotMatch(html, /<td>Texto libre<\/td>/);
 });
+
+test('classroom records keep five teams and distinct actor/authority views', () => {
+  const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
+  assert.equal(workshop.steps.length, 6);
+  assert.match(workshop.steps[0].body.join(' '), /enlaces no inician sesión ni cambian el rol/);
+  assert.match(workshop.steps[0].body.join(' '), /Equipo 5: reserva/);
+  assert.match(workshop.steps[2].body.join(' '), /número conserva/);
+  for (const index of [2, 3, 4]) {
+    assert.equal(workshop.steps[index].teams.length, 5);
+    for (const [i, team] of workshop.steps[index].teams.entries()) {
+      const n = i + 1;
+      assert.equal(team.label, 'Equipo ' + n);
+      for (const r of team.records) assert.match(r.path, new RegExp('cap-20261012-(?:manifiesto-' + n + '-|inspeccion-' + n + '-|participacion-' + n + '-|ticket-(?:generador|transportista|operador)-' + n + '$)'));
+      if (index === 2) assert.deepEqual(Array.from(team.records, (r: any) => r.path), ['BORRADOR', 'APROBADO', 'TRATADO'].map(s => '/manifiestos/cap-20261012-manifiesto-' + n + '-' + s));
+      if (index === 3) {
+        assert.equal(team.records[0].path, '/inspecciones/cap-20261012-inspeccion-' + n + '-GENERADOR');
+        for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
+          const id = 'cap-20261012-participacion-' + n + '-' + role + '-abierta';
+          assert.ok(team.records.some((r: any) => r.path === '/mis-inspecciones/' + id));
+          assert.ok(team.records.some((r: any) => r.path === '/inspecciones/' + id));
+        }
+      }
+    }
+  }
+});
+
+test('all classroom links remain on the current/future domain; trial stays trial', () => {
+  const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
+  const resources = workshop.steps.flatMap((s: any) => [...(s.resources || []), ...(s.teams || []).flatMap((t: any) => t.records)]);
+  assert.equal(resources.length, 73);
+  for (const r of resources) {
+    const href = r.path || r.href;
+    assert.match(href, /^\/(?!\/)[a-zA-Z0-9/?=&._-]+$/);
+    for (const origin of ['https://sitrep.ultimamilla.com.ar', 'https://sitrep.mendoza.gov.ar']) {
+      assert.equal(new URL(href, origin).origin, origin);
+      if (r.path) assert.equal(new URL('/app' + href, origin).origin, origin);
+    }
+    if (href.startsWith('/inscripcion/')) assert.equal(new URL(href, 'https://example.invalid').searchParams.get('modo'), 'revision');
+  }
+  const fixture = resources.find((r: any) => r.download);
+  assert.equal(fixture.href, '/manual/fixtures/licencia-capacitacion.png');
+  assert.ok(existsSync(fileURLToPath(new URL('fixtures/licencia-capacitacion.png', root))));
+});

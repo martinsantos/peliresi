@@ -282,6 +282,29 @@
     drawResults();
   }
 
+  function resourceLinks(records) {
+    return '<ul class="practice-records">' + records.map(function (record) {
+      var href = record.path || record.href;
+      // Only installation-relative URLs; no external origins or protocol URLs.
+      if (!/^\/(?!\/)[a-zA-Z0-9/?=&._-]+$/.test(href)) return '';
+      function anchor(url, label) {
+        return '<a href="' + escapeHTML(url) + '" target="_blank" rel="noopener"' +
+          (record.download ? ' download' : '') + ' aria-label="' + escapeHTML(record.label + ' · ' + (record.role || '') + ' · ' + label + ' (otra pestaña)') + '">' + escapeHTML(label) + '</a>';
+      }
+      return '<li><div><strong>' + escapeHTML(record.label) + '</strong>' +
+        (record.role ? '<span>' + escapeHTML(record.role) + '</span>' : '') +
+        '</div><div class="practice-actions">' + (record.path ? anchor(href, 'Web') + anchor('/app' + href, 'App') : anchor(href, record.action || 'Abrir')) + '</div></li>';
+    }).join('') + '</ul>';
+  }
+
+  function practiceResources(step) {
+    var html = step.resources ? resourceLinks(step.resources) : '';
+    if (step.teams) html += '<div class="practice-teams"><p class="practice-hint">Elegí tu equipo. Abrí el registro después de seleccionar la cuenta CAP; los enlaces no cambian la sesión. Web y App abren otra pestaña.</p>' + step.teams.map(function (team) {
+      return '<details class="practice-team"><summary><strong>' + escapeHTML(team.label) + '</strong><span>' + escapeHTML(team.note) + '</span></summary>' + resourceLinks(team.records) + '</details>';
+    }).join('') + '</div>';
+    return html;
+  }
+
   function renderTutorial() {
     var guide = guideById(params.get('guide')) || guideById('transportista-confirmar-retiro') || data.guides[0];
     if (!guide) return;
@@ -331,6 +354,7 @@
       section.innerHTML = '<p class="step-kicker">Paso ' + (index + 1) + ' de ' + guide.steps.length + '</p>' +
         '<div class="step-title-row"><h2>' + escapeHTML(step.title) + '</h2><button class="copy-step-link" type="button" data-copy-step="' + index + '"><span class="material-symbols-rounded" aria-hidden="true">link</span>Copiar enlace a este paso</button></div>' +
         '<ol class="step-instructions">' + step.body.map(function (instruction) { return '<li><span>' + escapeHTML(instruction) + '</span></li>'; }).join('') + '</ol>' +
+        practiceResources(step) +
         (step.image ? '<figure class="guide-image-wrap' + (step.image.indexOf('/mobile/') >= 0 ? ' is-mobile-capture' : ' is-desktop-capture') + '"><a class="guide-image-link" href="' + escapeHTML(step.image) + '" target="_blank" rel="noopener" aria-label="Abrir captura a tamaño completo"><img class="guide-image" src="' + escapeHTML(step.image) + '" width="1600" height="900" loading="lazy" alt="' + escapeHTML(step.alt) + '"></a><figcaption class="guide-image-caption">' + escapeHTML(step.caption || (step.image.indexOf('inspection_') >= 0 ? 'Simulación de capacitación con datos de prueba' : 'Captura de SITREP')) + ' · Tocá para verla completa.</figcaption></figure>' : '') +
         '<div class="expected-result"><span class="material-symbols-rounded" aria-hidden="true">check</span><div><strong>Resultado esperado</strong><p>' + escapeHTML(step.expected) + '</p></div></div>';
       stepsRoot.appendChild(section);
