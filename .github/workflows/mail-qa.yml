@@ -63,6 +63,7 @@ jobs:
         run: |
           npm ci --prefix frontend --no-audit --no-fund
           cd frontend
+          npm test -- src-v6/__tests__/manual/manualDocumentation.test.ts --maxWorkers=1
           npx --no-install playwright install --with-deps chromium
           npx --no-install playwright test --config cloud-qa/manual.playwright.config.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
