@@ -10,7 +10,7 @@ vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: nu
 describe('public landing identity and entry points', () => {
   it('names the system in the main title and uses both institutional brands', () => {
     const { container } = render(<MemoryRouter><LandingPage /></MemoryRouter>);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('SITREPSistema de trazabilidad de residuos peligrosos');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('SITREP Sistema de trazabilidad de residuos peligrosos');
     expect(container.querySelector('header [data-sitrep-mark]')).toHaveAttribute('src', '/sitrep-mark-green.svg');
     expect(screen.getByAltText('Mendoza — Gobierno de la Provincia')).toHaveAttribute('src', '/logo-mendoza.webp');
   });
@@ -41,6 +41,6 @@ describe('public landing identity and entry points', () => {
     expect(paths(green)).toHaveLength(3);
     expect(paths(green)).toEqual(paths(original));
     expect(green.querySelector('rect, image, script')).toBeNull();
-    expect(green.querySelector('g')).toHaveAttribute('fill', '#1B5E3C');
+    expect(green.querySelector('g')?.getAttribute('fill')).toBe('#1B5E3C');
   });
 });

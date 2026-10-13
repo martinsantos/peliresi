@@ -35,9 +35,7 @@ const LandingPage: React.FC = () => {
         <div className="landing-container landing-masthead">
           <div className="landing-wordmark" data-testid="landing-wordmark">
             <SitrepMark size={36} appearance="green" />
-            <span>
-              SITREP
-            </span>
+            <span>SITREP</span>
           </div>
           <img src={`${import.meta.env.BASE_URL}logo-mendoza.webp`} width={2968} height={1405}
             alt="Mendoza — Gobierno de la Provincia" className="landing-government-mark" fetchPriority="high" />
@@ -59,7 +57,7 @@ const LandingPage: React.FC = () => {
         <div className="landing-container landing-hero-inner">
         <div>
           <h1 className="institutional-title landing-title">
-            <span className="landing-title-name">SITREP</span>
+            <span className="landing-title-name">SITREP</span>{' '}
             <span className="landing-title-description">Sistema de trazabilidad de residuos peligrosos</span>
           </h1>
           <p className="text-neutral-600 text-sm leading-relaxed mb-8 max-w-md">

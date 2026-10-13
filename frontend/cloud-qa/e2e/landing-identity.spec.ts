@@ -25,7 +25,7 @@ for (const width of [1440, 768, 360, 320]) {
     });
     await page.goto('/');
     const title = page.getByRole('heading', { level: 1 });
-    await expect(title).toHaveText('SITREPSistema de trazabilidad de residuos peligrosos');
+    await expect(title).toHaveText('SITREP Sistema de trazabilidad de residuos peligrosos');
     await page.evaluate(() => document.fonts.ready);
     const mark = page.getByTestId('landing-wordmark');
     expect(Math.abs((await mark.boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThan(1);
