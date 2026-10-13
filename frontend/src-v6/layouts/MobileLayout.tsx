@@ -58,6 +58,7 @@ import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
+import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
 import { useAttentionCounts } from '../hooks/useAttentionCounts';
 import { AttentionBadge } from '../components/AttentionBadge';
@@ -412,6 +413,7 @@ export const MobileLayout: React.FC = () => {
         </div>
       </header>
       <ToastContainer />
+      <NotificacionesPoller />
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
       <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>

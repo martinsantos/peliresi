@@ -78,7 +78,7 @@ jobs:
         run: npx --no-install playwright test --config cloud-qa/landing.playwright.config.ts
       - name: Preserve exactly the tested static candidate, excluding manual and user data
         run: |
-          tar czf /tmp/sitrep-landing-qa/candidate.tar.gz -C frontend dist/assets dist/index.html dist/sw.js dist/sitrep-mark-green.svg dist/logo-mendoza.webp dist-app/assets dist-app/app.html dist-app/sw-app.js dist-app/sitrep-mark-green.svg
+          tar czf /tmp/sitrep-landing-qa/candidate.tar.gz -C frontend dist/assets dist/index.html dist/sw.js dist/sitrep-mark-green.svg dist/logo-mendoza.webp dist-app/assets dist-app/app.html dist-app/index.html dist-app/sw-app.js dist-app/sw-precache-manifest.js dist-app/sitrep-mark-green.svg
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
