@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileLayout } from '../../layouts/MobileLayout';
+vi.mock('../../hooks/useAttentionCounts', () => ({ useAttentionCounts: () => ({ support: 0, applicationPending: 0 }) }));
 
 const authState = vi.hoisted(() => ({
   currentUser: {

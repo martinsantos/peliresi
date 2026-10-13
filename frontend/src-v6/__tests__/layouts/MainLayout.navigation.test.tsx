@@ -3,6 +3,8 @@ import {MemoryRouter} from 'react-router-dom';
 import {beforeEach,describe,it,expect,vi} from 'vitest';
 import {MainLayout} from '../../layouts/MainLayout';
 const authState=vi.hoisted(()=>({rol:'ADMIN',esInspector:false}));
+const attention=vi.hoisted(()=>({support:0,applicationPending:0}));
+vi.mock('../../hooks/useAttentionCounts',()=>({useAttentionCounts:()=>attention}));
 vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa',rol:authState.rol,esInspector:authState.esInspector,nombre:'QA',email:'qa@example.invalid',avatar:'QA',permisos:[]},isAdmin:authState.rol==='ADMIN',isAdminGenerador:authState.rol==='ADMIN_GENERADOR',isAdminOperador:authState.rol==='ADMIN_OPERADOR',isAdminTransportista:authState.rol==='ADMIN_TRANSPORTISTA',isLoading:false,canAccess:()=>true,logout:vi.fn()})}));
 vi.mock('../../contexts/ImpersonationContext',()=>({useImpersonation:()=>({impersonationData:null,exitImpersonation:vi.fn()})}));
 vi.mock('../../components/GlobalSearchPanel',()=>({GlobalSearchPanel:()=>null}));
@@ -16,7 +18,12 @@ vi.mock('../../components/ui/Toast',()=>({ToastContainer:()=>null}));
 vi.mock('../../components/ui/UserSwitcher',()=>({UserSwitcher:()=>null}));
 function show(path:string){render(<MemoryRouter initialEntries={[path]}><MainLayout/></MemoryRouter>);}
 describe('Sidebar: one visible current destination',()=>{
-  beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;});
+  beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;attention.support=0;attention.applicationPending=0;});
+  it('puts server-backed work counts on their actionable section links',()=>{
+    attention.support=7;attention.applicationPending=26;show('/admin/solicitudes');
+    expect(screen.getByLabelText('7 pendientes de atender').closest('a')).toHaveAttribute('href','/soporte');
+    expect(screen.getByLabelText('26 pendientes de atender').closest('a')).toHaveAttribute('href','/admin/solicitudes');
+  });
   it.each(['ADMIN_GENERADOR','ADMIN_OPERADOR','ADMIN_TRANSPORTISTA'])('provides the authorized registration desk for %s without a hidden-route dead end',rol=>{
     authState.rol=rol;
     show('/admin/solicitudes');

@@ -69,7 +69,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci --no-audit --no-fund
-          npm test -- src-v6/__tests__/pages/LandingPage.test.tsx src-v6/__tests__/components/LoadingState.test.tsx src-v6/__tests__/layouts/ApplicantLayout.test.tsx src-v6/__tests__/services/attentionCounts.test.ts src-v6/__tests__/components/Toast.test.tsx src-v6/__tests__/utils/notificationNavigation.test.ts --maxWorkers=1
+          npm test -- src-v6/__tests__/pages/LandingPage.test.tsx src-v6/__tests__/components/LoadingState.test.tsx src-v6/__tests__/layouts/ src-v6/__tests__/services/attentionCounts.test.ts src-v6/__tests__/components/Toast.test.tsx src-v6/__tests__/utils/notificationNavigation.test.ts src-v6/__tests__/pages/SoportePage.cache.test.tsx --maxWorkers=1
           npm run build
           npx --no-install vite build --config vite.config.app.ts
           npx --no-install playwright install --with-deps chromium
