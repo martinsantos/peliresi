@@ -3,7 +3,11 @@ import { test, expect } from '@playwright/test';
 for (const app of [false, true]) test(`pending versus unread, ${app ? 'app' : 'web'}`, async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.setViewportSize({ width: app ? 360 : 1440, height: 900 });
-  await page.addInitScript(() => localStorage.setItem('sitrep_access_token', 'synthetic-qa-token'));
+  await page.addInitScript(() => {
+    const payload = btoa(JSON.stringify({ userId: 'qa-attention', exp: Math.floor(Date.now() / 1000) + 3600, iat: Math.floor(Date.now() / 1000) }));
+    localStorage.setItem('sitrep_access_token', 'eyJhbGciOiJIUzI1NiJ9.' + payload + '.synthetic');
+    localStorage.setItem('sitrep_refresh_token', 'synthetic-refresh');
+  });
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     // Isolated UI contract fixture. No connection to production, messages or writes.

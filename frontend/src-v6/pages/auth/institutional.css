@@ -68,7 +68,7 @@
 .landing-title { margin: 0 0 24px; max-width: 920px; font-family: 'Plus Jakarta Sans', sans-serif; text-wrap: initial; }
 .landing-title-name { display: block; margin-bottom: 14px; color: #1b5e3c; font-size: .7em; letter-spacing: -.025em; }
 .landing-title-description { display: block; text-wrap: balance; }
-.landing-page #instalar, .landing-page #perfiles { scroll-margin-top: 108px; }
+.landing-page #instalar, .landing-page #perfiles { scroll-margin-top: 128px; }
 @media (max-width: 639px) {
   .landing-container { padding-inline: 20px; }
   .landing-masthead { flex-wrap: wrap; gap: 12px; padding-block: 12px; }
@@ -80,7 +80,7 @@
   .landing-hero-inner { padding-block: 28px 36px; }
   .landing-page .landing-title { margin: 0 0 20px; font-size: 32px; line-height: 1.15; }
   .landing-title-name { margin-bottom: 12px; font-size: 28px; }
-  .landing-page #instalar, .landing-page #perfiles { scroll-margin-top: 132px; }
+  .landing-page #instalar, .landing-page #perfiles { scroll-margin-top: 152px; }
 }
 @media (max-width: 900px) {
   .auth-shell { display: block; }
