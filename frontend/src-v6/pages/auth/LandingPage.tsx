@@ -33,12 +33,14 @@ const LandingPage: React.FC = () => {
       {/* Header */}
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-10">
         <div className="landing-container landing-masthead">
+          <div className="landing-brands">
+          <img src={`${import.meta.env.BASE_URL}logo-mendoza.webp`} width={2968} height={1405}
+            alt="Mendoza — Gobierno de la Provincia" className="landing-government-mark" fetchPriority="high" />
           <div className="landing-wordmark" data-testid="landing-wordmark">
             <SitrepMark size={36} appearance="green" />
             <span>SITREP</span>
           </div>
-          <img src={`${import.meta.env.BASE_URL}logo-mendoza.webp`} width={2968} height={1405}
-            alt="Mendoza — Gobierno de la Provincia" className="landing-government-mark" fetchPriority="high" />
+          </div>
           <nav aria-label="Acceso al sistema" className="landing-header-actions">
             <a href="#instalar" className="brand-link flex items-center justify-center gap-1.5 text-sm transition-colors px-3 py-3">
               <Smartphone size={16} />

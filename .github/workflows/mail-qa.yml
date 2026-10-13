@@ -69,13 +69,16 @@ jobs:
         working-directory: frontend
         run: |
           npm ci --no-audit --no-fund
-          npm test -- src-v6/__tests__/pages/LandingPage.test.tsx src-v6/__tests__/components/LoadingState.test.tsx src-v6/__tests__/layouts/ApplicantLayout.test.tsx --maxWorkers=1
+          npm test -- src-v6/__tests__/pages/LandingPage.test.tsx src-v6/__tests__/components/LoadingState.test.tsx src-v6/__tests__/layouts/ApplicantLayout.test.tsx src-v6/__tests__/services/attentionCounts.test.ts src-v6/__tests__/components/Toast.test.tsx src-v6/__tests__/utils/notificationNavigation.test.ts --maxWorkers=1
           npm run build
           npx --no-install vite build --config vite.config.app.ts
           npx --no-install playwright install --with-deps chromium
       - name: Four screen widths and app login, no authenticated sessions or writes
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/landing.playwright.config.ts
+      - name: Preserve exactly the tested static candidate, excluding manual and user data
+        run: |
+          tar czf /tmp/sitrep-landing-qa/candidate.tar.gz -C frontend dist/assets dist/index.html dist/sw.js dist/sitrep-mark-green.svg dist/logo-mendoza.webp dist-app/assets dist-app/app.html dist-app/sw-app.js dist-app/sitrep-mark-green.svg
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

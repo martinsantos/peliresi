@@ -59,6 +59,8 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
+import { useAttentionCounts } from '../hooks/useAttentionCounts';
+import { AttentionBadge } from '../components/AttentionBadge';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 import { SupportEntry } from '../components/SupportReportDialog';
 import { SupportBubble } from '../components/SupportBubble';
@@ -161,6 +163,7 @@ export const MobileLayout: React.FC = () => {
   }, [isInspectionCase, isLoading, currentUser?.id]);
   const canInspect = Boolean(isInspector || currentUser?.rol === 'ADMIN' || currentUser?.rol.startsWith('ADMIN_'));
   const { data: unreadNotificationCount = 0 } = useNotificacionesNoLeidas();
+  const attention = useAttentionCounts();
 
   // Recover active trip from API after reinstall/crash
   useActiveTripRecovery();
@@ -267,6 +270,9 @@ export const MobileLayout: React.FC = () => {
     }
 
     // Admin section
+    if (currentUser && ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'].includes(currentUser.rol)) {
+      items.push({ to: mp('/admin/solicitudes'), icon: <FileText size={20} />, label: 'Solicitudes', badge: attention.applicationPending, section: 'main' });
+    }
     if (isAdmin) {
       items.push({ to: mp('/admin/usuarios'), icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
       items.push({ to: mp('/admin/actores/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
@@ -286,10 +292,10 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
     }
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
-    items.push({ to: mp('/soporte'), icon: <LifeBuoy size={20} />, label: 'Soporte', section: 'tools' });
+    items.push({ to: mp('/soporte'), icon: <LifeBuoy size={20} />, label: 'Soporte', badge: attention.support, section: 'tools' });
 
     return items;
-  }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId, unreadNotificationCount]);
+  }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId, unreadNotificationCount, attention.applicationPending, attention.support]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -555,6 +561,7 @@ export const MobileLayout: React.FC = () => {
                         to={item.to}
                         icon={item.icon}
                         label={item.label}
+                        badge={item.badge}
                         onClick={() => setIsMenuOpen(false)}
                       />
                     ))}
@@ -648,11 +655,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick }) 
     >
       {icon}
       <span className="flex-1 font-medium">{label}</span>
-      {badge && (
-        <span className="px-2 py-0.5 bg-error-700 text-white text-xs font-bold rounded-full">
-          {badge}
-        </span>
-      )}
+      <AttentionBadge count={badge} label={label === 'Avisos' ? 'avisos sin leer' : 'pendientes de atender'} />
       <ChevronRight size={16} className="text-neutral-400" />
     </NavLink>
   );

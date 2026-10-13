@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 if (process.env.GITHUB_ACTIONS !== 'true') throw new Error('Run this review in cloud CI only');
 
 export default defineConfig({
-  testDir: './e2e', testMatch: 'landing-identity.spec.ts',
+  testDir: './e2e', testMatch: ['landing-identity.spec.ts', 'attention.spec.ts'],
   workers: 1, retries: 0, timeout: 45000,
   outputDir: '/tmp/sitrep-landing-qa/failures',
   reporter: [['list'], ['json', { outputFile: '/tmp/sitrep-landing-qa/results.json' }]],

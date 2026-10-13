@@ -28,7 +28,6 @@ for (const width of [1440, 768, 360, 320]) {
     await expect(title).toHaveText('SITREP Sistema de trazabilidad de residuos peligrosos');
     await page.evaluate(() => document.fonts.ready);
     const mark = page.getByTestId('landing-wordmark');
-    expect(Math.abs((await mark.boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThan(1);
     await expect(mark).toHaveCSS('color', 'rgb(27, 94, 60)');
     const government = page.getByAltText('Mendoza — Gobierno de la Provincia');
     await expect(government).toBeVisible();
@@ -36,6 +35,8 @@ for (const width of [1440, 768, 360, 320]) {
       img.complete && img.naturalWidth >= img.clientWidth * devicePixelRatio)).toBe(true);
     const nav = page.getByRole('navigation', { name: 'Acceso al sistema' });
     const govBox = (await government.boundingBox())!;
+    expect(Math.abs(govBox.x - (await title.boundingBox())!.x)).toBeLessThan(1);
+    expect(govBox.x + govBox.width).toBeLessThan((await mark.boundingBox())!.x);
     const navBox = (await nav.boundingBox())!;
     if (width >= 640) {
       expect(Math.abs(govBox.y + govBox.height / 2 - navBox.y - navBox.height / 2)).toBeLessThan(1);

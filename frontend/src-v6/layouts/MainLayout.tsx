@@ -57,6 +57,8 @@ import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { SupportEntry } from '../components/SupportReportDialog';
 import { SupportBubble } from '../components/SupportBubble';
 import { ApplicantLayout } from './ApplicantLayout';
+import { AttentionBadge } from '../components/AttentionBadge';
+import { useAttentionCounts } from '../hooks/useAttentionCounts';
 
 // ========================================
 // COMPONENT
@@ -83,6 +85,7 @@ export const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
+  const attention = useAttentionCounts();
 
   // Items de administración según rol. Hooks must stay before loading/null guards.
   const adminItems = useMemo(() => {
@@ -301,6 +304,7 @@ export const MainLayout: React.FC = () => {
                   >
                     <Icon size={20} />
                     {item.label}
+                    {item.path === '/admin/solicitudes' && <AttentionBadge count={attention.applicationPending} />}
                   </Link>
                 );
               })}
@@ -333,7 +337,7 @@ export const MainLayout: React.FC = () => {
           <div className="mt-2">
             <NavLink to="/soporte" onClick={() => setSidebarOpen(false)}
               className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}>
-              <LifeBuoy size={20} />Soporte
+              <LifeBuoy size={20} />Soporte <AttentionBadge count={attention.support} />
             </NavLink>
             <SupportEntry onSubmitted={() => setSidebarOpen(false)} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-white" />
             <NavLink

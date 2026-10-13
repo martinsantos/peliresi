@@ -130,6 +130,12 @@ function App() {
         </Route>
 
         {/* Admin Mobile Routes - ADMIN only */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/solicitudes" element={<AdminSolicitudesPage />} />
+            <Route path="/mobile/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
+          </Route>
+        </Route>
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores" element={<ActoresPage />} />

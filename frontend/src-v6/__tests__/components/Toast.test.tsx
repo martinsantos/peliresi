@@ -6,6 +6,13 @@ const ids: string[] = [];
 afterEach(() => { act(() => ids.forEach(id => toast.remove(id))); ids.length = 0; vi.useRealTimers(); });
 
 describe('system notices', () => {
+  it('opens the linked record once and dismisses the notice', () => {
+    const open = vi.fn(); render(<ToastContainer />);
+    act(() => { ids.push(toast.add({ type: 'info', title: 'Nuevo ticket', actionLabel: 'Abrir ticket', onAction: open, duration: 0 })); });
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir ticket' }));
+    expect(open).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Nuevo ticket')).toBeNull();
+  });
   it('replaces superseded transient successes instead of consuming the field workspace', () => {
     render(<ToastContainer />);
     act(() => {

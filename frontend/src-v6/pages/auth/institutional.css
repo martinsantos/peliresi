@@ -57,9 +57,11 @@
 .login-institutional-footer .mendoza-brand { height: 32px; }
 /* The public masthead and title share one gutter. Keep login/wizard styling unchanged. */
 .landing-container { width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 24px; }
-.landing-masthead { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 28px; padding-block: 12px; }
+.landing-masthead { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding-block: 18px; }
+.landing-brands { display: flex; align-items: center; gap: 24px; }
 .landing-wordmark { display: flex; align-items: center; gap: 8px; color: #1b5e3c; font: 800 22px/1 'Plus Jakarta Sans', sans-serif; }
-.landing-government-mark { display: block; width: 142px; height: auto; }
+.landing-government-mark { display: block; width: 166px; height: auto; }
+.landing-brands .landing-wordmark { border-left: 1px solid #d2d3dc; padding-left: 24px; }
 .landing-header-actions { display: flex; align-items: center; gap: 12px; }
 .landing-header-actions a { min-height: 44px; white-space: nowrap; }
 .landing-hero-inner { padding-block: 48px 56px; }
@@ -69,9 +71,11 @@
 .landing-page #instalar, .landing-page #perfiles { scroll-margin-top: 108px; }
 @media (max-width: 639px) {
   .landing-container { padding-inline: 20px; }
-  .landing-masthead { grid-template-columns: 1fr auto; gap: 8px 16px; padding-block: 8px; }
-  .landing-government-mark { width: 110px; }
-  .landing-header-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .landing-masthead { flex-wrap: wrap; gap: 12px; padding-block: 12px; }
+  .landing-brands { gap: 16px; }
+  .landing-brands .landing-wordmark { padding-left: 16px; font-size: 21px; }
+  .landing-government-mark { width: 126px; }
+  .landing-header-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .landing-header-actions a { justify-content: center; }
   .landing-hero-inner { padding-block: 28px 36px; }
   .landing-page .landing-title { margin: 0 0 20px; font-size: 32px; line-height: 1.15; }

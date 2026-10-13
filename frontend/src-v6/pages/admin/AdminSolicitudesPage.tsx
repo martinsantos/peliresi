@@ -13,6 +13,7 @@ import { Card, CardContent } from '../../components/ui/CardV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Select } from '../../components/ui/Select';
 import { useSolicitudes } from '../../hooks/useSolicitudes';
+import { useAttentionCounts } from '../../hooks/useAttentionCounts';
 import type { EstadoSolicitud, SolicitudInscripcion } from '../../types/api';
 
 // ── Status config ──
@@ -36,6 +37,7 @@ const AdminSolicitudesPage: React.FC = () => {
   const [tipoActor, setTipoActor] = useState<string>('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const { applications } = useAttentionCounts();
 
   const { data, isLoading } = useSolicitudes({
     estado: (estado || undefined) as EstadoSolicitud | undefined,
@@ -49,13 +51,12 @@ const AdminSolicitudesPage: React.FC = () => {
   const totalPages = data?.totalPages || 1;
   const total = data?.total || 0;
 
-  // KPIs from current page data - for a production app these would come from a dedicated stats endpoint.
-  // We compute from all loaded items as a reasonable approximation.
+  // Server totals across all pages, independent of the visible list filters.
   const kpis = {
-    pendientes: solicitudes.filter(s => s.estado === 'ENVIADA').length,
-    enRevision: solicitudes.filter(s => s.estado === 'EN_REVISION').length,
-    observadas: solicitudes.filter(s => s.estado === 'OBSERVADA').length,
-    aprobadas: solicitudes.filter(s => s.estado === 'APROBADA').length,
+    pendientes: applications?.ENVIADA ?? '—',
+    enRevision: applications?.EN_REVISION ?? '—',
+    observadas: applications?.OBSERVADA ?? '—',
+    aprobadas: applications?.APROBADA ?? '—',
   };
 
   return (

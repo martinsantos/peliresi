@@ -24,6 +24,8 @@ interface Toast {
   title: string;
   message?: string;
   duration?: number;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 interface ToastItemProps extends Toast {
@@ -127,6 +129,8 @@ const ToastItem: React.FC<ToastItemProps> = ({
   title,
   message,
   onRemove,
+  actionLabel,
+  onAction,
 }) => {
   return (
     <div
@@ -144,6 +148,8 @@ const ToastItem: React.FC<ToastItemProps> = ({
           {message && (
             <p className="mt-1 break-words text-sm leading-relaxed text-neutral-700">{message}</p>
           )}
+          {onAction && <button type="button" className="mt-1 min-h-11 rounded-lg px-2 text-sm font-semibold text-primary-800 underline focus-visible:outline-primary-700"
+            onClick={() => { onAction(); onRemove(id); }}>{actionLabel || 'Abrir'}</button>}
         </div>
         <button
           type="button"
