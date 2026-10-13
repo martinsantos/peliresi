@@ -119,10 +119,34 @@ test('training bearer cannot read an operational record, emit a certificate or l
   await expect(page.getByRole('heading', { name: 'Ver como otro usuario' })).toBeVisible();
 });
 
-test('school transport and operator complete a persisted manifest through real buttons', async ({ page }, info) => {
+test('school generator signs and hands the same manifest to transport and operator through real buttons', async ({ page }, info) => {
+  test.setTimeout(120000);
   await login(page, info);
   const index = ['web-desktop', 'web-responsive', 'app'].indexOf(info.project.name) + 1;
-  const id = `cap-20261012-manifiesto-${index}-APROBADO`;
+  const id = `cap-20261012-manifiesto-${index}-BORRADOR`;
+  await enter(page, info, 'Generadores', index);
+  await page.goto(prefix(info) + '/manifiestos/' + id);
+  await page.getByRole('button', { name: 'Firmar Manifiesto', exact: true }).click();
+  const signature = page.getByRole('dialog', { name: 'Firma del manifiesto', exact: true });
+  const canvas = signature.locator('canvas');
+  await canvas.scrollIntoViewIfNeeded();
+  const bounds = (await canvas.boundingBox())!;
+  await expect(signature.getByRole('button', { name: 'Confirmar y Firmar', exact: true })).toBeDisabled();
+  await page.mouse.move(bounds.x + bounds.width * .1, bounds.y + bounds.height * .6);
+  await page.mouse.down();
+  for (const [x, y] of [[.25, .3], [.4, .6], [.5, .2], [.7, .7], [.85, .4]]) {
+    await page.mouse.move(bounds.x + bounds.width * x, bounds.y + bounds.height * y, { steps: 5 });
+  }
+  await page.mouse.up();
+  await signature.getByRole('button', { name: 'Usar firma', exact: true }).click();
+  await expect(signature.getByRole('img', { name: 'Firma', exact: true })).toBeVisible();
+  const signed = page.waitForResponse(r => r.url().endsWith('/' + id + '/firmar') && r.request().method() === 'POST');
+  await signature.getByRole('button', { name: 'Confirmar y Firmar', exact: true }).click();
+  const signResult = await signed;
+  expect(signResult.status()).toBe(200);
+  expect(signResult.request().postDataJSON().firma).toMatch(/^data:image\/png;base64,/);
+  await page.screenshot({ path: info.outputPath('training-manifest-signed.png'), fullPage: true });
+  await leave(page);
   await enter(page, info, 'Transportistas', index);
   await page.goto(prefix(info) + '/manifiestos/' + id);
   // Transportistas use the trip screen, not the administrator's action strip.
@@ -191,6 +215,7 @@ test('school inspector starts and resumes field work without exposing it to the 
 });
 
 test('school support upload and handoff stay invisible to the operational administrator', async ({ page }, info) => {
+  test.setTimeout(120000);
   await login(page, info);
   await enter(page, info, 'Generadores', 4);
   await page.goto(prefix(info) + '/soporte');
@@ -218,6 +243,45 @@ test('school support upload and handoff stay invisible to the operational admini
   await page.getByRole('button', { name: 'Asignarme', exact: true }).click();
   expect((await claimed).status()).toBe(200);
   await expect(page.getByText('Responsable', { exact: true }).locator('..')).toContainText('CAP · ADMIN 4');
+  const attention = page.getByRole('region', { name: 'Atender ticket', exact: true });
+  const privateNote = 'CAP nota técnica reservada ' + info.project.name;
+  const reply = 'CAP respuesta visible: práctica revisada ' + info.project.name;
+  const send = async (action: string, body: string, submit: string) => {
+    await attention.getByRole('button', { name: action, exact: true }).click();
+    await attention.getByRole('textbox', { name: /Mensaje o resolución|Nota interna \/ motivo/ }).fill(body);
+    const response = page.waitForResponse(r => r.url().endsWith('/' + ticket.id + '/acciones') && r.request().method() === 'POST');
+    await attention.getByRole('button', { name: submit, exact: true }).click();
+    expect((await response).status()).toBe(200);
+  };
+  await send('Nota interna', privateNote, 'Guardar nota interna');
+  await expect(page.getByText(privateNote, { exact: true })).toBeVisible();
+  await attention.getByRole('button', { name: 'Derivar', exact: true }).click();
+  await attention.getByRole('button', { name: 'Nuevo responsable', exact: true }).click();
+  await page.getByRole('option', { name: /^CAP · ADMIN 5 ·/ }).click();
+  const routed = page.waitForResponse(r => r.url().endsWith('/' + ticket.id + '/acciones') && r.request().method() === 'POST');
+  await attention.getByRole('button', { name: 'Confirmar derivación', exact: true }).click();
+  expect((await routed).status()).toBe(200);
+  await expect(page.getByText('Responsable', { exact: true }).locator('..')).toContainText('CAP · ADMIN 5');
+  await leave(page);
+  await enter(page, info, 'Administradores', 5);
+  await page.goto(prefix(info) + '/notificaciones');
+  await page.getByRole('button', { name: 'Abrir aviso: Ticket derivado a tu atención', exact: true }).first().click();
+  await expect(page).toHaveURL(new RegExp('/soporte/' + ticket.id + '$'));
+  await expect(page.getByText(privateNote, { exact: true })).toBeVisible();
+  await send('Responder', reply, 'Enviar respuesta');
+  await send('Cerrar', 'CAP resolución de práctica ' + info.project.name, 'Cerrar con resolución');
+  await leave(page);
+  await enter(page, info, 'Generadores', 4);
+  await page.goto(prefix(info) + '/notificaciones');
+  await page.getByRole('button', { name: 'Abrir aviso: Actualización de soporte', exact: true }).first().click();
+  await expect(page).toHaveURL(new RegExp('/soporte/' + ticket.id + '$'));
+  await expect(page.getByText(reply, { exact: true })).toBeVisible();
+  await expect(page.getByText('Cerrado', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(privateNote, { exact: true })).toHaveCount(0);
+  await expect(attention.getByRole('button', { name: 'Derivar', exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText(reply, { exact: true })).toBeVisible();
+  await expect(page.getByText(privateNote, { exact: true })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('training-support.png'), fullPage: true });
   await leave(page);
 });

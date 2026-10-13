@@ -17,6 +17,10 @@ on:
         description: Focused repeat of classroom journeys after test-only corrections; prior full suites remain separate evidence
         type: boolean
         default: false
+      workshop_review:
+        description: Full units plus classroom, OCR, registration, sessions, maps and QR on isolated cloud data
+        type: boolean
+        default: false
       training_apk:
         description: Original APK on Android 15, temporary instructor and isolated school only
         type: boolean
@@ -147,7 +151,7 @@ jobs:
   authenticated-links:
     needs: isolated-mail
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 50
     env:
       CI: 'true'
       NODE_ENV: test
@@ -234,7 +238,9 @@ jobs:
       - name: Real login and destinations, desktop and mobile web and app, one browser worker
         working-directory: frontend
         run: |
-          if test '${{ inputs.training_review }}' = true; then
+          if test '${{ inputs.workshop_review }}' = true; then
+            npx --no-install playwright test --config cloud-qa/workshop.playwright.config.ts
+          elif test '${{ inputs.training_review }}' = true; then
             npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'training|school'
           elif test '${{ inputs.design_review }}' = true; then
             npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'brand|all templates|verification|verifying|clean browser'

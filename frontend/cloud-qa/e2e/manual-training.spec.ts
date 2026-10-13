@@ -49,7 +49,7 @@ test('classroom: direct CAP records, collapsible teams, mobile index and reusabl
     await img.scrollIntoViewIfNeeded();
     await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth > 0)).toBe(true);
   }
-  if (info.project.name === 'mobile') await page.getByRole('button', { name: /Índice del tutorial/ }).click();
+  if (info.project.name !== 'web-desktop') await page.getByRole('button', { name: /Índice del tutorial/ }).click();
   await page.getByRole('navigation', { name: 'Pasos de la guía' }).getByRole('link', { name: /Inspector y autoridad/ }).click();
   await expect(page).toHaveURL(/#paso-4-inspector-y-autoridad-20-min$/);
   await page.reload();
