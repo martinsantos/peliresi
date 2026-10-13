@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      cap5_review:
+        description: Published CAP 5 rehearsal only; existing tickets, teams 1–4 protected, no deployment or mail
+        type: boolean
+        default: false
       manual_review:
         description: Static manual only, no backend or credentials (candidate or published)
         type: choice
@@ -43,6 +47,37 @@ concurrency:
   group: sitrep-mail-safety-qa
   cancel-in-progress: false
 jobs:
+  cap5-review:
+    if: ${{ inputs.cap5_review }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      NODE_OPTIONS: --max-old-space-size=1024
+      QA_CAP5_AUTHORIZED: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Deny other teams and operational writes
+        run: node --experimental-strip-types --test frontend/cloud-qa/cap5-policy.test.ts
+      - name: One browser in the cloud; no build, server or database copy
+        run: |
+          npm ci --prefix frontend --no-audit --no-fund
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Published classroom journey with CAP 5 only
+        env:
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        run: node --experimental-strip-types frontend/cloud-qa/cap5-rehearsal.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-cap5-${{ github.run_id }}
+          path: /tmp/sitrep-cap5/
+          retention-days: 3
   manual-review:
     if: ${{ inputs.manual_review != '' }}
     runs-on: ubuntu-24.04
@@ -73,7 +108,7 @@ jobs:
           path: /tmp/sitrep-manual-qa/
           retention-days: 3
   isolated-mail:
-    if: ${{ !inputs.manual_review && !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
+    if: ${{ !inputs.cap5_review && !inputs.manual_review && !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
