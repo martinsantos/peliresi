@@ -33,7 +33,7 @@ test('real impersonation survives reload and restores the original administrator
   await page.goto(`${prefix(info)}/switch-user`);
   await expect(page.getByRole('heading', { name: 'Ver como otro usuario', exact: true })).toBeVisible();
   await page.getByLabel('Buscar usuario').fill('operador@night-qa.invalid');
-  const target = page.getByRole('region', { name: 'Operador', exact: true })
+  const target = page.getByRole('region', { name: 'Operadores', exact: true })
     .getByRole('button').filter({ hasText: 'QA Operador 1' });
   await expect(target).toHaveCount(1);
   const switched = page.waitForResponse(response => response.url().includes('/api/admin/impersonate/') && response.request().method() === 'POST');

@@ -46,6 +46,17 @@ try {
   const playbackProbe = {date:new Intl.DateTimeFormat('en-CA',{
     timeZone:'America/Argentina/Mendoza',year:'numeric',month:'2-digit',day:'2-digit',
   }).format(deviceManifest.createdAt),eventId:'EVENTO:cloud-qa-device-created'};
+  // Forecast navigation must not depend on another HTTP suite having left an
+  // approved manifest behind. Persist our own read-only probe in this QA DB.
+  await db.manifiesto.create({ data: {
+    id: 'cloud-qa-monitor-pending', numero: 'QA-MONITOR-PENDING',
+    generadorId: fixture.actors.generador, transportistaId: fixture.actors.transportista,
+    operadorId: fixture.actors.operador, creadoPorId: fixture.users.admin,
+    estado: 'APROBADO', isDemoData: true, modalidad: 'FIJO',
+    fechaEstimadaRetiro: new Date(Date.now() + 86400000),
+    observaciones: 'QA Monitor: pendiente sintético reservado para consulta',
+    residuos: { create: [{ tipoResiduoId: fixture.wastes[0], cantidad: 10, unidad: 'kg', estado: 'SOLIDO' }] },
+  } });
   // LIVE popup checks need a genuinely persisted observation. The earlier
   // fixture had no GPS until the later Android phase, so no marker was correct.
   // Coordinates are explicit synthetic inputs, not a UI/API fallback location.

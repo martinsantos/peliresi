@@ -199,7 +199,9 @@ jobs:
           npm ci --prefix backend --no-audit --no-fund
           npm ci --prefix frontend --no-audit --no-fund
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-16 poppler-utils
+          sudo apt-get install -y --no-install-recommends postgresql-16 poppler-utils tesseract-ocr tesseract-ocr-spa
+          tesseract --version
+          tesseract --list-langs | grep -x spa
           cd frontend
           npx --no-install playwright install --with-deps chromium
       - name: Compile and run full frontend units without database

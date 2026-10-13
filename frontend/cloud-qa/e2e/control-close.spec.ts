@@ -350,7 +350,7 @@ test('monitor LIVE, PLAYBACK and FORECAST query real data and expose usable cont
   await expect(page.getByRole('button',{name:'Eventos',exact:true})).toHaveCount(0);
   await expect(page.getByText('Retiros pendientes',{exact:true}).locator('..')).toContainText(String(forecastData.pendienteRetiro.length));
   await visibleProof(page, info, 'monitor-forecast');
-  const firstPending=forecastData.pendienteRetiro[0];
+  const firstPending=forecastData.pendienteRetiro.find((row:{manifiestoId:string})=>row.manifiestoId==='cloud-qa-monitor-pending');
   expect(firstPending).toBeDefined();
   await page.getByRole('link',{name:'Abrir manifiesto '+firstPending.numero,exact:true}).click();
   await expect(page).toHaveURL(new RegExp('/manifiestos/'+firstPending.manifiestoId+'$'));
