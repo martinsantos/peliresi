@@ -329,7 +329,8 @@
     'Antes del taller: comprobá tu ingreso y usá un perfil de navegador separado de los formularios reales. Con correos apagados, no dependas de recuperar la contraseña durante la clase. Conservá el APK instalado; no borres sus datos.',
     'Administrador → Ver como otro usuario → Capacitación. Elegí CAP · GENERADOR 1 y comprobá «Capacitación · sin validez oficial». Practicá Volver a mi cuenta antes de continuar. Estos enlaces no inician sesión ni cambian el rol: elegilo primero en el selector.',
     'Equipo 1: demostración. Equipos 2–4: práctica. Equipo 5: reserva con respuestas de QA ya cargadas. Mantené el mismo número al cambiar de rol y un solo responsable por registro. No compartas contraseñas.',
-    'Las cuentas se llaman CAP · ADMIN N, INSPECTOR N, GENERADOR N, TRANSPORTISTA N y OPERADOR N. También hay ADMIN_GENERADOR N, ADMIN_TRANSPORTISTA N y ADMIN_OPERADOR N para consulta sectorial. Reemplazá N por tu equipo, del 1 al 5.'
+    'Las cuentas se llaman CAP · ADMIN N, INSPECTOR N, GENERADOR N, TRANSPORTISTA N y OPERADOR N. También hay ADMIN_GENERADOR N, ADMIN_TRANSPORTISTA N y ADMIN_OPERADOR N para consulta sectorial. Reemplazá N por tu equipo, del 1 al 5.',
+    'Los enlaces App abren la web móvil. Dentro del APK, seguí estos mismos números desde su menú si el manual se abrió en otro navegador. No instales ni actualices el APK para hacer este recorrido.'
   ];
   workshop.steps[0].resources = [{ label: 'Elegir cuenta CAP · requiere administrador', path: '/switch-user' }];
   workshop.steps[1].body = [
