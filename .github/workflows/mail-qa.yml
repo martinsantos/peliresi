@@ -235,6 +235,9 @@ jobs:
           node --experimental-strip-types frontend/cloud-qa/start.ts
       - name: Account lifecycle through real HTTP, suppressed outbox only
         run: node --experimental-strip-types frontend/cloud-qa/account-mail-http.ts
+      - name: Bounded simultaneous classroom identities on VM only
+        if: ${{ inputs.workshop_review }}
+        run: node --experimental-strip-types frontend/cloud-qa/training-concurrency.ts
       - name: Real login and destinations, desktop and mobile web and app, one browser worker
         working-directory: frontend
         run: |
