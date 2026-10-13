@@ -6,7 +6,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Factory, Truck, FlaskConical, Shield, ShieldCheck, ShieldPlus, Smartphone, Monitor, ArrowRight, LogIn, UserPlus, PlayCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
-import { MendozaBrand } from '../../components/MendozaBrand';
 import { SitrepMark } from '../../components/SitrepMark';
 import './institutional.css';
 
@@ -29,19 +28,21 @@ const LandingPage: React.FC = () => {
   }, [currentUser, navigate]);
 
   return (
-    <div className="institutional min-h-screen flex flex-col">
+    <div className="institutional landing-page min-h-screen flex flex-col">
       <div className="institutional-stripe" aria-hidden="true" />
       {/* Header */}
       <header className="bg-white border-b border-neutral-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <SitrepMark size={36} />
-            <span className="brand-link font-bold text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <div className="landing-container landing-masthead">
+          <div className="landing-wordmark" data-testid="landing-wordmark">
+            <SitrepMark size={36} appearance="green" />
+            <span>
               SITREP
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <a href="#instalar" className="brand-link hidden sm:flex items-center gap-1.5 text-sm transition-colors px-3 py-3">
+          <img src={`${import.meta.env.BASE_URL}logo-mendoza.webp`} width={2968} height={1405}
+            alt="Mendoza — Gobierno de la Provincia" className="landing-government-mark" fetchPriority="high" />
+          <nav aria-label="Acceso al sistema" className="landing-header-actions">
+            <a href="#instalar" className="brand-link flex items-center justify-center gap-1.5 text-sm transition-colors px-3 py-3">
               <Smartphone size={16} />
               Instalar App
             </a>
@@ -49,17 +50,17 @@ const LandingPage: React.FC = () => {
               <LogIn size={16} />
               Ingresar
             </Link>
-          </div>
+          </nav>
         </div>
       </header>
 
       {/* Hero */}
       <section className="institutional-hero">
-        <div className="institutional-hero-inner">
+        <div className="landing-container landing-hero-inner">
         <div>
-          <p className="institutional-eyebrow">Provincia de Mendoza · SITREP</p>
-          <h1 className="institutional-title" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Sistema de Trazabilidad de Residuos Peligrosos
+          <h1 className="institutional-title landing-title">
+            <span className="landing-title-name">SITREP</span>
+            <span className="landing-title-description">Sistema de trazabilidad de residuos peligrosos</span>
           </h1>
           <p className="text-neutral-600 text-sm leading-relaxed mb-8 max-w-md">
             Dirección General de Fiscalización Ambiental.<br />
@@ -82,7 +83,6 @@ const LandingPage: React.FC = () => {
             </a>
           </div>
         </div>
-        <div className="institutional-hero-brand"><MendozaBrand /></div>
         </div>
       </section>
 

@@ -1,9 +1,9 @@
 import React from 'react';
 
-/** Single vector asset shared by the public entrance and both application shells. */
-export const SitrepMark: React.FC<{ size?: number; className?: string }> = ({ size = 36, className = '' }) => (
+/** Approved cycle geometry; the public masthead can use green on a transparent ground. */
+export const SitrepMark: React.FC<{ size?: number; className?: string; appearance?: 'tile' | 'green' }> = ({ size = 36, className = '', appearance = 'tile' }) => (
   <img
-    src={`${import.meta.env.BASE_URL}favicon.svg`}
+    src={`${import.meta.env.BASE_URL}${appearance === 'green' ? 'sitrep-mark-green.svg' : 'favicon.svg'}`}
     width={size}
     height={size}
     alt=""

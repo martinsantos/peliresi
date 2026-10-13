@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      landing_review:
+        description: Public landing identity and entry links; compiled web/app, one browser, no backend or credentials
+        type: boolean
+        default: false
       cap5_review:
         description: Published CAP 5 rehearsal only; existing tickets, teams 1–4 protected, no deployment or mail
         type: boolean
@@ -47,6 +51,37 @@ concurrency:
   group: sitrep-mail-safety-qa
   cancel-in-progress: false
 jobs:
+  landing-review:
+    if: ${{ inputs.landing_review }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=2048
+      VITE_API_URL: /api
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Candidate dependencies, focused units, web and app builds on cloud only
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm test -- src-v6/__tests__/pages/LandingPage.test.tsx src-v6/__tests__/components/LoadingState.test.tsx src-v6/__tests__/layouts/ApplicantLayout.test.tsx --maxWorkers=1
+          npm run build
+          npx --no-install vite build --config vite.config.app.ts
+          npx --no-install playwright install --with-deps chromium
+      - name: Four screen widths and app login, no authenticated sessions or writes
+        working-directory: frontend
+        run: npx --no-install playwright test --config cloud-qa/landing.playwright.config.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-landing-qa-${{ github.run_id }}
+          path: /tmp/sitrep-landing-qa/
+          retention-days: 3
   cap5-review:
     if: ${{ inputs.cap5_review }}
     runs-on: ubuntu-24.04
@@ -108,7 +143,7 @@ jobs:
           path: /tmp/sitrep-manual-qa/
           retention-days: 3
   isolated-mail:
-    if: ${{ !inputs.cap5_review && !inputs.manual_review && !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
+    if: ${{ !inputs.landing_review && !inputs.cap5_review && !inputs.manual_review && !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
