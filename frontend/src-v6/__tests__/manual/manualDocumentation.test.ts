@@ -55,8 +55,11 @@ describe('manual documentation stays usable and truthful', () => {
   it('exposes the tutorial in all entry pages and escapes the explicit capture caption', () => {
     for (const file of ['index.html', 'search.html', 'tutorial.html']) {
       const html = readFileSync(manual + file, 'utf8');
-      expect(html).toContain('help-data.js?v=2026.19.1');
-      expect(html).toContain('manual.js?v=2026.17.1');
+      // The published classroom guide advances all three cache keys together.
+      // Keep exact versions: stale entry pages must not load an older renderer.
+      expect(html).toContain('help-data.js?v=2026.20.1');
+      expect(html).toContain('manual.js?v=2026.20.1');
+      expect(html).toContain('manual.css?v=2026.20.1');
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');
     expect(script).toContain("'administrador-alertas-proactivas'");
