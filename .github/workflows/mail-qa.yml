@@ -4,6 +4,10 @@ on:
     branches: [codex/sitrep-mail-safety-20261011]
   workflow_dispatch:
     inputs:
+      attention_published:
+        description: Final public web/app assets and synthetic read-only UI contracts; no real sessions, records or mail
+        type: boolean
+        default: false
       landing_review:
         description: Public landing identity and entry links; compiled web/app, one browser, no backend or credentials
         type: boolean
@@ -52,12 +56,13 @@ concurrency:
   cancel-in-progress: false
 jobs:
   landing-review:
-    if: ${{ inputs.landing_review }}
+    if: ${{ inputs.landing_review || inputs.attention_published }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=2048
       VITE_API_URL: /api
+      QA_LANDING_PUBLISHED: ${{ inputs.attention_published }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -69,14 +74,17 @@ jobs:
         working-directory: frontend
         run: |
           npm ci --no-audit --no-fund
+          if [ "$QA_LANDING_PUBLISHED" != "true" ]; then
           npm test -- src-v6/__tests__/pages/LandingPage.test.tsx src-v6/__tests__/components/LoadingState.test.tsx src-v6/__tests__/layouts/ src-v6/__tests__/services/attentionCounts.test.ts src-v6/__tests__/components/Toast.test.tsx src-v6/__tests__/utils/notificationNavigation.test.ts src-v6/__tests__/pages/SoportePage.cache.test.tsx --maxWorkers=1
           npm run build
           npx --no-install vite build --config vite.config.app.ts
+          fi
           npx --no-install playwright install --with-deps chromium
       - name: Four screen widths and app login, no authenticated sessions or writes
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/landing.playwright.config.ts
       - name: Preserve exactly the tested static candidate, excluding manual and user data
+        if: ${{ !inputs.attention_published }}
         run: |
           tar czf /tmp/sitrep-landing-qa/candidate.tar.gz -C frontend dist/assets dist/index.html dist/sw.js dist/sitrep-mark-green.svg dist/logo-mendoza.webp dist-app/assets dist-app/app.html dist-app/index.html dist-app/sw-app.js dist-app/sw-precache-manifest.js dist-app/sitrep-mark-green.svg
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -146,7 +154,7 @@ jobs:
           path: /tmp/sitrep-manual-qa/
           retention-days: 3
   isolated-mail:
-    if: ${{ !inputs.landing_review && !inputs.cap5_review && !inputs.manual_review && !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
+    if: ${{ !inputs.attention_published && !inputs.landing_review && !inputs.cap5_review && !inputs.manual_review && !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:

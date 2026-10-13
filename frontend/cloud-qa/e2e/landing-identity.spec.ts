@@ -76,7 +76,7 @@ for (const width of [1440, 768, 360, 320]) {
 
 test('app login keeps the existing brand, fields and mobile layout', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('http://127.0.0.1:4188/app/login');
+  await page.goto(process.env.QA_LANDING_PUBLISHED === 'true' ? 'https://sitrep.ultimamilla.com.ar/app/login' : 'http://127.0.0.1:4188/app/login');
   await expect(page.locator('#login-password')).toBeVisible();
   await expect(page.locator('#login-identifier')).toBeVisible();
   await expect(page.locator('[data-sitrep-mark]').first()).toHaveAttribute('src', '/app/favicon.svg');
