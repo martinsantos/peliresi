@@ -48,6 +48,13 @@ for (const width of [1440, 768, 360, 320]) {
     }
     await noOverflow(page);
     await page.screenshot({ path: `${evidence}/landing-${width}.png`, fullPage: true });
+    const hero = (await page.locator('.institutional-hero').boundingBox())!;
+    await page.screenshot({ path: `${evidence}/landing-header-${width}.png`,
+      clip: { x: 0, y: 0, width, height: Math.ceil(hero.y + hero.height) } });
+    await page.keyboard.press('Tab');
+    await expect(nav.getByRole('link', { name: 'Instalar App', exact: true })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(nav.getByRole('link', { name: 'Ingresar', exact: true })).toBeFocused();
     await page.getByRole('link', { name: 'Solicitar inscripción', exact: true }).click();
     await expect(page).toHaveURL(/#perfiles$/);
     await expect.poll(async () => (await page.locator('#perfiles').boundingBox())!.y).toBeGreaterThanOrEqual((await page.locator('header').boundingBox())!.height - 1);
