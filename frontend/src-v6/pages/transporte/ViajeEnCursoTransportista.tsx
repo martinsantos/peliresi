@@ -79,6 +79,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
     } catch { return null; }
   }, [id]);
   const m: Partial<Manifiesto> = apiData || cachedSnapshot || {};
+  const assignment = m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId
+    ? m.asignacionTransporte : null;
 
   // Persist active trip snapshot to localStorage for recovery after app restart
   useEffect(() => {
@@ -90,6 +92,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
         generador: m.generador ? { razonSocial: m.generador.razonSocial, domicilio: m.generador.domicilio } : undefined,
         operador: m.operador ? { razonSocial: m.operador.razonSocial, domicilio: m.operador.domicilio } : undefined,
         transportista: m.transportista ? { razonSocial: m.transportista.razonSocial } : undefined,
+        transportistaId: m.transportistaId,
+        asignacionTransporte: m.asignacionTransporte,
         residuos: m.residuos,
         eventos: m.eventos,
         fechaRetiro: m.fechaRetiro,
@@ -98,7 +102,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
       localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
       localStorage.setItem('sitrep_active_trip_id', id);
     }
-  }, [id, m.id, m.numero, m.estado, m.generador, m.operador, m.transportista, m.residuos, m.eventos, m.fechaRetiro]);
+  }, [id, m.id, m.numero, m.estado, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -393,6 +397,10 @@ const ViajeEnCursoTransportista: React.FC = () => {
       </header>
 
       <div className="p-4 space-y-4">
+        {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
+          <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
+          <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>
+        </dl>}
         {/* APROBADO state: Show confirm pickup */}
         {m.estado === EstadoManifiesto.APROBADO && (
           <>

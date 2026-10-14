@@ -35,6 +35,12 @@ test('separate real users hand a manifest from generator to transport to operato
     await page.getByRole('option', { name: 'lt', exact: true }).click();
     await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
     await choose('Transportista *', /^QA Transporte 1 /);
+    // This focused fixture adds a second vehicle/driver; the older complete
+    // suite keeps its original seed. Exercise assignment when explicitly seeded.
+    if (process.env.QA_ARTIFACTS === '/tmp/sitrep-manifest-v2') {
+      await choose('Vehículo (opcional)', /^QA002ZZ/);
+      await choose('Chofer (opcional)', /^QA Segundo /);
+    }
     await choose('Operador / Destino *', /^QA Operador 1 /);
     const created = page.waitForResponse(res => res.url().endsWith('/api/manifiestos') && res.request().method() === 'POST');
     await page.getByRole('button', { name: 'Crear Manifiesto', exact: true }).click();
@@ -61,6 +67,10 @@ test('separate real users hand a manifest from generator to transport to operato
     const carrier = await asRole('transportista');
     await carrier.goto(`${prefix(info)}/manifiestos/${id}`);
     await expect(carrier).toHaveURL(new RegExp(`/transporte/viaje/${id}$`));
+    if (process.env.QA_ARTIFACTS === '/tmp/sitrep-manifest-v2') {
+      await expect(carrier.getByLabel('Transporte asignado').getByText('QA002ZZ', { exact: true })).toBeVisible();
+      await expect(carrier.getByLabel('Transporte asignado').getByText('QA Segundo', { exact: true })).toBeVisible();
+    }
     await expect(carrier.locator('body')).toContainText('35 kg · 12,5 lt');
     await mutate(carrier, id, 'Confirmar retiro', 'confirmar-retiro');
     await carrier.getByRole('button', { name: 'Confirmar entrega', exact: true }).click();

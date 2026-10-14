@@ -61,8 +61,14 @@ jobs:
           cd backend
           npx --no-install prisma generate
       - name: Backend unit suite, database disconnected
+        # Existing PDF unit tests parse actual PDF bytes, not a renderer mock.
+        # Install the parser on the VM before running the suite.
+        if: success()
         working-directory: backend
-        run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
       - name: Frontend unit suite, providers mocked
         working-directory: frontend
         run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
@@ -74,8 +80,7 @@ jobs:
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
       - name: Cloud browser and isolated PostgreSQL
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-16 poppler-utils
+          sudo apt-get install -y --no-install-recommends postgresql-16
           cd frontend
           npx --no-install playwright install --with-deps chromium
           /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-manifest-pg" --username=qa --auth-local=trust --auth-host=trust
