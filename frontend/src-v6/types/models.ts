@@ -273,6 +273,12 @@ export interface Manifiesto {
   numero: string;
   generadorId: string;
   transportistaId: string | null;
+  asignacionTransporte?: {
+    version: 1;
+    transportistaId: string;
+    vehiculo: { id: string; patente: string; marca: string; modelo: string } | null;
+    chofer: { id: string; nombre: string; apellido: string; dni: string } | null;
+  } | null;
   operadorId: string;
   modalidad?: 'FIJO' | 'IN_SITU';
   creadoPorId: string;

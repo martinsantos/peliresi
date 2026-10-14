@@ -5,6 +5,8 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { generarNumeroManifiesto } from '../utils/manifiestoNumber';
 import { canAccessManifiesto } from '../utils/roleFilter';
+import { Prisma } from '@prisma/client';
+import { prepareTransportAssignment } from '../domain/manifiestoTransportAssignment';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
@@ -15,6 +17,8 @@ export { actualizarUbicacion, getViajeActual } from './manifiesto-gps.controller
 const createManifiestoSchema = z.object({
   generadorId: z.string().min(1, 'El generador es requerido').optional(),
   transportistaId: z.string().min(1, 'El transportista es requerido').optional(),
+  vehiculoId: z.string().min(1).max(100).optional(),
+  choferId: z.string().min(1).max(100).optional(),
   operadorId: z.string().min(1, 'El operador es requerido'),
   modalidad: z.enum(['FIJO', 'IN_SITU']).optional().default('FIJO'),
   fechaEstimadaRetiro: z.string().optional(),
@@ -104,7 +108,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const { generadorId: bodyGeneradorId, transportistaId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
+    const { generadorId: bodyGeneradorId, transportistaId, vehiculoId, choferId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
@@ -154,6 +158,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     // Reserve the number and insert record/event under one database lock.
     // A process-local mutex would not protect both production PM2 workers.
     const manifiesto = await prisma.$transaction(async (tx) => {
+      const asignacionTransporte = await prepareTransportAssignment(tx, { modalidad, transportistaId, vehiculoId, choferId });
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(836272)::text AS "lock"`;
       const numero = await generarNumeroManifiesto(tx);
 
@@ -163,6 +168,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         numero,
         generadorId,
         transportistaId: modalidad === 'IN_SITU' ? null : transportistaId,
+        ...(asignacionTransporte ? { asignacionTransporte } : {}),
         operadorId,
         modalidad,
         observaciones,
@@ -201,6 +207,11 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       }
     });
 
+    if (asignacionTransporte) await tx.eventoManifiesto.create({ data: {
+      manifiestoId: created.id, tipo: 'ASIGNACION_TRANSPORTE', usuarioId: userId,
+      descripcion: `Asignación inicial. Vehículo: ${asignacionTransporte.vehiculo?.patente || 'sin asignar'}. Chofer: ${asignacionTransporte.chofer ? `${asignacionTransporte.chofer.nombre} ${asignacionTransporte.chofer.apellido}`.trim() : 'sin asignar'}.`,
+    } });
+
       return created;
     });
 
@@ -230,6 +241,12 @@ export const updateManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const { transportistaId, operadorId, observaciones, residuos } = req.body;
 
     const updated = await prisma.$transaction(async (tx) => {
+      if (transportistaId && transportistaId !== manifiesto.transportistaId && manifiesto.asignacionTransporte) {
+        await tx.eventoManifiesto.create({ data: {
+          manifiestoId: id, usuarioId: req.user.id, tipo: 'ASIGNACION_TRANSPORTE_RETIRADA',
+          descripcion: 'Cambio de transportista en borrador. Asignación anterior: ' + JSON.stringify(manifiesto.asignacionTransporte),
+        } });
+      }
       // Actualizar residuos si se proporcionan
       if (residuos && Array.isArray(residuos)) {
         await tx.manifiestoResiduo.deleteMany({ where: { manifiestoId: id } });
@@ -251,6 +268,9 @@ export const updateManifiesto = async (req: AuthRequest, res: Response, next: Ne
         where: { id },
         data: {
           ...(transportistaId && { transportistaId }),
+          // A draft carrier change cannot retain another carrier's fleet.
+          ...(transportistaId && transportistaId !== manifiesto.transportistaId && manifiesto.asignacionTransporte
+            ? { asignacionTransporte: Prisma.DbNull } : {}),
           ...(operadorId && { operadorId }),
           ...(observaciones !== undefined && { observaciones }),
         },

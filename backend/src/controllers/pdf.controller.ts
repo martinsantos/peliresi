@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { canAccessManifiesto } from '../utils/roleFilter';
+import { readTransportAssignment } from '../domain/manifiestoTransportAssignment';
 
 // ── Shared PDF helpers ──
 
@@ -148,7 +149,7 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             where: { id },
             include: {
                 generador: true,
-                transportista: { include: { vehiculos: true, choferes: true } },
+                transportista: true,
                 operador: true,
                 residuos: { include: { tipoResiduo: true } },
                 eventos: { orderBy: { createdAt: 'asc' }, include: { usuario: { select: { nombre: true, apellido: true } } } },
@@ -217,14 +218,10 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             drawField(doc, 'CUIT', manifiesto.transportista.cuit, 290, tY, 100);
             drawField(doc, 'N\u00BA Habilitacion', manifiesto.transportista.numeroHabilitacion || 'N/A', 400, tY, 140);
             doc.y = tY + 28;
-            if (manifiesto.transportista.vehiculos?.[0]) {
-                const v = manifiesto.transportista.vehiculos[0];
-                drawField(doc, 'Vehiculo', `${v.marca} ${v.modelo} \u2014 ${v.patente}`, 58, doc.y, 220);
-            }
-            if (manifiesto.transportista.choferes?.[0]) {
-                const c = manifiesto.transportista.choferes[0];
-                drawField(doc, 'Chofer', `${c.nombre} \u2014 DNI ${c.dni}`, 290, doc.y, 250);
-            }
+            const assignment = readTransportAssignment(manifiesto.asignacionTransporte, manifiesto.transportistaId);
+            const v = assignment?.vehiculo, c = assignment?.chofer;
+            drawField(doc, 'Vehiculo', v ? `${v.marca} ${v.modelo} — ${v.patente}` : 'Sin asignación registrada', 58, doc.y, 220);
+            drawField(doc, 'Chofer', c ? `${c.nombre} ${c.apellido} — DNI ${c.dni}` : 'Sin asignación registrada', 290, doc.y, 250);
             doc.y += 30;
         } else {
             drawSectionTitle(doc, '02', 'MODALIDAD IN SITU');

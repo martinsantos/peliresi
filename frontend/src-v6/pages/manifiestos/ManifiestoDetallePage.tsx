@@ -468,6 +468,21 @@ const ManifiestoDetailPage: React.FC = () => {
           </Card>
 
           {/* Residuos */}
+          {m.transportistaId && <Card>
+            <CardHeader title="Transporte asignado" icon={<Truck size={20} />} />
+            <CardContent>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div className="min-w-0"><dt className="text-sm text-neutral-600">Vehículo</dt>
+                  <dd className="break-words text-sm font-medium text-neutral-900">{m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId && m.asignacionTransporte.vehiculo
+                    ? `${m.asignacionTransporte.vehiculo.patente} · ${m.asignacionTransporte.vehiculo.marca} ${m.asignacionTransporte.vehiculo.modelo}`
+                    : 'Sin asignación registrada'}</dd></div>
+                <div className="min-w-0"><dt className="text-sm text-neutral-600">Chofer</dt>
+                  <dd className="break-words text-sm font-medium text-neutral-900">{m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId && m.asignacionTransporte.chofer
+                    ? `${m.asignacionTransporte.chofer.nombre} ${m.asignacionTransporte.chofer.apellido}`
+                    : 'Sin asignación registrada'}</dd></div>
+              </dl>
+            </CardContent>
+          </Card>}
           <Card>
             <CardHeader title="Residuos transportados" icon={<Package size={20} />} />
             <CardContent>

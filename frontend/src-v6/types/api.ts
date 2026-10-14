@@ -73,6 +73,8 @@ export interface ChangePasswordRequest {
 export interface CreateManifiestoRequest {
   generadorId: string;
   transportistaId?: string;
+  vehiculoId?: string;
+  choferId?: string;
   operadorId: string;
   modalidad?: 'FIJO' | 'IN_SITU';
   fechaEstimadaRetiro?: string;

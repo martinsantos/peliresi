@@ -267,6 +267,8 @@ model Manifiesto {
   numero                  String           @unique
   generadorId             String
   transportistaId         String?
+  // Explicit creation snapshot; no backfill from the current fleet.
+  asignacionTransporte    Json?
   operadorId              String
   modalidad               String?          @default("FIJO")
   tratamientoMetodo       String?

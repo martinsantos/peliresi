@@ -29,6 +29,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
 import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
 import type { CatalogoItem } from '../../types/api';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 
 function ActorSummary({ actor, label }: { actor?: CatalogoItem; label: string }) {
   if (!actor) return null;
@@ -57,6 +58,7 @@ function parseCorrientes(raw: string | string[] | null | undefined): string[] {
 
 export const NuevoManifiestoPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const { currentUser, isAdmin, isGenerador } = useAuth();
   const [step, setStep] = useState(1);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -91,6 +93,8 @@ export const NuevoManifiestoPage: React.FC = () => {
     generadorId: currentUser?.rol === 'GENERADOR' ? currentUser?.actorId || '' : '',
     modalidad: 'FIJO' as 'FIJO' | 'IN_SITU',
     transportista: '',
+    vehiculoId: '',
+    choferId: '',
     operador: '',
     fechaRetiro: new Date().toISOString().split('T')[0],
     observaciones: '',
@@ -101,6 +105,8 @@ export const NuevoManifiestoPage: React.FC = () => {
   const selectedGenerador = generadoresList.find((g) => g.id === formData.generadorId);
   const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
+  const vehiculos = (selectedTransportista?.vehiculos || []).filter((v: { activo?: boolean }) => v.activo === true);
+  const choferes = (selectedTransportista?.choferes || []).filter((c: { activo?: boolean }) => c.activo === true);
 
   // Cross-filter: only show operadores that can handle ALL selected residuos
   const selectedResiduoIds = useMemo(
@@ -222,6 +228,8 @@ export const NuevoManifiestoPage: React.FC = () => {
       const result = await createManifiesto.mutateAsync({
         generadorId: formData.generadorId || formData.generador,
         ...(formData.modalidad !== 'IN_SITU' && { transportistaId: formData.transportista }),
+        ...(formData.modalidad !== 'IN_SITU' && formData.vehiculoId ? { vehiculoId: formData.vehiculoId } : {}),
+        ...(formData.modalidad !== 'IN_SITU' && formData.choferId ? { choferId: formData.choferId } : {}),
         operadorId: formData.operador,
         modalidad: formData.modalidad,
         fechaEstimadaRetiro: formData.fechaRetiro || undefined,
@@ -234,7 +242,7 @@ export const NuevoManifiestoPage: React.FC = () => {
       });
 
       toast.success('Manifiesto creado', `El manifiesto ${result.numero || result.id} fue creado exitosamente`);
-      navigate(`/manifiestos/${result.id}`);
+      navigate(mp(`/manifiestos/${result.id}`));
     } catch (err: any) {
       toast.error(
         'Error al crear manifiesto',
@@ -493,7 +501,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                     setValidationErrors(prev => { const n = {...prev}; delete n.residuos; return n; });
                     // A previously selected transport must still support the updated residues.
                     if (formData.transportista && !transportistasFiltrados.some((t) => t.id === formData.transportista)) {
-                      setFormData(prev => ({ ...prev, transportista: '' }));
+                      setFormData(prev => ({ ...prev, transportista: '', vehiculoId: '', choferId: '' }));
                     }
                     // Clear operador if no longer valid for the selected residuos
                     if (formData.operador) {
@@ -561,7 +569,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                     aria-pressed={formData.modalidad === 'IN_SITU'}
                     onClick={() => {
                       if (formData.modalidad === 'IN_SITU') return;
-                      setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', operador: '' }));
+                      setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', vehiculoId: '', choferId: '', operador: '' }));
                       setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
@@ -600,7 +608,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                     <Select
                       label="Transportista *"
                       value={formData.transportista}
-                      onChange={(val) => setFormData({ ...formData, transportista: val })}
+                      onChange={(val) => setFormData(prev => val === prev.transportista ? prev : ({ ...prev, transportista: val, vehiculoId: '', choferId: '' }))}
                       options={[...transportistasFiltrados]
                         .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                         .map((t: any) => ({
@@ -615,6 +623,18 @@ export const NuevoManifiestoPage: React.FC = () => {
                   </div>
 
                   <ActorSummary actor={selectedTransportista} label="Datos del transportista" />
+                  {selectedTransportista && <div className="grid gap-4 sm:grid-cols-2">
+                    <Select label="Vehículo (opcional)" value={formData.vehiculoId}
+                      onChange={value => setFormData(prev => ({ ...prev, vehiculoId: value }))}
+                      options={vehiculos.map((v: { id: string; patente: string; marca: string; modelo: string }) => ({ value: v.id, label: `${v.patente} · ${v.marca} ${v.modelo}`.trim() }))}
+                      placeholder={vehiculos.length ? 'Elegir vehículo' : 'Sin vehículos activos'}
+                      disabled={!vehiculos.length} searchable clearable />
+                    <Select label="Chofer (opcional)" value={formData.choferId}
+                      onChange={value => setFormData(prev => ({ ...prev, choferId: value }))}
+                      options={choferes.map((c: { id: string; nombre: string; apellido: string; dni: string }) => ({ value: c.id, label: `${c.nombre} ${c.apellido} · ${c.dni}`.trim() }))}
+                      placeholder={choferes.length ? 'Elegir chofer' : 'Sin choferes activos'}
+                      disabled={!choferes.length} searchable clearable />
+                  </div>}
                 </>
               )}
 
