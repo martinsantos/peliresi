@@ -227,7 +227,7 @@ try {
   // attached behind it; attempting a DOM tap there is not a valid logout test.
   adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
   await expect.poll(async () => nativeNodes(await readNativeWindow()).some(node =>
-    node.package === 'com.android.chrome' && node['content-desc'] === 'Abrir menu'),
+    node.package === 'com.android.chrome' && node.text === 'Abrir menu' && node.class === 'android.widget.Button'),
   { timeout: 15000, message: 'Return from native PDF viewer to the actual SITREP window' }).toBe(true);
   await proof('06-returned-from-pdf'); results.push('Native PDF viewer opens and returns to SITREP');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
