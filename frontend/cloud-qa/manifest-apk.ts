@@ -10,6 +10,7 @@ import { assertCloudDatabase } from './safety.ts';
 import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
 import { dismissObservedChromePrompts, nativeKeyboardShown, nativeNodes, readNativeWindow } from './native-window.ts';
 import { readablePageHeading } from './e2e/helpers.ts';
+import { assertIsolatedApkSignature } from './apk-signature.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -32,9 +33,8 @@ const sdkVersion = (await readdir(sdkTools)).filter(v => /^\d+\.\d+\.\d+$/.test(
 assert.ok(sdkVersion);
 const signature = execFileSync(path.join(sdkTools, sdkVersion, 'apksigner'),
   ['verify', '--verbose', '--print-certs', apk], { encoding: 'utf8', timeout: 15000 });
-assert.match(signature, /Signer #1 certificate SHA-256 digest:/);
-assert.doesNotMatch(signature, /14302500ef385b217b03efd82118bbb45c68de11930fc803cc500f020e08e1d7/);
 await writeFile(path.join(output, 'signature.txt'), signature);
+assertIsolatedApkSignature(signature);
 assert.match(adb('install', apk), /Success/);
 await writeFile(path.join(output, 'package.txt'), adb('shell', 'dumpsys', 'package', pkg));
 await writeFile(path.join(output, 'identity.json'), JSON.stringify({ ...metadata,

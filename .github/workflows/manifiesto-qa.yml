@@ -53,6 +53,7 @@ jobs:
           test ! -f frontend/.env
           node --experimental-strip-types --input-type=module -e "import { assertCloudEnvironment } from './frontend/cloud-qa/safety.ts'; assertCloudEnvironment();"
           node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/apk-signature.test.ts
           mkdir -p "$QA_ARTIFACTS"
       - name: Locked dependencies only on ephemeral VM
         run: |
