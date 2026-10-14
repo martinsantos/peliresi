@@ -218,7 +218,10 @@ try {
   await expect.poll(async () => nativeNodes(await readNativeWindow()).some(node =>
     (node.text || '').startsWith('certificado-')),
   { timeout: 25000, message: 'Native PDF viewer must open the requested certificate' }).toBe(true);
-  await proof('06-certificate-requested');
+  // The real PDF viewer is now foreground. Chromium cannot capture its hidden
+  // surface (run38641881433); record the native window, not the background DOM.
+  await device.screenshot({ path: path.join(output, '06-certificate-requested-device.png') });
+  await writeFile(path.join(output, '06-certificate-requested-native.xml'), await readNativeWindow());
   let savedFile = '';
   await expect.poll(() => {
     const added = adb('shell', 'ls', '-1', '/sdcard/Download').trim().split(/\r?\n/)
