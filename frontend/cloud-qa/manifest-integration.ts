@@ -69,11 +69,23 @@ try {
       const text = execFileSync('pdftotext', [file, '-'], { encoding: 'utf8' });
       if (assigned) { assert.match(text, /QA002ZZ/); assert.match(text, /Segundo/); assert.doesNotMatch(text, /QA-EDITADA|Editado|QA0001/); }
       else { assert.match(text, /Sin asignación registrada/); assert.doesNotMatch(text, /QA0001/); }
+      const layout = execFileSync('pdftotext', ['-bbox', file, '-'], { encoding: 'utf8' });
+      const fieldY = (label: 'Vehiculo' | 'Chofer') => {
+        const match = layout.match(new RegExp('<word xMin="[\\d.]+" yMin="([\\d.]+)" xMax="[\\d.]+" yMax="[\\d.]+">' + label + '</word>'));
+        assert.ok(match, 'The actual PDF must contain the ' + label + ' label');
+        return Number(match[1]);
+      };
+      assert.ok(Math.abs(fieldY('Vehiculo') - fieldY('Chofer')) < 0.1, 'Vehicle and driver labels must share the same row');
+      execFileSync('pdftoppm', ['-f', '1', '-singlefile', '-scale-to', '1200', '-png', file, path.join(output, assigned ? 'assigned-preview' : 'legacy-preview')]);
     }
     await request('/manifiestos/' + created.id, 'GET', undefined, 404, 'generador2');
     results.push('snapshot survives catalogue edits; PDF matches selection; legacy PDF never guesses; outsider denied');
     await request('/manifiestos/' + created.id, 'PUT', { transportistaId: fixture.actors.transportista2 });
     assert.equal((await db.manifiesto.findUniqueOrThrow({ where: { id: created.id } })).asignacionTransporte, null);
+    const removed = await db.eventoManifiesto.findMany({ where: { manifiestoId: created.id, tipo: 'ASIGNACION_TRANSPORTE_RETIRADA' } });
+    assert.equal(removed.length, 1);
+    assert.match(removed[0].descripcion, /QA002ZZ/);
+    assert.match(removed[0].descripcion, /Segundo/);
     results.push('draft carrier change invalidates old resources');
     // Restore only the synthetic catalogue probes so each browser starts consistently.
     await db.vehiculo.update({ where: { id: 'manifest-qa-second-vehicle' }, data: { patente: 'QA002ZZ' } });

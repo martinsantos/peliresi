@@ -220,9 +220,11 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             doc.y = tY + 28;
             const assignment = readTransportAssignment(manifiesto.asignacionTransporte, manifiesto.transportistaId);
             const v = assignment?.vehiculo, c = assignment?.chofer;
-            drawField(doc, 'Vehiculo', v ? `${v.marca} ${v.modelo} — ${v.patente}` : 'Sin asignación registrada', 58, doc.y, 220);
-            drawField(doc, 'Chofer', c ? `${c.nombre} ${c.apellido} — DNI ${c.dni}` : 'Sin asignación registrada', 290, doc.y, 250);
-            doc.y += 30;
+            const assignmentY = doc.y;
+            drawField(doc, 'Vehiculo', v ? `${v.marca} ${v.modelo} — ${v.patente}` : 'Sin asignación registrada', 58, assignmentY, 220);
+            const vehicleEnd = doc.y;
+            drawField(doc, 'Chofer', c ? `${c.nombre} ${c.apellido} — DNI ${c.dni}` : 'Sin asignación registrada', 290, assignmentY, 250);
+            doc.y = Math.max(vehicleEnd, doc.y) + 10;
         } else {
             drawSectionTitle(doc, '02', 'MODALIDAD IN SITU');
             drawField(doc, 'Modalidad', 'Tratamiento in situ — sin transporte', 58, doc.y, 400);

@@ -1,8 +1,19 @@
 # Manifiestos V2 — backlog de la reunión del 14/10/2026
 
 Estado: definición y candidato de desarrollo. **No autorizado para producción.**
-Fuente: requisitos del usuario del 14/10 y revisión del código activo.
-No se presentan los plazos ni certificados como normativa verificada por DGFA.
+Fuente: requisitos del usuario del 14/10, respuesta de Santiago/DGFA transmitida por el usuario y revisión del código activo.
+La respuesta define requisitos de negocio; no sustituye una validación normativa ni un modelo documental aprobado.
+
+## Aclaraciones recibidas de DGFA — 14/10
+
+Estas respuestas sustituyen las hipótesis anteriores sobre plazos y emisor del certificado final:
+
+1. Una vez pautado el retiro hay **30 días para hacerlo efectivo**. Si no se concreta, el manifiesto caduca; no se elimina. No es un plazo para terminar el tratamiento ni debe calcularse automáticamente desde la última aprobación.
+2. Los **seis meses de acopio comienzan cuando el residuo llega al operador y éste lo acepta**. Es el plazo de acumulación previo al tratamiento, no desde la creación o aprobación del manifiesto.
+3. En esa recepción se emite una **constancia de acopio**. No confundir el plazo de acopio con una autorización para seguir almacenando indefinidamente ni con la caducidad del documento como evidencia histórica.
+4. Una vez tratado el residuo, **el operador emite el certificado de disposición final**. Esto corrige el pedido inicial que atribuía la emisión al generador. No hay un modelo único suministrado: los certificados los emiten los operadores.
+
+Se mantienen pendientes las precisiones operativas de D05/D07/D08. No se cambian certificados ni estados de producción como consecuencia de esta aclaración.
 
 ## Alcance y barreras
 
@@ -21,16 +32,16 @@ No se presentan los plazos ni certificados como normativa verificada por DGFA.
 | D02 | Borrador vs envío formal; qué cambios invalidan aprobaciones y quién puede corregir | Envío y revisión | Propuesta: guardar no avisa; enviar crea versión y pendientes. No implementada como decisión aprobada |
 | D03 | Titular/ámbito de los rangos oficiales, formato, agotamiento, concurrencia y anulaciones | Asignar numeración V2 | Nunca consumir número en borrador ni reutilizar números anulados/vencidos en el nuevo circuito |
 | D04 | Sustitución sólo de vehículo/chofer o también de empresa transportista; autoridad para efectuarla | Sustituciones posteriores | La tanda inicial sólo selecciona recursos al crear; no cambia viajes ni responsables existentes |
-| D05 | 30 días: iniciar retiro o completar; días corridos y corte horario; revalidación; in situ | Vencimiento automático | No vencer ni bloquear manifiestos actuales |
+| D05 | Confirmado: 30 días para concretar el retiro una vez pautado. Precisar si el origen es el instante del acuerdo o la fecha de retiro acordada, cómputo/corte horario, efecto de reprogramar, revalidación e in situ | Vencimiento automático | No usar la fecha de unanimidad como sustituto del acuerdo ni vencer/bloquear manifiestos actuales |
 | D06 | Quién aprueba adendas; continuidad de la parte original; residuos nuevos/incompatibles; rechazo parcial | Ejecutar adendas | No alterar lo aprobado ni permitir tratar un agregado pendiente |
-| D07 | Acopio: seis meses calendario, fecha inicial, parciales, in situ, prórrogas, efectos del vencimiento | Emitir/vencer acopio | No inventar vencimientos ni disponer residuos automáticamente |
-| D08 | Modelo oficial y acto del generador: emitir disposición final o dar conformidad al certificado del operador; firma, numeración, rectificación | Nuevo cierre y certificados | Conservar expresamente el pedido de cierre manual por GENERADOR, sin sustituirlo por una interpretación técnica |
+| D07 | Confirmado: seis meses desde llegada y aceptación por el operador, con constancia al recibir. Precisar meses calendario/corte, recepciones parciales, in situ, prórrogas y efecto operativo del vencimiento | Automatizar límite de acopio y sus efectos | Conservar fecha de llegada y de aceptación; no reiniciar el plazo por reemitir la constancia ni disponer residuos automáticamente |
+| D08 | Confirmado: el OPERADOR emite disposición final después del tratamiento; no hay modelo único suministrado. Precisar incorporación del documento del operador, campos/firma/numeración/rectificación, parciales y momento del cierre | Nuevo cierre documental | Proponer carga del PDF emitido por operador con metadatos y trazabilidad; no inventar formato oficial ni exigir emisión/conformidad final del generador |
 | D09 | Receptores, hora y canales del resumen diario; significado de «abiertos sin aviso»; reprogramaciones y aprobaciones con menos de 24 h | Activar recordatorios nuevos | Propuesta: pendientes de actuar, agrupados por destinatario, sin insistir a quien ya respondió |
 | D10 | Obligatoriedad y momento de designar vehículo/chofer; habilitación/categorías/capacidad y vigencia a fecha de viaje | Exigir asignación y validar ejecución | Selección opcional, explícita, de recursos activos del transportista; no certifica por sí sola aptitud para una carga |
 
 ## Etapa 0 — contratos, aislamiento y compatibilidad (P0)
 
-**MV2-001 / definición:** aprobar D01–D10, adjuntar acta/modelos oficiales, registrar responsable y fecha. No cerrar un punto por inferencia del implementador.
+**MV2-001 / definición:** registrar lo confirmado y resolver los extremos pendientes de D01–D10; adjuntar acta y, si existen, ejemplos documentales de operadores. No exigir un modelo oficial que DGFA indicó que no tiene. No cerrar un punto por inferencia del implementador.
 
 **MV2-002 / protección:** preparar fixtures separados (fijo, in situ, multirol, 2 móviles, 2 choferes, recurso ajeno/inactivo, rechazo, adenda, vencimiento y certificado). Datos identificados QA, usuarios exclusivos; envíos capturados localmente.
 
@@ -88,11 +99,11 @@ Pruebas: todos los órdenes de aprobación; multirol/in situ según D01; doble c
 
 **MV2-302:** aviso 24 h antes, reprogramación/cancelación y resumen diario de pendientes. Dedupe por evento/versión/destinatario, no sólo por manifiesto. Reprogramar debe permitir un nuevo aviso válido.
 
-**MV2-303:** plazo de 30 días desde unanimidad; vencido se conserva y su número no se reutiliza. Definir recuperación/revalidación con D05.
+**MV2-303:** plazo de 30 días para concretar el retiro una vez pautado, conforme la respuesta de DGFA. Registrar por separado el momento del acuerdo, la fecha de retiro pactada y el retiro efectivo; precisar el origen exacto del cómputo con D05. Vencido se conserva y su número no se reutiliza. No se calcula desde unanimidad ni se extiende a tratamiento. Definir recuperación/revalidación con D05.
 
 Criterios: sin duplicados al reiniciar workers; no recordar cancelados o ya atendidos; mostrar zona Mendoza; no confundir falta de datos con cero pendientes; no aplicar caducidad pre-ejecución a cargas que ya están circulando sin regla aprobada.
 
-Pruebas: reloj controlado en bordes de día/mes/año; menos de 24 h; reprogramar dos veces; dos workers; reinicio; destinatario sin acceso; diferencias agenda/lista/mapa; sin red; vencimiento y revalidación con D05.
+Pruebas: reloj controlado en bordes de día/mes/año; aprobación y acuerdo en fechas distintas; retiro dentro/fuera del plazo; retiro concretado que no caduca por este límite aunque siga en tratamiento; menos de 24 h; reprogramar dos veces; dos workers; reinicio; destinatario sin acceso; diferencias agenda/lista/mapa; sin red; vencimiento y revalidación con D05.
 
 ## Etapa 4 — adendas (P1, D06)
 
@@ -108,15 +119,15 @@ Pruebas: excedente/faltante, residuo adicional, unidad incompatible, operador no
 
 ## Etapa 5 — certificados y cierre (P1, D07/D08)
 
-**MV2-501:** recepción aceptada habilita emisión de acopio transitorio, archivo verificable/versionado y fecha de vencimiento conforme D07.
+**MV2-501:** llegada y recepción aceptada por el operador originan la constancia de acopio y el plazo de seis meses. Registrar el hito una sola vez y vincular su documento verificable/versionado. Completar el cómputo y efectos operativos conforme D07; una reemisión documental no reinicia el acopio.
 
-**MV2-502:** distinguir tratamiento finalizado por operador del acto final manual del generador conforme D08; avisar a operador y transportista para descargar.
+**MV2-502:** después del tratamiento, el OPERADOR emite el certificado de disposición final. Incorporarlo al manifiesto y avisar al generador y transportista para descargarlo. El generador no es emisor. Propuesta pendiente D08: adjuntar el documento original del operador, registrar emisor/referencia/fecha y preservar versiones; no generar un supuesto modelo oficial ni convertir un pago externo en condición automática no confirmada.
 
-**MV2-503:** documentos originales reproducibles, control de acceso, firma/QR/rectificación según modelos oficiales. No regenerar un documento histórico con datos actuales del padrón.
+**MV2-503:** documentos originales descargables sin alterar sus bytes, control de acceso, integridad y rectificación. Firma/QR/formato común sólo según lo acordado en D08. No regenerar un documento histórico con datos actuales del padrón.
 
 Criterios: no emitir antes del hito; no permitir a un rol incorrecto; reintentar no duplica certificado; vigencia de acopio no borra existencia de residuos; no cerrar con adendas o cantidades pendientes sin política aprobada.
 
-Pruebas: seis meses y fines de mes; parciales; in situ; doble emisión; cambio posterior de datos; permiso ajeno; PDF abierto/descargado en web y Android; aviso con sesión caducada; integridad del documento.
+Pruebas: llegada/aceptación distintas de creación/aprobación; seis meses y fines de mes según D07; parciales; in situ; doble emisión/reemisión sin reinicio de plazo; disposición final antes de tratamiento denegada; intento de emisión por generador/transportista denegado; acceso del generador y transportista vinculados; cambio posterior de datos; permiso ajeno; PDF abierto/descargado en web y Android; aviso con sesión caducada; integridad del documento original.
 
 ## Etapa 6 — aceptación integral y preparación de publicación (P0 de salida)
 
@@ -148,3 +159,4 @@ Salida: unit + integración HTTP/DB + E2E web/móvil/PWA + Android nativo, captu
 ## Registro de ejecución
 
 - 14/10: backlog creado. Inicio MV2-101/102 en candidato; todas las demás etapas siguen pendientes. Evidencias y límites se actualizan al terminar la tanda, sin adjudicar pruebas inexistentes.
+- 14/10: incorporada respuesta de Santiago/DGFA: retiro efectivo dentro de 30 días de pautarlo; seis meses desde llegada y aceptación; constancia de acopio; disposición final emitida por OPERADOR tras tratamiento, sin modelo único suministrado. No se modificó producción ni se adelantaron reglas automáticas pendientes.
