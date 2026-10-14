@@ -245,6 +245,13 @@ describe('MobileLayout Android shell', () => {
     expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
     expect(authState.currentUser.rol).toBe('GENERADOR');
   });
+  it.each(['/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip'])('keeps technical help reachable without covering form/trip controls on %s', path => {
+    renderMobileLayout(path);
+    const help = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+    expect(help.closest('header')).toBe(screen.getByRole('banner'));
+    expect(help.parentElement).not.toHaveClass('fixed');
+    expect(help).toHaveClass('h-11', 'w-11');
+  });
   it('does not reinterpret the actor own inspection route as inspector work', () => {
     authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
     renderMobileLayout('/mis-inspecciones/qa-expediente');

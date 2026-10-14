@@ -9,6 +9,7 @@ import { expect } from '@playwright/test';
 import { assertCloudDatabase } from './safety.ts';
 import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
 import { dismissObservedChromePrompts, nativeKeyboardShown, nativeNodes, readNativeWindow } from './native-window.ts';
+import { readablePageHeading } from './e2e/helpers.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -89,6 +90,12 @@ async function proof(name: string) {
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  if (/\/(manifiestos|transporte\/viaje)\//.test(new URL(page.url()).pathname)) {
+    const help = page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+    await expect(help).toHaveCount(1);
+    assert.ok(await help.evaluate(el => Boolean(el.closest('header'))), 'Help must not float over manifest actions');
+    await readablePageHeading(page);
+  }
   await page.screenshot({ path: path.join(output, name + '.png') });
   await dismissObservedChromePrompts(output);
   await device.screenshot({ path: path.join(output, name + '-device.png') });

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix } from './helpers';
+import { login, prefix, readablePageHeading } from './helpers';
 
 async function choose(page: Page, label: string, option: RegExp) {
   await page.getByRole('button', { name: label, exact: true }).click();
@@ -20,6 +20,10 @@ async function destination(page: Page, info: TestInfo) {
 }
 
 async function proof(page: Page, info: TestInfo, name: string) {
+  const help = page.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+  await expect(help).toHaveCount(1);
+  expect(await help.evaluate(el => Boolean(el.closest('header')))).toBe(true);
+  await readablePageHeading(page);
   await expect(page).toHaveTitle(/SITREP/i);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

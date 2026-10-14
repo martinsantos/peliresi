@@ -82,6 +82,7 @@ export const MainLayout: React.FC = () => {
   }, []);
   const location = useLocation();
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
+  const inlineSupport = isInspectionCase || /^\/(?:app\/)?(?:manifiestos\/[^/]+|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
@@ -493,7 +494,7 @@ export const MainLayout: React.FC = () => {
             {searchOpen && <GlobalSearchPanel onClose={() => setSearchOpen(false)} />}
 
             {/* Help / Tour restart */}
-            {isInspectionCase ? <SupportBubble inline hidden={sidebarOpen || searchOpen || showTour} /> : <button
+            {inlineSupport ? <SupportBubble inline hidden={sidebarOpen || searchOpen || showTour} /> : <button
               onClick={() => {
                 resetOnboardingTour();
                 setShowTour(true);
@@ -537,7 +538,7 @@ export const MainLayout: React.FC = () => {
 
       {/* Role-specific welcome modal */}
       <DemoAppOnboarding />
-      {!isInspectionCase && <SupportBubble hidden={sidebarOpen || searchOpen || showTour} />}
+      {!inlineSupport && <SupportBubble hidden={sidebarOpen || searchOpen || showTour} />}
     </div>
   );
 };

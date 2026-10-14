@@ -132,6 +132,7 @@ export const MobileLayout: React.FC = () => {
   const isInspector = Boolean(currentUser?.esInspector);
   const isInspectionRoute = /\/inspecciones(?:\/|$)/.test(location.pathname);
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
+  const inlineSupport = isInspectionCase || /^\/(?:app\/)?(?:manifiestos\/[^/]+|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
   const inspectionShell = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const shell = inspectionShell.current, viewport = window.visualViewport;
@@ -406,7 +407,7 @@ export const MobileLayout: React.FC = () => {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {isInspectionCase && <SupportBubble mobile inline hidden={isMenuOpen} />}
+            {inlineSupport && <SupportBubble mobile inline hidden={isMenuOpen} />}
             <NotificationBell basePath={mp('')} inverse />
           </div>
         </div>
@@ -421,7 +422,7 @@ export const MobileLayout: React.FC = () => {
       </main>
 
       {/* Floating Action Button */}
-      {!isInspectionCase && <SupportBubble mobile hidden={isMenuOpen} aboveTrip={showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute)} />}
+      {!inlineSupport && <SupportBubble mobile hidden={isMenuOpen} aboveTrip={showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute)} />}
       {showFab && (
         <button
           onClick={() => navigate(mp('/manifiestos/nuevo'))}

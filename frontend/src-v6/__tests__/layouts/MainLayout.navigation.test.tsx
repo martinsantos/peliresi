@@ -48,6 +48,13 @@ describe('Sidebar: one visible current destination',()=>{
     expect(badge).toHaveAttribute('title','Rol base: GENERADOR');
     expect(authState.rol).toBe('GENERADOR');
   });
+  it.each(['/manifiestos/nuevo','/manifiestos/qa-record','/transporte/viaje/qa-trip'])('keeps help in the header, not over manifest controls on %s',path=>{
+    show(path);
+    const help=screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true});
+    expect(help.closest('header')).toBe(screen.getByRole('banner'));
+    expect(help.parentElement).not.toHaveClass('fixed');
+    expect(screen.queryByRole('button',{name:'Ver tour de ayuda',exact:true})).not.toBeInTheDocument();
+  });
   it('keeps the base role outside the inspection workspace',()=>{
     authState.rol='GENERADOR';authState.esInspector=true;
     show('/mis-inspecciones/qa-expediente');
