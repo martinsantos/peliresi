@@ -51,7 +51,7 @@ test('explicit second vehicle and driver persist in real manifest and PDF on thi
   await expect(page.getByRole('heading', { name: 'Transporte asignado', exact: true })).toBeVisible();
   await expect(page.getByText('QA002ZZ · QA Segundo', { exact: true })).toBeVisible();
   await expect(page.getByText('QA Segundo', { exact: true })).toBeVisible();
-  await page.getByRole('heading', { name: 'Transporte asignado', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByText('QA Segundo', { exact: true }).scrollIntoViewIfNeeded();
   await proof(page, info, 'transport-persisted');
   const pdf = page.waitForResponse(r => r.url().endsWith('/api/pdf/manifiesto/' + created.id));
   await page.getByRole('button', { name: 'Descargar PDF', exact: true }).click();

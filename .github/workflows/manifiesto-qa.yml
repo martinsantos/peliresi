@@ -12,7 +12,7 @@ jobs:
   manifests:
     if: github.ref == 'refs/heads/codex/sitrep-manifiestos-v2-20261014'
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       CI: 'true'
       NODE_ENV: test
@@ -99,6 +99,30 @@ jobs:
       - name: Web, responsive mobile and app journeys with actual backend
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/manifest.playwright.config.ts
+      - name: Build separately identified loopback QA APK, no release key
+        run: |
+          npm install --prefix "$RUNNER_TEMP/sitrep-bubblewrap" --save-exact @bubblewrap/core@1.24.1 --no-audit --no-fund
+          node --experimental-strip-types android-twa/scripts/generate-sitrep-brand.ts --isolated-manifest-qa
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          cd "$RUNNER_TEMP/sitrep-manifest-apk/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=1 assembleDebug
+      - name: Enable cloud VM hardware acceleration
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Installed QA APK on Android 15, synthetic roles only
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: true
+          script: timeout --signal=TERM --kill-after=20s 12m node --experimental-strip-types frontend/cloud-qa/manifest-apk.ts
       - name: Historical synthetic manifests remain byte-identical
         if: always()
         run: |

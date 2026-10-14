@@ -7,7 +7,13 @@ import path from 'node:path';
 
 assert.equal(process.env.GITHUB_ACTIONS, 'true');
 assert.equal(process.env.GITHUB_REPOSITORY, 'martinsantos/peliresi');
-const output = path.join(process.env.RUNNER_TEMP!, 'sitrep-brand-review');
+const isolated = process.argv.includes('--isolated-manifest-qa');
+if (isolated) {
+  const { assertCloudEnvironment } = await import('../../frontend/cloud-qa/safety.ts');
+  assertCloudEnvironment();
+  assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
+}
+const output = path.join(process.env.RUNNER_TEMP!, isolated ? 'sitrep-manifest-apk' : 'sitrep-brand-review');
 const target = path.join(output, 'android');
 const require = createRequire(path.join(process.env.RUNNER_TEMP!, 'sitrep-bubblewrap/package.json'));
 const { TwaManifest, TwaGenerator, fetchUtils } = require('@bubblewrap/core');
@@ -27,8 +33,10 @@ fetchUtils.fetch = async (url: string | URL) => {
     text: async () => data.toString('utf8'), arrayBuffer: async () => data, buffer: async () => data };
 };
 const manifest = new TwaManifest({
-  packageId: 'ar.com.ultimamilla.sitrep', host: 'sitrep.ultimamilla.com.ar',
-  name: 'SITREP - Trazabilidad RRPP', launcherName: 'SITREP', display: 'standalone',
+  packageId: isolated ? 'ar.com.ultimamilla.sitrep.manifestqa' : 'ar.com.ultimamilla.sitrep',
+  host: isolated ? '127.0.0.1' : 'sitrep.ultimamilla.com.ar',
+  name: isolated ? 'SITREP QA - NO DISTRIBUIR' : 'SITREP - Trazabilidad RRPP',
+  launcherName: isolated ? 'SITREP QA' : 'SITREP', display: 'standalone',
   themeColor: '#0D8A4F', themeColorDark: '#0D8A4F', navigationColor: '#0D8A4F',
   navigationColorDark: '#0D8A4F', navigationDividerColor: '#0D8A4F', navigationDividerColorDark: '#0D8A4F',
   backgroundColor: '#1B5E3C', enableNotifications: true,
@@ -46,12 +54,26 @@ const manifest = new TwaManifest({
 assert.equal(manifest.validate(), null);
 await manifest.saveToFile(path.join(target, 'twa-manifest.json'));
 await new TwaGenerator().createTwaProject(target, manifest, { debug() {}, info: console.log, warn: console.warn, error: console.error }, (current: number, total: number) => console.log('Android resources', current, total));
+if (isolated) {
+  // Only this disposable variant uses HTTP loopback. Never disable TLS checks,
+  // forge domain trust or change the production package's launch origin.
+  const gradlePath = path.join(target, 'app/build.gradle');
+  let gradle = await readFile(gradlePath, 'utf8');
+  const launch = 'def launchUrl = "https://" + twaManifest.hostName + twaManifest.launchUrl';
+  assert.equal(gradle.split(launch).length, 2, 'Review generator changes before building QA');
+  gradle = gradle.replace(launch, 'def launchUrl = "http://127.0.0.1:4177/app/"')
+    .replaceAll('https://sitrep.ultimamilla.com.ar', 'http://127.0.0.1:4177');
+  assert.ok(!gradle.includes('sitrep.ultimamilla.com.ar'));
+  await writeFile(gradlePath, gradle);
+}
 await writeFile(path.join(target, 'gradle.properties'), 'org.gradle.jvmargs=-Xmx1536m\norg.gradle.workers.max=1\norg.gradle.daemon=false\nandroid.useAndroidX=true\n');
 await writeFile(path.join(output, 'candidate.json'), JSON.stringify({
   run: process.env.GITHUB_RUN_ID, commit: process.env.GITHUB_SHA,
   sourceMarkSHA256: createHash('sha256').update(source).digest('hex'),
   iconSHA256: createHash('sha256').update(icon).digest('hex'),
   host: manifest.host, package: manifest.packageId, versionCode: 4,
+  launchOrigin: isolated ? 'http://127.0.0.1:4177' : 'https://sitrep.ultimamilla.com.ar',
+  isolated, trustBypassed: false,
   releaseSigned: false, distributionAllowed: false,
   limitation: 'Original release signing key unavailable; debug APK is VM-only, not an installed-app upgrade.',
 }, null, 2));
