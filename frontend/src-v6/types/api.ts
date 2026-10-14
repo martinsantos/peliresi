@@ -4,7 +4,7 @@
  */
 
 import type {
-  Usuario, Manifiesto, TipoResiduo, Rol, EstadoManifiesto, Generador,
+  Usuario, Manifiesto, TipoResiduo, Rol, EstadoManifiesto, Generador, Vehiculo, Chofer,
 } from './models';
 
 // ========================================
@@ -590,6 +590,8 @@ export interface CatalogoItem {
   licencia?: string;      // Chofer
   metodo?: string;        // TratamientoAutorizado
   usuario?: { email: string; nombre?: string };
+  vehiculos?: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'activo'>[];
+  choferes?: Pick<Chofer, 'id' | 'nombre' | 'apellido' | 'dni' | 'activo'>[];
   [key: string]: unknown;
 }
 

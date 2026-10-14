@@ -60,6 +60,12 @@ jobs:
           npm ci --prefix frontend --no-audit --no-fund
           cd backend
           npx --no-install prisma generate
+      - name: Build exact candidate, never deploy
+        run: |
+          npm run build --prefix backend
+          cd frontend
+          NODE_ENV=production npm run build
+          NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
       - name: Backend unit suite, database disconnected
         # Existing PDF unit tests parse actual PDF bytes, not a renderer mock.
         # Install the parser on the VM before running the suite.
@@ -72,12 +78,6 @@ jobs:
       - name: Frontend unit suite, providers mocked
         working-directory: frontend
         run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
-      - name: Build exact candidate, never deploy
-        run: |
-          npm run build --prefix backend
-          cd frontend
-          NODE_ENV=production npm run build
-          NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
       - name: Cloud browser and isolated PostgreSQL
         run: |
           sudo apt-get install -y --no-install-recommends postgresql-16
