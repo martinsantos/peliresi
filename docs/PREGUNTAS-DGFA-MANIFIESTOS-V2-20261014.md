@@ -1,0 +1,81 @@
+# Manifiestos V2 — preguntas reunidas para DGFA
+
+Para revisar con Santiago/DGFA. **Documento de decisión, no reglas activadas ni consulta enviada.**
+Referencia: [backlog por etapas y pruebas](BACKLOG-MANIFIESTOS-V2-20261014.md).
+
+## Lo que ya quedó confirmado
+
+- Pautado el retiro, hay 30 días para concretarlo; si no ocurre, el manifiesto caduca y se conserva. No es un plazo para terminar el tratamiento.
+- El acopio tiene seis meses desde que el residuo llega al operador y éste lo acepta. En la recepción se emite constancia de acopio.
+- Después de tratar, **el operador** emite disposición final. No el generador. No hay modelo único provisto por DGFA.
+- Se pidió registrar operaciones con generador y/o transportista sin alta en SITREP, para no perder movimientos y facilitar su regularización.
+- Se pidió gestionar diferencias de carga por aprobación rápida o continuación excepcional con aprobación posterior; lo añadido debe estar dentro de las corrientes admitidas para el generador.
+
+Los dos últimos puntos definen el objetivo solicitado por el usuario. Las autorizaciones concretas del circuito excepcional siguen pendientes de DGFA. Falta de cuenta SITREP no equivale a falta de habilitación legal.
+
+## Primero: decisiones que habilitan el circuito
+
+### 1. ¿Quién aprueba y qué número usamos? — D01, D02, D03
+
+- ¿Aprueban generador, transportista y operador en todos los casos? ¿Quiénes en in situ y cuando una misma empresa cumple varios roles?
+- Para quien no tenga cuenta: ¿quién registra su conformidad y con qué evidencia? ¿Existe sustitución administrativa o una excepción expresa? No vamos a inventar una aprobación del ausente.
+- ¿Guardar borrador no avisa y **enviar a aprobación** sí? ¿Qué cambios obligan a repetir aprobaciones y quién puede corregir?
+- ¿A quién pertenece cada rango oficial y cómo se elige? ¿Formato, agotamiento y anulación? En el circuito ordinario se consume al completar unanimidad: ¿cuándo en la excepción sin cuenta?
+
+**Respuesta / responsable / fecha:** pendiente.
+
+### 2. ¿Cómo operamos con participantes sin alta? — D11
+
+- ¿Qué datos y documentos mínimos permiten identificar a generador y transportista externos? ¿Puede faltar el alta de ambos en el mismo movimiento?
+- ¿Qué puede hacer el operador: registrar, retirar, transportar, recibir, acopiar, tratar y/o cerrar? Marcar las etapas permitidas y quién autoriza cada excepción.
+- ¿Quién queda a cargo de revisar identidad, habilitaciones y regularización, y en qué plazo? ¿A quién ve DGFA en la bandeja de pendientes?
+
+**Respuesta / responsable / fecha:** pendiente. Sin cuentas ficticias, actores genéricos ni intimaciones automáticas.
+
+### 3. ¿Cómo resolvemos diferencias y aprobación posterior? — D06, D12, D13
+
+- ¿Quién aprueba una diferencia de cantidad y quién una nueva corriente? ¿La parte original puede seguir por separado?
+- ¿De dónde tomamos las corrientes admitidas del generador: habilitación, declaración jurada u otra fuente? ¿Qué hacemos si falta, venció o el generador no tiene alta en SITREP?
+- ¿Quién autoriza continuar antes de aprobar la adenda y hasta qué etapa? ¿Cuánto tiempo tiene el responsable para responder? ¿Qué sucede ante silencio o rechazo después de recibir/tratar?
+- ¿Se permite cerrar o emitir certificado con una adenda pendiente? ¿Cómo se resuelven cantidades y documentos si se rechaza después?
+
+**Respuesta / responsable / fecha:** pendiente. Se conserva lo declarado, lo recibido y cada decisión; no se sobreescribe el original ni se retrofecha una aprobación.
+
+## Después: tiempos, recursos y documentos
+
+### 4. ¿Desde qué fecha exacta corren los plazos? — D05, D07
+
+- Retiro: ¿30 días desde **el momento en que se acuerda** o desde **la fecha de retiro pactada**? ¿Días corridos y hasta el final del día en Mendoza?
+- ¿Reprogramar mueve el vencimiento? ¿Quién puede revalidar uno vencido? ¿Cómo aplica a in situ?
+- Acopio: ¿seis meses calendario? ¿Cómo cuentan recepciones parciales y fines de mes? ¿Hay prórroga, quién la autoriza y qué acciones se permiten al vencer?
+
+**Respuesta / responsable / fecha:** pendiente. No volver a discutir el emisor ni el hito de aceptación ya confirmados.
+
+### 5. ¿Qué transporte se puede cambiar y cuándo se exige asignarlo? — D04, D10
+
+- ¿Debe quedar elegido vehículo y chofer al enviar, al aprobar o antes del retiro? ¿Qué habilitaciones/categorías/capacidad y vigencia se controlan a la fecha del viaje?
+- Ante avería: ¿se permite sustituir sólo móvil/chofer o también empresa transportista? ¿Quién lo registra? El cambio permitido informa a las partes: ¿requiere alguna autorización administrativa adicional?
+
+**Respuesta / responsable / fecha:** pendiente. La elección inicial ya desarrollada es opcional; un recurso activo en el padrón no certifica por sí solo aptitud para cualquier carga.
+
+### 6. ¿Cómo incorporamos los documentos del operador? — D08 y D07
+
+- Para la constancia de acopio y disposición final: ¿SITREP recibe el PDF original del operador? ¿Qué datos, número, fecha, firma y evidencia mínimos deben acompañarlo?
+- ¿Cómo se rectifica preservando versiones? ¿Se admiten tratamiento/certificados parciales? ¿Cuál es el momento exacto del cierre?
+- ¿Pueden compartir un ejemplo anonimizado de un operador para validar la carga y la descarga? No pedimos crear un modelo oficial que no existe.
+
+**Respuesta / responsable / fecha:** pendiente. No hacer depender el cierre de un pago externo ni de emisión por el generador sin una regla expresa.
+
+### 7. ¿A quién y cuándo recordamos? — D09
+
+- Aviso 24 horas antes: ¿a todas las partes o a responsables concretos? Si se programa con menos de 24 horas, ¿aviso inmediato?
+- Resumen diario: ¿sólo a quien tiene una aprobación/acción pendiente? ¿A qué hora y por qué canales? ¿Cuándo escalar y a quién?
+- Al reprogramar/cancelar: ¿qué aviso sustituye al anterior? ¿Qué significa exactamente «abiertos sin aviso»?
+
+**Respuesta / responsable / fecha:** pendiente. Las pruebas capturan avisos sin entregarlos; los envíos reales siguen fuera de alcance.
+
+## Qué podemos avanzar sin esas respuestas
+
+Selección explícita de móvil y chofer, snapshot inmutable, detalle/PDF coherentes; pruebas de permisos, aislamiento, sesión, teclado y circuito vigente en escritorio, móvil, `/app` y APK QA. Preparar compatibilidad y fixtures de excepciones no habilita esas excepciones.
+
+**Para activar Manifiestos V2:** registrar respuestas de estos siete grupos, vincularlas a D01–D13 y a sus pruebas, y pedir autorización separada de publicación. Ningún resultado de QA reemplaza estas decisiones.

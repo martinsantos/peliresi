@@ -89,9 +89,7 @@ jobs:
       - name: Verify database identity, additive candidate schema and synthetic seed
         run: |
           node --experimental-strip-types --input-type=module -e "import { assertCloudDatabase } from './frontend/cloud-qa/safety.ts'; await assertCloudDatabase();"
-          cd backend
-          npx --no-install prisma db push --skip-generate
-          cd ..
+          node --experimental-strip-types frontend/cloud-qa/manifest-migration.ts
           node --experimental-strip-types frontend/cloud-qa/manifest-fixture.ts
           node --experimental-strip-types frontend/cloud-qa/start.ts
       - name: Real authenticated HTTP, assignment, history and PDF

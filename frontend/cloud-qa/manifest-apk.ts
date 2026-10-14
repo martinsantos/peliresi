@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { _android, type Page } from 'playwright';
 import { expect } from '@playwright/test';
@@ -25,6 +25,15 @@ const apk = path.join(candidate, 'android/app/build/outputs/apk/debug/app-debug.
 const metadata = JSON.parse(await readFile(path.join(candidate, 'candidate.json'), 'utf8'));
 assert.equal(metadata.package, pkg); assert.equal(metadata.launchOrigin, origin);
 assert.equal(metadata.isolated, true); assert.equal(metadata.distributionAllowed, false);
+const sdkTools = path.join(process.env.ANDROID_HOME!, 'build-tools');
+const sdkVersion = (await readdir(sdkTools)).filter(v => /^\d+\.\d+\.\d+$/.test(v))
+  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).at(-1);
+assert.ok(sdkVersion);
+const signature = execFileSync(path.join(sdkTools, sdkVersion, 'apksigner'),
+  ['verify', '--verbose', '--print-certs', apk], { encoding: 'utf8', timeout: 15000 });
+assert.match(signature, /Signer #1 certificate SHA-256 digest:/);
+assert.doesNotMatch(signature, /14302500ef385b217b03efd82118bbb45c68de11930fc803cc500f020e08e1d7/);
+await writeFile(path.join(output, 'signature.txt'), signature);
 assert.match(adb('install', apk), /Success/);
 await writeFile(path.join(output, 'package.txt'), adb('shell', 'dumpsys', 'package', pkg));
 await writeFile(path.join(output, 'identity.json'), JSON.stringify({ ...metadata,
@@ -204,6 +213,7 @@ try {
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');
   assert.deepEqual(unsafe, []); assert.deepEqual(errors, []);
   assert.ok(mutations.every(r => r.status < 400));
+  await writeFile(path.join(output, 'chrome-memory.txt'), adb('shell', 'dumpsys', 'meminfo', 'com.android.chrome', '-s'));
   await writeFile(path.join(output, 'result.json'), JSON.stringify({ completed: true, results, manifestId, mutations, errors, unsafe,
     system: assertStableSystemPackages(baseline), emailSent: 0, originalPackageModified: false,
     limitations: ['Separate debug APK, not an installable update over the production APK',
