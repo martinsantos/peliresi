@@ -33,6 +33,8 @@ Se mantienen pendientes las precisiones operativas de D05/D07/D08. No se cambian
 
 ## Decisiones DGFA pendientes
 
+Para la reunión: [preguntas agrupadas en siete temas, con lo ya confirmado separado](PREGUNTAS-DGFA-MANIFIESTOS-V2-20261014.md). Esta lista no fue enviada ni convierte decisiones pendientes en reglas activas.
+
 | ID | Decisión que falta | Bloquea | Regla segura mientras tanto |
 |---|---|---|---|
 | D01 | Partes obligatorias por modalidad, empresa con varios roles, participantes sin cuenta y eventual intervención administrativa | Activar aprobación unánime | No atribuir aprobaciones a otro rol ni considerar aprobada a una parte porque no tiene cuenta |
@@ -231,3 +233,33 @@ Fallos previos conservados: dependencia Poppler ausente en VM (`38616610538`); f
 **No GO de Manifiestos V2 completo ni de APK:** restan decisiones DGFA, implementación de las demás etapas, variante Android aislada, prueba de migración/rollback aditiva y evidencia visual ampliada. En las capturas móviles se observa proximidad/superposición parcial de la burbuja de ayuda con controles inferiores: revisar espacio reservado antes de certificar UI global. No se ha afirmado ausencia de todos los defectos de interfaz.
 
 Siguiente lote: resolver D01/D03/D11/D12/D13 de forma conjunta antes de conectar las excepciones de participantes externos y aprobación posterior a la numeración/cierre. Para MV2-101/102, completar la evidencia visual desktop y Android QA sin apuntar a producción. No modificar aún manifiestos existentes ni publicar el candidato.
+
+### Cierre ampliado — APK aislado y compatibilidad, 14/10
+
+**Validación de QA cerrada para MV2-101/102 y el circuito vigente. No GO de Manifiestos V2 completo ni autorización de publicación.**
+
+Candidato `a63f699cb32ca919fd09f455a0bc9d500426edc6`.
+[Corrida 38644241339](https://github.com/martinsantos/peliresi/actions/runs/38644241339): **SUCCESS**, duración 12m32s. Sustituye los pendientes técnicos de Android, evidencia desktop y migración sintética del primer corte; no sustituye decisiones DGFA.
+
+| Comprobación | Resultado comprobado |
+|---|---|
+| Builds backend, web y app | PASS |
+| Unit backend / frontend | 976/976 (88 archivos) + 1432/1432 (194 archivos); cero fallos u omitidas |
+| Integración HTTP con PostgreSQL sintético | 5 grupos PASS: asignación, antifalsificación, pertenencia/actividad/permisos, compatibilidad, PDF e historial |
+| E2E escritorio1440, web móvil360 y app390 | 12/12, cero fallos, omitidos o flaky; backend real de QA |
+| Migración aditiva | Columna JSONB nullable sobre esquema anterior vacío+sintético; histórico idéntico, cliente Prisma anterior sigue leyendo/escribiendo, snapshots nuevos preservados |
+| APK instalado en Android15 | Login real de ADMIN/GENERADOR/TRANSPORTISTA/OPERADOR; teclado nativo; selección del segundo móvil/chofer; persistencia; reapertura del proceso SITREP con sesión; firma, retiro, entrega, recepción, tratamiento y cierre |
+| PDF y salida en Android | Archivo real de 3091 bytes en Downloads idéntico al de la API; visor nativo abre; volver retorna a SITREP; logout deniega ruta protegida |
+| Aislamiento y cierre | Cero errores JS o intentos de solicitud a producción registrados; todas las mutaciones del recorrido200/201; histórico sintético de control idéntico; backend/server/PG/emulador cerrados |
+
+**Corrección visual:** la ayuda flotante tapaba fecha/Confirmar retiro en capturas nativas. Se movió al encabezado sólo para nuevo/detalle de manifiesto y viaje, reutilizando el patrón de inspecciones; no se quitaron funciones. Seis unitarias nuevas y comprobaciones de título/ayuda única en E2E/Android. Revisadas capturas desktop con valores completos, selección móvil, transporte Android con acción descubierta, certificado, retorno y login final. No es una auditoría visual global.
+
+**Identidad y límites del APK:** paquete separado `ar.com.ultimamilla.sitrep.manifestqa`, código4, firma debug verificada, destino exclusivo `http://127.0.0.1:4177/app/`. No usa ni modifica el APK instalado del usuario. Prueba en Custom Tab de QA sin falsificar confianza TWA; Chrome124.0.6367.219 y GMS24.23.35 estables en la imagen Android15. No certifica actualización firmada del APK original, otros navegadores/visores, reinicio completo de Chrome/OS, teléfonos físicos, cámara/GPS/batería/celular ni cambio de idioma del sistema. La fecha nativa sigue la configuración de la VM. La firma original continúa pendiente.
+
+La compatibilidad anterior está demostrada a nivel de esquema/cliente Prisma; **no equivale a ensayo completo de despliegue/rollback del backend anterior**. La migración no fue aplicada a producción y no se ejecutó un down destructivo. El PDF probado es el vigente, no un nuevo formato oficial validado por DGFA.
+
+Fallos conservados: 38628501638 intentó logout con el visor PDF delante; 38630752906 esperaba un rótulo de firma distinto del emitido por el SDK; 38641881433 intentó screenshot de Chromium detrás del visor nativo. Se corrigió la automatización según evidencia: firma válida debug única con huella completa (3 pruebas puras), captura del visor en superficie nativa, archivo exacto y retorno observado antes de logout. No se ocultaron fallos con retries ni se relajaron las comprobaciones.
+
+Evidencias en artefacto `sitrep-manifest-v2-38644241339`, copia local `sitrep-cloud-qa-20261002/manifiestos-v2-38644241339/` (9,1MB, fuera de Git). PSS final de Chrome en VM102537KiB/RSS211032KiB: sólo una muestra final, no pico ni prueba de ausencia de fugas. Sin instalaciones, navegador o emulador locales; cierre de runtime6356/server6357 a22:10:30.649UTC y cleanup del job PASS. Queda aviso técnico no bloqueante de actualización futura de versiones de Actions, sin error en esta corrida.
+
+**Siguiente decisión:** responder los [siete grupos para DGFA](PREGUNTAS-DGFA-MANIFIESTOS-V2-20261014.md), especialmente D01/D03/D11/D12/D13. Participantes externos, aprobación conjunta/posterior, numeración nueva, agenda/vencimientos, sustitución durante viaje y certificados V2 siguen sin activar. Producción, manifiestos reales, correos y formulario humano no fueron tocados.
