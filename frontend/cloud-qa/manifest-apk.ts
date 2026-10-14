@@ -8,7 +8,7 @@ import { _android, type Page } from 'playwright';
 import { expect } from '@playwright/test';
 import { assertCloudDatabase } from './safety.ts';
 import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
-import { dismissObservedChromePrompts, nativeKeyboardShown, readNativeWindow } from './native-window.ts';
+import { dismissObservedChromePrompts, nativeKeyboardShown, nativeNodes, readNativeWindow } from './native-window.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -208,6 +208,9 @@ try {
   const pdf = await downloadResponse; expect(pdf.status()).toBe(200);
   const bytes = await pdf.body(); assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
   await writeFile(path.join(output, 'certificate.pdf'), bytes);
+  await expect.poll(async () => nativeNodes(await readNativeWindow()).some(node =>
+    (node.text || '').startsWith('certificado-')),
+  { timeout: 25000, message: 'Native PDF viewer must open the requested certificate' }).toBe(true);
   await proof('06-certificate-requested');
   let savedFile = '';
   await expect.poll(() => {
@@ -220,6 +223,13 @@ try {
   adb('pull', '/sdcard/Download/' + savedFile, savedPath);
   assert.deepEqual(await readFile(savedPath), bytes, 'Native download must preserve the exact API bytes');
   results.push('Certificate downloaded to Android storage with exact PDF bytes');
+  // Run38628501638 visibly opened the real PDF viewer. The web document remains
+  // attached behind it; attempting a DOM tap there is not a valid logout test.
+  adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+  await expect.poll(async () => nativeNodes(await readNativeWindow()).some(node =>
+    node.package === 'com.android.chrome' && node['content-desc'] === 'Abrir menu'),
+  { timeout: 15000, message: 'Return from native PDF viewer to the actual SITREP window' }).toBe(true);
+  await proof('06-returned-from-pdf'); results.push('Native PDF viewer opens and returns to SITREP');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');
@@ -230,7 +240,7 @@ try {
     system: assertStableSystemPackages(baseline), emailSent: 0, originalPackageModified: false,
     limitations: ['Separate debug APK, not an installable update over the production APK',
       'Loopback HTTP Custom Tab fallback, no forged TWA trust or TLS certification',
-      'No physical camera, GPS, battery or cellular test', 'PDF saved in Android Downloads; external PDF viewer not certified',
+      'No physical camera, GPS, battery or cellular test', 'One bundled Android PDF viewer tested, not every third-party viewer',
       'Current lifecycle plus MV2-101/102, not the unimplemented approval/addendum V2 workflow',
       'SITREP process reopened; full Chrome/OS restart is separate'] }, null, 2));
 } catch (error) {
