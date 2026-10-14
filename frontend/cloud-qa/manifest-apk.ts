@@ -202,12 +202,24 @@ try {
   await page.reload();
   await expect(page.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
   await proof('06-operator-completed'); results.push('Four real role sessions complete current lifecycle');
+  const downloadsBefore = new Set(adb('shell', 'ls', '-1', '/sdcard/Download').trim().split(/\r?\n/));
   const downloadResponse = page.waitForResponse(r => r.url() === origin + '/api/pdf/certificado/' + manifestId);
   await page.getByRole('button', { name: 'Descargar Certificado', exact: true }).tap();
   const pdf = await downloadResponse; expect(pdf.status()).toBe(200);
   const bytes = await pdf.body(); assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
   await writeFile(path.join(output, 'certificate.pdf'), bytes);
-  results.push('Certificate UI requests real PDF bytes on Android');
+  await proof('06-certificate-requested');
+  let savedFile = '';
+  await expect.poll(() => {
+    const added = adb('shell', 'ls', '-1', '/sdcard/Download').trim().split(/\r?\n/)
+      .filter(file => !downloadsBefore.has(file) && /^certificado-[a-zA-Z0-9_.()-]+\.pdf$/.test(file));
+    if (added.length === 1) savedFile = added[0];
+    return added.length;
+  }, { timeout: 25000, message: 'Actual PDF must reach Android Downloads, not merely return HTTP 200' }).toBe(1);
+  const savedPath = path.join(output, 'certificate-downloaded-on-device.pdf');
+  adb('pull', '/sdcard/Download/' + savedFile, savedPath);
+  assert.deepEqual(await readFile(savedPath), bytes, 'Native download must preserve the exact API bytes');
+  results.push('Certificate downloaded to Android storage with exact PDF bytes');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');
@@ -218,7 +230,7 @@ try {
     system: assertStableSystemPackages(baseline), emailSent: 0, originalPackageModified: false,
     limitations: ['Separate debug APK, not an installable update over the production APK',
       'Loopback HTTP Custom Tab fallback, no forged TWA trust or TLS certification',
-      'No physical camera, GPS, battery or cellular test', 'PDF response verified; external PDF viewer/file saving not certified',
+      'No physical camera, GPS, battery or cellular test', 'PDF saved in Android Downloads; external PDF viewer not certified',
       'Current lifecycle plus MV2-101/102, not the unimplemented approval/addendum V2 workflow',
       'SITREP process reopened; full Chrome/OS restart is separate'] }, null, 2));
 } catch (error) {
