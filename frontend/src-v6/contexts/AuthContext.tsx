@@ -289,6 +289,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real login via API — accepts email or CUIT
   const login = useCallback(async (identifier: string, password: string) => {
     sessionChanging.current = true;
+    setShowOnboarding(false);
     ++authGeneration.current;
     clearOfflineSession();
     setOfflineExpiresAt(null);
@@ -314,7 +315,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(user);
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
       const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
-      if (isFirstSession || isPostReset) setShowOnboarding(true);
+      // A verified applicant may edit drafts, but has no approved operational role.
+      // Do not consume their first operational welcome before approval.
+      setShowOnboarding(!response.restricted && response.user.activo && (isFirstSession || isPostReset));
       return user;
     } catch (err: any) {
       clearTokens();
@@ -331,6 +334,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Logout
   const logout = useCallback(async () => {
     sessionChanging.current = true;
+    setShowOnboarding(false);
     ++authGeneration.current;
     const confirmation = authService.logout().catch(() => {});
     clearTokens();
@@ -452,7 +456,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       <ImpersonationProvider>
         {children}
       </ImpersonationProvider>
-      {showOnboarding && currentUser && (
+      {showOnboarding && currentUser && !isRestricted && (
         <OnboardingWizard
           rol={currentUser.rol}
           esInspector={currentUser.esInspector}

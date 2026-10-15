@@ -15,7 +15,8 @@ test('approved activity switch, additional draft and unblocked incomplete operat
   expect(errors).toEqual([]);
 });
 test('verified applicant keeps separate activity drafts without operational access', async ({ page }, info) => {
-  await login(page, info, 'multirol-pending-' + info.project.name);
+  await login(page, info, 'multirol-pending-' + info.project.name, { showWelcome: true });
+  await expect(page.getByRole('button', { name: 'Saltar introducción', exact: true })).toHaveCount(0);
   await pendingMultiRoleJourney(page, prefix(info));
   await page.screenshot({ path: info.outputPath('pending-activities.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

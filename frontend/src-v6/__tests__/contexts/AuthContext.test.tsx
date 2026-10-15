@@ -75,7 +75,7 @@ vi.mock('../../hooks/useSessionTimeout', () => ({
 }));
 
 vi.mock('../../components/OnboardingWizard', () => ({
-  default: () => null,
+  default: () => <div data-testid="operational-onboarding" />,
 }));
 
 // Import AFTER mocks are declared
@@ -268,6 +268,23 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('isAdmin').textContent).toBe('true');
     expect(screen.getByTestId('isAnyAdmin').textContent).toBe('true');
     expect(screen.getByTestId('isGenerador').textContent).toBe('false');
+    expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument();
+  });
+
+  it.each([false, true])('does not introduce pending applicants as approved actors (post-reset: %s)', async (postReset) => {
+    if (postReset) localStorage.setItem('sitrep_post_reset', '1');
+    vi.mocked(authService.login).mockResolvedValueOnce({
+      user: { ...inspector, id: 'pending-multirole', rol: 'GENERADOR', activo: false, esInspector: false },
+      accessToken: 'restricted-token', refreshToken: 'restricted-refresh', restricted: true, solicitudId: 'pending-draft',
+    });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    await userEvent.setup().click(screen.getByTestId('login-btn'));
+    await waitFor(() => expect(screen.getByTestId('restricted')).toHaveTextContent('true'));
+    expect(screen.getByTestId('draft')).toHaveTextContent('pending-draft');
+    expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
+    expect(localStorage.getItem('sitrep_onboarding_pending-multirole')).toBeNull();
+    if (postReset) expect(localStorage.getItem('sitrep_post_reset')).toBe('1');
   });
 
   it('logout clears the current user', async () => {
@@ -291,6 +308,7 @@ describe('AuthContext', () => {
     });
     expect(screen.getByTestId('isAdmin').textContent).toBe('false');
     expect(clearSyncQueue).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
   });
 
   it('useAuth throws when used outside AuthProvider', () => {
