@@ -69,7 +69,12 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
         residuos: manifest.residuos.map(r => ({ id: r.id, tipoResiduoId: r.tipoResiduoId,
           corriente: r.tipoResiduo.codigo, cantidad: r.cantidad, unidad: r.unidad, descripcion: r.descripcion })) },
       revisiones: [],
-    } });
+    } }).catch(async (error: unknown) => {
+      // Prisma can race its client-side upsert on simultaneous first requests.
+      // Only recover a primary-key conflict, then verify the original request below.
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      return prisma.adendaManifiesto.findUniqueOrThrow({ where: { id: command.id } });
+    });
     verifyReplay(record);
     res.status(201).json({ success: true, data: { adenda: present(record, req) } });
   } catch (error) { next(error); }

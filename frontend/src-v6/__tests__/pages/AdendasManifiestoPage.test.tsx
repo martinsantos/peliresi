@@ -28,7 +28,7 @@ it('keeps original and observed loads separate; read-only participant has no wri
 it('failed resolution retains the reason and idempotency key, never shows false approval', async () => {
   mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, puedeResolver: true }] } } });
   mock.post.mockRejectedValue(new Error('offline')); view();
-  const note = await screen.findByLabelText('Motivo de resolución qa-adenda');
+  const note = await screen.findByLabelText('Motivo de resolución');
   fireEvent.change(note, { target: { value: 'Revisión con evidencia' } });
   fireEvent.click(screen.getByRole('button', { name: 'Aprobar post facto' })); await screen.findByRole('alert');
   expect(note).toHaveValue('Revisión con evidencia'); expect(screen.getByText('Pendiente de revisión')).toBeVisible();
@@ -40,7 +40,7 @@ it('successful write invalidates even a fresh list and shows the server resoluti
   mock.get.mockResolvedValueOnce({ data: { data: { ...data, adendas: [reviewable] } } })
     .mockResolvedValue({ data: { data: { ...data, adendas: [{ ...reviewable, estadoRevision: 'OBSERVADA', version: 1 }] } } });
   mock.post.mockResolvedValue({ data: {} }); view();
-  fireEvent.change(await screen.findByLabelText('Motivo de resolución qa-adenda'), { target: { value: 'Revisar evidencia' } });
+  fireEvent.change(await screen.findByLabelText('Motivo de resolución'), { target: { value: 'Revisar evidencia' } });
   fireEvent.click(screen.getByRole('button', { name: 'Observar' })); await screen.findByText('Observada');
   expect(mock.get).toHaveBeenCalledTimes(2); expect(screen.getByText('Y1 · 10 kg')).toBeVisible();
 });

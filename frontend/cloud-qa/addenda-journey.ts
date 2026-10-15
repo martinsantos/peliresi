@@ -23,7 +23,7 @@ export async function recordOrdinaryAddendum(page: Page, hideKeyboard = async ()
 }
 export async function resolveOrdinaryAddendum(page: Page, id: string, decision: 'Aprobar post facto' | 'Rechazar conformidad', hideKeyboard = async () => {}) {
   const region = page.getByRole('region', { name: 'Adenda ' + id, exact: true });
-  await region.getByLabel('Motivo de resolución ' + id, { exact: true }).fill('QA revisión posterior con hechos conservados');
+  await region.getByLabel('Motivo de resolución', { exact: true }).fill('QA revisión posterior con hechos conservados');
   await hideKeyboard();
   const response = page.waitForResponse(r => r.url().endsWith('/adendas/' + id + '/revisiones') && r.request().method() === 'POST');
   await press(page, region.getByRole('button', { name: decision, exact: true }));
