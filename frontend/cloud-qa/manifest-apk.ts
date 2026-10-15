@@ -134,8 +134,12 @@ async function login(role: string) {
 }
 async function logout() {
   await hideKeyboard();
-  await page.getByRole('button', { name: 'Abrir menu', exact: true }).tap();
-  await page.getByRole('button', { name: 'Cerrar Sesión', exact: true }).tap();
+  const candidateExit = page.getByRole('button', { name: 'Salir', exact: true });
+  if (await candidateExit.isVisible()) await candidateExit.tap();
+  else {
+    await page.getByRole('button', { name: 'Abrir menu', exact: true }).tap();
+    await page.getByRole('button', { name: 'Cerrar Sesión', exact: true }).tap();
+  }
   await expect(page).toHaveURL(/\/app\/login$/);
   expect(await page.evaluate(() => localStorage.getItem('sitrep_access_token'))).toBeNull();
 }

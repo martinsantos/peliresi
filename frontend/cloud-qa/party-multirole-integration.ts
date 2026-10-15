@@ -30,6 +30,7 @@ try {
     if (surface !== 'http') continue;
     const token = await login(name);
     const second = (await call(token, '/solicitudes/actividad-adicional', 'POST', { tipoActor: 'OPERADOR' }, 201)).solicitud;
+    await call(token, '/manifiestos', 'GET', undefined, 403);
     await call(token, '/auth/profile', 'GET', undefined, 403, 'OPERADOR');
     assert.equal(await db.usuario.count({ where: { cuit: user.cuit } }), 1);
     for (const application of [second, first]) {

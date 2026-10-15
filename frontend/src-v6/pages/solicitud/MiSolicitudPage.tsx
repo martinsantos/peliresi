@@ -57,6 +57,8 @@ const MiSolicitudPage: React.FC = () => {
   const { data: solicitudes, isLoading, isError, refetch } = useMisSolicitudes();
   const [selectedId, setSelectedId] = useState('');
   const solicitud = (solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
+  const conversations = useRef<Record<string, { reply: string; message: string }>>({});
+  useEffect(() => { if (!selectedId && solicitud) setSelectedId(solicitud.id); }, [selectedId, solicitud?.id]);
 
   const { data: mensajes } = useMensajesSolicitud(solicitud?.id || '');
   const enviarMensaje = useEnviarMensaje();
@@ -152,12 +154,18 @@ const MiSolicitudPage: React.FC = () => {
 
       {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <>
         <ActorActivities />
-        {(solicitudes?.length || 0) > 1 && <label className="block text-sm font-medium">Solicitud por actividad
-          <select className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base"
-            value={solicitud.id} onChange={event => { setSelectedId(event.target.value); setReplyText(''); setMessageText(''); }}>
+        {(solicitudes?.length || 0) > 1 && <div>
+          <label htmlFor="application-activity" className="block text-sm font-medium">Solicitud por actividad</label>
+          <select id="application-activity" className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base"
+            value={solicitud.id} onChange={event => {
+              conversations.current[solicitud.id] = { reply: replyText, message: messageText };
+              const previous = conversations.current[event.target.value];
+              setSelectedId(event.target.value); setReplyText(previous?.reply || ''); setMessageText(previous?.message || '');
+            }}>
             {solicitudes?.map(item => <option key={item.id} value={item.id}>{item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
           </select>
-        </label>}
+        </div>}
+        {solicitud.estado === 'BORRADOR' && <Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>Continuar borrador</Button>}
       </>}
       {/* Stepper */}
       <Card>

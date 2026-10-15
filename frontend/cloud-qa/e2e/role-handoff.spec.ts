@@ -101,8 +101,10 @@ test('separate real users hand a manifest from generator to transport to operato
       await operator.getByRole('link', { name: 'Adendas y revisión posterior', exact: true }).click();
       await expect(operator.getByRole('status', { name: 'Estado de revisión' })).toHaveCount(2);
       await expect(operator.getByRole('status', { name: 'Estado de revisión' }).first()).toHaveText('Pendiente de revisión');
+      await expect(operator.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true }).getByRole('button', { name: 'Aprobar post facto', exact: true })).toHaveCount(0);
+      await expect(operator.getByRole('region', { name: 'Adenda ' + carrierAdenda, exact: true }).getByRole('button', { name: 'Aprobar post facto', exact: true })).toHaveCount(1);
       await operator.context().close();
-      const reviewer = await asRole('admin'); const errors: string[] = [];
+      const reviewer = await asRole('generador'); const errors: string[] = [];
       reviewer.on('pageerror', e => errors.push(e.message));
       reviewer.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
       await reviewer.goto(`${prefix(info)}/manifiestos/${id}/adendas`);
@@ -137,7 +139,7 @@ test('separate real users hand a manifest from generator to transport to operato
       await owner.goto(`${prefix(info)}/manifiestos/${id}/adendas`);
       await expect(owner.getByText('Conformidad rechazada', { exact: true })).toBeVisible();
       await expect(owner.getByRole('button', { name: 'Registrar diferencia' })).toHaveCount(0);
-      await expect(owner.getByRole('button', { name: 'Aprobar post facto' })).toHaveCount(0);
+      await expect(owner.getByRole('button', { name: 'Aprobar post facto' })).toHaveCount(2);
       await owner.getByRole('link', { name: 'Volver al manifiesto' }).click();
       await expect(owner.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
     }

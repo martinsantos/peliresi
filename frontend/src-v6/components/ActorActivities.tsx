@@ -33,7 +33,7 @@ export default function ActorActivities() {
         const draft = result.data.data.solicitud;
         if (!draft?.id || draft.usuarioId !== currentUser.id) throw new Error('Solicitud incompatible');
         // Existing wizard discovers the user's own draft; no identity or form is replaced.
-        navigate(mp('/inscripcion/' + type.toLowerCase()));
+        navigate('/inscripcion/' + type.toLowerCase());
       }
     } catch (caught) {
       const failure = caught as { response?: { data?: { message?: string } } };
