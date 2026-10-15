@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-export async function createExceptionalJourney(page: Page, prefix: string, hideKeyboard = async () => {}) {
+export async function createExceptionalJourney(page: Page, prefix: string, hideKeyboard = async () => {}, linked?: 'Generador' | 'Transportista') {
   await page.goto('http://127.0.0.1:4177' + prefix + '/manifiestos');
   await page.getByRole('link', { name: 'Baja intensidad · revisión posterior', exact: true }).click();
   await page.getByRole('button', { name: 'Registrar operación', exact: true }).click();
@@ -8,6 +8,14 @@ export async function createExceptionalJourney(page: Page, prefix: string, hideK
     await page.getByLabel(actor + ' · Nombre o razón social', { exact: true }).fill('QA Externo ' + actor);
     await page.getByLabel(actor + ' · Identificación declarada', { exact: true }).fill('QA identidad sintética sin alta');
     await page.getByLabel(actor + ' · Domicilio', { exact: true }).fill('QA Calle de prueba 123');
+  }
+  if (linked) {
+    await page.getByRole('button', { name: linked + ' · Buscar en padrón', exact: true }).click();
+    await page.getByLabel(linked + ' del padrón', { exact: true }).click();
+    await expect(page.getByRole('option', { name: linked === 'Generador' ? /^QA Generador 1 ·/ : /^QA Transporte 1 ·/ })).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
+    await page.getByRole('option', { name: linked === 'Generador' ? /^QA Generador 1 ·/ : /^QA Transporte 1 ·/ }).click();
+    await expect(page.getByLabel(linked + ' · Nombre o razón social', { exact: true })).toHaveValue(linked === 'Generador' ? 'QA Generador 1' : 'QA Transporte 1');
   }
   await page.getByLabel('Patente declarada', { exact: true }).fill('QA-EXTERNO');
   await page.getByLabel('Corriente', { exact: true }).fill('Y1');
@@ -19,6 +27,7 @@ export async function createExceptionalJourney(page: Page, prefix: string, hideK
   const saved = await response; expect(saved.status()).toBe(201);
   const record = (await saved.json()).data.registro;
   expect(record.numeroOficial).toBeNull();
+  if (linked) expect(record.datos[linked.toLowerCase()].padronId).toBeTruthy();
   await expect(page).toHaveURL(new RegExp('registro=' + record.id));
   await page.reload();
   await expect(page.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Registrado');

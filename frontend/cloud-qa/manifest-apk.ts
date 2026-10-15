@@ -245,7 +245,7 @@ try {
     node.package === 'com.android.chrome' && node.text === 'Abrir menu' && node.class === 'android.widget.Button'),
   { timeout: 15000, message: 'Return from native PDF viewer to the actual SITREP window' }).toBe(true);
   await proof('06-returned-from-pdf'); results.push('Native PDF viewer opens and returns to SITREP');
-  const exceptionalId = await createExceptionalJourney(page, '/app', hideKeyboard);
+  const exceptionalId = await createExceptionalJourney(page, '/app', hideKeyboard, 'Transportista');
   await continueExceptionalJourney(page, hideKeyboard);
   await page.getByRole('status', { name: 'Estado operativo' }).scrollIntoViewIfNeeded();
   await proof('08-exceptional-operator');

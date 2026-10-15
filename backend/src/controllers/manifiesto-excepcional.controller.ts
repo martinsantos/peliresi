@@ -1,5 +1,6 @@
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
+import { createHash } from 'crypto';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
@@ -15,10 +16,26 @@ function reviewer(req: AuthRequest) {
   return req.user.rol === 'ADMIN' && !req.user.impersonatedBy &&
     (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').includes(req.user.id);
 }
-function scope(req: AuthRequest) {
+function scope(req: AuthRequest): Prisma.RegistroManifiestoExcepcionalWhereInput {
   if (reviewer(req)) return {};
   if (req.user.rol === 'OPERADOR' && req.user.operador?.id) return { operadorId: req.user.operador.id };
+  if (req.user.rol === 'GENERADOR' && req.user.generador?.id) return { datos: { path: ['generador', 'padronId'], equals: req.user.generador.id } };
+  if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista?.id) return { datos: { path: ['transportista', 'padronId'], equals: req.user.transportista.id } };
   throw new AppError('Acceso reservado al operador y revisor designado', 403);
+}
+export async function exceptionalParticipants(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    if (req.user.rol !== 'OPERADOR' || !req.user.operador?.id) throw new AppError('Sólo el operador selecciona participantes', 403);
+    const type = req.query.tipo;
+    if (type !== 'generador' && type !== 'transportista') throw new AppError('Tipo de participante inválido', 400);
+    const search = String(req.query.q || '').trim().slice(0, 100);
+    const where = search ? { OR: [{ razonSocial: { contains: search, mode: 'insensitive' as const } }, { cuit: { contains: search } }] } : {};
+    const args = { where, select: { id: true, razonSocial: true, cuit: true, domicilio: true }, orderBy: { razonSocial: 'asc' as const }, take: 20 };
+    const records = type === 'generador' ? await prisma.generador.findMany(args) : await prisma.transportista.findMany(args);
+    res.json({ success: true, data: { participantes: records.map(r => ({
+      padronId: r.id, nombre: r.razonSocial, identificacion: r.cuit, domicilio: r.domicilio || 'Sin domicilio en padrón',
+    })) } });
+  } catch (error) { next(error); }
 }
 function present(record: { id: string; creadoPorId: string; eventos: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
   return { ...record, referencia: 'BI-' + record.id, numeroOficial: null,
@@ -50,15 +67,30 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
     if (req.user.rol !== 'OPERADOR' || !req.user.operador?.id) throw new AppError('El operador registra su propia operación', 403);
     const input = exceptionalCreateSchema.safeParse(req.body);
     if (!input.success) throw new AppError(input.error.issues[0].message, 400);
-    const datos = input.data as unknown as Prisma.InputJsonValue;
+    const huellaSolicitud = createHash('sha256').update(JSON.stringify(input.data)).digest('hex');
+    const existing = await prisma.registroManifiestoExcepcional.findUnique({ where: { id: input.data.id } });
+    if (existing) {
+      if (existing.creadoPorId !== req.user.id || existing.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || existing.huellaSolicitud !== huellaSolicitud) throw new AppError('La referencia ya se usó para otro registro', 409);
+      res.status(201).json({ success: true, data: { registro: present(existing, req) } }); return;
+    }
+    const snapshot = async (type: 'generador' | 'transportista') => {
+      const declared = input.data[type];
+      if (!declared.padronId) return declared;
+      const args = { where: { id: declared.padronId }, select: { id: true, razonSocial: true, cuit: true, domicilio: true } };
+      const actor = type === 'generador' ? await prisma.generador.findUnique(args) : await prisma.transportista.findUnique(args);
+      if (!actor) throw new AppError('El participante seleccionado no existe en el padrón', 400);
+      return { padronId: actor.id, nombre: actor.razonSocial, identificacion: actor.cuit, domicilio: actor.domicilio || 'Sin domicilio en padrón' };
+    };
+    const [generador, transportista] = await Promise.all([snapshot('generador'), snapshot('transportista')]);
+    const datos = { ...input.data, generador, transportista } as unknown as Prisma.InputJsonValue;
     // Upsert with an empty update gives retry-safe creation without changing facts.
     const record = await prisma.registroManifiestoExcepcional.upsert({
       where: { id: input.data.id }, update: {},
       create: { id: input.data.id, operadorId: req.user.operador.id, creadoPorId: req.user.id,
-        impersonadoPorId: req.user.impersonatedBy?.id || null, datos, eventos: [] },
+        impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud, datos, eventos: [] },
     });
-    // JSONB key order is not stable; compare structure, never stringify equality.
-    if (record.creadoPorId !== req.user.id || record.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || !same(record.datos, datos)) throw new AppError('La referencia ya se usó para otro registro', 409);
+    // Compare the normalized request fingerprint; the original padrón snapshot remains immutable.
+    if (record.creadoPorId !== req.user.id || record.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || record.huellaSolicitud !== huellaSolicitud) throw new AppError('La referencia ya se usó para otro registro', 409);
     res.status(201).json({ success: true, data: { registro: present(record, req) } });
   } catch (error) { next(error); }
 }

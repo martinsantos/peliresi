@@ -35,6 +35,8 @@ describe('baja intensidad: hechos separados de conformidad', () => {
     const actor = { nombre: 'QA externo', identificacion: 'Declarado QA', domicilio: 'Calle sintética 1' };
     const input = { id, generador: actor, transportista: actor, patente: 'QA001', motivo: 'Sin alta', residuos: [{ corriente: 'Y1', cantidad: 2, unidad: 'kg' }] };
     expect(exceptionalCreateSchema.safeParse(input).success).toBe(true);
+    expect(exceptionalCreateSchema.safeParse({ ...input, transportista: { ...actor, padronId: 'qa-registered' } }).success).toBe(true);
+    expect(exceptionalCreateSchema.safeParse({ ...input, generador: { ...actor, padronId: 'qa-generator' }, transportista: { ...actor, padronId: 'qa-carrier' } }).success).toBe(false);
     expect(exceptionalCreateSchema.safeParse({ ...input, numero: 'OFICIAL' }).success).toBe(false);
     expect(exceptionalCreateSchema.safeParse({ ...input, generador: { ...actor, nombre: ' ' } }).success).toBe(false);
     expect(exceptionalEventSchema.safeParse({ ...base, tipo: 'DIFERENCIA', residuos: [{ corriente: 'Y1', cantidad: -1, unidad: 'kg' }] }).success).toBe(false);

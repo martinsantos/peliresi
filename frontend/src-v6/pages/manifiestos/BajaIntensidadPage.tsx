@@ -7,9 +7,10 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
-type Participant = { nombre: string; identificacion: string; domicilio: string };
+type Participant = { nombre: string; identificacion: string; domicilio: string; padronId?: string };
 type Entry = {
   id: string; referencia: string; version: number; etapa: string; puedeRegistrar: boolean; puedeResolver: boolean;
   datos: { generador: Participant; transportista: Participant; patente: string; motivo: string; residuos: Waste[] };
@@ -23,10 +24,32 @@ const nextStages: Record<string, string> = { REGISTRADO: 'RETIRADO', RETIRADO: '
 const labels: Record<string, string> = { AVANCE: 'Movimiento registrado', DIFERENCIA: 'Diferencia registrada', SOLICITAR_REVISION: 'Revisión solicitada', RESOLVER: 'Resolución posterior' };
 
 function ParticipantFields({ title, value, onChange }: { title: string; value: Participant; onChange: (v: Participant) => void }) {
-  return <fieldset className="space-y-3 min-w-0"><legend className="font-semibold mb-2">{title} sin alta</legend>
-    <Input label={title + ' · Nombre o razón social'} required maxLength={500} value={value.nombre} onChange={e => onChange({ ...value, nombre: e.target.value })} />
-    <Input label={title + ' · Identificación declarada'} required maxLength={500} placeholder="CUIT o referencia disponible" value={value.identificacion} onChange={e => onChange({ ...value, identificacion: e.target.value })} />
-    <Input label={title + ' · Domicilio'} required maxLength={500} value={value.domicilio} onChange={e => onChange({ ...value, domicilio: e.target.value })} />
+  const { currentUser } = useAuth();
+  const [lookup, setLookup] = useState(false);
+  const [search, setSearch] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
+  const externalDraft = useRef(value);
+  const query = useQuery({ queryKey: ['baja-intensidad-participantes', currentUser?.id, title, submittedSearch], enabled: lookup,
+    queryFn: async () => (await api.get(endpoint + '/participantes', { params: { tipo: title.toLowerCase(), q: submittedSearch } })).data.data.participantes as Participant[],
+    retry: false, staleTime: 60000 });
+  const participants = query.data || [];
+  const choices = participants.some(p => p.padronId === value.padronId) || !value.padronId ? participants : [value, ...participants];
+  return <fieldset className="space-y-3 min-w-0"><legend className="font-semibold mb-2">{title} · {value.padronId ? 'Del padrón' : 'Sin alta'}</legend>
+    <Button type="button" variant="outline" size="sm" onClick={() => {
+      if (!lookup) { if (!value.padronId) externalDraft.current = value; setLookup(true); }
+      else { onChange(externalDraft.current); setLookup(false); }
+    }}>{lookup ? title + ' · Usar datos declarados' : title + ' · Buscar en padrón'}</Button>
+    {lookup && <div className="space-y-2">
+      <Input label={title + ' · Buscar por nombre o CUIT'} value={search} onChange={e => setSearch(e.target.value)} />
+      <Button type="button" variant="outline" size="sm" onClick={() => setSubmittedSearch(search)}>Buscar {title.toLowerCase()}</Button>
+      <Select label={title + ' del padrón'} value={value.padronId || ''} options={choices.map(p => ({ value: p.padronId!, label: p.nombre + ' · ' + p.identificacion }))}
+        onChange={id => { const actor = choices.find(p => p.padronId === id); if (actor) onChange(actor); }}
+        placeholder={query.isFetching ? 'Buscando…' : 'Elegir participante'} />
+      {query.isError && <p role="alert">No se pudo consultar el padrón. Conservamos los datos declarados.</p>}
+    </div>}
+    <Input label={title + ' · Nombre o razón social'} required readOnly={!!value.padronId} maxLength={500} value={value.nombre} onChange={e => onChange({ ...value, nombre: e.target.value })} />
+    <Input label={title + ' · Identificación declarada'} required readOnly={!!value.padronId} maxLength={500} placeholder="CUIT o referencia disponible" value={value.identificacion} onChange={e => onChange({ ...value, identificacion: e.target.value })} />
+    <Input label={title + ' · Domicilio'} required readOnly={!!value.padronId} maxLength={500} value={value.domicilio} onChange={e => onChange({ ...value, domicilio: e.target.value })} />
   </fieldset>;
 }
 function WasteFields({ value, onChange }: { value: Waste; onChange: (v: Waste) => void }) {
@@ -127,7 +150,7 @@ export default function BajaIntensidadPage() {
         <h3 className="font-semibold mt-4">Declaración original</h3>
         {entry.datos.residuos.map((r, i) => <p key={i}>{r.corriente} · {r.cantidad} {r.unidad}</p>)}
         <details className="mt-3 text-sm"><summary className="cursor-pointer py-2">Identidades declaradas</summary>
-          {[entry.datos.generador, entry.datos.transportista].map((p, i) => <p key={i} className="break-words">{p.nombre} · {p.identificacion} · {p.domicilio}</p>)}
+          {[entry.datos.generador, entry.datos.transportista].map((p, i) => <p key={i} className="break-words">{p.nombre} · {p.identificacion} · {p.domicilio} · {p.padronId ? 'Vinculado al padrón' : 'Sin alta'}</p>)}
           <p>{entry.datos.motivo}</p>
         </details>
       </Card>

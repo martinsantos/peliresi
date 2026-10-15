@@ -301,7 +301,7 @@ const ManifiestosPage: React.FC = () => {
         </div>
       </div>
 
-      {import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true' && ['OPERADOR', 'ADMIN'].includes(currentUser?.rol || '') && <div className="py-3">
+      {import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true' && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '') && <div className="py-3">
         <Link className="inline-flex min-h-11 items-center text-primary-700 underline font-medium" to={mp('/manifiestos/baja-intensidad')}>Baja intensidad · revisión posterior</Link>
       </div>}
       {/* Filters — sticky */}

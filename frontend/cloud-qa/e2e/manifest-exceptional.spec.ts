@@ -30,3 +30,21 @@ test('baja intensidad continues with independent post-facto review and preserved
   await expect(page.getByRole('region', { name: 'Revisión diferencia 1' })).toContainText('Observada');
   expect(errors).toEqual([]);
 });
+
+test('mixed participant keeps identity and grants only the linked actor read access', async ({ page, browser }, info) => {
+  await login(page, info, 'operador');
+  const id = await createExceptionalJourney(page, prefix(info), async () => {}, 'Transportista');
+  const context = await browser.newContext({ viewport: page.viewportSize()! });
+  try {
+    const participant = await context.newPage();
+    await login(participant, info, 'transportista');
+    await participant.goto('http://127.0.0.1:4177' + prefix(info) + '/manifiestos/baja-intensidad?registro=' + id);
+    await expect(participant.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Registrado');
+    await participant.getByText('Identidades declaradas', { exact: true }).click();
+    await expect(participant.locator('details')).toContainText('QA Transporte 1');
+    await expect(participant.locator('details')).toContainText('Vinculado al padrón');
+    await expect(participant.getByRole('button', { name: 'Registrar retirado', exact: true })).toHaveCount(0);
+    await expect(participant.getByRole('button', { name: 'Aprobar post facto', exact: true })).toHaveCount(0);
+    await participant.screenshot({ path: info.outputPath('exceptional-linked-readonly.png') });
+  } finally { await context.close(); }
+});

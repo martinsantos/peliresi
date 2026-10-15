@@ -9,12 +9,15 @@ export const wasteSchema = z.object({
 }).strict();
 const participant = z.object({
   nombre: text, identificacion: text, domicilio: text,
+  padronId: z.string().trim().min(1).max(100).optional(),
 }).strict();
 export const exceptionalCreateSchema = z.object({
   id: z.string().uuid(), generador: participant, transportista: participant,
   patente: z.string().trim().min(1).max(20), motivo: text,
   residuos: z.array(wasteSchema).min(1).max(50),
-}).strict();
+}).strict().refine(value => !value.generador.padronId || !value.transportista.padronId, {
+  message: 'Baja intensidad requiere al menos un participante sin alta',
+});
 export const exceptionalEventSchema = z.object({
   id: z.string().uuid(), version: z.number().int().nonnegative(),
   tipo: z.enum(['AVANCE', 'DIFERENCIA', 'SOLICITAR_REVISION', 'RESOLVER']),

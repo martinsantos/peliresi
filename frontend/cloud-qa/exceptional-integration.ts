@@ -37,10 +37,24 @@ try {
   await call(operator, 'POST', '', { ...data, motivo: 'Otro contenido' }, 409);
   await call(outsider, 'GET', '/' + created.id, undefined, 404);
   assert.equal((await call(outsider, 'GET')).total, 0);
-  await call(generator, 'GET', '', undefined, 403);
+  await call(generator, 'GET', '/' + created.id, undefined, 404);
   await call(sector, 'GET', '', undefined, 403);
   await call(admin, 'POST', '', { ...data, id: randomUUID() }, 403);
   await call(operator, 'POST', '', { ...data, id: randomUUID(), numeroOficial: 'FALSO' }, 400);
+  for (const type of ['generador', 'transportista'] as const) {
+    const lookup = await call(operator, 'GET', '/participantes?tipo=' + type + '&q=QA');
+    assert.ok(lookup.participantes.length <= 20);
+    const registered = lookup.participantes.find((p: { padronId: string }) => p.padronId === fixture.actors[type]);
+    assert.ok(registered);
+    const body = { ...data, id: randomUUID(), [type]: { ...registered, nombre: 'Forged caller label' } };
+    const mixed = (await call(operator, 'POST', '', body, 201)).registro;
+    assert.equal(mixed.datos[type].nombre, registered.nombre);
+    const owner = type === 'generador' ? generator : await login('transportista');
+    assert.equal((await call(owner, 'GET', '/' + mixed.id)).registro.puedeRegistrar, false);
+    const unrelated = type === 'generador' ? await login('generador2') : await login('transportista2');
+    await call(unrelated, 'GET', '/' + mixed.id, undefined, 404);
+    assert.equal((await call(operator, 'POST', '', body, 201)).registro.id, mixed.id);
+  }
   let current = created;
   const append = async (body: Record<string, unknown>, token = operator) => {
     const command = { id: randomUUID(), version: current.version, nota: 'QA evidencia de acción', ...body };
@@ -80,7 +94,8 @@ try {
   assert.equal(await db.notificacion.count(), notifications);
   await writeFile(path.join(process.env.QA_ARTIFACTS!, 'exceptional-http.json'), JSON.stringify({
     passed: true, reference: created.id, cases: ['external identity/no official number', 'idempotency and conflicting replay',
-      'ownership/reviewer/sector permissions', 'continue without approval', 'independent addendum review',
+      'ownership/reviewer/sector permissions', 'mixed participants canonical identity and restricted read access',
+      'continue without approval', 'independent addendum review',
       'post-facto observation preserves treated fact', 'concurrent version conflict', 'legacy/users/notifications unchanged'],
   }, null, 2));
 } finally { await db.$disconnect(); }
