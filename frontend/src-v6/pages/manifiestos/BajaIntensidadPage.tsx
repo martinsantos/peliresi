@@ -15,7 +15,7 @@ type Entry = {
   id: string; referencia: string; version: number; etapa: string; puedeRegistrar: boolean; puedeResolver: boolean;
   datos: { generador: Participant; transportista: Participant; patente: string; motivo: string; residuos: Waste[] };
   revisiones: { objetivo: string; estado: string; solicitada: boolean }[];
-  eventos: { id: string; tipo: string; nota: string; fecha: string; autorId: string; residuos?: Waste[]; decision?: string }[];
+  eventos: { id: string; tipo: string; nota: string; fecha: string; autorId: string; etapa?: string; residuos?: Waste[]; decision?: string }[];
 };
 const endpoint = '/manifiestos/baja-intensidad';
 const emptyActor = (): Participant => ({ nombre: '', identificacion: '', domicilio: '' });
@@ -179,7 +179,7 @@ export default function BajaIntensidadPage() {
       </div></Card>
       <Card><h2 className="font-semibold mb-3">Historial</h2><ol className="space-y-3">
         {entry.eventos.map(e => <li key={e.id} className="border-l-2 border-primary-200 pl-3 text-sm">
-          <p className="font-medium">{labels[e.tipo]}{e.decision ? ' · ' + e.decision : ''}</p><p className="break-words">{e.nota}</p>
+          <p className="font-medium">{labels[e.tipo]}{e.etapa ? ' · ' + stageLabels[e.etapa] : ''}{e.decision ? ' · ' + e.decision : ''}</p><p className="break-words">{e.nota}</p>
           {e.residuos?.map((r, i) => <p key={i}>{r.corriente} · {r.cantidad} {r.unidad}</p>)}
           <time className="text-neutral-600">{new Date(e.fecha).toLocaleString('es-AR')}</time>
         </li>)}

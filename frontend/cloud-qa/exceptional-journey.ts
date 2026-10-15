@@ -60,6 +60,7 @@ export async function continueExceptionalJourney(page: Page, hideKeyboard = asyn
   await expect(page.getByRole('region', { name: 'Revisión diferencia 1' })).toContainText('Revisión solicitada');
   await expect(page.getByText('Y1 · 10 kg', { exact: true })).toBeVisible();
   await expect(page.getByText('Y2 · 12 kg', { exact: true })).toBeVisible();
+  for (const stage of ['Retirado', 'Recibido', 'Tratado']) await expect(page.getByText('Movimiento registrado · ' + stage, { exact: true })).toBeVisible();
 }
 export async function reviewExceptionalJourney(page: Page, prefix: string, id: string, hideKeyboard = async () => {}) {
   await page.goto('http://127.0.0.1:4177' + prefix + '/manifiestos/baja-intensidad?registro=' + id);
