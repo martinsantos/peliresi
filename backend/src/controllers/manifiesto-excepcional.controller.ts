@@ -54,12 +54,11 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
     // Upsert with an empty update gives retry-safe creation without changing facts.
     const record = await prisma.registroManifiestoExcepcional.upsert({
       where: { id: input.data.id }, update: {},
-      create: { id: input.data.id, operadorId: req.user.operador.id, creadoPorId: req.user.id, datos, eventos: [] },
+      create: { id: input.data.id, operadorId: req.user.operador.id, creadoPorId: req.user.id,
+        impersonadoPorId: req.user.impersonatedBy?.id || null, datos, eventos: [] },
     });
-    if (record.creadoPorId !== req.user.id || JSON.stringify(record.datos) !== JSON.stringify(JSON.parse(JSON.stringify(datos)))) {
-      // JSONB key order is not stable; structural comparison below handles it.
-      if (record.creadoPorId !== req.user.id || !same(record.datos, datos)) throw new AppError('La referencia ya se usó para otro registro', 409);
-    }
+    // JSONB key order is not stable; compare structure, never stringify equality.
+    if (record.creadoPorId !== req.user.id || record.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || !same(record.datos, datos)) throw new AppError('La referencia ya se usó para otro registro', 409);
     res.status(201).json({ success: true, data: { registro: present(record, req) } });
   } catch (error) { next(error); }
 }
@@ -82,8 +81,8 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
       const events = current.eventos as unknown as ExceptionalEvent[];
       const repeated = events.find(e => e.id === command.id);
       if (repeated) {
-        const { autorId, fecha: _date, ...previous } = repeated;
-        if (autorId !== req.user.id || !same(previous, command)) throw new AppError('La acción ya tiene otro contenido', 409);
+        const { autorId, impersonadoPorId, fecha: _date, ...previous } = repeated;
+        if (autorId !== req.user.id || impersonadoPorId !== req.user.impersonatedBy?.id || !same(previous, command)) throw new AppError('La acción ya tiene otro contenido', 409);
         return current;
       }
       if (command.version !== current.version) throw new AppError('Otro usuario actualizó el registro; recargá antes de continuar', 409);
@@ -95,7 +94,8 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
       const updated = await tx.registroManifiestoExcepcional.updateMany({
         where: { id: current.id, version: current.version },
         data: { etapa, version: { increment: 1 }, eventos: [...events,
-          { ...command, autorId: req.user.id, fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue },
+          { ...command, autorId: req.user.id, ...(req.user.impersonatedBy ? { impersonadoPorId: req.user.impersonatedBy.id } : {}),
+            fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue },
       });
       if (updated.count !== 1) throw new AppError('El registro cambió; recargá antes de continuar', 409);
       return tx.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: current.id } });

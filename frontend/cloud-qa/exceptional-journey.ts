@@ -21,7 +21,7 @@ export async function createExceptionalJourney(page: Page, prefix: string, hideK
   expect(record.numeroOficial).toBeNull();
   await expect(page).toHaveURL(new RegExp('registro=' + record.id));
   await page.reload();
-  await expect(page.getByRole('status')).toHaveText('Operación: Registrado');
+  await expect(page.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Registrado');
   await expect(page.getByRole('region', { name: 'Revisión original' })).toContainText('Pendiente de conformidad');
   return record.id as string;
 }
@@ -43,7 +43,7 @@ export async function continueExceptionalJourney(page: Page, hideKeyboard = asyn
   await expect(page.getByRole('region', { name: 'Revisión diferencia 1' })).toContainText('Pendiente de conformidad');
   await action(page, 'Registrar recibido', hideKeyboard);
   await action(page, 'Registrar tratado', hideKeyboard);
-  await expect(page.getByRole('status')).toHaveText('Operación: Tratado');
+  await expect(page.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Tratado');
   await action(page, 'Solicitar revisión', hideKeyboard, 'Revisión original');
   await action(page, 'Solicitar revisión', hideKeyboard, 'Revisión diferencia 1');
   await page.reload();
@@ -60,6 +60,6 @@ export async function reviewExceptionalJourney(page: Page, prefix: string, id: s
   await page.reload();
   await expect(page.getByRole('region', { name: 'Revisión original' })).toContainText('Conformidad aprobada');
   await expect(page.getByRole('region', { name: 'Revisión diferencia 1' })).toContainText('Observada · requiere atención');
-  await expect(page.getByRole('status')).toHaveText('Operación: Tratado');
+  await expect(page.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Tratado');
   await expect(page.getByText('Sin número oficial', { exact: false })).toBeVisible();
 }

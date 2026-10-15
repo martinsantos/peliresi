@@ -18,15 +18,27 @@ export const exceptionalCreateSchema = z.object({
 export const exceptionalEventSchema = z.object({
   id: z.string().uuid(), version: z.number().int().nonnegative(),
   tipo: z.enum(['AVANCE', 'DIFERENCIA', 'SOLICITAR_REVISION', 'RESOLVER']),
-  nota: text,
+  nota: z.string().trim().max(500).default(''),
   etapa: z.enum(['RETIRADO', 'RECIBIDO', 'TRATADO']).optional(),
   residuos: z.array(wasteSchema).min(1).max(50).optional(),
   objetivo: z.string().uuid().optional(),
-  decision: z.enum(['APROBADA', 'OBSERVADA']).optional(),
-}).strict();
+  decision: z.enum(['APROBADA', 'OBSERVADA', 'RECHAZADA']).optional(),
+}).strict().superRefine((command, ctx) => {
+  if (command.tipo !== 'AVANCE' && !command.nota) ctx.addIssue({ code: 'custom', path: ['nota'], message: 'Indicá el motivo de la diferencia o revisión' });
+  const fields: Record<string, string[]> = {
+    AVANCE: ['etapa'], DIFERENCIA: ['residuos'],
+    SOLICITAR_REVISION: ['objetivo'], RESOLVER: ['objetivo', 'decision'],
+  };
+  for (const key of ['etapa', 'residuos', 'objetivo', 'decision'] as const) {
+    const required = fields[command.tipo].includes(key);
+    if (required !== (command[key] !== undefined)) ctx.addIssue({
+      code: 'custom', path: [key], message: required ? 'Dato requerido para esta acción' : 'Dato no permitido para esta acción',
+    });
+  }
+});
 export type ExceptionalInput = z.infer<typeof exceptionalCreateSchema>;
 export type ExceptionalCommand = z.infer<typeof exceptionalEventSchema>;
-export type ExceptionalEvent = ExceptionalCommand & { autorId: string; fecha: string };
+export type ExceptionalEvent = ExceptionalCommand & { autorId: string; impersonadoPorId?: string; fecha: string };
 export type ExceptionalStage = 'REGISTRADO' | 'RETIRADO' | 'RECIBIDO' | 'TRATADO';
 export function exceptionalPending(id: string, events: ExceptionalEvent[]) {
   return [id, ...events.filter(e => e.tipo === 'DIFERENCIA').map(e => e.id)].map(objetivo => {

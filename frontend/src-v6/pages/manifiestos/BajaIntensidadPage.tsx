@@ -43,18 +43,19 @@ export default function BajaIntensidadPage() {
   const mp = useMobilePrefix();
   const [params, setParams] = useSearchParams();
   const id = params.get('registro');
+  const listPage = Math.max(1, Math.floor(Number(params.get('pagina')) || 1));
   const enabled = import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true';
   const qc = useQueryClient();
-  const queryKey = ['baja-intensidad', currentUser?.id, id];
+  const queryKey = id ? ['baja-intensidad', currentUser?.id, id] : ['baja-intensidad', currentUser?.id, null, listPage];
   const query = useQuery({ queryKey, enabled: enabled && !!currentUser,
-    queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint)).data.data as { registro?: Entry; registros?: Entry[]; total?: number },
+    queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint + '?page=' + listPage)).data.data as { registro?: Entry; registros?: Entry[]; total?: number },
     retry: false });
   const [creating, setCreating] = useState(false);
   const [generador, setGenerador] = useState(emptyActor);
   const [transportista, setTransportista] = useState(emptyActor);
   const [patente, setPatente] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [waste, setWaste] = useState<Waste>({ corriente: '', cantidad: 0, unidad: 'kg' });
+  const [wastes, setWastes] = useState<Waste[]>([{ corriente: '', cantidad: 0, unidad: 'kg' }]);
   const [nota, setNota] = useState('');
   const [difference, setDifference] = useState(false);
   const [error, setError] = useState('');
@@ -81,6 +82,13 @@ export default function BajaIntensidadPage() {
   }
   const entry = query.data?.registro;
   const event = (body: Record<string, unknown>) => entry && send(endpoint + '/' + entry.id + '/eventos', { ...body, version: entry.version });
+  const wasteInputs = <div className="space-y-3">{wastes.map((waste, index) => <fieldset key={index} className="space-y-2">
+    <legend className="text-sm font-semibold mb-2">Residuo {index + 1}</legend>
+    <WasteFields value={waste} onChange={value => setWastes(rows => rows.map((row, i) => i === index ? value : row))} />
+    {wastes.length > 1 && <Button type="button" variant="outline" size="sm" onClick={() => setWastes(rows => rows.filter((_, i) => i !== index))}>Quitar residuo {index + 1}</Button>}
+  </fieldset>)}
+    <Button type="button" variant="outline" disabled={wastes.length >= 50} onClick={() => setWastes(rows => [...rows, { corriente: '', cantidad: 0, unidad: 'kg' }])}>Agregar residuo</Button>
+  </div>;
   if (!enabled) return <p className="p-6">Circuito no habilitado.</p>;
   return <div className="max-w-4xl mx-auto py-5 space-y-4 pb-24">
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
@@ -93,24 +101,28 @@ export default function BajaIntensidadPage() {
     {error && <div role="alert" className="p-3 bg-error-50 text-error-800 rounded-lg">{error} <Button variant="outline" size="sm" onClick={() => void query.refetch()}>Recargar registro</Button></div>}
     {query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
     {query.isLoading && <p role="status">Cargando registros…</p>}
-    {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, { generador, transportista, patente, motivo, residuos: [waste] }, true); }}>
+    {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, { generador, transportista, patente, motivo, residuos: wastes }, true); }}>
       <div className="grid sm:grid-cols-2 gap-5"><ParticipantFields title="Generador" value={generador} onChange={setGenerador} /><ParticipantFields title="Transportista" value={transportista} onChange={setTransportista} /></div>
       <Input label="Patente declarada" required maxLength={20} value={patente} onChange={e => setPatente(e.target.value)} />
-      <WasteFields value={waste} onChange={setWaste} />
+      {wasteInputs}
       <Input label="Motivo del registro excepcional" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
       <Button type="submit" disabled={busy}>Guardar operación</Button>
     </form></Card>}
     {!id && !creating && <div className="space-y-3">
-      <p className="text-sm text-neutral-600">{query.data?.total ?? '—'} registros · se muestran los 20 más recientes</p>
+      <p className="text-sm text-neutral-600">{query.data?.total ?? '—'} registros · Página {listPage}</p>
       {query.data?.registros?.map(row => <Card key={row.id}><button className="text-left w-full min-h-11 space-y-1" onClick={() => setParams({ registro: row.id })}>
         <span className="block font-semibold">{row.datos.generador.nombre}</span><span className="block text-sm">{stageLabels[row.etapa]} · {row.revisiones.filter(r => r.estado !== 'APROBADA').length} revisiones pendientes</span>
         <span className="block text-xs text-neutral-600 break-all">{row.referencia}</span>
       </button></Card>)}
+      <div className="flex flex-wrap gap-3">
+        <Button variant="outline" disabled={listPage <= 1 || query.isFetching} onClick={() => setParams({ pagina: String(listPage - 1) })}>Anterior</Button>
+        <Button variant="outline" disabled={listPage * 20 >= (query.data?.total ?? 0) || query.isFetching} onClick={() => setParams({ pagina: String(listPage + 1) })}>Siguiente</Button>
+      </div>
     </div>}
     {entry && <div className="space-y-4">
       <Card><p className="text-xs break-all text-neutral-600">{entry.referencia}</p><h2 className="font-bold text-lg mt-2">{entry.datos.generador.nombre}</h2>
         <p>{entry.datos.transportista.nombre} · {entry.datos.patente}</p>
-        <p className="font-semibold mt-3" role="status">Operación: {stageLabels[entry.etapa]}</p>
+        <p className="font-semibold mt-3" role="status" aria-label="Estado operativo">Operación: {stageLabels[entry.etapa]}</p>
         <p className="text-sm text-amber-900 mt-1">Regularización pendiente · Compatibilidad de corrientes sin verificar</p>
         <h3 className="font-semibold mt-4">Declaración original</h3>
         {entry.datos.residuos.map((r, i) => <p key={i}>{r.corriente} · {r.cantidad} {r.unidad}</p>)}
@@ -119,24 +131,25 @@ export default function BajaIntensidadPage() {
           <p>{entry.datos.motivo}</p>
         </details>
       </Card>
-      {(entry.puedeRegistrar || entry.puedeResolver) && <Input label="Nota de la acción" maxLength={500} value={nota} onChange={e => setNota(e.target.value)} />}
+      {(entry.puedeRegistrar || entry.puedeResolver) && <Input label="Nota de la acción" helperText="Opcional para movimientos; requerida para diferencias y revisiones." maxLength={500} value={nota} onChange={e => setNota(e.target.value)} />}
       {entry.puedeRegistrar && <Card><div className="flex flex-wrap gap-3">
-        {nextStages[entry.etapa] && <Button disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
+        {nextStages[entry.etapa] && <Button disabled={busy} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
         <Button variant="outline" onClick={() => setDifference(v => !v)}>{difference ? 'Cerrar diferencia' : 'Registrar diferencia'}</Button>
       </div>
-      {difference && <form className="space-y-3 mt-4" onSubmit={e => { e.preventDefault(); void event({ tipo: 'DIFERENCIA', nota, residuos: [waste] }); }}>
+      {difference && <form className="space-y-3 mt-4" onSubmit={e => { e.preventDefault(); void event({ tipo: 'DIFERENCIA', nota, residuos: wastes }); }}>
         <p className="text-sm">Carga observada completa; no se suma automáticamente al original.</p>
-        <WasteFields value={waste} onChange={setWaste} /><Button type="submit" disabled={busy || !nota.trim()}>Guardar diferencia</Button>
+        {wasteInputs}<Button type="submit" disabled={busy || !nota.trim()}>Guardar diferencia</Button>
       </form>}</Card>}
       <Card><h2 className="font-semibold mb-3">Revisión posterior</h2><div className="space-y-4">
         {entry.revisiones.map((review, i) => <section key={review.objetivo} aria-label={i === 0 ? 'Revisión original' : 'Revisión diferencia ' + i} className="border-b border-neutral-200 pb-3 last:border-0">
           <h3 className="font-medium">{i === 0 ? 'Registro original' : 'Diferencia ' + i}</h3>
-          <p className="text-sm mb-2">{review.estado === 'APROBADA' ? 'Conformidad aprobada' : review.estado === 'OBSERVADA' ? 'Observada · requiere atención' : 'Pendiente de conformidad'}{review.solicitada ? ' · Revisión solicitada' : ''}</p>
+          <p className="text-sm mb-2">{review.estado === 'APROBADA' ? 'Conformidad aprobada' : review.estado === 'OBSERVADA' ? 'Observada · requiere atención' : review.estado === 'RECHAZADA' ? 'Conformidad rechazada · hechos conservados' : 'Pendiente de conformidad'}{review.solicitada ? ' · Revisión solicitada' : ''}</p>
           <div className="flex flex-wrap gap-2">
             {entry.puedeRegistrar && <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'SOLICITAR_REVISION', objetivo: review.objetivo, nota })}>Solicitar revisión</Button>}
             {entry.puedeResolver && review.solicitada && <>
               <Button disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'APROBADA', nota })}>Aprobar post facto</Button>
               <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'OBSERVADA', nota })}>Observar</Button>
+              <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'RECHAZADA', nota })}>Rechazar conformidad</Button>
             </>}
           </div>
         </section>)}

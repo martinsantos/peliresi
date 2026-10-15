@@ -30,6 +30,7 @@ it('disabled feature never fetches or shows write controls', () => {
 it('pending conformity does not disable recording treatment, nor grant reviewer buttons', async () => {
   view(true); await screen.findByText('Operación: Recibido');
   expect(screen.getByText(/Pendiente de conformidad/)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Registrar tratado' })).toBeEnabled();
   fireEvent.change(screen.getByLabelText('Nota de la acción'), { target: { value: 'Hecho registrado con evidencia' } });
   expect(screen.getByRole('button', { name: 'Registrar tratado' })).toBeEnabled();
   expect(screen.queryByRole('button', { name: 'Aprobar post facto' })).not.toBeInTheDocument();

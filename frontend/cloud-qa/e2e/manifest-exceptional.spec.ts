@@ -9,7 +9,7 @@ test('baja intensidad continues with independent post-facto review and preserved
   await login(page, info, 'operador');
   const id = await createExceptionalJourney(page, prefix(info));
   await continueExceptionalJourney(page);
-  await page.getByRole('status').scrollIntoViewIfNeeded();
+  await page.getByRole('status', { name: 'Estado operativo' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('exceptional-operator.png') });
   await readablePageHeading(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

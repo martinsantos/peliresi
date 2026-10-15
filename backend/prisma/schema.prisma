@@ -267,6 +267,7 @@ model RegistroManifiestoExcepcional {
   id         String   @id
   operadorId String
   creadoPorId String
+  impersonadoPorId String?
   datos      Json
   eventos    Json
   etapa      String   @default("REGISTRADO")

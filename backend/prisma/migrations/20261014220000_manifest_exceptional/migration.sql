@@ -2,6 +2,7 @@ CREATE TABLE "registros_manifiesto_excepcional" (
   "id" TEXT PRIMARY KEY,
   "operadorId" TEXT NOT NULL REFERENCES "operadores"("id") ON DELETE RESTRICT,
   "creadoPorId" TEXT NOT NULL REFERENCES "usuarios"("id") ON DELETE RESTRICT,
+  "impersonadoPorId" TEXT REFERENCES "usuarios"("id") ON DELETE RESTRICT,
   "datos" JSONB NOT NULL,
   "eventos" JSONB NOT NULL,
   "etapa" TEXT NOT NULL DEFAULT 'REGISTRADO',

@@ -23,6 +23,7 @@ describe('baja intensidad: hechos separados de conformidad', () => {
   it('observación posterior conserva la operación y requiere revisión explícita', () => {
     const events = [{ ...base, tipo: 'SOLICITAR_REVISION', objetivo: id }] as ExceptionalEvent[];
     expect(advanceExceptional(id, 'TRATADO', events, { ...base, tipo: 'RESOLVER', objetivo: id, decision: 'OBSERVADA' }, true)).toBe('TRATADO');
+    expect(advanceExceptional(id, 'TRATADO', events, { ...base, tipo: 'RESOLVER', objetivo: id, decision: 'RECHAZADA' }, true)).toBe('TRATADO');
     expect(() => advanceExceptional(id, 'TRATADO', events, { ...base, tipo: 'RESOLVER', objetivo: id, decision: 'APROBADA' }, false)).toThrow();
     expect(() => advanceExceptional(id, 'TRATADO', [], { ...base, tipo: 'RESOLVER', objetivo: id, decision: 'APROBADA' }, true)).toThrow();
   });
@@ -37,5 +38,9 @@ describe('baja intensidad: hechos separados de conformidad', () => {
     expect(exceptionalCreateSchema.safeParse({ ...input, numero: 'OFICIAL' }).success).toBe(false);
     expect(exceptionalCreateSchema.safeParse({ ...input, generador: { ...actor, nombre: ' ' } }).success).toBe(false);
     expect(exceptionalEventSchema.safeParse({ ...base, tipo: 'DIFERENCIA', residuos: [{ corriente: 'Y1', cantidad: -1, unidad: 'kg' }] }).success).toBe(false);
+    expect(exceptionalEventSchema.safeParse({ ...base, tipo: 'AVANCE', etapa: 'RETIRADO', decision: 'APROBADA' }).success).toBe(false);
+    expect(exceptionalEventSchema.safeParse({ ...base, tipo: 'DIFERENCIA' }).success).toBe(false);
+    expect(exceptionalEventSchema.safeParse({ ...base, nota: '', tipo: 'AVANCE', etapa: 'RETIRADO' }).success).toBe(true);
+    expect(exceptionalEventSchema.safeParse({ ...base, nota: '', tipo: 'RESOLVER', objetivo: id, decision: 'APROBADA' }).success).toBe(false);
   });
 });

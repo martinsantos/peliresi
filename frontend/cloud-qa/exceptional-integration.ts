@@ -50,7 +50,8 @@ try {
   await append({ tipo: 'AVANCE', etapa: 'RETIRADO' });
   const difference = await append({ tipo: 'DIFERENCIA', residuos: [{ corriente: 'Y2', cantidad: 12, unidad: 'kg' }] });
   assert.deepEqual(current.datos, data); // original immutable, no duplicate total
-  await call(operator, 'POST', '/' + created.id + '/eventos', { ...difference, id: randomUUID(), tipo: 'RESOLVER', objetivo: created.id, decision: 'APROBADA', version: current.version }, 403);
+  await call(operator, 'POST', '/' + created.id + '/eventos', { id: randomUUID(), tipo: 'RESOLVER', objetivo: created.id, decision: 'APROBADA', version: current.version, nota: 'QA intento no autorizado' }, 403);
+  await call(operator, 'POST', '/' + created.id + '/eventos', { id: randomUUID(), tipo: 'AVANCE', etapa: 'RECIBIDO', decision: 'APROBADA', version: current.version, nota: 'QA conformidad falsa' }, 400);
   await append({ tipo: 'AVANCE', etapa: 'RECIBIDO' });
   await append({ tipo: 'AVANCE', etapa: 'TRATADO' });
   assert.ok(current.revisiones.every((r: { estado: string }) => r.estado === 'PENDIENTE'));
@@ -63,6 +64,8 @@ try {
   await append({ tipo: 'SOLICITAR_REVISION', objetivo: difference.id });
   await append({ tipo: 'RESOLVER', objetivo: difference.id, decision: 'OBSERVADA' }, admin);
   assert.equal(current.etapa, 'TRATADO'); assert.equal(current.revisiones[1].estado, 'OBSERVADA');
+  await append({ tipo: 'RESOLVER', objetivo: difference.id, decision: 'RECHAZADA' }, admin);
+  assert.equal(current.etapa, 'TRATADO'); assert.equal(current.revisiones[1].estado, 'RECHAZADA');
   await call(operator, 'POST', '/' + created.id + '/eventos', { ...request, id: randomUUID() }, 409);
   // Two writers with the same version: exactly one succeeds, no lost history.
   const competing = await Promise.all([1, 2].map(async n => {

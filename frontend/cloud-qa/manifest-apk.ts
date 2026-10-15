@@ -247,7 +247,7 @@ try {
   await proof('06-returned-from-pdf'); results.push('Native PDF viewer opens and returns to SITREP');
   const exceptionalId = await createExceptionalJourney(page, '/app', hideKeyboard);
   await continueExceptionalJourney(page, hideKeyboard);
-  await page.getByRole('status').scrollIntoViewIfNeeded();
+  await page.getByRole('status', { name: 'Estado operativo' }).scrollIntoViewIfNeeded();
   await proof('08-exceptional-operator');
   await logout(); await login('admin');
   await reviewExceptionalJourney(page, '/app', exceptionalId, hideKeyboard);
