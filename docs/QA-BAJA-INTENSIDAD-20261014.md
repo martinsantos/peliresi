@@ -1,4 +1,62 @@
-# Baja intensidad y conformidad posterior — candidato aislado
+# Baja intensidad, adendas y conformidad posterior — candidato aislado
+
+## Actualización 15/10 — adendas de manifiestos ordinarios
+
+**GO del corte funcional aislado: validación cerrada, sin publicar.** Candidato `85ca66a26fa6cbaef02b7cbc5f3a7cd7d869f62a`, [corrida 38714116108](https://github.com/martinsantos/peliresi/actions/runs/38714116108) SUCCESS: 15/10, 09:35:58–09:50:45 UTC (06:35–06:50 Mendoza), 14m47s. Los resultados del 14/10 más abajo corresponden al corte anterior de baja intensidad.
+
+### Qué cambia
+
+- Transporte y operador vinculados pueden registrar una diferencia después de la aprobación inicial del manifiesto. Retiro, recepción y tratamiento no esperan su revisión. El generador vinculado consulta las adendas sin modificar ni aprobar por ese solo vínculo.
+- Cada adenda conserva número y declaración originales en una instantánea canónica del servidor. La carga observada completa aparece separada: no se suma automáticamente ni reemplaza cantidades declaradas o pesos recibidos.
+- Las revisiones son independientes por adenda. Aprobar una no aprueba las demás; observar/rechazar no borra hechos ni revierte el estado operativo. La decisión, nota, autor, fecha y versión quedan en historial.
+- Rectificar crea otra adenda vinculada al antecedente. No existe edición destructiva del original.
+- Guardar solicita revisión pendiente. El revisor explícito de QA resuelve sin impersonación ni autoaprobación; se reutiliza la lista autorizada de baja intensidad. Esto no define por inferencia la matriz productiva de autoridad.
+- UUID y huella de petición reconocen reintentos exactos. Reutilizar una referencia con otro contenido devuelve conflicto; dos revisiones concurrentes no pisan el historial.
+
+### Recorrido ordinario comprobable
+
+1. Generador firma un manifiesto sintético con carga declarada.
+2. Transportista abre **Adendas y revisión posterior** desde su viaje, registra la carga observada y vuelve al manifiesto; confirma retiro y entrega con la adenda pendiente.
+3. Operador registra otra diferencia, recibe, pesa, trata y cierra operativamente con ambas revisiones pendientes.
+4. Revisor designado aprueba la primera y rechaza la conformidad de la segunda. Al recargar, ambas resoluciones y la declaración original permanecen; la operación sigue TRATADO.
+5. Generador consulta las resoluciones sin botones de modificación. El certificado vigente sigue accesible, **sin incorporar automáticamente adendas ni certificar conformidad pendiente**.
+
+La UI compartida es lazy, paginada de a 20 y sin polling nuevo. Conserva motivo y referencia de reintento ante error; invalida caché al guardar. Ayuda en encabezado, no sobre los controles, también en /app y /mobile.
+
+### Aislamiento y límites del corte
+
+`MANIFEST_ADDENDA_ENABLED` y `VITE_MANIFEST_ADDENDA_ENABLED` están apagados por defecto; sólo habilitados en la VM. Tabla nueva `adendas_manifiesto`, con vínculos restrictivos: las APIs de adendas no actualizan manifiestos, residuos, firmas, números ni eventos originales. Migración aditiva probada sólo en DB sintética; no aplicada a producción.
+
+No se incorporó un nuevo certificado, anexo PDF, aviso/correo, bandeja global de revisión, conciliación automática de cantidades ni validación legal de corrientes. La compatibilidad figura como no comprobada. Falta definir la matriz productiva de revisores y el cierre documental; registrar o tratar no implica habilitación ni conformidad completa. La variante Android es un APK debug separado con backend loopback, no una actualización del APK instalado.
+
+### Fallos encontrados y corregidos durante esta tanda
+
+- Corrida38710703619: builds y unitarias pasaron; HTTP detectó que dos altas simultáneas idénticas podían devolver409 por una carrera del upsert de Prisma. Se recupera únicamente P2002 leyendo la fila creada y verificando manifiesto, autor, impersonador y huella; no se acepta contenido diferente ni se rebajó la expectativa201. No llegó a E2E/Android.
+- Corrida38711638045: builds, unit993 backend/1442 frontend, migración, HTTP y18 E2E pasaron. Android completó tratamiento y ambas resoluciones; falló la comprobación visual porque la ayuda flotante cubría el nuevo formulario. Captura nativa FAIL-device confirma el defecto. Se incluyeron las rutas de adendas en el patrón de ayuda de encabezado, con seis casos unitarios y comprobación E2E adicional; la guarda Android se conserva. Esta corrida NO cuenta como Android aprobado.
+- Corrida38714116108: SUCCESS, con las comprobaciones originales conservadas y las nuevas guardas de ayuda en encabezado.
+
+### Resultados finales del 15/10
+
+| Comprobación | Resultado |
+|---|---|
+| Builds backend, web y app | 3 PASS |
+| Unit backend con DB desconectada | 993/993, cero fallos/omitidas |
+| Unit frontend | 1448/1448, cero fallos/omitidas; incluye seis casos nuevos de ayuda |
+| HTTP real con PostgreSQL sintético | 5 grupos de asignación/regresión, 9 de baja intensidad y 9 de adendas PASS |
+| E2E escritorio1440, web móvil360 y app390 | 18/18, cero fallos, omitidos o flaky; tres recorridos extendidos con adendas |
+| Android15, APK debug separado | Completo PASS, adendas de transporte/operador, continuidad hasta tratado, aprobación/rechazo independientes, PDF y logout |
+| Preservación histórica y migración aditiva | PASS, histórico sintético idéntico; compatibilidad de cliente anterior |
+| Aislamiento | 0 correos, 0 errores JS e intentos inseguros registrados por Android, mutaciones200/201; APK original no modificado |
+
+Revisadas capturas de escritorio, web responsive, app web y Android nativo: declaración y carga observada diferenciadas, estado operativo TRATADO separado de conformidad rechazada, ayuda única en encabezado sin cubrir el campo de resolución. Sin overflow horizontal en el recorrido. Las capturas son de viewport: los controles inferiores y el historial se consultan desplazándose. El aviso general de novedades sigue ocupando espacio en móvil y se puede cerrar; no se atribuye a este corte una auditoría visual global.
+
+Entorno: `http://127.0.0.1:4177` y `/app/`, backend3037 y PostgreSQL55440/base sintética en VM efímera. Browser plugin not available: se utilizó Playwright existente en nube, un worker. Secuencia reproducible en `.github/workflows/manifiesto-qa.yml`: builds y unit completas → `addenda-integration.ts`/regresión HTTP → Playwright → `manifest-apk.ts` con Android15 → comparación histórica y cierre. Ninguna llamada productiva ni interacción con el formulario humano.
+
+Evidencia fuera de Git: `sitrep-cloud-qa-20261002/manifiestos-v2-38714116108/` (13MB). Incluye resultados unit/HTTP/E2E, `manifest-migration.json`, `manifest-history-proof.json`, `closure.json`, `apk/result.json` y `apk/identity.json`. Capturas `manifest-e2e/*/ordinary-addenda-post-facto.png` y `apk/10-ordinary-addenda-post-facto-device.png`. Artefacto remoto con retención de tres días, copia local conservada; no se descargó el APK. Backend/server propios detenidos a09:50:40UTC; cierre de emulador/VM PASS, ninguna corrida pendiente. Muestra final de Chrome en VM PSS102040KiB/RSS215560KiB; no es medición del pico ni prueba de ausencia de fugas.
+
+APK instalado `ar.com.ultimamilla.sitrep.manifestqa`, versión interna4, debug y no distribuible. Comprueba Custom Tab loopback, no confianza TWA/TLS productiva ni actualización del APK original. No cubre teléfonos físicos, GPS/cámara/batería/celular, reinicio completo de Chrome/OS ni todos los visores PDF. Sin producción, datos reales, envíos ni instalaciones locales.
+
+## Corte anterior — baja intensidad (14/10)
 
 ## Alcance implementado
 
@@ -74,8 +132,8 @@ Evidencias conservadas fuera del repositorio en `sitrep-cloud-qa-20261002/manifi
 
 ## Límites y siguiente alcance
 
-Este corte implementa registro y revisión posterior de operaciones de baja intensidad. **No modifica el workflow ordinario ni incorpora todavía adendas post facto a manifiestos ordinarios existentes.** La variante exige al menos un participante sin alta.
+El corte del 14/10 implementó registro y revisión posterior de operaciones de baja intensidad. No incorporaba adendas ordinarias; la actualización del 15/10 se detalla al principio de este documento. La variante de baja intensidad exige al menos un participante sin alta.
 
-Quedan pendientes en el backlog V2: numeración oficial excepcional; matriz productiva de revisores y evidencia; conciliación de participantes que luego se inscriben y estadísticas de regularización; fuente de compatibilidad de corrientes; adendas del circuito ordinario; agenda/plazos; sustituciones durante viaje; documentación/certificados y avisos de estos eventos. La UI indica compatibilidad no comprobada; no bloquea el hecho ni certifica aptitud.
+Quedaban pendientes al cierre del 14/10: numeración oficial excepcional; matriz productiva de revisores y evidencia; conciliación de participantes que luego se inscriben y estadísticas de regularización; fuente de compatibilidad de corrientes; adendas del circuito ordinario (avance del 15/10 arriba); agenda/plazos; sustituciones durante viaje; documentación/certificados y avisos de estos eventos. La UI indica compatibilidad no comprobada; no bloquea el hecho ni certifica aptitud.
 
 La migración ensayada es aditiva y verifica compatibilidad del cliente Prisma anterior. No equivale a un despliegue/rollback completo ni a validación del APK original firmado, teléfonos físicos, GPS, cámara o batería.

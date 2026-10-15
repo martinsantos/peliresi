@@ -2,7 +2,7 @@
 
 Estado: definición y candidato de desarrollo. **No autorizado para producción.**
 
-Actualización: [alcance implementado de baja intensidad y QA](QA-BAJA-INTENSIDAD-20261014.md). MV2-110/111 y revisión posterior tienen un candidato provisional separado de los manifiestos ordinarios; ver resultados y límites antes de considerar estos ítems cerrados. Los estados históricos más abajo no sustituyen ese corte.
+Actualización: [alcance implementado de baja intensidad, adendas ordinarias y QA](QA-BAJA-INTENSIDAD-20261014.md). MV2-110/111 tienen candidato separado; el 15/10 se amplía MV2-401–406 con adendas post facto vinculadas al circuito ordinario, sin sobrescribirlo. QA cerrada en web/móvil/app y APK aislado (38714116108 SUCCESS); no publicada. Ver resultados y límites antes de considerar estos ítems cerrados: siguen pendientes matriz productiva de autoridad, documentos y compatibilidad. Los estados históricos más abajo no sustituyen ese corte.
 Fuente: requisitos del usuario del 14/10, respuesta de Santiago/DGFA transmitida por el usuario y revisión del código activo.
 La respuesta define requisitos de negocio; no sustituye una validación normativa ni un modelo documental aprobado.
 
@@ -17,7 +17,7 @@ La respuesta define requisitos de negocio; no sustituye una validación normativ
 - **MV2-502/503:** PDF original del operador confirmado; rectificación mediante agregado, sin reemplazo destructivo.
 - **MV2-302:** horarios configurables, recordatorios a primera hora y eventos en ventana; menos de 24 h permitido con conformidades aplicables.
 
-**Estado:** definición actualizada; no se implementaron ni probaron estas reglas nuevas en este corte. La QA anterior permanece limitada a MV2-101/102 y circuito vigente. No producción, correos, nuevas pruebas pesadas ni cambios sobre formulario humano.
+**Estado de esa actualización documental del 14/10:** no contenía implementación ni nuevas pruebas. Los cortes posteriores de baja intensidad y adendas, con su evidencia y límites, están enlazados arriba. No producción, correos ni cambios sobre formulario humano.
 
 ## Aclaraciones recibidas de DGFA — 14/10
 

@@ -4,7 +4,7 @@ Fuente: respuesta directa del usuario del 14/10/2026. Son decisiones de producto
 
 Este documento prevalece sobre las preguntas y condiciones anteriores del backlog en los puntos que resuelve. Lo no respondido permanece explícito, sin volver a consultar lo confirmado.
 
-Actualización de implementación: ver [candidato de baja intensidad y evidencia de QA](QA-BAJA-INTENSIDAD-20261014.md). Las pruebas planificadas más abajo corresponden al backlog completo; no todas están implementadas. Sin publicación.
+Actualización de implementación: ver [candidatos de baja intensidad y adendas ordinarias, con evidencia de QA](QA-BAJA-INTENSIDAD-20261014.md). El 15/10 se implementa registro y revisión independiente de adendas ordinarias; corrida38714116108 SUCCESS, incluidas web/móvil/app y Android QA aislado. La matriz productiva de autoridad y el cierre documental siguen pendientes; las pruebas planificadas más abajo corresponden al backlog completo, no todas están implementadas. Sin publicación.
 
 ## Reglas definidas
 
@@ -37,7 +37,7 @@ La UI de web, móvil, PWA y APK debe permitir continuar y mostrar un pendiente a
 
 ## Pruebas de aceptación a implementar
 
-Estas son pruebas planificadas; **no se ejecutaron ni se incorporaron al runtime en esta actualización documental**. La QA anterior sólo certifica MV2-101/102 y el circuito vigente.
+Estas son pruebas planificadas para el backlog completo; **no se ejecutaron ni se incorporaron al runtime en la actualización documental original**. Consultar la evidencia enlazada arriba para los subconjuntos implementados después; no interpretar esta lista como resultados.
 
 1. Generador externo, transportista externo y ambos: registrar/continuar sin cuenta ni aprobación ficticia; preservar identidad y pendientes; regularización sin duplicar estadísticas.
 2. Diferencia de cantidad y de corriente: continuar con adenda pendiente, solicitar resolución posterior, aprobar/rechazar conservando hechos; incompatibilidad visible y nunca marcada apta por ausencia de datos.
@@ -49,4 +49,4 @@ Estas son pruebas planificadas; **no se ejecutaron ni se incorporaron al runtime
 
 ## Siguiente corte
 
-Diseñar primero el contrato de variantes y separación operación/conformidad/regularización, con fixtures y pruebas sintéticas. Implementar lo definido sin activar numeración oficial excepcional o reglas de cierre no resueltas. La publicación sigue requiriendo autorización separada. No migrar ni reinterpretar los manifiestos actuales.
+Continuar con los pendientes del contrato operación/conformidad/regularización desde los cortes ya implementados y probados. No repetir la definición ni pruebas terminadas salvo regresión; no activar numeración oficial excepcional o reglas de cierre no resueltas. La publicación sigue requiriendo autorización separada. No migrar ni reinterpretar los manifiestos actuales.
