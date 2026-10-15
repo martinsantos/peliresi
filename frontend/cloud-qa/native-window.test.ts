@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chromeButtonPoint, chromeScrollGesture, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint, observeNativeTransition } from './native-window.ts';
+import { chromeButtonPoint, chromeScrollGesture, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint, observeNativeTransition, requireNativeWindow } from './native-window.ts';
 
 test('reads explicit OS keyboard visibility rather than inferring it from DOM focus or viewport size', () => {
   assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=true mShowRequested=true'), true);
@@ -22,6 +22,21 @@ test('transition observation never absorbs device failure, malformed XML or fail
   await assert.rejects(observeNativeTransition(() => collectNativeWindow(async () => ({
     stdout: '', stderr: 'ERROR: null root node returned by UiTestAutomationBridge.',
   })), async () => { throw new Error('diagnostic storage failed'); }), /diagnostic storage failed/);
+});
+test('native transition recovery requires a newly successful dump and remains bounded', async () => {
+  const missing = () => collectNativeWindow(async () => ({ stdout: '', stderr: 'ERROR: null root node returned by UiTestAutomationBridge.' }));
+  let calls = 0; const diagnostics: string[] = [];
+  assert.equal(await requireNativeWindow(async () => ++calls < 3 ? missing() : window(node()),
+    async message => { diagnostics.push(message); }), window(node()));
+  assert.equal(calls, 3); assert.equal(diagnostics.length, 2);
+  calls = 0;
+  await assert.rejects(requireNativeWindow(async () => { calls++; return missing(); }, async () => {}), /three fresh observations/);
+  assert.equal(calls, 3);
+});
+test('bounded native observation never retries a disconnected device', async () => {
+  let calls = 0;
+  await assert.rejects(requireNativeWindow(async () => { calls++; throw new Error('device offline'); }, async () => {}), /device offline/);
+  assert.equal(calls, 1);
 });
 test('unknown, incomplete and ambiguous keyboard dumps cannot pass as a hidden keyboard', () => {
   for (const dump of ['', 'mInputShown=unknown', 'mInputShown=true\nmInputShown=false', 'mInputShown=false\nmInputShown=false']) assert.throws(() => nativeKeyboardShown(dump));

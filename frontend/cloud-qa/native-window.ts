@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFile } from 'node:fs/promises';
+import { appendFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudEnvironment } from './safety.ts';
 
@@ -117,7 +117,23 @@ export async function collectNativeWindow(run: NativeCommand): Promise<string> {
 }
 export async function readNativeWindow(): Promise<string> {
   assertCloudEnvironment();
-  return collectNativeWindow(async (args, timeout) => execute('adb', args, { encoding: 'utf8', timeout }));
+  const deadline = Date.now() + 20000;
+  return requireNativeWindow(() => collectNativeWindow(async (args, timeout) => {
+    const remaining = deadline - Date.now();
+    assert.ok(remaining > 0, 'Fresh native window deadline expired');
+    return execute('adb', args, { encoding: 'utf8', timeout: Math.min(timeout, remaining) });
+  }), async diagnostic => {
+    await appendFile(path.join(process.env.QA_ARTIFACTS!, 'native-window-transitions.log'),
+      new Date().toISOString() + ' ' + diagnostic + '\n');
+  });
+}
+
+export async function requireNativeWindow(read: () => Promise<string>, record: (diagnostic: string) => Promise<void>): Promise<string> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const xml = await observeNativeTransition(read, message => record('Attempt ' + attempt + ': ' + message));
+    if (xml !== null) return xml;
+  }
+  throw new Error('Native window unavailable after three fresh observations; no previous XML accepted');
 }
 
 /** A transitioning Android activity may not yet expose an accessibility root.
