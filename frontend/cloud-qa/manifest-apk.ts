@@ -241,9 +241,15 @@ try {
   const bytes = await pdf.body(); assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
   await writeFile(path.join(output, 'certificate.pdf'), bytes);
   let viewerWindow = '';
-  const observeWindow = () => observeNativeTransition(readNativeWindow, async message => {
-    await appendFile(path.join(output, 'native-transitions.log'), new Date().toISOString() + ' ' + message + '\n');
-  });
+  const observeWindow = async () => {
+    const xml = await observeNativeTransition(readNativeWindow, async message => {
+      await appendFile(path.join(output, 'native-transitions.log'), new Date().toISOString() + ' ' + message + '\n');
+    });
+    // Keep the exact fresh observation used by the strict PDF assertion. A
+    // later screenshot can paint successfully after the accessibility timeout.
+    if (xml) await writeFile(path.join(output, 'native-pdf-window-latest.xml'), xml);
+    return xml;
+  };
   await expect.poll(async () => {
     const xml = await observeWindow(); if (!xml) return false;
     const nodes = nativeNodes(xml);
