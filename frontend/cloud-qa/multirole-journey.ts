@@ -19,6 +19,8 @@ export async function pendingMultiRoleJourney(page: Page, prefix: string, hideKe
   await expect(page.getByText('Tipo: GENERADOR', { exact: false })).toBeVisible();
   await page.goto(origin + prefix + '/manifiestos/baja-intensidad');
   await expect(page).toHaveURL(/\/mi-solicitud$/);
+  await expect(page.getByLabel('Solicitud por actividad', { exact: true }).locator('option')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Continuar borrador', exact: true })).toBeVisible();
 }
 export async function multiRoleJourney(page: Page, prefix: string, hideKeyboard = async () => {}) {
   const origin = 'http://127.0.0.1:4177';

@@ -345,6 +345,8 @@ try {
   await multiRoleJourney(page, '/app', hideKeyboard);
   await proof('13-multirole-incomplete-operation');
   await page.goto(origin + '/app/mi-perfil');
+  await expect(page.getByRole('button', { name: 'Operador · En uso', exact: true })).toBeDisabled();
+  await page.getByRole('heading', { name: 'Mis actividades', exact: true }).scrollIntoViewIfNeeded();
   await proof('14-approved-activities');
   results.push('Multi-role per-tab activity, additional registration draft and incomplete low-intensity record survive reload');
   await logout(); await login('multirol-pending-apk', true);
