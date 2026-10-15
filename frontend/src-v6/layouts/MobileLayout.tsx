@@ -132,7 +132,7 @@ export const MobileLayout: React.FC = () => {
   const isInspector = Boolean(currentUser?.esInspector);
   const isInspectionRoute = /\/inspecciones(?:\/|$)/.test(location.pathname);
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
-  const inlineSupport = isInspectionCase || /^\/(?:app\/)?(?:manifiestos\/[^/]+|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
+  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
   const inspectionShell = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const shell = inspectionShell.current, viewport = window.visualViewport;

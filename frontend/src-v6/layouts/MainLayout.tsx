@@ -82,7 +82,7 @@ export const MainLayout: React.FC = () => {
   }, []);
   const location = useLocation();
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
-  const inlineSupport = isInspectionCase || /^\/(?:app\/)?(?:manifiestos\/[^/]+|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
+  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();

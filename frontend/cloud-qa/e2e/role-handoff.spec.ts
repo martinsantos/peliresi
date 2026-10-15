@@ -112,6 +112,9 @@ test('separate real users hand a manifest from generator to transport to operato
       await expect(reviewer.locator('vite-error-overlay')).toHaveCount(0); await expect(reviewer).toHaveTitle(/SITREP/i);
       expect(await reviewer.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
       await reviewer.getByRole('heading', { name: /^Adendas ·/ }).scrollIntoViewIfNeeded();
+      const help = reviewer.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+      await expect(help).toHaveCount(1);
+      expect(await help.evaluate(el => Boolean(el.closest('header')))).toBe(true);
       await reviewer.screenshot({ path: info.outputPath('ordinary-addenda-post-facto.png'), animations: 'disabled' });
       expect(errors).toEqual([]); await reviewer.context().close();
       const owner = await asRole('generador');
