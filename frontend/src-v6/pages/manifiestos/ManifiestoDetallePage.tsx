@@ -429,6 +429,8 @@ const ManifiestoDetailPage: React.FC = () => {
         isCancelling={isCancelling}
       />
 
+      {import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED === 'true' && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
+
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main info */}

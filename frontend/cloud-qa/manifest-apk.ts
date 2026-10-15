@@ -12,6 +12,7 @@ import { dismissObservedChromePrompts, nativeKeyboardShown, nativeNodes, readNat
 import { readablePageHeading } from './e2e/helpers.ts';
 import { assertIsolatedApkSignature } from './apk-signature.ts';
 import { createExceptionalJourney, continueExceptionalJourney, reviewExceptionalJourney } from './exceptional-journey.ts';
+import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from './addenda-journey.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -203,11 +204,13 @@ try {
   await expect(page.getByLabel('Transporte asignado').getByText('QA002ZZ', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Transporte asignado').getByText('QA Segundo', { exact: true })).toBeVisible();
   await proof('05-carrier-assignment');
+  const carrierAdenda = await recordOrdinaryAddendum(page, hideKeyboard);
   await mutate('Confirmar retiro', 'confirmar-retiro');
   await page.getByRole('button', { name: 'Confirmar entrega', exact: true }).tap();
   await mutate('Sí, Confirmar Entrega', 'confirmar-entrega');
   await logout(); await login('operador');
   await page.goto(origin + '/app/manifiestos/' + manifestId);
+  const operatorAdenda = await recordOrdinaryAddendum(page, hideKeyboard);
   await mutate('Confirmar Recepcion', 'confirmar-recepcion');
   await page.getByRole('button', { name: 'Registrar Tratamiento', exact: true }).tap();
   await mutate('Confirmar Tratamiento', 'tratamiento');
@@ -269,6 +272,13 @@ try {
   await page.getByRole('heading', { name: 'Revisión posterior', exact: true }).scrollIntoViewIfNeeded();
   await proof('09-exceptional-post-facto');
   results.push('Baja intensidad: external identities, independent post-facto approval/observation, treated facts preserved');
+  await page.goto(origin + '/app/manifiestos/' + manifestId + '/adendas');
+  await resolveOrdinaryAddendum(page, carrierAdenda, 'Aprobar post facto', hideKeyboard);
+  await expect(page.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true })).toContainText('Pendiente de revisión');
+  await resolveOrdinaryAddendum(page, operatorAdenda, 'Rechazar conformidad', hideKeyboard);
+  await page.getByRole('heading', { name: /^Adendas ·/ }).scrollIntoViewIfNeeded();
+  await proof('10-ordinary-addenda-post-facto');
+  results.push('Ordinary addenda: carrier/operator observations do not block lifecycle; independent approval/rejection preserves treated manifest and declaration');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');

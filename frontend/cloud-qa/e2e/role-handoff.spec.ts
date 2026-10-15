@@ -1,5 +1,6 @@
 import { devices, expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { login, prefix } from './helpers';
+import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from '../addenda-journey';
 
 test('separate real users hand a manifest from generator to transport to operator', async ({ page, browser }, info) => {
   test.setTimeout(120_000);
@@ -72,6 +73,7 @@ test('separate real users hand a manifest from generator to transport to operato
       await expect(carrier.getByLabel('Transporte asignado').getByText('QA Segundo', { exact: true })).toBeVisible();
     }
     await expect(carrier.locator('body')).toContainText('35 kg · 12,5 lt');
+    const carrierAdenda = process.env.MANIFEST_ADDENDA_ENABLED === 'true' ? await recordOrdinaryAddendum(carrier) : undefined;
     await mutate(carrier, id, 'Confirmar retiro', 'confirmar-retiro');
     await carrier.getByRole('button', { name: 'Confirmar entrega', exact: true }).click();
     await mutate(carrier, id, 'Sí, Confirmar Entrega', 'confirmar-entrega');
@@ -80,6 +82,7 @@ test('separate real users hand a manifest from generator to transport to operato
 
     const operator = await asRole('operador');
     await operator.goto(`${prefix(info)}/manifiestos/${id}`);
+    const operatorAdenda = process.env.MANIFEST_ADDENDA_ENABLED === 'true' ? await recordOrdinaryAddendum(operator) : undefined;
     await mutate(operator, id, 'Confirmar Recepcion', 'confirmar-recepcion');
     await operator.getByRole('button', { name: 'Registrar Pesaje', exact: true }).click();
     await operator.getByPlaceholder('Peso real').first().fill('34.5');
@@ -92,6 +95,33 @@ test('separate real users hand a manifest from generator to transport to operato
     await expect(operator.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
     await expect(operator.getByRole('button', { name: 'Firmar Manifiesto', exact: true })).toHaveCount(0);
     await operator.screenshot({ path: info.outputPath('operator-completed.png'), animations: 'disabled' });
+    if (carrierAdenda && operatorAdenda) {
+      await operator.getByRole('link', { name: 'Adendas y revisión posterior', exact: true }).click();
+      await expect(operator.getByRole('status', { name: 'Estado de revisión' })).toHaveCount(2);
+      await expect(operator.getByRole('status', { name: 'Estado de revisión' }).first()).toHaveText('Pendiente de revisión');
+      await operator.context().close();
+      const reviewer = await asRole('admin'); const errors: string[] = [];
+      reviewer.on('pageerror', e => errors.push(e.message));
+      reviewer.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+      await reviewer.goto(`${prefix(info)}/manifiestos/${id}/adendas`);
+      await resolveOrdinaryAddendum(reviewer, carrierAdenda, 'Aprobar post facto');
+      await expect(reviewer.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true })).toContainText('Pendiente de revisión');
+      await resolveOrdinaryAddendum(reviewer, operatorAdenda, 'Rechazar conformidad');
+      await expect(reviewer.getByText('Y1 · 35 kg', { exact: true }).first()).toBeVisible();
+      await expect(reviewer.getByText('Y2 · 12.5 lt', { exact: true }).first()).toBeVisible();
+      await expect(reviewer.locator('vite-error-overlay')).toHaveCount(0); await expect(reviewer).toHaveTitle(/SITREP/i);
+      expect(await reviewer.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      await reviewer.getByRole('heading', { name: /^Adendas ·/ }).scrollIntoViewIfNeeded();
+      await reviewer.screenshot({ path: info.outputPath('ordinary-addenda-post-facto.png'), animations: 'disabled' });
+      expect(errors).toEqual([]); await reviewer.context().close();
+      const owner = await asRole('generador');
+      await owner.goto(`${prefix(info)}/manifiestos/${id}/adendas`);
+      await expect(owner.getByText('Conformidad rechazada', { exact: true })).toBeVisible();
+      await expect(owner.getByRole('button', { name: 'Registrar diferencia' })).toHaveCount(0);
+      await expect(owner.getByRole('button', { name: 'Aprobar post facto' })).toHaveCount(0);
+      await owner.getByRole('link', { name: 'Volver al manifiesto' }).click();
+      await expect(owner.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
+    }
   } finally {
     for (const context of contexts) await context.close();
   }

@@ -280,6 +280,26 @@ model RegistroManifiestoExcepcional {
   @@map("registros_manifiesto_excepcional")
 }
 
+// Additive observations/reviews only: original manifest and its signatures remain untouched.
+model AdendaManifiesto {
+  id String @id
+  manifiestoId String
+  creadoPorId String
+  impersonadoPorId String?
+  huellaSolicitud String
+  declaracion Json
+  residuos Json
+  motivo String
+  rectificaId String?
+  revisiones Json
+  version Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([manifiestoId, createdAt])
+  @@map("adendas_manifiesto")
+}
+
 model Manifiesto {
   id                      String           @id @default(cuid())
   numero                  String           @unique

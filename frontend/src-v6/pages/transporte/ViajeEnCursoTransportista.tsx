@@ -13,7 +13,8 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import {
   ArrowLeft, Truck, MapPin, Clock, Package,
   CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
@@ -61,6 +62,7 @@ function RecenterMap({ position, onUserInteract, followUser }: {
 const ViajeEnCursoTransportista: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const { currentUser } = useAuth();
   // Map recenter control
   const [followUser, setFollowUser] = useState(true);
@@ -397,6 +399,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
       </header>
 
       <div className="p-4 space-y-4">
+        {import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED === 'true' && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
         {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>

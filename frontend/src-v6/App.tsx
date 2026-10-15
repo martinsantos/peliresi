@@ -32,7 +32,7 @@ import {
   InspeccionesPage, InspeccionDetallePage,
   VerificarInspeccionPage,
   InspeccionadoParticipacionPage,
-  ManifiestosPage, BajaIntensidadPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  ManifiestosPage, BajaIntensidadPage, AdendasManifiestoPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, ConfiguracionPage,
@@ -104,6 +104,7 @@ function App() {
             <Route path="/mobile/centro-control/viaje/:id" element={<ViajeRedirect />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
             <Route path="/mobile/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
+            <Route path="/mobile/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} />
             <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
@@ -234,6 +235,7 @@ function App() {
             {/* Manifiestos */}
             <Route path="/manifiestos" element={<ManifiestosPage />} />
             <Route path="/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
+            <Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />

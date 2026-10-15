@@ -20,6 +20,7 @@ try {
   const field = /^[ \t]*asignacionTransporte[ \t]+Json\?[ \t]*\r?\n/m;
   assert.ok(field.test(schema));
   const legacySchema = schema.replace(field, '').replace(/model RegistroManifiestoExcepcional \{[\s\S]*?\n\}/, '')
+    .replace(/model AdendaManifiesto \{[\s\S]*?\n\}/, '')
     .replace('generator client {', `generator client {\n  output = "${work}/client"`);
   const schemaPath = path.join(work, 'schema.prisma');
   await writeFile(schemaPath, legacySchema);
@@ -42,6 +43,9 @@ try {
   const exceptionalMigration = await readFile(path.join(root, 'backend/prisma/migrations/20261014220000_manifest_exceptional/migration.sql'), 'utf8');
   for (const statement of exceptionalMigration.split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement);
   assert.equal(await db.registroManifiestoExcepcional.count(), 0);
+  const addendumMigration = await readFile(path.join(root, 'backend/prisma/migrations/20261015010000_manifest_addenda/migration.sql'), 'utf8');
+  for (const statement of addendumMigration.split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement);
+  assert.equal(await db.adendaManifiesto.count(), 0);
   const after = await db.manifiesto.findUniqueOrThrow({ where: { id: data.id }, include: { residuos: true, eventos: true } });
   const { asignacionTransporte, ...historical } = after;
   assert.equal(asignacionTransporte, null);
