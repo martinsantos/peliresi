@@ -4,6 +4,8 @@ Fuente: respuesta directa del usuario del 14/10/2026. Son decisiones de producto
 
 Este documento prevalece sobre las preguntas y condiciones anteriores del backlog en los puntos que resuelve. Lo no respondido permanece explícito, sin volver a consultar lo confirmado.
 
+Actualización de implementación: ver [candidato de baja intensidad y evidencia de QA](QA-BAJA-INTENSIDAD-20261014.md). Las pruebas planificadas más abajo corresponden al backlog completo; no todas están implementadas. Sin publicación.
+
 ## Reglas definidas
 
 1. **Variantes y baja intensidad (D01/D11).** El sistema contempla variantes por modalidad y participantes. Debe permitir operar sin la aprobación de un generador no inscripto, bajo la denominación solicitada «Manifiesto de baja intensidad», para registrar una actividad que de otro modo quedaría fuera del sistema. También contempla transportista sin alta y el recorrido de participantes externos. No crear cuentas, firmas ni aprobaciones ficticias. Baja intensidad describe el circuito de registro, no una clasificación de peligrosidad, volumen o habilitación ambiental.

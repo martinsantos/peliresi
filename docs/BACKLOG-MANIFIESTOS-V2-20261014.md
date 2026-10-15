@@ -1,6 +1,8 @@
 # Manifiestos V2 — backlog de la reunión del 14/10/2026
 
 Estado: definición y candidato de desarrollo. **No autorizado para producción.**
+
+Actualización: [alcance implementado de baja intensidad y QA](QA-BAJA-INTENSIDAD-20261014.md). MV2-110/111 y revisión posterior tienen un candidato provisional separado de los manifiestos ordinarios; ver resultados y límites antes de considerar estos ítems cerrados. Los estados históricos más abajo no sustituyen ese corte.
 Fuente: requisitos del usuario del 14/10, respuesta de Santiago/DGFA transmitida por el usuario y revisión del código activo.
 La respuesta define requisitos de negocio; no sustituye una validación normativa ni un modelo documental aprobado.
 
