@@ -111,6 +111,7 @@ async function keyboard(shown: boolean, name: string) {
 }
 async function hideKeyboard() {
   if (nativeKeyboardShown(adb('shell', 'dumpsys', 'input_method'))) adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+  await expect.poll(() => nativeKeyboardShown(adb('shell', 'dumpsys', 'input_method')), { timeout: 10000 }).toBe(false);
 }
 const seenRoles = new Set<string>();
 async function login(role: string) {
@@ -245,7 +246,7 @@ try {
     node.package === 'com.android.chrome' && node.text === 'Abrir menu' && node.class === 'android.widget.Button'),
   { timeout: 15000, message: 'Return from native PDF viewer to the actual SITREP window' }).toBe(true);
   await proof('06-returned-from-pdf'); results.push('Native PDF viewer opens and returns to SITREP');
-  const exceptionalId = await createExceptionalJourney(page, '/app', hideKeyboard, 'Transportista');
+  const exceptionalId = await createExceptionalJourney(page, '/app', hideKeyboard, 'Transportista', () => keyboard(false, '08-participant-no-auto-keyboard'));
   await continueExceptionalJourney(page, hideKeyboard);
   await page.getByRole('status', { name: 'Estado operativo' }).scrollIntoViewIfNeeded();
   await proof('08-exceptional-operator');
