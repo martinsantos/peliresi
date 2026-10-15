@@ -1,5 +1,39 @@
 # Manifiestos V2 — preguntas reunidas para DGFA
 
+## Mensaje vigente para Santiago — 15/10
+
+Texto para copiar; no enviado. Sólo precisiones pendientes:
+
+Santiago, para cerrar los detalles de SITREP nos falta definir:
+
+1. ¿Quién revisa diferencias y baja intensidad, quién puede derivar o reemplazar al revisor y en qué plazo? ¿Qué hacemos documentalmente ante silencio o rechazo? En empresas multirol, ¿quién representa cada aprobación y qué cambios exigen renovarla?
+2. Para participantes sin alta, ¿qué datos/evidencia mínimos pedimos y quién queda a cargo de su regularización?
+3. En baja intensidad, ¿cuándo corresponde número oficial, de qué rango/titular y qué hacemos si se agota?
+4. Los 30 días: ¿desde que se acuerda el retiro o desde la fecha pactada, y con qué corte horario? Los seis meses: ¿calendario? ¿Cómo cuentan recepciones parciales, prórrogas e in situ?
+5. ¿Qué fuente usamos para comprobar corrientes y capacidad de generador/transporte/operador? ¿Cuándo debe estar asignado el chofer? ¿“Varios transportes” incluye repartir una carga simultáneamente?
+6. ¿Qué datos y firma deben acompañar los PDF del operador? ¿Se admiten certificados parciales y qué permite cerrar documentalmente si quedan adendas pendientes/rechazadas? ¿Hay exigencia de archivo de cada PDF emitido?
+7. Para avisos, ¿qué destinatarios, canales y horarios iniciales usamos, y quién puede configurarlos?
+
+No necesitamos volver a definir continuidad sin bloquear, post facto, sustituciones, rectificaciones ni quién emite los certificados: eso ya está incorporado.
+
+### Trazabilidad de la consulta
+
+| Punto | Decisiones pendientes |
+|---|---|
+| 1 | D01/D02/D06/D12; R1–R4 |
+| 2 | D11; R3 |
+| 3 | D03 |
+| 4 | D05/D07 |
+| 5 | D10/D13; R6 |
+| 6 | D08/D12; R4/R5 |
+| 7 | D09 |
+
+Los criterios vigentes están en [decisiones](DECISIONES-MANIFIESTOS-V2-20261014.md) y la lista detallada de revisores en [R1–R6](ADENDAS-CIERRE-DOCUMENTAL-20261015.md). No se amplían bloqueos de operación mientras se esperan respuestas. Cada respuesta se registrará con responsable/fecha y la prueba afectada; lo no respondido sigue pendiente, no aceptado por omisión.
+
+## Archivo de la consulta inicial — NO reenviar ni implementar como regla vigente
+
+Se conserva íntegro lo preguntado antes de recibir respuestas. Los «pendiente» y las hipótesis de autorización previa/revalidación de esta sección son históricos; no sustituyen el mensaje vigente ni las decisiones del usuario.
+
 > **Actualización 14/10, posterior a la consulta:** el usuario respondió los siete grupos. Ver [decisiones vigentes y precisiones residuales](DECISIONES-MANIFIESTOS-V2-20261014.md). El cuestionario siguiente queda como historial de lo preguntado, no como lista actual de bloqueantes. No volver a preguntar si se permite baja intensidad, continuidad post facto, sustitución, reprogramar con autorización, PDF original o rectificación aditiva: ya fueron definidos. Tampoco revalidar vencidos: requieren otro manifiesto.
 
 Para revisar con Santiago/DGFA. **Documento de decisión, no reglas activadas ni consulta enviada.**
