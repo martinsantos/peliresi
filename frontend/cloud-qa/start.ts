@@ -7,6 +7,11 @@ import { assertCloudDatabase, root } from './safety.ts';
 await assertCloudDatabase();
 const output=process.env.QA_ARTIFACTS!;
 await mkdir(output,{recursive:true});
+if (process.env.MANIFEST_EXCEPTIONAL_ENABLED === 'true') {
+  const fixture = JSON.parse(await readFile(path.join(output, 'fixture.json'), 'utf8'));
+  // Authority assignment exists only in this isolated QA process environment.
+  process.env.MANIFEST_EXCEPTIONAL_REVIEWERS = fixture.users.admin;
+}
 const processes=['runtime.ts','server.ts'].map(file=>{
   const log=openSync(path.join(output,file+'.log'),'a');
   const child=spawn(process.execPath,['--experimental-strip-types',path.join(root,'frontend/cloud-qa',file)],{

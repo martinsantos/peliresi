@@ -262,6 +262,22 @@ model TipoResiduo {
   @@map("tipos_residuos")
 }
 
+// Provisional V2 ledger: never consumes official ranges or mutates legacy manifests.
+model RegistroManifiestoExcepcional {
+  id         String   @id
+  operadorId String
+  creadoPorId String
+  datos      Json
+  eventos    Json
+  etapa      String   @default("REGISTRADO")
+  version    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([operadorId, createdAt])
+  @@map("registros_manifiesto_excepcional")
+}
+
 model Manifiesto {
   id                      String           @id @default(cuid())
   numero                  String           @unique

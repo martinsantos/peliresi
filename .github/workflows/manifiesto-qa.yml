@@ -36,6 +36,8 @@ jobs:
       FRONTEND_URL: http://127.0.0.1:4177
       CORS_ORIGIN: http://127.0.0.1:4177
       VITE_API_URL: /api
+      MANIFEST_EXCEPTIONAL_ENABLED: 'true'
+      VITE_MANIFEST_EXCEPTIONAL_ENABLED: 'true'
       QA_ARTIFACTS: /tmp/sitrep-manifest-v2
       UPLOADS_DIR: /tmp/sitrep-manifest-v2/uploads
       QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
@@ -94,7 +96,9 @@ jobs:
           node --experimental-strip-types frontend/cloud-qa/manifest-fixture.ts
           node --experimental-strip-types frontend/cloud-qa/start.ts
       - name: Real authenticated HTTP, assignment, history and PDF
-        run: node --experimental-strip-types frontend/cloud-qa/manifest-integration.ts
+        run: |
+          node --experimental-strip-types frontend/cloud-qa/manifest-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/exceptional-integration.ts
       - name: Web, responsive mobile and app journeys with actual backend
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/manifest.playwright.config.ts

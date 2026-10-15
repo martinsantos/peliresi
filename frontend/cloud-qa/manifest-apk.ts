@@ -11,6 +11,7 @@ import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packa
 import { dismissObservedChromePrompts, nativeKeyboardShown, nativeNodes, readNativeWindow } from './native-window.ts';
 import { readablePageHeading } from './e2e/helpers.ts';
 import { assertIsolatedApkSignature } from './apk-signature.ts';
+import { createExceptionalJourney, continueExceptionalJourney, reviewExceptionalJourney } from './exceptional-journey.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -111,6 +112,7 @@ async function keyboard(shown: boolean, name: string) {
 async function hideKeyboard() {
   if (nativeKeyboardShown(adb('shell', 'dumpsys', 'input_method'))) adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
 }
+const seenRoles = new Set<string>();
 async function login(role: string) {
   await page.getByLabel('Correo electrónico o CUIT').fill(role + '@night-qa.invalid');
   await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
@@ -121,8 +123,11 @@ async function login(role: string) {
   await expect(page).not.toHaveURL(/\/login$/);
   await dismissObservedChromePrompts(output);
   const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
-  await expect(welcome).toBeVisible(); await welcome.tap();
-  await expect(welcome).toHaveCount(0);
+  if (!seenRoles.has(role)) {
+    await expect(welcome).toBeVisible(); await welcome.tap();
+    await expect(welcome).toHaveCount(0);
+    seenRoles.add(role);
+  }
 }
 async function logout() {
   await hideKeyboard();
@@ -240,6 +245,15 @@ try {
     node.package === 'com.android.chrome' && node.text === 'Abrir menu' && node.class === 'android.widget.Button'),
   { timeout: 15000, message: 'Return from native PDF viewer to the actual SITREP window' }).toBe(true);
   await proof('06-returned-from-pdf'); results.push('Native PDF viewer opens and returns to SITREP');
+  const exceptionalId = await createExceptionalJourney(page, '/app', hideKeyboard);
+  await continueExceptionalJourney(page, hideKeyboard);
+  await page.getByRole('status').scrollIntoViewIfNeeded();
+  await proof('08-exceptional-operator');
+  await logout(); await login('admin');
+  await reviewExceptionalJourney(page, '/app', exceptionalId, hideKeyboard);
+  await page.getByRole('heading', { name: 'Revisión posterior', exact: true }).scrollIntoViewIfNeeded();
+  await proof('09-exceptional-post-facto');
+  results.push('Baja intensidad: external identities, independent post-facto approval/observation, treated facts preserved');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');
@@ -251,7 +265,7 @@ try {
     limitations: ['Separate debug APK, not an installable update over the production APK',
       'Loopback HTTP Custom Tab fallback, no forged TWA trust or TLS certification',
       'No physical camera, GPS, battery or cellular test', 'One bundled Android PDF viewer tested, not every third-party viewer',
-      'Current lifecycle plus MV2-101/102, not the unimplemented approval/addendum V2 workflow',
+      'Current lifecycle, MV2-101/102 and provisional baja intensidad; no official exceptional numbering or legal certification',
       'SITREP process reopened; full Chrome/OS restart is separate'] }, null, 2));
 } catch (error) {
   await device.screenshot({ path: path.join(output, 'FAIL-device.png') }).catch(() => {});

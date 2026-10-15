@@ -29,6 +29,7 @@ export const VerificarInspeccionPage = lazy(() => import('../pages/inspecciones/
 
 // Manifiestos
 export const ManifiestosPage = lazy(() => import('../pages/manifiestos/ManifiestosPage'));
+export const BajaIntensidadPage = lazy(() => import('../pages/manifiestos/BajaIntensidadPage'));
 export const ManifiestoDetallePage = lazy(() => import('../pages/manifiestos/ManifiestoDetallePage'));
 export const NuevoManifiestoPage = lazy(() => import('../pages/manifiestos/NuevoManifiestoPage'));
 export const EditarManifiestoPage = lazy(() => import('../pages/manifiestos/EditarManifiestoPage'));

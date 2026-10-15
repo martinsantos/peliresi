@@ -4,6 +4,19 @@ Estado: definición y candidato de desarrollo. **No autorizado para producción.
 Fuente: requisitos del usuario del 14/10, respuesta de Santiago/DGFA transmitida por el usuario y revisión del código activo.
 La respuesta define requisitos de negocio; no sustituye una validación normativa ni un modelo documental aprobado.
 
+## Actualización vigente — respuestas del usuario a los siete grupos
+
+[Decisiones, pendientes residuales y pruebas de aceptación](DECISIONES-MANIFIESTOS-V2-20261014.md). Esta actualización prevalece sobre las condiciones anteriores de las etapas y tabla D01–D13 cuando difieran; no modifica la evidencia histórica de QA.
+
+- **MV2-110/111/202:** variante «Manifiesto de baja intensidad», sin exigir aprobación de generador no inscripto; participantes externos explícitos, no cuentas/firmas ficticias. Falta precisar numeración oficial excepcional, no la posibilidad de registrar y continuar.
+- **MV2-401–406:** continuar con diferencias y aprobación post facto o solicitud a autoridad; se sustituye la condición anterior de autorización PREVIA para continuar. Corrientes incompatibles/desconocidas quedan visibles para revisión, sin borrar hechos ni presentarlas como habilitadas. Continuidad operativa no equivale a conformidad documental.
+- **MV2-303:** reprogramación sustentada en eventos validados modifica plazo. Vencido NO se revalida: se crea otro vinculado. Eliminar revalidación de escenarios futuros, conservar los históricos de QA.
+- **MV2-103/D10:** al elegir transporte debe tener al menos un móvil; orientar elección por carga/Y y compatibilidad. Permitir sustitución con historial y aviso sin frenar circuito. La asignación opcional del candidato probado es una etapa previa, no implementación completa de esta nueva regla.
+- **MV2-502/503:** PDF original del operador confirmado; rectificación mediante agregado, sin reemplazo destructivo.
+- **MV2-302:** horarios configurables, recordatorios a primera hora y eventos en ventana; menos de 24 h permitido con conformidades aplicables.
+
+**Estado:** definición actualizada; no se implementaron ni probaron estas reglas nuevas en este corte. La QA anterior permanece limitada a MV2-101/102 y circuito vigente. No producción, correos, nuevas pruebas pesadas ni cambios sobre formulario humano.
+
 ## Aclaraciones recibidas de DGFA — 14/10
 
 Estas respuestas sustituyen las hipótesis anteriores sobre plazos y emisor del certificado final:

@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 import ManifiestosPage from '../../pages/manifiestos/ManifiestosPage';
 const mock=vi.hoisted(()=>({query:vi.fn(),refetch:vi.fn()}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa-user',rol:'ADMIN'}})}));
 vi.mock('../../hooks/useManifiestos',()=>({useManifiestos:mock.query}));
 vi.mock('../../hooks/useMobilePrefix',()=>({useMobilePrefix:()=>((p:string)=>p)}));
 vi.mock('../../hooks/useGeneradores',()=>({useGeneradores:()=>({data:{items:[]}})}));

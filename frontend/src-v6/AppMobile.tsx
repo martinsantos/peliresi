@@ -20,7 +20,7 @@ import {
   MobileDashboardPage, CentroControlPage, WarRoomPage,
   InspeccionesPage, InspeccionDetallePage,
   InspeccionadoParticipacionPage,
-  ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  ManifiestosPage, BajaIntensidadPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   VerificarInspeccionPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
@@ -137,6 +137,7 @@ function AppMobile() {
             <Route path="/centro-control" element={<CentroControlPage />} />
             <Route path="/centro-control/viaje/:id" element={<ViajeRedirectMobile />} />
             <Route path="/manifiestos" element={<ManifiestosPage />} />
+            <Route path="/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />

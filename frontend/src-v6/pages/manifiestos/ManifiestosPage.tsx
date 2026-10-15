@@ -19,6 +19,7 @@ import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useAuth } from '../../contexts/AuthContext';
 import { useGeneradores } from '../../hooks/useGeneradores';
 import { useOperadores } from '../../hooks/useOperadores';
 import { manifiestoService } from '../../services/manifiesto.service';
@@ -110,6 +111,7 @@ function mapRow(m: any): MRow {
 const ManifiestosPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
+  const { currentUser } = useAuth();
   const [searchParams] = useSearchParams();
 
   // Filters
@@ -299,6 +301,9 @@ const ManifiestosPage: React.FC = () => {
         </div>
       </div>
 
+      {import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true' && ['OPERADOR', 'ADMIN'].includes(currentUser?.rol || '') && <div className="py-3">
+        <Link className="inline-flex min-h-11 items-center text-primary-700 underline font-medium" to={mp('/manifiestos/baja-intensidad')}>Baja intensidad · revisión posterior</Link>
+      </div>}
       {/* Filters — sticky */}
       <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-2">
         <Card padding="base">

@@ -28,6 +28,7 @@ import {
 } from '../controllers/manifiesto.controller';
 
 const router = Router();
+import { exceptionalEnabled, listExceptional, getExceptional, createExceptional, eventExceptional } from '../controllers/manifiesto-excepcional.controller';
 
 /**
  * @openapi
@@ -66,6 +67,11 @@ router.get('/verificar/:numero', verificarManifiesto);
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+
+router.get('/baja-intensidad', exceptionalEnabled, listExceptional);
+router.post('/baja-intensidad', exceptionalEnabled, createExceptional);
+router.get('/baja-intensidad/:id', exceptionalEnabled, getExceptional);
+router.post('/baja-intensidad/:id/eventos', exceptionalEnabled, eventExceptional);
 
 /**
  * @openapi

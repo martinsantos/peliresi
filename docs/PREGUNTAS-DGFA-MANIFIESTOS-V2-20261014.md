@@ -1,5 +1,7 @@
 # Manifiestos V2 — preguntas reunidas para DGFA
 
+> **Actualización 14/10, posterior a la consulta:** el usuario respondió los siete grupos. Ver [decisiones vigentes y precisiones residuales](DECISIONES-MANIFIESTOS-V2-20261014.md). El cuestionario siguiente queda como historial de lo preguntado, no como lista actual de bloqueantes. No volver a preguntar si se permite baja intensidad, continuidad post facto, sustitución, reprogramar con autorización, PDF original o rectificación aditiva: ya fueron definidos. Tampoco revalidar vencidos: requieren otro manifiesto.
+
 Para revisar con Santiago/DGFA. **Documento de decisión, no reglas activadas ni consulta enviada.**
 Referencia: [backlog por etapas y pruebas](BACKLOG-MANIFIESTOS-V2-20261014.md).
 
