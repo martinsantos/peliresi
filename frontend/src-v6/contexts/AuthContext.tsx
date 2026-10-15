@@ -82,6 +82,7 @@ export const DEMO_CREDENTIALS: Record<number, { email: string; password: string;
 
 /** Convert a real API Usuario to the local User shape used throughout the app */
 function apiUserToUser(u: Usuario): User {
+  const activeActor = u.rol === 'GENERADOR' ? u.generador : u.rol === 'TRANSPORTISTA' ? u.transportista : u.rol === 'OPERADOR' ? u.operador : null;
   const initials = u.nombre
     ? u.nombre.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : u.email.slice(0, 2).toUpperCase();
@@ -102,7 +103,7 @@ function apiUserToUser(u: Usuario): User {
     email: u.email,
     rol: u.rol as UserRole,
     actividades: u.actividades,
-    sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
+    sector: activeActor?.razonSocial || u.empresa || '',
     actorId: u.rol === 'GENERADOR' ? u.generador?.id : u.rol === 'TRANSPORTISTA' ? u.transportista?.id : u.rol === 'OPERADOR' ? u.operador?.id : undefined,
     avatar: initials,
     telefono: u.telefono || '',

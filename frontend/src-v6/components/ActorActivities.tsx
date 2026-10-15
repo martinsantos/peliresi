@@ -15,8 +15,8 @@ export default function ActorActivities() {
   const mp = useMobilePrefix();
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const lock = useRef(false);
-  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED !== 'true' || !currentUser || isRestricted || !(currentUser.rol in labels)) return null;
-  const activities = currentUser.actividades || [currentUser.rol];
+  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED !== 'true' || !currentUser || !(currentUser.rol in labels)) return null;
+  const activities = isRestricted ? [] : currentUser.actividades || [currentUser.rol];
   async function choose(type: keyof typeof labels, approved: boolean) {
     if (lock.current || !currentUser) return;
     lock.current = true; setBusy(true); setError('');
@@ -43,8 +43,9 @@ export default function ActorActivities() {
   return <Card><h2 className="font-semibold mb-3">Mis actividades</h2>
     <div className="flex flex-wrap gap-2">{(Object.keys(labels) as Array<keyof typeof labels>).map(type => {
       const approved = activities.includes(type);
-      return <Button key={type} variant="outline" disabled={busy || currentUser.rol === type}
-        onClick={() => void choose(type, approved)}>{currentUser.rol === type ? labels[type] + ' · En uso' : approved ? 'Usar ' + labels[type] : 'Solicitar ' + labels[type]}</Button>;
+      const inUse = !isRestricted && currentUser.rol === type;
+      return <Button key={type} variant="outline" disabled={busy || inUse}
+        onClick={() => void choose(type, approved)}>{inUse ? labels[type] + ' · En uso' : approved ? 'Usar ' + labels[type] : 'Solicitar ' + labels[type]}</Button>;
     })}</div>
     {error && <p role="alert" className="mt-3 text-error-700">{error}</p>}
   </Card>;

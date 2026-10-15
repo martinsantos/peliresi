@@ -21,13 +21,33 @@ try {
   const oldManifests = await db.manifiesto.findMany({ orderBy: { id: 'asc' }, include: { residuos: true, eventos: true } });
   const template = await db.usuario.findUniqueOrThrow({ where: { id: fixture.users.generador } });
   const admin = await login('admin');
+  for (const [index, surface] of ['web-desktop', 'web-responsive', 'app', 'apk', 'http'].entries()) {
+    const name = 'multirol-pending-' + surface;
+    const user = await db.usuario.create({ data: { email: name + '@night-qa.invalid', password: template.password,
+      nombre: 'QA Multirol pendiente ' + surface, rol: 'GENERADOR', activo: false, emailVerified: true,
+      motivoInactividad: 'PENDIENTE_APROBACION', cuit: '30-0000020' + index + '-0' } });
+    const first = await db.solicitudInscripcion.create({ data: { usuarioId: user.id, tipoActor: 'GENERADOR', datosActor: JSON.stringify({ razonSocial: user.nombre, cuit: user.cuit }) } });
+    if (surface !== 'http') continue;
+    const token = await login(name);
+    const second = (await call(token, '/solicitudes/actividad-adicional', 'POST', { tipoActor: 'OPERADOR' }, 201)).solicitud;
+    await call(token, '/auth/profile', 'GET', undefined, 403, 'OPERADOR');
+    assert.equal(await db.usuario.count({ where: { cuit: user.cuit } }), 1);
+    for (const application of [second, first]) {
+      await db.solicitudInscripcion.update({ where: { id: application.id }, data: { estado: 'EN_REVISION' } });
+      await call(admin, '/solicitudes/' + application.id + '/aprobar', 'POST', {});
+    }
+    const account = await db.usuario.findUniqueOrThrow({ where: { id: user.id } });
+    assert.equal(account.rol, 'OPERADOR'); // first approval wins the base, second adds its activity
+    const fresh = await login(name);
+    assert.deepEqual((await call(fresh, '/auth/profile')).user.actividades, ['GENERADOR', 'OPERADOR']);
+  }
   // Each UI surface gets its own synthetic account and drafts; no exercise consumes another's records.
   for (const [index, surface] of ['web-desktop', 'web-responsive', 'app', 'apk', 'http'].entries()) {
     const name = 'multirol-' + surface;
     const user = await db.usuario.create({ data: { email: name + '@night-qa.invalid', password: template.password,
       nombre: 'QA Multirol ' + surface, rol: 'GENERADOR', activo: true, emailVerified: true, cuit: '30-0000010' + index + '-0' } });
     await db.generador.create({ data: { usuarioId: user.id, razonSocial: user.nombre, cuit: user.cuit,
-      domicilio: 'QA sin domicilio real', telefono: '', numeroInscripcion: 'QA', categoria: 'QA' } });
+      domicilio: 'QA sin domicilio real', telefono: '', email: user.email, numeroInscripcion: 'QA', categoria: 'QA' } });
     const token = await login(name);
     await call(token, '/auth/profile', 'GET', undefined, 403, 'OPERADOR');
     await call(token, '/auth/profile', 'GET', undefined, 403, 'ADMIN');

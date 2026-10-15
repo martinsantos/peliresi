@@ -43,7 +43,7 @@ export async function exceptionalParticipants(req: AuthRequest, res: Response, n
     const args = { where, select: { id: true, razonSocial: true, cuit: true, domicilio: true }, orderBy: { razonSocial: 'asc' as const }, take: 20 };
     const records = type === 'generador' ? await prisma.generador.findMany(args) : await prisma.transportista.findMany(args);
     res.json({ success: true, data: { participantes: records.map(r => ({
-      padronId: r.id, nombre: r.razonSocial, identificacion: r.cuit, domicilio: r.domicilio || 'Sin domicilio en padrón',
+      padronId: r.id, nombre: r.razonSocial, identificacion: r.cuit, domicilio: r.domicilio || '',
     })) } });
   } catch (error) { next(error); }
 }
@@ -89,7 +89,7 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
       const args = { where: { id: declared.padronId }, select: { id: true, razonSocial: true, cuit: true, domicilio: true } };
       const actor = type === 'generador' ? await prisma.generador.findUnique(args) : await prisma.transportista.findUnique(args);
       if (!actor) throw new AppError('El participante seleccionado no existe en el padrón', 400);
-      return { padronId: actor.id, nombre: actor.razonSocial, identificacion: actor.cuit, domicilio: actor.domicilio || 'Sin domicilio en padrón' };
+      return { padronId: actor.id, nombre: actor.razonSocial, identificacion: actor.cuit, domicilio: actor.domicilio || '' };
     };
     const [generador, transportista] = await Promise.all([snapshot('generador'), snapshot('transportista')]);
     const datos = { ...input.data, generador, transportista } as unknown as Prisma.InputJsonValue;

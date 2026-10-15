@@ -871,6 +871,9 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
 
     const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true') {
+        await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${solicitud.usuarioId} FOR UPDATE`;
+      }
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
       if (!current || current.estado !== 'EN_REVISION') throw new AppError('La solicitud ya fue procesada por otro usuario', 409);
       const datosActor = JSON.parse(jsonObject(current.datosActor));

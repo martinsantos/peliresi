@@ -436,7 +436,7 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);
     const activities = await accountActivities(user);
-    res.json({ success: true, data: { user: { ...user, rol: req.user.rol, actividades: activities, ...(isTrainingSession() ? { training: true } : {}) } } });
+    res.json({ success: true, data: { user: { ...user, rol: req.user.rolBase ? req.user.rol : user.rol, actividades: activities, ...(isTrainingSession() ? { training: true } : {}) } } });
   } catch (error) {
     next(error);
   }

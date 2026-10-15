@@ -13,7 +13,7 @@ import { readablePageHeading } from './e2e/helpers.ts';
 import { assertIsolatedApkSignature } from './apk-signature.ts';
 import { createExceptionalJourney, continueExceptionalJourney, reviewExceptionalJourney } from './exceptional-journey.ts';
 import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from './addenda-journey.ts';
-import { multiRoleJourney } from './multirole-journey.ts';
+import { multiRoleJourney, pendingMultiRoleJourney } from './multirole-journey.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -332,6 +332,10 @@ try {
   await page.goto(origin + '/app/mi-perfil');
   await proof('14-approved-activities');
   results.push('Multi-role per-tab activity, additional registration draft and incomplete low-intensity record survive reload');
+  await logout(); await login('multirol-pending-apk');
+  await pendingMultiRoleJourney(page, '/app', hideKeyboard);
+  await proof('15-pending-activities');
+  results.push('Verified pending applicant keeps multiple activity drafts and no operational access');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');

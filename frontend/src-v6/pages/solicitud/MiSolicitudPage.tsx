@@ -21,6 +21,7 @@ import {
   useEnviarSolicitud,
 } from '../../hooks/useSolicitudes';
 import type { EstadoSolicitud, SolicitudInscripcion, MensajeSolicitud } from '../../types/api';
+import ActorActivities from '../../components/ActorActivities';
 
 // ── Status config ──
 
@@ -54,7 +55,8 @@ const MiSolicitudPage: React.FC = () => {
   const messagesPanelRef = useRef<HTMLDivElement>(null);
 
   const { data: solicitudes, isLoading, isError, refetch } = useMisSolicitudes();
-  const solicitud = solicitudes?.[0] as SolicitudInscripcion | undefined;
+  const [selectedId, setSelectedId] = useState('');
+  const solicitud = (solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
 
   const { data: mensajes } = useMensajesSolicitud(solicitud?.id || '');
   const enviarMensaje = useEnviarMensaje();
@@ -148,6 +150,15 @@ const MiSolicitudPage: React.FC = () => {
         </div>
       </div>
 
+      {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <>
+        <ActorActivities />
+        {(solicitudes?.length || 0) > 1 && <label className="block text-sm font-medium">Solicitud por actividad
+          <select className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base"
+            value={solicitud.id} onChange={event => { setSelectedId(event.target.value); setReplyText(''); setMessageText(''); }}>
+            {solicitudes?.map(item => <option key={item.id} value={item.id}>{item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
+          </select>
+        </label>}
+      </>}
       {/* Stepper */}
       <Card>
         <div className="flex items-center justify-between">

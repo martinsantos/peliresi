@@ -8,6 +8,11 @@
 import { saveOffline, getOffline, getAllOffline, removeOffline } from './indexeddb';
 import { manifiestoService } from './manifiesto.service';
 import type { Manifiesto } from '../types/models';
+import { getAccessToken } from './api';
+import { readActorActivity } from './actorActivity';
+
+const accountCacheKey = (userId: string | number) => import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'
+  ? `user_${userId}:activity:${readActorActivity(getAccessToken()) || 'base'}` : `user_${userId}`;
 
 interface CachedManifiestos {
   id: string;
@@ -19,12 +24,13 @@ interface CachedManifiestos {
  * Download manifiestos from API and cache in IndexedDB, scoped by userId.
  */
 export async function syncOfflineData(userId: string | number): Promise<void> {
+  const cacheKey = accountCacheKey(userId);
   // Fetch manifiestos (the list endpoint already filters by role server-side)
   const response = await manifiestoService.list({ limit: 200 });
   const items = response?.items || [];
 
   await saveOffline('manifiestos', {
-    id: `user_${userId}`,
+    id: cacheKey,
     items: Array.isArray(items) ? items : [],
     syncedAt: Date.now(),
   } satisfies CachedManifiestos);
@@ -35,7 +41,7 @@ export async function syncOfflineData(userId: string | number): Promise<void> {
  */
 export async function getCachedManifiestos(userId: string | number): Promise<Manifiesto[]> {
   try {
-    const cached: CachedManifiestos | null = await getOffline('manifiestos', `user_${userId}`);
+    const cached: CachedManifiestos | null = await getOffline('manifiestos', accountCacheKey(userId));
     return cached?.items || [];
   } catch {
     return [];
@@ -47,7 +53,7 @@ export async function getCachedManifiestos(userId: string | number): Promise<Man
  */
 export async function getLastSyncTime(userId: string | number): Promise<number | null> {
   try {
-    const cached: CachedManifiestos | null = await getOffline('manifiestos', `user_${userId}`);
+    const cached: CachedManifiestos | null = await getOffline('manifiestos', accountCacheKey(userId));
     return cached?.syncedAt || null;
   } catch {
     return null;
@@ -60,6 +66,10 @@ export async function getLastSyncTime(userId: string | number): Promise<number |
  * silently deleting unpublished field work would be unsafe.
  */
 export async function clearUserOfflineData(userId: string | number): Promise<void> {
+  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true') {
+    const snapshots = await getAllOffline<{ id: string }>('manifiestos').catch(() => []);
+    for (const row of snapshots.filter(row => row.id.startsWith(`user_${userId}:activity:`))) await removeOffline('manifiestos', row.id).catch(() => {});
+  }
   await removeOffline('manifiestos', `user_${userId}`).catch(() => {});
   await removeOffline('catalogos', `user_${userId}`).catch(() => {});
   const prefix = `${userId}:`;

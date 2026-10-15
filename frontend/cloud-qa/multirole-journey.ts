@@ -1,4 +1,25 @@
 import { expect, type Page } from '@playwright/test';
+export async function pendingMultiRoleJourney(page: Page, prefix: string, hideKeyboard = async () => {}) {
+  const origin = 'http://127.0.0.1:4177';
+  await page.goto(origin + prefix + '/mi-solicitud');
+  await page.getByRole('button', { name: 'Solicitar Operador', exact: true }).click();
+  await expect(page).toHaveURL(/\/inscripcion\/operador$/);
+  await expect(page.getByLabel('Razon Social *', { exact: true })).toHaveValue(/^QA Multirol pendiente /);
+  await page.getByLabel('Telefono', { exact: true }).fill('0000000000');
+  await hideKeyboard();
+  const saved = page.waitForResponse(r => /\/api\/solicitudes\/[^/]+$/.test(r.url()) && r.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click();
+  expect((await saved).status()).toBe(200);
+  await page.reload();
+  await expect(page.getByLabel('Telefono', { exact: true })).toHaveValue('0000000000');
+  await page.goto(origin + prefix + '/mi-solicitud');
+  const chooser = page.getByLabel('Solicitud por actividad', { exact: true });
+  await expect(chooser.locator('option')).toHaveCount(2);
+  await chooser.selectOption({ label: 'GENERADOR · Borrador' });
+  await expect(page.getByText('Tipo: GENERADOR', { exact: false })).toBeVisible();
+  await page.goto(origin + prefix + '/manifiestos/baja-intensidad');
+  await expect(page).toHaveURL(/\/mi-solicitud$/);
+}
 export async function multiRoleJourney(page: Page, prefix: string, hideKeyboard = async () => {}) {
   const origin = 'http://127.0.0.1:4177';
   await page.goto(origin + prefix + '/mi-perfil');
@@ -10,6 +31,14 @@ export async function multiRoleJourney(page: Page, prefix: string, hideKeyboard 
   await expect(page.getByRole('button', { name: 'Operador · En uso', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Solicitar Transportista', exact: true }).click();
   await expect(page).toHaveURL(/\/inscripcion\/transportista$/);
+  await expect(page.getByLabel('Razon Social *', { exact: true })).toHaveValue(/^QA Multirol /);
+  await page.getByLabel('Telefono', { exact: true }).fill('0000000000');
+  await hideKeyboard();
+  const saving = page.waitForResponse(r => /\/api\/solicitudes\/[^/]+$/.test(r.url()) && r.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click();
+  expect((await saving).status()).toBe(200);
+  await page.reload();
+  await expect(page.getByLabel('Telefono', { exact: true })).toHaveValue('0000000000');
   // The unified wizard resumes the server-owned draft, not the account/password step.
   await expect(page.getByLabel('Contraseña', { exact: true })).toHaveCount(0);
   await expect(page.getByText('No se pudo recuperar', { exact: false })).toHaveCount(0);
