@@ -1,8 +1,10 @@
 # Manifiestos V2 — preguntas reunidas para DGFA
 
+> **Respondido por el usuario el 15/10. NO reenviar el mensaje siguiente como consulta pendiente.** Las respuestas, los detalles residuales y las diferencias con el código probado están en [decisiones del15/10](DECISIONES-MANIFIESTOS-V2-20261015.md). Se conserva la consulta como antecedente, sin pedir nuevamente lo contestado.
+
 ## Mensaje vigente para Santiago — 15/10
 
-Texto para copiar; no enviado. Sólo precisiones pendientes:
+Título conservado para enlaces anteriores. **Consulta archivada tras recibir respuesta**, no enviada desde esta tarea:
 
 Santiago, para cerrar los detalles de SITREP nos falta definir:
 

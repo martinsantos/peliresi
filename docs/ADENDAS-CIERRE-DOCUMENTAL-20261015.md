@@ -1,5 +1,7 @@
 # Adendas: control documental, anexos y decisiones de revisores
 
+> **Respuesta posterior del15/10:** [decisiones nuevas](DECISIONES-MANIFIESTOS-V2-20261015.md). Revisión entre partes y comunicación de nuevaY a autoridad, tolerancia de identidad externa, fuente de compatibilidad y prohibición de cerrar con adendas pendientes/rechazadas ya tienen definición. La tablaR1–R6 y la QA de abajo describen el candidato anterior; no certifican implementación de esas respuestas ni deben usarse para repetir preguntas resueltas. Derivación, detalles multirol y destino documental del rechazo aún requieren diseño/precisión.
+
 ## Alcance del candidato
 
 Sin publicación ni cambios a producción. La continuidad operativa y las rectificaciones aditivas ya están definidas; no se vuelven a consultar. Este corte permite ver los pendientes documentales y descargar un anexo informativo independiente por adenda y versión.

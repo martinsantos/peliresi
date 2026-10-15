@@ -1,5 +1,7 @@
 # Manifiestos V2 — respuestas del usuario a los siete grupos
 
+> **Actualización 15/10:** [segunda respuesta y revisión técnica multirol](DECISIONES-MANIFIESTOS-V2-20261015.md) resuelve/reformula pendientes de esta versión: revisión entre partes, datos externos no obligatorios, condición de número oficial, fecha de retiro/Mendoza/meses calendario, fuente de compatibilidad, cierre sin adendas pendientes/rechazadas y configuración ADMIN. Los pendientes originales de este documento no deben reenviarse como si siguieran íntegramente abiertos. No se ha implementado esa segunda respuesta todavía.
+
 Fuente: respuesta directa del usuario del 14/10/2026. Son decisiones de producto para el candidato, no una nueva acta de DGFA ni reglas publicadas. Complementan las confirmaciones previas de Santiago; no modifican producción ni manifiestos existentes.
 
 Este documento prevalece sobre las preguntas y condiciones anteriores del backlog en los puntos que resuelve. Lo no respondido permanece explícito, sin volver a consultar lo confirmado.

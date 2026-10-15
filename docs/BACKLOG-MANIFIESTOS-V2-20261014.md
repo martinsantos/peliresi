@@ -2,6 +2,22 @@
 
 Estado: definición y candidato de desarrollo. **No autorizado para producción.**
 
+## Prioridad vigente tras la segunda respuesta — 15/10
+
+[Contrato actualizado y diagnóstico del alta multirol](DECISIONES-MANIFIESTOS-V2-20261015.md). Prevalece sobre la cola y tablaD anteriores en los puntos contestados. Esta actualización es documental, no ejecución ni nuevaQA:
+
+- **MV2-110/111:** eliminar obligatoriedad de datos de participantes externos en baja intensidad; advertir faltantes, preservar identidad incompleta y responsable, sin inventar datos ni fusionar desconocidos. El candidato probado aún exige nombre/identificación/domicilio: pendiente de corrección.
+- **MV2-104 (nuevo, alta multirol):** una identidad/CUIT, varias actividades y aprobaciones independientes; contexto de rol validado por servidor. Alta/solicitud/sesión actuales sólo manejan un rol. No duplicar cuentas ni sobrescribir el rol previo al aprobar otra actividad.
+- **MV2-202/402/404/405:** revisión entre partes; comentario no aprueba, nuevaY aprobada post facto se comunica a autoridad. Buscar antecedentes de pedidos no aprobados/rechazados, sin heredar decisiones. Sustituir el revisorQA fijo sólo con permisos/contexto bien definidos.
+- **MV2-203:** baja intensidad consume número oficial cuando el generador carga operador y aprueba. Reintento/concurrencia no duplican número ni actividad. Mecanismo de identidad del generador externo y rango/agotamiento pendientes.
+- **MV2-303/501:** fecha de retiro, zonaMendoza, meses calendario. Separar fecha pactada de retiro efectivo; no generar caducidad desde una fecha real de retiro que aún no ocurrió. Bordes/parciales/prórrogas pendientes, sin caducar históricos.
+- **MV2-406:** fuente de compatibilidad es el alta validada por autoridad en el procesoTEF; TEF no es por sí solo habilitación. Preservar fuente/versión/vigencia.
+- **MV2-304 (nuevo, recorridos):** transporte con distintas cargas/Y y varias entregas en serie. Desglosar paradas y carga por entrega. No inferir reparto simultáneo de una misma declaración ni duplicar manifiestos/estadísticas.
+- **MV2-502/503:** PDF con firma del operador; no cerrar documentalmente con adendas pendientes o rechazadas. Certificados parciales fuera del próximo corte, no requisito confirmado. Evaluar rechazo documental separado de rechazo de carga, conservando hechos tratados.
+- **MV2-302:** ADMIN configura avisos típicos; entregas externas siguen apagadas. No habilitar destinatarios/canales por interpretar “típicos”.
+
+La consulta de siete grupos fue respondida; no reenviarla. La última QA sigue válida para runtime7ef526e y sus límites, no para multirol/numeración/cierre nuevos. Siguiente corte seguro: tolerancia externa y advertencias, con pruebas nuevas; el agregadoMV2-112 debe contemplar identidades desconocidas sin fusionarlas.
+
 Actualización: [alcance implementado de baja intensidad, adendas ordinarias y QA](QA-BAJA-INTENSIDAD-20261014.md). MV2-110/111 tienen candidato separado; el 15/10 se amplía el circuito ordinario con adendas post facto y anexos actuales/históricos. Última QA cerrada en web/móvil/app y APK aislado: 38722598671 intento2 SUCCESS, runtime7ef526e; no publicada. No dar por completas MV2-401–406: siguen pendientes matriz productiva de autoridad, evidencia de compatibilidad, consolidación y certificados oficiales. Los registros de ejecución al final son históricos, no la cola vigente.
 Fuente: requisitos del usuario del 14/10, respuesta de Santiago/DGFA transmitida por el usuario y revisión del código activo.
 La respuesta define requisitos de negocio; no sustituye una validación normativa ni un modelo documental aprobado.
