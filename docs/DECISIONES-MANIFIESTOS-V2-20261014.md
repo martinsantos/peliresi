@@ -4,7 +4,7 @@ Fuente: respuesta directa del usuario del 14/10/2026. Son decisiones de producto
 
 Este documento prevalece sobre las preguntas y condiciones anteriores del backlog en los puntos que resuelve. Lo no respondido permanece explícito, sin volver a consultar lo confirmado.
 
-Actualización de implementación: ver [candidatos de baja intensidad y adendas ordinarias, con evidencia de QA](QA-BAJA-INTENSIDAD-20261014.md). El 15/10 se implementa registro y revisión independiente de adendas ordinarias; corrida38714116108 SUCCESS, incluidas web/móvil/app y Android QA aislado. La matriz productiva de autoridad y el cierre documental siguen pendientes; las pruebas planificadas más abajo corresponden al backlog completo, no todas están implementadas. Sin publicación.
+Actualización de implementación: ver [candidatos de baja intensidad y adendas ordinarias, con evidencia de QA](QA-BAJA-INTENSIDAD-20261014.md). El 15/10 se implementa registro y revisión independiente de adendas ordinarias (corrida38714116108 SUCCESS) y después resumen documental/anexos versionados (38722598671 intento2 SUCCESS), incluidas web/móvil/app y Android QA aislado. La matriz productiva de autoridad y los criterios de cierre oficial siguen pendientes; las pruebas planificadas más abajo corresponden al backlog completo, no todas están implementadas. Sin publicación.
 
 ## Reglas definidas
 

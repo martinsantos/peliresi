@@ -1,5 +1,50 @@
 # Baja intensidad, adendas y conformidad posterior — candidato aislado
 
+## Actualización 15/10 — control documental y anexos
+
+**GO del corte funcional aislado; NO publicado ni cierre oficial acreditado.** Implementación y decisiones de revisores juntas en [anexos y cierre documental](ADENDAS-CIERRE-DOCUMENTAL-20261015.md).
+
+### Cierre verificable
+
+Candidato `7ef526e7efcce3752b38b46e6dafe1968c9d39d6`, [corrida 38722598671, intento 2](https://github.com/martinsantos/peliresi/actions/runs/38722598671/attempts/2), **SUCCESS**. Job 15/10/2026 10:58:56–11:16:35 UTC (07:58:56–08:16:35 Mendoza), duración 17m39s. El reintento usa exactamente el mismo código que el intento 1, sin quitar guardas ni cambiar expectativas.
+
+| Comprobación | Resultado final |
+|---|---|
+| Builds backend, web y app | 3 PASS |
+| Unit backend, DB desconectada | 1004/1004; cero fallos, omitidas o TODO |
+| Unit frontend | 1454/1454; cero fallos, omitidas o TODO |
+| HTTP con backend y PostgreSQL sintéticos | 5 grupos de regresión + 9 de baja intensidad + 12 de adendas PASS |
+| E2E Chromium escritorio 1440×900, web móvil 360×800 y app 390×844 | 18/18; cero fallos, omitidos o flaky |
+| APK separado instalado en Android 15 de nube | 10 comprobaciones agrupadas PASS, 30 mutaciones con 200/201, errores JS e intentos inseguros vacíos |
+| PDF actual/histórico | Bytes exactos en almacenamiento Android, contenido/decisiones extraídos, visor nativo y retorno PASS |
+| PDF largo | 50 corrientes y 12 revisiones, cinco folios completos; extracción, límites de texto y revisión visual PASS |
+| Histórico y migración | Histórico sintético idéntico; esquema aditivo y cliente Prisma anterior lee/escribe conservando snapshots |
+| Aislamiento y limpieza | 0 correos; APK original no modificado; procesos propios, PostgreSQL y emulador detenidos |
+
+Se inspeccionaron las capturas finales de escritorio, web móvil, app web, ambos anexos en el visor Android y retorno al manifiesto. Página identificable, sin blanco ni overlay de Vite; sin overflow horizontal en los recorridos. Las nuevas guardas verticales y la captura nativa `apk/12-returned-from-annex-device.png` confirman el encabezado completo después del visor y del desplazamiento. La operación TRATADO permanece separada de la conformidad rechazada. Los PDF v0 y v1 muestran respectivamente pendiente y rechazo, sin contaminar la versión anterior. Los cinco folios del PDF largo fueron revisados individualmente: contenido íntegro y dentro de márgenes. Queda un detalle editorial no bloqueante: el resumen usa plural aun para una adenda y a 360px puede partir el número y la etiqueta entre líneas. El aviso general de novedades ocupa espacio en móvil; no se certifica uniformidad global de UI.
+
+Evidencia fuera de Git: `sitrep-cloud-qa-20261002/manifiestos-v2-38722598671-attempt2/` (16MB, sin APK). Incluye JSON unit/HTTP/E2E, prueba de histórico/migración/cierre, `apk/result.json`, capturas nativas, PDF descargados y los cinco renders. La copia del intento 1 se conserva separada en `manifiestos-v2-38722598671/`; no se borró la evidencia del fallo ni la de la primera corrida. Artefacto remoto con retención de tres días. Backend/server propios detenidos a11:16:28.879Z; el job confirmó parada de PostgreSQL/emulador y terminó sin procesos propios pendientes. Muestra final de Chrome en VM: PSS100816KiB/RSS192760KiB, no medición de pico ni certificación de ausencia de fugas.
+
+Reproducción: `.github/workflows/manifiesto-qa.yml`, secuencia serial de compilaciones → suites unit completas → migración/seed sintético → `manifest-integration.ts`, `exceptional-integration.ts`, `addenda-integration.ts` → Playwright → `manifest-apk.ts` → verificación histórica y cierre. No se ejecutaron suites ni emuladores locales. Browser plugin no disponible: se reutilizó Playwright de nube; habilitar ese plugin sería útil para futuras revisiones interactivas, no fue necesario instalarlo para esta corrida.
+
+Límites: APK debug `ar.com.ultimamilla.sitrep.manifestqa`, loopback HTTP y Custom Tab, Chrome124.0.6367.219/GMS24.23.35 estables. No es actualización firmada del APK instalado, prueba de confianza TWA/TLS productiva, Safari ni teléfonos físicos/GPS/cámara/batería/celular. Reabre el proceso SITREP, no reinicia Chrome/Android completos. Un visor PDF probado. Los anexos no son certificados oficiales ni archivo firmado inmutable entre futuras versiones del renderer. Las decisiones R1–R6 siguen pendientes; no habilitar matriz productiva de revisión ni cierre documental por inferencia.
+
+### Historial de esta tanda
+
+Primer candidato `8fd3880171e9196d674d21d5cae1e576cc918ce8`, [38718902306](https://github.com/martinsantos/peliresi/actions/runs/38718902306): SUCCESS automatizado. Builds3, unit1004backend/1452frontend, HTTP5+9+12grupos, E2E18/18 sin omitidas/flaky, APK10comprobaciones agrupadas y limpieza PASS. PDFs actuales/históricos descargados byte a byte en Android; versión0 no incluye resoluciones posteriores. Prueba de5folios con50corrientes y12revisiones conserva todo el contenido. Histórico sintético intacto.
+
+La inspección visual posterior detectó un defecto no cubierto por la guarda anterior: tras volver del visor y desplazar adendas, el encabezado del APK QA quedaba parcialmente fuera del área visible. Evidencia `manifiestos-v2-38718902306/apk/12-returned-from-annex-device.png`, también visible en captura DOM; antes de abrir el PDF estaba completo. La guarda previa comprobaba ancho y pertenencia al header, no posición vertical. No se declara GO visual por el verde automático.
+
+Corrección `7ef526e7efcce3752b38b46e6dafe1968c9d39d6`: reutiliza el seguimiento de visualViewport ya existente para inspecciones, limitado también a adendas. No cambia estilos globales, foco, formulario ni scroll deliberado/pinch zoom. Dos unit nuevos cubren desplazamiento/restauración, identidad del contenido y limpieza. Android añade guardas verticales después de cada PDF y después de desplazar el título. Validación final cerrada en el intento 2, detallada arriba.
+
+El intento1 de esa corrida pasó builds3/unit1004+1454/HTTP/E2E18 e histórico; Android no llegó a instalar el APK. El inventario previo del emulador (`adb shell dumpsys package packages`, freezeCloudPlayStore/snapshot) retornó255 con signalnull y stderr vacío. No fue una aserción de SITREP ni un fallo de la corrección visual; tampoco es evidencia de que ésta funcione en Android. Procesos cerrados y artefactos conservados. Se inició un único reintento del mismo commit en una VM nueva, sin cambiar código, quitar controles ni reutilizar dumps incompletos.
+
+También se corrige el arnés E2E para que cada contexto de rol herede viewport del proyecto:1440×900 escritorio,360×800 web móvil y390×844 app. En la primera corrida esos contextos heredaban los valores de dispositivo (1280×720 y393×851); las demás pruebas sí usaban los anchos configurados. No atribuir tamaños no probados a las capturas anteriores.
+
+Entorno: loopback4177/3037 y PostgreSQL sintético55440/sitrep_night_qa_20260926 en GitHub Actions. Browser plugin no disponible; se usa el Playwright existente en nube. Un worker, sin dependencias ni emuladores locales, sin tocar navegador/formulario humano. Flags nuevos apagados por defecto. No producción, manifiestos reales ni envíos de correo/push/blockchain.
+
+Alcance documental: resumen global paginado de pendientes/observaciones/rechazos; descarga autenticada del anexo actual y de versiones anteriores; SHA256 del contenido estructurado, no firma digital. No acredita cierre legal ni reemplaza manifiesto/certificado original. No incluye todavía archivo inmutable de PDFs emitidos a través de distintas versiones futuras del renderer ni carga de certificados originales del operador.
+
 ## Actualización 15/10 — adendas de manifiestos ordinarios
 
 **GO del corte funcional aislado: validación cerrada, sin publicar.** Candidato `85ca66a26fa6cbaef02b7cbc5f3a7cd7d869f62a`, [corrida 38714116108](https://github.com/martinsantos/peliresi/actions/runs/38714116108) SUCCESS: 15/10, 09:35:58–09:50:45 UTC (06:35–06:50 Mendoza), 14m47s. Los resultados del 14/10 más abajo corresponden al corte anterior de baja intensidad.
