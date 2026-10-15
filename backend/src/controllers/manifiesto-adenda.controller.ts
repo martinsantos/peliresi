@@ -7,6 +7,8 @@ import prisma from '../lib/prisma';
 import { canAccessManifiesto } from '../utils/roleFilter';
 import { exceptionalCanReview } from './manifiesto-excepcional.controller';
 import { addendumCreateSchema, addendumReviewSchema, addendumStageAllowed, canRecordAddendum, AddendumReview } from '../domain/manifiestoAdenda';
+import { addendumDocument, documentaryStatus, DocumentaryCounts } from '../domain/manifiestoAdendaDocument';
+import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
   if (process.env.MANIFEST_ADDENDA_ENABLED !== 'true') return next(new AppError('Adendas no habilitadas', 404));
@@ -27,13 +29,41 @@ export async function listAddenda(req: AuthRequest, res: Response, next: NextFun
     const manifest = await accessibleManifest(req);
     const page = Math.max(1, Math.min(100000, Math.floor(Number(req.query.page) || 1)));
     const where = { manifiestoId: manifest.id };
-    const [items, total] = await Promise.all([
+    const [items, counts] = await Promise.all([
       prisma.adendaManifiesto.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
-      prisma.adendaManifiesto.count({ where }),
+      // Counts span all pages. Authorization was checked against the parent above.
+      prisma.$queryRaw<DocumentaryCounts[]>(Prisma.sql`
+        SELECT COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE jsonb_array_length(revisiones) = 0)::int AS pendientes,
+          COUNT(*) FILTER (WHERE revisiones->-1->>'decision' = 'OBSERVADA')::int AS observadas,
+          COUNT(*) FILTER (WHERE revisiones->-1->>'decision' = 'RECHAZADA')::int AS rechazadas
+        FROM adendas_manifiesto WHERE "manifiestoId" = ${manifest.id}`),
     ]);
-    res.json({ success: true, data: { adendas: items.map(r => present(r, req)), total,
+    const summary = counts[0];
+    res.json({ success: true, data: { adendas: items.map(r => present(r, req)), total: summary.total,
+      documental: { ...summary, estado: documentaryStatus(summary), cierreAcreditado: false },
       manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado },
       puedeRegistrar: canRecordAddendum(req.user, manifest) && addendumStageAllowed(manifest.estado) } });
+  } catch (error) { next(error); }
+}
+export async function downloadAddendum(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const manifest = await accessibleManifest(req);
+    const row = await prisma.adendaManifiesto.findFirst({ where: { id: req.params.adendaId, manifiestoId: manifest.id } });
+    if (!row) throw new AppError('Adenda no encontrada', 404);
+    const requested = req.query.version;
+    if (requested !== undefined && (typeof requested !== 'string' || !/^(0|[1-9][0-9]*)$/.test(requested))) {
+      throw new AppError('Versión de anexo inválida', 400);
+    }
+    const version = requested === undefined ? row.version : Number(requested);
+    if (!Number.isSafeInteger(version) || version > row.version) throw new AppError('Versión de anexo inexistente', 400);
+    const content = addendumDocument(row, version);
+    const pdf = await renderAddendumPdf(content);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="anexo-adenda-' + row.id + '-v' + version + '.pdf"');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-SITREP-Content-SHA256', content.huella);
+    res.send(pdf);
   } catch (error) { next(error); }
 }
 export async function createAddendum(req: AuthRequest, res: Response, next: NextFunction) {

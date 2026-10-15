@@ -28,6 +28,8 @@ La UI de web, móvil, PWA y APK debe permitir continuar y mostrar un pendiente a
 
 ## Precisiones aún necesarias, sin repetir lo resuelto
 
+Las decisiones de revisores y cierre documental están reunidas en una sola [lista R1–R6, con el comportamiento provisional del candidato](ADENDAS-CIERRE-DOCUMENTAL-20261015.md). No confundir el resumen de pendientes ni el anexo informativo con una autorización de cierre oficial.
+
 - **Numeración excepcional (D03):** cuándo consume número oficial un baja intensidad, rango/titular aplicable y qué hacer si se agota. Hasta resolverlo no inventar número ni unanimidad; la referencia interna permite conservar el registro.
 - **Responsabilidades (D01/D02/D11/D12):** matriz por modalidad/multirol; quién registra, revisa y resuelve por autoridad; mínimos de identidad/evidencia; qué cambios versionan y requieren nueva conformidad; plazo de revisión y efecto documental del rechazo/silencio. La continuidad sin aprobación previa ya está definida, no volver a preguntarla.
 - **Cómputo (D05/D07):** evento validado y fecha base exactos para computar los 30 días, corte horario; seis meses calendario, recepciones parciales/prórrogas. Reprogramación con autorización modifica plazo y vencido exige nuevo: ya resuelto.

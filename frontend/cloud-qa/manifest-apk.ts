@@ -279,6 +279,42 @@ try {
   await page.getByRole('heading', { name: /^Adendas ·/ }).scrollIntoViewIfNeeded();
   await proof('10-ordinary-addenda-post-facto');
   results.push('Ordinary addenda: carrier/operator observations do not block lifecycle; independent approval/rejection preserves treated manifest and declaration');
+  await expect(page.getByRole('region', { name: 'Control documental' })).toContainText('0 pendientes · 0 observadas · 1 rechazadas');
+  const annexRegion = page.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true });
+  for (const version of [1, 0]) {
+    if (!version) await annexRegion.getByText('Trazabilidad de la adenda', { exact: true }).tap();
+    const filename = 'anexo-adenda-' + operatorAdenda + '-v' + version + '.pdf';
+    const requested = page.waitForResponse(r => r.url() === origin + '/api/manifiestos/' + manifestId + '/adendas/' + operatorAdenda + '/anexo?version=' + version);
+    await annexRegion.getByRole('button', { name: version ? 'Descargar anexo v1' : 'Descargar versión anterior', exact: true }).tap();
+    const response = await requested; expect(response.status()).toBe(200); const content = await response.body();
+    assert.equal(content.subarray(0, 5).toString(), '%PDF-');
+    let native = '';
+    await expect.poll(async () => {
+      const xml = await observeWindow(); if (!xml) return false;
+      const nodes = nativeNodes(xml);
+      const ready = nodes.some(node => (node.text || '').startsWith('anexo-adenda-'))
+        && nodes.some(node => (node['content-desc'] || '').includes('ANEXO DE ADENDA')
+          && (node['content-desc'] || '').includes(version ? 'CONFORMIDAD RECHAZADA' : 'PENDIENTE DE REVISIÓN'));
+      if (ready) native = xml; return ready;
+    }, { timeout: 25000, message: 'Native viewer opens the selected annex version, not the preceding PDF' }).toBe(true);
+    await device.screenshot({ path: path.join(output, '11-annex-v' + version + '-device.png') });
+    await writeFile(path.join(output, '11-annex-v' + version + '-native.xml'), native);
+    await expect.poll(() => adb('shell', 'ls', '-1', '/sdcard/Download').trim().split(/\r?\n/).includes(filename), { timeout: 25000 }).toBe(true);
+    const localFile = path.join(output, 'annex-v' + version + '-downloaded-on-device.pdf');
+    adb('pull', '/sdcard/Download/' + filename, localFile);
+    assert.deepEqual(await readFile(localFile), content);
+    const extracted = execFileSync('pdftotext', ['-raw', localFile, '-'], { encoding: 'utf8' });
+    assert.match(extracted, /Y2 \| 42 kg/);
+    if (!version) assert.ok(!extracted.includes('QA revisión posterior con hechos conservados'));
+    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+    await expect.poll(async () => {
+      const xml = await observeWindow();
+      return !!xml && nativeNodes(xml).some(node => node.package === 'com.android.chrome' && node.text === 'Abrir menu');
+    }, { timeout: 15000 }).toBe(true);
+  }
+  await page.getByRole('heading', { name: /^Adendas ·/ }).scrollIntoViewIfNeeded();
+  await proof('12-returned-from-annex');
+  results.push('Current and historical annex PDFs opened natively, saved byte-exactly, correct decisions extracted, and returned to SITREP');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');

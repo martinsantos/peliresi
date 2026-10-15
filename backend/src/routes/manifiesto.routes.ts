@@ -29,7 +29,7 @@ import {
 
 const router = Router();
 import { exceptionalEnabled, exceptionalParticipants, listExceptional, getExceptional, createExceptional, eventExceptional } from '../controllers/manifiesto-excepcional.controller';
-import { addendaEnabled, listAddenda, createAddendum, reviewAddendum } from '../controllers/manifiesto-adenda.controller';
+import { addendaEnabled, listAddenda, createAddendum, reviewAddendum, downloadAddendum } from '../controllers/manifiesto-adenda.controller';
 
 /**
  * @openapi
@@ -75,6 +75,7 @@ router.post('/baja-intensidad', exceptionalEnabled, createExceptional);
 router.get('/baja-intensidad/:id', exceptionalEnabled, getExceptional);
 router.post('/baja-intensidad/:id/eventos', exceptionalEnabled, eventExceptional);
 router.get('/:id/adendas', addendaEnabled, listAddenda);
+router.get('/:id/adendas/:adendaId/anexo', addendaEnabled, downloadAddendum);
 router.post('/:id/adendas', addendaEnabled, createAddendum);
 router.post('/:id/adendas/:adendaId/revisiones', addendaEnabled, reviewAddendum);
 

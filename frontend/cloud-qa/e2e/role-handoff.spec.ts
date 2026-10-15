@@ -1,6 +1,8 @@
 import { devices, expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { login, prefix } from './helpers';
 import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from '../addenda-journey';
+import { readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 
 test('separate real users hand a manifest from generator to transport to operator', async ({ page, browser }, info) => {
   test.setTimeout(120_000);
@@ -116,6 +118,20 @@ test('separate real users hand a manifest from generator to transport to operato
       await expect(help).toHaveCount(1);
       expect(await help.evaluate(el => Boolean(el.closest('header')))).toBe(true);
       await reviewer.screenshot({ path: info.outputPath('ordinary-addenda-post-facto.png'), animations: 'disabled' });
+      await expect(reviewer.getByRole('region', { name: 'Control documental' })).toContainText('0 pendientes · 0 observadas · 1 rechazadas');
+      const annexRegion = reviewer.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true });
+      for (const version of [1, 0]) {
+        if (version === 0) await annexRegion.getByText('Trazabilidad de la adenda', { exact: true }).click();
+        const downloaded = reviewer.waitForEvent('download');
+        await annexRegion.getByRole('button', { name: version ? 'Descargar anexo v1' : 'Descargar versión anterior', exact: true }).click();
+        const download = await downloaded; const file = info.outputPath('annex-v' + version + '.pdf');
+        expect(download.suggestedFilename()).toBe('anexo-adenda-' + operatorAdenda + '-v' + version + '.pdf');
+        await download.saveAs(file); expect((await readFile(file)).subarray(0, 5).toString()).toBe('%PDF-');
+        const text = execFileSync('pdftotext', ['-raw', file, '-'], { encoding: 'utf8' });
+        expect(text).toContain(version ? 'CONFORMIDAD RECHAZADA' : 'PENDIENTE DE REVISIÓN');
+        expect(text).toContain('Y1 | 35 kg'); expect(text).toContain('Y2 | 42 kg');
+        if (!version) expect(text).not.toContain('QA revisión posterior con hechos conservados');
+      }
       expect(errors).toEqual([]); await reviewer.context().close();
       const owner = await asRole('generador');
       await owner.goto(`${prefix(info)}/manifiestos/${id}/adendas`);

@@ -161,6 +161,8 @@ Pruebas: reloj controlado en bordes de día/mes/año; aprobación y acuerdo en f
 
 **MV2-403:** cantidades, tratamiento y PDF reflejan original más adendas aprobadas, sin sumar dos veces ni perder unidades.
 
+Corte adicional 15/10: [control documental y anexo informativo versionado](ADENDAS-CIERRE-DOCUMENTAL-20261015.md). Presenta declaración y carga observada por separado, sin consolidar cantidades automáticamente ni cambiar el certificado original. No completa la certificación oficial ni las decisiones R1–R6.
+
 **MV2-404 / aprobación rápida:** presentar al responsable una comparación breve de declarado/recibido/agregado, con cantidades, unidades, evidencia y corrientes elegibles. Aprobar u observar esa versión desde web/app con sesión válida; sin volver a completar el manifiesto ni aprobar por tocar un enlace de aviso.
 
 **MV2-405 / continuidad con aprobación posterior:** registrar la diferencia y permitir las acciones expresamente autorizadas por D12. Mostrar simultáneamente «hecho registrado» y «adenda pendiente de aprobación», con motivo, responsable y vencimiento de revisión. El hecho físico no se borra si la adenda es luego rechazada. No retrofechar firmas ni presentar como aprobada una carga pendiente.

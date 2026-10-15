@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
 await assertCloudDatabase();
 const { PrismaClient } = backendRequire('@prisma/client'); const db = new PrismaClient();
@@ -21,6 +22,17 @@ async function call(id: string, role: string, method = 'GET', suffix = '', body?
     headers: { Authorization: 'Bearer ' + await token(role), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
   const json = await res.json(); assert.equal(res.status, status, JSON.stringify(json)); return json.data;
 }
+async function annex(manifestId: string, adendaId: string, role: string, version: string, status = 200) {
+  const response = await fetch(`${base}/manifiestos/${manifestId}/adendas/${adendaId}/anexo?version=${version}`, {
+    headers: { Authorization: 'Bearer ' + await token(role) } });
+  assert.equal(response.status, status);
+  if (status !== 200) return null;
+  assert.equal(response.headers.get('content-type'), 'application/pdf');
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
+  return { bytes, hash: response.headers.get('x-sitrep-content-sha256') };
+}
 try {
   const historical = await db.manifiesto.findMany({ orderBy: { id: 'asc' }, include: { residuos: true, eventos: true } });
   const create = (estado: string) => db.manifiesto.create({ data: { numero: 'QA-ADENDA-' + randomUUID(), estado, fechaFirma: new Date(),
@@ -36,6 +48,12 @@ try {
   const adenda = (await call(manifest.id, 'transportista', 'POST', '', input, 201)).adenda;
   assert.equal(adenda.declaracion.numero, manifest.numero); assert.equal(adenda.declaracion.residuos[0].cantidad, 10);
   assert.equal(adenda.estadoRevision, 'PENDIENTE');
+  const originalAnnex = (await annex(manifest.id, adenda.id, 'generador', '0'))!;
+  assert.equal(originalAnnex.hash?.length, 64);
+  for (const role of ['generador2', 'transportista2', 'operador2']) await annex(manifest.id, adenda.id, role, '0', 404);
+  await annex(other.id, adenda.id, 'admin', '0', 404);
+  for (const version of ['-1', '1', '0.5', 'NaN', 'Infinity', '9007199254740992', '0&version=0']) await annex(manifest.id, adenda.id, 'admin', version, 400);
+  assert.equal((await fetch(`${base}/manifiestos/${manifest.id}/adendas/${adenda.id}/anexo`)).status, 401);
   assert.deepEqual((await call(manifest.id, 'transportista', 'POST', '', input, 201)).adenda, adenda);
   await call(manifest.id, 'transportista', 'POST', '', { ...input, motivo: 'Conflicting replay' }, 409);
   await call(other.id, 'transportista', 'POST', '', input, 409);
@@ -60,6 +78,19 @@ try {
   assert.equal(rectification.rectificaId, adenda.id); assert.equal(rectification.estadoRevision, 'PENDIENTE');
   await call(other.id, 'operador', 'POST', '', { ...input, id: randomUUID(), rectificaId: adenda.id }, 400);
   const list = await call(manifest.id, 'generador'); assert.equal(list.total, 3); assert.equal(list.puedeRegistrar, false);
+  assert.deepEqual(list.documental, { total: 3, pendientes: 2, observadas: 1, rechazadas: 0, estado: 'OBSERVADA', cierreAcreditado: false });
+  assert.deepEqual(await annex(manifest.id, adenda.id, 'generador', '0'), originalAnnex);
+  const currentAnnex = (await annex(manifest.id, adenda.id, 'operador', '2'))!;
+  assert.notEqual(currentAnnex.hash, originalAnnex.hash);
+  const file = path.join(output, 'annex-observed-v2.pdf'); await writeFile(file, currentAnnex.bytes);
+  const text = execFileSync('pdftotext', ['-raw', file, '-'], { encoding: 'utf8' });
+  assert.match(text, /OBSERVADA/); assert.match(text, /Y1 \| 10 kg/); assert.match(text, /Y2 \| 12 kg/);
+  execFileSync('pdftoppm', ['-scale-to', '1100', '-png', file, path.join(output, 'annex-observed-v2')]);
+  // A second synthetic manifest proves counters cover all pages, not just the first 20.
+  for (let i = 0; i < 21; i++) await call(other.id, 'operador', 'POST', '', { ...input, id: randomUUID(), motivo: 'QA paginación ' + i }, 201);
+  const secondPage = await call(other.id, 'generador', 'GET', '?page=2');
+  assert.equal(secondPage.adendas.length, 1); assert.equal(secondPage.documental.pendientes, 21);
+  assert.equal(secondPage.documental.cierreAcreditado, false);
   assert.ok(list.adendas.every((a: { puedeResolver: boolean }) => !a.puedeResolver));
   for (const m of [manifest, other, draft]) assert.deepEqual(await db.manifiesto.findUniqueOrThrow({ where: { id: m.id }, include: { residuos: true, eventos: true } }), m);
   const originalIds = historical.map((m: { id: string }) => m.id);
@@ -68,5 +99,7 @@ try {
     'assigned carrier/operator only; outsiders denied', 'draft rejected; forged original rejected', 'idempotent creation/replay/concurrent creation',
     'canonical declaration and official number preserved', 'reviewer permissions and independent resolution', 'optimistic concurrency and replay',
     'rectification appends and cannot cross manifests', 'generator read only', 'existing manifests/residues/signatures/events unchanged',
+    'PDF authorized scope, strict versions and no-store; outsiders/anonymous denied', 'historical PDF bytes/hash unchanged after reviews; current evidence extracted',
+    'documentary summary covers every page, never asserts closure',
   ] }, null, 2));
 } finally { await db.$disconnect(); }

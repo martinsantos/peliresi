@@ -12,7 +12,8 @@ type Waste = { corriente: string; cantidad: number; unidad: string };
 type Adenda = { id: string; motivo: string; rectificaId: string | null; version: number; estadoRevision: string; puedeResolver: boolean;
   creadoPorId: string; createdAt: string; residuos: Waste[]; declaracion: { numero: string; residuos: Waste[] };
   revisiones: { id: string; autorId: string; fecha: string; decision: string; nota: string }[] };
-type Data = { adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: string } };
+type Data = { adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: string };
+  documental?: { pendientes: number; observadas: number; rechazadas: number; estado: string; cierreAcreditado: boolean } };
 const labels: Record<string, string> = { PENDIENTE: 'Pendiente de revisión', APROBADA: 'Aprobada post facto', OBSERVADA: 'Observada', RECHAZADA: 'Conformidad rechazada' };
 const emptyWaste = (): Waste => ({ corriente: '', cantidad: 0, unidad: 'kg' });
 function Load({ rows }: { rows: Waste[] }) {
@@ -29,8 +30,21 @@ export default function AdendasManifiestoPage() {
   const [creating, setCreating] = useState(false); const [rectificaId, setRectificaId] = useState<string | undefined>();
   const [wastes, setWastes] = useState<Waste[]>([emptyWaste()]); const [motivo, setMotivo] = useState('');
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [versions, setVersions] = useState<Record<string, number>>({});
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [saved, setSaved] = useState('');
   const lock = useRef(false); const pending = useRef<{ signature: string; id: string } | undefined>(undefined);
+  async function download(item: Adenda, version: number) {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); setError('');
+    try {
+      const { data: blob } = await api.get(endpoint + '/' + item.id + '/anexo', { params: { version }, responseType: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'anexo-adenda-' + item.id + '-v' + version + '.pdf';
+      anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setError('No se pudo descargar el anexo. Tus datos y revisiones no cambiaron.');
+    } finally { lock.current = false; setBusy(false); }
+  }
   async function send(path: string, body: Record<string, unknown>) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError(''); setSaved('');
@@ -55,6 +69,11 @@ export default function AdendasManifiestoPage() {
       {data?.puedeRegistrar && !creating && <Button onClick={() => { setCreating(true); setSaved(''); }}>Registrar diferencia</Button>}
     </div>
     {data && <p className="text-sm text-neutral-600">Operación: {data.manifiesto.estado}. La revisión de adendas no detiene el circuito.</p>}
+    {data?.documental && <Card className="p-4 space-y-1" role="region" aria-label="Control documental">
+      <h2 className="font-semibold">Control documental</h2>
+      <p>{data.documental.pendientes} pendientes · {data.documental.observadas} observadas · {data.documental.rechazadas} rechazadas</p>
+      <p className="text-sm text-neutral-600">{data.total === 0 ? 'Sin adendas registradas.' : data.documental.estado === 'ADENDAS_REVISADAS' ? 'Adendas revisadas. No acredita el cierre documental del expediente.' : 'Hay revisiones por atender. El cierre operativo no las aprueba.'}</p>
+    </Card>}
     {query.isPending && <p role="status">Cargando adendas…</p>}
     {query.isError && <p role="alert">No se pudieron cargar las adendas. <Button variant="outline" onClick={() => void query.refetch()}>Reintentar carga</Button></p>}
     {error && <p role="alert" className="text-error-700">{error} <Button variant="outline" onClick={() => void query.refetch()}>Actualizar revisiones</Button></p>}
@@ -82,11 +101,16 @@ export default function AdendasManifiestoPage() {
         <div className="grid gap-4 sm:grid-cols-2"><div><h3 className="font-medium">Declaración conservada</h3><Load rows={item.declaracion.residuos} /></div><div><h3 className="font-medium">Carga observada</h3><Load rows={item.residuos} /></div></div>
         {item.rectificaId && <p className="text-sm break-all">Rectifica adenda {item.rectificaId}; el antecedente se conserva.</p>}
         <p className="text-sm text-amber-800">Compatibilidad de corrientes sin verificar. Registrar no implica habilitación.</p>
+        <Button variant="outline" disabled={busy} onClick={() => void download(item, item.version)}>Descargar anexo v{item.version}</Button>
         {item.puedeResolver && <div className="space-y-2"><Input id={`resolucion-${item.id}`} label="Motivo de resolución" maxLength={500} value={notes[item.id] || ''} onChange={e => setNotes({ ...notes, [item.id]: e.target.value })} />
           <div className="flex flex-wrap gap-2">{[['APROBADA', 'Aprobar post facto'], ['OBSERVADA', 'Observar'], ['RECHAZADA', 'Rechazar conformidad']].map(([decision, label]) => <Button key={decision} variant="outline" disabled={busy || !notes[item.id]?.trim()} onClick={() => void send(endpoint + '/' + item.id + '/revisiones', { version: item.version, decision, nota: notes[item.id] })}>{label}</Button>)}</div>
         </div>}
         {data.puedeRegistrar && <Button variant="outline" disabled={busy} onClick={() => { setRectificaId(item.id); setWastes(item.residuos.map(r => ({ ...r }))); setMotivo(''); setCreating(true); setSaved(''); }}>Agregar rectificación</Button>}
         <details><summary className="cursor-pointer py-2 text-sm">Trazabilidad de la adenda</summary><p className="text-sm break-all">{item.id} · {item.createdAt} · {item.creadoPorId}</p>
+          {item.version > 0 && <div className="flex flex-wrap gap-2" aria-label="Versiones anteriores">
+            <Input label="Versión anterior" type="number" inputMode="numeric" min={0} max={item.version - 1} step={1} value={versions[item.id] ?? 0} onChange={e => setVersions({ ...versions, [item.id]: Number(e.target.value) })} />
+            <Button variant="outline" disabled={busy || !Number.isSafeInteger(versions[item.id] ?? 0) || (versions[item.id] ?? 0) < 0 || (versions[item.id] ?? 0) >= item.version} onClick={() => void download(item, versions[item.id] ?? 0)}>Descargar versión anterior</Button>
+          </div>}
           <ul className="space-y-2">{item.revisiones.map(r => <li key={r.id} className="text-sm break-words">{labels[r.decision]} · {r.nota}<span className="block text-neutral-600 break-all">{r.fecha} · {r.autorId}</span></li>)}</ul>
         </details>
       </Card>)}
