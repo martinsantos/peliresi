@@ -1,10 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chromeButtonPoint, chromeScrollGesture, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint } from './native-window.ts';
+import { chromeButtonPoint, chromeScrollGesture, chromeRenderedButtonPoint, chromeButtonHasZeroBounds, collectNativeWindow, nativeKeyboardShown, nativeNodes, pixelLauncherAnrClosePoint, observeNativeTransition } from './native-window.ts';
 
 test('reads explicit OS keyboard visibility rather than inferring it from DOM focus or viewport size', () => {
   assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=true mShowRequested=true'), true);
   assert.equal(nativeKeyboardShown('InputMethodManagerService\n  mInputShown=false mShowRequested=false'), false);
+});
+test('a null native root is an unavailable observation, never a passing or stale window', async () => {
+  const diagnostics: string[] = []; let calls = 0;
+  const value = await observeNativeTransition(() => collectNativeWindow(async () => {
+    calls++; return { stdout: '', stderr: 'ERROR: null root node returned by UiTestAutomationBridge.' };
+  }), async message => { diagnostics.push(message); });
+  assert.equal(value, null); assert.equal(calls, 1);
+  assert.match(diagnostics[0], /null root node/);
+  assert.equal(await observeNativeTransition(async () => window(node()), async () => {}), window(node()));
+});
+test('transition observation never absorbs device failure, malformed XML or failed diagnostics', async () => {
+  for (const message of ['device offline', 'permission denied', 'malformed XML', 'ERROR: null root node returned by UiTestAutomationBridge.']) {
+    await assert.rejects(observeNativeTransition(async () => { throw new Error(message); }, async () => {}));
+  }
+  await assert.rejects(observeNativeTransition(() => collectNativeWindow(async () => ({
+    stdout: '', stderr: 'ERROR: null root node returned by UiTestAutomationBridge.',
+  })), async () => { throw new Error('diagnostic storage failed'); }), /diagnostic storage failed/);
 });
 test('unknown, incomplete and ambiguous keyboard dumps cannot pass as a hidden keyboard', () => {
   for (const dump of ['', 'mInputShown=unknown', 'mInputShown=true\nmInputShown=false', 'mInputShown=false\nmInputShown=false']) assert.throws(() => nativeKeyboardShown(dump));

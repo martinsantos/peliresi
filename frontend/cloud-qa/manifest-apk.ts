@@ -2,13 +2,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { _android, type Page } from 'playwright';
 import { expect } from '@playwright/test';
 import { assertCloudDatabase } from './safety.ts';
 import { freezeCloudPlayStore, assertStableSystemPackages } from './system-packages.ts';
-import { dismissObservedChromePrompts, nativeKeyboardShown, nativeNodes, readNativeWindow } from './native-window.ts';
+import { dismissObservedChromePrompts, nativeKeyboardShown, nativeNodes, readNativeWindow, observeNativeTransition } from './native-window.ts';
 import { readablePageHeading } from './e2e/helpers.ts';
 import { assertIsolatedApkSignature } from './apk-signature.ts';
 import { createExceptionalJourney, continueExceptionalJourney, reviewExceptionalJourney } from './exceptional-journey.ts';
@@ -221,13 +221,24 @@ try {
   const pdf = await downloadResponse; expect(pdf.status()).toBe(200);
   const bytes = await pdf.body(); assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
   await writeFile(path.join(output, 'certificate.pdf'), bytes);
-  await expect.poll(async () => nativeNodes(await readNativeWindow()).some(node =>
-    (node.text || '').startsWith('certificado-')),
+  let viewerWindow = '';
+  const observeWindow = () => observeNativeTransition(readNativeWindow, async message => {
+    await appendFile(path.join(output, 'native-transitions.log'), new Date().toISOString() + ' ' + message + '\n');
+  });
+  await expect.poll(async () => {
+    const xml = await observeWindow(); if (!xml) return false;
+    const nodes = nativeNodes(xml);
+    const ready = nodes.some(node => (node.text || '').startsWith('certificado-'))
+      && nodes.some(node => (node['content-desc'] || '').includes('CERTIFICADO DE TRATAMIENTO')
+        && (node['content-desc'] || '').includes('QA Operador 1'));
+    if (ready) viewerWindow = xml;
+    return ready;
+  },
   { timeout: 25000, message: 'Native PDF viewer must open the requested certificate' }).toBe(true);
   // The real PDF viewer is now foreground. Chromium cannot capture its hidden
   // surface (run38641881433); record the native window, not the background DOM.
   await device.screenshot({ path: path.join(output, '06-certificate-requested-device.png') });
-  await writeFile(path.join(output, '06-certificate-requested-native.xml'), await readNativeWindow());
+  await writeFile(path.join(output, '06-certificate-requested-native.xml'), viewerWindow);
   let savedFile = '';
   await expect.poll(() => {
     const added = adb('shell', 'ls', '-1', '/sdcard/Download').trim().split(/\r?\n/)
@@ -242,8 +253,11 @@ try {
   // Run38628501638 visibly opened the real PDF viewer. The web document remains
   // attached behind it; attempting a DOM tap there is not a valid logout test.
   adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
-  await expect.poll(async () => nativeNodes(await readNativeWindow()).some(node =>
-    node.package === 'com.android.chrome' && node.text === 'Abrir menu' && node.class === 'android.widget.Button'),
+  await expect.poll(async () => {
+    const xml = await observeWindow();
+    return !!xml && nativeNodes(xml).some(node =>
+      node.package === 'com.android.chrome' && node.text === 'Abrir menu' && node.class === 'android.widget.Button');
+  },
   { timeout: 15000, message: 'Return from native PDF viewer to the actual SITREP window' }).toBe(true);
   await proof('06-returned-from-pdf'); results.push('Native PDF viewer opens and returns to SITREP');
   const exceptionalId = await createExceptionalJourney(page, '/app', hideKeyboard, 'Transportista', () => keyboard(false, '08-participant-no-auto-keyboard'));

@@ -119,6 +119,19 @@ export async function readNativeWindow(): Promise<string> {
   assertCloudEnvironment();
   return collectNativeWindow(async (args, timeout) => execute('adb', args, { encoding: 'utf8', timeout }));
 }
+
+/** A transitioning Android activity may not yet expose an accessibility root.
+ * Return no observation (never stale XML) so the caller's bounded poll can continue. */
+export async function observeNativeTransition(read: () => Promise<string>, record: (diagnostic: string) => Promise<void>): Promise<string | null> {
+  try { return await read(); }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.startsWith('Native UI dump failed: Native UI dump did not confirm a fresh window:')
+      || !message.includes('ERROR: null root node returned by UiTestAutomationBridge.')) throw error;
+    await record(message);
+    return null;
+  }
+}
 export async function dismissObservedChromePrompts(output: string): Promise<void> {
   // Do not mix a long-running Playwright UIAutomator instrumentation with the
   // one-shot native dump: run7 reproduced tap timeout, dump failures and hanging
