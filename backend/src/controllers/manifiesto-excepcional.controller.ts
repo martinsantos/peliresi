@@ -16,6 +16,9 @@ function reviewer(req: AuthRequest) {
   return req.user.rol === 'ADMIN' && !req.user.impersonatedBy &&
     (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').includes(req.user.id);
 }
+export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId?: unknown }) {
+  return reviewer(req) && record.creadoPorId !== req.user.id && record.impersonadoPorId !== req.user.id;
+}
 function scope(req: AuthRequest): Prisma.RegistroManifiestoExcepcionalWhereInput {
   if (reviewer(req)) return {};
   if (req.user.rol === 'OPERADOR' && req.user.operador?.id) return { operadorId: req.user.operador.id };
@@ -40,7 +43,7 @@ export async function exceptionalParticipants(req: AuthRequest, res: Response, n
 function present(record: { id: string; creadoPorId: string; eventos: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
   return { ...record, referencia: 'BI-' + record.id, numeroOficial: null,
     revisiones: exceptionalPending(record.id, record.eventos as unknown as ExceptionalEvent[]),
-    puedeResolver: reviewer(req) && record.creadoPorId !== req.user.id,
+    puedeResolver: exceptionalCanReview(req, record),
     puedeRegistrar: req.user.rol === 'OPERADOR' && req.user.operador?.id === record.operadorId };
 }
 export async function listExceptional(req: AuthRequest, res: Response, next: NextFunction) {
@@ -122,7 +125,7 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
         throw new AppError('Sólo el operador registra hechos y solicita revisión', 403);
       }
       const etapa = advanceExceptional(current.id, current.etapa as ExceptionalStage, events, command,
-        reviewer(req) && current.creadoPorId !== req.user.id);
+        exceptionalCanReview(req, current));
       const updated = await tx.registroManifiestoExcepcional.updateMany({
         where: { id: current.id, version: current.version },
         data: { etapa, version: { increment: 1 }, eventos: [...events,
