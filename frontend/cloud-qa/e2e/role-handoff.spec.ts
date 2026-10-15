@@ -8,7 +8,7 @@ test('separate real users hand a manifest from generator to transport to operato
   test.setTimeout(120_000);
   const contexts: BrowserContext[] = [];
   const asRole = async (role: string) => {
-    const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), baseURL: 'http://127.0.0.1:4177', geolocation: { latitude: -32.89, longitude: -68.84 }, permissions: ['geolocation'] });
+    const context = await browser.newContext({ ...(info.project.name === 'web-desktop' ? devices['Desktop Chrome'] : devices['Pixel 7']), viewport: info.project.use.viewport, baseURL: 'http://127.0.0.1:4177', geolocation: { latitude: -32.89, longitude: -68.84 }, permissions: ['geolocation'] });
     contexts.push(context);
     const next = await context.newPage();
     await login(next, info, role);

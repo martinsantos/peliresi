@@ -132,11 +132,13 @@ export const MobileLayout: React.FC = () => {
   const isInspector = Boolean(currentUser?.esInspector);
   const isInspectionRoute = /\/inspecciones(?:\/|$)/.test(location.pathname);
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
+  const isAddendaRoute = /\/manifiestos\/[^/]+\/adendas\/?$/.test(location.pathname);
+  const boundedViewport = isInspectionCase || isAddendaRoute;
   const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
   const inspectionShell = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const shell = inspectionShell.current, viewport = window.visualViewport;
-    if (!isInspectionCase || !shell || !viewport) return;
+    if (!boundedViewport || !shell || !viewport) return;
     let frame = 0;
     const reset = () => {
       for (const property of ['position', 'top', 'left', 'width', 'height']) shell.style.removeProperty(property);
@@ -146,6 +148,8 @@ export const MobileLayout: React.FC = () => {
       // the footer leaves the header and server confirmation above the screen.
       // Keep the same mounted flex shell in the visible frame, not an overlay
       // toast or a focus/scroll reset. Do not counteract deliberate pinch zoom.
+      // Addenda also return from Android's native PDF viewer: browser scroll
+      // restoration must not leave the header partially above the visible frame.
       if (viewport.scale !== 1) { reset(); return; }
       const { height, width, offsetTop, offsetLeft } = viewport;
       if (![height, width, offsetTop, offsetLeft].every(Number.isFinite) || height <= 0 || width <= 0) return;
@@ -161,7 +165,7 @@ export const MobileLayout: React.FC = () => {
       viewport.removeEventListener('scroll', schedule);
       reset();
     };
-  }, [isInspectionCase, isLoading, currentUser?.id]);
+  }, [boundedViewport, isLoading, currentUser?.id]);
   const canInspect = Boolean(isInspector || currentUser?.rol === 'ADMIN' || currentUser?.rol.startsWith('ADMIN_'));
   const { data: unreadNotificationCount = 0 } = useNotificacionesNoLeidas();
   const attention = useAttentionCounts();

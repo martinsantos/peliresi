@@ -189,6 +189,23 @@ describe('MobileLayout Android shell', () => {
     expect(screen.getByRole('banner').closest('[data-app-shell]')).not.toHaveStyle({ position: 'fixed' });
   });
 
+  it.each(['/manifiestos/qa/adendas', '/app/manifiestos/qa/adendas'])('keeps the addenda shell visible after native viewer restoration on %s', route => {
+    const viewport = Object.assign(new EventTarget(), { height: 783, width: 393, offsetTop: 0, offsetLeft: 0, scale: 1 });
+    vi.stubGlobal('visualViewport', viewport);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+    const view = renderMobileLayout(route);
+    const shell = screen.getByRole('banner').closest('[data-app-shell]') as HTMLElement;
+    const content = screen.getByText(route.startsWith('/app') ? 'Adendas app' : 'Adendas');
+    expect(shell).toHaveStyle({ position: 'fixed', top: '0px', height: '783px' });
+    act(() => { viewport.height = 720; viewport.offsetTop = 42; viewport.dispatchEvent(new Event('scroll')); });
+    expect(shell).toHaveStyle({ top: '42px', height: '720px' });
+    expect(screen.getByText(content.textContent!)).toBe(content);
+    act(() => { viewport.scale = 2; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell.style.position).toBe('');
+    view.unmount();
+    expect(shell.style.height).toBe('');
+  });
+
   it('keeps the original drawer and work when reporting is deferred without acknowledgement', () => {
     renderMobileLayout('/dashboard');
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));

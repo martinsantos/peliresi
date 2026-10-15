@@ -311,8 +311,17 @@ try {
       const xml = await observeWindow();
       return !!xml && nativeNodes(xml).some(node => node.package === 'com.android.chrome' && node.text === 'Abrir menu');
     }, { timeout: 15000 }).toBe(true);
+    await expect.poll(() => page.locator('header').evaluate(header => {
+      const rect = header.getBoundingClientRect(), viewport = window.visualViewport;
+      const top = viewport?.offsetTop ?? 0, height = viewport?.height ?? innerHeight;
+      return rect.top >= top - 1 && rect.bottom <= top + height + 1;
+    }), { timeout: 10000, message: 'Entire app header remains within the visible viewport after native PDF return' }).toBe(true);
   }
   await page.getByRole('heading', { name: /^Adendas ·/ }).scrollIntoViewIfNeeded();
+  await expect.poll(() => page.locator('header').evaluate(header => {
+    const rect = header.getBoundingClientRect();
+    return rect.top >= (window.visualViewport?.offsetTop ?? 0) - 1;
+  }), { message: 'Scrolling the addenda must not clip the shell header' }).toBe(true);
   await proof('12-returned-from-annex');
   results.push('Current and historical annex PDFs opened natively, saved byte-exactly, correct decisions extracted, and returned to SITREP');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
