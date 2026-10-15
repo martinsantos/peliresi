@@ -38,7 +38,11 @@ describe('baja intensidad: hechos separados de conformidad', () => {
     expect(exceptionalCreateSchema.safeParse({ ...input, transportista: { ...actor, padronId: 'qa-registered' } }).success).toBe(true);
     expect(exceptionalCreateSchema.safeParse({ ...input, generador: { ...actor, padronId: 'qa-generator' }, transportista: { ...actor, padronId: 'qa-carrier' } }).success).toBe(false);
     expect(exceptionalCreateSchema.safeParse({ ...input, numero: 'OFICIAL' }).success).toBe(false);
-    expect(exceptionalCreateSchema.safeParse({ ...input, generador: { ...actor, nombre: ' ' } }).success).toBe(false);
+    const incomplete = exceptionalCreateSchema.parse({ ...input, patente: '', generador: {}, transportista: { nombre: ' ' } });
+    expect(incomplete.generador).toEqual({ nombre: '', identificacion: '', domicilio: '' });
+    expect(incomplete.transportista.nombre).toBe('');
+    expect(exceptionalCreateSchema.safeParse({ ...input, generador: { telefono: 'x'.repeat(101) } }).success).toBe(false);
+    expect(exceptionalCreateSchema.safeParse({ ...input, generador: { nombre: 123 } }).success).toBe(false);
     expect(exceptionalEventSchema.safeParse({ ...base, tipo: 'DIFERENCIA', residuos: [{ corriente: 'Y1', cantidad: -1, unidad: 'kg' }] }).success).toBe(false);
     expect(exceptionalEventSchema.safeParse({ ...base, tipo: 'AVANCE', etapa: 'RETIRADO', decision: 'APROBADA' }).success).toBe(false);
     expect(exceptionalEventSchema.safeParse({ ...base, tipo: 'DIFERENCIA' }).success).toBe(false);

@@ -1,6 +1,8 @@
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
+import { canReviewAsCounterpart } from '../domain/partyReview';
+import { noticeNewCurrents } from '../services/postFactoNotice.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
@@ -16,8 +18,13 @@ function reviewer(req: AuthRequest) {
   return req.user.rol === 'ADMIN' && !req.user.impersonatedBy &&
     (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').includes(req.user.id);
 }
-export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId?: unknown }) {
-  return reviewer(req) && record.creadoPorId !== req.user.id && record.impersonadoPorId !== req.user.id;
+export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId?: unknown; datos?: unknown; operadorId?: unknown }) {
+  const data = record.datos as { generador?: { padronId?: string }; transportista?: { padronId?: string } } | undefined;
+  const counterpart = process.env.MANIFEST_PARTY_REVIEW_ENABLED === 'true' && data && canReviewAsCounterpart(req.user, record, {
+    generadorId: data.generador?.padronId, transportistaId: data.transportista?.padronId,
+    operadorId: typeof record.operadorId === 'string' ? record.operadorId : undefined,
+  });
+  return Boolean(counterpart || (reviewer(req) && record.creadoPorId !== req.user.id && record.impersonadoPorId !== req.user.id));
 }
 function scope(req: AuthRequest): Prisma.RegistroManifiestoExcepcionalWhereInput {
   if (reviewer(req)) return {};
@@ -133,6 +140,11 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
             fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue },
       });
       if (updated.count !== 1) throw new AppError('El registro cambió; recargá antes de continuar', 409);
+      if (command.tipo === 'RESOLVER' && command.decision === 'APROBADA' && command.objetivo !== current.id) {
+        await noticeNewCurrents(tx, (current.datos as { residuos?: unknown }).residuos,
+          events.find(e => e.id === command.objetivo && e.tipo === 'DIFERENCIA')?.residuos,
+          '/manifiestos/baja-intensidad?registro=' + current.id, command.id);
+      }
       return tx.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: current.id } });
     });
     res.json({ success: true, data: { registro: present(record, req) } });

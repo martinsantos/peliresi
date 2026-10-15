@@ -28,6 +28,7 @@ import { usuarioService } from '../../services/usuario.service';
 import { useGenerador, useOperador } from '../../hooks/useActores';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import ActorCertificates from '../../components/ActorCertificates';
+import ActorActivities from '../../components/ActorActivities';
 
 
 const PerfilPage: React.FC = () => {
@@ -92,6 +93,7 @@ const PerfilPage: React.FC = () => {
         <p className="text-neutral-600 mt-1">Gestiona tu información personal</p>
       </div>
 
+      <ActorActivities />
       {currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}

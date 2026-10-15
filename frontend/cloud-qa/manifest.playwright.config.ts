@@ -4,7 +4,7 @@ import { assertCloudEnvironment } from './safety';
 
 assertCloudEnvironment();
 export default defineConfig({
-  testDir: './e2e', testMatch: ['manifest-transport.spec.ts', 'manifest-lifecycle.spec.ts', 'role-handoff.spec.ts', 'manifest-exceptional.spec.ts'],
+  testDir: './e2e', testMatch: ['manifest-transport.spec.ts', 'manifest-lifecycle.spec.ts', 'role-handoff.spec.ts', 'manifest-exceptional.spec.ts', 'manifest-multirole.spec.ts'],
   fullyParallel: false, forbidOnly: true, retries: 0, workers: 1, maxFailures: 1, timeout: 90000,
   outputDir: path.join(process.env.QA_ARTIFACTS!, 'manifest-e2e'),
   reporter: [['line'], ['json', { outputFile: path.join(process.env.QA_ARTIFACTS!, 'manifest-e2e.json') }]],

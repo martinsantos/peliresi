@@ -10,7 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
-type Participant = { nombre: string; identificacion: string; domicilio: string; padronId?: string };
+type Participant = { nombre: string; identificacion: string; domicilio: string; nombreFantasia?: string; telefono?: string; padronId?: string };
 type Entry = {
   id: string; referencia: string; version: number; etapa: string; puedeRegistrar: boolean; puedeResolver: boolean;
   datos: { generador: Participant; transportista: Participant; patente: string; motivo: string; residuos: Waste[] };
@@ -47,9 +47,13 @@ function ParticipantFields({ title, value, onChange }: { title: string; value: P
         placeholder={query.isFetching ? 'Buscando…' : 'Elegir participante'} />
       {query.isError && <p role="alert">No se pudo consultar el padrón. Conservamos los datos declarados.</p>}
     </div>}
-    <Input label={title + ' · Nombre o razón social'} required readOnly={!!value.padronId} maxLength={500} value={value.nombre} onChange={e => onChange({ ...value, nombre: e.target.value })} />
-    <Input label={title + ' · Identificación declarada'} required readOnly={!!value.padronId} maxLength={500} placeholder="CUIT o referencia disponible" value={value.identificacion} onChange={e => onChange({ ...value, identificacion: e.target.value })} />
-    <Input label={title + ' · Domicilio'} required readOnly={!!value.padronId} maxLength={500} value={value.domicilio} onChange={e => onChange({ ...value, domicilio: e.target.value })} />
+    <Input label={title + ' · Nombre o razón social'} readOnly={!!value.padronId} maxLength={500} value={value.nombre} onChange={e => onChange({ ...value, nombre: e.target.value })} />
+    <Input label={title + ' · Identificación declarada'} readOnly={!!value.padronId} maxLength={500} placeholder="CUIT o referencia disponible" value={value.identificacion} onChange={e => onChange({ ...value, identificacion: e.target.value })} />
+    <Input label={title + ' · Domicilio'} readOnly={!!value.padronId} maxLength={500} value={value.domicilio} onChange={e => onChange({ ...value, domicilio: e.target.value })} />
+    {!value.padronId && <><Input label={title + ' · Nombre de fantasía'} maxLength={500} value={value.nombreFantasia || ''} onChange={e => onChange({ ...value, nombreFantasia: e.target.value })} />
+      <Input label={title + ' · Teléfono'} type="tel" maxLength={100} value={value.telefono || ''} onChange={e => onChange({ ...value, telefono: e.target.value })} />
+      {(!value.nombre.trim() || !value.identificacion.trim() || !value.domicilio.trim() || !value.telefono?.trim()) && <p role="status" className="text-sm text-amber-900">Faltan datos de contacto o identificación. Podés registrar la operación igualmente.</p>}
+    </>}
   </fieldset>;
 }
 function WasteFields({ value, onChange }: { value: Waste; onChange: (v: Waste) => void }) {
@@ -128,7 +132,7 @@ export default function BajaIntensidadPage() {
     {query.isLoading && <p role="status">Cargando registros…</p>}
     {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, { generador, transportista, patente, motivo, residuos: wastes }, true); }}>
       <div className="grid sm:grid-cols-2 gap-5"><ParticipantFields title="Generador" value={generador} onChange={setGenerador} /><ParticipantFields title="Transportista" value={transportista} onChange={setTransportista} /></div>
-      <Input label="Patente declarada" required maxLength={20} value={patente} onChange={e => setPatente(e.target.value)} />
+      <Input label="Patente declarada" maxLength={20} value={patente} onChange={e => setPatente(e.target.value)} />
       {wasteInputs}
       <Input label="Motivo del registro excepcional" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
       <Button type="submit" disabled={busy}>Guardar operación</Button>
@@ -136,7 +140,7 @@ export default function BajaIntensidadPage() {
     {!id && !creating && <div className="space-y-3">
       <p className="text-sm text-neutral-600">{query.data?.total ?? '—'} registros · Página {listPage}</p>
       {query.data?.registros?.map(row => <Card key={row.id}><button className="text-left w-full min-h-11 space-y-1" onClick={() => setParams({ registro: row.id })}>
-        <span className="block font-semibold">{row.datos.generador.nombre}</span><span className="block text-sm">{stageLabels[row.etapa]} · {row.revisiones.filter(r => r.estado !== 'APROBADA').length} revisiones pendientes</span>
+        <span className="block font-semibold">{row.datos.generador.nombre || 'Generador por identificar'}</span><span className="block text-sm">{stageLabels[row.etapa]} · {row.revisiones.filter(r => r.estado !== 'APROBADA').length} revisiones pendientes</span>
         <span className="block text-xs text-neutral-600 break-all">{row.referencia}</span>
       </button></Card>)}
       <div className="flex flex-wrap gap-3">
@@ -145,8 +149,8 @@ export default function BajaIntensidadPage() {
       </div>
     </div>}
     {entry && <div className="space-y-4">
-      <Card><p className="text-xs break-all text-neutral-600">{entry.referencia}</p><h2 className="font-bold text-lg mt-2">{entry.datos.generador.nombre}</h2>
-        <p>{entry.datos.transportista.nombre} · {entry.datos.patente}</p>
+      <Card><p className="text-xs break-all text-neutral-600">{entry.referencia}</p><h2 className="font-bold text-lg mt-2">{entry.datos.generador.nombre || 'Generador por identificar'}</h2>
+        <p>{entry.datos.transportista.nombre || 'Transportista por identificar'} · {entry.datos.patente || 'Patente pendiente'}</p>
         <p className="font-semibold mt-3" role="status" aria-label="Estado operativo">Operación: {stageLabels[entry.etapa]}</p>
         <p className="text-sm text-amber-900 mt-1">Regularización pendiente · Compatibilidad de corrientes sin verificar</p>
         <h3 className="font-semibold mt-4">Declaración original</h3>

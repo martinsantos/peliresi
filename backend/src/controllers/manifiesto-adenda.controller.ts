@@ -6,9 +6,11 @@ import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { canAccessManifiesto } from '../utils/roleFilter';
 import { exceptionalCanReview } from './manifiesto-excepcional.controller';
+import { canReviewAsCounterpart, ReviewParties } from '../domain/partyReview';
 import { addendumCreateSchema, addendumReviewSchema, addendumStageAllowed, canRecordAddendum, AddendumReview } from '../domain/manifiestoAdenda';
 import { addendumDocument, documentaryStatus, DocumentaryCounts } from '../domain/manifiestoAdendaDocument';
 import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
+import { noticeNewCurrents } from '../services/postFactoNotice.service';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
   if (process.env.MANIFEST_ADDENDA_ENABLED !== 'true') return next(new AppError('Adendas no habilitadas', 404));
@@ -20,9 +22,13 @@ async function accessibleManifest(req: AuthRequest) {
   if (!manifest || !canAccessManifiesto(req.user, manifest)) throw new AppError('Manifiesto no encontrado', 404);
   return manifest;
 }
-function present(record: { creadoPorId: string; impersonadoPorId: string | null; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
+function canReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue }) {
+  return exceptionalCanReview(req, record) || (process.env.MANIFEST_PARTY_REVIEW_ENABLED === 'true'
+    && canReviewAsCounterpart(req.user, record, record.declaracion as ReviewParties));
+}
+function present(record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
   const reviews = record.revisiones as unknown as AddendumReview[];
-  return { ...record, estadoRevision: reviews[reviews.length - 1]?.decision || 'PENDIENTE', puedeResolver: exceptionalCanReview(req, record) };
+  return { ...record, estadoRevision: reviews[reviews.length - 1]?.decision || 'PENDIENTE', puedeResolver: canReview(req, record) };
 }
 export async function listAddenda(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -118,7 +124,7 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
     const record = await prisma.$transaction(async tx => {
       const current = await tx.adendaManifiesto.findFirst({ where: { id: req.params.adendaId, manifiestoId: req.params.id } });
       if (!current) throw new AppError('Adenda no encontrada', 404);
-      if (!exceptionalCanReview(req, current)) throw new AppError('Se requiere revisor designado, sin autoaprobación ni impersonación', 403);
+      if (!canReview(req, current)) throw new AppError('Se requiere contraparte vinculada o revisor designado, sin autoaprobación ni impersonación', 403);
       const reviews = current.revisiones as unknown as AddendumReview[];
       const repeated = reviews.find(r => r.id === command.id);
       if (repeated) {
@@ -132,6 +138,10 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
         version: { increment: 1 }, revisiones: [...reviews, { ...command, autorId: req.user.id, fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue,
       } });
       if (updated.count !== 1) throw new AppError('Otro revisor resolvió esta versión; recargá', 409);
+      if (command.decision === 'APROBADA') {
+        await noticeNewCurrents(tx, (current.declaracion as { residuos?: unknown }).residuos, current.residuos,
+          '/manifiestos/' + current.manifiestoId + '/adendas', command.id);
+      }
       return tx.adendaManifiesto.findUniqueOrThrow({ where: { id: current.id } });
     });
     res.json({ success: true, data: { adenda: present(record, req) } });

@@ -13,6 +13,7 @@ import { readablePageHeading } from './e2e/helpers.ts';
 import { assertIsolatedApkSignature } from './apk-signature.ts';
 import { createExceptionalJourney, continueExceptionalJourney, reviewExceptionalJourney } from './exceptional-journey.ts';
 import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from './addenda-journey.ts';
+import { multiRoleJourney } from './multirole-journey.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -267,11 +268,12 @@ try {
   await continueExceptionalJourney(page, hideKeyboard);
   await page.getByRole('status', { name: 'Estado operativo' }).scrollIntoViewIfNeeded();
   await proof('08-exceptional-operator');
-  await logout(); await login('admin');
+  await logout(); await login('transportista');
   await reviewExceptionalJourney(page, '/app', exceptionalId, hideKeyboard);
   await page.getByRole('heading', { name: 'Revisión posterior', exact: true }).scrollIntoViewIfNeeded();
   await proof('09-exceptional-post-facto');
   results.push('Baja intensidad: external identities, independent post-facto approval/observation, treated facts preserved');
+  await logout(); await login('generador');
   await page.goto(origin + '/app/manifiestos/' + manifestId + '/adendas');
   await resolveOrdinaryAddendum(page, carrierAdenda, 'Aprobar post facto', hideKeyboard);
   await expect(page.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true })).toContainText('Pendiente de revisión');
@@ -324,6 +326,12 @@ try {
   }), { message: 'Scrolling the addenda must not clip the shell header' }).toBe(true);
   await proof('12-returned-from-annex');
   results.push('Current and historical annex PDFs opened natively, saved byte-exactly, correct decisions extracted, and returned to SITREP');
+  await logout(); await login('multirol-apk');
+  await multiRoleJourney(page, '/app', hideKeyboard);
+  await proof('13-multirole-incomplete-operation');
+  await page.goto(origin + '/app/mi-perfil');
+  await proof('14-approved-activities');
+  results.push('Multi-role per-tab activity, additional registration draft and incomplete low-intensity record survive reload');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');

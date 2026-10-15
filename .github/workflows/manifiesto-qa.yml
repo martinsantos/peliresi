@@ -40,6 +40,9 @@ jobs:
       VITE_MANIFEST_EXCEPTIONAL_ENABLED: 'true'
       MANIFEST_ADDENDA_ENABLED: 'true'
       VITE_MANIFEST_ADDENDA_ENABLED: 'true'
+      MANIFEST_PARTY_REVIEW_ENABLED: 'true'
+      ACTOR_MULTIROLE_ENABLED: 'true'
+      VITE_ACTOR_MULTIROLE_ENABLED: 'true'
       QA_ARTIFACTS: /tmp/sitrep-manifest-v2
       UPLOADS_DIR: /tmp/sitrep-manifest-v2/uploads
       QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
@@ -73,6 +76,9 @@ jobs:
           NODE_ENV=production npm run build
           NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
       - name: Backend unit suite, database disconnected
+        env:
+          ACTOR_MULTIROLE_ENABLED: 'false'
+          MANIFEST_PARTY_REVIEW_ENABLED: 'false'
         # Existing PDF unit tests parse actual PDF bytes, not a renderer mock.
         # Install the parser on the VM before running the suite.
         if: success()
@@ -82,6 +88,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends poppler-utils
           npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
       - name: Frontend unit suite, providers mocked
+        env:
+          VITE_ACTOR_MULTIROLE_ENABLED: 'false'
         working-directory: frontend
         run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
       - name: Cloud browser and isolated PostgreSQL
@@ -103,6 +111,7 @@ jobs:
           node --experimental-strip-types frontend/cloud-qa/manifest-integration.ts
           node --experimental-strip-types frontend/cloud-qa/exceptional-integration.ts
           node --experimental-strip-types frontend/cloud-qa/addenda-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/party-multirole-integration.ts
       - name: Web, responsive mobile and app journeys with actual backend
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/manifest.playwright.config.ts

@@ -62,13 +62,16 @@ try {
   assert.equal(twice[0].adenda.id, twice[1].adenda.id);
   const review = { id: randomUUID(), version: 0, decision: 'APROBADA', nota: 'QA evidencia revisada' };
   await call(manifest.id, 'transportista', 'POST', `/${adenda.id}/revisiones`, review, 403);
-  await call(manifest.id, 'generador', 'POST', `/${adenda.id}/revisiones`, review, 403);
   await call(manifest.id, 'jefe-operadores', 'POST', `/${adenda.id}/revisiones`, review, 403);
   await call(other.id, 'admin', 'POST', `/${adenda.id}/revisiones`, review, 404);
-  const approved = (await call(manifest.id, 'admin', 'POST', `/${adenda.id}/revisiones`, review)).adenda;
+  const approved = (await call(manifest.id, 'generador', 'POST', `/${adenda.id}/revisiones`, review)).adenda;
   assert.equal(approved.estadoRevision, 'APROBADA');
-  assert.deepEqual((await call(manifest.id, 'admin', 'POST', `/${adenda.id}/revisiones`, review)).adenda, approved);
-  await call(manifest.id, 'admin', 'POST', `/${adenda.id}/revisiones`, { ...review, nota: 'Changed replay' }, 409);
+  const notices = await db.notificacion.findMany({ where: { titulo: 'Nueva corriente aprobada post facto' } });
+  assert.ok(notices.some((n: { usuarioId: string; datos: string }) => n.usuarioId === fixture.users.admin
+    && JSON.parse(n.datos).reviewId === review.id && JSON.parse(n.datos).corrientes.includes('Y2')));
+  assert.deepEqual((await call(manifest.id, 'generador', 'POST', `/${adenda.id}/revisiones`, review)).adenda, approved);
+  assert.equal(await db.notificacion.count({ where: { titulo: 'Nueva corriente aprobada post facto' } }), notices.length);
+  await call(manifest.id, 'generador', 'POST', `/${adenda.id}/revisiones`, { ...review, nota: 'Changed replay' }, 409);
   const statuses = await Promise.all([1, 2].map(async n => {
     const res = await fetch(`${base}/manifiestos/${manifest.id}/adendas/${adenda.id}/revisiones`, { method: 'POST', headers: { Authorization: 'Bearer ' + await token('admin'), 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: randomUUID(), version: 1, decision: 'OBSERVADA', nota: 'Concurrent reviewer ' + n }) }); return res.status;
@@ -91,7 +94,7 @@ try {
   const secondPage = await call(other.id, 'generador', 'GET', '?page=2');
   assert.equal(secondPage.adendas.length, 1); assert.equal(secondPage.documental.pendientes, 21);
   assert.equal(secondPage.documental.cierreAcreditado, false);
-  assert.ok(list.adendas.every((a: { puedeResolver: boolean }) => !a.puedeResolver));
+  assert.ok(list.adendas.every((a: { puedeResolver: boolean }) => a.puedeResolver));
   for (const m of [manifest, other, draft]) assert.deepEqual(await db.manifiesto.findUniqueOrThrow({ where: { id: m.id }, include: { residuos: true, eventos: true } }), m);
   const originalIds = historical.map((m: { id: string }) => m.id);
   assert.deepEqual(await db.manifiesto.findMany({ where: { id: { in: originalIds } }, orderBy: { id: 'asc' }, include: { residuos: true, eventos: true } }), historical);

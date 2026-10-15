@@ -6,6 +6,8 @@ import { AppError } from './errorHandler';
 import prisma from '../lib/prisma';
 import { isFullAccess } from '../utils/roleFilter';
 import { verifiedImpersonator } from '../services/impersonationIdentity.service';
+import { accountActivities } from '../services/actorActivities.service';
+import { isActorActivity } from '../domain/actorActivities';
 
 /** Shape of req.user set by isAuthenticated middleware. */
 export interface AuthUser {
@@ -83,6 +85,17 @@ export const isAuthenticated = async (
     // Adjuntar el usuario al objeto de solicitud (with restricted flag)
     const impersonatedBy = await verifiedImpersonator(decoded.impersonatedBy, user.id, decoded.restricted);
     req.user = { ...user, restricted: decoded.restricted || false, ...(impersonatedBy ? { impersonatedBy } : {}) };
+    // Per-request activity, not a mutation of Usuario.rol or another tab's JWT.
+    const activity = req.headers['x-sitrep-activity'];
+    if (activity !== undefined) {
+      if (process.env.ACTOR_MULTIROLE_ENABLED !== 'true' || decoded.restricted || impersonatedBy
+        || !user.activo || !isActorActivity(user.rol) || !isActorActivity(activity)
+        || !(await accountActivities(user)).includes(activity)) {
+        throw new AppError('Actividad no aprobada para esta cuenta', 403);
+      }
+      req.user.rolBase = user.rol;
+      req.user.rol = activity;
+    }
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {

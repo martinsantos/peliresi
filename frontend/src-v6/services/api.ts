@@ -6,6 +6,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiErrorResponse, RefreshTokenResponse } from '../types/api';
 import { toast } from '../components/ui/Toast';
+import { ACTIVITY_HEADER, readActorActivity } from './actorActivity';
 import { readSessionCheckpoint, writeSessionCheckpoint, type SessionCheckpoint } from './sessionCheckpoint';
 
 const TOKEN_KEY = 'sitrep_access_token';
@@ -179,6 +180,8 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    const activity = readActorActivity(token);
+    if (activity && !config.headers.has(ACTIVITY_HEADER)) config.headers.set(ACTIVITY_HEADER, activity);
   }
   return config;
 }, undefined, { synchronous: true });

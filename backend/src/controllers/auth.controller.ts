@@ -11,6 +11,7 @@ import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
 import { verifiedImpersonator } from '../services/impersonationIdentity.service';
 import { recordAccountMail } from '../services/account-mail.service';
+import { accountActivities } from '../services/actorActivities.service';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -76,6 +77,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     let isMultiRol = false;
 
     if (existingByCuit && existingByEmail && existingByCuit.id === existingByEmail.id) {
+      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true') throw new AppError('Ingresá a tu cuenta y solicitá otra actividad desde Mi Perfil', 409);
       // Mismo CUIT y mismo email → multi-rol legítimo
       isMultiRol = true;
       user = { id: existingByCuit.id, email: existingByCuit.email, rol, nombre: existingByCuit.nombre };
@@ -433,7 +435,8 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
       },
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);
-    res.json({ success: true, data: { user: { ...user, ...(isTrainingSession() ? { training: true } : {}) } } });
+    const activities = await accountActivities(user);
+    res.json({ success: true, data: { user: { ...user, rol: req.user.rol, actividades: activities, ...(isTrainingSession() ? { training: true } : {}) } } });
   } catch (error) {
     next(error);
   }

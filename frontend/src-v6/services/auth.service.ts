@@ -12,7 +12,9 @@ export const authService = {
     const { data } = await api.post<{ success: true; data: { user: Usuario; tokens: { accessToken: string; refreshToken: string }; restricted?: boolean; solicitudId?: string | null } }>('/auth/login', credentials);
     const { tokens, user, restricted, solicitudId } = data.data;
     await setTokensDurably(tokens.accessToken, tokens.refreshToken);
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user, restricted, solicitudId };
+    const profile = import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && user.activo && !restricted
+      ? await this.getMe() : user;
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: profile, restricted, solicitudId };
   },
 
   async logout(): Promise<void> {

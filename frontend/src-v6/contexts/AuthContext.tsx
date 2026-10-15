@@ -22,6 +22,7 @@ import type { Usuario } from '../types/models';
 export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 export interface User {
+  actividades?: UserRole[];
   training?: boolean;
   id: number | string;
   nombre: string;
@@ -100,8 +101,9 @@ function apiUserToUser(u: Usuario): User {
     nombre: [u.nombre, u.apellido].filter(Boolean).join(' '),
     email: u.email,
     rol: u.rol as UserRole,
+    actividades: u.actividades,
     sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
-    actorId: u.generador?.id || u.transportista?.id || u.operador?.id,
+    actorId: u.rol === 'GENERADOR' ? u.generador?.id : u.rol === 'TRANSPORTISTA' ? u.transportista?.id : u.rol === 'OPERADOR' ? u.operador?.id : undefined,
     avatar: initials,
     telefono: u.telefono || '',
     ubicacion: '',

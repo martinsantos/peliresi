@@ -8,12 +8,16 @@ export const wasteSchema = z.object({
   unidad: z.enum(['kg', 'l', 't', 'm3']),
 }).strict();
 const participant = z.object({
-  nombre: text, identificacion: text, domicilio: text,
+  nombre: z.string().trim().max(500).default(''),
+  identificacion: z.string().trim().max(500).default(''),
+  domicilio: z.string().trim().max(500).default(''),
+  nombreFantasia: z.string().trim().max(500).optional(),
+  telefono: z.string().trim().max(100).optional(),
   padronId: z.string().trim().min(1).max(100).optional(),
 }).strict();
 export const exceptionalCreateSchema = z.object({
   id: z.string().uuid(), generador: participant, transportista: participant,
-  patente: z.string().trim().min(1).max(20), motivo: text,
+  patente: z.string().trim().max(20).default(''), motivo: text,
   residuos: z.array(wasteSchema).min(1).max(50),
 }).strict().refine(value => !value.generador.padronId || !value.transportista.padronId, {
   message: 'Baja intensidad requiere al menos un participante sin alta',

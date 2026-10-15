@@ -14,6 +14,9 @@ interface OfflineSession {
   expiresAt: number;
 }
 
+// Multi-activity tabs must never restore another tab's role from a shared cache.
+const sessionStore = () => import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' ? sessionStorage : localStorage;
+
 /** A server response (including 401/403/5xx) is never an offline authorization. */
 export function isOfflineNetworkError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -48,7 +51,7 @@ function validUser(value: unknown): value is User {
 
 export function clearOfflineSession(): void {
   try {
-    localStorage.removeItem(OFFLINE_SESSION_KEY);
+    sessionStore().removeItem(OFFLINE_SESSION_KEY);
   } catch { /* Disabled storage must not prevent logout. */ }
 }
 
@@ -63,7 +66,7 @@ export function saveOfflineSession(user: User, token: string, now = Date.now()):
     return;
   }
   try {
-    localStorage.setItem(OFFLINE_SESSION_KEY, JSON.stringify({
+    sessionStore().setItem(OFFLINE_SESSION_KEY, JSON.stringify({
       version: 1, token, user, validatedAt: now,
       expiresAt: Math.min(identity.expiresAt, now + MAX_OFFLINE_SESSION_MS),
     } satisfies OfflineSession));
@@ -74,7 +77,7 @@ export function saveOfflineSession(user: User, token: string, now = Date.now()):
 
 export function readOfflineSession(token: string, now = Date.now()): OfflineSession | null {
   try {
-    const stored = localStorage.getItem(OFFLINE_SESSION_KEY);
+    const stored = sessionStore().getItem(OFFLINE_SESSION_KEY);
     if (!stored) return null;
     const cached = JSON.parse(stored) as OfflineSession;
     const identity = tokenIdentity(token);

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { previewDocument, previewUpload } from '../controllers/documentPreview.controller';
 import { isAuthenticated, requireAnyAdmin } from '../middlewares/auth.middleware';
+import { startActorActivity } from '../controllers/actorActivity.controller';
 import {
   iniciarSolicitud,
   getMisSolicitudes,
@@ -38,6 +39,7 @@ router.get('/', isAuthenticated, requireAnyAdmin, listarSolicitudes);
 
 // ── Candidate auth ──────────────────────────────────────────────────
 router.get('/mis-solicitudes', isAuthenticated, getMisSolicitudes);
+router.post('/actividad-adicional', isAuthenticated, startActorActivity);
 router.get('/:id', isAuthenticated, getSolicitud);
 router.put('/:id', isAuthenticated, updateSolicitud);
 router.post('/:id/enviar', isAuthenticated, enviarSolicitud);

@@ -93,6 +93,7 @@ export enum TipoDiferencia {
 // ========================================
 
 export interface Usuario {
+  actividades?: Array<'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'>;
   training?: boolean;
   id: string;
   email: string;

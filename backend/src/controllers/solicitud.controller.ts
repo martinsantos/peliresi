@@ -943,13 +943,16 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         },
       });
 
-      // Activate user + set correct role
+      // Additional approved activity must not replace the existing active role.
+      const account = process.env.ACTOR_MULTIROLE_ENABLED === 'true'
+        ? await tx.usuario.findUniqueOrThrow({ where: { id: solicitud.usuarioId }, select: { activo: true, rol: true, motivoInactividad: true } }) : null;
+      if (account?.motivoInactividad === 'SUSPENDIDA') throw new AppError('La cuenta está suspendida; no se puede reactivar desde esta solicitud', 409);
       await tx.usuario.update({
         where: { id: solicitud.usuarioId },
         data: {
           activo: true,
           motivoInactividad: null,
-          rol: solicitud.tipoActor as Rol,
+          rol: account?.activo ? account.rol : solicitud.tipoActor as Rol,
         },
       });
 
