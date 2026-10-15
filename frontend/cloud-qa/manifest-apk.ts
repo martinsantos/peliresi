@@ -116,16 +116,27 @@ async function hideKeyboard() {
   await expect.poll(() => nativeKeyboardShown(adb('shell', 'dumpsys', 'input_method')), { timeout: 10000 }).toBe(false);
 }
 const seenRoles = new Set<string>();
-async function login(role: string) {
+async function login(role: string, expectedRestricted = false) {
   await page.getByLabel('Correo electrónico o CUIT').fill(role + '@night-qa.invalid');
   await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await hideKeyboard();
   const response = page.waitForResponse(r => r.url() === origin + '/api/auth/login' && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Ingresar', exact: true }).tap();
-  expect((await response).status()).toBe(200);
+  const result = await response;
+  expect(result.status()).toBe(200);
+  expect((await result.json()).data.restricted === true).toBe(expectedRestricted);
   await expect(page).not.toHaveURL(/\/login$/);
   await dismissObservedChromePrompts(output);
   const welcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+  if (expectedRestricted) {
+    // ApplicantLayout intentionally has no operational onboarding or menu.
+    await expect(page).toHaveURL(origin + '/app/mi-solicitud');
+    await expect(page.getByRole('heading', { name: 'Mi solicitud', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salir', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Abrir menu', exact: true })).toHaveCount(0);
+    await expect(welcome).toHaveCount(0);
+    return;
+  }
   if (!seenRoles.has(role)) {
     await expect(welcome).toBeVisible(); await welcome.tap();
     await expect(welcome).toHaveCount(0);
@@ -336,7 +347,7 @@ try {
   await page.goto(origin + '/app/mi-perfil');
   await proof('14-approved-activities');
   results.push('Multi-role per-tab activity, additional registration draft and incomplete low-intensity record survive reload');
-  await logout(); await login('multirol-pending-apk');
+  await logout(); await login('multirol-pending-apk', true);
   await pendingMultiRoleJourney(page, '/app', hideKeyboard);
   await proof('15-pending-activities');
   results.push('Verified pending applicant keeps multiple activity drafts and no operational access');
