@@ -36,6 +36,12 @@ export async function createExceptionalJourney(page: Page, prefix: string, hideK
   expect(record.numeroOficial).toBeNull();
   if (linked) expect(record.datos[linked.toLowerCase()].padronId).toBeTruthy();
   await expect(page).toHaveURL(new RegExp('registro=' + record.id));
+  // Return through the UI before any reload: the fresh list cache must not hide the new record.
+  await press(page, page.getByRole('button', { name: 'Ver registros', exact: true }));
+  const listed = page.getByRole('button', { name: new RegExp('BI-' + record.id) });
+  await expect(listed).toBeVisible();
+  await press(page, listed);
+  await expect(page).toHaveURL(new RegExp('registro=' + record.id));
   await page.reload();
   await expect(page.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Registrado');
   await expect(page.getByRole('region', { name: 'Revisión original' })).toContainText('Pendiente de conformidad');

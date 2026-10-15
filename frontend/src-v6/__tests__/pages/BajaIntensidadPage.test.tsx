@@ -12,8 +12,8 @@ const entry = { id, referencia: 'BI-' + id, version: 0, etapa: 'RECIBIDO', puede
     transportista: { nombre: 'QA externo transporte', identificacion: 'Declarada', domicilio: 'QA' },
     patente: 'QA-1', motivo: 'Sin alta', residuos: [{ corriente: 'Y1', cantidad: 10, unidad: 'kg' }] },
   revisiones: [{ objetivo: id, estado: 'PENDIENTE', solicitada: false }], eventos: [] };
-function view(detail = false) {
-  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+function view(detail = false, client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+  return render(<QueryClientProvider client={client}>
     <MemoryRouter initialEntries={['/manifiestos/baja-intensidad' + (detail ? '?registro=' + id : '')]}><BajaIntensidadPage /></MemoryRouter>
   </QueryClientProvider>);
 }
@@ -49,4 +49,16 @@ it('an HTTP error is not presented as zero records', async () => {
   mock.get.mockRejectedValue(new Error('unavailable')); view();
   await screen.findByRole('alert');
   expect(screen.queryByText(/^0 registros/)).not.toBeInTheDocument();
+});
+it('invalidates a fresh list after a write without discarding the returned detail', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 } } });
+  const listKey = ['baja-intensidad', mock.user.id, null, 1];
+  client.setQueryData(listKey, { registros: [entry], total: 1 });
+  const updated = { ...entry, version: 1, etapa: 'TRATADO' };
+  mock.post.mockResolvedValue({ data: { data: { registro: updated } } });
+  view(true, client); await screen.findByText('Operación: Recibido');
+  fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' }));
+  await screen.findByText('Operación: Tratado');
+  expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
+  expect(client.getQueryData(['baja-intensidad', mock.user.id, id])).toEqual({ registro: updated });
 });

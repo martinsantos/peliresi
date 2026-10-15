@@ -94,6 +94,8 @@ export default function BajaIntensidadPage() {
     if (request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
     try {
       const result: Entry = (await api.post(path, { ...body, id: created ? creationId.current : request.current.id })).data.data.registro;
+      // Lists must not retain the shared 60-second cache after an operation or resolution.
+      void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id], refetchType: 'none' });
       qc.setQueryData(['baja-intensidad', currentUser?.id, result.id], { registro: result });
       setParams({ registro: result.id }); setCreating(false); setDifference(false); setNota('');
       if (created) creationId.current = crypto.randomUUID();
