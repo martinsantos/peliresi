@@ -2,6 +2,49 @@
 
 16/10/2026. Es un punto de traspaso de desarrollo, **no una publicación ni un GO global**. No mezclar SITREP con Precrimen u otros proyectos.
 
+## Revisión UI/UX — primera tanda (rama `codex/sitrep-uiux-review-20261016`)
+
+**Qué es.** Una revisión estática de código; en esta tanda no se ejecutó la aplicación. El detalle está en [hallazgos, cobertura y pruebas](HALLAZGOS-UIUX-20261016.md).
+
+**Qué no se hizo:**
+- No se usó el preview 76.13.234.213: no hay acceso autorizado desde esta sesión y no se improvisó otro entorno.
+- Sin capturas, consola, recorridos, build, suite completa ni APK.
+- Sin merge, deploy ni Actions.
+
+**Hallazgos.** Hay 31 registrados con ID, prioridad, ruta, rol, evidencia, efecto y aceptación. Todos son «hipótesis de código»: se sabe qué hace el código, pero nada se observó en pantalla.
+
+**Corregidos en 9 commits chicos**, uno por causa, sin tocar backend, permisos, contratos ni reglas regulatorias:
+- Los errores de red ahora se muestran en español con texto de recuperación.
+- Los coeficientes A de la TEF ya no se pierden al cambiar de paso.
+- Los textos de observación y rechazo de DGFA sobreviven a un cierre accidental.
+- El chat de solicitudes ya no envía mensajes duplicados.
+- Los botones de empresa e invitación ya no envían el formulario por accidente.
+- El CUIT de `/reclamar` abre el teclado numérico.
+- `/app` tiene `ErrorBoundary`, permite zoom con pellizco y protege los pies sin zona segura.
+- La evidencia de inspección sin señal ya no se anuncia como sincronizada.
+- El aviso «Reporte enviado» se oculta solo.
+
+**Pruebas locales livianas:**
+- 3 regresiones fallan antes del arreglo y pasan después.
+- 27 archivos unitarios afectados: 286/286.
+- Typecheck sin errores.
+- ESLint de los archivos tocados: sin errores nuevos.
+
+**Pendientes:**
+- **Funcionales:**
+  - H10: la edición de un manifiesto in situ y la fecha de retiro descartada (P0).
+  - H13: el pesaje vacío se envía como 0.
+  - H04: la verificación de sesión del alta administrativa no se reintenta.
+  - H03: el wizard bloquea el cambio de paso hasta guardar en el servidor.
+  - H17: baja intensidad se envía con Enter y conserva datos tras guardar.
+- **Decisiones de negocio:**
+  - H15: confirmar los pasos irreversibles del manifiesto.
+  - H14: cuánto deben persistir los errores.
+- **Validación:**
+  - Recorridos web/móvil/app con capturas.
+  - Build y suite completa.
+  - Android físico/APK.
+
 ## Git y punto de partida
 
 - Repositorio: `https://github.com/martinsantos/peliresi.git`.
