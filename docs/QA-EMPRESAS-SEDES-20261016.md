@@ -2,7 +2,30 @@
 
 16/10/2026. Alcance: empresa titular por CUIT, domicilios legal/productivos separados, varias personas autorizadas por responsable validado por DGFA y preparación segura del padrón.
 
-## Cierre en preview — candidato probado, no publicado
+## Ampliación: paginación y conciliación — candidato no publicado
+
+Runtime candidato `de059094c6a020ab8af9f5a6b9f26e2ad47ee2b2`, mismo contenedor de preview, sin Actions ni instalaciones nuevas. API con25 empresas por defecto/máximo100, búsqueda por razón social/nombre/CUIT, total filtrado de servidor y orden razón social+ID. Se elimina el corte silencioso de200 empresas/autorizaciones. Selección y borrador no se pierden al paginar/buscar, fallar la red o renombrar la primera empresa. El detalle carga sus permisos propios aunque esté fuera de la página visible.
+
+| Comprobación | Evidencia actual |
+| --- | --- |
+| Guardas/afectados | 29 guardas y ambas tandas unitarias afectadas aprobadas |
+| Builds | Backend aprobado en99bf90a (backend idéntico a de05909); web/app de05909 aprobados |
+| HTTP/PDF/migración | Siete guiones+PDF+compatibilidad aditiva aprobados;215 empresas y211 permisos, páginas completas sin duplicados, búsquedas y aislamiento |
+| E2E | 39/39:13 por escritorio1440×900, móvil360×800 y app web390×844; cero omitidas/inesperadas/flaky/retries,9m42s |
+| UI | Nueve adjuntos de URL/título/consola/errores analizados: consola vacía; raíz con contenido y sin overlay. Tres capturas de paginación revisadas |
+| Unit backend | 1.037/1.037,99 archivos, cero fallos/omitidas |
+| Unit frontend | 1.486/1.486,207 archivos, cero fallos/omitidas/errores de colección; una invocación completa verde,8m09s |
+| Histórico/cierre de servicios | Histórico sintético íntegro; backend/frontend/PG9 detenidos antes de unitarias,21:24:17UTC |
+
+Conciliación privada del archivo de generadores contra snapshot READ ONLY16/10/2026 18:08:59UTC:1.627 fuentes=1.278 coincidencias de ficha+277 certificados distintos de entidad conocida+1 nueva candidata+71 pendientes(66 CUIT,2 certificados,3 conciliaciones). Cero propuestas nuevas al repetir las mismas fuentes. Se conservan2.016 diferencias y164 entidades con revisiones (incluyen127 conflictos legales). Los1.556 registros de sede/certificado no se convierten automáticamente en plantas. Fichas inactivas no se habilitan. Plan sin SQL/apply, cuentas ni sobrescrituras; los datos reales nunca se subieron a preview/GitHub. Los12 pendientes de operadores/transportistas del plan anterior se conservan aparte, sin aplicarlos.
+
+Hashes de los originales inalterados: staging `520eb9f2fae13f43ff24b23047f24f4e682bf3ea3bb79a920ea747c1a2a2e0da`; snapshot `999109bd00439b40e2bed09443487dac4221d7741deca5a3d77058ca7005771e`. El plan privado registra también SHA256 del módulo compilado/testeado. No certifica vigencia posterior del padrón: antes de aplicar requiere revisión de dudas, snapshot vigente y autorización.
+
+Incidencias conservadas: primer build detuvo frontend por uso de `exact` no admitido en tipos de Testing Library; se corrigieron sólo las pruebas y se recompilaron web/app. HTTP8 reprodujo `Ú/ú` distintas por locale C del clúster; SQL confirmó `lower('Última')='Última'`. Se detuvo ese clúster sin borrarlo y se creó9 con C.utf8, Unicode existente, manteniendo la misma aserción y producto sin cambios. Antes de una migración futura comprobar también collation Unicode del destino. Los avisos act()/jsdom de fixtures unitarios antiguos se conservan; no equivalen a consola de navegador limpia ni se ocultaron para conseguir verde.
+
+Evidencias nuevas fuera del repo: `ROOT/empresas-preview-20261016/pagination/`, JSON y desktop.png/mobile.png/app.png; failure8 conserva los reportes iniciales fallidos. El cierre unit terminó21:33:28UTC. Cuota agregada1CPU/2GiB/swap0, red interna sin salida ni puertos públicos; pico1.418GiB y cero OOM/eventos de límite. Contenedor confirmado `exited`, `Running=false`, `Restart=no`, `OOMKilled=false`, sin puertos; sin procesos de tests restantes ni consumo propio de RAM/CPU. Se retienen dependencias para reutilizarlas, no se reinstalan ni borran otros proyectos. Sin correos reales, datos productivos, formulario humano ni servicios ajenos. APK/Android no incluido: este preview no tiene KVM; las tres superficies son navegador y app web, no un APK certificado.
+
+## Cierre previo en preview — histórico anterior a la paginación
 
 Candidato `cb51e62da4907c554e7e963fb6569014e36cf5ff`, rama `codex/sitrep-manifiestos-v2-20261014`. El producto incluye la corrección de etiqueta de NativeSelect en d9f1ca7; commits posteriores de este corte modifican sólo QA. El cierre documental no cambia el runtime probado.
 
