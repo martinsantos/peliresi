@@ -49,6 +49,7 @@ import { SitrepMark } from '../components/SitrepMark';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import CompanyContextBar from '../components/CompanyContextBar';
+import { canUseCompanySection } from '../services/companyContext';
 import { InstallPWAButton } from '../components/InstallPWAButton';
 import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -232,8 +233,8 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/notificaciones'), icon: <Bell size={22} />, label: 'Avisos', badge: unreadNotificationCount });
     }
 
-    return items;
-  }, [currentUser?.rol, currentUser?.esInspector, isInspector, isTransportista, isAdmin, mp, unreadNotificationCount]);
+    return items.filter(item=>canUseCompanySection(currentUser?.empresaContexto,item.to));
+  }, [currentUser?.rol, currentUser?.esInspector, currentUser?.empresaContexto, isInspector, isTransportista, isAdmin, mp, unreadNotificationCount]);
 
   // Menu items según rol
   const menuItems = useMemo(() => {
@@ -300,8 +301,8 @@ export const MobileLayout: React.FC = () => {
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
     items.push({ to: mp('/soporte'), icon: <LifeBuoy size={20} />, label: 'Soporte', badge: attention.support, section: 'tools' });
 
-    return items;
-  }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId, unreadNotificationCount, attention.applicationPending, attention.support]);
+    return items.filter(item=>canUseCompanySection(currentUser?.empresaContexto,item.to));
+  }, [currentUser?.rol, currentUser?.esInspector, currentUser?.empresaContexto, canInspect, isAdmin, isTransportista, mp, activeTripId, unreadNotificationCount, attention.applicationPending, attention.support]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');

@@ -1,5 +1,5 @@
 import { expect,it,vi,afterEach } from 'vitest';
-import { readCompanyContext,saveCompanyContext,companyHeaders,companyCacheScope } from './companyContext';
+import { readCompanyContext,saveCompanyContext,companyHeaders,companyCacheScope,canUseCompanySection } from './companyContext';
 import { saveActorActivity } from './actorActivity';
 const token=(payload:any)=>'e30.'+btoa(JSON.stringify(payload))+'.signature';
 afterEach(()=>{sessionStorage.clear();vi.unstubAllEnvs();});
@@ -20,4 +20,11 @@ it('switching personal/company context is exclusive, malformed selection fails c
  saveActorActivity('u1','OPERADOR');expect(readCompanyContext(token({id:'u1'}))).toBeNull();
  sessionStorage.setItem('sitrep_company:u1','{"empresaId":"a"}');expect(readCompanyContext(token({id:'u1'}))).toBeNull();
  expect(readCompanyContext('invalid')).toBeNull();
+});
+it('a site-limited delegate is not offered legacy company-wide sections',()=>{
+ const limited:any={todasSedes:false};
+ for(const path of ['/reportes','/mobile/mis-inspecciones','/centro-control','/admin/usuarios'])expect(canUseCompanySection(limited,path)).toBe(false);
+ for(const path of ['/mobile/manifiestos/nuevo','/empresas','/mi-perfil','/ayuda','/soporte'])expect(canUseCompanySection(limited,path)).toBe(true);
+ expect(canUseCompanySection(undefined,'/reportes')).toBe(true);
+ expect(canUseCompanySection({...limited,todasSedes:true},'/reportes')).toBe(true);
 });

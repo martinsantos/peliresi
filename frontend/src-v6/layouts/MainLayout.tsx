@@ -50,6 +50,7 @@ import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import CompanyContextBar from '../components/CompanyContextBar';
+import { canUseCompanySection } from '../services/companyContext';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
@@ -205,7 +206,7 @@ export const MainLayout: React.FC = () => {
     // Alertas para todos
     items.push({ path: '/alertas', icon: AlertTriangle, label: 'Alertas' });
     
-    return items;
+    return items.filter(item=>canUseCompanySection(currentUser?.empresaContexto,item.path));
   })();
 
   // One current section, including detail routes; hidden role items never compete.

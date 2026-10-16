@@ -273,6 +273,7 @@ export interface TipoResiduo {
 }
 
 export interface Manifiesto {
+  contextoEmpresa?:import('../services/companyContext').CompanyContext|null;
   id: string;
   numero: string;
   generadorId: string;

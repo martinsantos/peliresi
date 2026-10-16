@@ -58,6 +58,7 @@ import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declared
 import type { Manifiesto } from '../../types/models';
 import { EstadoManifiesto } from '../../types/models';
 import ManifiestoTimeline from './components/ManifiestoTimeline';
+import { companyGeneratorView } from '../../utils/enterprisePresentation';
 import ManifiestoActions from './components/ManifiestoActions';
 
 const ACTOR_SUMMARY = {
@@ -160,8 +161,8 @@ const ManifiestoDetailPage: React.FC = () => {
 
   // Generador and Operador locations for planned route
   const generadorPos = useMemo(() => {
-    const g = m.generador;
-    return g?.latitud && g?.longitud ? [g.latitud, g.longitud] as [number, number] : null;
+    const g = companyGeneratorView(m.generador,m.contextoEmpresa);
+    return g?.latitud!=null && g?.longitud!=null ? [g.latitud, g.longitud] as [number, number] : null;
   }, [m]);
   const operadorPos = useMemo(() => {
     const o = m.operador;
@@ -439,6 +440,7 @@ const ManifiestoDetailPage: React.FC = () => {
           <Card>
             <CardHeader title="Información general" icon={<FileText size={20} />} />
             <CardContent>
+              {m.contextoEmpresa?.rol==='GENERADOR'&&<dl className="mb-5 grid gap-3 sm:grid-cols-2"><div><dt className="text-sm text-neutral-600">Domicilio legal al declarar</dt><dd className="break-words">{m.contextoEmpresa.domicilioLegal.calle||'No informado'}</dd></div><div><dt className="text-sm text-neutral-600">Establecimiento y domicilio productivo</dt><dd className="break-words">{m.contextoEmpresa.establecimiento?.nombre||'No identificado'} · {m.contextoEmpresa.establecimiento?.domicilio||'Por completar'}</dd></div></dl>}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ActorSummary type="GENERADOR" actorId={m.generadorId} user={currentUser}
                   name={m.generador?.razonSocial || '-'} detail={`CUIT: ${m.generador?.cuit ? formatCuit(m.generador.cuit) : '-'}`}
@@ -587,7 +589,7 @@ const ManifiestoDetailPage: React.FC = () => {
                       <Popup>
                         <strong>Generador</strong><br />
                         {m.generador?.razonSocial || '-'}<br />
-                        <span style={{ fontSize: 11, color: '#666' }}>{m.generador?.domicilio || ''}</span>
+                        <span style={{ fontSize: 11, color: '#666' }}>{companyGeneratorView(m.generador,m.contextoEmpresa)?.domicilio || ''}</span>
                       </Popup>
                     </Marker>
                   )}

@@ -33,6 +33,8 @@ export async function enterpriseJourney(page:Page,prefix:string,surface:string,o
  await member.getByRole('button',{name:'Revocar acceso',exact:true}).click();expect((await revoked).status()).toBe(200);
  await expect(member.getByText(/Revocada/)).toBeVisible();
  await page.getByLabel('Correo de la persona',{exact:true}).fill('empresa-'+surface+'-member@night-qa.invalid');await hide();
+ await page.getByRole('checkbox',{name:'Todos los establecimientos',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'Planta Norte',exact:true}).check();
  await page.getByRole('button',{name:'Autorizar cuenta verificada',exact:true}).click();
  await expect(member.getByText(/Autorizada/)).toBeVisible();
  await options.evidence?.('enterprise-people');
@@ -65,4 +67,41 @@ export async function enterpriseJourney(page:Page,prefix:string,surface:string,o
  await page.getByRole('link',{name:'Cambiar empresa o sede',exact:true}).click();
  await page.getByRole('button',{name:'Volver a mi cuenta personal',exact:true}).click();
  await expect(page.getByText(/Actuando por QA Empresa/)).toHaveCount(0);
+}
+
+export async function enterpriseDelegateJourney(page:Page,prefix:string,surface:string,options:{hideKeyboard?:()=>Promise<void>;evidence?:(name:string)=>Promise<void>}={}) {
+ await page.goto('http://127.0.0.1:4177'+prefix+'/empresas');
+ await expect(page.getByRole('heading',{name:'Empresas y establecimientos',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Personas autorizadas',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Establecimientos',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Planta Norte',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Planta Sur',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Usar empresa y establecimiento',exact:true}).click();
+ await expect(page.getByRole('link',{name:'Cambiar empresa o sede',exact:true})).toBeVisible();
+ await page.goto('http://127.0.0.1:4177'+prefix+'/manifiestos/nuevo');
+ await page.getByText('Datos del generador',{exact:true}).click();
+ await expect(page.getByText('Productiva '+surface+' 201',{exact:true})).toBeVisible();
+ await expect(page.getByText('Legal QA '+surface+' 101',{exact:true})).toBeVisible();
+ await options.evidence?.('delegate-manifest-form');
+ await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+ const choose=async(label:string,option:RegExp)=>{await page.getByRole('button',{name:label,exact:true}).click();await page.getByRole('option',{name:option}).click();};
+ await choose('Tipo de Residuo *',/^Y1 - /);
+ await page.getByLabel('Cantidad *',{exact:true}).fill('8');await options.hideKeyboard?.();
+ await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+ await choose('Transportista *',/^QA Transporte 1 /);
+ await choose('Operador / Destino *',/^QA Operador 1 /);
+ const pending=page.waitForResponse(r=>r.url().endsWith('/api/manifiestos')&&r.request().method()==='POST');
+ await page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click();
+ const response=await pending;expect(response.status()).toBe(201);
+ const m=(await response.json()).data.manifiesto;
+ expect(m.contextoEmpresa.establecimiento.nombre).toBe('Planta Norte');
+ expect(m.contextoEmpresa.domicilioLegal.calle).toBe('Legal QA '+surface+' 101');
+ const profile=await page.evaluate(()=>{const t=localStorage.getItem('sitrep_access_token')!.split('.')[1];return JSON.parse(atob(t.replace(/-/g,'+').replace(/_/g,'/'))).id;});
+ expect(m.creadoPorId).toBe(profile);
+ await page.goto('http://127.0.0.1:4177'+prefix+'/manifiestos/'+m.id);
+ await expect(page.getByText('Planta Norte · Productiva '+surface+' 201',{exact:true})).toBeVisible();
+ await expect(page.getByText('Legal QA '+surface+' 101',{exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:/Abrir ficha de generador/})).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+ await options.evidence?.('delegate-created-manifest');
 }

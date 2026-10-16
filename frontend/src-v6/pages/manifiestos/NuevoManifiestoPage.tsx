@@ -30,11 +30,13 @@ import { useCreateManifiesto } from '../../hooks/useManifiestos';
 import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
 import type { CatalogoItem } from '../../types/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { companyGeneratorView } from '../../utils/enterprisePresentation';
 
 function ActorSummary({ actor, label }: { actor?: CatalogoItem; label: string }) {
   if (!actor) return null;
   const fields: Array<[string, unknown]> = [
-    ['CUIT', actor.cuit], ['Domicilio', actor.domicilio], ['Teléfono', actor.telefono],
+    ['CUIT', actor.cuit], [actor.domicilioLegalEmpresa!==undefined?'Domicilio productivo':'Domicilio', actor.domicilio||'Por completar'], ['Teléfono', actor.telefono],
+    ['Domicilio legal',actor.domicilioLegalEmpresa],['Establecimiento',actor.establecimientoEmpresa],
     ['Email', actor.usuario?.email], ['Inscripción', actor.numeroInscripcion],
     ['Habilitación', actor.numeroHabilitacion], ['Categoría', actor.categoria],
   ];
@@ -102,7 +104,7 @@ export const NuevoManifiestoPage: React.FC = () => {
   });
 
   // Selected actor details (auto-populated from catalogs)
-  const selectedGenerador = generadoresList.find((g) => g.id === formData.generadorId);
+  const selectedGenerador = companyGeneratorView(generadoresList.find((g) => g.id === formData.generadorId),currentUser?.empresaContexto);
   const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
   const vehiculos = (selectedTransportista?.vehiculos || []).filter((v: { activo?: boolean }) => v.activo === true);

@@ -1,7 +1,7 @@
 import type { User } from '../contexts/AuthContext';
 
 export type ActorReadType = 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
-type Reader = Pick<User, 'rol' | 'esInspector' | 'actorId'> | null | undefined;
+type Reader = Pick<User, 'rol' | 'esInspector' | 'actorId' | 'empresaContexto'> | null | undefined;
 const ADMIN_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']);
 const TYPES: Record<string, ActorReadType> = {
   generadores: 'GENERADOR', transportistas: 'TRANSPORTISTA', operadores: 'OPERADOR',
@@ -12,6 +12,7 @@ const DETAIL_PATH = /^\/(?:mobile\/)?(?:(?:admin\/)?actores\/(generadores|transp
 /** Consultation only. This rule never grants creation, editing or moderation. */
 export function canReadActorDetail(user: Reader, type: ActorReadType, id?: string): boolean {
   if (!user || !id?.trim()) return false;
+  if(user.empresaContexto&&!user.empresaContexto.todasSedes)return false;
   if (ADMIN_ROLES.has(user.rol) || user.esInspector === true) return true;
   return user.rol === type && Boolean(user.actorId) && user.actorId === id;
 }
