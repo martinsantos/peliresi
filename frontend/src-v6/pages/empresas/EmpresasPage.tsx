@@ -11,16 +11,13 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { BrandSpinner } from '../../components/ui/LoadingState';
+import { NativeSelect } from '../../components/ui/NativeSelect';
 
 type Company={id:string;cuit:string;razonSocial:string;nombreFantasia?:string;revision:number;domicilioLegal:{calle:string;localidad:string;departamento:string}};
 type Details={empresa:Company;actividades:Array<{id:string;rol:string;actorId:string}>;establecimientos:any[];autorizaciones:any[];responsables:any[];eventos:any[];invitaciones:any[];personas:any[];puedeGestionar:boolean;puedeValidar:boolean};
 const labels:Record<string,string>={GENERADOR:'Generador',TRANSPORTISTA:'Transportista',OPERADOR:'Operador'};
 const request=async(route:string,method='GET',body?:unknown)=>(await api.request({url:'/empresas'+route,method,data:body})).data.data;
 const message=(e:unknown)=>(e as any)?.response?.data?.message||'No se pudo guardar. Tus datos siguen en el formulario.';
-const selectClass='min-h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-base text-neutral-800';
-function NativeSelect({label,value,onChange,children}:{label:string;value:string;onChange:(v:string)=>void;children:React.ReactNode}) {
- return <label className="block space-y-1 text-sm font-medium text-neutral-700"><span>{label}</span><select className={selectClass} value={value} onChange={e=>onChange(e.target.value)}>{children}</select></label>;
-}
 export default function EmpresasPage(){
  const {currentUser}=useAuth(),[id,setId]=useState(''),mp=useMobilePrefix();
  const list=useQuery({queryKey:['empresas',currentUser?.id],queryFn:()=>request(''),retry:false});
