@@ -505,7 +505,8 @@ const InspeccionExpedientePage: React.FC = () => {
       if (!canWriteDraft() || evidenceScopeRef.current !== evidenceScope) return;
       await refreshPendingEvidence();
       if (!isOnline || !navigator.onLine) {
-        toast.success('Archivo protegido en el dispositivo', fields?.itemId
+        // Queued, not synced: same tone as the device-only draft above.
+        toast.info('Archivo guardado solo en este dispositivo', fields?.itemId
           ? 'Quedó vinculado a este control y se sincronizará al recuperar conexión.'
           : 'Se sincronizará al recuperar conexión.');
         return;
