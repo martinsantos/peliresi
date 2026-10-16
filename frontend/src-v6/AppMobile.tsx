@@ -7,6 +7,7 @@
 
 import React, { Suspense } from 'react';
 import { PageLoader } from './components/ui/LoadingState';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
@@ -112,6 +113,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
 function AppMobile() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
         <AuthGate>
@@ -231,6 +233,7 @@ function AppMobile() {
         </AuthGate>
       </Suspense>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
