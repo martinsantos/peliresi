@@ -1,4 +1,4 @@
-import { useRef,useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,6 +21,8 @@ const message=(e:unknown)=>(e as any)?.response?.data?.message||'No se pudo guar
 export default function EmpresasPage(){
  const {currentUser}=useAuth(),[choice,setChoice]=useState<Company>(),[page,setPage]=useState(1),[search,setSearch]=useState(''),mp=useMobilePrefix();
  const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',currentUser?.id,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
+ // Pin the initial choice too: editing its name may change the server sort order.
+ useEffect(()=>{if(!choice&&list.data?.empresas[0])setChoice(list.data.empresas[0]);},[choice,list.data]);
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true')return <p>Funcionalidad no disponible.</p>;
  const selected=choice||list.data?.empresas[0];
  return <div className="mx-auto w-full max-w-5xl space-y-5 pb-6">
