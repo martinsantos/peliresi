@@ -2,9 +2,22 @@
 
 Estado: definición y candidato de desarrollo. **No autorizado para producción.**
 
+## Implementación vigente — tolerancia, multirol y contrapartes, 15/10
+
+[Informe del candidato y resultados por superficie](QA-MULTIROL-PARTES-20261015.md). Esta sección sustituye el diagnóstico documental de abajo para estos tres puntos; no declara cerrado todo Manifiestos V2.
+
+- **MV2-110/111:** implementados campos de identidad/contacto externos opcionales, patente opcional y advertencias no bloqueantes. Datos ausentes permanecen ausentes, sin cuentas ni identidades ficticias. Continúan controles de autenticación, pertenencia y carga válida.
+- **MV2-104:** una cuenta verificada puede iniciar varias solicitudes, también antes de su primera aprobación. Borradores y revisiones separados; aprobar otra actividad no pisa el rol previo. Cambio de actividad validado por servidor y aislado por pestaña; permisos y caché corresponden a la actividad aprobada.
+- **MV2-202/402/404/405:** contrapartes vinculadas pueden revisar sin autoaprobación ni impersonación. Una corriente nueva aprobada genera aviso interno transaccional a la autoridad designada; correo/push apagados. Se conserva declaración, historial, versiones y camino de autoridad para participantes externos. No equivale a unanimidad del manifiesto original.
+- **Pendientes de esos puntos:** búsqueda transversal de antecedentes; matriz productiva de autoridad; numeración oficial excepcional e identidad del generador que la autoriza; cierre/certificados oficiales y destino documental del rechazo. No habilitar producción con una matriz de revisores QA.
+
+Pruebas y fallos de cada intento constan en el informe enlazado. Flags apagados por defecto. Sin migración de datos reales ni cambios en manifiestos existentes.
+
+**Cierre QA 16/10:** candidato cf5ed0c, corrida38741944296 intento2 SUCCESS. Backend1016/frontend1462 unit, HTTP34grupos, E2E24/24 y APKAndroid15 con12bloques completos (PDF actual/histórico, retorno, multirol, solicitante pendiente y logout). Sin fallos/omitidas/flaky en suites finales; histórico sintético intacto. Publicación sigue NO autorizada. El timeout previo del visor no se reprodujo sin relajar aserciones; no afirmar causa resuelta. Microtexto singular/plural y claridad de «Solicitar» frente a «Continuar» quedan como pulido no bloqueante, no GO visual global. Detalle/evidencias en el informe.
+
 ## Prioridad vigente tras la segunda respuesta — 15/10
 
-[Contrato actualizado y diagnóstico del alta multirol](DECISIONES-MANIFIESTOS-V2-20261015.md). Prevalece sobre la cola y tablaD anteriores en los puntos contestados. Esta actualización es documental, no ejecución ni nuevaQA:
+[Contrato actualizado y diagnóstico del alta multirol](DECISIONES-MANIFIESTOS-V2-20261015.md). Registro histórico de la definición previa al candidato anterior; sus requisitos siguen vigentes, pero el estado de implementación se informa arriba:
 
 - **MV2-110/111:** eliminar obligatoriedad de datos de participantes externos en baja intensidad; advertir faltantes, preservar identidad incompleta y responsable, sin inventar datos ni fusionar desconocidos. El candidato probado aún exige nombre/identificación/domicilio: pendiente de corrección.
 - **MV2-104 (nuevo, alta multirol):** una identidad/CUIT, varias actividades y aprobaciones independientes; contexto de rol validado por servidor. Alta/solicitud/sesión actuales sólo manejan un rol. No duplicar cuentas ni sobrescribir el rol previo al aprobar otra actividad.
