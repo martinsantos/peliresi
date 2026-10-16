@@ -31,7 +31,7 @@ export default function EmpresaInvitacionPage() {
    {register&&<Input label="Tu nombre" required value={name} autoComplete="name" onChange={e=>setName(e.target.value)}/>}
    <Input label={register?'Crear contraseña':'Contraseña de tu cuenta'} type="password" autoComplete={register?'new-password':'current-password'} required value={password} onChange={e=>setPassword(e.target.value)}/>
    <Button type="submit" disabled={busy}>{register?'Crear cuenta personal':'Aceptar acceso a empresa'}</Button>
-   <Button variant="outline" disabled={busy} onClick={()=>{setRegister(!register);setPassword('');}}>{register?'Ya tengo cuenta':'No tengo cuenta'}</Button>
+   <Button type="button" variant="outline" disabled={busy} onClick={()=>{setRegister(!register);setPassword('');}}>{register?'Ya tengo cuenta':'No tengo cuenta'}</Button>
    <p className="text-sm text-neutral-600">La autorización no modifica tu cuenta ni aprueba actividades regulatorias nuevas.</p>
   </form>:!error&&<p role="status" className="mt-4">Consultando invitación…</p>}
  </Card></div>;
