@@ -1,8 +1,7 @@
 name: SITREP Manifest V2 Isolated QA
 on:
+  # Expensive full regression: explicit execution only, never on every push.
   workflow_dispatch:
-  push:
-    branches: [codex/sitrep-manifiestos-v2-20261014]
 permissions:
   contents: read
 concurrency:
