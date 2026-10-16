@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudEnvironment, root } from './safety.ts';
 assertCloudEnvironment();
@@ -8,14 +8,15 @@ let processes:Array<{pid:number;file:string}>=[];
 try{processes=JSON.parse(await readFile(path.join(output,'processes.json'),'utf8'));}catch{}
 const stopped=[];
 const forced:number[]=[];
+function commandFor(pid:number){
+ try{return readFileSync('/proc/'+pid+'/cmdline','utf8').replaceAll('\0',' ');}
+ catch(error){if(['ENOENT','ESRCH'].includes((error as NodeJS.ErrnoException).code||''))return '';throw error;}
+}
 function stillOwned(item:{pid:number;file:string}){
- let command='';
- try{command=execFileSync('ps',['-p',String(item.pid),'-o','args='],{encoding:'utf8'});}catch{return false;}
- return command.includes(path.join(root,'frontend/cloud-qa',item.file));
+ return commandFor(item.pid).includes(path.join(root,'frontend/cloud-qa',item.file));
 }
 for(const item of processes){
-  let command='';
-  try{command=execFileSync('ps',['-p',String(item.pid),'-o','args='],{encoding:'utf8'});}catch{continue;}
+ const command=commandFor(item.pid);if(!command)continue;
   if(!command.includes(path.join(root,'frontend/cloud-qa',item.file)))throw Error('PID identity mismatch');
  process.kill(item.pid,'SIGTERM');
  const until=Date.now()+3000;
