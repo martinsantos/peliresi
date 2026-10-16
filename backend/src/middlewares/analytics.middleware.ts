@@ -79,7 +79,7 @@ export const analyticsMiddleware = (req: Request, res: Response, next: NextFunct
         const analyticsData: AnalyticsData = {
             timestamp: new Date(),
             method: req.method,
-            path: req.path,
+            path: req.path.replace(/(\/empresas\/invitaciones\/)[^/]+/,'$1[redacted]'),
             userAgent: req.headers['user-agent'] || 'unknown',
             ip: req.ip || req.socket.remoteAddress || 'unknown',
             userId: user?.id,

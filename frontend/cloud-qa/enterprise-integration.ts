@@ -100,8 +100,10 @@ try {
  const pending=await db.usuario.findUniqueOrThrow({where:{email:newEmail}});
  const newInvite=await invite(newEmail),newRoute=newInvite.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/');
  await req(null,newRoute+'/aceptar',403,{email:newEmail,password});
- // Only synthetic proof of verified email; no email is delivered by this suite.
- await db.usuario.update({where:{id:pending.id},data:{emailVerified:true}});
+ // Synthetic mailbox proof: exercise the real verifier without delivering email.
+ const verifyToken=randomUUID();
+ await db.usuario.update({where:{id:pending.id},data:{emailVerificationToken:createHash('sha256').update(verifyToken).digest('hex')}});
+ await req(null,'/auth/verify-email?token='+verifyToken);
  await req(null,newRoute+'/aceptar',200,{email:newEmail,password});
  const suspended=await db.usuario.create({data:{nombre:'QA Suspendida',email:'empresa-suspended@night-qa.invalid',password:original.password,rol:'GENERADOR',activo:false,emailVerified:true,motivoInactividad:'SUSPENDIDA'}});
  const si=await invite(suspended.email),sr=si.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/');
@@ -109,6 +111,7 @@ try {
  await req(null,sr+'/aceptar',403,{email:suspended.email,password},'POST',{'X-Forwarded-For':'192.0.2.81'});
  const fresh=await db.usuario.findUniqueOrThrow({where:{id:pending.id}});assert.equal(fresh.activo,true);assert.equal(fresh.cuit,null);
  assert.equal(await db.generador.count({where:{usuarioId:pending.id}}),0);
+ assert.equal(await db.emailQueue.count({where:{estado:'ENVIADO'}}),0,'no email sent');
  for(const u of beforeUsers)assert.deepEqual(await db.usuario.findUniqueOrThrow({where:{id:u.id}}),u,'existing user unchanged');
  for(const a of beforeActors)assert.deepEqual(await db.generador.findUniqueOrThrow({where:{id:a.id}}),a,'existing actor unchanged');
  for(const m of legacy)assert.deepEqual(await db.manifiesto.findUniqueOrThrow({where:{id:m.id},include:{residuos:true,eventos:true}}),m,'existing manifest unchanged');

@@ -13,6 +13,10 @@ export const editEstablecimiento = z.object({...siteFields,revision:z.number().i
 export const scopeSchema = z.object({actividadId:id,todosEstablecimientos:z.boolean(),establecimientoIds:z.array(id).max(100)}).refine(s=>s.todosEstablecimientos?s.establecimientoIds.length===0:s.establecimientoIds.length>0,'Elegí todos los establecimientos o una selección explícita');
 export const invitationSchema = scopeSchema.safeExtend({email:z.string().trim().toLowerCase().email().max(254)});
 export const personSchema = scopeSchema.safeExtend({email:z.string().trim().toLowerCase().email().max(254),revision:z.number().int().nonnegative().optional()});
+/** Persist only grant fields, never an invitation's id/token/email/audit metadata. */
+export const authorizationScope=(data:{actividadId:string;todosEstablecimientos:boolean;establecimientoIds:string[]})=>({
+ actividadId:data.actividadId,todosEstablecimientos:data.todosEstablecimientos,establecimientoIds:[...data.establecimientoIds],
+});
 export type EnterpriseContext = { empresaId:string;razonSocial:string;actividadId:string;rol:string;actorId:string;establecimientoId:string|null;establecimiento?:{id:string;nombre:string;domicilio:string;localidad?:string|null;departamento?:string|null;certificados:unknown};autorizacionId:string;revision:number;todasSedes:boolean;domicilioLegal:unknown };
 /** Delegated access never guesses the site of an old, unassigned manifest. */
 export function canReadEnterpriseManifest(context:EnterpriseContext|undefined,manifest:{contextoEmpresa?:unknown}) {

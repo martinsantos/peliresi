@@ -5,7 +5,7 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { createEmpresa,editEmpresa,createEstablecimiento,editEstablecimiento,actividadEmpresa,invitationSchema,personSchema } from '../domain/empresa';
+import { createEmpresa,editEmpresa,createEstablecimiento,editEstablecimiento,actividadEmpresa,invitationSchema,personSchema,authorizationScope } from '../domain/empresa';
 import { verifiedCuit } from '../domain/conciliacionExterna';
 import { canAdministerCompanies,requireCompanyManager,checkCompanyScope,enterpriseEvent,companyContexts } from '../services/empresa.service';
 
@@ -89,10 +89,11 @@ export const saveSite=companyAction(async(req,res)=>{
  });return send(res,{establecimiento:site},edit?200:201);
 });
 async function authorizePerson(db:any,actor:any,empresaId:string,data:{actividadId:string;todosEstablecimientos:boolean;establecimientoIds:string[]},userId:string,revision?:number) {
- await checkCompanyScope(db,empresaId,data);
+ const scope=authorizationScope(data);
+ await checkCompanyScope(db,empresaId,scope);
  const before=await db.autorizacionEmpresa.findUnique({where:{actividadId_usuarioId:{actividadId:data.actividadId,usuarioId:userId}}});
  if(before&&before.revision!==revision)throw new AppError('El acceso ya existe o cambió. Revisalo antes de modificarlo.',409);
- const after=before?await db.autorizacionEmpresa.update({where:{id:before.id},data:{...data,activa:true,otorgadaPor:actor.id,revision:{increment:1}}}):await db.autorizacionEmpresa.create({data:{...data,empresaId,usuarioId:userId,otorgadaPor:actor.id}});
+ const after=before?await db.autorizacionEmpresa.update({where:{id:before.id},data:{...scope,activa:true,otorgadaPor:actor.id,revision:{increment:1}}}):await db.autorizacionEmpresa.create({data:{...scope,empresaId,usuarioId:userId,otorgadaPor:actor.id}});
  await enterpriseEvent(db,actor,empresaId,'PERSONA_AUTORIZADA',{antes:before,despues:after});return after;
 }
 export const addPerson=companyAction(async(req,res)=>{

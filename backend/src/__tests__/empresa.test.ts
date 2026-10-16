@@ -1,5 +1,5 @@
 import { expect,it } from 'vitest';
-import { createEmpresa,createEstablecimiento,personSchema,canReadEnterpriseManifest, type EnterpriseContext } from '../domain/empresa';
+import { createEmpresa,createEstablecimiento,personSchema,canReadEnterpriseManifest,authorizationScope, type EnterpriseContext } from '../domain/empresa';
 import { applyRoleFilter,canAccessManifiesto } from '../utils/roleFilter';
 import { planCompanyRegister,type PadronRow } from '../domain/padronEmpresaPlan';
 it('company CUIT is verified, legal and productive addresses are distinct and no authority can be forged',()=>{
@@ -28,6 +28,11 @@ it('site isolation is applied to list/search and detail, old unassigned records 
  expect(canReadEnterpriseManifest({...context,todasSedes:true},{})).toBe(true);
 });
 const row=(n:number,certificate='G-000001'):PadronRow=>({source:{file:'synthetic.xlsx',sha256:'a'.repeat(64),sheet:'REGISTRO',row:n},participant:{cuitNormalized:'30712345671',certificate,name:'Sintética'},addresses:{legal:['Legal','',''],productive:['Productiva','','']},fields:[{cell:'AD2',value:'observación sin presentar'}],sourceMarks:{legalStatus:null,colors:['FF0000']},reconciliation:{status:'COINCIDENCIA_CERTIFICADO_Y_CUIT',actorId:'existing'},apply:false});
+it('invitation acceptance projects grant scope without copying invitation identity or credentials into authorization',()=>{
+ const input={id:'invitation',email:'qa@invalid',tokenHash:'secret-hash',creadaPor:'issuer',actividadId:'a',todosEstablecimientos:false,establecimientoIds:['s']};
+ expect(authorizationScope(input)).toEqual({actividadId:'a',todosEstablecimientos:false,establecimientoIds:['s']});
+ expect(authorizationScope(input).establecimientoIds).not.toBe(input.establecimientoIds);
+});
 it('register plan keeps several establishments per company, all raw observations and never proposes user creation or overwrite',()=>{
  const a=row(2),b=row(3,'G-000002');b.addresses.legal=['Otro domicilio','',''];
  const plan=planCompanyRegister([a,b]);

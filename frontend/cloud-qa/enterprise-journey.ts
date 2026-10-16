@@ -36,6 +36,19 @@ export async function enterpriseJourney(page:Page,prefix:string,surface:string,o
  await page.getByRole('button',{name:'Autorizar cuenta verificada',exact:true}).click();
  await expect(member.getByText(/Autorizada/)).toBeVisible();
  await options.evidence?.('enterprise-people');
+ // Accept another person's invitation without replacing the owner's open session.
+ const ownerBefore=await page.evaluate(()=>localStorage.getItem('sitrep_access_token'));
+ await page.getByLabel('Correo de la persona',{exact:true}).fill('empresa-'+surface+'-other@night-qa.invalid');await hide();
+ await page.getByRole('button',{name:'Preparar invitación',exact:true}).click();
+ const invitation=await page.getByLabel('Enlace de invitación',{exact:true}).inputValue();
+ expect(invitation).toMatch(/\/empresa-invitacion\/\w{64}$/);
+ await page.goto(invitation);
+ await page.getByLabel('Contraseña de tu cuenta',{exact:true}).fill('OnlyLocal-NightQA-2026!');await hide();
+ await page.getByRole('button',{name:'Aceptar acceso a empresa',exact:true}).click();
+ await expect(page.getByText('Acceso autorizado. Tu sesión anterior no se modificó.',{exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>localStorage.getItem('sitrep_access_token'))).toBe(ownerBefore);
+ await options.evidence?.('enterprise-invitation');
+ await page.goto('http://127.0.0.1:4177'+prefix+'/empresas');
  await page.getByRole('button',{name:'Historial',exact:true}).click();
  await expect(page.getByText('PERSONA REVOCADA',{exact:true})).toBeVisible();
  await expect(page.getByText('DOMICILIO LEGAL ACTUALIZADO',{exact:true})).toBeVisible();
