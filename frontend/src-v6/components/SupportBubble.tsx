@@ -27,6 +27,12 @@ function Bubble({ owner, mobile, aboveTrip, hidden, inline }: { owner: string; m
   const mounted = useRef(true);
   const inFlight = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  // The confirmation floats over the task; it must not stay on every later screen.
+  useEffect(() => {
+    if (!sent) return;
+    const timer = setTimeout(() => setSent(false), 8000);
+    return () => clearTimeout(timer);
+  }, [sent]);
   useEffect(() => {
     const viewport = window.visualViewport;
     const check = () => setKeyboard(Boolean(viewport && viewport.height < window.innerHeight - 150));

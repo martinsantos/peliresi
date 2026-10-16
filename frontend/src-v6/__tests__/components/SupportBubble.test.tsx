@@ -67,3 +67,18 @@ describe('help bubble opens from the current task without automatic delivery', (
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
+describe('help bubble confirmation', () => {
+  beforeEach(() => { vi.clearAllMocks(); mocks.user.id = 'owner'; mocks.pending = null; mocks.impersonation = null; mocks.matches.mockReturnValue(true); mocks.capture.mockResolvedValue(new File(['jpeg'], 'pantalla.jpg')); });
+  it('does not stay over later screens after a delivered report', async () => {
+    render(<SupportBubble mobile />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ayuda y soporte técnico' }));
+    await screen.findByRole('dialog');
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'ACK real simulado' }));
+      expect(screen.getByRole('status')).toHaveTextContent('Reporte enviado a soporte');
+      act(() => { vi.advanceTimersByTime(8000); });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally { vi.useRealTimers(); }
+  });
+});
