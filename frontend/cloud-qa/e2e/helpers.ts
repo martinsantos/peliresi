@@ -145,8 +145,21 @@ export async function readableMapLayers(group: Locator) {
 
 export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';
 
+const fixturePages = new WeakSet<Page>();
+async function isolatedMapTiles(page: Page, info: TestInfo) {
+  if (process.env.SITREP_QA_EXECUTOR !== 'preview-container' || fixturePages.has(page)) return;
+  fixturePages.add(page);
+  info.annotations.push({ type: 'provider-fixture', description: 'OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified.' });
+  await page.route('https://tile.openstreetmap.org/**', async route => {
+    expect(route.request().method()).toBe('GET');
+    expect(new URL(route.request().url()).pathname).toMatch(/^\/\d+\/\d+\/\d+\.png$/);
+    await route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><path fill="#edf2ef" d="M0 0h256v256H0z"/><path fill="none" stroke="#c6d5cc" d="M0 64h256M0 128h256M0 192h256M64 0v256M128 0v256M192 0v256"/><text x="18" y="32" fill="#52655a" font-size="12">QA - MAPA SIMULADO</text></svg>' });
+  });
+}
+
 /** Real synthetic-account login; no auth storage or business API interception. */
 export async function login(page: Page, info: TestInfo, user = 'admin', options: { showWelcome?: boolean } = {}) {
+  await isolatedMapTiles(page, info);
   // Metadata consumed only by the loopback QA reverse proxy. Login still goes
   // through the real form and real backend; this cookie carries no credentials.
   await page.context().addCookies([{ name: 'sitrep_qa_client', value: `127.11.${Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`, url: 'http://127.0.0.1:4177' }]);
