@@ -66,9 +66,11 @@ try {
   const snapshot = { version: 1, transportistaId: fixture.actors.transportista,
     vehiculo: { id: 'night-qa-vehicle-1', patente: 'QA0001', marca: 'QA', modelo: 'SINTETICO' }, chofer: null };
   const { residuos: _residues, ...scalars } = data;
-  await db.manifiesto.create({ data: { ...scalars, id: 'manifest-qa-new-schema', numero: 'QA-NEW-SCHEMA', asignacionTransporte: snapshot } });
+  const enterpriseSnapshot={empresaId:'qa-company',establecimientoId:'qa-site',domicilioLegal:{calle:'QA legal al declarar'}};
+  await db.manifiesto.create({ data: { ...scalars, id: 'manifest-qa-new-schema', numero: 'QA-NEW-SCHEMA', asignacionTransporte: snapshot,contextoEmpresa:enterpriseSnapshot } });
   await oldDb.manifiesto.update({ where: { id: 'manifest-qa-new-schema' }, data: { observaciones: 'QA write through previous client' } });
   assert.deepEqual((await db.manifiesto.findUniqueOrThrow({ where: { id: 'manifest-qa-new-schema' } })).asignacionTransporte, snapshot);
+  assert.deepEqual((await db.manifiesto.findUniqueOrThrow({ where: { id: 'manifest-qa-new-schema' } })).contextoEmpresa, enterpriseSnapshot);
   await oldDb.manifiesto.create({ data: { ...scalars, id: 'manifest-qa-old-client', numero: 'QA-OLD-CLIENT' } });
   assert.equal((await db.manifiesto.findUniqueOrThrow({ where: { id: 'manifest-qa-old-client' } })).asignacionTransporte, null);
   await writeFile(path.join(output, 'manifest-migration.json'), JSON.stringify({ passed: true,

@@ -18,7 +18,8 @@ const contexts:any={};
 try {
  const original=await db.usuario.findUniqueOrThrow({where:{id:fixture.users.generador}});
  const template=await db.generador.findUniqueOrThrow({where:{id:fixture.actors.generador}});
- const legacy=await db.manifiesto.findMany({orderBy:{id:'asc'},include:{residuos:true,eventos:true}});
+ const manifestInclude={residuos:{orderBy:{id:'asc'}},eventos:{orderBy:{id:'asc'}}};
+ const legacy=await db.manifiesto.findMany({orderBy:{id:'asc'},include:manifestInclude});
  const beforeUsers=await db.usuario.findMany({orderBy:{id:'asc'}});
  const beforeActors=await db.generador.findMany({orderBy:{id:'asc'}});
  const admin=await login('admin');
@@ -114,7 +115,7 @@ try {
  assert.equal(await db.emailQueue.count({where:{estado:'ENVIADO'}}),0,'no email sent');
  for(const u of beforeUsers)assert.deepEqual(await db.usuario.findUniqueOrThrow({where:{id:u.id}}),u,'existing user unchanged');
  for(const a of beforeActors)assert.deepEqual(await db.generador.findUniqueOrThrow({where:{id:a.id}}),a,'existing actor unchanged');
- for(const m of legacy)assert.deepEqual(await db.manifiesto.findUniqueOrThrow({where:{id:m.id},include:{residuos:true,eventos:true}}),m,'existing manifest unchanged');
+ for(const m of legacy)assert.deepEqual(await db.manifiesto.findUniqueOrThrow({where:{id:m.id},include:manifestInclude}),m,'existing manifest unchanged, including every residue/event field in deterministic ID order');
  // Never retain passwords, JWTs or invitation capabilities in downloadable reports.
  await writeFile(path.join(process.env.QA_ARTIFACTS!,'enterprise-fixture.json'),JSON.stringify(Object.fromEntries(Object.entries(contexts).map(([k,v]:any)=>[k,{companyId:v.company.id,northId:v.north.id,southId:v.south.id,prefix:v.prefix}]))));
  await writeFile(path.join(process.env.QA_ARTIFACTS!,'enterprise-http.json'),JSON.stringify({passed:true,emailSent:0,groups:[
