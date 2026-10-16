@@ -72,7 +72,7 @@ const ReclamarCuentaPage: React.FC = () => {
         <AlertCircle size={16} className="shrink-0" />{error}
       </div>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input label="CUIT *" required value={cuit} onChange={event => setCuit(event.target.value)} autoComplete="off"
+        <Input label="CUIT *" required value={cuit} onChange={event => setCuit(event.target.value)} autoComplete="off" inputMode="numeric"
           leftIcon={<Hash size={16} />} placeholder="Con o sin guiones" />
         <Input label="Razón social *" required value={razonSocial} onChange={event => setRazonSocial(event.target.value)}
           autoComplete="organization" leftIcon={<Building2 size={16} />} placeholder="Nombre de tu empresa" />
