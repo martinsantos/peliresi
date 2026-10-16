@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { verifiedCuit } from './conciliacionExterna';
 export const empresaEnabled = () => process.env.ENTERPRISE_ENABLED === 'true';
+const positiveQuery = (fallback:string,max:number) => z.string().regex(/^[1-9]\d*$/).default(fallback).transform(Number).refine(n=>Number.isSafeInteger(n)&&n<=max,'Paginación inválida');
+export const companyListQuery = z.object({page:positiveQuery('1',1000000),limit:positiveQuery('25',100),search:z.string().trim().max(100).default('')}).strict();
 const id = z.string().trim().min(1).max(100);
 export const actividadEmpresa = z.enum(['GENERADOR','TRANSPORTISTA','OPERADOR']);
 export const domicilioLegal = z.object({ calle:z.string().trim().max(300), localidad:z.string().trim().max(150), departamento:z.string().trim().max(100) }).strict();

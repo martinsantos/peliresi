@@ -1,0 +1,30 @@
+import { render,screen,fireEvent,cleanup } from '@testing-library/react';
+import { afterEach,expect,test,vi } from 'vitest';
+import { CompanyPicker } from './CompanyPicker';
+afterEach(cleanup);
+const first={id:'a',cuit:'30712345671',razonSocial:'Empresa Alfa'},second={id:'b',cuit:'20123456786',razonSocial:'Empresa Beta'};
+const callbacks=()=>({onChoose:vi.fn(),onSearch:vi.fn(),onPage:vi.fn()});
+test('search is submitted deliberately, page controls use server totals, and selection survives a different page and no matches',()=>{
+ const handlers=callbacks(),props={...handlers,companies:[first],selected:first,pagination:{page:1,limit:25,total:1279,totalPages:52},busy:false};
+ const view=render(<CompanyPicker {...props}/>);
+ expect(screen.getByText('1–1 de 1279 empresas')).toBeVisible();
+ expect(screen.getByRole('button',{name:'Anterior'})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('Buscar empresa'),{target:{value:'  Beta  '}});expect(handlers.onSearch).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Buscar',exact:true}));expect(handlers.onSearch).toHaveBeenLastCalledWith('Beta');
+ fireEvent.click(screen.getByRole('button',{name:'Siguiente'}));expect(handlers.onPage).toHaveBeenLastCalledWith(2);
+ view.rerender(<CompanyPicker {...props} companies={[second]} pagination={{page:2,limit:25,total:26,totalPages:2}}/>);
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('a');expect(screen.getAllByRole('option')).toHaveLength(2);
+ fireEvent.change(screen.getByLabelText('Empresa',{exact:true}),{target:{value:'b'}});expect(handlers.onChoose).toHaveBeenLastCalledWith('b');
+ expect(screen.getByRole('button',{name:'Siguiente'})).toBeDisabled();
+ view.rerender(<CompanyPicker {...props} companies={[]} pagination={{page:1,limit:25,total:0,totalPages:1}}/>);
+ expect(screen.getByText('Sin coincidencias')).toBeVisible();expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('a');
+ fireEvent.click(screen.getByRole('button',{name:'Limpiar búsqueda'}));expect(handlers.onSearch).toHaveBeenLastCalledWith('');
+});
+test('loading disables pagination/search, retains the selected native option and never requests keyboard focus',()=>{
+ render(<CompanyPicker {...callbacks()} companies={[]} selected={first} pagination={{page:1,limit:25,total:0,totalPages:1}} busy/>);
+ expect(screen.getByRole('status')).toHaveTextContent('Consultando empresas');
+ expect(screen.getByRole('button',{name:'Buscar',exact:true})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Siguiente'})).toBeDisabled();
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('a');
+ expect(document.activeElement).not.toBe(screen.getByLabelText('Buscar empresa'));
+});

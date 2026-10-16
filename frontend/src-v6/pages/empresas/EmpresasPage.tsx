@@ -10,26 +10,28 @@ import { catalogoService } from '../../services/catalogo.service';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
-import { BrandSpinner } from '../../components/ui/LoadingState';
 import { NativeSelect } from '../../components/ui/NativeSelect';
+import { CompanyPicker,type CompanyPagination } from '../../components/CompanyPicker';
 
 type Company={id:string;cuit:string;razonSocial:string;nombreFantasia?:string;revision:number;domicilioLegal:{calle:string;localidad:string;departamento:string}};
-type Details={empresa:Company;actividades:Array<{id:string;rol:string;actorId:string}>;establecimientos:any[];autorizaciones:any[];responsables:any[];eventos:any[];invitaciones:any[];personas:any[];puedeGestionar:boolean;puedeValidar:boolean};
+type Details={empresa:Company;contextos:CompanyChoice[];actividades:Array<{id:string;rol:string;actorId:string}>;establecimientos:any[];autorizaciones:any[];responsables:any[];eventos:any[];invitaciones:any[];personas:any[];puedeGestionar:boolean;puedeValidar:boolean};
 const labels:Record<string,string>={GENERADOR:'Generador',TRANSPORTISTA:'Transportista',OPERADOR:'Operador'};
 const request=async(route:string,method='GET',body?:unknown)=>(await api.request({url:'/empresas'+route,method,data:body})).data.data;
 const message=(e:unknown)=>(e as any)?.response?.data?.message||'No se pudo guardar. Tus datos siguen en el formulario.';
 export default function EmpresasPage(){
- const {currentUser}=useAuth(),[id,setId]=useState(''),mp=useMobilePrefix();
- const list=useQuery({queryKey:['empresas',currentUser?.id],queryFn:()=>request(''),retry:false});
+ const {currentUser}=useAuth(),[choice,setChoice]=useState<Company>(),[page,setPage]=useState(1),[search,setSearch]=useState(''),mp=useMobilePrefix();
+ const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',currentUser?.id,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true')return <p>Funcionalidad no disponible.</p>;
- const selected=id||list.data?.empresas?.[0]?.id||'';
+ const selected=choice||list.data?.empresas[0];
  return <div className="mx-auto w-full max-w-5xl space-y-5 pb-6">
   <div><Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Mi perfil</Link><h1 className="text-2xl font-bold text-neutral-900">Empresas y establecimientos</h1></div>
-  {list.isPending?<p role="status"><BrandSpinner size={20}/> Consultando empresas…</p>:list.isError?<div role="alert"><p>No pudimos consultar las empresas.</p><Button onClick={()=>void list.refetch()}>Reintentar</Button></div>:<>
-   {list.data.empresas.length?<NativeSelect label="Empresa" value={selected} onChange={setId}>{list.data.empresas.map((c:Company)=><option key={c.id} value={c.id}>{c.razonSocial} · {c.cuit}</option>)}</NativeSelect>:<p>No tenés empresas autorizadas.</p>}
-   {selected&&<CompanyDetail key={selected} id={selected} choices={list.data.contextos||[]} reloadList={()=>list.refetch()}/>}
-   {list.data.puedeValidar&&<details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold">Registrar empresa</summary><CompanyCreate done={async c=>{await list.refetch();setId(c.id);}}/></details>}
-  </>}
+  <CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
+   onChoose={id=>setChoice(list.data?.empresas.find(c=>c.id===id)||selected)}
+   onPage={next=>{setChoice(selected);setPage(next);}}
+   onSearch={value=>{setChoice(selected);setPage(1);setSearch(value);}}/>
+  {list.isError&&<div role="alert"><p>No pudimos consultar las empresas.</p><Button onClick={()=>void list.refetch()}>Reintentar</Button></div>}
+  {selected&&<CompanyDetail key={selected.id} id={selected.id} reloadList={()=>list.refetch()}/>}
+  {list.data?.puedeValidar&&<details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold">Registrar empresa</summary><CompanyCreate done={async c=>{setChoice(c);await list.refetch();}}/></details>}
  </div>;
 }
 function CompanyCreate({done}:{done:(c:Company)=>Promise<void>}){
@@ -39,14 +41,14 @@ function CompanyCreate({done}:{done:(c:Company)=>Promise<void>}){
   {error&&<p role="alert" className="sm:col-span-2 text-error-700">{error}</p>}<Button type="submit" disabled={busy}>Registrar empresa</Button>
  </form>;
 }
-function CompanyDetail({id,choices,reloadList}:{id:string;choices:CompanyChoice[];reloadList:()=>Promise<unknown>}){
+function CompanyDetail({id,reloadList}:{id:string;reloadList:()=>Promise<unknown>}){
  const {currentUser}=useAuth();const [tab,setTab]=useState('empresa'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
  const query=useQuery<Details>({queryKey:['empresa',currentUser?.id,id],queryFn:()=>request('/'+id),retry:false});
  async function run(action:()=>Promise<unknown>,after?:()=>void){if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');try{await action();await Promise.all([query.refetch(),reloadList()]);after?.();setNotice('Cambios guardados');}catch(e){setError(message(e));}finally{setBusy(false);lock.current=false;}}
  if(!query.data)return query.isError?<div role="alert"><p>No pudimos abrir la empresa.</p><Button onClick={()=>void query.refetch()}>Reintentar empresa</Button></div>:<p role="status">Cargando empresa…</p>;
  const d=query.data;
  return <>
-  <WorkspaceChoices choices={choices.filter(c=>c.empresaId===id)}/>
+  <WorkspaceChoices choices={d.contextos||[]}/>
   <nav className="flex gap-2 overflow-x-auto border-b border-neutral-200" aria-label="Secciones de empresa">{[['empresa','Empresa'],['sedes','Establecimientos'],['personas','Personas autorizadas'],['historial','Historial']].filter(([key])=>d.puedeGestionar||!['personas','historial'].includes(key)).map(([key,title])=><button type="button" key={key} className={'min-h-11 shrink-0 border-b-2 px-3 font-medium '+(tab===key?'border-primary-700 text-primary-800':'border-transparent text-neutral-600')} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{title}</button>)}</nav>
   {error&&<p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-error-800">{error}</p>}{notice&&<p role="status" className="text-primary-800">{notice}</p>}
   {tab==='empresa'&&<><CompanyForm key={d.empresa.revision} company={d.empresa} manage={d.puedeGestionar} busy={busy} save={data=>run(()=>request('/'+id,'PUT',data))}/>{d.puedeValidar&&<AuthorityTools id={id} details={d} busy={busy} run={run}/>}</>}

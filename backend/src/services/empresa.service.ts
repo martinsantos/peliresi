@@ -22,9 +22,20 @@ export async function checkCompanyScope(db:any,empresaId:string,scope:{actividad
  if(scope.establecimientoIds.length&&await db.establecimientoEmpresa.count({where:{empresaId,activo:true,id:{in:scope.establecimientoIds}}})!==scope.establecimientoIds.length)throw new AppError('Establecimiento ajeno o inactivo',400);
  return activity;
 }
-export async function companyContexts(user:any) {
+/** Metadata only: listing a page must not hydrate every establishment of every company. */
+export async function accessibleCompanyIds(user:any) {
  if(!empresaEnabled()||!user.activo||!user.emailVerified||user.restricted||user.impersonatedBy)return [];
- const grants=await prisma.autorizacionEmpresa.findMany({where:{usuarioId:user.id,activa:true},orderBy:{createdAt:'asc'},take:200});
+ const [owners,grants]=await Promise.all([
+  prisma.responsableEmpresa.findMany({where:{usuarioId:user.id,revocadoAt:null},select:{empresaId:true}}),
+  prisma.autorizacionEmpresa.findMany({where:{usuarioId:user.id,activa:true},select:{empresaId:true,actividadId:true}}),
+ ]);
+ const activities=grants.length?await prisma.empresaActividad.findMany({where:{id:{in:grants.map(g=>g.actividadId)},activa:true},select:{id:true,empresaId:true}}):[];
+ const active=new Map(activities.map(a=>[a.id,a.empresaId]));
+ return [...new Set([...owners.map(o=>o.empresaId),...grants.filter(g=>active.get(g.actividadId)===g.empresaId).map(g=>g.empresaId)])];
+}
+export async function companyContexts(user:any,empresaIds?:string[]) {
+ if(!empresaEnabled()||!user.activo||!user.emailVerified||user.restricted||user.impersonatedBy)return [];
+ const grants=await prisma.autorizacionEmpresa.findMany({where:{usuarioId:user.id,activa:true,...(empresaIds?{empresaId:{in:empresaIds}}:{})},orderBy:[{createdAt:'asc'},{id:'asc'}]});
  if(!grants.length)return [];
  const companyIds=[...new Set(grants.map(g=>g.empresaId))];
  const [companies,activities,sites]=await Promise.all([
@@ -32,11 +43,14 @@ export async function companyContexts(user:any) {
   prisma.empresaActividad.findMany({where:{empresaId:{in:companyIds},activa:true}}),
   prisma.establecimientoEmpresa.findMany({where:{empresaId:{in:companyIds},activo:true},orderBy:{codigo:'asc'}}),
  ]);
+ const companiesById=new Map(companies.map(c=>[c.id,c])),activitiesById=new Map(activities.map(a=>[a.id,a]));
+ const sitesByCompany=new Map<string,typeof sites>();
+ for(const site of sites){const list=sitesByCompany.get(site.empresaId)||[];list.push(site);sitesByCompany.set(site.empresaId,list);}
  return grants.flatMap(g=>{
-  const company=companies.find(c=>c.id===g.empresaId),activity=activities.find(a=>a.id===g.actividadId&&a.empresaId===g.empresaId);
-  if(!company||!activity)return [];
+  const company=companiesById.get(g.empresaId),activity=activitiesById.get(g.actividadId);
+  if(!company||!activity||activity.empresaId!==g.empresaId)return [];
   return [{empresaId:company.id,razonSocial:company.razonSocial,actividadId:activity.id,rol:activity.rol,autorizacionId:g.id,revision:g.revision,todosEstablecimientos:g.todosEstablecimientos,
-   establecimientos:sites.filter(s=>s.empresaId===company.id&&(g.todosEstablecimientos||g.establecimientoIds.includes(s.id))).map(s=>({id:s.id,codigo:s.codigo,nombre:s.nombre,domicilio:s.domicilio}))}];
+   establecimientos:(sitesByCompany.get(company.id)||[]).filter(s=>g.todosEstablecimientos||g.establecimientoIds.includes(s.id)).map(s=>({id:s.id,codigo:s.codigo,nombre:s.nombre,domicilio:s.domicilio}))}];
  });
 }
 /** Resolve anew on EVERY request. JWT/sessionStorage never grants a company role. */

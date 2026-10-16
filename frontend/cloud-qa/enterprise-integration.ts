@@ -13,7 +13,7 @@ async function req(token:string|null,route:string,status=200,body?:object,method
  return raw?JSON.parse(raw).data:undefined;
 }
 async function login(name:string){return (await req(null,'/auth/login',200,{email:name+'@night-qa.invalid',password})).tokens.accessToken;}
-function cuit(n:number){const b='30'+String(n).padStart(8,'0'),weights=[5,4,3,2,7,6,5,4,3,2];const v=11-[...b].reduce((s,c,i)=>s+Number(c)*weights[i],0)%11;return b+(v===11?0:v===10?9:v);}
+function cuit(n:number){const b='30'+String(n).padStart(8,'0'),weights=[5,4,3,2,7,6,5,4,3,2];const v=11-[...b].reduce((s,c,i)=>s+Number(c)*weights[i],0)%11;return v===10?'33'+b.slice(2)+'9':b+(v===11?0:v);}
 const contexts:any={};
 try {
  const original=await db.usuario.findUniqueOrThrow({where:{id:fixture.users.generador}});
@@ -50,6 +50,37 @@ try {
  }
  const c=contexts.http,route='/empresas/'+c.company.id,owner=await login(c.prefix+'-owner'),member=await login(c.prefix+'-member'),outsider=await login(c.prefix+'-other');
  const h={'X-SITREP-Empresa':c.company.id,'X-SITREP-Empresa-Actividad':c.activity.id,'X-SITREP-Establecimiento':c.sites[0].id};
+ // More than the old 200-company/grant ceiling. Bulk synthetic rows only.
+ const paginationCompanies=Array.from({length:210},(_,i)=>({id:randomUUID(),cuit:cuit(90002000+i),razonSocial:'QA Paginación '+String(i+1).padStart(3,'0'),nombreFantasia:i===209?'Última empresa QA':null,domicilioLegal:{calle:'Legal paginación '+(i+1),localidad:'Mendoza',departamento:'Capital'}}));
+ await db.empresa.createMany({data:paginationCompanies});
+ const people=paginationCompanies.map((p,i)=>({id:randomUUID(),email:'pagination-actor-'+i+'@night-qa.invalid',nombre:'QA ficha paginación '+i,password:original.password,rol:'GENERADOR',activo:true,emailVerified:true,notifEmail:false}));
+ await db.usuario.createMany({data:people});
+ const actors=paginationCompanies.map((p,i)=>({...template,id:randomUUID(),usuarioId:people[i].id,cuit:p.cuit,razonSocial:p.razonSocial,numeroInscripcion:'QA-PAG-'+i}));
+ await db.generador.createMany({data:actors});
+ const activities=paginationCompanies.map((p,i)=>({id:randomUUID(),empresaId:p.id,rol:'GENERADOR',actorId:actors[i].id,aprobadaPor:fixture.users.admin}));
+ await db.empresaActividad.createMany({data:activities});
+ await db.autorizacionEmpresa.createMany({data:activities.map(a=>({empresaId:a.empresaId,actividadId:a.id,usuarioId:c.owner.id,todosEstablecimientos:true,establecimientoIds:[],otorgadaPor:fixture.users.admin}))});
+ const browserOwners=['web-desktop','web-responsive','app'].map(surface=>contexts[surface].owner.id);
+ await db.responsableEmpresa.createMany({data:paginationCompanies.flatMap(p=>browserOwners.map(usuarioId=>({empresaId:p.id,usuarioId,validadoPor:fixture.users.admin,motivo:'QA paginación sin datos reales'})))});
+ const last=paginationCompanies.at(-1)!,lastActivity=activities.at(-1)!;
+ await db.autorizacionEmpresa.createMany({data:browserOwners.map(usuarioId=>({empresaId:last.id,actividadId:lastActivity.id,usuarioId,todosEstablecimientos:true,establecimientoIds:[],otorgadaPor:fixture.users.admin}))});
+ const adminAll=await req(admin,'/empresas?limit=100'),allIds:string[]=[];
+ assert.equal(adminAll.pagination.total,215);assert.equal(adminAll.empresas.length,100);
+ for(let page=1;page<=adminAll.pagination.totalPages;page++)allIds.push(...(await req(admin,'/empresas?limit=100&page='+page)).empresas.map((e:any)=>e.id));
+ assert.equal(new Set(allIds).size,215);assert.equal(allIds.length,215);
+ assert.deepEqual((await req(admin,'/empresas?limit=100&page=2')).empresas.map((e:any)=>e.id),allIds.slice(100,200),'stable ordering');
+ const owned=await req(owner,'/empresas?limit=100&page=3');assert.equal(owned.pagination.total,211);assert.equal(owned.empresas.length,11);
+ assert.ok(owned.empresas.some((p:any)=>p.id===last.id));
+ const found=await req(owner,'/empresas?search='+encodeURIComponent(last.cuit.slice(0,2)+'-'+last.cuit.slice(2,10)+'-'+last.cuit.slice(10)));
+ assert.deepEqual(found.empresas.map((p:any)=>p.id),[last.id]);assert.equal(found.pagination.total,1);
+ assert.equal((await req(owner,'/empresas?search='+encodeURIComponent('última empresa qa'))).pagination.total,1);
+ assert.equal((await req(outsider,'/empresas?search='+last.cuit)).pagination.total,0);
+ assert.equal((await req(member,'/empresas?limit=100')).pagination.total,1);
+ assert.equal((await req(admin,'/empresas?page=99')).empresas.length,0);
+ for(const bad of ['page=0','page=1.5','limit=101','page=1&page=2'])await req(admin,'/empresas?'+bad,400);
+ const after200=await req(owner,'/auth/profile');assert.equal(after200.user.contextosEmpresa.length,211);
+ assert.ok(after200.user.contextosEmpresa.some((x:any)=>x.empresaId===last.id),'grant after 200 remains discoverable');
+ assert.deepEqual((await req(owner,'/empresas/'+last.id)).contextos.map((x:any)=>x.actividadId),[lastActivity.id]);
  await req(owner,route+'/actividades',403,{rol:'OPERADOR',actorId:fixture.actors.operador});
  await req(owner,route+'/responsables',403,{email:c.other.email,motivo:'No autoridad'});
  await req(member,route+'/personas',403,{email:c.other.email,actividadId:c.activity.id,todosEstablecimientos:true,establecimientoIds:[]});
@@ -121,6 +152,7 @@ try {
  // Never retain passwords, JWTs or invitation capabilities in downloadable reports.
  await writeFile(path.join(process.env.QA_ARTIFACTS!,'enterprise-fixture.json'),JSON.stringify(Object.fromEntries(Object.entries(contexts).map(([k,v]:any)=>[k,{companyId:v.company.id,northId:v.north.id,southId:v.south.id,prefix:v.prefix}]))));
  await writeFile(path.join(process.env.QA_ARTIFACTS!,'enterprise-http.json'),JSON.stringify({passed:true,emailSent:0,groups:[
+ '215 companies and 211 grants: complete pages, stable IDs/totals, name/CUIT search, scoped results and context after item 200',
  'DGFA validates activities/responsibles; company owner alone delegates; outsiders and escalation rejected',
  'separate legal and productive addresses, before/after audit and concurrent revision conflict',
  'site list/detail/edit/PDF isolation, no inference of legacy site, personal identity retained',

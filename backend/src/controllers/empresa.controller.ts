@@ -5,9 +5,9 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
-import { createEmpresa,editEmpresa,createEstablecimiento,editEstablecimiento,actividadEmpresa,invitationSchema,personSchema,authorizationScope } from '../domain/empresa';
+import { createEmpresa,editEmpresa,createEstablecimiento,editEstablecimiento,actividadEmpresa,invitationSchema,personSchema,authorizationScope,companyListQuery } from '../domain/empresa';
 import { verifiedCuit } from '../domain/conciliacionExterna';
-import { canAdministerCompanies,requireCompanyManager,checkCompanyScope,enterpriseEvent,companyContexts } from '../services/empresa.service';
+import { canAdministerCompanies,requireCompanyManager,checkCompanyScope,enterpriseEvent,companyContexts,accessibleCompanyIds } from '../services/empresa.service';
 
 const parse=<T>(schema:z.ZodType<T>,body:unknown):T=>{const result=schema.safeParse(body);if(!result.success)throw new AppError(result.error.issues[0].message,400);return result.data;};
 const transaction=async<T>(fn:(db:any)=>Promise<T>)=>prisma.$transaction(fn,{isolationLevel:'Serializable'});
@@ -16,15 +16,19 @@ export const companyAction=(fn:(req:AuthRequest,res:Response)=>Promise<unknown>)
 const dgfa=(user:any)=>{if(!canAdministerCompanies(user))throw new AppError('Sólo DGFA puede validar responsables y actividades',403);};
 
 export const listCompanies=companyAction(async(req,res)=>{
- const user=req.user,contexts=await companyContexts(user);
- const owners=await prisma.responsableEmpresa.findMany({where:{usuarioId:user.id,revocadoAt:null},select:{empresaId:true}});
- const companies=await prisma.empresa.findMany({where:canAdministerCompanies(user)?{activa:true}:{id:{in:[...new Set([...owners.map(o=>o.empresaId),...contexts.map(c=>c.empresaId)])]},activa:true},orderBy:{razonSocial:'asc'},take:200});
- return send(res,{empresas:companies,contextos:contexts,puedeValidar:canAdministerCompanies(user)});
+ const user=req.user,{page,limit,search}=parse(companyListQuery,req.query),admin=canAdministerCompanies(user);
+ const tax=search.replace(/\D/g,'');
+ const where:any={activa:true,...(!admin?{id:{in:await accessibleCompanyIds(user)}}:{}),...(search?{OR:[{razonSocial:{contains:search,mode:'insensitive'}},{nombreFantasia:{contains:search,mode:'insensitive'}},...(tax&&/^[\d\s-]+$/.test(search)?[{cuit:{contains:tax}}]:[])]}:{})};
+ const [total,companies]=await prisma.$transaction([
+  prisma.empresa.count({where}),
+  prisma.empresa.findMany({where,orderBy:[{razonSocial:'asc'},{id:'asc'}],skip:(page-1)*limit,take:limit}),
+ ],{isolationLevel:'RepeatableRead'});
+ return send(res,{empresas:companies,contextos:await companyContexts(user,companies.map(c=>c.id)),puedeValidar:admin,pagination:{page,limit,total,totalPages:Math.max(1,Math.ceil(total/limit))}});
 });
 export const getCompany=companyAction(async(req,res)=>{
  const id=req.params.id,user=req.user,company=await prisma.empresa.findUnique({where:{id}});
  if(!company?.activa)throw new AppError('Empresa no encontrada',404);
- const contexts=await companyContexts(user);
+ const contexts=await companyContexts(user,[id]);
  let manage=canAdministerCompanies(user);
  if(!manage)manage=!!await prisma.responsableEmpresa.findFirst({where:{empresaId:id,usuarioId:user.id,revocadoAt:null}});
  if(!manage&&!contexts.some(c=>c.empresaId===id))throw new AppError('Empresa no encontrada',404);
@@ -37,7 +41,7 @@ export const getCompany=companyAction(async(req,res)=>{
   manage?prisma.invitacionEmpresa.findMany({where:{empresaId:id},select:{id:true,email:true,venceAt:true,aceptadaAt:true,revocadaAt:true,actividadId:true},orderBy:{createdAt:'desc'},take:50}):[],
  ]);
  const users=manage?await prisma.usuario.findMany({where:{id:{in:[...new Set([...authorizations.map(a=>a.usuarioId),...responsibles.map(r=>r.usuarioId)])]}},select:{id:true,nombre:true,email:true,activo:true,emailVerified:true}}):[];
- return send(res,{empresa:company,actividades:manage?activities:activities.filter(a=>contexts.some(c=>c.actividadId===a.id)),establecimientos:sites,autorizaciones:authorizations,responsables:responsibles,eventos:events,invitaciones:invitations,personas:users,puedeGestionar:manage,puedeValidar:canAdministerCompanies(user)});
+ return send(res,{empresa:company,contextos:contexts,actividades:manage?activities:activities.filter(a=>contexts.some(c=>c.actividadId===a.id)),establecimientos:sites,autorizaciones:authorizations,responsables:responsibles,eventos:events,invitaciones:invitations,personas:users,puedeGestionar:manage,puedeValidar:canAdministerCompanies(user)});
 });
 export const addCompany=companyAction(async(req,res)=>{
  dgfa(req.user);const data=parse(createEmpresa,req.body);
