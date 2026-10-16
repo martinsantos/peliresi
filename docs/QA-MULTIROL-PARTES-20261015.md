@@ -1,10 +1,31 @@
 # Baja intensidad, actividades múltiples y contrapartes — candidato 15/10
 
-## Corte actual — exportación/conciliación: IMPLEMENTADO, QA pendiente
+## Corte actual — exportación/conciliación: QA CERRADA, SIN PUBLICAR
+
+**Candidato probado:** `c0ca5ffd2dd48e38e23a906b2946c86f1a18adb6`, [corrida 38905517965 SUCCESS](https://github.com/martinsantos/peliresi/actions/runs/38905517965). Job del 16/10, 10:08:01–10:31:09 Mendoza (23m08s). Una VM, trabajadores seriales, sin pruebas pesadas locales ni solapamientos.
+
+| Evidencia final | Resultado |
+|---|---|
+| Builds backend/web/app | 3 PASS |
+| Unit backend | 1021 PASS, 0 fallos/pendientes |
+| Unit frontend | 1475 PASS, 0 fallos/pendientes |
+| HTTP autenticado sintético | 47 grupos PASS: 5 manifiestos + 9 excepcional + 12 adendas + 8 multirol/partes + 6 seguimiento + 7 conciliación |
+| E2E escritorio 1440×900 / web móvil 360×800 / app 390×844 | 30/30, 0 omitidos/fallos/flaky; 288s |
+| APK QA instalado, Android 15 | 14 bloques completos; 47 mutaciones 200/201; errors/unsafe vacíos |
+| Histórico y compatibilidad | Histórico sintético intacto, esquema aditivo y cliente Prisma anterior PASS |
+| Cierre de recursos | Backend/server detenidos 10:31:05.974 Mendoza; emulador/PostgreSQL/cleanup y job SUCCESS |
+
+Android verificó confirmación → recarga → CSV realmente descargado en Downloads → desvinculación → ambas revisiones visibles. SHA256, longitud y BOM de los bytes descargados coinciden con el servidor. También pasaron sesión/reapertura/logout, roles, multirol, borradores pendientes y visor nativo de PDF/anexos con retorno. Cero correos enviados; APK original sin modificar.
+
+**Intento previo, no aprobado:** 38904379535/94127ba: builds3, unit1021+1475 y HTTP47grupos PASS; E2E3 PASS/1 FAIL/26 no ejecutados, APK no ejecutado. Falló la comparación contra el cuerpo textual de CDP: traza1854bytes frente1857 del servidor por BOM UTF8. Se corrigió la comprobación con SHA256/longitud del payload exacto; HTTP contrasta independientemente bytes y BOM. No se relajó integridad ni se omitió la descarga. Evidencias conservadas; backend/server cerrados13:04:58.477UTC y PG/cleanup PASS antes del segundo intento.
 
 CSV con filtros aplicados (todas las páginas), original y vínculo actual en columnas separadas; unidades sin mezclar, fórmulas neutralizadas, límite de 10.000 renglones con rechazo explícito, sin truncación. Conciliación por registro/rol en tabla aditiva independiente: sólo revisor designado no autor, CUIT verificable y ficha única, motivo obligatorio, confirmación explícita, revisión optimista/idempotencia y desvinculación sin borrar antecedentes. No cambia declaraciones, acceso de actores, aprobaciones ni cantidades. Los CUIT dudosos y ausentes siguen pendientes, sin bloquear la operación. No incorpora una matriz productiva nueva ni regularización legal automática.
 
-Aviso de pendientes compacto: contador como botón, cierre táctil de44px; mensajes de error completos. Plan de prueba: unit, HTTP autenticado aislado, web1440/móvil360/app390 y APKAndroid15 con descarga CSV real, persistencia/revocación y captura del aviso. Todavía NO probado este candidato; resultados anteriores son histórico. Sin publicar ni envíos, datos reales/formulario humano/localemulator.
+Entorno: `http://127.0.0.1:4177` dentro de la VM, backend3037 y PostgreSQLsintético55440. Browser plugin not available: se usa el Playwright configurado del repositorio exclusivamente en nube, sin navegar la sesión humana. Flujo: baja intensidad → seguimiento → filtrar → revisar ficha → confirmar vínculo → recargar → exportar → desvincular → consultar ambas revisiones. Antes de publicar en otra tanda se requiere la migración aditiva `20261016140000_external_reconciliation` y confirmar revisores; el rollback de aplicación debe conservar la tabla y su historial, no borrarlos.
+
+Aviso de pendientes compacto: contador como botón y cierre táctil; E2E exige alto máximo60px, ambos objetivos de al menos44px, dentro del contenedor y sin desborde horizontal. Mensajes de error completos conservados. Capturas revisadas de conciliación escritorio, aviso web móvil/app y Android, historial Android y retorno del anexo. El aviso «File downloaded» de la captura Android pertenece a Chrome, no a SITREP. No se presenta esta muestra como auditoría visual global.
+
+Evidencias locales: `../sitrep-cloud-qa-20261002/manifiestos-v2-38905517965/` (21MB, sin APK descargado), incluidos informes JSON, capturas, CSV sintético descargado, `apk/result.json`, `manifest-history-proof.json` y `closure.json`. El nuevo recorrido de escritura usa el rol generador; transportista comparte controlador genérico y tiene cobertura previa de consulta por rol, no una matriz exhaustiva de conciliación para todos los actores. La interfaz muestra las últimas50 revisiones; conserva todas en almacenamiento. APK QA aislado/debug con loopback Custom Tab: no certifica actualización/firma del APK original, TWA/TLS productivo ni GPS/cámara/batería en teléfono físico. Pendientes la matriz productiva de revisores y demás alcance V2. Sin publicar, correos, datos reales, formulario humano ni emulador local.
 
 ## Corte 16/10 — microtexto y seguimiento externo: QA CERRADA, sin publicar
 

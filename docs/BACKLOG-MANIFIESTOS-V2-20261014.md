@@ -2,11 +2,15 @@
 
 Estado: definición y candidato de desarrollo. **No autorizado para producción.**
 
+## Corte probado — 16/10, exportación y conciliación MV2-112/113
+
+Candidato `c0ca5ffd2dd48e38e23a906b2946c86f1a18adb6`, corrida38905517965 SUCCESS. CSV de todas las coincidencias y conciliación reversible por registro/rol con CUIT válido, ficha única, revisión explícita y motivo; conserva declaraciones, cantidades e historial. Autoridad designada existente, sin autoaprobación, fusiones por nombre ni ampliación de acceso. Identidad dudosa sigue pendiente sin bloquear el recorrido. Aviso móvil compacto; errores completos. Builds3, unit backend1021/frontend1475, HTTP47grupos, E2E30/30 sin omitidos/fallos/flaky y APKAndroid15 con14bloques/47mutaciones200-201. Descarga CSV real en Android con SHA256/longitud/BOM correctos. Histórico sintético intacto y procesos cerrados. Capturas revisadas; [informe QA e intento previo corregido](QA-MULTIROL-PARTES-20261015.md). Sin publicación ni correos; no certificación global, firma original o teléfono físico.
+
 ## Corte probado — 16/10, microtexto y MV2-112 parcial
 
 Microtexto y acciones Solicitar/Continuar/Ver solicitud corregidos; seguimiento externo de sólo lectura implementado con permisos existentes, filtros por rol/identificación exacta, paginación, totales por corriente/unidad y enlace al origen. Candidato`b063758`, corrida38897435629 SUCCESS: builds3, backend1018/frontend1471 unit,HTTP40grupos,E2E27/27 y APK13bloques. Sin fallos/omitidas/flaky finales, histórico sintético intacto y procesos cerrados. Capturas vistas; detalle y fallo/corrección de etiqueta del intento anterior en [informe QA](QA-MULTIROL-PARTES-20261015.md).
 
-MV2-112 sigue **parcial**: no exportación/conciliación ni determinación de inscripción legal. Los desconocidos se conservan separados; consultar no genera avisos o intimaciones. Los demás pendientes V2 permanecen vigentes. No publicación.
+En ese corte previo MV2-112 seguía **parcial**, sin exportación/conciliación. El candidato actual las incorpora y su prueba está cerrada por separado; todavía no determina inscripción legal. Los desconocidos se conservan separados; consultar no genera avisos o intimaciones. Los demás pendientes V2 permanecen vigentes. No publicación.
 
 ## Implementación vigente — tolerancia, multirol y contrapartes, 15/10
 
@@ -108,7 +112,7 @@ Para la reunión: [mensaje vigente para Santiago, separado del cuestionario hist
 | MV2-001 | Contrato actualizado, preguntas deduplicadas | Registrar respuestas pendientes por ID; no volver a consultar reglas definidas |
 | MV2-002,101/102 | Corte de aislamiento/asignación y regresiones probado | No repetir pruebas sin cambio; no confundir con rollback productivo completo |
 | MV2-110/111 | Registro externo y continuidad probados en candidato | Identidad/regularización y numeración productiva siguen pendientes |
-| MV2-112/113 | Seguimiento y conciliación no implementados | Próximo corte seguro: agregado de movimientos externos por identidad declarada y residuo/unidad, sin fusionar actores, sancionar ni enviar avisos. Vinculación efectiva requiere permisos/revisión definidos |
+| MV2-112/113 | Seguimiento, exportación y conciliación: corte probado, no publicado | Vínculo explícito por revisor designado, sin sobrescribir original ni conceder permisos. Pendientes matriz productiva, regularización legal y búsqueda transversal de antecedentes. Migración aditiva necesaria antes de activar; rollback conserva historial |
 | MV2-401/402/404/405 | Registro y revisión independiente probados con revisor QA | Matriz productiva, bandeja/derivación y plazos requieren R1–R4 |
 | MV2-403 | Anexo informativo/versionado y resumen global probados | No es conciliación automática ni certificado oficial; archivo de emitidos pendiente R5 |
 | MV2-406 | Compatibilidad mostrada como no comprobada | Integración con fuente autorizada pendiente R6; no inferir aptitud |
@@ -164,7 +168,7 @@ Pruebas: unitarias de validación y snapshot; HTTP creación/consulta/PDF con da
 Criterios de aceptación:
 
 - Se puede guardar el movimiento con identidad externa explícita; no aparece una cuenta habilitada ni un correo automático como efecto lateral.
-- Los campos mínimos acordados permiten saber quién entregó/transportó y quién lo declaró. No se acepta una persona jurídica anónima por dejar vacío un selector.
+- La decisión del15/10 permite identidad incompleta: advertir y conservar lo ausente, nunca inventar una persona jurídica ni bloquear el registro por campos de identidad. El autor autenticado y operador informante siempre quedan trazados.
 - Un CUIT válido coincidente propone reutilizar/vincular, sin duplicar automáticamente; identidad dudosa o conflicto se conserva para revisión.
 - Participante externo ≠ autorizado para cualquier residuo. Los controles D13 y las habilitaciones aplicables no desaparecen.
 - Los avisos y la bandeja separan operación, conformidad pendiente y regularización. Sólo los roles autorizados ven los datos necesarios.
