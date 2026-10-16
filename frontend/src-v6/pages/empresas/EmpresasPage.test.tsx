@@ -39,10 +39,10 @@ test('a failed search preserves the selected company and the unsaved form; retry
  const state=setup();await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
  fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Domicilio sin guardar'}});state.failSearch();
  fireEvent.change(screen.getByLabelText('Buscar empresa'),{target:{value:'Sin red'}});
- fireEvent.click(screen.getByRole('button',{name:'Buscar',exact:true}));
+ fireEvent.click(screen.getByRole('button',{name:'Buscar'}));
  await screen.findByText('No pudimos consultar las empresas.');
  expect(screen.getByLabelText('Calle legal')).toHaveValue('Domicilio sin guardar');
- fireEvent.click(screen.getByRole('button',{name:'Reintentar',exact:true}));
+ fireEvent.click(screen.getByRole('button',{name:'Reintentar'}));
  await waitFor(()=>expect(mocks.request.mock.calls.filter(([r])=>r.url.includes('search=Sin+red')).length).toBeGreaterThanOrEqual(2));
  expect(screen.getByLabelText('Calle legal')).toHaveValue('Domicilio sin guardar');
 });

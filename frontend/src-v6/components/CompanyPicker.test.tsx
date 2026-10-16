@@ -10,7 +10,7 @@ test('search is submitted deliberately, page controls use server totals, and sel
  expect(screen.getByText('1–1 de 1279 empresas')).toBeVisible();
  expect(screen.getByRole('button',{name:'Anterior'})).toBeDisabled();
  fireEvent.change(screen.getByLabelText('Buscar empresa'),{target:{value:'  Beta  '}});expect(handlers.onSearch).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole('button',{name:'Buscar',exact:true}));expect(handlers.onSearch).toHaveBeenLastCalledWith('Beta');
+ fireEvent.click(screen.getByRole('button',{name:'Buscar'}));expect(handlers.onSearch).toHaveBeenLastCalledWith('Beta');
  fireEvent.click(screen.getByRole('button',{name:'Siguiente'}));expect(handlers.onPage).toHaveBeenLastCalledWith(2);
  view.rerender(<CompanyPicker {...props} companies={[second]} pagination={{page:2,limit:25,total:26,totalPages:2}}/>);
  expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('a');expect(screen.getAllByRole('option')).toHaveLength(2);
@@ -23,7 +23,7 @@ test('search is submitted deliberately, page controls use server totals, and sel
 test('loading disables pagination/search, retains the selected native option and never requests keyboard focus',()=>{
  render(<CompanyPicker {...callbacks()} companies={[]} selected={first} pagination={{page:1,limit:25,total:0,totalPages:1}} busy/>);
  expect(screen.getByRole('status')).toHaveTextContent('Consultando empresas');
- expect(screen.getByRole('button',{name:'Buscar',exact:true})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Buscar'})).toBeDisabled();
  expect(screen.getByRole('button',{name:'Siguiente'})).toBeDisabled();
  expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('a');
  expect(document.activeElement).not.toBe(screen.getByLabelText('Buscar empresa'));
