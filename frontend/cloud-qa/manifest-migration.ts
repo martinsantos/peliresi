@@ -10,7 +10,11 @@ await assertCloudDatabase();
 const { PrismaClient } = backendRequire('@prisma/client');
 const db = new PrismaClient();
 const output = process.env.QA_ARTIFACTS!;
-const work = path.join(process.env.RUNNER_TEMP!, 'manifest-legacy-schema');
+// Keep generator resolution inside the existing locked dependency tree on
+// preview; no implicit package install after outbound networking is removed.
+const work = process.env.SITREP_QA_EXECUTOR === 'preview-container'
+  ? path.join(root, 'backend/.qa-legacy-schema')
+  : path.join(process.env.RUNNER_TEMP!, 'manifest-legacy-schema');
 await mkdir(work, { recursive: true });
 let oldDb: InstanceType<typeof PrismaClient> | undefined;
 try {
