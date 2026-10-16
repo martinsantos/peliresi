@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
@@ -15,8 +15,15 @@ async function login(name: string) {
 async function request(token: string, route: string, status = 200, body?: object) {
   const res = await fetch(base + route, { method: body ? 'POST' : 'GET', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     ...(body ? { body: JSON.stringify(body) } : {}) });
-  const text = await res.text(); assert.equal(res.status, status, text);
-  return res.headers.get('content-type')?.includes('text/csv') ? text : JSON.parse(text).data;
+  const bytes = Buffer.from(await res.arrayBuffer()), text = bytes.toString('utf8');
+  assert.equal(res.status, status, text);
+  if (res.headers.get('content-type')?.includes('text/csv')) {
+    assert.equal(bytes.length, Number(res.headers.get('x-content-bytes')));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), res.headers.get('x-content-sha256'));
+    assert.equal(bytes.subarray(0, 3).toString('hex'), 'efbbbf');
+    return text;
+  }
+  return JSON.parse(text).data;
 }
 try {
   const admin = await login('admin'), operator = await login('operador'), other = await login('operador2'), outsider = await login('generador');

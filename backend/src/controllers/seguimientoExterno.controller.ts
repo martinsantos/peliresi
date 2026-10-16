@@ -1,4 +1,5 @@
 import { NextFunction, Response } from 'express';
+import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
@@ -93,6 +94,9 @@ export async function exportExternalTracking(req: AuthRequest, res: Response, ne
       .map(row => row.map(csvCell).join(';')).join('\r\n');
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Content-Disposition', 'attachment; filename="participantes-externos.csv"');
-    res.type('text/csv; charset=utf-8').send('\uFEFF' + csv);
+    const bytes = Buffer.from('\uFEFF' + csv, 'utf8');
+    res.setHeader('X-Content-SHA256', createHash('sha256').update(bytes).digest('hex'));
+    res.setHeader('X-Content-Bytes', String(bytes.length));
+    res.type('text/csv; charset=utf-8').send(bytes);
   } catch (error) { next(error); }
 }

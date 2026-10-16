@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { createHash } from 'node:crypto';
 
 export async function reconciliationJourney(page: Page, prefix: string, surface: string, options: {
   hideKeyboard?: () => Promise<void>;
@@ -37,7 +38,14 @@ export async function reconciliationJourney(page: Page, prefix: string, surface:
     bytes = Buffer.concat(chunks);
   }
   const exported = await response; expect(exported.status()).toBe(200);
-  expect(bytes.equals(await exported.body()), 'Downloaded CSV must be byte-exact').toBe(true);
+  // CDP decodes text/csv and strips its UTF-8 BOM (run38904379535:
+  // server1857 bytes, CDP1854). Compare actual saved bytes with the server's
+  // digest and length, not a text-decoded developer-tools representation.
+  const headers = exported.headers();
+  expect(headers['x-content-sha256']).toMatch(/^[a-f0-9]{64}$/);
+  expect(bytes.length).toBe(Number(headers['x-content-bytes']));
+  expect(createHash('sha256').update(bytes).digest('hex'), 'Downloaded CSV must be byte-exact').toBe(headers['x-content-sha256']);
+  expect(bytes.subarray(0, 3).toString('hex')).toBe('efbbbf');
   const text = bytes.toString('utf8');
   expect(text).toContain('QA Conciliación ' + surface); expect(text).toContain('"VINCULAR"');
   expect(text).toContain('QA Ficha conciliada'); expect(text).toContain('"cantidad_original"');
