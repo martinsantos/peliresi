@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -9,10 +9,31 @@ export const backendRequire = createRequire(new URL('../../backend/package.json'
 export const externalKeys = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'VAPID_PUBLIC_KEY',
   'VAPID_PRIVATE_KEY', 'BLOCKCHAIN_RPC_URL', 'BLOCKCHAIN_CONTRACT_ADDRESS'];
 
+export function assertPreviewResourceLimits(proof: { platform: string; docker: boolean; root: string; cpu: string; memory: string; swap: string }) {
+  assert.equal(proof.platform, 'linux');
+  assert.equal(proof.docker, true);
+  assert.equal(proof.root, '/work/sitrep');
+  const cpu = proof.cpu.trim().split(/\s+/).map(Number);
+  assert.equal(cpu.length, 2);
+  assert.ok(cpu.every(n => Number.isFinite(n) && n > 0) && cpu[0] <= cpu[1], 'At most one CPU, no unlimited quota');
+  const memory = Number(proof.memory.trim());
+  assert.ok(Number.isFinite(memory) && memory > 0 && memory <= 2147483648, 'At most 2 GiB, no unlimited memory');
+  assert.equal(proof.swap.trim(), '0', 'No swap outside the memory budget');
+}
+
 /** Refuse production, other repositories, local machines and enabled delivery. */
 export function assertCloudEnvironment(env = process.env) {
   assert.equal(env.CI, 'true');
-  assert.equal(env.GITHUB_ACTIONS, 'true');
+  if (env.SITREP_QA_EXECUTOR === 'preview-container') {
+    assert.notEqual(env.GITHUB_ACTIONS, 'true', 'Do not impersonate a GitHub runner');
+    assertPreviewResourceLimits({ platform: process.platform, docker: existsSync('/.dockerenv'), root,
+      cpu: readFileSync('/sys/fs/cgroup/cpu.max', 'utf8'),
+      memory: readFileSync('/sys/fs/cgroup/memory.max', 'utf8'),
+      swap: readFileSync('/sys/fs/cgroup/memory.swap.max', 'utf8') });
+  } else {
+    assert.equal(env.SITREP_QA_EXECUTOR, undefined, 'Unknown executor');
+    assert.equal(env.GITHUB_ACTIONS, 'true');
+  }
   assert.equal(env.GITHUB_REPOSITORY, 'martinsantos/peliresi');
   assert.ok(['refs/heads/codex/sitrep-cloud-qa-20261002',
     'refs/heads/codex/sitrep-mail-safety-20261011',

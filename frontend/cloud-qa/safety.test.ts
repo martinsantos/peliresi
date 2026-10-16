@@ -1,6 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assertCloudEnvironment, externalKeys } from './safety.ts';
+import { assertCloudEnvironment, assertPreviewResourceLimits, externalKeys } from './safety.ts';
+
+const previewProof = { platform: 'linux', docker: true, root: '/work/sitrep', cpu: '100000 100000', memory: '2147483648', swap: '0' };
+test('preview requires actual bounded Linux container, not an unrestricted host', () => {
+  assert.doesNotThrow(() => assertPreviewResourceLimits(previewProof));
+  for (const patch of [{platform:'darwin'}, {docker:false}, {root:'/var/www/sitrep'}, {cpu:'max 100000'},
+    {cpu:'200000 100000'}, {cpu:'0 100000'}, {memory:'max'}, {memory:'4294967296'}, {swap:'2147483648'}]) {
+    assert.throws(() => assertPreviewResourceLimits({...previewProof, ...patch}));
+  }
+});
 
 const safe: NodeJS.ProcessEnv = {
   CI:'true', GITHUB_ACTIONS:'true', GITHUB_REPOSITORY:'martinsantos/peliresi',
