@@ -1,5 +1,14 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Punto de entrada vigente — cierre parcial 16/10/2026
+
+- Desarrollo funcional actual: `codex/sitrep-manifiestos-v2-20261014`. Revisión UI/UX independiente: `codex/sitrep-uiux-review-20261016`, desde el tag `sitrep-uiux-baseline-20261016`. Leer [cierre y estado](docs/CIERRE-PARCIAL-20261016.md) y [guía para la otra IA](docs/REVISION-UIUX-20261016.md) antes de trabajar.
+- Este candidato **no está publicado**. No confundir `main`, ramas antiguas, archivos de demo ni Precrimen con la fuente actual. Los apartados de arquitectura, estados, CI/CD y cifras de febrero que siguen son históricos; no acreditan la configuración ni autorización actuales. Las reglas de ingeniería y estilo siguen vigentes.
+- No desplegar, importar el padrón real, activar correo/push, tocar la sesión/formulario humano ni ejecutar seeds/smokes mutantes contra producción desde la revisión. No alterar reglas de negocio, permisos, IDs, numeración ni declaraciones originales para facilitar UI/tests.
+- Cuidar RAM: sin Docker Desktop, emulador, instalaciones ni suites completas locales. Preview existente: una tarea a la vez, máximo1CPU/2GiB/swap0, datos sintéticos y proveedores desconectados. Está detenido al cierre. Actions sin crédito: no disparar workflows. Los commits de cierre llevan `[skip ci]`.
+- Reutilizar marca SITREP vigente, iconografía de actores y componentes compartidos. Mantener formularios livianos, borradores y separación legal/productiva/empresa/persona. Las dudas DGFA se conservan para conciliación, **no bloquean todo el lote ni la operación existente**.
+- No proclamar GO global o APK por pruebas de navegador. El cierre documenta por separado resultados actuales y baselines históricos. No iniciar un refactor general antes de registrar rutas/roles/estados realmente revisados.
+
 Sistema de gestión y trazabilidad de residuos peligrosos para la Provincia de Mendoza.
 Permite el seguimiento completo del ciclo de vida de manifiestos: desde la generación hasta el tratamiento final.
 

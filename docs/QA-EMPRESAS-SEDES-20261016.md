@@ -2,6 +2,14 @@
 
 16/10/2026. Alcance: empresa titular por CUIT, domicilios legal/productivos separados, varias personas autorizadas por responsable validado por DGFA y preparación segura del padrón.
 
+## Cierre posterior: continuidad no bloqueante y borradores
+
+Producto `10ecc9a`, no publicado. Se corrigió pérdida de borradores legal/sede/persona al alternar secciones, conservando el reinicio por empresa y los permisos. Antes: tres regresiones unitarias rojas y un E2E fallido (otros dos sin ejecutar). Después:14/14 unitarias afectadas, web/app compiladas y3/3E2E finales en1440×900/360×800/app390×844, sin fallos/omitidas/flaky/reintentos/consola/pageerror. React Activity mantiene sólo secciones visitadas, pausa efectos ocultos y no envía datos al navegar.
+
+Preparador/guardas36/36 en preview, DB desconectada durante unit. La integración conserva9fuentes ficticias sin duplicar,5grupos de dudas no bloqueantes y permite crear un borrador por HTTP sin cerrarlas. Históricos/domicilios/cuentas/permisos intactos y correos0. El helper privado también rechaza fechas ausentes/inválidas que antes se aceptaban si coincidían. No se aplica ningún padrón real ni se da por implementada una pantalla/importador de conciliación productivos.
+
+Cuota1CPU/2GiB/swap0, pico1,536GiB y cero OOM; contenedor/servicios/PG detenidos23:04:03UTC. [Resumen/hashes](qa/nonblocking-20261016/evidence-proof.json), [capturas y cierre](CIERRE-PARCIAL-20261016.md), [entrada para UI/UX](REVISION-UIUX-20261016.md). Las cifras de suites completas de los apartados siguientes son baseline histórico, no nuevas ejecuciones de este arreglo. No APK ni GO global. Las dudas DGFA no son bloqueo global para continuar casos seguros; antes de aplicar datos siguen siendo necesarios nuevo pedido, snapshot vigente y lote autorizado.
+
 ## Ampliación: paginación y conciliación — candidato no publicado
 
 Runtime candidato `de059094c6a020ab8af9f5a6b9f26e2ad47ee2b2`, mismo contenedor de preview, sin Actions ni instalaciones nuevas. API con25 empresas por defecto/máximo100, búsqueda por razón social/nombre/CUIT, total filtrado de servidor y orden razón social+ID. Se elimina el corte silencioso de200 empresas/autorizaciones. Selección y borrador no se pierden al paginar/buscar, fallar la red o renombrar la primera empresa. El detalle carga sus permisos propios aunque esté fuera de la página visible.

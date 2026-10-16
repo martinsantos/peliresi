@@ -1,0 +1,94 @@
+{
+  "at": "2026-10-16T23:04:02.091Z",
+  "baseHead": "68f55c91ac19abe8ad734e1acb112482ac205342",
+  "productWorkingTreePatched": true,
+  "files": [
+    {
+      "file": "frontend/src-v6/pages/empresas/EmpresasPage.tsx",
+      "sha256": "6cc5059fb8b6f818bd9a2c6c28f02628254d8a21874ca9508ee14875b5d90ef3"
+    },
+    {
+      "file": "frontend/src-v6/pages/empresas/EmpresasPage.test.tsx",
+      "sha256": "e75ed8b6023df51c5dd98ee200b7e623bfdfe2288bacac882ad5b2c21d7760f1"
+    }
+  ],
+  "unit": {
+    "preparationAndGuards": 36,
+    "frontendAffected": 14,
+    "failed": 0,
+    "skipped": 0
+  },
+  "browser": {
+    "startTime": "2026-10-16T23:02:56.125Z",
+    "duration": 45331.53,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "http": {
+    "sources": 9,
+    "reconciliationGroups": 5,
+    "stagingInserted": 9,
+    "replayAdds": 0,
+    "preserved": {
+      "empresa": "1fe67f5ddecf8d20a9bfd3cda374e203c1a7e9042d2094b79a04facc3d439399",
+      "establecimientoEmpresa": "27a42bbeb54eda2fba060ab8074f09497275a94e0d5f0e7bb76d5d042f9788a7",
+      "empresaActividad": "b34f3e58871c41792a3cbf1d5384600d1648002f132cfbf208281ee487afac98",
+      "responsableEmpresa": "89759534d4cc4b02730dd5229d11e2de6196d496e5d34ef3c26562d2345cab15",
+      "autorizacionEmpresa": "5dc7ab9217da26c02249fa319e35fa3bbd373ba0deb67872ef1ddfa1a50692a2",
+      "usuario": "a2261c7bced32bba37e8f433b0cc635a3302ee257758b90f75cd66c2509b7057",
+      "generador": "365b6d70845b0d592fba854166748cf95227c15c1863cb6a594e8e8869c79594",
+      "transportista": "0c70eaaca32e46b207a75d4b654fb6fcfd742b095cb68fb34d5b5d01668799d0",
+      "operador": "b68200f36a81e9480a1758ae4790a43fd0d65a384a105eaa0744e0e9362347a7",
+      "manifiesto": "7bf87fef9e63fa165a06cd784097e204c13d1d8110038baa44a01a3f01341b1a"
+    },
+    "emailsSent": 0
+  },
+  "limits": {
+    "cpu": "100000 100000",
+    "memoryBytes": 2147483648,
+    "swapBytes": 0
+  },
+  "memoryPeak": 1649426432,
+  "phases": {
+    "initialMemoryPeak": 1649426432,
+    "currentPhaseMemoryPeak": 857083904,
+    "screenshotOnlyRerun": true
+  },
+  "memoryEvents": {
+    "low": 0,
+    "high": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0
+  },
+  "screenshots": [
+    {
+      "file": "browser/nonblocking-preview-existi-cd2de-le-source-doubts-are-queued-app/nonblocking-existing-flow.png",
+      "sha256": "786e3e9d9b515ae1c0fce762b741279d909d45f6bc3a1a79efaf1e134be4d802"
+    },
+    {
+      "file": "browser/nonblocking-preview-existi-cd2de-le-source-doubts-are-queued-app/nonblocking-preserved-draft.png",
+      "sha256": "f7445c34da5b1360c32823f3bf527672a1d2958c03dc19acb593e5618cfa9027"
+    },
+    {
+      "file": "browser/nonblocking-preview-existi-cd2de-le-source-doubts-are-queued-web-desktop/nonblocking-existing-flow.png",
+      "sha256": "0bdadb9f9f5a17838df3e0c893bd515f06b8b62d2cdb379eac5cecf45ea86e1f"
+    },
+    {
+      "file": "browser/nonblocking-preview-existi-cd2de-le-source-doubts-are-queued-web-desktop/nonblocking-preserved-draft.png",
+      "sha256": "aee1988ccbc6cc57556977f1af6f257c42e85dcae39b1875b1b94717d99342c2"
+    },
+    {
+      "file": "browser/nonblocking-preview-existi-cd2de-le-source-doubts-are-queued-web-responsive/nonblocking-existing-flow.png",
+      "sha256": "e71bb3c2d5849678421b98a5383957f806750a8991cc66642f25355b7e0850c7"
+    },
+    {
+      "file": "browser/nonblocking-preview-existi-cd2de-le-source-doubts-are-queued-web-responsive/nonblocking-preserved-draft.png",
+      "sha256": "8cfbbb1f1ee64ce54e5c6a585ad325f1556a66c0a39154d9633ce63a70d06f76"
+    }
+  ],
+  "scope": "Synthetic planner, preparation and source storage; actual existing API and web/mobile/app-web flow. No production importer or reconciliation UI, APK, or global GO is claimed."
+}
