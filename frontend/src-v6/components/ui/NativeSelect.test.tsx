@@ -9,7 +9,7 @@ test('select has an exact associated label, without including option contents', 
     <option value="norte">Planta Norte · NORTE</option><option value="sur">Planta Sur · SUR</option>
   </NativeSelect>);
   const select = screen.getByLabelText('Establecimiento para operar', { exact: true });
-  expect(select).toBe(screen.getByRole('combobox', { name: 'Establecimiento para operar', exact: true }));
+  expect(select).toBe(screen.getByRole('combobox', { name: 'Establecimiento para operar' }));
   expect(select).toHaveValue('norte');
   fireEvent.change(select, { target: { value: 'sur' } });
   expect(change).toHaveBeenCalledExactlyOnceWith('sur');
