@@ -1,6 +1,6 @@
 # Padrón, domicilios y usuarios que actúan por una empresa
 
-Fecha: 16/10/2026. Revisión y definición de alcance; sin migración ni despliegue.
+Fecha: 16/10/2026. Implementación candidata y preparación privada; sin migración productiva ni despliegue.
 
 ## Definido por el usuario
 
@@ -100,4 +100,8 @@ Compatibilidad: el esquema actual ya conserva campos de domicilio legal/real y s
 
 ## Estado de esta entrega
 
-Análisis y staging privados preparados; diseño funcional definido. No se ejecutó el importador antiguo, no hubo cambios de producción/cuentas/manifiestos, no se enviaron correos ni se alteró el formulario humano. No se instalaron servicios ni emuladores. Los datos de conciliación y contacto quedan fuera del repositorio y del paquete para la otra IA.
+Análisis, staging y plan privados preparados. Candidato implementado con ocho tablas aditivas, responsable validado por DGFA, personas autorizadas, invitaciones verificadas y revocación con sesión abierta. Domicilios legal/productivo separados y fotografía en manifiestos nuevos. Flags apagados por defecto. Ver [alcance, pruebas y límites](QA-EMPRESAS-SEDES-20261016.md).
+
+La delegación limitada por establecimiento está cerrada sólo para GENERADOR; TRANSPORTISTA/OPERADOR requieren alcance empresarial completo. No se infieren sedes de documentos históricos ni se habilitan recorridos sin contrato de autorización por sede. Inspecciones delegadas, migración productiva y APK no quedan certificados por este corte.
+
+Plan puro: 1.627 fuentes, 1.279 empresas y 1.556 establecimientos propuestos; 71 filas pendientes y 127 conflictos de domicilio legal. Repetición idéntica: cero propuestas nuevas. No se ejecutó el importador antiguo ni hubo cambios de producción/cuentas/manifiestos reales, correos o formulario humano. Herramientas y pruebas sólo dentro del contenedor acotado de preview, sin instalaciones ni emuladores locales. Los datos de conciliación/contacto siguen fuera del repositorio y de la VM.

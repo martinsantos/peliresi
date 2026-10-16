@@ -2,6 +2,37 @@
 
 16/10/2026. Alcance: empresa titular por CUIT, domicilios legal/productivos separados, varias personas autorizadas por responsable validado por DGFA y preparación segura del padrón.
 
+## Cierre en preview — candidato probado, no publicado
+
+Candidato `cb51e62da4907c554e7e963fb6569014e36cf5ff`, rama `codex/sitrep-manifiestos-v2-20261014`. El producto incluye la corrección de etiqueta de NativeSelect en d9f1ca7; commits posteriores de este corte modifican sólo QA. El cierre documental no cambia el runtime probado.
+
+Entorno: contenedor propio en preview76.13.234.213, Node22.22.0/PostgreSQL15, base sintética `127.0.0.1:55440/sitrep_night_qa_20260926`, backend3037/frontend4177 sólo loopback del contenedor. No puertos públicos, secretos productivos ni datos del padrón. `Browser plugin not available`: Playwright existente remoto, un worker, sin navegador/emulador/pruebas pesadas locales.
+
+| Capa | Resultado comprobado |
+| --- | --- |
+| Compilación | Backend, web y `/app` aprobados |
+| Unit backend | 1.027/1.027, cero fallos/omitidas |
+| Unit frontend | 1.475 aprobadas en suite completa + 7 recuperadas del manual = 1.482 verificadas, 205 archivos, cero aserciones fallidas/omitidas |
+| HTTP/PDF | Siete guiones completos y texto real del PDF aprobados |
+| Migración sintética | Aditiva, cliente anterior compatible e histórico conservado |
+| E2E | 36/36: 12 escritorio1440×900, 12 móvil360×800, 12 `/app`390×844; cero omitidas, inesperadas o flaky; sin retries; 10m14s |
+| UI | Seis pruebas empresariales con URL/título/contenido significativo y consola vacía; sin overlays/pageerror; capturas desktop/móvil/app revisadas |
+| Android APK/físicos | No ejecutado en este corte: preview sin KVM; no instalar emulador local |
+
+La primera suite completa frontend terminó con error de colección en dos archivos: la copia inicial omitía `docs/manual`. Sus 1.475 aserciones ejecutadas pasaron. Se copiaron los archivos versionados sin modificarlos, se corrigió su dueño dentro de la carpeta privada y se ejecutaron sólo las siete pruebas faltantes; todas pasaron. Se conservan el reporte completo original con `success:false`, el fallo inicial de permisos del recurso y el reporte de recuperación con `success:true`. No presentar esto como una única invocación completa verde ni repetir las 1.475 sin motivo. `consolidated.json` valida ambos conjuntos y sus 205 archivos sin eliminar casos.
+
+Reproducción/fix visible: el select de empresa/sede incluía las opciones dentro del texto de su label y el E2E de nombre exacto no podía identificarlo. Se separó label/select mediante useId/htmlFor en componente nativo compartido, con dos unitarias; se mantuvieron las expectativas E2E y el control nativo sin búsqueda/autofoco. También se corrigieron únicamente guardas de QA para resolver el generador Prisma localmente, iniciar sobre puertos libres y esperar los PIDs propios mediante `/proc` (sin depender de `ps` instalado).
+
+Proveedores del navegador: fuentes Google CSS/WOFF originales cacheadas (27 archivos/490.401bytes, SHA256 y MIME verificados). Sólo las teselas OSM usan SVG con leyenda «QA - MAPA SIMULADO», declarado en cada caso. Ninguna API de negocio o autenticación está interceptada. No se certifica red cartográfica real. Los fallos DNS de fuentes, la transición temporal de raíz vacía y los fallos anteriores se preservan; no se suprimieron errores de consola para conseguir verde.
+
+Recursos: límite Docker total 1CPU/2GiB/swap0 para todos los procesos, una prueba a la vez. Última corrida pico1.621GiB, cero OOM; los builds anteriores también se mantuvieron bajo la misma cuota (reclamación de caché sin OOM). Cierre posterior a E2E verificó el histórico y detuvo backend/frontend/PG. Contenedor `sitrep-qa-enterprise-20261016` confirmado `exited`, `Running=false`, `Restart=no`, `OOMKilled=false` el16/10 después de20:39UTC. Queda detenido para reutilizar dependencias, sin consumo de RAM/CPU de sus procesos y sin reinstalaciones nuevas en Mac. No se detuvieron/alteraron otros proyectos.
+
+Evidencias fuera del repo: `ROOT/empresas-preview-20261016/current/` contiene reportes JSON, tres capturas de contexto y archivo `qa-evidence-20261016.tgz`; `ROOT` es la carpeta de evidencia del hilo. Incluye intentos fallidos, recuperación y resumen comprobado. Sin APK ni dependencias en la descarga. Las suites completas no se disparan por push: workflow manual; no se consumieron nuevos minutos de Actions.
+
+Plan privado ya generado: 1.627 fuentes, 1.279 empresas, 1.556 establecimientos propuestos, 71 filas pendientes y 127 conflictos de domicilio legal. Repetir idéntico agrega cero propuestas. Sin SQL/apply, cuentas automáticas ni sobrescrituras. Los datos reales no se suben a este preview ni a GitHub.
+
+Este cierre aprueba sólo el circuito candidato probado. Antes de migración masiva falta resolver casos de padrón y paginación/búsqueda de la lista de empresas (límite actual200). La delegación por sede está cerrada sólo para GENERADOR; transporte/operador requieren alcance completo. Inspecciones delegadas, APK original, firma/actualización, TWA/TLS final y teléfonos/GPS/cámara/batería no se certifican aquí. No GO global, no100% de cobertura ni perfección; flags productivos siguen apagados.
+
 ## Contrato implementado
 
 - Ocho tablas nuevas, sin reescribir IDs de cuentas, fichas operativas, inscripciones ni manifiestos anteriores. Migración aditiva versionada; rollback de aplicación sin borrar columnas ni datos.
@@ -22,7 +53,7 @@ Agrupa por CUIT confirmado y conserva certificados/establecimientos candidatos s
 
 Datos reales en padrones-20261016/private, fuera del repositorio y de Actions. Snapshot productivo 16/10 sólo lectura, nunca usado para pruebas. Operadores/transportistas conservan planes privados anteriores; ninguno se aplica aquí.
 
-## Validación en curso
+## Historial anterior — superado por el cierre de preview
 
 Primer intento38950498951/019593b detuvo compilación por dos estrechamientos de tipo y una variable de actividad. Corregidos en eb5496f. No se cuentan suites pasadas. Cleanup SUCCESS.
 
@@ -46,4 +77,4 @@ Límite de aceptación: cinco intentos por IP+capacidad durante15min, clave sin 
 
 Sin publicar, migrar producción, correos/push, datos reales ni formulario humano. Sin instalaciones/servicios/pruebas pesadas locales. APK QA debug separado: no acredita firma/actualización del instalado, TWA/TLS final ni cámara/GPS/batería físicos.
 
-Browser plugin no disponible: Playwright existente sólo dentro de Actions. No certifica GO global de pendientes V2 ni revisión legal de inferencias. Antes de activar: autorización y conciliación contra snapshot actualizado.
+Browser plugin no disponible: Playwright existente en el contenedor aislado de preview (antes, Actions). No certifica GO global de pendientes V2 ni revisión legal de inferencias. Antes de activar: autorización y conciliación contra snapshot actualizado.
