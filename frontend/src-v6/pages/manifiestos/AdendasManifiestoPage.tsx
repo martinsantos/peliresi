@@ -71,7 +71,7 @@ export default function AdendasManifiestoPage() {
     {data && <p className="text-sm text-neutral-600">Operación: {data.manifiesto.estado}. La revisión de adendas no detiene el circuito.</p>}
     {data?.documental && <Card className="p-4 space-y-1" role="region" aria-label="Control documental">
       <h2 className="font-semibold">Control documental</h2>
-      <p>{data.documental.pendientes} pendientes · {data.documental.observadas} observadas · {data.documental.rechazadas} rechazadas</p>
+      <p>{data.documental.pendientes} {data.documental.pendientes === 1 ? 'pendiente' : 'pendientes'} · {data.documental.observadas} {data.documental.observadas === 1 ? 'observada' : 'observadas'} · {data.documental.rechazadas} {data.documental.rechazadas === 1 ? 'rechazada' : 'rechazadas'}</p>
       <p className="text-sm text-neutral-600">{data.total === 0 ? 'Sin adendas registradas.' : data.documental.estado === 'ADENDAS_REVISADAS' ? 'Adendas revisadas. No acredita el cierre documental del expediente.' : 'Hay revisiones por atender. El cierre operativo no las aprueba.'}</p>
     </Card>}
     {query.isPending && <p role="status">Cargando adendas…</p>}

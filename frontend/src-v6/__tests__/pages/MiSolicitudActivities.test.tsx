@@ -13,6 +13,12 @@ vi.mock('../../hooks/useSolicitudes', () => ({
 }));
 import MiSolicitudPage from '../../pages/solicitud/MiSolicitudPage';
 afterEach(() => vi.unstubAllEnvs());
+it('opens the requested own application from the activity button', () => {
+  vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true');
+  render(<MemoryRouter initialEntries={['/mi-solicitud?solicitud=o']}><MiSolicitudPage /></MemoryRouter>);
+  expect(screen.getByLabelText('Solicitud por actividad')).toHaveValue('o');
+  expect(screen.getByText('Tipo: OPERADOR')).toBeVisible();
+});
 it('keeps unsent conversations separate when selecting another application', () => {
   vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true');
   render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);

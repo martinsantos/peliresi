@@ -14,6 +14,7 @@ import { assertIsolatedApkSignature } from './apk-signature.ts';
 import { createExceptionalJourney, continueExceptionalJourney, reviewExceptionalJourney } from './exceptional-journey.ts';
 import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from './addenda-journey.ts';
 import { multiRoleJourney, pendingMultiRoleJourney } from './multirole-journey.ts';
+import { externalTrackingJourney } from './external-tracking-journey.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -302,7 +303,7 @@ try {
   await page.getByRole('heading', { name: /^Adendas ·/ }).scrollIntoViewIfNeeded();
   await proof('10-ordinary-addenda-post-facto');
   results.push('Ordinary addenda: carrier/operator observations do not block lifecycle; independent approval/rejection preserves treated manifest and declaration');
-  await expect(page.getByRole('region', { name: 'Control documental' })).toContainText('0 pendientes · 0 observadas · 1 rechazadas');
+  await expect(page.getByRole('region', { name: 'Control documental' })).toContainText('0 pendientes · 0 observadas · 1 rechazada');
   const annexRegion = page.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true });
   for (const version of [1, 0]) {
     if (!version) await annexRegion.getByText('Trazabilidad de la adenda', { exact: true }).tap();
@@ -359,6 +360,10 @@ try {
   await pendingMultiRoleJourney(page, '/app', hideKeyboard);
   await proof('15-pending-activities');
   results.push('Verified pending applicant keeps multiple activity drafts and no operational access');
+  await logout(); await login('operador');
+  await externalTrackingJourney(page, '/app', hideKeyboard);
+  await proof('16-external-tracking');
+  results.push('Read-only external participant tracking: exact identity, two pages, role-specific totals and source record');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');

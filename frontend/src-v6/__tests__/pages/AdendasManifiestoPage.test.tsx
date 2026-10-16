@@ -50,7 +50,7 @@ it('read errors are not an empty-list success', async () => {
 });
 it('shows global documentary counts, not a false closure inferred from the visible page', async () => {
   mock.get.mockResolvedValue({ data: { data: { ...data, total: 25, documental: { pendientes: 23, observadas: 1, rechazadas: 1, estado: 'RECHAZADA', cierreAcreditado: false } } } });
-  view(); await screen.findByText('23 pendientes · 1 observadas · 1 rechazadas');
+  view(); await screen.findByText('23 pendientes · 1 observada · 1 rechazada');
   expect(screen.getByText('Hay revisiones por atender. El cierre operativo no las aprueba.')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Siguiente' })).toBeEnabled();
 });

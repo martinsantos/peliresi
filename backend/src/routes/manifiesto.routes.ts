@@ -29,6 +29,7 @@ import {
 
 const router = Router();
 import { exceptionalEnabled, exceptionalParticipants, listExceptional, getExceptional, createExceptional, eventExceptional } from '../controllers/manifiesto-excepcional.controller';
+import { externalTracking } from '../controllers/seguimientoExterno.controller';
 import { addendaEnabled, listAddenda, createAddendum, reviewAddendum, downloadAddendum } from '../controllers/manifiesto-adenda.controller';
 
 /**
@@ -71,6 +72,7 @@ router.use(requireFullAccess);
 
 router.get('/baja-intensidad', exceptionalEnabled, listExceptional);
 router.get('/baja-intensidad/participantes', exceptionalEnabled, exceptionalParticipants);
+router.get('/baja-intensidad/seguimiento', exceptionalEnabled, externalTracking);
 router.post('/baja-intensidad', exceptionalEnabled, createExceptional);
 router.get('/baja-intensidad/:id', exceptionalEnabled, getExceptional);
 router.post('/baja-intensidad/:id/eventos', exceptionalEnabled, eventExceptional);

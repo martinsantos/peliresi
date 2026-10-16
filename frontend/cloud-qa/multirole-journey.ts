@@ -21,6 +21,9 @@ export async function pendingMultiRoleJourney(page: Page, prefix: string, hideKe
   await expect(page).toHaveURL(/\/mi-solicitud$/);
   await expect(page.getByLabel('Solicitud por actividad', { exact: true }).locator('option')).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Continuar borrador', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continuar Generador', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continuar Operador', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Solicitar Operador', exact: true })).toHaveCount(0);
 }
 export async function multiRoleJourney(page: Page, prefix: string, hideKeyboard = async () => {}) {
   const origin = 'http://127.0.0.1:4177';
@@ -46,6 +49,8 @@ export async function multiRoleJourney(page: Page, prefix: string, hideKeyboard 
   await expect(page.getByText('No se pudo recuperar', { exact: false })).toHaveCount(0);
   await page.goto(origin + prefix + '/mi-perfil');
   await expect(page.getByRole('button', { name: 'Operador · En uso', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Continuar Transportista', exact: true }).click();
+  await expect(page.getByLabel('Telefono', { exact: true })).toHaveValue('0000000000');
   await page.goto(origin + prefix + '/manifiestos/baja-intensidad');
   await page.getByRole('button', { name: 'Registrar operación', exact: true }).click();
   await expect(page.getByText('Faltan datos de contacto o identificación.', { exact: false }).first()).toBeVisible();

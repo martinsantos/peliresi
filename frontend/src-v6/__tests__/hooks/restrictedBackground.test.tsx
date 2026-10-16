@@ -21,6 +21,7 @@ import { useNotificacionesNoLeidas } from '../../hooks/useNotificaciones';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useActiveTripRecovery } from '../../hooks/useActiveTripRecovery';
 import { NotificacionesPoller } from '../../components/NotificacionesPoller';
+import { toast } from '../../components/ui/Toast';
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -34,6 +35,12 @@ beforeEach(() => {
   mocks.get.mockResolvedValue({ data: { data: { notificaciones: [] } } });
 });
 describe('restricted applicants do not start full-access background services', () => {
+  it.each([1, 2])('uses the correct unread notice wording for %s', async count => {
+    mocks.restricted = false; mocks.notices.mockResolvedValue({ items: [], noLeidas: count });
+    const poller = render(<NotificacionesPoller />, { wrapper });
+    await waitFor(() => expect(toast.add).toHaveBeenCalledWith(expect.objectContaining({ title: `${count} ${count === 1 ? 'aviso' : 'avisos'} sin leer` })));
+    poller.unmount();
+  });
   it('does not poll counters, recover trips, download manifests or process business mutations, even on manual retry', async () => {
     const { result, unmount } = renderHook(() => {
       useNotificacionesNoLeidas(); useActiveTripRecovery(); return useOfflineSync();

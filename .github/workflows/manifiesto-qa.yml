@@ -112,6 +112,7 @@ jobs:
           node --experimental-strip-types frontend/cloud-qa/exceptional-integration.ts
           node --experimental-strip-types frontend/cloud-qa/addenda-integration.ts
           node --experimental-strip-types frontend/cloud-qa/party-multirole-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/external-tracking-integration.ts
       - name: Web, responsive mobile and app journeys with actual backend
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/manifest.playwright.config.ts

@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import SeguimientoExterno from './SeguimientoExterno';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
 type Participant = { nombre: string; identificacion: string; domicilio: string; nombreFantasia?: string; telefono?: string; padronId?: string };
@@ -70,11 +71,12 @@ export default function BajaIntensidadPage() {
   const mp = useMobilePrefix();
   const [params, setParams] = useSearchParams();
   const id = params.get('registro');
+  const tracking = !id && params.get('vista') === 'seguimiento';
   const listPage = Math.max(1, Math.floor(Number(params.get('pagina')) || 1));
   const enabled = import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true';
   const qc = useQueryClient();
   const queryKey = id ? ['baja-intensidad', currentUser?.id, id] : ['baja-intensidad', currentUser?.id, null, listPage];
-  const query = useQuery({ queryKey, enabled: enabled && !!currentUser,
+  const query = useQuery({ queryKey, enabled: enabled && !!currentUser && !tracking,
     queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint + '?page=' + listPage)).data.data as { registro?: Entry; registros?: Entry[]; total?: number },
     retry: false });
   const [creating, setCreating] = useState(false);
@@ -123,13 +125,15 @@ export default function BajaIntensidadPage() {
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-bold text-neutral-900">Baja intensidad</h1>
-      {!id && currentUser?.rol === 'OPERADOR' && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : 'Registrar operación'}</Button>}
+      {!id && !tracking && currentUser?.rol === 'OPERADOR' && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : 'Registrar operación'}</Button>}
       {id && <Button variant="outline" onClick={() => setParams({})}>Ver registros</Button>}
     </div>
+    {!id && !creating && ['OPERADOR', 'ADMIN'].includes(currentUser?.rol || '') && <Button variant="outline" onClick={() => setParams(tracking ? {} : { vista: 'seguimiento' })}>{tracking ? 'Volver a registros' : 'Seguimiento de participantes'}</Button>}
+    {tracking && <SeguimientoExterno />}
     <p className="text-sm text-neutral-600">Referencia interna · Sin número oficial. Registrar no implica aprobación ni habilitación.</p>
     {error && <div role="alert" className="p-3 bg-error-50 text-error-800 rounded-lg">{error} <Button variant="outline" size="sm" onClick={() => void query.refetch()}>Recargar registro</Button></div>}
-    {query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
-    {query.isLoading && <p role="status">Cargando registros…</p>}
+    {!tracking && query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
+    {!tracking && query.isLoading && <p role="status">Cargando registros…</p>}
     {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, { generador, transportista, patente, motivo, residuos: wastes }, true); }}>
       <div className="grid sm:grid-cols-2 gap-5"><ParticipantFields title="Generador" value={generador} onChange={setGenerador} /><ParticipantFields title="Transportista" value={transportista} onChange={setTransportista} /></div>
       <Input label="Patente declarada" maxLength={20} value={patente} onChange={e => setPatente(e.target.value)} />
@@ -137,7 +141,7 @@ export default function BajaIntensidadPage() {
       <Input label="Motivo del registro excepcional" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
       <Button type="submit" disabled={busy}>Guardar operación</Button>
     </form></Card>}
-    {!id && !creating && <div className="space-y-3">
+    {!id && !creating && !tracking && <div className="space-y-3">
       <p className="text-sm text-neutral-600">{query.data?.total ?? '—'} registros · Página {listPage}</p>
       {query.data?.registros?.map(row => <Card key={row.id}><button className="text-left w-full min-h-11 space-y-1" onClick={() => setParams({ registro: row.id })}>
         <span className="block font-semibold">{row.datos.generador.nombre || 'Generador por identificar'}</span><span className="block text-sm">{stageLabels[row.etapa]} · {row.revisiones.filter(r => r.estado !== 'APROBADA').length} revisiones pendientes</span>

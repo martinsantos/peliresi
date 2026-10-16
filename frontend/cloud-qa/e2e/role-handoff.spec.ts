@@ -120,7 +120,7 @@ test('separate real users hand a manifest from generator to transport to operato
       await expect(help).toHaveCount(1);
       expect(await help.evaluate(el => Boolean(el.closest('header')))).toBe(true);
       await reviewer.screenshot({ path: info.outputPath('ordinary-addenda-post-facto.png'), animations: 'disabled' });
-      await expect(reviewer.getByRole('region', { name: 'Control documental' })).toContainText('0 pendientes · 0 observadas · 1 rechazadas');
+      await expect(reviewer.getByRole('region', { name: 'Control documental' })).toContainText('0 pendientes · 0 observadas · 1 rechazada');
       const annexRegion = reviewer.getByRole('region', { name: 'Adenda ' + operatorAdenda, exact: true });
       for (const version of [1, 0]) {
         if (version === 0) await annexRegion.getByText('Trazabilidad de la adenda', { exact: true }).click();

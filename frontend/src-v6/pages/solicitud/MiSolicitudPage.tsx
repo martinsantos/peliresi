@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, CheckCircle, Clock, AlertTriangle, XCircle, Send,
   ArrowRight, Eye, MessageSquare,
@@ -50,6 +50,7 @@ const STEPS = [
 
 const MiSolicitudPage: React.FC = () => {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [replyText, setReplyText] = useState('');
   const [messageText, setMessageText] = useState('');
   const messagesPanelRef = useRef<HTMLDivElement>(null);
@@ -59,6 +60,13 @@ const MiSolicitudPage: React.FC = () => {
   const solicitud = (solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
   const conversations = useRef<Record<string, { reply: string; message: string }>>({});
   useEffect(() => { if (!selectedId && solicitud) setSelectedId(solicitud.id); }, [selectedId, solicitud?.id]);
+  const requestedId = params.get('solicitud');
+  useEffect(() => {
+    if (!requestedId || requestedId === selectedId || !solicitudes?.some(s => s.id === requestedId)) return;
+    if (solicitud) conversations.current[solicitud.id] = { reply: replyText, message: messageText };
+    const previous = conversations.current[requestedId];
+    setSelectedId(requestedId); setReplyText(previous?.reply || ''); setMessageText(previous?.message || '');
+  }, [requestedId, selectedId, solicitudes, solicitud, replyText, messageText]);
 
   const { data: mensajes } = useMensajesSolicitud(solicitud?.id || '');
   const enviarMensaje = useEnviarMensaje();
@@ -161,6 +169,7 @@ const MiSolicitudPage: React.FC = () => {
               conversations.current[solicitud.id] = { reply: replyText, message: messageText };
               const previous = conversations.current[event.target.value];
               setSelectedId(event.target.value); setReplyText(previous?.reply || ''); setMessageText(previous?.message || '');
+              setParams({ solicitud: event.target.value }, { replace: true });
             }}>
             {solicitudes?.map(item => <option key={item.id} value={item.id}>{item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
           </select>

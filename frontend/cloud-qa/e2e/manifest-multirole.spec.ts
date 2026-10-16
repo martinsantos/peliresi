@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { login, prefix } from './helpers';
 import { multiRoleJourney, pendingMultiRoleJourney } from '../multirole-journey';
+import { externalTrackingJourney } from '../external-tracking-journey';
+test('external participant tracking is scoped, paginated and read-only', async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await login(page, info, 'operador');
+  await externalTrackingJourney(page, prefix(info));
+  await page.screenshot({ path: info.outputPath('external-tracking.png'), fullPage: true });
+  expect(errors).toEqual([]);
+});
 test('approved activity switch, additional draft and unblocked incomplete operation', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
