@@ -82,7 +82,7 @@ export const InstallPWAModal: React.FC = () => {
       />
 
       {/* Modal panel */}
-      <div className="relative w-full sm:max-w-md bg-white sm:rounded-2xl rounded-t-2xl shadow-4 z-10 animate-slide-up safe-area-bottom overflow-hidden">
+      <div className="relative w-full sm:max-w-md bg-white sm:rounded-2xl rounded-t-2xl shadow-4 z-10 animate-slide-up safe-bottom overflow-hidden">
         {/* Close */}
         <button
           onClick={handleDismiss}

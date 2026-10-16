@@ -619,7 +619,7 @@ export const MobileLayout: React.FC = () => {
             </div>
 
             {/* Drawer Footer */}
-            <div className="p-4 border-t border-neutral-100 bg-white safe-area-bottom space-y-2">
+            <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-neutral-100 bg-white space-y-2">
               <InstallPWAButton />
               <button
                 onClick={async () => { setIsMenuOpen(false); await logout(); }}
