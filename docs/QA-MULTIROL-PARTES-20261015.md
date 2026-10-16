@@ -1,6 +1,37 @@
 # Baja intensidad, actividades múltiples y contrapartes — candidato 15/10
 
-Estado al 16/10: **QA del corte cerrada, sin publicación**. Corrida [38741944296, intento 2](https://github.com/martinsantos/peliresi/actions/runs/38741944296/attempts/2) SUCCESS, candidato `cf5ed0c2f9364be5e4774367f26060afcb4048dd`. No equivale a GO global de Manifiestos V2 ni a certificación del APK de producción.
+## Corte 16/10 — microtexto y seguimiento externo: QA CERRADA, sin publicar
+
+**Candidato probado:** `b0637585ac48184300490a21bad54cff8058168a`, [corrida38897435629 SUCCESS](https://github.com/martinsantos/peliresi/actions/runs/38897435629). Job09:07:40–09:30:33 Mendoza,22m53s después de la cola. Una VM, pruebas seriales; no ejecución pesada local.
+
+| Evidencia | Resultado |
+|---|---|
+| Builds backend/web/app | 3 PASS |
+| Unit backend | 1018/1018,0 fallos/omitidas |
+| Unit frontend | 1471/1471,0 fallos/omitidas |
+| HTTP autenticado | 40 grupos PASS,6 nuevos de seguimiento |
+| E2E web1440/móvil360/app390 | 27/27,0 fallos/omitidas/flaky;272,3s |
+| APK QA instalado,Android15 | 13 bloques completos;43 mutaciones200/201;errors/unsafe vacíos |
+| Histórico sintético | Byteidéntico |
+| Limpieza | Backend/server detenidos09:30:29.195Mendoza; PostgreSQL/emulador y cierrejob SUCCESS |
+
+Android volvió a comprobar sesión/reapertura/logout, roles, borradores multirol, continuidad con diferencias, revisiones independientes, certificado y anexos actual/histórico con bytes exactos, visor nativo y retorno. Se añadió consulta de externos con paginación, rol, totales y apertura del origen sin escrituras de ese recorrido. APK separado/debug y loopbackCustomTab: no certifica firma/actualización del APK original, confianzaTWA/TLS ni cámara/GPS/batería/celular físicos.
+
+Evidencias locales19MB, sin APK descargado: `sitrep-cloud-qa-20261002/manifiestos-v2-38897435629/`. Revisadas capturas de seguimiento en escritorio/webmóvil/app, `apk/16-external-tracking-device.png`, `15-pending-activities-device.png`, `12-returned-from-annex-device.png` y `06-returned-from-pdf-device.png`. Textos/control legibles, sin desborde horizontal en pruebas, «Continuar» sobre borradores y «1 rechazada» visibles. El banner general de avisos aún ocupa bastante alto en móvil: pulido global pendiente, no GO visual de toda la aplicación. Las capturas muestran el viewport, no prueban por sí solas toda la lista; la navegación/paginación/origen se verificó por interacción E2E.
+
+### Intento previo y corrección
+
+Candidato inicial `f6b4683`, [corrida38895880941](https://github.com/martinsantos/peliresi/actions/runs/38895880941), falló antes de Android. No contar ese intento como aprobado.
+
+Primer intento: builds3, backend1018/1018, frontend1470/1470 y HTTP completo PASS. E2E3 PASS/1 FAIL/23 no ejecutados: `getByLabel('Tipo de participante', exact:true)` no podía resolver inequívocamente el selector porque el label contenía también las opciones. Captura/DOM conservados y revisados. Corrección de producto: label explícito htmlFor/id y select hermano; nueva prueba unitaria exige nombre accesible y selección exacta. No se cambian timeout ni selectores E2E. Histórico intacto y cleanup SUCCESS a11:56:34UTC; APK no ejecutado en ese intento.
+
+- Avisos/adendas: singular y plural coherentes. Actividades: **Solicitar** sólo cuando no hay expediente vigente, **Continuar** para borrador/observada y **Ver solicitud** para expediente enviado/en revisión. Enlace selecciona la solicitud propia, manteniendo las conversaciones sin enviar por actividad. Si no se puede consultar el estado, no se ofrece crear una solicitud como si no existiera.
+- MV2-112, primera parte: `Baja intensidad → Seguimiento de participantes`. Consulta de movimientos con participante sin vínculo al padrón; generador/transportista separados, identificación declarada exacta, 20 movimientos por página, fechas Mendoza, operador informante y enlace al registro original. Los totales cubren todas las coincidencias, separados por corriente/unidad y sólo carga original: no suman adendas ni cuentan personas únicas.
+- Permisos: operador ve sus propios registros; sólo autoridad designada existente ve el conjunto. No incorpora una nueva matriz productiva. Identidad dudosa/incompleta no se fusiona por nombre ni se considera infracción. No realiza altas, regularizaciones, intimaciones, numeración, modificaciones de historial ni envíos.
+- Pruebas añadidas: unit de filtros/permisos, acciones por estado, enlace de solicitud, errores/vacíos/paginación; HTTP con 21 movimientos, homónimos, identificación incompleta, dos operadores, unidades distintas y ausencia de escrituras; mismo recorrido de consulta en web, web móvil, app y APK QA aislado.
+- Fuera de este corte: conciliación de identidades, exportación DGFA, búsqueda transversal de decisiones de adendas, validación regulatoria, agenda, numeración y certificados oficiales. No afirmar MV2-112 completo ni GO global. Sin publicación/manual público, correos, formulario humano o emuladores locales.
+
+Estado del corte anterior al 16/10: **QA cerrada, sin publicación**. Corrida [38741944296, intento 2](https://github.com/martinsantos/peliresi/actions/runs/38741944296/attempts/2) SUCCESS, candidato `cf5ed0c2f9364be5e4774367f26060afcb4048dd`. El corte vigente está al inicio de este informe. No equivale a GO global de Manifiestos V2 ni a certificación del APK de producción.
 
 ## Cierre verificado — 16/10
 
@@ -78,6 +109,6 @@ Comandos del workflow existente: build backend/web/app, suites unit de cada paqu
 
 ## No incluido ni certificado
 
-Numeración oficial excepcional, unanimidad/agenda/caducidad del manifiesto original, compatibilidad regulatoria de Y, agregación/búsqueda transversal de antecedentes, cierre documental oficial y certificados finales continúan en el backlog. La revisión conserva sus antecedentes dentro de cada registro; no existe aún una búsqueda global que los relacione automáticamente.
+Numeración oficial excepcional, unanimidad/agenda/caducidad del manifiesto original, compatibilidad regulatoria de Y, conciliación/exportación DGFA, búsqueda transversal de decisiones de adendas, cierre documental oficial y certificados finales continúan en el backlog. La consulta nueva agrega movimientos/carga original por identificación declarada exacta, no identifica personas únicas ni relaciona automáticamente sus decisiones de revisión.
 
 Pendientes externos: matriz productiva de autoridad designada, identidad/aprobación del generador no inscripto para numeración oficial, destino documental de adendas rechazadas, firma original del APK y teléfonos físicos. No usar la prueba cloud como certificación de firma, confianza TWA/TLS, GPS, cámara o batería reales.

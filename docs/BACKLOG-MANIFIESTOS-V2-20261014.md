@@ -2,6 +2,12 @@
 
 Estado: definición y candidato de desarrollo. **No autorizado para producción.**
 
+## Corte probado — 16/10, microtexto y MV2-112 parcial
+
+Microtexto y acciones Solicitar/Continuar/Ver solicitud corregidos; seguimiento externo de sólo lectura implementado con permisos existentes, filtros por rol/identificación exacta, paginación, totales por corriente/unidad y enlace al origen. Candidato`b063758`, corrida38897435629 SUCCESS: builds3, backend1018/frontend1471 unit,HTTP40grupos,E2E27/27 y APK13bloques. Sin fallos/omitidas/flaky finales, histórico sintético intacto y procesos cerrados. Capturas vistas; detalle y fallo/corrección de etiqueta del intento anterior en [informe QA](QA-MULTIROL-PARTES-20261015.md).
+
+MV2-112 sigue **parcial**: no exportación/conciliación ni determinación de inscripción legal. Los desconocidos se conservan separados; consultar no genera avisos o intimaciones. Los demás pendientes V2 permanecen vigentes. No publicación.
+
 ## Implementación vigente — tolerancia, multirol y contrapartes, 15/10
 
 [Informe del candidato y resultados por superficie](QA-MULTIROL-PARTES-20261015.md). Esta sección sustituye el diagnóstico documental de abajo para estos tres puntos; no declara cerrado todo Manifiestos V2.
