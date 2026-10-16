@@ -5,6 +5,9 @@ function uiProof(page:Page,info:TestInfo) {
  const messages:Array<{type:string;text:string}>=[];
  page.on('console',m=>{if(['error','warning'].includes(m.type())&&messages.length<50)messages.push({type:m.type(),text:m.text()});});
  return async()=>{
+  // Returning to the personal account performs a full navigation. Wait for
+  // the destination, not the transient empty React root between documents.
+  await expect(page.getByRole('main')).toContainText(/manifiesto/i);
   const title=await page.title(),text=await page.locator('#root').innerText();
   await info.attach('ui-console-proof',{body:Buffer.from(JSON.stringify({url:page.url(),title,meaningfulContent:text.trim().length,console:messages},null,2)),contentType:'application/json'});
   expect(title).toMatch(/SITREP/i);expect(text.trim().length).toBeGreaterThan(20);
