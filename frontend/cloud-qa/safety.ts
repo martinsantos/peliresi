@@ -26,7 +26,7 @@ export function assertCloudEnvironment(env = process.env) {
   assert.equal(env.CI, 'true');
   if (env.SITREP_QA_EXECUTOR === 'preview-container') {
     assert.notEqual(env.GITHUB_ACTIONS, 'true', 'Do not impersonate a GitHub runner');
-    assertPreviewResourceLimits({ platform: process.platform, docker: existsSync('/.dockerenv'), root,
+    assertPreviewResourceLimits({ platform: process.platform, docker: existsSync('/.dockerenv'), root: path.resolve(root),
       cpu: readFileSync('/sys/fs/cgroup/cpu.max', 'utf8'),
       memory: readFileSync('/sys/fs/cgroup/memory.max', 'utf8'),
       swap: readFileSync('/sys/fs/cgroup/memory.swap.max', 'utf8') });
