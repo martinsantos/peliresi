@@ -111,7 +111,8 @@ const MiSolicitudPage: React.FC = () => {
       setReplyText('');
       toast.success('Enviada', 'Tu solicitud fue re-enviada con la respuesta');
     } catch {
-      toast.error('Error', postedReply.current ? 'La respuesta quedó guardada, pero no se re-envió la solicitud. Reintentá.' : 'No se pudo re-enviar la solicitud');
+      const replySaved = postedReply.current?.solicitudId === solicitud.id && postedReply.current.contenido === contenido;
+      toast.error('Error', replySaved ? 'La respuesta quedó guardada, pero no se re-envió la solicitud. Reintentá.' : 'No se pudo re-enviar la solicitud');
     }
   };
 
