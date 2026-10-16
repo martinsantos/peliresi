@@ -207,8 +207,15 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
         drawField(doc, 'CUIT', manifiesto.generador.cuit, 290, gY, 100);
         drawField(doc, 'N\u00BA Inscripcion', manifiesto.generador.numeroInscripcion || 'N/A', 400, gY, 140);
         doc.y = gY + 28;
-        drawField(doc, 'Domicilio', manifiesto.generador.domicilio, 58, doc.y, 350);
+        const companySnapshot = manifiesto.contextoEmpresa as any;
+        const productive = companySnapshot?.rol==='GENERADOR' ? companySnapshot.establecimiento : null;
+        drawField(doc, productive?'Domicilio productivo':'Domicilio', productive?.domicilio ?? manifiesto.generador.domicilio, 58, doc.y, 350);
         doc.y += 30;
+        if(productive) {
+          drawField(doc, 'Establecimiento', productive.nombre, 58, doc.y, 235);
+          drawField(doc, 'Domicilio legal al declarar', companySnapshot.domicilioLegal?.calle || 'No informado', 310, doc.y, 230);
+          doc.y += 30;
+        }
 
         // ── 2. Transportista ──
         if (manifiesto.transportista) {

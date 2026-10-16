@@ -30,7 +30,7 @@ export const errorHandler = (
   logger.error({
     err,
     method: req.method,
-    path: req.path,
+    path: req.path?.replace(/(\/empresas\/invitaciones\/)[^/]+/,'$1[redacted]'),
     statusCode: err.statusCode || 500,
   }, err.message);
 

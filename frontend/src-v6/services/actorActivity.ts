@@ -14,5 +14,6 @@ export function readActorActivity(token: string | null): string | null {
   try { return sessionStorage.getItem('sitrep_activity:' + owner); } catch { return null; }
 }
 export function saveActorActivity(owner: string, activity: string) {
+  sessionStorage.removeItem('sitrep_company:' + owner);
   sessionStorage.setItem('sitrep_activity:' + owner, activity);
 }

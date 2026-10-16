@@ -22,6 +22,9 @@ import type { Usuario } from '../types/models';
 export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 export interface User {
+  empresaContexto?:import('../services/companyContext').CompanyContext;
+  contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
+  empresaContextoError?:string;
   actividades?: UserRole[];
   training?: boolean;
   id: number | string;
@@ -103,6 +106,7 @@ function apiUserToUser(u: Usuario): User {
     email: u.email,
     rol: u.rol as UserRole,
     actividades: u.actividades,
+    empresaContexto:u.empresaContexto,contextosEmpresa:u.contextosEmpresa,empresaContextoError:u.empresaContextoError,
     sector: activeActor?.razonSocial || u.empresa || '',
     actorId: u.rol === 'GENERADOR' ? u.generador?.id : u.rol === 'TRANSPORTISTA' ? u.transportista?.id : u.rol === 'OPERADOR' ? u.operador?.id : undefined,
     avatar: initials,

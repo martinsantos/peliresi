@@ -6,13 +6,15 @@ import axios from 'axios';
 import api, { setTokensDurably, clearTokensDurably, getAccessToken } from './api';
 import type { LoginRequest, LoginResponse, ChangePasswordRequest } from '../types/api';
 import type { Usuario } from '../types/models';
+import { readCompanyContext,saveCompanyContext } from './companyContext';
+import { activityOwner } from './actorActivity';
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const { data } = await api.post<{ success: true; data: { user: Usuario; tokens: { accessToken: string; refreshToken: string }; restricted?: boolean; solicitudId?: string | null } }>('/auth/login', credentials);
     const { tokens, user, restricted, solicitudId } = data.data;
     await setTokensDurably(tokens.accessToken, tokens.refreshToken);
-    const profile = import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && user.activo && !restricted
+    const profile = (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'||import.meta.env.VITE_ENTERPRISE_ENABLED==='true') && user.activo && !restricted
       ? await this.getMe() : user;
     return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: profile, restricted, solicitudId };
   },
@@ -31,8 +33,20 @@ export const authService = {
   },
 
   async getMe(): Promise<Usuario> {
-    const { data } = await api.get<{ success: true; data: { user: Usuario } }>('/auth/profile');
-    return data.data.user;
+    try {
+      const { data } = await api.get<{ success: true; data: { user: Usuario } }>('/auth/profile');
+      return data.data.user;
+    }catch(error) {
+      // Profile recovery only. Never replay a denied business action in another company.
+      if(axios.isAxiosError(error)&&error.response?.status===403&&readCompanyContext(getAccessToken())) {
+        const selection=readCompanyContext(getAccessToken());
+        const owner=activityOwner(getAccessToken());
+        if(owner)saveCompanyContext(owner,null);
+        const {data}=await api.get<{data:{user:Usuario}}>('/auth/profile');
+        return {...data.data.user,empresaContextoError:selection?'Tu autorización cambió. Elegí nuevamente la empresa.':undefined};
+      }
+      throw error;
+    }
   },
 
   async changePassword(req: ChangePasswordRequest): Promise<void> {

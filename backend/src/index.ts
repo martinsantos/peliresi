@@ -38,6 +38,7 @@ import supportRoutes from './routes/support.routes';
 import { startEmailFlushTimer } from './services/email.service';
 import { createAuthenticationLimiters } from './middlewares/authRateLimit';
 import { trainingSession } from './middlewares/trainingSession';
+import empresaRoutes from './routes/empresa.routes';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -224,6 +225,7 @@ app.get('/api/health/ready', async (_req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/empresas',empresaRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
 app.use('/api/catalogos', catalogoRoutes);
 app.use('/api/pdf', pdfRoutes);

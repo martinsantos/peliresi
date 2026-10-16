@@ -40,7 +40,7 @@ import {
   AdminOperadoresPage, NuevoOperadorPage, NuevoTransportistaPage,
   AdminRenovacionesPage, AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
   AdminSolicitudesPage, SolicitudDetallePage,
-  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
+  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage, EmpresasPage, EmpresaInvitacionPage,
   MobileDashboardPage, NotificacionesPage, AyudaPage, SoportePage, EscanerQRPage, EstadisticasPage,
   InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
 } from './routes/pages';
@@ -88,6 +88,7 @@ function App() {
           <Route path="/l/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/registro" element={<RegistroPage />} />
+          <Route path="/empresa-invitacion/:token" element={<EmpresaInvitacionPage />} />
           <Route path="/verificar-email" element={<VerificarEmailPage />} />
           <Route path="/recuperar" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -100,6 +101,7 @@ function App() {
           <Route element={<MobileLayout />}>
             <Route path="/mobile" element={<MobileDashboardPage />} />
             <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
+            <Route path="/mobile/empresas" element={<EmpresasPage />} />
             <Route path="/mobile/centro-control" element={<CentroControlPage />} />
             <Route path="/mobile/centro-control/viaje/:id" element={<ViajeRedirect />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
@@ -260,6 +262,7 @@ function App() {
 
             {/* Perfil */}
             <Route path="/mi-perfil" element={<PerfilPage />} />
+            <Route path="/empresas" element={<EmpresasPage />} />
 
             {/* Ayuda */}
             <Route path="/ayuda" element={<AyudaPage />} />

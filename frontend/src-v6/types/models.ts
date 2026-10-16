@@ -93,6 +93,9 @@ export enum TipoDiferencia {
 // ========================================
 
 export interface Usuario {
+  empresaContexto?:import('../services/companyContext').CompanyContext;
+  contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
+  empresaContextoError?:string;
   actividades?: Array<'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'>;
   training?: boolean;
   id: string;

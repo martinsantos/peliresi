@@ -19,7 +19,9 @@ try {
   const schema = await readFile(path.join(root, 'backend/prisma/schema.prisma'), 'utf8');
   const field = /^[ \t]*asignacionTransporte[ \t]+Json\?[ \t]*\r?\n/m;
   assert.ok(field.test(schema));
-  const legacySchema = schema.replace(field, '').replace(/model RegistroManifiestoExcepcional \{[\s\S]*?\n\}/, '')
+  const legacySchema = schema.replace(field, '').replace(/^[ \t]*contextoEmpresa[ \t]+Json\?[ \t]*\r?\n/m,'')
+    .replace(/model (?:Empresa|EmpresaActividad|EstablecimientoEmpresa|ResponsableEmpresa|AutorizacionEmpresa|InvitacionEmpresa|EventoEmpresa|FuentePadronEmpresa) \{[\s\S]*?\n\}/g,'')
+    .replace(/model RegistroManifiestoExcepcional \{[\s\S]*?\n\}/, '')
     .replace(/model ConciliacionParticipanteExterno \{[\s\S]*?\n\}/, '')
     .replace(/model AdendaManifiesto \{[\s\S]*?\n\}/, '')
     .replace('generator client {', `generator client {\n  output = "${work}/client"`);
@@ -41,6 +43,9 @@ try {
   const before = await oldDb.manifiesto.create({ data, include: { residuos: true, eventos: true } });
   const migration = await readFile(path.join(root, 'backend/prisma/migrations/20261014120000_manifest_transport_assignment/migration.sql'), 'utf8');
   await db.$executeRawUnsafe(migration);
+  const enterpriseMigration=await readFile(path.join(root,'backend/prisma/migrations/20261016180000_enterprise_boundary/migration.sql'),'utf8');
+  for(const statement of enterpriseMigration.split(';').filter(s=>s.trim()))await db.$executeRawUnsafe(statement);
+  assert.equal(await db.empresa.count(),0);
   const exceptionalMigration = await readFile(path.join(root, 'backend/prisma/migrations/20261014220000_manifest_exceptional/migration.sql'), 'utf8');
   for (const statement of exceptionalMigration.split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement);
   assert.equal(await db.registroManifiestoExcepcional.count(), 0);
@@ -51,7 +56,8 @@ try {
   for (const statement of addendumMigration.split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement);
   assert.equal(await db.adendaManifiesto.count(), 0);
   const after = await db.manifiesto.findUniqueOrThrow({ where: { id: data.id }, include: { residuos: true, eventos: true } });
-  const { asignacionTransporte, ...historical } = after;
+  const { asignacionTransporte, contextoEmpresa, ...historical } = after;
+  assert.equal(contextoEmpresa,null);
   assert.equal(asignacionTransporte, null);
   assert.deepEqual(historical, before, 'Old fields, dates, state, number, residues and events must remain unchanged');
   // Application rollback keeps the new column and its values. Old Prisma can

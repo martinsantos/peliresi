@@ -33,7 +33,9 @@ import ActorActivities from '../../components/ActorActivities';
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, isGenerador, isOperador } = useAuth();
+  const { currentUser, isGenerador:personalGenerador, isOperador:personalOperador } = useAuth();
+  const isGenerador=personalGenerador&&!currentUser?.empresaContexto;
+  const isOperador=personalOperador&&!currentUser?.empresaContexto;
   // Reuse the actor queries that normalize the API's {generador}/{operador}
   // envelope. Keys follow identity changes instead of retaining the prior actor.
   const generador = useGenerador(isGenerador ? currentUser?.actorId || '' : '');
@@ -94,7 +96,9 @@ const PerfilPage: React.FC = () => {
       </div>
 
       <ActorActivities />
-      {currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
+      {import.meta.env.VITE_ENTERPRISE_ENABLED==='true'&&<Button variant="outline" onClick={()=>navigate(location.pathname.startsWith('/mobile/')?'/mobile/empresas':'/empresas')}>Empresas y establecimientos</Button>}
+      {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y sede en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}
+      {!currentUser?.empresaContexto&&currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}
       {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isLoading && <p role="status">Cargando datos de tu establecimiento…</p>}

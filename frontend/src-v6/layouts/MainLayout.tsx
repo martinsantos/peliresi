@@ -49,6 +49,7 @@ import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
+import CompanyContextBar from '../components/CompanyContextBar';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
@@ -209,7 +210,7 @@ export const MainLayout: React.FC = () => {
 
   // One current section, including detail routes; hidden role items never compete.
   const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems, { path: '/soporte', icon: LifeBuoy, label: 'Soporte' }]);
-  const currentPage = isInspectionCase ? 'Inspección' : currentItem?.label || 'SITREP';
+  const currentPage = isInspectionCase ? 'Inspección' : location.pathname.startsWith('/empresas')?'Empresas y sedes':currentItem?.label || 'SITREP';
 
   return (
     <div data-app-shell className="h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden">
@@ -515,6 +516,7 @@ export const MainLayout: React.FC = () => {
         </header>
 
         <SWUpdateBanner />
+        <CompanyContextBar />
         <ToastContainer />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}

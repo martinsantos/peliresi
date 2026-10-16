@@ -12,6 +12,7 @@ import { emailService } from '../services/email.service';
 import { verifiedImpersonator } from '../services/impersonationIdentity.service';
 import { recordAccountMail } from '../services/account-mail.service';
 import { accountActivities } from '../services/actorActivities.service';
+import { companyContexts } from '../services/empresa.service';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -436,7 +437,10 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);
     const activities = await accountActivities(user);
-    res.json({ success: true, data: { user: { ...user, rol: req.user.rolBase ? req.user.rol : user.rol, actividades: activities, ...(isTrainingSession() ? { training: true } : {}) } } });
+    const contexts = await companyContexts(req.user);
+    res.json({ success: true, data: { user: { ...user, rol: req.user.rolBase ? req.user.rol : user.rol, actividades: activities,
+      ...(req.user.empresaContexto?{generador:req.user.generador,transportista:req.user.transportista,operador:req.user.operador,esInspector:false,empresaContexto:req.user.empresaContexto}:{}),
+      ...(process.env.ENTERPRISE_ENABLED==='true'?{contextosEmpresa:contexts}:{}),...(isTrainingSession() ? { training: true } : {}) } } });
   } catch (error) {
     next(error);
   }

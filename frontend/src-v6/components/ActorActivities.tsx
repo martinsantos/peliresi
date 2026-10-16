@@ -14,7 +14,7 @@ import { Button } from './ui/ButtonV2';
 const labels = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' };
 export default function ActorActivities() {
   const { currentUser } = useAuth();
-  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED !== 'true' || !currentUser || !(currentUser.rol in labels)) return null;
+  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED !== 'true' || !currentUser || currentUser.empresaContexto || !(currentUser.rol in labels)) return null;
   return <ActivityChoices key={currentUser.id} />;
 }
 function ActivityChoices() {

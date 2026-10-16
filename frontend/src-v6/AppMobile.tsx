@@ -29,7 +29,7 @@ import {
   AdminOperadoresPage, NuevoOperadorPage, NuevoTransportistaPage,
   AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
   AdminRenovacionesPage, AdminSolicitudesPage, SolicitudDetallePage,
-  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
+  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage, EmpresasPage, EmpresaInvitacionPage,
   AyudaPage, SoportePage, EscanerQRPage, EstadisticasPage,
   InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
 } from './routes/pages';
@@ -76,7 +76,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
+  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
@@ -123,6 +123,7 @@ function AppMobile() {
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
           <Route element={<AuthLayout />}>
             <Route path="/registro" element={<RegistroPage />} />
+            <Route path="/empresa-invitacion/:token" element={<EmpresaInvitacionPage />} />
             <Route path="/verificar-email" element={<VerificarEmailPage />} />
             <Route path="/recuperar" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -134,6 +135,7 @@ function AppMobile() {
           {/* Mobile Routes - MobileLayout (auth handled by AuthGate above) */}
           <Route element={<MobileLayout />}>
             <Route path="/dashboard" element={<MobileDashboardPage />} />
+            <Route path="/empresas" element={<EmpresasPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
             <Route path="/centro-control/viaje/:id" element={<ViajeRedirectMobile />} />
             <Route path="/manifiestos" element={<ManifiestosPage />} />

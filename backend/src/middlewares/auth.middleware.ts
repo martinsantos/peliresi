@@ -8,6 +8,7 @@ import { isFullAccess } from '../utils/roleFilter';
 import { verifiedImpersonator } from '../services/impersonationIdentity.service';
 import { accountActivities } from '../services/actorActivities.service';
 import { isActorActivity } from '../domain/actorActivities';
+import { resolveCompanyContext } from '../services/empresa.service';
 
 /** Shape of req.user set by isAuthenticated middleware. */
 export interface AuthUser {
@@ -66,6 +67,7 @@ export const isAuthenticated = async (
         rol: true,
         activo: true,
         motivoInactividad: true,
+        emailVerified: true,
         esInspector: true,
         generador: true,
         transportista: true,
@@ -85,9 +87,20 @@ export const isAuthenticated = async (
     // Adjuntar el usuario al objeto de solicitud (with restricted flag)
     const impersonatedBy = await verifiedImpersonator(decoded.impersonatedBy, user.id, decoded.restricted);
     req.user = { ...user, restricted: decoded.restricted || false, ...(impersonatedBy ? { impersonatedBy } : {}) };
+    const enterprise = await resolveCompanyContext(req.user, req.headers);
+    if (enterprise) {
+      if(req.headers['x-sitrep-activity']!==undefined)throw new AppError('Elegí actividad personal o empresa, no ambas',400);
+      req.user = { ...req.user, rolBase:user.rol, rol:enterprise.context.rol, esInspector:false,
+        generador:null,transportista:null,operador:null,[enterprise.key]:enterprise.actor,empresaContexto:enterprise.context };
+      // These legacy sections lack a per-establishment historical contract.
+      // Restricted delegates cannot inherit company-wide records through them.
+      if(!enterprise.context.todasSedes&&!/^\/api\/(?:auth\/profile|manifiestos|pdf|catalogos|notificaciones|soporte)(?:[/?]|$)/.test(req.originalUrl)) {
+        throw new AppError('Esta sección requiere autorización para todos los establecimientos de la empresa',403);
+      }
+    }
     // Per-request activity, not a mutation of Usuario.rol or another tab's JWT.
     const activity = req.headers['x-sitrep-activity'];
-    if (activity !== undefined) {
+    if (activity !== undefined && !enterprise) {
       if (process.env.ACTOR_MULTIROLE_ENABLED !== 'true' || decoded.restricted || impersonatedBy
         || !user.activo || !isActorActivity(user.rol) || !isActorActivity(activity)
         || !(await accountActivities(user)).includes(activity)) {

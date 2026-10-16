@@ -10,8 +10,11 @@ import { manifiestoService } from './manifiesto.service';
 import type { Manifiesto } from '../types/models';
 import { getAccessToken } from './api';
 import { readActorActivity } from './actorActivity';
+import { readCompanyContext,companyCacheScope } from './companyContext';
 
-const accountCacheKey = (userId: string | number) => import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'
+const accountCacheKey = (userId: string | number) => import.meta.env.VITE_ENTERPRISE_ENABLED==='true'
+  ? `user_${userId}:company:${companyCacheScope(readCompanyContext(getAccessToken()))}:activity:${readActorActivity(getAccessToken())||'base'}`
+  : import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'
   ? `user_${userId}:activity:${readActorActivity(getAccessToken()) || 'base'}` : `user_${userId}`;
 
 interface CachedManifiestos {
@@ -66,9 +69,9 @@ export async function getLastSyncTime(userId: string | number): Promise<number |
  * silently deleting unpublished field work would be unsafe.
  */
 export async function clearUserOfflineData(userId: string | number): Promise<void> {
-  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true') {
+  if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'||import.meta.env.VITE_ENTERPRISE_ENABLED==='true') {
     const snapshots = await getAllOffline<{ id: string }>('manifiestos').catch(() => []);
-    for (const row of snapshots.filter(row => row.id.startsWith(`user_${userId}:activity:`))) await removeOffline('manifiestos', row.id).catch(() => {});
+    for (const row of snapshots.filter(row => row.id.startsWith(`user_${userId}:activity:`)||row.id.startsWith(`user_${userId}:company:`))) await removeOffline('manifiestos', row.id).catch(() => {});
   }
   await removeOffline('manifiestos', `user_${userId}`).catch(() => {});
   await removeOffline('catalogos', `user_${userId}`).catch(() => {});

@@ -169,6 +169,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         generadorId,
         transportistaId: modalidad === 'IN_SITU' ? null : transportistaId,
         ...(asignacionTransporte ? { asignacionTransporte } : {}),
+        ...(req.user.empresaContexto?{contextoEmpresa:JSON.parse(JSON.stringify(req.user.empresaContexto))}:{}),
         operadorId,
         modalidad,
         observaciones,

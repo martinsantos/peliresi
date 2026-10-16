@@ -16,6 +16,7 @@ import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from './addenda-journ
 import { multiRoleJourney, pendingMultiRoleJourney } from './multirole-journey.ts';
 import { externalTrackingJourney } from './external-tracking-journey.ts';
 import { compactNoticeProof, reconciliationJourney } from './reconciliation-journey.ts';
+import { enterpriseJourney } from './enterprise-journey.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -382,6 +383,9 @@ try {
     },
   });
   results.push('External identity confirmed, persisted, CSV saved byte-exactly on Android and revoked with history; compact notice remains actionable');
+  await logout(); await login('empresa-apk-owner');
+  await enterpriseJourney(page,'/app','apk',{hideKeyboard,evidence:name=>proof('19-'+name)});
+  results.push('Company legal/productive addresses, delegation/revocation/regrant, audit and company/site context passed in installed Android APK');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');

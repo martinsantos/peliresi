@@ -79,6 +79,8 @@ export const CargaMasivaPage = lazy(() => import('../pages/carga-masiva/CargaMas
 
 // Perfil
 export const PerfilPage = lazy(() => import('../pages/perfil/PerfilPage'));
+export const EmpresasPage = lazy(() => import('../pages/empresas/EmpresasPage'));
+export const EmpresaInvitacionPage = lazy(() => import('../pages/empresas/EmpresaInvitacionPage'));
 export const SolicitarCambiosPage = lazy(() => import('../pages/perfil/SolicitarCambiosPage'));
 
 // Mobile

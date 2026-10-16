@@ -15,7 +15,7 @@ interface OfflineSession {
 }
 
 // Multi-activity tabs must never restore another tab's role from a shared cache.
-const sessionStore = () => import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' ? sessionStorage : localStorage;
+const sessionStore = () => import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'||import.meta.env.VITE_ENTERPRISE_ENABLED==='true' ? sessionStorage : localStorage;
 
 /** A server response (including 401/403/5xx) is never an offline authorization. */
 export function isOfflineNetworkError(error: unknown): boolean {

@@ -324,6 +324,8 @@ model Manifiesto {
   transportistaId         String?
   // Explicit creation snapshot; no backfill from the current fleet.
   asignacionTransporte    Json?
+  // Actor IDs and addresses in this snapshot never follow later registry edits.
+  contextoEmpresa        Json?
   operadorId              String
   modalidad               String?          @default("FIJO")
   tratamientoMetodo       String?
@@ -1380,4 +1382,114 @@ model EmailQueue {
   @@index([to, createdAt])
   @@index([digestKey])
   @@map("email_queue")
+}
+
+// Additive enterprise boundary. Legacy actor/account links are retained.
+model Empresa {
+  id String @id @default(cuid())
+  cuit String @unique
+  razonSocial String
+  nombreFantasia String?
+  domicilioLegal Json
+  revision Int @default(0)
+  activa Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("empresas")
+}
+model EmpresaActividad {
+  id String @id @default(cuid())
+  empresaId String
+  rol String
+  actorId String
+  aprobadaPor String
+  activa Boolean @default(true)
+  createdAt DateTime @default(now())
+  @@unique([empresaId, rol])
+  @@unique([rol, actorId])
+  @@map("empresas_actividades")
+}
+model EstablecimientoEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  codigo String
+  nombre String
+  domicilio String
+  localidad String?
+  departamento String?
+  latitud Float?
+  longitud Float?
+  certificados Json
+  revision Int @default(0)
+  activo Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([empresaId, codigo])
+  @@map("empresas_establecimientos")
+}
+model ResponsableEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  usuarioId String
+  validadoPor String
+  validadoAt DateTime @default(now())
+  revocadoAt DateTime?
+  motivo String
+  @@unique([empresaId, usuarioId])
+  @@map("empresas_responsables")
+}
+model AutorizacionEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  actividadId String
+  usuarioId String
+  todosEstablecimientos Boolean
+  establecimientoIds String[]
+  activa Boolean @default(true)
+  revision Int @default(0)
+  otorgadaPor String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([actividadId, usuarioId])
+  @@index([usuarioId, activa])
+  @@map("empresas_autorizaciones")
+}
+model InvitacionEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  actividadId String
+  email String
+  tokenHash String @unique
+  todosEstablecimientos Boolean
+  establecimientoIds String[]
+  creadaPor String
+  venceAt DateTime
+  aceptadaPor String?
+  aceptadaAt DateTime?
+  revocadaAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([empresaId, email])
+  @@map("empresas_invitaciones")
+}
+model EventoEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  usuarioId String
+  tipo String
+  datos Json
+  createdAt DateTime @default(now())
+  @@index([empresaId, createdAt])
+  @@map("empresas_eventos")
+}
+model FuentePadronEmpresa {
+  id String @id @default(cuid())
+  sha256 String
+  archivo String
+  hoja String
+  fila Int
+  contenidoHash String
+  datos Json
+  createdAt DateTime @default(now())
+  @@unique([sha256, hoja, fila])
+  @@map("empresas_fuentes_padron")
 }

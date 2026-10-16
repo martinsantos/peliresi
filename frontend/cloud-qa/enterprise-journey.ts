@@ -1,0 +1,55 @@
+import { expect,type Page } from '@playwright/test';
+export async function enterpriseJourney(page:Page,prefix:string,surface:string,options:{hideKeyboard?:()=>Promise<void>;evidence?:(name:string)=>Promise<void>}={}) {
+ const hide=async()=>{await options.hideKeyboard?.();};
+ await page.goto('http://127.0.0.1:4177'+prefix+'/empresas');
+ await expect(page.getByRole('heading',{name:'Empresas y establecimientos',exact:true})).toBeVisible();
+ await expect(page.getByLabel('Calle legal',{exact:true})).toHaveValue('Legal QA 100');
+ await page.getByLabel('Calle legal',{exact:true}).fill('Legal QA '+surface+' 101');
+ await page.getByLabel('Motivo del cambio legal',{exact:true}).fill('QA corrección legal '+surface);await hide();
+ await page.getByRole('button',{name:'Guardar datos legales',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'Cambios guardados'})).toBeVisible();
+ await page.getByRole('button',{name:'Establecimientos',exact:true}).click();
+ // Scope each editor to its establishment, not the other repeated field labels.
+ const card=page.getByRole('heading',{name:'Planta Norte',exact:true}).locator('..');
+ await card.getByText('Editar establecimiento',{exact:true}).click();
+ await card.getByLabel('Domicilio productivo',{exact:true}).fill('Productiva '+surface+' 201');
+ await card.getByLabel('Motivo del cambio productivo',{exact:true}).fill('QA cambio de sede '+surface);await hide();
+ const saved=page.waitForResponse(r=>r.url().includes('/establecimientos/')&&r.request().method()==='PUT');
+ await card.getByRole('button',{name:'Guardar establecimiento',exact:true}).click();expect((await saved).status()).toBe(200);
+ await expect(card.getByText('Productiva '+surface+' 201, Mendoza, Capital',{exact:true})).toBeVisible();
+ await page.reload();await page.getByRole('button',{name:'Establecimientos',exact:true}).click();
+ await expect(card.getByText('Productiva '+surface+' 201, Mendoza, Capital',{exact:true})).toBeVisible();
+ await options.evidence?.('enterprise-sites');
+ await page.getByRole('button',{name:'Personas autorizadas',exact:true}).click();
+ await page.getByLabel('Correo de la persona',{exact:true}).fill('empresa-'+surface+'-member@night-qa.invalid');
+ // Update the existing authorization deliberately; never create a duplicate.
+ await hide();
+ const granted=page.waitForResponse(r=>r.url().endsWith('/personas')&&r.request().method()==='POST');
+ await page.getByRole('button',{name:'Autorizar cuenta verificada',exact:true}).click();expect((await granted).status()).toBe(201);
+ const member=page.getByText('QA '+surface+' member',{exact:true}).locator('..').locator('..');
+ await expect(member.getByText('Todos los establecimientos',{exact:true})).toBeVisible();
+ await page.getByLabel('Motivo de revocación',{exact:true}).fill('QA revocación '+surface);await hide();
+ const revoked=page.waitForResponse(r=>r.url().includes('/revocar')&&r.request().method()==='POST');
+ await member.getByRole('button',{name:'Revocar acceso',exact:true}).click();expect((await revoked).status()).toBe(200);
+ await expect(member.getByText(/Revocada/)).toBeVisible();
+ await page.getByLabel('Correo de la persona',{exact:true}).fill('empresa-'+surface+'-member@night-qa.invalid');await hide();
+ await page.getByRole('button',{name:'Autorizar cuenta verificada',exact:true}).click();
+ await expect(member.getByText(/Autorizada/)).toBeVisible();
+ await options.evidence?.('enterprise-people');
+ await page.getByRole('button',{name:'Historial',exact:true}).click();
+ await expect(page.getByText('PERSONA REVOCADA',{exact:true})).toBeVisible();
+ await expect(page.getByText('DOMICILIO LEGAL ACTUALIZADO',{exact:true})).toBeVisible();
+ await options.evidence?.('enterprise-audit');
+ await page.getByLabel('Establecimiento para operar',{exact:true}).selectOption({label:'Planta Norte · NORTE'});
+ await page.getByRole('button',{name:'Usar empresa y establecimiento',exact:true}).click();
+ await expect(page.getByRole('link',{name:'Cambiar empresa o sede',exact:true})).toBeVisible();
+ await expect(page.getByText(/Actuando por QA Empresa/)).toContainText('Planta Norte');
+ await page.goto('http://127.0.0.1:4177'+prefix+'/mi-perfil');
+ await expect(page.getByText('Legal: Legal QA '+surface+' 101',{exact:true})).toBeVisible();
+ await expect(page.getByText('Productivo: Productiva '+surface+' 201',{exact:true})).toBeVisible();
+ await options.evidence?.('enterprise-context');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+ await page.getByRole('link',{name:'Cambiar empresa o sede',exact:true}).click();
+ await page.getByRole('button',{name:'Volver a mi cuenta personal',exact:true}).click();
+ await expect(page.getByText(/Actuando por QA Empresa/)).toHaveCount(0);
+}

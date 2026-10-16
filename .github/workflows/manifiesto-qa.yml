@@ -43,6 +43,8 @@ jobs:
       MANIFEST_PARTY_REVIEW_ENABLED: 'true'
       ACTOR_MULTIROLE_ENABLED: 'true'
       VITE_ACTOR_MULTIROLE_ENABLED: 'true'
+      ENTERPRISE_ENABLED: 'true'
+      VITE_ENTERPRISE_ENABLED: 'true'
       QA_ARTIFACTS: /tmp/sitrep-manifest-v2
       UPLOADS_DIR: /tmp/sitrep-manifest-v2/uploads
       QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
@@ -79,6 +81,7 @@ jobs:
         env:
           ACTOR_MULTIROLE_ENABLED: 'false'
           MANIFEST_PARTY_REVIEW_ENABLED: 'false'
+          ENTERPRISE_ENABLED: 'false'
         # Existing PDF unit tests parse actual PDF bytes, not a renderer mock.
         # Install the parser on the VM before running the suite.
         if: success()
@@ -90,6 +93,7 @@ jobs:
       - name: Frontend unit suite, providers mocked
         env:
           VITE_ACTOR_MULTIROLE_ENABLED: 'false'
+          VITE_ENTERPRISE_ENABLED: 'false'
         working-directory: frontend
         run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
       - name: Cloud browser and isolated PostgreSQL
@@ -114,6 +118,11 @@ jobs:
           node --experimental-strip-types frontend/cloud-qa/party-multirole-integration.ts
           node --experimental-strip-types frontend/cloud-qa/external-tracking-integration.ts
           node --experimental-strip-types frontend/cloud-qa/reconciliation-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/enterprise-integration.ts
+          pdftotext "$QA_ARTIFACTS/empresa-north.pdf" "$QA_ARTIFACTS/empresa-north.txt"
+          node --input-type=module -e "import fs from 'node:fs'; import assert from 'node:assert/strict';const t=fs.readFileSync(process.env.QA_ARTIFACTS+'/empresa-north.txt','utf8');for(const v of ['Productiva QA 200','Legal QA 100','Planta Norte'])assert.ok(t.includes(v),v);"
+          mkdir -p "$QA_ARTIFACTS/qa-planner"
+          cp backend/dist/domain/padronEmpresaPlan.js backend/dist/domain/conciliacionExterna.js "$QA_ARTIFACTS/qa-planner/"
       - name: Web, responsive mobile and app journeys with actual backend
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/manifest.playwright.config.ts

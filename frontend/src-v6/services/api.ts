@@ -7,6 +7,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiErrorResponse, RefreshTokenResponse } from '../types/api';
 import { toast } from '../components/ui/Toast';
 import { ACTIVITY_HEADER, readActorActivity } from './actorActivity';
+import { readCompanyContext,companyHeaders } from './companyContext';
 import { readSessionCheckpoint, writeSessionCheckpoint, type SessionCheckpoint } from './sessionCheckpoint';
 
 const TOKEN_KEY = 'sitrep_access_token';
@@ -180,7 +181,11 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    const activity = readActorActivity(token);
+    const company=readCompanyContext(token);
+    const companyManagement=config.url?.startsWith('/empresas');
+    const accountRoute=config.url?.startsWith('/auth/')&&config.url!=='/auth/profile';
+    if(company&&!companyManagement&&!accountRoute&&!config.headers.has('X-SITREP-Empresa'))for(const [key,value] of Object.entries(companyHeaders(company)))config.headers.set(key,value);
+    const activity = !company&&!config.headers.has('X-SITREP-Empresa')&&!companyManagement&&!accountRoute?readActorActivity(token):null;
     if (activity && !config.headers.has(ACTIVITY_HEADER)) config.headers.set(ACTIVITY_HEADER, activity);
   }
   return config;

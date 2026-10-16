@@ -48,6 +48,7 @@ import { NotificationBell } from '../components/NotificationBell';
 import { SitrepMark } from '../components/SitrepMark';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
+import CompanyContextBar from '../components/CompanyContextBar';
 import { InstallPWAButton } from '../components/InstallPWAButton';
 import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -334,6 +335,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/alertas')) return 'Alertas';
     if (path.includes('/configuracion')) return 'Configuración';
     if (path.includes('/mi-perfil')) return 'Mi Perfil';
+    if (path.includes('/empresas')) return 'Empresas y sedes';
     if (path.includes('/notificaciones')) return 'Avisos';
     if (path.includes('/estadisticas')) return 'Estadísticas';
     if (path.includes('/escaner-qr')) return 'Escanear QR';
@@ -417,6 +419,7 @@ export const MobileLayout: React.FC = () => {
         </div>
       </header>
       <ToastContainer />
+      <CompanyContextBar />
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
       <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>
