@@ -90,12 +90,6 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends poppler-utils
           npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
-      - name: Frontend unit suite, providers mocked
-        env:
-          VITE_ACTOR_MULTIROLE_ENABLED: 'false'
-          VITE_ENTERPRISE_ENABLED: 'false'
-        working-directory: frontend
-        run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
       - name: Cloud browser and isolated PostgreSQL
         run: |
           sudo apt-get install -y --no-install-recommends postgresql-16
@@ -126,6 +120,12 @@ jobs:
       - name: Web, responsive mobile and app journeys with actual backend
         working-directory: frontend
         run: npx --no-install playwright test --config cloud-qa/manifest.playwright.config.ts
+      - name: Frontend unit suite, providers mocked
+        env:
+          VITE_ACTOR_MULTIROLE_ENABLED: 'false'
+          VITE_ENTERPRISE_ENABLED: 'false'
+        working-directory: frontend
+        run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
       - name: Build separately identified loopback QA APK, no release key
         run: |
           npm install --prefix "$RUNNER_TEMP/sitrep-bubblewrap" --save-exact @bubblewrap/core@1.24.1 --no-audit --no-fund
