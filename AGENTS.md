@@ -1,5 +1,13 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Aviso de checkout histórico — 16/10/2026
+
+Este checkout conserva `codex/sitrep-hardening-snapshot-20260729` y archivos ajenos sin seguimiento; **no es la fuente activa del producto**. No hacer reset, merge de ramas antiguas, importaciones, seeds, instalaciones ni despliegues para actualizarlo. Los datos/arquitectura/CI de los apartados siguientes son históricos, no una autorización actual.
+
+Desarrollo actual: `codex/sitrep-manifiestos-v2-20261014`. Para la revisión UI/UX usar `codex/sitrep-uiux-review-20261016`, desde `sitrep-uiux-baseline-20261016`; leer [cierre vigente](https://github.com/martinsantos/peliresi/blob/codex/sitrep-uiux-review-20261016/docs/CIERRE-PARCIAL-20261016.md) y [brief para el otro motor](https://github.com/martinsantos/peliresi/blob/codex/sitrep-uiux-review-20261016/docs/REVISION-UIUX-20261016.md). Reutilizar el checkout activo `sitrep-production-source-20261001` del hilo, no crear copias de dependencias. Preservar Precrimen y otros proyectos.
+
+Cinco referencias Git de worktrees tmp ya ausentes se depuraron con metadatos recuperables en `tmp/repo-close-20261016/prunable-worktree-metadata.tgz`; ramas/commits conservados. Este cierre no publicó producto, no activó correos y no tocó formularios ni datos reales. QA pesada sólo remota y autorizada,1CPU/2GiB/swap0, un worker, sin Docker/emulador local ni Actions nuevos.
+
 Sistema de gestión y trazabilidad de residuos peligrosos para la Provincia de Mendoza.
 Permite el seguimiento completo del ciclo de vida de manifiestos: desde la generación hasta el tratamiento final.
 
