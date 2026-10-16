@@ -1,4 +1,7 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
 
 /** Tooltip/accessible name alone does not prove that a page title is readable. */
 export async function readablePageHeading(page: Page) {
@@ -149,6 +152,17 @@ const fixturePages = new WeakSet<Page>();
 async function isolatedMapTiles(page: Page, info: TestInfo) {
   if (process.env.SITREP_QA_EXECUTOR !== 'preview-container' || fixturePages.has(page)) return;
   fixturePages.add(page);
+  const fontRoot=path.resolve(process.env.QA_ARTIFACTS!,'../.qa-fonts');
+  const fonts=JSON.parse(readFileSync(path.join(fontRoot,'manifest.json'),'utf8'));
+  info.annotations.push({type:'provider-cache',description:'Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography.'});
+  await page.route(/^https:\/\/fonts\.(?:googleapis|gstatic)\.com\//,async route=>{
+    expect(route.request().method()).toBe('GET');
+    const asset=fonts[route.request().url()];expect(asset,'Known public font asset').toBeDefined();
+    expect(asset.file).toMatch(/^[a-f0-9]{64}\.(?:css|woff2)$/);
+    const body=readFileSync(path.join(fontRoot,asset.file));
+    expect(createHash('sha256').update(body).digest('hex')).toBe(asset.sha256);
+    await route.fulfill({body,contentType:asset.contentType,headers:{'access-control-allow-origin':'*'}});
+  });
   info.annotations.push({ type: 'provider-fixture', description: 'OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified.' });
   await page.route('https://tile.openstreetmap.org/**', async route => {
     expect(route.request().method()).toBe('GET');
