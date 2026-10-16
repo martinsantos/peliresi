@@ -96,6 +96,9 @@ try {
  await req(null,inviteRoute+'/aceptar',403,{email:c.other.email,password:'wrong'});
  await req(null,inviteRoute+'/aceptar',200,{email:c.other.email,password});
  await req(null,inviteRoute+'/aceptar',404,{email:c.other.email,password});
+ const brute=await invite(c.other.email),bruteRoute=brute.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/')+'/aceptar';
+ for(let i=0;i<5;i++)await req(null,bruteRoute,403,{email:c.other.email,password:'wrong'});
+ await req(null,bruteRoute,429,{email:c.other.email,password:'wrong'});
  const newEmail='empresa-new-personal@night-qa.invalid';
  await req(null,'/auth/register',201,{email:newEmail,password,nombre:'QA Persona invitada',rol:'GENERADOR'});
  const pending=await db.usuario.findUniqueOrThrow({where:{email:newEmail}});
@@ -108,8 +111,7 @@ try {
  await req(null,newRoute+'/aceptar',200,{email:newEmail,password});
  const suspended=await db.usuario.create({data:{nombre:'QA Suspendida',email:'empresa-suspended@night-qa.invalid',password:original.password,rol:'GENERADOR',activo:false,emailVerified:true,motivoInactividad:'SUSPENDIDA'}});
  const si=await invite(suspended.email),sr=si.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/');
- // Separate client IP only for synthetic rate-limiter isolation; do not weaken production limit.
- await req(null,sr+'/aceptar',403,{email:suspended.email,password},'POST',{'X-Forwarded-For':'192.0.2.81'});
+ await req(null,sr+'/aceptar',403,{email:suspended.email,password});
  const fresh=await db.usuario.findUniqueOrThrow({where:{id:pending.id}});assert.equal(fresh.activo,true);assert.equal(fresh.cuit,null);
  assert.equal(await db.generador.count({where:{usuarioId:pending.id}}),0);
  assert.equal(await db.emailQueue.count({where:{estado:'ENVIADO'}}),0,'no email sent');
