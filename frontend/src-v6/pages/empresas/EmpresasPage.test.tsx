@@ -46,3 +46,44 @@ test('a failed search preserves the selected company and the unsaved form; retry
  await waitFor(()=>expect(mocks.request.mock.calls.filter(([r])=>r.url.includes('search=Sin+red')).length).toBeGreaterThanOrEqual(2));
  expect(screen.getByLabelText('Calle legal')).toHaveValue('Domicilio sin guardar');
 });
+test('switching sections preserves legal drafts without exposing the hidden save action',async()=>{
+ setup();await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Domicilio por conciliar'}});
+ fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'Revisar evidencia antes de guardar'}});
+ expect(screen.queryByLabelText('Correo de la persona')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:/^Establecimientos$/}));
+ expect(screen.queryByRole('button',{name:'Guardar datos legales'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:/^Empresa$/}));
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('Domicilio por conciliar');
+ expect(screen.getByLabelText('Motivo del cambio legal')).toHaveValue('Revisar evidencia antes de guardar');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('a new establishment draft survives navigation between company sections',async()=>{
+ setup();await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:/^Establecimientos$/}));
+ fireEvent.change(screen.getByLabelText('Código de establecimiento'),{target:{value:'QA-PENDIENTE'}});
+ fireEvent.change(screen.getByLabelText('Domicilio productivo'),{target:{value:'Sede por verificar'}});
+ fireEvent.click(screen.getByRole('button',{name:/^Personas autorizadas$/}));
+ expect(screen.queryByRole('button',{name:'Agregar establecimiento'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:/^Establecimientos$/}));
+ expect(screen.getByLabelText('Código de establecimiento')).toHaveValue('QA-PENDIENTE');
+ expect(screen.getByLabelText('Domicilio productivo')).toHaveValue('Sede por verificar');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('a person draft survives section changes but never leaks to another company',async()=>{
+ setup();await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:/^Personas autorizadas$/}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'delegado@night-qa.invalid'}});
+ fireEvent.change(screen.getByLabelText('Motivo de revocación'),{target:{value:'Borrador no enviado'}});
+ fireEvent.click(screen.getByRole('button',{name:/^Empresa$/}));
+ expect(screen.queryByRole('button',{name:'Autorizar cuenta verificada'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:/^Personas autorizadas$/}));
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('delegado@night-qa.invalid');
+ expect(screen.getByLabelText('Motivo de revocación')).toHaveValue('Borrador no enviado');
+ fireEvent.change(screen.getByLabelText('Empresa',{exact:true}),{target:{value:'other'}});
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal other'));
+ fireEvent.click(screen.getByRole('button',{name:/^Personas autorizadas$/}));
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('');
+ expect(screen.getByLabelText('Motivo de revocación')).toHaveValue('');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
