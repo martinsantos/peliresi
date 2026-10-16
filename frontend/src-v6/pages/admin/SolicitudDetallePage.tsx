@@ -132,13 +132,17 @@ const SolicitudDetallePage: React.FC = () => {
     finally { readingInFlight.current = false; setReadingReceipt(false); }
   };
 
+  const sendingMessage = useRef(false);
   const handleSendMessage = async () => {
-    if (!id || !messageText.trim()) return;
+    if (!id || !messageText.trim() || sendingMessage.current) return;
+    sendingMessage.current = true;
     try {
       await enviarMensaje.mutateAsync({ solicitudId: id, contenido: messageText.trim() });
       setMessageText('');
     } catch {
       toast.error('Error', 'No se pudo enviar el mensaje');
+    } finally {
+      sendingMessage.current = false;
     }
   };
 
@@ -499,14 +503,15 @@ const SolicitudDetallePage: React.FC = () => {
 
       {/* Observar Modal */}
       {observarModal && (
-        <Modal isOpen onClose={() => { setObservarModal(false); setObservarText(''); }} title="Observar Solicitud" size="sm">
+        <Modal isOpen onClose={() => setObservarModal(false)} isBusy={observarSolicitud.isPending} title="Observar Solicitud" size="sm">
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
               La solicitud volvera al candidato con tus observaciones para que corrija y re-envie.
             </p>
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones *</label>
+              <label htmlFor="solicitud-observaciones" className="block text-sm font-medium text-neutral-700 mb-1">Observaciones *</label>
               <textarea
+                id="solicitud-observaciones"
                 value={observarText}
                 onChange={e => setObservarText(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
@@ -534,14 +539,15 @@ const SolicitudDetallePage: React.FC = () => {
 
       {/* Rechazar Modal */}
       {rechazarModal && (
-        <Modal isOpen onClose={() => { setRechazarModal(false); setRechazarText(''); }} title="Rechazar Solicitud" size="sm">
+        <Modal isOpen onClose={() => setRechazarModal(false)} isBusy={rechazarSolicitud.isPending} title="Rechazar Solicitud" size="sm">
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
               Rechazar la solicitud de <strong>{solicitud.usuario?.nombre}</strong>. Esta accion es definitiva.
             </p>
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
+              <label htmlFor="solicitud-motivo-rechazo" className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
               <textarea
+                id="solicitud-motivo-rechazo"
                 value={rechazarText}
                 onChange={e => setRechazarText(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"

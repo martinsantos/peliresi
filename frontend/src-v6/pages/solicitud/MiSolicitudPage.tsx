@@ -81,25 +81,37 @@ const MiSolicitudPage: React.FC = () => {
 
   // ── Handlers ──
 
+  const sendingMessage = useRef(false);
   const handleSendMessage = async () => {
-    if (!solicitud || !messageText.trim()) return;
+    if (!solicitud || !messageText.trim() || sendingMessage.current) return;
+    sendingMessage.current = true;
     try {
       await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido: messageText.trim() });
       setMessageText('');
     } catch {
       toast.error('Error', 'No se pudo enviar el mensaje');
+    } finally {
+      sendingMessage.current = false;
     }
   };
 
+  // A retry after a failed resend must not post the same reply twice.
+  const postedReply = useRef<{ solicitudId: string; contenido: string } | null>(null);
   const handleReplyAndResend = async () => {
     if (!solicitud || !replyText.trim()) return;
+    const contenido = replyText.trim();
     try {
-      await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido: replyText.trim() });
+      const alreadyPosted = postedReply.current?.solicitudId === solicitud.id && postedReply.current.contenido === contenido;
+      if (!alreadyPosted) {
+        await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido });
+        postedReply.current = { solicitudId: solicitud.id, contenido };
+      }
       await enviarSolicitud.mutateAsync(solicitud.id);
+      postedReply.current = null;
       setReplyText('');
       toast.success('Enviada', 'Tu solicitud fue re-enviada con la respuesta');
     } catch {
-      toast.error('Error', 'No se pudo re-enviar la solicitud');
+      toast.error('Error', postedReply.current ? 'La respuesta quedó guardada, pero no se re-envió la solicitud. Reintentá.' : 'No se pudo re-enviar la solicitud');
     }
   };
 
