@@ -15,6 +15,7 @@ import { createExceptionalJourney, continueExceptionalJourney, reviewExceptional
 import { recordOrdinaryAddendum, resolveOrdinaryAddendum } from './addenda-journey.ts';
 import { multiRoleJourney, pendingMultiRoleJourney } from './multirole-journey.ts';
 import { externalTrackingJourney } from './external-tracking-journey.ts';
+import { compactNoticeProof, reconciliationJourney } from './reconciliation-journey.ts';
 
 await assertCloudDatabase();
 assert.equal(process.env.QA_ARTIFACTS, '/tmp/sitrep-manifest-v2');
@@ -364,6 +365,23 @@ try {
   await externalTrackingJourney(page, '/app', hideKeyboard);
   await proof('16-external-tracking');
   results.push('Read-only external participant tracking: exact identity, two pages, role-specific totals and source record');
+  await logout(); await login('admin');
+  await compactNoticeProof(page); await proof('17-compact-notice');
+  const csvFilesBefore = new Set(adb('shell', 'ls', '-1', '/sdcard/Download').trim().split(/\r?\n/));
+  await reconciliationJourney(page, '/app', 'apk', { hideKeyboard,
+    evidence: () => proof('18-reconciliation'),
+    download: async click => {
+      await click(); let filename = '';
+      await expect.poll(() => {
+        const files = adb('shell', 'ls', '-1', '/sdcard/Download').trim().split(/\r?\n/)
+          .filter(file => !csvFilesBefore.has(file) && /^participantes-externos.*\.csv$/.test(file));
+        if (files.length === 1) filename = files[0]; return files.length;
+      }, { timeout: 25000, message: 'CSV must reach Android storage' }).toBe(1);
+      const target = path.join(output, 'external-participants-downloaded.csv');
+      adb('pull', '/sdcard/Download/' + filename, target); return readFile(target);
+    },
+  });
+  results.push('External identity confirmed, persisted, CSV saved byte-exactly on Android and revoked with history; compact notice remains actionable');
   await logout(); await page.goto(origin + '/app/manifiestos/' + manifestId);
   await expect(page).toHaveURL(/\/app\/login$/);
   await proof('07-logout-denies-protected-route'); results.push('Logout denies protected route');

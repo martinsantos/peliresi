@@ -280,6 +280,23 @@ model RegistroManifiestoExcepcional {
   @@map("registros_manifiesto_excepcional")
 }
 
+// Append-only identity reconciliation. Never changes original declarations or access grants.
+model ConciliacionParticipanteExterno {
+  id String @id
+  registroId String
+  rol String
+  revision Int
+  accion String
+  actorId String?
+  ficha Json?
+  motivo String
+  autorId String
+  createdAt DateTime @default(now())
+
+  @@unique([registroId, rol, revision])
+  @@map("conciliaciones_participantes_externos")
+}
+
 // Additive observations/reviews only: original manifest and its signatures remain untouched.
 model AdendaManifiesto {
   id String @id

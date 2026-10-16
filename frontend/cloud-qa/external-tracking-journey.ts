@@ -33,7 +33,7 @@ export async function externalTrackingJourney(page: Page, prefix: string, hideKe
     await expect(summary).toContainText('1 movimiento · Transportistas');
     await expect(summary).toContainText('Y1 · 5 kg');
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    await page.getByRole('heading', { name: 'Participantes sin vínculo al padrón', exact: true }).scrollIntoViewIfNeeded();
+    await page.getByRole('heading', { name: 'Participantes externos', exact: true }).scrollIntoViewIfNeeded();
     expect(writes).toEqual([]);
   } finally { page.off('request', recordWrite); }
 }

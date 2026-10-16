@@ -26,6 +26,7 @@ interface Toast {
   duration?: number;
   actionLabel?: string;
   onAction?: () => void;
+  compact?: boolean;
 }
 
 interface ToastItemProps extends Toast {
@@ -131,7 +132,19 @@ const ToastItem: React.FC<ToastItemProps> = ({
   onRemove,
   actionLabel,
   onAction,
+  compact,
 }) => {
+  // Only the unread summary uses the compact row. Full warnings/errors keep
+  // their explanation and actions; never truncate critical information.
+  if (compact && !message && type === 'info') return <div role="status" aria-atomic="true" data-compact-notice="true"
+    className={cn('flex w-full items-center gap-2 rounded-xl border px-2 py-1', toastStyles[type])}>
+    <span className="shrink-0" aria-hidden="true">{toastIcons[type]}</span>
+    {onAction ? <button type="button" className="min-h-11 min-w-0 flex-1 rounded-lg text-left text-sm font-semibold text-primary-800 underline focus-visible:outline-primary-700"
+      aria-label={title + '. ' + (actionLabel || 'Abrir')} onClick={() => { onAction(); onRemove(id); }}>{title}</button>
+      : <p className="min-w-0 flex-1 break-words text-sm font-semibold text-neutral-900">{title}</p>}
+    <button type="button" aria-label="Cerrar notificación" onClick={() => onRemove(id)}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline-primary-700"><X size={16} /></button>
+  </div>;
   return (
     <div
       className={cn(

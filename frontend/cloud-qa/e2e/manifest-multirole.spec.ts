@@ -2,6 +2,17 @@ import { test, expect } from '@playwright/test';
 import { login, prefix } from './helpers';
 import { multiRoleJourney, pendingMultiRoleJourney } from '../multirole-journey';
 import { externalTrackingJourney } from '../external-tracking-journey';
+import { compactNoticeProof, reconciliationJourney } from '../reconciliation-journey';
+test('external reconciliation is reversible, audited and exported without replacing the original', async ({ page }, info) => {
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await login(page, info, 'admin');
+  await compactNoticeProof(page);
+  await page.screenshot({ path: info.outputPath('compact-notice.png') });
+  await reconciliationJourney(page, prefix(info), info.project.name, {
+    evidence: () => page.screenshot({ path: info.outputPath('reconciliation.png'), fullPage: true }).then(() => {}),
+  });
+  expect(errors).toEqual([]);
+});
 test('external participant tracking is scoped, paginated and read-only', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -7,6 +7,7 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import ConciliacionExterna from './ConciliacionExterna';
 
 type Result = { total: number; primera: string | null; ultima: string | null; pageSize: number;
   cantidades: { corriente: string; unidad: string; cantidad: string }[];
@@ -17,12 +18,30 @@ export default function SeguimientoExterno() {
   const { currentUser } = useAuth(); const mp = useMobilePrefix();
   const [role, setRole] = useState('generador'), [identity, setIdentity] = useState('');
   const [filters, setFilters] = useState({ rol: 'generador', identificacion: '', page: 1 });
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false), [exportError, setExportError] = useState('');
+  const exportingRef = useRef(false);
   const query = useQuery({ queryKey: ['seguimiento-externo', currentUser?.id, currentUser?.rol, filters],
     queryFn: async () => (await api.get('/manifiestos/baja-intensidad/seguimiento', { params: filters })).data.data as Result,
     retry: false });
   const data = query.data;
+  async function exportCsv() {
+    if (exportingRef.current) return;
+    exportingRef.current = true; setExporting(true); setExportError('');
+    try {
+      const { data: blob } = await api.get('/manifiestos/baja-intensidad/seguimiento/exportar', {
+        params: { rol: filters.rol, identificacion: filters.identificacion }, responseType: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'participantes-externos.csv';
+      document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      const status = (e as { response?: { status?: number } }).response?.status;
+      setExportError(status === 422 ? 'Más de 10.000 renglones. Filtrá por identificación para exportar sin recortes.' : 'No se pudo exportar. Reintentá cuando tengas conexión.');
+    } finally { exportingRef.current = false; setExporting(false); }
+  }
   return <section aria-label="Seguimiento de participantes externos" className="space-y-4">
-    <h2 className="text-lg font-semibold">Participantes sin vínculo al padrón</h2>
+    <h2 className="text-lg font-semibold">Participantes externos</h2>
     <p className="text-sm text-neutral-600">Datos declarados, identidad por verificar. No acredita una infracción.</p>
     <Card><form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); setFilters({ rol: role, identificacion: identity.trim(), page: 1 }); }}>
       <div className="text-sm font-medium"><label htmlFor="external-participant-type">Tipo de participante</label>
@@ -43,6 +62,8 @@ export default function SeguimientoExterno() {
         <p className="text-sm text-neutral-600">Carga original declarada en todas las coincidencias; no suma adendas ni identifica personas únicas.</p>
         <ul className="flex flex-wrap gap-x-5 gap-y-1" aria-label="Cantidades por corriente y unidad">{data.cantidades.map(row =>
           <li key={row.corriente + row.unidad}>{row.corriente} · {row.cantidad} {row.unidad}</li>)}</ul>
+        <Button variant="outline" disabled={exporting || query.isFetching || !data.total} onClick={() => void exportCsv()}>{exporting ? 'Exportando…' : 'Exportar coincidencias CSV'}</Button>
+        {exportError && <p role="alert">{exportError}</p>}
       </Card>
       {data.total === 0 && <p>No hay movimientos para estos filtros.</p>}
       {data.registros.map(row => <Card key={row.id} className="space-y-2" role="region" aria-label={'Movimiento BI-' + row.id}>
@@ -54,6 +75,8 @@ export default function SeguimientoExterno() {
           <p className="text-xs break-all">BI-{row.id}</p>
         </details>
         <Link className="inline-flex min-h-11 items-center text-primary-700 underline" to={mp('/manifiestos/baja-intensidad') + '?registro=' + encodeURIComponent(row.id)}>Ver registro</Link>
+        <Button variant="outline" aria-expanded={expanded === row.id} onClick={() => setExpanded(expanded === row.id ? null : row.id)}>{expanded === row.id ? 'Cerrar vínculo' : 'Revisar vínculo'}</Button>
+        {expanded === row.id && <ConciliacionExterna key={row.id + filters.rol} id={row.id} rol={filters.rol} userId={currentUser!.id} />}
       </Card>)}
       <nav aria-label="Páginas del seguimiento" className="flex flex-wrap items-center gap-3">
         <Button variant="outline" disabled={filters.page <= 1 || query.isFetching} onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}>Anterior</Button>

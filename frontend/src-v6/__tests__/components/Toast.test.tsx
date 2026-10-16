@@ -6,6 +6,16 @@ const ids: string[] = [];
 afterEach(() => { act(() => ids.forEach(id => toast.remove(id))); ids.length = 0; vi.useRealTimers(); });
 
 describe('system notices', () => {
+  it('offers the unread count itself as the compact action, preserving dismissal and full errors', () => {
+    const open = vi.fn(); render(<ToastContainer />);
+    act(() => { ids.push(toast.add({ type: 'info', title: '1 aviso sin leer', compact: true, duration: 0, actionLabel: 'Ver avisos', onAction: open })); });
+    expect(screen.getByRole('status')).toHaveAttribute('data-compact-notice', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '1 aviso sin leer. Ver avisos' }));
+    expect(open).toHaveBeenCalledOnce();
+    act(() => { ids.push(toast.add({ type: 'error', title: 'Fallo', message: 'No se guardó la operación', compact: true, duration: 0 })); });
+    expect(screen.getByRole('alert')).not.toHaveAttribute('data-compact-notice');
+    expect(screen.getByText('No se guardó la operación')).toBeVisible();
+  });
   it('opens the linked record once and dismisses the notice', () => {
     const open = vi.fn(); render(<ToastContainer />);
     act(() => { ids.push(toast.add({ type: 'info', title: 'Nuevo ticket', actionLabel: 'Abrir ticket', onAction: open, duration: 0 })); });

@@ -39,7 +39,7 @@ function AuthorizedNotificationsPoller({ userId }: { userId: string | number }) 
       data.items.forEach((n) => seen.current.add(n.id));
       initialized.current = true;
       if (data.noLeidas > 0) toastIds.current.push(toast.add({ type: 'info',
-        title: `${data.noLeidas} ${data.noLeidas === 1 ? 'aviso' : 'avisos'} sin leer`, duration: 8000,
+        title: `${data.noLeidas} ${data.noLeidas === 1 ? 'aviso' : 'avisos'} sin leer`, duration: 8000, compact: true,
         actionLabel: 'Ver avisos', onAction: () => navigate(mp('/notificaciones')) }));
       return;
     }

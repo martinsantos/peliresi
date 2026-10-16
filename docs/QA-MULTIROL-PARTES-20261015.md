@@ -1,5 +1,11 @@
 # Baja intensidad, actividades múltiples y contrapartes — candidato 15/10
 
+## Corte actual — exportación/conciliación: IMPLEMENTADO, QA pendiente
+
+CSV con filtros aplicados (todas las páginas), original y vínculo actual en columnas separadas; unidades sin mezclar, fórmulas neutralizadas, límite de 10.000 renglones con rechazo explícito, sin truncación. Conciliación por registro/rol en tabla aditiva independiente: sólo revisor designado no autor, CUIT verificable y ficha única, motivo obligatorio, confirmación explícita, revisión optimista/idempotencia y desvinculación sin borrar antecedentes. No cambia declaraciones, acceso de actores, aprobaciones ni cantidades. Los CUIT dudosos y ausentes siguen pendientes, sin bloquear la operación. No incorpora una matriz productiva nueva ni regularización legal automática.
+
+Aviso de pendientes compacto: contador como botón, cierre táctil de44px; mensajes de error completos. Plan de prueba: unit, HTTP autenticado aislado, web1440/móvil360/app390 y APKAndroid15 con descarga CSV real, persistencia/revocación y captura del aviso. Todavía NO probado este candidato; resultados anteriores son histórico. Sin publicar ni envíos, datos reales/formulario humano/localemulator.
+
 ## Corte 16/10 — microtexto y seguimiento externo: QA CERRADA, sin publicar
 
 **Candidato probado:** `b0637585ac48184300490a21bad54cff8058168a`, [corrida38897435629 SUCCESS](https://github.com/martinsantos/peliresi/actions/runs/38897435629). Job09:07:40–09:30:33 Mendoza,22m53s después de la cola. Una VM, pruebas seriales; no ejecución pesada local.
