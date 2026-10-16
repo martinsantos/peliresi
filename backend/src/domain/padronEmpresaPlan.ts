@@ -28,7 +28,7 @@ export function planCompanyRegister(rows:PadronRow[], previous:Origin[]=[]) {
   seen.set(key,origin.contenidoHash);sources.push({...origin,archivo:row.source.file,datos:row});
   const cuit=typeof row.participant.cuitNormalized==='string'?verifiedCuit(row.participant.cuitNormalized):null,certificate=row.participant.certificate;
   const reason=!cuit?'CUIT_NO_CONFIRMADO':!certificate||certs.get(certificate)!.size>1?'CERTIFICADO_REPETIDO_O_AUSENTE':!['COINCIDENCIA_CERTIFICADO_Y_CUIT','ESTABLECIMIENTO_NO_REPRESENTADO','ENTIDAD_NUEVA_A_PREPARAR'].includes(row.reconciliation.status)?'CONCILIACION_PENDIENTE':null;
-  if(reason){pending.push({origen:key,motivo:reason,datos:row});continue;}
+  if(reason||!cuit){pending.push({origen:key,motivo:reason||'CUIT_NO_CONFIRMADO',datos:row});continue;}
   let company=companies.get(cuit);
   if(!company){company={cuit,razonesSociales:[],domiciliosLegalesCandidatos:[],establecimientos:[],fichasExistentes:[],acciones:['PROPONER_ENTIDAD_POR_CUIT','CONSERVAR_FICHAS_EXISTENTES','REVISAR_DIFERENCIAS'],crearCuentas:false,modificarExistentes:false};companies.set(cuit,company);}
   if(!company.razonesSociales.includes(row.participant.name))company.razonesSociales.push(row.participant.name);

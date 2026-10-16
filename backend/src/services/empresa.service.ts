@@ -48,7 +48,7 @@ export async function resolveCompanyContext(user:any,headers:Record<string,unkno
  const [company,activity,grant]=await Promise.all([
   prisma.empresa.findUnique({where:{id:companyId}}),
   prisma.empresaActividad.findFirst({where:{id:activityId,empresaId:companyId,activa:true}}),
-  prisma.autorizacionEmpresa.findUnique({where:{actividadId_usuarioId:{actividadId,usuarioId:user.id}}}),
+  prisma.autorizacionEmpresa.findUnique({where:{actividadId_usuarioId:{actividadId:activityId,usuarioId:user.id}}}),
  ]);
  if(!company?.activa||!activity||!grant?.activa||grant.empresaId!==companyId)throw new AppError('La autorización de empresa ya no está disponible',403);
  const site=typeof siteId==='string'?await prisma.establecimientoEmpresa.findFirst({where:{id:siteId,empresaId:companyId,activo:true}}):null;
