@@ -13,6 +13,14 @@ const result = { total: 21, pageSize: 20, primera: '2026-10-01T12:00:00Z', ultim
 function view() { return render(<MemoryRouter><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><SeguimientoExterno /></QueryClientProvider></MemoryRouter>); }
 beforeEach(() => { get.mockReset(); get.mockResolvedValue({ data: { data: result } }); });
 afterEach(cleanup);
+it('has an unambiguous participant label and applies the selected role explicitly', async () => {
+  view(); await screen.findByText('21 movimientos · Generadores');
+  const selector = screen.getByRole('combobox', { name: 'Tipo de participante', exact: true });
+  expect(screen.getByLabelText('Tipo de participante', { exact: true })).toBe(selector);
+  fireEvent.change(selector, { target: { value: 'transportista' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Consultar' }));
+  await waitFor(() => expect(get).toHaveBeenLastCalledWith('/manifiestos/baja-intensidad/seguimiento', { params: { rol: 'transportista', identificacion: '', page: 1 } }));
+});
 it('shows aggregate totals beyond the visible page and separates units; filters only on submit', async () => {
   view(); await screen.findByText('21 movimientos · Generadores');
   expect(screen.getByText('Y1 · 105 kg')).toBeVisible(); expect(screen.getByText('Y1 · 21 l')).toBeVisible();

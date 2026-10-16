@@ -25,11 +25,11 @@ export default function SeguimientoExterno() {
     <h2 className="text-lg font-semibold">Participantes sin vínculo al padrón</h2>
     <p className="text-sm text-neutral-600">Datos declarados, identidad por verificar. No acredita una infracción.</p>
     <Card><form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); setFilters({ rol: role, identificacion: identity.trim(), page: 1 }); }}>
-      <label className="text-sm font-medium">Tipo de participante
-        <select value={role} onChange={e => setRole(e.target.value)} className="block mt-1 min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base">
+      <div className="text-sm font-medium"><label htmlFor="external-participant-type">Tipo de participante</label>
+        <select id="external-participant-type" value={role} onChange={e => setRole(e.target.value)} className="block mt-1 min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base">
           <option value="generador">Generador</option><option value="transportista">Transportista</option>
         </select>
-      </label>
+      </div>
       <div className="min-w-0 flex-1 basis-52"><Input label="Identificación exacta" maxLength={500} placeholder="CUIT o referencia declarada" value={identity} onChange={e => setIdentity(e.target.value)} /></div>
       <Button type="submit" disabled={query.isFetching}>Consultar</Button>
       <Button type="button" variant="outline" disabled={query.isFetching} onClick={() => { setIdentity(''); setFilters({ rol: role, identificacion: '', page: 1 }); }}>Ver todos</Button>
