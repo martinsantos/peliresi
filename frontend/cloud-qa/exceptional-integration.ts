@@ -116,7 +116,7 @@ try {
   assert.equal(eventual.datos.generador.padronId, fixture.actors.generador); assert.notEqual(eventual.datos.operador.nombre, 'Forged');
   assert.deepEqual(eventual.aprobacion.partes.map((p: { parte: string }) => p.parte), ['creador', 'operador']);
   assert.deepEqual(eventual.puedeAprobar, ['creador']); assert.equal(eventual.numeroOficial, null);
-  await call(other, 'GET', '/' + eventual.id, undefined, 404); await call(carrier, 'GET', '/' + eventual.id, undefined, 404);
+  await call(outsider, 'GET', '/' + eventual.id, undefined, 404); await call(carrier, 'GET', '/' + eventual.id, undefined, 404);
   await call(otherGenerator, 'GET', '/' + eventual.id, undefined, 404);
   const step = async (token: string, body: Record<string, unknown>, status = 200) => {
     const result = await call(token, 'POST', '/' + eventual.id + '/eventos', { id: randomUUID(), version: eventual.version, nota: 'QA eventual', ...body }, status);
@@ -125,7 +125,7 @@ try {
   await step(generator, { tipo: 'APROBAR_PARTE', parte: 'creador' });
   await step(generator, { tipo: 'AVANCE', etapa: 'RETIRADO' }, 409);
   await step(generator, { tipo: 'APROBAR_PARTE', parte: 'operador' }, 403);
-  await step(other, { tipo: 'APROBAR_PARTE', parte: 'operador' }, 404);
+  await step(outsider, { tipo: 'APROBAR_PARTE', parte: 'operador' }, 404);
   assert.deepEqual((await call(operator, 'GET', '/' + eventual.id)).registro.puedeAprobar, ['operador']);
   await step(operator, { tipo: 'APROBAR_PARTE', parte: 'operador' });
   await step(operator, { tipo: 'APROBAR_PARTE', parte: 'operador' }, 409);
