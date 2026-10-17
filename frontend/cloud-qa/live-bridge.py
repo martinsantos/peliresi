@@ -53,6 +53,14 @@ def handle(conn):
         proc.wait()
 
 
+def exit_with_session(parent=os.getppid()):
+    # A non-tty SSH session sends no SIGHUP: when sshd goes away we are reparented, so leave.
+    while os.getppid() == parent:
+        threading.Event().wait(2)
+    os._exit(0)
+
+
+threading.Thread(target=exit_with_session, daemon=True).start()
 server = socket.socket()
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(("127.0.0.1", 14177))
