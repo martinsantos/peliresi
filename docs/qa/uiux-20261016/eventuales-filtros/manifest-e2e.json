@@ -1,0 +1,2596 @@
+{
+  "config": {
+    "configFile": "/work/sitrep/frontend/cloud-qa/manifest.playwright.config.ts",
+    "rootDir": "/work/sitrep/frontend/cloud-qa/e2e",
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 1,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/work/sitrep/.qa-rel-16100dd/manifest-e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "web-desktop",
+        "name": "web-desktop",
+        "testDir": "/work/sitrep/frontend/cloud-qa/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "manifest-transport.spec.ts",
+          "manifest-lifecycle.spec.ts",
+          "role-handoff.spec.ts",
+          "manifest-exceptional.spec.ts",
+          "manifest-multirole.spec.ts",
+          "enterprise.spec.ts",
+          "enterprise-pagination.spec.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/work/sitrep/.qa-rel-16100dd/manifest-e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "web-responsive",
+        "name": "web-responsive",
+        "testDir": "/work/sitrep/frontend/cloud-qa/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "manifest-transport.spec.ts",
+          "manifest-lifecycle.spec.ts",
+          "role-handoff.spec.ts",
+          "manifest-exceptional.spec.ts",
+          "manifest-multirole.spec.ts",
+          "enterprise.spec.ts",
+          "enterprise-pagination.spec.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/work/sitrep/.qa-rel-16100dd/manifest-e2e",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "app",
+        "name": "app",
+        "testDir": "/work/sitrep/frontend/cloud-qa/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "manifest-transport.spec.ts",
+          "manifest-lifecycle.spec.ts",
+          "role-handoff.spec.ts",
+          "manifest-exceptional.spec.ts",
+          "manifest-multirole.spec.ts",
+          "enterprise.spec.ts",
+          "enterprise-pagination.spec.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/work/sitrep/.qa-rel-16100dd/manifest-e2e.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "enterprise-pagination.spec.ts",
+      "file": "enterprise-pagination.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "company pagination and search preserve unsaved work and load the selected company context beyond page one",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7913,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:18:16.108Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "pagination-proof",
+                      "contentType": "application/json",
+                      "body": "eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvZW1wcmVzYXMiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJjb25zb2xlIjpbXSwiZXJyb3JzIjpbXX0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8974e18c615df3bad78-68170594198daaac9f93",
+          "file": "enterprise-pagination.spec.ts",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "title": "company pagination and search preserve unsaved work and load the selected company context beyond page one",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6587,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:22:13.745Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "pagination-proof",
+                      "contentType": "application/json",
+                      "body": "eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvZW1wcmVzYXMiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJjb25zb2xlIjpbXSwiZXJyb3JzIjpbXX0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8974e18c615df3bad78-1af81a2200619e3eb0cf",
+          "file": "enterprise-pagination.spec.ts",
+          "line": 3,
+          "column": 1
+        },
+        {
+          "title": "company pagination and search preserve unsaved work and load the selected company context beyond page one",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5446,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:25:31.863Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "pagination-proof",
+                      "contentType": "application/json",
+                      "body": "eyJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYXBwL2VtcHJlc2FzIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJjb25zb2xlIjpbXSwiZXJyb3JzIjpbXX0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d8974e18c615df3bad78-1257c160f5c6fafcc630",
+          "file": "enterprise-pagination.spec.ts",
+          "line": 3,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "enterprise.spec.ts",
+      "file": "enterprise.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "company owner edits separate addresses, delegates/revokes, audits and changes company context without account mutation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20466,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:18:24.331Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "ui-console-proof",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2Rhc2hib2FyZCIsCiAgInRpdGxlIjogIlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLAogICJtZWFuaW5nZnVsQ29udGVudCI6IDUyNSwKICAiY29uc29sZSI6IFtdCn0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ad3e280ab08559ce7920-4d084aca680280c148da",
+          "file": "enterprise.spec.ts",
+          "line": 17,
+          "column": 1
+        },
+        {
+          "title": "delegated site user creates a correctly attributed manifest without seeing other sites or management",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13271,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:18:44.815Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "ui-console-proof",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo0MTc3L21hbmlmaWVzdG9zL2NtdmNiMDFydjAwZTQxM2J5MGhlemFlMzIiLAogICJ0aXRsZSI6ICJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwKICAibWVhbmluZ2Z1bENvbnRlbnQiOiAxMjc4LAogICJjb25zb2xlIjogW10KfQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ad3e280ab08559ce7920-1ff475d04b9bcfab4c9a",
+          "file": "enterprise.spec.ts",
+          "line": 24,
+          "column": 1
+        },
+        {
+          "title": "company owner edits separate addresses, delegates/revokes, audits and changes company context without account mutation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 18854,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:22:20.531Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "ui-console-proof",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2Rhc2hib2FyZCIsCiAgInRpdGxlIjogIlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLAogICJtZWFuaW5nZnVsQ29udGVudCI6IDQ2OCwKICAiY29uc29sZSI6IFtdCn0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ad3e280ab08559ce7920-d11eab5024b5d16fe3da",
+          "file": "enterprise.spec.ts",
+          "line": 17,
+          "column": 1
+        },
+        {
+          "title": "delegated site user creates a correctly attributed manifest without seeing other sites or management",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11783,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:22:39.404Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "ui-console-proof",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo0MTc3L21hbmlmaWVzdG9zL2NtdmNiNTI2YzAwbDAxM2J5bHRnM3c3ZDIiLAogICJ0aXRsZSI6ICJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwKICAibWVhbmluZ2Z1bENvbnRlbnQiOiAxMjQ0LAogICJjb25zb2xlIjogW10KfQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ad3e280ab08559ce7920-71f28d7cf52201bb48f1",
+          "file": "enterprise.spec.ts",
+          "line": 24,
+          "column": 1
+        },
+        {
+          "title": "company owner edits separate addresses, delegates/revokes, audits and changes company context without account mutation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 16296,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:25:37.557Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "ui-console-proof",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2FwcC9kYXNoYm9hcmQiLAogICJ0aXRsZSI6ICJTSVRSRVAgLSBBcHAiLAogICJtZWFuaW5nZnVsQ29udGVudCI6IDI5NywKICAiY29uc29sZSI6IFtdCn0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ad3e280ab08559ce7920-0512da49f72f7f7a8fdf",
+          "file": "enterprise.spec.ts",
+          "line": 17,
+          "column": 1
+        },
+        {
+          "title": "delegated site user creates a correctly attributed manifest without seeing other sites or management",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10978,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:25:53.903Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "ui-console-proof",
+                      "contentType": "application/json",
+                      "body": "ewogICJ1cmwiOiAiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2FwcC9tYW5pZmllc3Rvcy9jbXZjYjk3OXgwMHJ3MTNieThyYnRvZWxzIiwKICAidGl0bGUiOiAiU0lUUkVQIC0gQXBwIiwKICAibWVhbmluZ2Z1bENvbnRlbnQiOiA5ODIsCiAgImNvbnNvbGUiOiBbXQp9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "ad3e280ab08559ce7920-4c234ced6bd4db84c329",
+          "file": "enterprise.spec.ts",
+          "line": 24,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "manifest-exceptional.spec.ts",
+      "file": "manifest-exceptional.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "baja intensidad continues with independent post-facto review and preserved facts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 25063,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:18:58.120Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18edd2d424c072e1136f-86533b64553444710aef",
+          "file": "manifest-exceptional.spec.ts",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "title": "mixed participant keeps identity and grants only the linked actor read access",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15086,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:19:23.203Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18edd2d424c072e1136f-264c16759564e44fa9bf",
+          "file": "manifest-exceptional.spec.ts",
+          "line": 34,
+          "column": 1
+        },
+        {
+          "title": "baja intensidad continues with independent post-facto review and preserved facts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21167,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:22:51.213Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18edd2d424c072e1136f-6fdc40ed24360a7b75d7",
+          "file": "manifest-exceptional.spec.ts",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "title": "mixed participant keeps identity and grants only the linked actor read access",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 12932,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:23:12.395Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18edd2d424c072e1136f-da6f29f153be491e8e82",
+          "file": "manifest-exceptional.spec.ts",
+          "line": 34,
+          "column": 1
+        },
+        {
+          "title": "baja intensidad continues with independent post-facto review and preserved facts",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 18878,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:26:04.912Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18edd2d424c072e1136f-14945fa1ceed91bd54ab",
+          "file": "manifest-exceptional.spec.ts",
+          "line": 5,
+          "column": 1
+        },
+        {
+          "title": "mixed participant keeps identity and grants only the linked actor read access",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11820,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:26:23.803Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "18edd2d424c072e1136f-28c981b85318f72a4164",
+          "file": "manifest-exceptional.spec.ts",
+          "line": 34,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "manifest-lifecycle.spec.ts",
+      "file": "manifest-lifecycle.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real manifest UI completes approval, transport, receipt, treatment and certificate",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 21131,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:19:38.321Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f5c4b59de8dbf28cf2a7-be4fe2a25579f975f429",
+          "file": "manifest-lifecycle.spec.ts",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "title": "real manifest UI completes approval, transport, receipt, treatment and certificate",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15861,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:23:25.352Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f5c4b59de8dbf28cf2a7-079699de1400cb24204f",
+          "file": "manifest-lifecycle.spec.ts",
+          "line": 4,
+          "column": 1
+        },
+        {
+          "title": "real manifest UI completes approval, transport, receipt, treatment and certificate",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15044,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:26:35.652Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "f5c4b59de8dbf28cf2a7-8347510f996333ec187b",
+          "file": "manifest-lifecycle.spec.ts",
+          "line": 4,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "manifest-multirole.spec.ts",
+      "file": "manifest-multirole.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "external reconciliation is reversible, audited and exported without replacing the original",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13046,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:19:59.510Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-1d9dd0482f43b97e245a",
+          "file": "manifest-multirole.spec.ts",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "external participant tracking is scoped, paginated and read-only",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7635,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:20:12.576Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-cc3d8171120010ed25b9",
+          "file": "manifest-multirole.spec.ts",
+          "line": 16,
+          "column": 1
+        },
+        {
+          "title": "approved activity switch, additional draft and unblocked incomplete operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 19614,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:20:20.233Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-d011e99944576995dd1d",
+          "file": "manifest-multirole.spec.ts",
+          "line": 24,
+          "column": 1
+        },
+        {
+          "title": "verified applicant keeps separate activity drafts without operational access",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9415,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:20:39.891Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-804ebd041b1823233b34",
+          "file": "manifest-multirole.spec.ts",
+          "line": 37,
+          "column": 1
+        },
+        {
+          "title": "external reconciliation is reversible, audited and exported without replacing the original",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8828,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:23:41.302Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-ede595124c22e9dd7886",
+          "file": "manifest-multirole.spec.ts",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "external participant tracking is scoped, paginated and read-only",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5681,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:23:50.143Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-26853984657f0b9e0645",
+          "file": "manifest-multirole.spec.ts",
+          "line": 16,
+          "column": 1
+        },
+        {
+          "title": "approved activity switch, additional draft and unblocked incomplete operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 17389,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:23:55.836Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-7598beb6793687edbd52",
+          "file": "manifest-multirole.spec.ts",
+          "line": 24,
+          "column": 1
+        },
+        {
+          "title": "verified applicant keeps separate activity drafts without operational access",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7929,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:24:13.242Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-5ff02c20d63f533accda",
+          "file": "manifest-multirole.spec.ts",
+          "line": 37,
+          "column": 1
+        },
+        {
+          "title": "external reconciliation is reversible, audited and exported without replacing the original",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8019,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:26:50.797Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-90c53dad251cd3c3cee0",
+          "file": "manifest-multirole.spec.ts",
+          "line": 6,
+          "column": 1
+        },
+        {
+          "title": "external participant tracking is scoped, paginated and read-only",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6829,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:26:58.825Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-02160c07881fe6670eda",
+          "file": "manifest-multirole.spec.ts",
+          "line": 16,
+          "column": 1
+        },
+        {
+          "title": "approved activity switch, additional draft and unblocked incomplete operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13183,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:27:05.667Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-11962e64f830f3825080",
+          "file": "manifest-multirole.spec.ts",
+          "line": 24,
+          "column": 1
+        },
+        {
+          "title": "verified applicant keeps separate activity drafts without operational access",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5882,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:27:18.913Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "e47aab9ed13bdcb58991-595197210dd22d032bb6",
+          "file": "manifest-multirole.spec.ts",
+          "line": 37,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "manifest-transport.spec.ts",
+      "file": "manifest-transport.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "explicit second vehicle and driver persist in real manifest and PDF on this surface",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11947,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:20:49.354Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d2fc1163abf4f843b3a1-05e676f45e04f82d3040",
+          "file": "manifest-transport.spec.ts",
+          "line": 33,
+          "column": 1
+        },
+        {
+          "title": "carrier and modality changes clear only fleet selections and never infer replacements",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9666,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:21:01.324Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d2fc1163abf4f843b3a1-0eedd0e7ba5849dfadee",
+          "file": "manifest-transport.spec.ts",
+          "line": 68,
+          "column": 1
+        },
+        {
+          "title": "explicit second vehicle and driver persist in real manifest and PDF on this surface",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10329,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:24:21.196Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d2fc1163abf4f843b3a1-155374862002ca48f230",
+          "file": "manifest-transport.spec.ts",
+          "line": 33,
+          "column": 1
+        },
+        {
+          "title": "carrier and modality changes clear only fleet selections and never infer replacements",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7667,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:24:31.538Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d2fc1163abf4f843b3a1-5103a991a2a303571e52",
+          "file": "manifest-transport.spec.ts",
+          "line": 68,
+          "column": 1
+        },
+        {
+          "title": "explicit second vehicle and driver persist in real manifest and PDF on this surface",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8013,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:27:24.835Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d2fc1163abf4f843b3a1-639971a2db2ea0430213",
+          "file": "manifest-transport.spec.ts",
+          "line": 33,
+          "column": 1
+        },
+        {
+          "title": "carrier and modality changes clear only fleet selections and never infer replacements",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6891,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:27:32.888Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "d2fc1163abf4f843b3a1-2c808e46431741ce2219",
+          "file": "manifest-transport.spec.ts",
+          "line": 68,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "role-handoff.spec.ts",
+      "file": "role-handoff.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "separate real users hand a manifest from generator to transport to operator",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 60643,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:21:11.035Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "77ab1c0cd45fb61b424c-d5ac784617d8cd893f4d",
+          "file": "role-handoff.spec.ts",
+          "line": 7,
+          "column": 1
+        },
+        {
+          "title": "separate real users hand a manifest from generator to transport to operator",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 50496,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:24:39.241Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "77ab1c0cd45fb61b424c-05d80210fde7997d3e14",
+          "file": "role-handoff.spec.ts",
+          "line": 7,
+          "column": 1
+        },
+        {
+          "title": "separate real users hand a manifest from generator to transport to operator",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                },
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 46822,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T11:27:39.817Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    },
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "77ab1c0cd45fb61b424c-faa82df966574b46cde0",
+          "file": "role-handoff.spec.ts",
+          "line": 7,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-17T11:18:14.152Z",
+    "duration": 613011.028,
+    "expected": 39,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

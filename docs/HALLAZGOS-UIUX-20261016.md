@@ -145,6 +145,43 @@ Capturas «después», incluidas las `-fin` al final del scroll: [qa/uiux-202610
 
 **Límite de la línea base:** la corrida «antes» usó el spec previo a ese ajuste, así que sus fallas del inicio de `/app` mezclan el falso positivo con la superposición real. Las de manifiestos y centro de control sí son superposiciones reales.
 
+## Tercera tanda — «Eventuales» y cabecera compacta del listado (17/10/2026)
+
+Pedido de revisión humana sobre el preview: títulos repetidos y filtros que ocupaban un tercio de la pantalla en los listados de `/app`. Además, el circuito de baja intensidad pasa a llamarse **Eventuales**.
+
+**Cambios** (`f494b4a`, `271ed77`, `16100dd`):
+- **Nombre «Eventuales», sólo en lo que se ve.**
+  - Enlace «Eventuales» en el listado.
+  - Título «Manifiestos eventuales» en la página.
+  - Título de la barra de `/app`: «Eventuales».
+  - **No cambian:** la ruta `/manifiestos/baja-intensidad`, la API, los estados, las claves de datos ni los permisos.
+- **Listado de manifiestos por debajo de 768 px.**
+  - El título de la página queda sólo para lectores de pantalla, porque la barra ya lo muestra.
+  - Las acciones van en una fila: Eventuales, actualizar (ícono con nombre accesible «Actualizar listado») y «Nuevo», con nombre accesible «Nuevo Manifiesto».
+  - Búsqueda y Filtros van en una fila. El estado pasa al panel de filtros.
+  - Los filtros aplicados se muestran como chips que se quitan con un toque.
+  - El botón Filtros anuncia la cantidad activa.
+  - «Limpiar» borra también el estado y cumple 44 px.
+- **Escritorio:** la cabecera se mantiene. El enlace «Eventuales» queda debajo, en el lugar del anterior, y perdió el texto «· revisión posterior». «Limpiar» ahora también borra el estado.
+
+**Pruebas:**
+- **Unitarias:** 4 nuevas en el listado. Fallan sobre el código anterior y pasan después; la de nombres accesibles pasa en ambos, lo que prueba que se conservan. 7 archivos afectados: 104/104 + 1. Typecheck sin errores. ESLint sin errores nuevos.
+- **Preview aislado**, fuente `16100dd`, mismos límites:
+  - build web y app aprobados;
+  - base nueva e integraciones HTTP aprobadas;
+  - **E2E completo 39/39** en escritorio 1440, web móvil 360 y app 390, sin omitidas, flaky ni reintentos, en 10 min 13 s. Incluye el recorrido de eventuales con el enlace nuevo y el «+» de `/app`;
+  - recorrido de pantallas 18/18.
+  - El pico de memoria del contenedor llegó a **1,94 GiB de 2 GiB**, sin OOM. Queda poco margen.
+- **Primera corrida de pantallas: 6 falsos positivos.** Con 28 manifiestos, el scroll infinito seguía cargando. Se corrigió el spec en `3deb15e` para esperar a que la lista deje de crecer; luego pasó 18/18. Capturas en [qa/uiux-20261016/eventuales-filtros](qa/uiux-20261016/eventuales-filtros/).
+- **O1 confirmado en ambos sentidos:** papelera en «Borrador», ninguna en «Tratado».
+
+**Pendiente, no hecho:**
+- El mismo patrón compacto en los otros listados: actores, inspecciones, solicitudes.
+- El título repetido en Nuevo/Editar manifiesto en `/app`.
+- El título repetido en escritorio.
+- «Editar» se ofrece en manifiestos tratados en la tabla de escritorio.
+- El mensaje de validación del backend todavía dice «Baja intensidad»: es un cambio de backend que requiere tu decisión.
+
 ## Comprobado y sin defecto
 
 `Modal` (bloqueo de scroll, trampa de foco, Escape, alto por viewport visible, pie fijo), `Select` (abre en una opción, no en la búsqueda: no abre el teclado), `Input`, `ButtonV2` (44 px en móvil), `Tabs`, `NativeSelect`, `MapLayerToggle`, badges pendiente≠sin leer, wizard público con reintento por documento y envío protegido contra doble toque, `SupportReportDialog` con borrador local.

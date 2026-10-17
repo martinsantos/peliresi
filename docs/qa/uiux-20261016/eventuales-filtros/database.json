@@ -1,0 +1,19 @@
+{
+  "phase": "database",
+  "attempt": "1",
+  "source": "16100dd",
+  "status": "passed",
+  "startedAt": "2026-10-17T11:17:40.392Z",
+  "steps": [
+    "empty private cluster",
+    "loopback database",
+    "synthetic database",
+    "manifest-migration",
+    "manifest-fixture",
+    "start"
+  ],
+  "current": "start",
+  "finishedAt": "2026-10-17T11:17:50.829Z",
+  "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "memoryPeak": "1907314688"
+}
