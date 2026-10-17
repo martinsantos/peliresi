@@ -20,6 +20,11 @@ function watch(page: Page) {
 
 async function capture(page: Page, info: TestInfo, name: string, seen: ReturnType<typeof watch>) {
   await page.waitForLoadState('networkidle').catch(() => undefined);
+  // Network idle can precede React replacing the initial loading screen.
+  await expect.poll(
+    async () => (await page.locator('#root').innerText()).trim().length,
+    { message: name + ' waits for rendered root content' },
+  ).toBeGreaterThan(30);
   const proof = {
     name, url: page.url(), title: await page.title(), viewport: page.viewportSize(),
     rootText: (await page.locator('#root').innerText()).trim().length,
