@@ -34,6 +34,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
+import { capacityFormValue, vehicleUpdatePayload } from '../../utils/vehicleUpdate';
 
 interface VehiculoDisplay {
   id: string;
@@ -43,6 +44,7 @@ interface VehiculoDisplay {
   modelo: string;
   anio: number;
   capacidad: string;
+  capacidadKg: number | null;
   transportista: string;
   habilitacion: string;
   estado: string;
@@ -113,6 +115,7 @@ export const AdminVehiculosPage: React.FC = () => {
         modelo: v.modelo,
         anio: v.anio,
         capacidad: typeof v.capacidad === 'number' ? `${v.capacidad.toLocaleString()} kg` : '',
+        capacidadKg: typeof v.capacidad === 'number' ? v.capacidad : null,
         transportista: t.razonSocial,
         habilitacion: v.numeroHabilitacion || '',
         estado: v.activo ? 'disponible' : 'inactivo',
@@ -213,20 +216,16 @@ export const AdminVehiculosPage: React.FC = () => {
   // Handlers
   const handleEditVehiculo = async () => {
     if (!editingVehiculo) return;
+    const payload = vehicleUpdatePayload(vehiculoForm);
+    if ('error' in payload) {
+      toast.error('Revisá el vehículo', payload.error);
+      return;
+    }
     try {
       await updateVehiculoMut.mutateAsync({
         transportistaId: editingVehiculo.transportistaId,
         vehiculoId: editingVehiculo.id,
-        data: {
-          patente: vehiculoForm.patente,
-          marca: vehiculoForm.marca,
-          modelo: vehiculoForm.modelo,
-          anio: Number(vehiculoForm.anio),
-          capacidad: Number(vehiculoForm.capacidad),
-          numeroHabilitacion: vehiculoForm.numeroHabilitacion || undefined,
-          vencimiento: vehiculoForm.vencimiento || undefined,
-          activo: vehiculoForm.activo,
-        },
+        data: payload.data,
       });
       toast.success('Actualizado', 'Vehículo actualizado exitosamente');
       setEditingVehiculo(null);
@@ -402,7 +401,7 @@ export const AdminVehiculosPage: React.FC = () => {
                 marca: row.marca,
                 modelo: row.modelo,
                 anio: String(row.anio || ''),
-                capacidad: row.capacidad.replace(/[^\d]/g, ''),
+                capacidad: capacityFormValue(row.capacidadKg),
                 numeroHabilitacion: row.habilitacion || '',
                 vencimiento: row.vencimiento ? new Date(row.vencimiento).toISOString().split('T')[0] : '',
                 activo: row.activo,
@@ -714,7 +713,7 @@ export const AdminVehiculosPage: React.FC = () => {
                                 marca: v.marca,
                                 modelo: v.modelo,
                                 anio: String(v.anio || ''),
-                                capacidad: v.capacidad.replace(/[^\d]/g, ''),
+                                capacidad: capacityFormValue(v.capacidadKg),
                                 numeroHabilitacion: v.habilitacion || '',
                                 vencimiento: v.vencimiento ? new Date(v.vencimiento).toISOString().split('T')[0] : '',
                                 activo: v.activo,
