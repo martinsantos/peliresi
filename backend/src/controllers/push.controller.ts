@@ -47,7 +47,10 @@ export async function subscribe(req: Request, res: Response) {
 export async function unsubscribe(req: Request, res: Response) {
   const { endpoint } = req.body ?? {};
   if (!endpoint) throw new AppError('endpoint requerido', 400);
+  const user = (req as any).user;
+  // Impersonation never changes device subscriptions, in either direction.
+  if (user.impersonatedBy) { res.json({ success: true }); return; }
 
-  await prisma.pushSubscripcion.deleteMany({ where: { endpoint, usuarioId: (req as any).user.id } });
+  await prisma.pushSubscripcion.deleteMany({ where: { endpoint, usuarioId: user.id } });
   res.json({ success: true });
 }

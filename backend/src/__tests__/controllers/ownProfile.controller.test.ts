@@ -59,6 +59,15 @@ describe('own profile update', () => {
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: { telefono: '' } }));
   });
 
+  it('answers 404 for a missing account without writing or auditing', async () => {
+    mocks.findUnique.mockResolvedValue(null);
+    const c = context({ telefono: '261-555' });
+    await updateOwnProfile(c.req, c.res, c.next);
+    expect(c.next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404, message: 'Usuario no encontrado' }));
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
   it('does not let an administrator edit the impersonated person profile', async () => {
     const c = context({ nombre: 'Cambio ajeno' }, { id: 'generador-qa', rol: 'GENERADOR', impersonatedBy: { id: 'admin-qa', nombre: 'Admin' } });
     await updateOwnProfile(c.req, c.res, c.next);

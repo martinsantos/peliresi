@@ -38,6 +38,7 @@ try {
   const after = await db.usuario.findUnique({ where: { id }, select: { rol: true, email: true, activo: true, esInspector: true } });
   assert.equal(after.rol, before.rol); assert.equal(after.email, before.email);
   checks.push('role, email, activation and inspector flags cannot be changed through the own-profile route');
+  // Restore the fixture phone (a null fixture phone becomes an empty string; no fixture asserts it).
   await request('/auth/profile', 'PUT', { telefono: before.telefono ?? '' }, token);
 
   const endpoint = 'https://push.night-qa.invalid/shared-device';

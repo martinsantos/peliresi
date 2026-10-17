@@ -84,5 +84,11 @@ describe('push controller', () => {
       await unsubscribe({ body: { endpoint: body.endpoint }, user: { id: 'leaving-person' } } as never, createResponse());
       expect(prisma.pushSubscripcion.deleteMany).toHaveBeenCalledWith({ where: { endpoint: body.endpoint, usuarioId: 'leaving-person' } });
     });
+
+    it('does not remove a device subscription from an impersonated session', async () => {
+      vi.mocked(prisma.pushSubscripcion.deleteMany).mockClear();
+      await unsubscribe({ body: { endpoint: body.endpoint }, user: { id: 'impersonated', impersonatedBy: { id: 'admin', nombre: 'Admin' } } } as never, createResponse());
+      expect(prisma.pushSubscripcion.deleteMany).not.toHaveBeenCalled();
+    });
   });
 });
