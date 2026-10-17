@@ -76,6 +76,7 @@ Tipo: **F** bug funcional, **V** visual, **U** mejora de uso, **D** decisión de
 | `fad0569` | H20, H22 |
 | `482f735` | H25 |
 | `75f7ac3` | H28 |
+| `4edc13b` | H10 |
 
 ## Pruebas locales de esta tanda
 
@@ -85,6 +86,7 @@ Se corrieron en la Mac, sólo como verificación liviana: sin build, sin E2E, si
   - `apiErrorMessage`: 3 fallas antes, 6/6 después.
   - `CalculadoraTEFInputs`: 1 falla antes, 1/1 después.
   - `SupportBubble`, autocierre: 1 falla antes, 7/7 después.
+  - `EditarManifiestoModalidad` (H10): 4 fallas antes, 4/4 después; junto con `NuevoManifiestoCompatibility`, 11/11, un worker. Typecheck sin errores.
 - **Unitarias afectadas:** 27 archivos, 286/286, un worker, 30 s, sin omitidas. Es la selección por archivos que importan lo modificado; **no** es la suite completa.
 - **Typecheck:** `tsc -p tsconfig.app.json --noEmit` sin errores (7 s, ~0,75 GB).
 - **ESLint** sobre los archivos tocados: 0 errores. Hay 22 advertencias preexistentes y ninguna está en una línea modificada.
