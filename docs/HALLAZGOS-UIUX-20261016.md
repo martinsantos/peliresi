@@ -96,6 +96,39 @@ Se corrieron en la Mac, sólo como verificación liviana: sin build, sin E2E, si
 
 **Pendiente:** recorridos reales en escritorio 1440, web móvil 360 y `/app` 390 (consola, foco, scroll, overlays, capturas); build web/app; suite completa; APK.
 
+## Preview sintético — corrida de pantallas (17/10/2026 00:23–00:28 UTC)
+
+Fuente `04e45dd`: los arreglos de esta rama más H10, aplicados sobre una copia del servidor verificada contra el baseline (1039 archivos con hash idéntico). Se usó el contenedor existente `sitrep-qa-enterprise-20261016`:
+- red interna sin gateway;
+- 1 CPU, 2 GiB, swap 0;
+- base Postgres sintética nueva;
+- correo, push y blockchain apagados (`runtime-proof.json`);
+- un worker.
+
+| Paso | Resultado |
+| --- | --- |
+| Build web (`tsc -b` + vite) y `/app` | Aprobados, 1 min 35 s, pico 1,40 GiB, sin OOM |
+| Base, migración, fixture y servicios en loopback | Aprobados |
+| Recorrido `uiux-preview.spec.ts` (sólo lectura, sin envíos) | 18/18 en escritorio 1440×900, web móvil 360×800 y app 390×844. Sin omitidas, flaky ni reintentos; 2,3 min |
+| Pantallas | 45 capturas en [qa/uiux-20261016](qa/uiux-20261016/). Raíz con contenido, sin overlay, sin scroll horizontal, sin `pageerror` |
+| Consola | En las pantallas logueadas, ninguna. En login y reclamar sin sesión, `ERR_NAME_NOT_RESOLVED`: el test público no instala la caché offline de fuentes que sí usa el login. Es del test, no del producto |
+| Comprobaciones de arreglos | `/reclamar` con CUIT `inputmode=numeric` en los 3 viewports. `/app` sin `user-scalable=no` |
+| Cierre | Procesos detenidos sin forzar, Postgres detenido, contenedor `exited`, `OOMKilled=false`, `restart=no` |
+
+**Observado en pantalla** (deja de ser hipótesis):
+- **H27:** el botón flotante de ayuda tapa contenido.
+  - En `app--transportista-dashboard`, la flecha del primer ítem de «Actividad reciente».
+  - En `web-responsive--generador-manifiestos`, las tarjetas y el pie institucional.
+- **Nuevo, O1 (P2):** en `web-responsive--generador-manifiestos` el generador ve la papelera en manifiestos `TRATADO`.
+  - Falta comprobar si el servidor lo rechaza.
+  - Aceptación: no ofrecer acciones que el rol o el estado no permiten.
+
+**No cubierto por esta corrida:**
+- Interacciones de los arreglos: cerrar los modales DGFA, chat, TEF entre pasos, evidencia offline y edición in situ. Sólo están cubiertos por unitarias.
+- Teclado abierto.
+- Zoom real en Android.
+- APK.
+
 ## Comprobado y sin defecto
 
 `Modal` (bloqueo de scroll, trampa de foco, Escape, alto por viewport visible, pie fijo), `Select` (abre en una opción, no en la búsqueda: no abre el teclado), `Input`, `ButtonV2` (44 px en móvil), `Tabs`, `NativeSelect`, `MapLayerToggle`, badges pendiente≠sin leer, wizard público con reintento por documento y envío protegido contra doble toque, `SupportReportDialog` con borrador local.
