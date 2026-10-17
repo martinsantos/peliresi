@@ -24,6 +24,7 @@ import { toast } from '../../components/ui/Toast';
 import { Select } from '../../components/ui/Select';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 import api from '../../services/api';
+import { bulkUploadFailureMessage, summarizeBulkUpload, type BulkUploadRowError } from '../../utils/bulkUploadResult';
 
 // Type for upload results
 interface CargaResultado {
@@ -34,6 +35,7 @@ interface CargaResultado {
   exitosos: number;
   fallidos: number;
   estado: string;
+  errores: BulkUploadRowError[];
 }
 
 // Historial starts empty - populated by actual uploads
@@ -126,12 +128,12 @@ const CargaMasivaPage: React.FC = () => {
               resolve({ data: null });
             }
           } else {
-            reject(new Error(`Upload failed: ${xhr.status}`));
+            reject(new Error(bulkUploadFailureMessage(xhr.status, xhr.responseText)));
           }
         });
 
-        xhr.addEventListener('error', () => reject(new Error('Network error')));
-        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+        xhr.addEventListener('error', () => reject(new Error(bulkUploadFailureMessage(0, ''))));
+        xhr.addEventListener('abort', () => reject(new Error('Carga cancelada. El archivo sigue seleccionado.')));
 
         // Add auth token
         const token = localStorage.getItem('sitrep_access_token');
@@ -144,24 +146,27 @@ const CargaMasivaPage: React.FC = () => {
       });
 
       // Process response
-      const resultData = result?.data;
+      const summary = summarizeBulkUpload(result?.data);
       const nuevoRegistro: CargaResultado = {
         id: historial.length + 1,
         archivo: archivo.name,
         fecha: new Date().toLocaleString('es-AR'),
-        registros: resultData?.total || 0,
-        exitosos: resultData?.exitosos || resultData?.total || 0,
-        fallidos: resultData?.fallidos || 0,
-        estado: resultData?.fallidos > 0 ? 'parcial' : 'completado',
+        ...summary,
       };
 
       setHistorial(prev => [nuevoRegistro, ...prev]);
-      toast.success('Carga completada', `Se procesaron ${nuevoRegistro.registros} registros de ${archivo.name}`);
-    } catch {
-      toast.error('Error de carga', `No se pudo procesar el archivo ${archivo.name}. Verifica el formato e intenta nuevamente.`);
+      setArchivo(null);
+      if (summary.estado === 'completado') {
+        toast.success('Carga completada', `${summary.exitosos} de ${summary.registros} registros de ${archivo.name} se cargaron.`);
+      } else if (summary.estado === 'parcial') {
+        toast.warning('Carga parcial', `${summary.exitosos} de ${summary.registros} registros se cargaron; ${summary.fallidos} tienen errores. Revisalos en el historial.`);
+      } else {
+        toast.error('No se cargó ningún registro', `${archivo.name}: revisá las filas con error en el historial.`);
+      }
+    } catch (error) {
+      toast.error('Error de carga', error instanceof Error && error.message ? error.message : bulkUploadFailureMessage(-1, ''));
     } finally {
       setProcesando(false);
-      setArchivo(null);
       setProgreso(0);
     }
   };
@@ -352,6 +357,14 @@ const CargaMasivaPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          {historial.filter(carga => carga.errores.length > 0).slice(0, 1).map(carga => (
+            <details key={carga.id} open className="border-t border-neutral-200 px-3 py-3">
+              <summary className="min-h-11 cursor-pointer text-sm font-semibold text-error-700">Filas con error en {carga.archivo} ({carga.errores.length})</summary>
+              <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto text-sm text-neutral-800">
+                {carga.errores.map((row, index) => <li key={`${row.linea}-${index}`}><span className="font-mono">Línea {row.linea}</span>: {row.error}</li>)}
+              </ul>
+            </details>
+          ))}
         </CardContent>
       </Card>
     </div>
