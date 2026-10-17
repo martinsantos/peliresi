@@ -1,6 +1,6 @@
 # Especificación — Manifiesto eventual (17/10/2026, versión 2)
 
-**Estado:** **aprobada por el dueño el 17/10/2026, tal cual, con C sí.** Implementada en commits locales (ver [Implementación](#implementación-17102026)); la validación completa en el preview aislado está pendiente.
+**Estado:** **aprobada por el dueño el 17/10/2026, tal cual, con C sí.** Implementada en commits locales y validada en el preview aislado (ver [Implementación](#implementación-17102026)).
 
 No entra en la publicación a producción del lunes: queda detrás de `MANIFEST_EXCEPTIONAL_ENABLED` (cerrado por defecto) y se valida sólo en el preview aislado.
 
@@ -238,4 +238,16 @@ Commits locales en `codex/sitrep-uiux-review-20261016`, todos con `[skip ci]`. S
   - rojo: 6 fallidas / 9 aprobadas;
   - verde: 25/25 en `BajaIntensidadPage`, `SeguimientoExterno` y `manifestListReleaseRecovery`;
   - `tsc -b` sin errores.
-- **Preview aislado:** falta correr build, base nueva (incluye la prueba de migración con una fila del contrato anterior), HTTP y E2E. Se hace coordinado con la sesión principal, porque usa la fuente compartida `/work/sitrep` y el límite es una corrida a la vez.
+- **Preview aislado** (`sitrep-qa-live-20261017`: 1 CPU, 2 GiB, swap 0, red interna), con turno cedido por la sesión principal y una corrida a la vez. Fuente final `9b3b71c`; env `preview-evt-5e461d3.env`; artefactos en `/work/sitrep/.qa-evt-5e461d3`.
+  - **`prisma generate` y build:** backend, web y app aprobados.
+  - **Base nueva** (intento 4) **aprobada**, con la prueba de migración: `legacyExceptionalUnchanged: true`, `operadorId` admite NULL y la fila del contrato anterior queda igual salvo las dos columnas nuevas en NULL.
+  - **HTTP 7/7 integraciones:** manifiestos, eventuales, adendas, multirol, seguimiento, conciliación y empresas. Además, `own-profile-push-http.ts` 4/4.
+  - **E2E 45/45** en 11,2 min (escritorio 1440, web 360 y app 390): 0 omitidas, 0 inestables, sin reintentos. Incluye los 2 recorridos nuevos con el generador como autor.
+  - **Pantallas UI/UX:** 20/20, más 1 omitida a propósito (como en corridas anteriores).
+  - **Memoria:** `oom 0`, `oom_kill 0`. El contador acumulado `memory.events max` pasó de 3815 a 4935: el contenedor tocó el límite y se recuperó sin matar procesos. `memory.peak` es el de toda la vida del contenedor (2 GiB) y ya estaba en ese valor antes de esta corrida.
+- **Fallas encontradas en el preview y corregidas, todas en las pruebas, no en el producto:**
+  - **`534bee4`:** la prueba de migración releía con el mismo `SELECT *` y PostgreSQL rechazaba el plan cacheado («cached plan must not change result type»). Ahora relee con otra sentencia.
+  - **`c55f44f`:** la prueba HTTP nueva usaba la variable `other` en vez de `outsider`.
+  - **`9b3b71c`:** `party-multirole-integration` pedía revisión sobre un eventual nuevo sin aprobación de partes, y la regla aprobada lo bloquea (409). Se agregaron la aprobación de quien lo creó, la del transportista vinculado y la negativa 409 previa; la revisión de la contraparte se mantiene igual.
+  - En cada caso la base se rehízo desde cero antes de repetir.
+- **Preview vivo restaurado** con env `preview-live7.env` (base nueva, fuente `9b3b71c`) y las cuentas fáciles (`rol@sitrep.test`). Login y `/app` responden 200. **El preview vivo ahora muestra esta funcionalidad.**
