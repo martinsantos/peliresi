@@ -299,91 +299,13 @@ const ConfiguracionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* WhatsApp */}
-            <div>
-              <h4 className="font-medium text-neutral-900 mb-1">WhatsApp (proximamente)</h4>
-              <p className="text-sm text-neutral-500 mb-4">
-                Recibir notificaciones de manifiestos y alertas via WhatsApp.
-              </p>
-              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 text-sm">Recibir alertas por WhatsApp</p>
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Las alertas tambien llegaran a tu WhatsApp
-                  </p>
-                </div>
-                <button
-                  disabled={savingNotif}
-                  onClick={() => handleToggleNotif('notifWhatsapp', !notifWhatsapp)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifWhatsapp ? 'bg-green-600' : 'bg-neutral-300'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifWhatsapp ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
+            {/* WhatsApp/Telegram are not delivered yet: never offer them; only let a stored opt-in be turned off. */}
+            {([['notifWhatsapp', 'WhatsApp', notifWhatsapp], ['notifTelegram', 'Telegram', notifTelegram]] as const).filter(([, , on]) => on).map(([key, channel]) => (
+              <div key={key} role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900">{channel} todavía no envía avisos. Tus alertas siguen llegando en SITREP y por email.</p>
+                <Button type="button" size="sm" variant="outline" disabled={savingNotif} onClick={() => handleToggleNotif(key, false)}>Desactivar {channel}</Button>
               </div>
-              {notifWhatsapp && (
-                <div className="mt-2">
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Telefono WhatsApp (con codigo de pais)</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="tel"
-                      value={whatsappPhone}
-                      onChange={(e) => setWhatsappPhone(e.target.value)}
-                      placeholder="+54 261 XXXXXXX"
-                      className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleToggleNotif('whatsappPhone', whatsappPhone)}
-                      className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Telegram */}
-            <div>
-              <h4 className="font-medium text-neutral-900 mb-1">Telegram (proximamente)</h4>
-              <p className="text-sm text-neutral-500 mb-4">
-                Recibir notificaciones via bot de Telegram.
-              </p>
-              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 text-sm">Recibir alertas por Telegram</p>
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Configura tu Chat ID de Telegram para recibir alertas
-                  </p>
-                </div>
-                <button
-                  disabled={savingNotif}
-                  onClick={() => handleToggleNotif('notifTelegram', !notifTelegram)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifTelegram ? 'bg-blue-500' : 'bg-neutral-300'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifTelegram ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-              </div>
-              {notifTelegram && (
-                <div className="mt-2">
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Chat ID de Telegram</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={telegramChatId}
-                      onChange={(e) => setTelegramChatId(e.target.value)}
-                      placeholder="Tu chat ID numerico"
-                      className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleToggleNotif('telegramChatId', telegramChatId)}
-                      className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            ))}
 
             {/* Solo para ADMIN */}
             {isAdmin && (
