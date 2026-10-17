@@ -50,8 +50,11 @@ async function endOfContent(page: Page, info: TestInfo, name: string) {
     let contentBottom = 0;
     for (const node of element.querySelectorAll('*')) {
       if (node.children.length) continue;
+      // Closed <details> bodies and visually hidden text still report layout boxes.
+      if (node.closest('details:not([open])') && !node.closest('summary')) continue;
+      if (!node.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
       const box = node.getBoundingClientRect();
-      if (!box.width || !box.height || box.bottom <= view.top || box.top >= view.bottom) continue;
+      if (box.width <= 1 || box.height <= 1 || box.bottom <= view.top || box.top >= view.bottom) continue;
       contentBottom = Math.max(contentBottom, box.bottom);
     }
     return { contentBottom };
