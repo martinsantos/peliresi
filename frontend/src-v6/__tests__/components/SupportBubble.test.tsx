@@ -9,7 +9,7 @@ vi.mock('../../utils/supportSession', () => ({ supportSessionMatches: mocks.matc
 vi.mock('../../utils/supportDraft', () => ({ readSupportDraft: () => mocks.pending }));
 vi.mock('../../components/SupportReportDialog', () => ({ SupportReportDialog: ({ open, screenshot, captureError, returnToTask, onClose, onSubmitted }: { open: boolean; screenshot?: File; captureError?: string; returnToTask: boolean; onClose: () => void; onSubmitted: () => void }) =>
   open ? <div role="dialog"><span>{screenshot?.name}</span><span>{captureError}</span><span>{String(returnToTask)}</span><button onClick={onClose}>Cerrar reporte</button><button onClick={() => { onClose(); onSubmitted(); }}>ACK real simulado</button></div> : null }));
-import { SupportBubble } from '../../components/SupportBubble';
+import { SupportBubble, mobileSupportClearance } from '../../components/SupportBubble';
 import { ToastContainer } from '../../components/ui/Toast';
 describe('help bubble opens from the current task without automatic delivery', () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.user.id = 'owner'; mocks.pending = null; mocks.impersonation = null; mocks.matches.mockReturnValue(true); mocks.capture.mockResolvedValue(new File(['jpeg'], 'pantalla.jpg')); });
@@ -80,5 +80,17 @@ describe('help bubble confirmation', () => {
       act(() => { vi.advanceTimersByTime(8000); });
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     } finally { vi.useRealTimers(); }
+  });
+});
+describe('help bubble does not cover the end of the content', () => {
+  beforeEach(() => { vi.clearAllMocks(); mocks.user.id = 'owner'; mocks.pending = null; mocks.impersonation = null; mocks.matches.mockReturnValue(true); });
+  it.each([[false, 88], [true, 164]])('reserves space above the floating button (above trip: %s)', (aboveTrip, bottom) => {
+    const reserved = Number(/calc\((\d+)px/.exec(mobileSupportClearance(aboveTrip))?.[1]);
+    expect(reserved).toBeGreaterThanOrEqual(bottom + 48 + 16);
+    expect(mobileSupportClearance(aboveTrip)).toContain('env(safe-area-inset-bottom, 0px)');
+  });
+  it('shows only the icon on phones in the web layout', () => {
+    render(<SupportBubble />);
+    expect(screen.getByText('Ayuda')).toHaveClass('hidden', 'sm:inline');
   });
 });

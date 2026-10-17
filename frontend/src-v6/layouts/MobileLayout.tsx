@@ -65,7 +65,7 @@ import { useAttentionCounts } from '../hooks/useAttentionCounts';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 import { SupportEntry } from '../components/SupportReportDialog';
-import { SupportBubble } from '../components/SupportBubble';
+import { SupportBubble, mobileSupportClearance } from '../components/SupportBubble';
 import { ApplicantLayout } from './ApplicantLayout';
 
 function cn(...inputs: ClassValue[]) {
@@ -357,6 +357,8 @@ export const MobileLayout: React.FC = () => {
   // Create belongs to the list, not over the current record's fields or actor links.
   const showFab = /^\/(?:app\/)?manifiestos\/?$/.test(location.pathname) && (isAdmin || isGenerador);
   const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
+  const floatingSupport = !inlineSupport;
+  const supportAboveTrip = showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute);
 
   return (
     <div ref={inspectionShell} data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
@@ -424,13 +426,14 @@ export const MobileLayout: React.FC = () => {
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
       <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>
-        <div className={cn(isInspectionCase ? 'h-full min-h-0 p-3' : 'p-4', isInspectionCase ? '' : isFieldTripRoute ? 'pb-6' : 'pb-28')}>
+        <div className={cn(isInspectionCase ? 'h-full min-h-0 p-3' : 'p-4', isInspectionCase ? '' : isFieldTripRoute ? 'pb-6' : 'pb-28')}
+          style={floatingSupport && !isFieldTripRoute ? { paddingBottom: mobileSupportClearance(supportAboveTrip) } : undefined}>
           <Outlet />
         </div>
       </main>
 
       {/* Floating Action Button */}
-      {!inlineSupport && <SupportBubble mobile hidden={isMenuOpen} aboveTrip={showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute)} />}
+      {floatingSupport && <SupportBubble mobile hidden={isMenuOpen} aboveTrip={supportAboveTrip} />}
       {showFab && (
         <button
           onClick={() => navigate(mp('/manifiestos/nuevo'))}

@@ -521,12 +521,12 @@ export const MainLayout: React.FC = () => {
         <ToastContainer />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
-        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'overflow-clip px-3 py-3 lg:px-8 lg:py-4' : 'overflow-auto px-4 pb-4 lg:px-8 lg:pb-8')}>
+        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'overflow-clip px-3 py-3 lg:px-8 lg:py-4' : 'overflow-auto px-4 lg:px-8 lg:pb-8 ' + (inlineSupport ? 'pb-4' : 'pb-12'))}>
           <Outlet />
         </main>
 
-        {/* Footer */}
-        <footer className={'border-t border-neutral-100 bg-white px-4 py-2.5 items-center justify-center gap-3 shrink-0 ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'hidden' : 'flex')}>
+        {/* Footer — on phones keep its text clear of the floating help button. */}
+        <footer className={'border-t border-neutral-100 bg-white pl-4 pr-16 sm:px-4 py-2.5 items-center justify-center gap-3 shrink-0 ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'hidden' : 'flex')}>
           <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-6 w-auto opacity-60" />
           <span className="text-xs text-neutral-400">Provincia de Mendoza — SITREP v6</span>
         </footer>

@@ -9,6 +9,10 @@ import type { SupportCreate } from '../types/support';
 import { SupportReportDialog } from './SupportReportDialog';
 import { toast } from './ui/Toast';
 
+const mobileBubbleBottom = (aboveTrip: boolean) => aboveTrip ? 164 : 88;
+/** Bottom padding a mobile scroll area needs so its last content can scroll clear of the floating button. */
+export const mobileSupportClearance = (aboveTrip: boolean) => `calc(${mobileBubbleBottom(aboveTrip) + 48 + 16}px + env(safe-area-inset-bottom, 0px))`;
+
 export function SupportBubble({ mobile = false, aboveTrip = false, hidden = false, inline = false }: { mobile?: boolean; aboveTrip?: boolean; hidden?: boolean; inline?: boolean }) {
   const { currentUser } = useAuth();
   if (!currentUser) return null;
@@ -57,13 +61,13 @@ function Bubble({ owner, mobile, aboveTrip, hidden, inline }: { owner: string; m
       if (mounted.current) { setCapturing(false); if (supportSessionMatches(owner)) setOpen(true); }
     }
   };
-  const bottom = mobile ? `calc(${aboveTrip ? 164 : 88}px + env(safe-area-inset-bottom, 0px))` : '24px';
+  const bottom = mobile ? `calc(${mobileBubbleBottom(aboveTrip)}px + env(safe-area-inset-bottom, 0px))` : '24px';
   return <>
     {!hidden && !keyboard && <div data-support-ui className={inline ? 'relative flex shrink-0 items-center' : 'fixed right-4 z-[45] flex flex-col items-end gap-2'} style={inline ? undefined : { bottom }} hidden={open && !inline}>
       {sent && !inline && <p role="status" className="max-w-[240px] rounded-lg border border-primary-200 bg-white p-3 text-sm text-primary-900 shadow-sm">Reporte enviado a soporte. Podés continuar.</p>}
       <button type="button" title="Ayuda y soporte técnico" aria-label="Ayuda y soporte técnico" aria-haspopup="dialog" aria-busy={capturing || undefined} disabled={capturing || open}
         onClick={() => void report()} className={`flex items-center justify-center gap-2 rounded-full border-2 border-white bg-primary-700 text-white transition-colors hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:opacity-80 ${inline ? 'h-11 w-11 p-0' : mobile ? 'h-12 w-12 p-0 shadow-lg' : 'min-h-12 min-w-12 px-3 shadow-lg'}`}>
-        <HelpCircle size={inline ? 20 : 24} aria-hidden="true" />{!mobile && !inline && <span className="text-sm font-semibold">{capturing ? 'Capturando…' : 'Ayuda'}</span>}
+        <HelpCircle size={inline ? 20 : 24} aria-hidden="true" />{!mobile && !inline && <span className="hidden text-sm font-semibold sm:inline">{capturing ? 'Capturando…' : 'Ayuda'}</span>}
       </button>
     </div>}
     <SupportReportDialog open={open} onClose={() => { setOpen(false); setScreenshot(undefined); }}
