@@ -446,6 +446,53 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
   }
 };
 
+// ── UPDATE OWN PROFILE ─────────────────────────────────────────────
+// Any authenticated person may correct their own name and phone; role, email,
+// activation and actor links stay with administrators.
+const OWN_PROFILE_FIELDS = ['nombre', 'telefono'] as const;
+const ownProfileSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(120, 'El nombre es demasiado largo').optional(),
+  telefono: z.string().trim().max(40, 'El teléfono es demasiado largo').optional(),
+});
+
+export const updateOwnProfile = async (req: Request & { user?: any }, res: Response, next: NextFunction) => {
+  try {
+    if (req.user.impersonatedBy) throw new AppError('Volvé a tu cuenta para modificar tu propio perfil', 403);
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    if (Object.keys(body).some(key => !(OWN_PROFILE_FIELDS as readonly string[]).includes(key))) {
+      throw new AppError('Sólo podés modificar tu nombre y tu teléfono', 400);
+    }
+    const parsed = ownProfileSchema.safeParse(body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    if (Object.keys(parsed.data).length === 0) throw new AppError('No hay cambios para guardar', 400);
+
+    const usuario = await prisma.$transaction(async tx => {
+      const before = await tx.usuario.findUnique({ where: { id: req.user.id }, select: { nombre: true, telefono: true } });
+      if (!before) throw new AppError('Usuario no encontrado', 404);
+      const updated = await tx.usuario.update({
+        where: { id: req.user.id },
+        data: parsed.data,
+        select: { id: true, email: true, nombre: true, telefono: true },
+      });
+      await tx.auditoria.create({
+        data: {
+          usuarioId: req.user.id,
+          accion: 'UPDATE_PERFIL_PROPIO',
+          modulo: 'AUTH',
+          datosAntes: JSON.stringify(before),
+          datosDespues: JSON.stringify({ nombre: updated.nombre, telefono: updated.telefono }),
+          ip: req.ip || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
+        },
+      });
+      return updated;
+    });
+    res.json({ success: true, data: { usuario } });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ── LOGOUT ────────────────────────────────────────────────────────
 export const logout = async (req: Request, res: Response, next: NextFunction) => {
   try {

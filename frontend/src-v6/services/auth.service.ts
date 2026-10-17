@@ -8,6 +8,7 @@ import type { LoginRequest, LoginResponse, ChangePasswordRequest } from '../type
 import type { Usuario } from '../types/models';
 import { readCompanyContext,saveCompanyContext } from './companyContext';
 import { activityOwner } from './actorActivity';
+import { releasePushSubscription } from './pushRelease';
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
@@ -29,7 +30,8 @@ export const authService = {
       timeout: api.defaults.timeout,
       headers: { Authorization: `Bearer ${endingToken}` },
     }) : Promise.resolve();
-    await Promise.all([durableLogout, confirmation]);
+    const pushRelease = endingToken ? releasePushSubscription(endingToken, api.defaults.baseURL) : Promise.resolve();
+    await Promise.all([durableLogout, confirmation, pushRelease]);
   },
 
   async getMe(): Promise<Usuario> {
@@ -47,6 +49,11 @@ export const authService = {
       }
       throw error;
     }
+  },
+
+  /** Own name and phone only (PUT /auth/profile); other account fields stay with administrators. */
+  async updateOwnProfile(changes: { nombre?: string; telefono?: string }): Promise<void> {
+    await api.put('/auth/profile', changes);
   },
 
   async changePassword(req: ChangePasswordRequest): Promise<void> {

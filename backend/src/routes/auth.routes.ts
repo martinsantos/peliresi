@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { register, login, getProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { register, login, getProfile, updateOwnProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -248,6 +248,23 @@ router.post('/claim-account', claimAccount);
  */
 // Protegidas
 router.get('/profile', isAuthenticated, getProfile);
+
+/**
+ * @openapi
+ * /auth/profile:
+ *   put:
+ *     tags: [Auth]
+ *     summary: Actualizar el propio nombre y teléfono
+ *     description: Sólo acepta nombre y telefono de la persona autenticada. No disponible durante una suplantación.
+ *     responses:
+ *       200:
+ *         description: Perfil actualizado
+ *       400:
+ *         description: Campo no permitido o inválido
+ *       403:
+ *         description: Sesión suplantada o restringida
+ */
+router.put('/profile', isAuthenticated, requireFullAccess, updateOwnProfile);
 
 /**
  * @openapi

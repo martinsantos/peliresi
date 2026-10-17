@@ -29,7 +29,6 @@ import { InstallPWAButton } from '../../components/InstallPWAButton';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { authService } from '../../services/auth.service';
 import api from '../../services/api';
-import { usuarioService } from '../../services/usuario.service';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { passwordRuleError } from '../../utils/passwordRule';
 
@@ -108,14 +107,11 @@ const ConfiguracionPage: React.FC = () => {
     setIsSaving(true);
     try {
       if (currentUser?.id) {
-        await usuarioService.update(String(currentUser.id), {
-          nombre: profile.nombre,
-          telefono: profile.telefono,
-        });
+        await authService.updateOwnProfile({ nombre: profile.nombre, telefono: profile.telefono });
       }
       toast.success('Configuración guardada', 'Los cambios se han guardado correctamente.');
-    } catch {
-      toast.error('Error al guardar', 'No se pudieron guardar los cambios. Intenta nuevamente.');
+    } catch (error) {
+      toast.error('Error al guardar', getApiErrorMessage(error, 'Revisá la conexión y reintentá; tus cambios siguen en pantalla.'));
     } finally {
       setIsSaving(false);
     }

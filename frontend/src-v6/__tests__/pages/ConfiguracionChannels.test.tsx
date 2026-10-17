@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ prefs: {} as Record<string, unknown>, put: vi.fn(), toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }, auth: { currentUser: { id: 7, nombre: 'QA Generador', email: 'qa@night-qa.invalid', rol: 'GENERADOR' }, isAdmin: false } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => mocks.auth }));
-vi.mock('../../services/auth.service', () => ({ authService: { getMe: () => Promise.resolve(mocks.prefs), changePassword: vi.fn() } }));
+vi.mock('../../services/auth.service', () => ({ authService: { getMe: () => Promise.resolve(mocks.prefs), changePassword: vi.fn(), updateOwnProfile: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: mocks.toast, ToastContainer: () => null }));
 vi.mock('../../services/api', () => ({ default: { put: mocks.put } }));
 vi.mock('../../hooks/usePWAInstall', () => ({ usePWAInstall: () => ({ canInstall: false, isInstalled: false, isIOS: false, install: vi.fn() }) }));
@@ -60,5 +60,24 @@ describe('Password change follows the server rule and shows its reason', () => {
     finish({ isAxiosError: true, response: { data: { message: 'La contraseña cambió durante la operación. Volvé a iniciar sesión.' } } });
     await waitFor(() => expect(submit).not.toBeDisabled());
     expect(mocks.toast.error).toHaveBeenCalledWith('Error', 'La contraseña cambió durante la operación. Volvé a iniciar sesión.');
+  });
+});
+
+describe('Non-admin people save their own name and phone', () => {
+  beforeEach(() => { vi.clearAllMocks(); mocks.prefs = {}; });
+  it('uses the own-profile endpoint, not the administrator user endpoint', async () => {
+    vi.mocked(authService.updateOwnProfile).mockResolvedValue(undefined);
+    render(<MemoryRouter initialEntries={['/configuracion?tab=perfil']}><ConfiguracionPage /></MemoryRouter>);
+    fireEvent.change(await screen.findByLabelText('Teléfono'), { target: { value: '261-555' } });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+    await waitFor(() => expect(authService.updateOwnProfile).toHaveBeenCalledWith({ nombre: 'QA Generador', telefono: '261-555' }));
+    expect(mocks.put).not.toHaveBeenCalledWith(expect.stringMatching(/^\/admin\/usuarios\//), expect.anything());
+    expect(mocks.toast.success).toHaveBeenCalled();
+  });
+  it('shows the server reason when the change is refused', async () => {
+    vi.mocked(authService.updateOwnProfile).mockRejectedValue({ isAxiosError: true, response: { status: 403, data: { message: 'Volvé a tu cuenta para modificar tu propio perfil' } } });
+    render(<MemoryRouter initialEntries={['/configuracion?tab=perfil']}><ConfiguracionPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: /Guardar cambios/ }));
+    await waitFor(() => expect(mocks.toast.error).toHaveBeenCalledWith('Error al guardar', 'Volvé a tu cuenta para modificar tu propio perfil'));
   });
 });

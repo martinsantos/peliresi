@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Response } from 'express';
-import { getVapidPublicKey } from '../../controllers/push.controller';
+import { getVapidPublicKey, subscribe, unsubscribe } from '../../controllers/push.controller';
+import prisma from '../../lib/prisma';
 
 vi.mock('../../lib/prisma', () => ({
   __esModule: true,
@@ -55,6 +56,33 @@ describe('push controller', () => {
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       data: { enabled: true, publicKey: 'test-public-key' },
+    });
+  });
+
+  describe('shared devices', () => {
+    const body = { endpoint: 'https://push.example.invalid/device', keys: { p256dh: 'p', auth: 'a' } };
+    const request = (user: Record<string, unknown>) => ({ body, user, headers: { 'user-agent': 'unit' } }) as never;
+
+    it('reassigns an existing device subscription to the person signed in now', async () => {
+      vi.mocked(prisma.pushSubscripcion.findUnique).mockResolvedValue({ id: 'existing' } as never);
+      await subscribe(request({ id: 'second-person' }), createResponse());
+      expect(prisma.pushSubscripcion.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        where: { endpoint: body.endpoint },
+        update: expect.objectContaining({ usuarioId: 'second-person' }),
+      }));
+    });
+
+    it('leaves the administrator device untouched while impersonating', async () => {
+      vi.mocked(prisma.pushSubscripcion.upsert).mockClear();
+      const res = createResponse();
+      await subscribe(request({ id: 'impersonated', impersonatedBy: { id: 'admin', nombre: 'Admin' } }), res);
+      expect(prisma.pushSubscripcion.upsert).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({ success: true });
+    });
+
+    it('only removes the caller own subscription', async () => {
+      await unsubscribe({ body: { endpoint: body.endpoint }, user: { id: 'leaving-person' } } as never, createResponse());
+      expect(prisma.pushSubscripcion.deleteMany).toHaveBeenCalledWith({ where: { endpoint: body.endpoint, usuarioId: 'leaving-person' } });
     });
   });
 });

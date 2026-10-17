@@ -24,7 +24,8 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
-import { usuarioService } from '../../services/usuario.service';
+import { authService } from '../../services/auth.service';
+import { getApiErrorMessage } from '../../utils/api-error';
 import { useGenerador, useOperador } from '../../hooks/useActores';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import ActorCertificates from '../../components/ActorCertificates';
@@ -72,15 +73,12 @@ const PerfilPage: React.FC = () => {
     setGuardando(true);
     try {
       if (currentUser?.id) {
-        await usuarioService.update(String(currentUser.id), {
-          nombre: user.nombre,
-          telefono: user.telefono,
-        });
+        await authService.updateOwnProfile({ nombre: user.nombre, telefono: user.telefono });
       }
       toast.success('Perfil actualizado', 'Tus cambios se guardaron correctamente');
       setEditando(false);
-    } catch {
-      toast.error('No se guardaron los cambios', 'Reintentá cuando tengas conexión.');
+    } catch (error) {
+      toast.error('No se guardaron los cambios', getApiErrorMessage(error, 'Revisá la conexión y reintentá; tus cambios siguen en pantalla.'));
       return;
     } finally {
       setGuardando(false);
