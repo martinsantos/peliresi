@@ -4,7 +4,7 @@
  * Página de configuración del sistema
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   User,
@@ -30,6 +30,8 @@ import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { authService } from '../../services/auth.service';
 import api from '../../services/api';
 import { usuarioService } from '../../services/usuario.service';
+import { getApiErrorMessage } from '../../utils/api-error';
+import { passwordRuleError } from '../../utils/passwordRule';
 
 /** Extended user profile fields from /auth/profile (notification preferences) */
 interface UserWithPreferences {
@@ -119,15 +121,22 @@ const ConfiguracionPage: React.FC = () => {
     }
   };
 
-  const handleChangePassword = async () => {
+  const changingPassword = useRef(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const handleChangePassword = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (changingPassword.current) return;
     if (passwordForm.nueva !== passwordForm.confirmar) {
       toast.error('Error', 'Las contraseñas no coinciden');
       return;
     }
-    if (passwordForm.nueva.length < 6) {
-      toast.error('Error', 'La contraseña debe tener al menos 6 caracteres');
+    const ruleError = passwordRuleError(passwordForm.nueva);
+    if (ruleError) {
+      toast.error('Error', ruleError);
       return;
     }
+    changingPassword.current = true;
+    setIsChangingPassword(true);
     try {
       await authService.changePassword({
         currentPassword: passwordForm.current,
@@ -135,8 +144,11 @@ const ConfiguracionPage: React.FC = () => {
       });
       toast.success('Contraseña cambiada', 'Tu contraseña se ha actualizado correctamente.');
       setPasswordForm({ current: '', nueva: '', confirmar: '' });
-    } catch {
-      toast.error('Error', 'No se pudo cambiar la contraseña. Verifica tu contraseña actual.');
+    } catch (error) {
+      toast.error('Error', getApiErrorMessage(error, 'No se pudo cambiar la contraseña. Revisá la conexión y reintentá.'));
+    } finally {
+      changingPassword.current = false;
+      setIsChangingPassword(false);
     }
   };
 
@@ -189,10 +201,11 @@ const ConfiguracionPage: React.FC = () => {
           <div className="space-y-6 animate-fade-in">
             <div>
               <h4 className="font-medium text-neutral-900 mb-4">Cambiar contraseña</h4>
-              <div className="space-y-4 max-w-md">
+              <form className="space-y-4 max-w-md" onSubmit={handleChangePassword}>
                 <Input
                   type="password"
                   label="Contraseña actual"
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   value={passwordForm.current}
                   onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
@@ -200,6 +213,8 @@ const ConfiguracionPage: React.FC = () => {
                 <Input
                   type="password"
                   label="Nueva contraseña"
+                  autoComplete="new-password"
+                  helperText="Al menos 8 caracteres, una mayúscula y un número."
                   placeholder="••••••••"
                   value={passwordForm.nueva}
                   onChange={(e) => setPasswordForm({ ...passwordForm, nueva: e.target.value })}
@@ -207,12 +222,13 @@ const ConfiguracionPage: React.FC = () => {
                 <Input
                   type="password"
                   label="Confirmar contraseña"
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   value={passwordForm.confirmar}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmar: e.target.value })}
                 />
-                <Button onClick={handleChangePassword}>Cambiar contraseña</Button>
-              </div>
+                <Button type="submit" isLoading={isChangingPassword} disabled={isChangingPassword}>Cambiar contraseña</Button>
+              </form>
             </div>
           </div>
         );
