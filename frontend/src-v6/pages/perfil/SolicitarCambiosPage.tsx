@@ -27,6 +27,7 @@ import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { renovacionService } from '../../services/renovacion.service';
 import api from '../../services/api';
+import { getApiErrorMessage } from '../../utils/api-error';
 
 // Field definitions per actor type
 interface FieldDef {
@@ -148,8 +149,9 @@ const SolicitarCambiosPage: React.FC = () => {
 
       setSubmitted(true);
       toast.success('Solicitud enviada', 'Tu solicitud de modificacion fue registrada y sera revisada por un administrador');
-    } catch {
-      toast.error('Error', 'No se pudo enviar la solicitud. Intenta nuevamente.');
+    } catch (error) {
+      // The server explains rejections (e.g. one request per actor and year); retrying would not help.
+      toast.error('No se envió la solicitud', getApiErrorMessage(error, 'Revisá la conexión y reintentá; tus cambios siguen en pantalla.'));
     } finally {
       submissionInFlight.current = false;
       setSubmitting(false);

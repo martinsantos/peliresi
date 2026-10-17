@@ -49,3 +49,17 @@ describe('existing registry is available only through the verified owner and act
     await waitFor(() => expect(screen.getByText('Revisión precargada')).toBeVisible()); expect(mock.submit).not.toHaveBeenCalled();
   });
 });
+
+import { toast as mockedToast } from '../../components/ui/Toast';
+describe('change requests explain a server rejection instead of inviting a pointless retry', () => {
+  it('shows the server reason and keeps the edited values', async () => {
+    mock.role = 'GENERADOR';
+    mock.get.mockResolvedValue({ data: { data: { generador: { id: 'actor', razonSocial: 'QA padrón', domicilio: 'QA domicilio anterior', telefono: '0261-QA' } } } });
+    mock.submit.mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { message: 'Ya existe una renovacion para este actor en ese ano' } } });
+    await act(async () => render(<MemoryRouter><SolicitarCambiosPage /></MemoryRouter>));
+    fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA domicilio nuevo' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Enviar Solicitud/ })); });
+    expect(mockedToast.error).toHaveBeenCalledWith('No se envió la solicitud', 'Ya existe una renovacion para este actor en ese ano');
+    expect(screen.getByLabelText('Domicilio')).toHaveValue('QA domicilio nuevo');
+  });
+});
