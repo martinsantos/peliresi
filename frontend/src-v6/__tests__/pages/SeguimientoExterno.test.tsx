@@ -44,3 +44,11 @@ it('does not present a failed query as zero activity and allows retry', async ()
   await screen.findByText('No hay movimientos para estos filtros.');
   expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
 });
+
+it('tracks external operators too (spec v2 §4)', async () => {
+  view(); await screen.findByText('21 movimientos · Generadores');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Tipo de participante', exact: true }), { target: { value: 'operador' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Consultar' }));
+  await waitFor(() => expect(get).toHaveBeenLastCalledWith('/manifiestos/baja-intensidad/seguimiento', { params: { rol: 'operador', identificacion: '', page: 1 } }));
+  await screen.findByText('21 movimientos · Operadores');
+});

@@ -46,7 +46,7 @@ export default function SeguimientoExterno() {
     <Card><form className="flex flex-wrap items-end gap-3" onSubmit={e => { e.preventDefault(); setFilters({ rol: role, identificacion: identity.trim(), page: 1 }); }}>
       <div className="text-sm font-medium"><label htmlFor="external-participant-type">Tipo de participante</label>
         <select id="external-participant-type" value={role} onChange={e => setRole(e.target.value)} className="block mt-1 min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base">
-          <option value="generador">Generador</option><option value="transportista">Transportista</option>
+          <option value="generador">Generador</option><option value="transportista">Transportista</option><option value="operador">Operador</option>
         </select>
       </div>
       <div className="min-w-0 flex-1 basis-52"><Input label="Identificación exacta" maxLength={500} placeholder="CUIT o referencia declarada" value={identity} onChange={e => setIdentity(e.target.value)} /></div>
@@ -57,7 +57,7 @@ export default function SeguimientoExterno() {
     {query.isError && <div role="alert">No se pudo consultar el seguimiento. <Button variant="outline" onClick={() => void query.refetch()}>Reintentar</Button></div>}
     {data && !query.isError && <>
       <Card role="region" aria-label="Resumen del seguimiento" className="space-y-2">
-        <p className="font-semibold">{data.total} {data.total === 1 ? 'movimiento' : 'movimientos'} · {filters.rol === 'generador' ? 'Generadores' : 'Transportistas'}</p>
+        <p className="font-semibold">{data.total} {data.total === 1 ? 'movimiento' : 'movimientos'} · {filters.rol === 'generador' ? 'Generadores' : filters.rol === 'operador' ? 'Operadores' : 'Transportistas'}</p>
         {data.primera && data.ultima && <p className="text-sm">{date(data.primera)} — {date(data.ultima)}</p>}
         <p className="text-sm text-neutral-600">Carga original declarada en todas las coincidencias; no suma adendas ni identifica personas únicas.</p>
         <ul className="flex flex-wrap gap-x-5 gap-y-1" aria-label="Cantidades por corriente y unidad">{data.cantidades.map(row =>

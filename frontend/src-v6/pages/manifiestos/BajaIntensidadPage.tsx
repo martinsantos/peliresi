@@ -12,17 +12,28 @@ import SeguimientoExterno from './SeguimientoExterno';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
 type Participant = { nombre: string; identificacion: string; domicilio: string; nombreFantasia?: string; telefono?: string; padronId?: string };
+type Slot = 'generador' | 'transportista' | 'operador';
+type Approval = { estado: 'NO_REQUIERE' | 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'; partes: { parte: string; rol: string; estado: string }[] };
 type Entry = {
   id: string; referencia: string; version: number; etapa: string; puedeRegistrar: boolean; puedeResolver: boolean;
-  datos: { generador: Participant; transportista: Participant; patente: string; motivo: string; residuos: Waste[] };
+  puedeAprobar?: string[]; aprobacion?: Approval;
+  datos: { generador: Participant; transportista: Participant; operador?: Participant; patente: string; motivo: string; residuos: Waste[] };
   revisiones: { objetivo: string; estado: string; solicitada: boolean }[];
-  eventos: { id: string; tipo: string; nota: string; fecha: string; autorId: string; etapa?: string; residuos?: Waste[]; decision?: string }[];
+  eventos: { id: string; tipo: string; nota: string; fecha: string; autorId: string; etapa?: string; parte?: string; residuos?: Waste[]; decision?: string }[];
 };
 const endpoint = '/manifiestos/baja-intensidad';
 const emptyActor = (): Participant => ({ nombre: '', identificacion: '', domicilio: '' });
 const stageLabels: Record<string, string> = { REGISTRADO: 'Registrado', RETIRADO: 'Retirado', RECIBIDO: 'Recibido', TRATADO: 'Tratado' };
 const nextStages: Record<string, string> = { REGISTRADO: 'RETIRADO', RETIRADO: 'RECIBIDO', RECIBIDO: 'TRATADO' };
-const labels: Record<string, string> = { AVANCE: 'Movimiento registrado', DIFERENCIA: 'Diferencia registrada', SOLICITAR_REVISION: 'Revisión solicitada', RESOLVER: 'Resolución posterior' };
+const labels: Record<string, string> = { AVANCE: 'Movimiento registrado', DIFERENCIA: 'Diferencia registrada', SOLICITAR_REVISION: 'Revisión solicitada', RESOLVER: 'Resolución posterior',
+  APROBAR_PARTE: 'Aprobación de parte', RECHAZAR_PARTE: 'Rechazo de parte' };
+const slotTitles: Record<Slot, string> = { generador: 'Generador', transportista: 'Transportista', operador: 'Operador' };
+// Spec v2 §1: the server injects the creator's own slot; an administrator declares all three.
+const ownSlot: Record<string, Slot> = { GENERADOR: 'generador', TRANSPORTISTA: 'transportista', OPERADOR: 'operador' };
+const creators = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN'];
+const approvalLabels: Record<string, string> = { PENDIENTE: 'pendiente', APROBADO: 'aprobado', RECHAZADO: 'rechazado' };
+const partLabels: Record<string, string> = { creador: 'Quien lo creó', generador: 'Generador', transportista: 'Transportista', operador: 'Operador' };
+const decisionLabels: Record<string, string> = { PENDIENTE: 'Pendiente', APROBADA: 'Aprobada', RECHAZADA: 'Rechazada' };
 
 function ParticipantFields({ title, value, onChange }: { title: string; value: Participant; onChange: (v: Participant) => void }) {
   const { currentUser } = useAuth();
@@ -80,8 +91,7 @@ export default function BajaIntensidadPage() {
     queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint + '?page=' + listPage)).data.data as { registro?: Entry; registros?: Entry[]; total?: number },
     retry: false });
   const [creating, setCreating] = useState(false);
-  const [generador, setGenerador] = useState(emptyActor);
-  const [transportista, setTransportista] = useState(emptyActor);
+  const [declared, setDeclared] = useState<Record<Slot, Participant>>(() => ({ generador: emptyActor(), transportista: emptyActor(), operador: emptyActor() }));
   const [patente, setPatente] = useState('');
   const [motivo, setMotivo] = useState('');
   const [wastes, setWastes] = useState<Waste[]>([{ corriente: '', cantidad: 0, unidad: 'kg' }]);
@@ -112,6 +122,9 @@ export default function BajaIntensidadPage() {
     } finally { lock.current = false; setBusy(false); }
   }
   const entry = query.data?.registro;
+  const formSlots = (['generador', 'transportista', 'operador'] as Slot[]).filter(slot => slot !== ownSlot[currentUser?.rol || '']);
+  const approval = entry?.aprobacion && entry.aprobacion.estado !== 'NO_REQUIERE' ? entry.aprobacion : undefined;
+  const factsBlocked = approval?.estado === 'PENDIENTE' || approval?.estado === 'RECHAZADO';
   const event = (body: Record<string, unknown>) => entry && send(endpoint + '/' + entry.id + '/eventos', { ...body, version: entry.version });
   const wasteInputs = <div className="space-y-3">{wastes.map((waste, index) => <fieldset key={index} className="space-y-2">
     <legend className="text-sm font-semibold mb-2">Residuo {index + 1}</legend>
@@ -125,17 +138,18 @@ export default function BajaIntensidadPage() {
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-bold text-neutral-900">Manifiestos eventuales</h1>
-      {!id && !tracking && currentUser?.rol === 'OPERADOR' && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : 'Registrar operación'}</Button>}
+      {!id && !tracking && creators.includes(currentUser?.rol || '') && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : 'Registrar operación'}</Button>}
       {id && <Button variant="outline" onClick={() => setParams({})}>Ver registros</Button>}
     </div>
-    {!id && !creating && ['OPERADOR', 'ADMIN'].includes(currentUser?.rol || '') && <Button variant="outline" onClick={() => setParams(tracking ? {} : { vista: 'seguimiento' })}>{tracking ? 'Volver a registros' : 'Seguimiento de participantes'}</Button>}
+    {!id && !creating && creators.includes(currentUser?.rol || '') && <Button variant="outline" onClick={() => setParams(tracking ? {} : { vista: 'seguimiento' })}>{tracking ? 'Volver a registros' : 'Seguimiento de participantes'}</Button>}
     {tracking && <SeguimientoExterno />}
     <p className="text-sm text-neutral-600">Referencia interna · Sin número oficial. Registrar no implica aprobación ni habilitación.</p>
     {error && <div role="alert" className="p-3 bg-error-50 text-error-800 rounded-lg">{error} <Button variant="outline" size="sm" onClick={() => void query.refetch()}>Recargar registro</Button></div>}
     {!tracking && query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
     {!tracking && query.isLoading && <p role="status">Cargando registros…</p>}
-    {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, { generador, transportista, patente, motivo, residuos: wastes }, true); }}>
-      <div className="grid sm:grid-cols-2 gap-5"><ParticipantFields title="Generador" value={generador} onChange={setGenerador} /><ParticipantFields title="Transportista" value={transportista} onChange={setTransportista} /></div>
+    {creating && !id && <Card><form className="space-y-5" onSubmit={e => { e.preventDefault(); void send(endpoint, { ...Object.fromEntries(formSlots.map(slot => [slot, declared[slot]])), patente, motivo, residuos: wastes }, true); }}>
+      <div className="grid sm:grid-cols-2 gap-5">{formSlots.map(slot => <ParticipantFields key={slot} title={slotTitles[slot]} value={declared[slot]}
+        onChange={value => setDeclared(current => ({ ...current, [slot]: value }))} />)}</div>
       <Input label="Patente declarada" maxLength={20} value={patente} onChange={e => setPatente(e.target.value)} />
       {wasteInputs}
       <Input label="Motivo del registro excepcional" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
@@ -155,19 +169,29 @@ export default function BajaIntensidadPage() {
     {entry && <div className="space-y-4">
       <Card><p className="text-xs break-all text-neutral-600">{entry.referencia}</p><h2 className="font-bold text-lg mt-2">{entry.datos.generador.nombre || 'Generador por identificar'}</h2>
         <p>{entry.datos.transportista.nombre || 'Transportista por identificar'} · {entry.datos.patente || 'Patente pendiente'}</p>
+        {entry.datos.operador && <p>{entry.datos.operador.nombre || 'Operador por identificar'}</p>}
         <p className="font-semibold mt-3" role="status" aria-label="Estado operativo">Operación: {stageLabels[entry.etapa]}</p>
         <p className="text-sm text-amber-900 mt-1">Regularización pendiente · Compatibilidad de corrientes sin verificar</p>
         <h3 className="font-semibold mt-4">Declaración original</h3>
         {entry.datos.residuos.map((r, i) => <p key={i}>{r.corriente} · {r.cantidad} {r.unidad}</p>)}
         <details className="mt-3 text-sm"><summary className="cursor-pointer py-2">Identidades declaradas</summary>
-          {[entry.datos.generador, entry.datos.transportista].map((p, i) => <p key={i} className="break-words">{p.nombre} · {p.identificacion} · {p.domicilio} · {p.padronId ? 'Vinculado al padrón' : 'Sin alta'}</p>)}
+          {[entry.datos.generador, entry.datos.transportista, ...(entry.datos.operador ? [entry.datos.operador] : [])].map((p, i) => <p key={i} className="break-words">{p.nombre} · {p.identificacion} · {p.domicilio} · {p.padronId ? 'Vinculado al padrón' : 'Sin alta'}</p>)}
           <p>{entry.datos.motivo}</p>
         </details>
       </Card>
-      {(entry.puedeRegistrar || entry.puedeResolver) && <Input label="Nota de la acción" helperText="Opcional para movimientos; requerida para diferencias y revisiones." maxLength={500} value={nota} onChange={e => setNota(e.target.value)} />}
+      {approval && <Card><h2 className="font-semibold" role="status">Aprobación de las partes: {approvalLabels[approval.estado]}</h2>
+        <ul className="text-sm mt-2 space-y-1">{approval.partes.map(p => <li key={p.parte}>{partLabels[p.parte]} · {decisionLabels[p.estado]}</li>)}</ul>
+        {approval.estado === 'PENDIENTE' && <p className="text-sm text-amber-900 mt-2">Faltan aprobaciones de las partes para avanzar.</p>}
+        {approval.estado === 'RECHAZADO' && <p className="text-sm text-error-800 mt-2">Rechazado por una parte: se conserva como antecedente y no avanza.</p>}
+        {!!entry.puedeAprobar?.length && <div className="flex flex-wrap gap-2 mt-3">{entry.puedeAprobar.map(parte => <React.Fragment key={parte}>
+          <Button disabled={busy} onClick={() => void event({ tipo: 'APROBAR_PARTE', parte, nota })}>Aprobar como {partLabels[parte].toLowerCase()}</Button>
+          <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RECHAZAR_PARTE', parte, nota })}>Rechazar como {partLabels[parte].toLowerCase()}</Button>
+        </React.Fragment>)}</div>}
+      </Card>}
+      {(entry.puedeRegistrar || entry.puedeResolver || !!entry.puedeAprobar?.length) && <Input label="Nota de la acción" helperText="Opcional para movimientos; requerida para diferencias y revisiones." maxLength={500} value={nota} onChange={e => setNota(e.target.value)} />}
       {entry.puedeRegistrar && <Card><div className="flex flex-wrap gap-3">
-        {nextStages[entry.etapa] && <Button disabled={busy} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
-        <Button variant="outline" onClick={() => setDifference(v => !v)}>{difference ? 'Cerrar diferencia' : 'Registrar diferencia'}</Button>
+        {nextStages[entry.etapa] && <Button disabled={busy || factsBlocked} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
+        <Button variant="outline" disabled={factsBlocked} onClick={() => setDifference(v => !v)}>{difference ? 'Cerrar diferencia' : 'Registrar diferencia'}</Button>
       </div>
       {difference && <form className="space-y-3 mt-4" onSubmit={e => { e.preventDefault(); void event({ tipo: 'DIFERENCIA', nota, residuos: wastes }); }}>
         <p className="text-sm">Carga observada completa; no se suma automáticamente al original.</p>
@@ -178,7 +202,7 @@ export default function BajaIntensidadPage() {
           <h3 className="font-medium">{i === 0 ? 'Registro original' : 'Diferencia ' + i}</h3>
           <p className="text-sm mb-2">{review.estado === 'APROBADA' ? 'Conformidad aprobada' : review.estado === 'OBSERVADA' ? 'Observada · requiere atención' : review.estado === 'RECHAZADA' ? 'Conformidad rechazada · hechos conservados' : 'Pendiente de conformidad'}{review.solicitada ? ' · Revisión solicitada' : ''}</p>
           <div className="flex flex-wrap gap-2">
-            {entry.puedeRegistrar && <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'SOLICITAR_REVISION', objetivo: review.objetivo, nota })}>Solicitar revisión</Button>}
+            {entry.puedeRegistrar && !factsBlocked && <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'SOLICITAR_REVISION', objetivo: review.objetivo, nota })}>Solicitar revisión</Button>}
             {entry.puedeResolver && review.solicitada && <>
               <Button disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'APROBADA', nota })}>Aprobar post facto</Button>
               <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'OBSERVADA', nota })}>Observar</Button>
@@ -189,7 +213,7 @@ export default function BajaIntensidadPage() {
       </div></Card>
       <Card><h2 className="font-semibold mb-3">Historial</h2><ol className="space-y-3">
         {entry.eventos.map(e => <li key={e.id} className="border-l-2 border-primary-200 pl-3 text-sm">
-          <p className="font-medium">{labels[e.tipo]}{e.etapa ? ' · ' + stageLabels[e.etapa] : ''}{e.decision ? ' · ' + e.decision : ''}</p><p className="break-words">{e.nota}</p>
+          <p className="font-medium">{labels[e.tipo]}{e.parte ? ' · ' + partLabels[e.parte] : ''}{e.etapa ? ' · ' + stageLabels[e.etapa] : ''}{e.decision ? ' · ' + e.decision : ''}</p><p className="break-words">{e.nota}</p>
           {e.residuos?.map((r, i) => <p key={i}>{r.corriente} · {r.cantidad} {r.unidad}</p>)}
           <time className="text-neutral-600">{new Date(e.fecha).toLocaleString('es-AR')}</time>
         </li>)}
