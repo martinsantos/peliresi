@@ -46,7 +46,9 @@
   - suites unitarias completas sobre el commit final;
   - decidir qué flags se encienden (`ENTERPRISE_ENABLED`, `VITE_MANIFEST_EXCEPTIONAL_ENABLED`, multirol).
 
-**Preview vivo** (sintético, en `76.13.234.213`):
+**Decisiones del dueño aplicadas:** S1, S2/S3, F1 (`PUT /auth/profile`) y F2 (push). Ver la sexta tanda en hallazgos y [DECISIONES-RELEASE-20261017.md](DECISIONES-RELEASE-20261017.md). La especificación de eventuales está en una sesión aparte (`docs/ESPEC-EVENTUALES-20261017.md`) y espera aprobación.
+
+**Preview vivo** (sintético, en `76.13.234.213`). Cuentas fáciles, sólo ahí: `admin|generador|transportista|operador|inspector@sitrep.test`, contraseña `Sitrep2026`, aplicadas con `live-easy-accounts.ts`.
 - **Contenedor:** gemelo `sitrep-qa-live-20261017`.
   - Imagen `sitrep-qa-enterprise-20261016:live-20261017` (2,2 GB), creada con commit del original.
   - Mismos límites: 1 CPU, 2 GiB, swap 0, red interna sin gateway, sin puertos.

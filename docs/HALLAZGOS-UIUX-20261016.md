@@ -265,6 +265,37 @@ Revisión de código sin ejecutar. **Verificados a mano** en el código: S1–S5
 - **O4:** en carga masiva, «Descargar plantilla» todavía dice «Descarga disponible cuando el API este conectado».
 - **O5:** en Perfil se lee «JPG, PNG o GIF. Máximo 2MB» sin ningún control para subir.
 
+## Sexta tanda — decisiones del dueño aplicadas (17/10/2026)
+
+**Decisiones:** S1 sí, sin migrar archivos porque no hay subidos valiosos. S2/S3 sí. Correo: todavía no. F1: opción A. F2: sí.
+
+| ID | Commit | Cambio |
+| --- | --- | --- |
+| S1 | `9772169` | `sitrep-deploy-fase3.sh`: `UPLOADS_DIR=/var/www/sitrep-uploads` en el `.env` nuevo. En un `.env` existente se agrega sólo si falta. Crea el directorio para el usuario del servicio. Verificado con `bash -n`. **fase3 no se ejecutó y el `.env` real del servidor no se leyó** |
+| S2/S3 | `1dad348` | `seed-admin-data.ts` y `repair-demo-certification.ts` exigen `ALLOW_DEMO_SEED=1` y rechazan `NODE_ENV=production`. **`DEPLOY-NUEVO-SERVIDOR.md:994` y `SETUP.html:266` describen ese paso, que ahora aborta a propósito: hay que actualizar esa documentación** |
+| F1 | `8ffe7f0` | `PUT /auth/profile`: sólo nombre y teléfono propios, con auditoría `UPDATE_PERFIL_PROPIO` (antes/después en la misma transacción). Rechazado en sesión suplantada o restringida; cualquier otro campo se rechaza con «Sólo podés modificar tu nombre y tu teléfono». Mi perfil y Configuración lo usan y muestran el motivo del servidor |
+| F2 | `8ffe7f0`, `55de02d` | Push: la suscripción pasa al usuario actual. Una sesión suplantada no la modifica. `unsubscribe` sólo borra la propia. Al cerrar sesión se libera el endpoint del dispositivo, como intento de 5 s que no bloquea |
+
+**Pruebas:**
+- **Backend:** el typecheck y las pruebas se corrieron dentro del contenedor, porque la Mac no tiene las dependencias de desarrollo del backend. 3 archivos, 31/31, con perfil propio (incluye 404 y suplantación) y push.
+- **Frontend:**
+  - `pushRelease`: 3 casos nuevos;
+  - Configuración: 2 casos nuevos, que fallan sin el arreglo;
+  - 6 archivos afectados: 51/51;
+  - typecheck limpio.
+- **Preview aislado,** fuente `55de02d`, con build de backend:
+  - build, base nueva e integraciones HTTP aprobados;
+  - **nueva prueba HTTP real `own-profile-push-http.ts` 4/4.** No está incluida en `preview-run.ts http`: se corre aparte;
+  - **E2E 39/39**;
+  - pantallas 20/20, más 1 omitida a propósito.
+  - El contador `memory.events max` acumulado llegó a 1736, sin OOM.
+
+**Preview vivo:** `frontend/cloud-qa/live-easy-accounts.ts` deja cuentas fáciles sólo en la base del preview vivo (`rol@sitrep.test`, contraseña `Sitrep2026`). Correrlo sólo después de restaurar la base viva, nunca antes de HTTP o E2E.
+
+**No hecho:**
+- `solicitud.controller.ts:42` sigue guardando por defecto en `cwd/uploads`. Con `UPLOADS_DIR` definido no afecta a producción; alinear ese valor por defecto es opcional.
+- El log de datos personales de WhatsApp/Telegram en el backend (S5) sigue pendiente.
+
 ## Comprobado y sin defecto
 
 `Modal` (bloqueo de scroll, trampa de foco, Escape, alto por viewport visible, pie fijo), `Select` (abre en una opción, no en la búsqueda: no abre el teclado), `Input`, `ButtonV2` (44 px en móvil), `Tabs`, `NativeSelect`, `MapLayerToggle`, badges pendiente≠sin leer, wizard público con reintento por documento y envío protegido contra doble toque, `SupportReportDialog` con borrador local.
