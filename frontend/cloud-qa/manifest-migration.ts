@@ -69,7 +69,8 @@ try {
   const anyPartyMigration = await readFile(path.join(root, 'backend/prisma/migrations/20261017140000_exceptional_any_party/migration.sql'), 'utf8');
   assert.ok(!/\b(UPDATE|DELETE|DROP COLUMN|DROP TABLE|TRUNCATE)\b/i.test(anyPartyMigration.replace(/--.*$/gm, '')), 'additive only');
   for (const statement of anyPartyMigration.replace(/--.*$/gm, '').split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement);
-  const [legacyAfter] = await db.$queryRawUnsafe(legacyRow, 'qa-legacy-exceptional');
+  // New statement text: PostgreSQL refuses a cached plan whose result columns changed.
+  const [legacyAfter] = await db.$queryRawUnsafe(legacyRow + ' AND true', 'qa-legacy-exceptional');
   const { autorRol, autorActorId, ...legacyKept } = legacyAfter;
   assert.equal(autorRol, null); assert.equal(autorActorId, null);
   assert.deepEqual(legacyKept, legacyBefore, 'datos, eventos, huella, etapa, version and dates unchanged');
