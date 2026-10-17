@@ -6,7 +6,7 @@ async function press(page: Page, control: Locator) {
 }
 export async function createExceptionalJourney(page: Page, prefix: string, hideKeyboard = async () => {}, linked?: 'Generador' | 'Transportista', assertNoKeyboard = async () => {}) {
   await page.goto('http://127.0.0.1:4177' + prefix + '/manifiestos');
-  await press(page, page.getByRole('link', { name: 'Baja intensidad · revisión posterior', exact: true }));
+  await press(page, page.getByRole('link', { name: 'Eventuales', exact: true }));
   await press(page, page.getByRole('button', { name: 'Registrar operación', exact: true }));
   for (const actor of ['Generador', 'Transportista']) {
     await page.getByLabel(actor + ' · Nombre o razón social', { exact: true }).fill('QA Externo ' + actor);

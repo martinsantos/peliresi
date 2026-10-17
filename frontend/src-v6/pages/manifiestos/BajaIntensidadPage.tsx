@@ -124,7 +124,7 @@ export default function BajaIntensidadPage() {
   return <div className="max-w-4xl mx-auto py-5 space-y-4 pb-24">
     <Link className="text-primary-700 underline text-sm" to={mp('/manifiestos')}>Manifiestos</Link>
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-xl font-bold text-neutral-900">Baja intensidad</h1>
+      <h1 className="text-xl font-bold text-neutral-900">Manifiestos eventuales</h1>
       {!id && !tracking && currentUser?.rol === 'OPERADOR' && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : 'Registrar operación'}</Button>}
       {id && <Button variant="outline" onClick={() => setParams({})}>Ver registros</Button>}
     </div>

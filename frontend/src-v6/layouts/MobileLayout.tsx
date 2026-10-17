@@ -323,6 +323,7 @@ export const MobileLayout: React.FC = () => {
     const path = location.pathname;
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
+    if (path.includes('/manifiestos/baja-intensidad')) return 'Eventuales';
     if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
     if (path.includes('/inspecciones')) return 'Inspecciones';
     if (path.includes('/transporte/perfil')) return 'Mis Viajes';
