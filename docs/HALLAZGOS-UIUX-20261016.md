@@ -227,6 +227,44 @@ Revisión de código sin ejecutar. **Verificados a mano** en el código: S1–S5
 | F14 | P3 | `usePushNotifications.ts:44` | Pide permiso de push al cargar, sin gesto del usuario y sin opción para reactivarlo | Botón en Configuración |
 | F15 | P3 | `RegistroPage.tsx`, `EscanerQRPage.tsx:84`, interruptores de Configuración | Etiquetas sin vincular, sin `inputMode`/`tel`; QR pendiente que nadie lee; interruptores sin `role="switch"` | Accesibilidad básica |
 
+## Quinta tanda — P1 de frontend corregidos (17/10/2026)
+
+**Commits:** `ab5e474` S4, `f565d2d` S5, `6981704` F3, `8af96e2` F5, `f9aecd1` F6, `2055c93` F4. Sin cambios de backend, permisos ni contratos.
+
+- **S4:** el menú de cuenta sólo muestra el selector de usuarios cuando existen cuentas demo. Si no, muestra «Usuario actual» y un enlace a «Mi perfil».
+- **S5:** WhatsApp y Telegram ya no se ofrecen. Quien los tenía activados ve un aviso de que todavía no envían y un botón «Desactivar», que usa la misma ruta de preferencias, accesible para todo usuario autenticado.
+- **F3:** carga masiva calcula el resultado con el contrato real (`total`, `exitosos`, `errores`):
+  - distingue completado, parcial y error;
+  - lista las filas con error;
+  - conserva el archivo si falla;
+  - explica una sesión vencida o la falta de conexión en lugar de culpar al formato.
+- **F5:** el cambio de contraseña:
+  - aplica la misma regla que el servidor (8 caracteres, una mayúscula y un número);
+  - muestra el motivo real;
+  - envía una sola vez;
+  - está dentro de un `<form>` con `autoComplete`.
+- **F6:** al editar vehículos:
+  - la capacidad se precarga desde el número original, no desde «1.500,5 kg»;
+  - año y capacidad vacíos no se envían, así que queda lo guardado;
+  - se rechazan año y capacidad imposibles;
+  - se acepta coma decimal.
+- **F4:** la solicitud de cambios muestra el motivo del servidor y conserva lo editado.
+
+**Pruebas:**
+- **Unitarias:** 13 casos nuevos. Cada uno falla sin su arreglo, salvo los de la función nueva de vehículos, que no tiene versión previa. Los 10 archivos afectados dan 83/83. Typecheck limpio y ESLint sin errores.
+- **Preview aislado** sobre `d0fb16b`:
+  - build web/app, base nueva e integraciones HTTP aprobados;
+  - **E2E 39/39** sin omitidas, flaky ni reintentos;
+  - pantallas **20/20**, más 1 omitida a propósito (el menú de cuenta no existe en `/app`). Ahora incluye configuración, seguridad, carga masiva, vehículos, solicitar cambios y el menú de cuenta.
+  - Capturas en [qa/uiux-20261016/formularios](qa/uiux-20261016/formularios/).
+- **Memoria:** el contenedor llegó al techo de 2 GiB por caché de archivos durante los builds (`memory.events max` acumulado 727; memoria anónima unos 243 MB al cierre), sin OOM. Las corridas siguen siendo de a una.
+
+**Observado en estas capturas, no corregido:**
+- **O2:** en Configuración, la barra superior dice «SITREP» en vez de «Configuración».
+- **O3:** la pestaña Seguridad muestra «Guardar cambios», que guarda el perfil. Para quien no es ADMIN termina en el 403 de F1.
+- **O4:** en carga masiva, «Descargar plantilla» todavía dice «Descarga disponible cuando el API este conectado».
+- **O5:** en Perfil se lee «JPG, PNG o GIF. Máximo 2MB» sin ningún control para subir.
+
 ## Comprobado y sin defecto
 
 `Modal` (bloqueo de scroll, trampa de foco, Escape, alto por viewport visible, pie fijo), `Select` (abre en una opción, no en la búsqueda: no abre el teclado), `Input`, `ButtonV2` (44 px en móvil), `Tabs`, `NativeSelect`, `MapLayerToggle`, badges pendiente≠sin leer, wizard público con reintento por documento y envío protegido contra doble toque, `SupportReportDialog` con borrador local.
