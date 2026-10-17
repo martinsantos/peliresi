@@ -64,3 +64,10 @@ it('names the exceptional circuit Eventuales only where it is enabled',()=>{
  finally{vi.unstubAllEnvs();}
  cleanup();render(<View/>);expect(screen.queryByRole('link',{name:'Eventuales'})).not.toBeInTheDocument();
 });
+it('clears every filter, including state, from the expanded panel',()=>{
+ render(<MemoryRouter initialEntries={['/manifiestos?estado=TRATADO']}><ManifiestosPage/></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Filtros, 1 activos'}));
+ fireEvent.click(screen.getByRole('button',{name:'Limpiar'}));
+ expect(mock.query).toHaveBeenLastCalledWith(expect.objectContaining({estado:undefined}));
+ expect(screen.getByRole('button',{name:'Filtros'})).toBeInTheDocument();
+});

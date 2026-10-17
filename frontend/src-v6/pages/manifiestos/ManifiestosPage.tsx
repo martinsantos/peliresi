@@ -409,8 +409,8 @@ const ManifiestosPage: React.FC = () => {
                   <input id="manifest-date-to" type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} className="min-h-11 min-w-0 w-full text-sm border border-neutral-400 rounded-lg px-2 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" />
                 </div>
               </div>
-              {(fechaDesde || fechaHasta || generadorFilter || operadorFilter) && (
-                <button onClick={() => { setFechaDesde(''); setFechaHasta(''); setGeneradorFilter(''); setOperadorFilter(''); }} className="flex items-center gap-1 text-xs text-neutral-500 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
+              {filterCount > 0 && (
+                <button type="button" onClick={() => { setEstadoFilter(''); setFechaDesde(''); setFechaHasta(''); setGeneradorFilter(''); setOperadorFilter(''); }} className="flex min-h-11 items-center gap-1 text-sm text-neutral-600 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
               )}
             </div>
           )}
