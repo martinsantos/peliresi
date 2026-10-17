@@ -1,0 +1,1377 @@
+{
+  "config": {
+    "configFile": "/work/sitrep/frontend/cloud-qa/uiux.playwright.config.ts",
+    "rootDir": "/work/sitrep/frontend/cloud-qa/e2e",
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/work/sitrep/.qa-uiux-0cf57d2/uiux",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "web-desktop",
+        "name": "web-desktop",
+        "testDir": "/work/sitrep/frontend/cloud-qa/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "uiux-preview.spec.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/work/sitrep/.qa-uiux-0cf57d2/uiux",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "web-responsive",
+        "name": "web-responsive",
+        "testDir": "/work/sitrep/frontend/cloud-qa/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "uiux-preview.spec.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/work/sitrep/.qa-uiux-0cf57d2/uiux",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "app",
+        "name": "app",
+        "testDir": "/work/sitrep/frontend/cloud-qa/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "uiux-preview.spec.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "line",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/work/sitrep/.qa-uiux-0cf57d2/uiux.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "uiux-preview.spec.ts",
+      "file": "uiux-preview.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "public entry: account claim and app viewport",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3156,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:00:29.808Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "reclamar",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoicmVjbGFtYXIiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvcmVjbGFtYXIiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6NTI1LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOlsiRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IG5ldDo6RVJSX05BTUVfTk9UX1JFU09MVkVEIiwiRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IG5ldDo6RVJSX05BTUVfTk9UX1JFU09MVkVEIl19"
+                    },
+                    {
+                      "name": "login",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoibG9naW4iLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvbG9naW4iLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6NTQ3LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOlsiRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IG5ldDo6RVJSX05BTUVfTk9UX1JFU09MVkVEIiwiRmFpbGVkIHRvIGxvYWQgcmVzb3VyY2U6IG5ldDo6RVJSX05BTUVfTk9UX1JFU09MVkVEIl19"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-5bb1a8e8d35fe59aa431",
+          "file": "uiux-preview.spec.ts",
+          "line": 68,
+          "column": 1
+        },
+        {
+          "title": "role admin main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15835,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:00:33.144Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "admin-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tZGFzaGJvYXJkIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2Rhc2hib2FyZCIsInRpdGxlIjoiU0lUUkVQIC0gUmVzaWR1b3MgUGVsaWdyb3NvcyIsInZpZXdwb3J0Ijp7IndpZHRoIjoxNDQwLCJoZWlnaHQiOjkwMH0sInJvb3RUZXh0Ijo5OTAsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "admin-admin-solicitudes",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tc29saWNpdHVkZXMiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYWRtaW4vc29saWNpdHVkZXMiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6NzAzLCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "admin-admin-actores-generadores-nuevo",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tYWN0b3Jlcy1nZW5lcmFkb3Jlcy1udWV2byIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9hZG1pbi9hY3RvcmVzL2dlbmVyYWRvcmVzL251ZXZvIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjE0NDAsImhlaWdodCI6OTAwfSwicm9vdFRleHQiOjkzMiwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "admin-centro-control",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tY2VudHJvLWNvbnRyb2wiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvY2VudHJvLWNvbnRyb2wiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6OTY5LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-e91a1eecd9f598ec5475",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role generador main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10270,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:00:49.004Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "generador-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLWRhc2hib2FyZCIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9kYXNoYm9hcmQiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6NTY4LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "generador-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L21hbmlmaWVzdG9zIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjE0NDAsImhlaWdodCI6OTAwfSwicm9vdFRleHQiOjg1Miwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "generador-manifiestos-nuevo",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zLW51ZXZvIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L21hbmlmaWVzdG9zL251ZXZvIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjE0NDAsImhlaWdodCI6OTAwfSwicm9vdFRleHQiOjQ1Miwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-589e977f93ecf863c81b",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role transportista main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8561,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:00:59.336Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "transportista-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1kYXNoYm9hcmQiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvZGFzaGJvYXJkIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjE0NDAsImhlaWdodCI6OTAwfSwicm9vdFRleHQiOjUyOCwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "transportista-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1tYW5pZmllc3RvcyIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9tYW5pZmllc3RvcyIsInRpdGxlIjoiU0lUUkVQIC0gUmVzaWR1b3MgUGVsaWdyb3NvcyIsInZpZXdwb3J0Ijp7IndpZHRoIjoxNDQwLCJoZWlnaHQiOjkwMH0sInJvb3RUZXh0Ijo5MjgsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-3851bd5775b949426ffd",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role operador main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7879,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:01:07.947Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "operador-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItZGFzaGJvYXJkIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2Rhc2hib2FyZCIsInRpdGxlIjoiU0lUUkVQIC0gUmVzaWR1b3MgUGVsaWdyb3NvcyIsInZpZXdwb3J0Ijp7IndpZHRoIjoxNDQwLCJoZWlnaHQiOjkwMH0sInJvb3RUZXh0Ijo1NzYsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "operador-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItbWFuaWZpZXN0b3MiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvbWFuaWZpZXN0b3MiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6ODQ1LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-251b8d88c760aaf9c284",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role inspector main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-desktop",
+              "projectName": "web-desktop",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7825,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:01:15.842Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "inspector-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWRhc2hib2FyZCIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9kYXNoYm9hcmQiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6NTQ5LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "inspector-inspecciones",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWluc3BlY2Npb25lcyIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9pbnNwZWNjaW9uZXMiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MTQ0MCwiaGVpZ2h0Ijo5MDB9LCJyb290VGV4dCI6OTI0LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-7c423285740825278d24",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "public entry: account claim and app viewport",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3901,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:01:25.456Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "reclamar",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoicmVjbGFtYXIiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvcmVjbGFtYXIiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0IjozNDIsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6WyJGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogbmV0OjpFUlJfTkFNRV9OT1RfUkVTT0xWRUQiLCJGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogbmV0OjpFUlJfTkFNRV9OT1RfUkVTT0xWRUQiXX0="
+                    },
+                    {
+                      "name": "reclamar-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoicmVjbGFtYXItZmluIiwiY29udGVudEJvdHRvbSI6NjgwLCJoZWxwVG9wIjpudWxsfQ=="
+                    },
+                    {
+                      "name": "login",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoibG9naW4iLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvbG9naW4iLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0IjozNjQsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6WyJGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogbmV0OjpFUlJfTkFNRV9OT1RfUkVTT0xWRUQiLCJGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogbmV0OjpFUlJfTkFNRV9OT1RfUkVTT0xWRUQiXX0="
+                    },
+                    {
+                      "name": "login-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoibG9naW4tZmluIiwiY29udGVudEJvdHRvbSI6NzQ0LjUsImhlbHBUb3AiOm51bGx9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-f39171d55da4b2cbea25",
+          "file": "uiux-preview.spec.ts",
+          "line": 68,
+          "column": 1
+        },
+        {
+          "title": "role admin main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 15239,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:01:29.635Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "admin-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tZGFzaGJvYXJkIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2Rhc2hib2FyZCIsInRpdGxlIjoiU0lUUkVQIC0gUmVzaWR1b3MgUGVsaWdyb3NvcyIsInZpZXdwb3J0Ijp7IndpZHRoIjozNjAsImhlaWdodCI6ODAwfSwicm9vdFRleHQiOjk2NSwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "admin-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tZGFzaGJvYXJkLWZpbiIsImNvbnRlbnRCb3R0b20iOjY3MC4wNDY4NzUsImhlbHBUb3AiOjcyOH0="
+                    },
+                    {
+                      "name": "admin-admin-solicitudes",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tc29saWNpdHVkZXMiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYWRtaW4vc29saWNpdHVkZXMiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0Ijo2NTIsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "admin-admin-solicitudes-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tc29saWNpdHVkZXMtZmluIiwiY29udGVudEJvdHRvbSI6NjM3Ljc4MTI1LCJoZWxwVG9wIjo3Mjh9"
+                    },
+                    {
+                      "name": "admin-admin-actores-generadores-nuevo",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tYWN0b3Jlcy1nZW5lcmFkb3Jlcy1udWV2byIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9hZG1pbi9hY3RvcmVzL2dlbmVyYWRvcmVzL251ZXZvIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjM2MCwiaGVpZ2h0Ijo4MDB9LCJyb290VGV4dCI6ODgzLCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "admin-admin-actores-generadores-nuevo-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tYWN0b3Jlcy1nZW5lcmFkb3Jlcy1udWV2by1maW4iLCJjb250ZW50Qm90dG9tIjo2NjMsImhlbHBUb3AiOjcyOH0="
+                    },
+                    {
+                      "name": "admin-centro-control",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tY2VudHJvLWNvbnRyb2wiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvY2VudHJvLWNvbnRyb2wiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0Ijo5MjIsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "admin-centro-control-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tY2VudHJvLWNvbnRyb2wtZmluIiwiY29udGVudEJvdHRvbSI6NzA1LjY4NzUsImhlbHBUb3AiOjcyOH0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-66bbd24cd270a7064055",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role generador main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 10351,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:01:44.890Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "generador-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLWRhc2hib2FyZCIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9kYXNoYm9hcmQiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0Ijo1MTMsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "generador-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLWRhc2hib2FyZC1maW4iLCJjb250ZW50Qm90dG9tIjo2NjkuOTUzMTI1LCJoZWxwVG9wIjo3Mjh9"
+                    },
+                    {
+                      "name": "generador-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L21hbmlmaWVzdG9zIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjM2MCwiaGVpZ2h0Ijo4MDB9LCJyb290VGV4dCI6NjQ4LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "generador-manifiestos-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zLWZpbiIsImNvbnRlbnRCb3R0b20iOjcwMC41OTM3NSwiaGVscFRvcCI6NzI4fQ=="
+                    },
+                    {
+                      "name": "generador-manifiestos-nuevo",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zLW51ZXZvIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L21hbmlmaWVzdG9zL251ZXZvIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjM2MCwiaGVpZ2h0Ijo4MDB9LCJyb290VGV4dCI6NDAzLCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "generador-manifiestos-nuevo-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zLW51ZXZvLWZpbiIsImNvbnRlbnRCb3R0b20iOjQ2MC42MjUsImhlbHBUb3AiOm51bGx9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-64a34538f749b3d1d8bd",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role transportista main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 8478,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:01:55.255Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "transportista-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1kYXNoYm9hcmQiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvZGFzaGJvYXJkIiwidGl0bGUiOiJTSVRSRVAgLSBSZXNpZHVvcyBQZWxpZ3Jvc29zIiwidmlld3BvcnQiOnsid2lkdGgiOjM2MCwiaGVpZ2h0Ijo4MDB9LCJyb290VGV4dCI6NDYxLCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "transportista-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1kYXNoYm9hcmQtZmluIiwiY29udGVudEJvdHRvbSI6Njg1Ljk4NDM3NSwiaGVscFRvcCI6NzI4fQ=="
+                    },
+                    {
+                      "name": "transportista-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1tYW5pZmllc3RvcyIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9tYW5pZmllc3RvcyIsInRpdGxlIjoiU0lUUkVQIC0gUmVzaWR1b3MgUGVsaWdyb3NvcyIsInZpZXdwb3J0Ijp7IndpZHRoIjozNjAsImhlaWdodCI6ODAwfSwicm9vdFRleHQiOjcxMiwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "transportista-manifiestos-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1tYW5pZmllc3Rvcy1maW4iLCJjb250ZW50Qm90dG9tIjo3MDAuNTkzNzUsImhlbHBUb3AiOjcyOH0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-8896112d397f21db27f0",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role operador main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7876,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:02:03.747Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "operador-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItZGFzaGJvYXJkIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2Rhc2hib2FyZCIsInRpdGxlIjoiU0lUUkVQIC0gUmVzaWR1b3MgUGVsaWdyb3NvcyIsInZpZXdwb3J0Ijp7IndpZHRoIjozNjAsImhlaWdodCI6ODAwfSwicm9vdFRleHQiOjUyNCwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "operador-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItZGFzaGJvYXJkLWZpbiIsImNvbnRlbnRCb3R0b20iOjY3MC4zNDM3NSwiaGVscFRvcCI6NzI4fQ=="
+                    },
+                    {
+                      "name": "operador-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItbWFuaWZpZXN0b3MiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvbWFuaWZpZXN0b3MiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0Ijo2NDQsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "operador-manifiestos-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItbWFuaWZpZXN0b3MtZmluIiwiY29udGVudEJvdHRvbSI6NzAwLjU5Mzc1LCJoZWxwVG9wIjo3Mjh9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-779f912098def7b74577",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role inspector main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "web-responsive",
+              "projectName": "web-responsive",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7291,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:02:11.645Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "inspector-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWRhc2hib2FyZCIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9kYXNoYm9hcmQiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0Ijo1MDQsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "inspector-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWRhc2hib2FyZC1maW4iLCJjb250ZW50Qm90dG9tIjo2NjkuNTYyNSwiaGVscFRvcCI6NzI4fQ=="
+                    },
+                    {
+                      "name": "inspector-inspecciones",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWluc3BlY2Npb25lcyIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9pbnNwZWNjaW9uZXMiLCJ0aXRsZSI6IlNJVFJFUCAtIFJlc2lkdW9zIFBlbGlncm9zb3MiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzYwLCJoZWlnaHQiOjgwMH0sInJvb3RUZXh0Ijo3ODEsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "inspector-inspecciones-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWluc3BlY2Npb25lcy1maW4iLCJjb250ZW50Qm90dG9tIjo2ODEuNSwiaGVscFRvcCI6NzI4fQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-fa58e7505ccd3476e838",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "public entry: account claim and app viewport",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2694,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:02:20.674Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "reclamar",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoicmVjbGFtYXIiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYXBwL3JlY2xhbWFyIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0IjozNDIsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6WyJGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogbmV0OjpFUlJfTkFNRV9OT1RfUkVTT0xWRUQiXX0="
+                    },
+                    {
+                      "name": "login",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoibG9naW4iLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYXBwL2xvZ2luIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0IjozNjQsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6WyJGYWlsZWQgdG8gbG9hZCByZXNvdXJjZTogbmV0OjpFUlJfTkFNRV9OT1RfUkVTT0xWRUQiXX0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-74c675fd312a09a13c5b",
+          "file": "uiux-preview.spec.ts",
+          "line": 68,
+          "column": 1
+        },
+        {
+          "title": "role admin main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 13270,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:02:23.559Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "admin-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tZGFzaGJvYXJkIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2FwcC9kYXNoYm9hcmQiLCJ0aXRsZSI6IlNJVFJFUCAtIEFwcCIsInZpZXdwb3J0Ijp7IndpZHRoIjozOTAsImhlaWdodCI6ODQ0fSwicm9vdFRleHQiOjM2NSwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "admin-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tZGFzaGJvYXJkLWZpbiIsImNvbnRlbnRCb3R0b20iOjY5MSwiaGVscFRvcCI6NzA4fQ=="
+                    },
+                    {
+                      "name": "admin-admin-solicitudes",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tc29saWNpdHVkZXMiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYXBwL2FkbWluL3NvbGljaXR1ZGVzIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0IjoyNDYsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "admin-admin-solicitudes-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tc29saWNpdHVkZXMtZmluIiwiY29udGVudEJvdHRvbSI6NjIyLjc4MTI1LCJoZWxwVG9wIjo3MDh9"
+                    },
+                    {
+                      "name": "admin-admin-actores-generadores-nuevo",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tYWN0b3Jlcy1nZW5lcmFkb3Jlcy1udWV2byIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9hcHAvYWRtaW4vYWN0b3Jlcy9nZW5lcmFkb3Jlcy9udWV2byIsInRpdGxlIjoiU0lUUkVQIC0gQXBwIiwidmlld3BvcnQiOnsid2lkdGgiOjM5MCwiaGVpZ2h0Ijo4NDR9LCJyb290VGV4dCI6NDc2LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "admin-admin-actores-generadores-nuevo-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tYWRtaW4tYWN0b3Jlcy1nZW5lcmFkb3Jlcy1udWV2by1maW4iLCJjb250ZW50Qm90dG9tIjo2NDgsImhlbHBUb3AiOjcwOH0="
+                    },
+                    {
+                      "name": "admin-centro-control",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tY2VudHJvLWNvbnRyb2wiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYXBwL2NlbnRyby1jb250cm9sIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0Ijo1MTEsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "admin-centro-control-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiYWRtaW4tY2VudHJvLWNvbnRyb2wtZmluIiwiY29udGVudEJvdHRvbSI6NjkwLjY4NzUsImhlbHBUb3AiOjcwOH0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-6f6b15174e7815ee03dc",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role generador main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9299,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:02:36.853Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "generador-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLWRhc2hib2FyZCIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9hcHAvZGFzaGJvYXJkIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0IjozNTMsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "generador-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLWRhc2hib2FyZC1maW4iLCJjb250ZW50Qm90dG9tIjo2OTEsImhlbHBUb3AiOjcwOH0="
+                    },
+                    {
+                      "name": "generador-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2FwcC9tYW5pZmllc3RvcyIsInRpdGxlIjoiU0lUUkVQIC0gQXBwIiwidmlld3BvcnQiOnsid2lkdGgiOjM5MCwiaGVpZ2h0Ijo4NDR9LCJyb290VGV4dCI6NDU5LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "generador-manifiestos-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zLWZpbiIsImNvbnRlbnRCb3R0b20iOjYwOS41OTM3NSwiaGVscFRvcCI6NjMyfQ=="
+                    },
+                    {
+                      "name": "generador-manifiestos-nuevo",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zLW51ZXZvIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2FwcC9tYW5pZmllc3Rvcy9udWV2byIsInRpdGxlIjoiU0lUUkVQIC0gQXBwIiwidmlld3BvcnQiOnsid2lkdGgiOjM5MCwiaGVpZ2h0Ijo4NDR9LCJyb290VGV4dCI6MjE5LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "generador-manifiestos-nuevo-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiZ2VuZXJhZG9yLW1hbmlmaWVzdG9zLW51ZXZvLWZpbiIsImNvbnRlbnRCb3R0b20iOjQ3Ni42MjUsImhlbHBUb3AiOm51bGx9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-facf4adbd3e3eb0212d5",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role transportista main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7275,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:02:46.165Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "transportista-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1kYXNoYm9hcmQiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYXBwL2Rhc2hib2FyZCIsInRpdGxlIjoiU0lUUkVQIC0gQXBwIiwidmlld3BvcnQiOnsid2lkdGgiOjM5MCwiaGVpZ2h0Ijo4NDR9LCJyb290VGV4dCI6NDE2LCJvdmVybGF5IjowLCJvdmVyZmxvd1giOjAsImVycm9ycyI6W10sImNvbnNvbGUiOltdfQ=="
+                    },
+                    {
+                      "name": "transportista-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1kYXNoYm9hcmQtZmluIiwiY29udGVudEJvdHRvbSI6NjkxLCJoZWxwVG9wIjo3MDh9"
+                    },
+                    {
+                      "name": "transportista-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1tYW5pZmllc3RvcyIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9hcHAvbWFuaWZpZXN0b3MiLCJ0aXRsZSI6IlNJVFJFUCAtIEFwcCIsInZpZXdwb3J0Ijp7IndpZHRoIjozOTAsImhlaWdodCI6ODQ0fSwicm9vdFRleHQiOjQ1Niwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "transportista-manifiestos-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoidHJhbnNwb3J0aXN0YS1tYW5pZmllc3Rvcy1maW4iLCJjb250ZW50Qm90dG9tIjo2ODUuNTkzNzUsImhlbHBUb3AiOjcwOH0="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-4b211745aeb20eed780b",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role operador main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6920,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:02:53.451Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "operador-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItZGFzaGJvYXJkIiwidXJsIjoiaHR0cDovLzEyNy4wLjAuMTo0MTc3L2FwcC9kYXNoYm9hcmQiLCJ0aXRsZSI6IlNJVFJFUCAtIEFwcCIsInZpZXdwb3J0Ijp7IndpZHRoIjozOTAsImhlaWdodCI6ODQ0fSwicm9vdFRleHQiOjQzNCwib3ZlcmxheSI6MCwib3ZlcmZsb3dYIjowLCJlcnJvcnMiOltdLCJjb25zb2xlIjpbXX0="
+                    },
+                    {
+                      "name": "operador-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItZGFzaGJvYXJkLWZpbiIsImNvbnRlbnRCb3R0b20iOjY5MSwiaGVscFRvcCI6NzA4fQ=="
+                    },
+                    {
+                      "name": "operador-manifiestos",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItbWFuaWZpZXN0b3MiLCJ1cmwiOiJodHRwOi8vMTI3LjAuMC4xOjQxNzcvYXBwL21hbmlmaWVzdG9zIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0Ijo0NTgsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "operador-manifiestos-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoib3BlcmFkb3ItbWFuaWZpZXN0b3MtZmluIiwiY29udGVudEJvdHRvbSI6Njg1LjU5Mzc1LCJoZWxwVG9wIjo3MDh9"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-d55e16a8e8a61582ffd0",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        },
+        {
+          "title": "role inspector main screens",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [
+                {
+                  "type": "provider-cache",
+                  "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                },
+                {
+                  "type": "provider-fixture",
+                  "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "app",
+              "projectName": "app",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 7529,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-17T01:03:00.382Z",
+                  "annotations": [
+                    {
+                      "type": "provider-cache",
+                      "description": "Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography."
+                    },
+                    {
+                      "type": "provider-fixture",
+                      "description": "OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified."
+                    }
+                  ],
+                  "attachments": [
+                    {
+                      "name": "inspector-dashboard",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWRhc2hib2FyZCIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9hcHAvZGFzaGJvYXJkIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0IjozNjksIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "inspector-dashboard-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWRhc2hib2FyZC1maW4iLCJjb250ZW50Qm90dG9tIjo2OTEsImhlbHBUb3AiOjcwOH0="
+                    },
+                    {
+                      "name": "inspector-inspecciones",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWluc3BlY2Npb25lcyIsInVybCI6Imh0dHA6Ly8xMjcuMC4wLjE6NDE3Ny9hcHAvaW5zcGVjY2lvbmVzIiwidGl0bGUiOiJTSVRSRVAgLSBBcHAiLCJ2aWV3cG9ydCI6eyJ3aWR0aCI6MzkwLCJoZWlnaHQiOjg0NH0sInJvb3RUZXh0Ijo1ODYsIm92ZXJsYXkiOjAsIm92ZXJmbG93WCI6MCwiZXJyb3JzIjpbXSwiY29uc29sZSI6W119"
+                    },
+                    {
+                      "name": "inspector-inspecciones-fin",
+                      "contentType": "application/json",
+                      "body": "eyJuYW1lIjoiaW5zcGVjdG9yLWluc3BlY2Npb25lcy1maW4iLCJjb250ZW50Qm90dG9tIjo2NjYuNSwiaGVscFRvcCI6NzA4fQ=="
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "95a6d90670a5cff057aa-f1a64877ddaaae0ad1bc",
+          "file": "uiux-preview.spec.ts",
+          "line": 82,
+          "column": 3
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-17T01:00:27.966Z",
+    "duration": 160214.665,
+    "expected": 18,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

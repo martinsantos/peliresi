@@ -57,7 +57,7 @@ Tipo: **F** bug funcional, **V** visual, **U** mejora de uso, **D** decisión de
 | H24 | P3 | U | `components/ui/SearchInput.tsx` (7 llamadas) | ADMIN | Foco sólo por color, botón limpiar sin etiqueta, 36 px | Accesibilidad | Anillo de foco, `aria-label`, 44 px | registrado |
 | H25 | P1 | F | `InspeccionExpedientePage.tsx:507-510` | Inspector sin señal | Evidencia en cola anunciada con toast de éxito de 5 s que otro éxito reemplaza | Se cree sincronizado lo que sólo está en el dispositivo | Aviso informativo, igual que el borrador local | corregido |
 | H26 | P3 | U | `NotificationBell.tsx:236-278` | Todos | Enlace dentro de botón; punto sin texto | Accesibilidad | Acciones hermanas, texto «sin leer» | registrado |
-| H27 | P2 | V | `MobileLayout.tsx:427,448,377` | Transportista | Banner de viaje en `bottom-[76px]` sin safe-area; reintentar 36 px | Tapa navegación o el final de la lista | Variable común para la pila inferior | registrado |
+| H27 | P2 | V | `MobileLayout.tsx`, `MainLayout.tsx`, `SupportBubble.tsx` | Todos en `/app` y web móvil | El contenido de `/app` termina con `pb-28` (112 px), pero la burbuja de ayuda llega a 136 px (212 px con banner de viaje o botón «+»). En web móvil, la píldora «Ayuda» con texto queda sobre el pie | El final de listas y paneles queda siempre debajo del botón | Al terminar el scroll, el último contenido queda sobre el botón | corregido en `56d839f`: el espacio reservado sale de la misma medida que posiciona la burbuja y en teléfono se muestra sólo el ícono. Verificado en el preview (ver abajo). Sin cambios: la posición del banner de viaje y el «reintentar» de 36 px |
 | H28 | P3 | U | `components/SupportBubble.tsx:57` | Todos | «Reporte enviado» queda fijo en pantalla | Tarjeta flotante permanente sobre el contenido | Se oculta sola | corregido |
 | H29 | P3 | U | `InspectionEvidenceImage.tsx:44-74` | Inspector | Visor sin trampa de foco, 100vh | Accesibilidad, pie fuera de vista | Usar `Modal` | registrado |
 | H30 | P3 | U | `centro-control/.../ViajesPanel.tsx:74,192-224` | DGFA | Filas de «Realizados» sin teclado, botón 28 px, 100vh | Accesibilidad | Botones como en «Activos» | registrado |
@@ -120,14 +120,30 @@ Fuente `04e45dd`: los arreglos de esta rama más H10, aplicados sobre una copia 
   - En `app--transportista-dashboard`, la flecha del primer ítem de «Actividad reciente».
   - En `web-responsive--generador-manifiestos`, las tarjetas y el pie institucional.
 - **Nuevo, O1 (P2):** en `web-responsive--generador-manifiestos` el generador ve la papelera en manifiestos `TRATADO`.
-  - Falta comprobar si el servidor lo rechaza.
-  - Aceptación: no ofrecer acciones que el rol o el estado no permiten.
+  - El servidor la rechaza siempre: `DELETE /manifiestos/:id` exige `GENERADOR` o `ADMIN` y estado `BORRADOR` o `CANCELADO`.
+  - **Corregido en `a02a629`.** `canOfferManifestDelete` replica esa regla sin cambiar el backend.
+  - En el navegador se verificó sólo el caso negativo (`TRATADO` sin papelera). El caso positivo (`BORRADOR`) está cubierto por unitarias.
+- **Pendiente relacionado:** el botón «Editar» de la tabla de escritorio también aparece en todos los estados.
 
 **No cubierto por esta corrida:**
 - Interacciones de los arreglos: cerrar los modales DGFA, chat, TEF entre pasos, evidencia offline y edición in situ. Sólo están cubiertos por unitarias.
 - Teclado abierto.
 - Zoom real en Android.
 - APK.
+
+## Preview sintético — segunda corrida: H27 y O1 (17/10/2026 00:35–01:03 UTC)
+
+Se usó el mismo contenedor aislado, con base nueva en cada corrida. El spec agrega una verificación en web móvil y `/app`: después de bajar hasta el final, la última hoja visible tiene que quedar por encima del botón de ayuda.
+
+| Corrida | Fuente del producto | Resultado |
+| --- | --- | --- |
+| Antes | Compilación `04e45dd` (sin los arreglos) | 9 de 18 fallan; 4 en web móvil y 5 en `/app`. Ejemplos: `/app` manifiestos, contenido hasta 726 px con la ayuda en 632; web móvil manifiestos, 733 contra 728 |
+| Intermedia | `73a1942`, compilada en el contenedor (build web y app aprobados, pico 1,49 GiB, sin OOM) | 13/18. Web móvil, todo bien. En `/app` falla el inicio de los 5 roles por un **falso positivo del spec**: el texto oculto de un `<details>` cerrado («Conexión y dispositivo») reporta posición. La captura muestra la tarjeta visible terminando antes de la ayuda |
+| Final | Misma compilación; sólo se corrigió el spec en `0cf57d2` para ignorar contenido no visible | **18/18**, 2,7 min. Inicio de `/app` 691 contra 708. Sin `pageerror` ni scroll horizontal. Cierre sin forzar, `OOMKilled=false`, contenedor detenido |
+
+Capturas «después», incluidas las `-fin` al final del scroll: [qa/uiux-20261016/despues](qa/uiux-20261016/despues/).
+
+**Límite de la línea base:** la corrida «antes» usó el spec previo a ese ajuste, así que sus fallas del inicio de `/app` mezclan el falso positivo con la superposición real. Las de manifiestos y centro de control sí son superposiciones reales.
 
 ## Comprobado y sin defecto
 
