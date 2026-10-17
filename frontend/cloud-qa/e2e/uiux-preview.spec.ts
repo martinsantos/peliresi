@@ -42,8 +42,15 @@ async function endOfContent(page: Page, info: TestInfo, name: string) {
   const help = page.getByRole('button', { name: 'Ayuda y soporte técnico' });
   const main = page.locator('main').first();
   if (!await main.count()) return;
-  await main.evaluate(element => { element.scrollTop = element.scrollHeight; });
-  await page.waitForTimeout(150);
+  // Infinite lists load more pages at the bottom: scroll until the height stops growing.
+  let height = -1;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const current = await main.evaluate(element => { element.scrollTop = element.scrollHeight; return element.scrollHeight; });
+    if (current === height) break;
+    height = current;
+    await page.waitForLoadState('networkidle').catch(() => undefined);
+    await page.waitForTimeout(300);
+  }
   const fixed = await help.count() && await help.isVisible() && await help.evaluate(button => getComputedStyle(button.closest('[data-support-ui]')!).position === 'fixed');
   const geometry = await main.evaluate(element => {
     const view = element.getBoundingClientRect();
