@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -185,6 +186,14 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                 </div>
               </div>
 
+              {/* Outside demo mode there are no switchable accounts: offer the profile, not an empty switcher. */}
+              {users.length === 0 ? (
+                <div className="p-3">
+                  <Link to="/mi-perfil" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                    Mi perfil
+                  </Link>
+                </div>
+              ) : <>
               {/* Filtros por rol */}
               <div className="p-3 border-b border-neutral-100">
                 <p className="text-xs font-semibold text-neutral-500 uppercase mb-2">
@@ -281,6 +290,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                   {filteredUsers.length} usuarios disponibles
                 </p>
               </div>
+              </>}
             </div>
           </>
         )}
