@@ -109,10 +109,7 @@ const AdminTratamientosPage: React.FC = () => {
           <BarChart3 className="text-primary-600" size={22} />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Tratamientos</h2>
-          <p className="text-neutral-500 text-sm mt-0.5">
-            Catálogo de referencia y autorizaciones por operador
-          </p>
+          <h2 className="sr-only">Tratamientos</h2>
         </div>
       </div>
 

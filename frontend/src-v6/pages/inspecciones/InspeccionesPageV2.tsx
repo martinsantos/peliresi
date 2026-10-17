@@ -124,7 +124,7 @@ const InspeccionesPageV2: React.FC = () => {
 
   return <div className="space-y-4">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="text-xl font-bold text-neutral-900">Inspecciones</h2>
+      <h2 className="sr-only">Inspecciones</h2>
       <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setFindingRequest((value) => value + 1)}>Denuncia / hallazgo</Button><Button size="sm" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => setShowCreate(true)}>Nueva inspección</Button></div>
     </header>
 

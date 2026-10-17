@@ -583,10 +583,7 @@ export const AdminVehiculosPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Vehículos</h2>
-          <p className="text-neutral-600 mt-1">
-            Gestión de flota de transporte
-          </p>
+          <h2 className="sr-only">Vehículos</h2>
         </div>
         <div className="flex gap-2">
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>

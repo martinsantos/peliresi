@@ -88,10 +88,7 @@ const PerfilPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-neutral-900">Mi Perfil</h2>
-        <p className="text-neutral-600 mt-1">Gestiona tu información personal</p>
-      </div>
+      <h2 className="sr-only">Mi Perfil</h2>
 
       <ActorActivities />
       {import.meta.env.VITE_ENTERPRISE_ENABLED==='true'&&<Button variant="outline" onClick={()=>navigate(location.pathname.startsWith('/mobile/')?'/mobile/empresas':'/empresas')}>Empresas y establecimientos</Button>}

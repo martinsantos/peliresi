@@ -79,7 +79,7 @@ const NotificacionesPage: React.FC = () => {
             className={'flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 hover:bg-neutral-100 md:hidden ' + focus}>
             <ArrowLeft size={20} aria-hidden="true" />
           </button>
-          <h2 className="text-2xl font-bold text-neutral-900">Notificaciones</h2>
+          <h2 className="sr-only">Notificaciones</h2>
         </div>
         {data && data.noLeidas > 0 && (
           <Button variant="outline" leftIcon={<CheckCheck size={18} />} isLoading={markAll.isPending}

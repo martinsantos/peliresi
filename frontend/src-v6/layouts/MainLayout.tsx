@@ -65,6 +65,14 @@ import { useAttentionCounts } from '../hooks/useAttentionCounts';
 // ========================================
 // COMPONENT
 // ========================================
+const UNLISTED_PAGE_TITLES: Record<string, string> = {
+  '/configuracion': 'Configuración',
+  '/mi-perfil': 'Mi Perfil',
+  '/notificaciones': 'Notificaciones',
+  '/estadisticas': 'Estadísticas',
+  '/ayuda': 'Ayuda',
+};
+
 export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -211,7 +219,10 @@ export const MainLayout: React.FC = () => {
 
   // One current section, including detail routes; hidden role items never compete.
   const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems, { path: '/soporte', icon: LifeBuoy, label: 'Soporte' }]);
-  const currentPage = isInspectionCase ? 'Inspección' : location.pathname.startsWith('/empresas')?'Empresas y sedes':currentItem?.label || 'SITREP';
+  // Pages outside the side menu still name themselves in the bar (their own heading is screen-reader only).
+  const sectionPath = location.pathname.replace(/^\/mobile(?=\/)/, '');
+  const unlistedPage = Object.entries(UNLISTED_PAGE_TITLES).find(([path]) => sectionPath === path || sectionPath.startsWith(path + '/'))?.[1];
+  const currentPage = isInspectionCase ? 'Inspección' : location.pathname.startsWith('/empresas')?'Empresas y sedes':currentItem?.label || unlistedPage || 'SITREP';
 
   return (
     <div data-app-shell className="h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden">

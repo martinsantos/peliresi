@@ -208,7 +208,7 @@ const AuditoriaPage: React.FC = () => {
             <Shield size={20} className="text-primary-600" />
           </div>
           <div>
-            <h2 className="text-lg sm:text-2xl font-bold text-neutral-900">Auditoría</h2>
+            <h2 className="sr-only">Auditoría</h2>
             <p className="text-sm text-neutral-600">
               {isLoading ? <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Cargando...</span>
                 : <>{stats.total.toLocaleString()} registros totales</>}

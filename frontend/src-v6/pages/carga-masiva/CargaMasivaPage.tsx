@@ -188,10 +188,7 @@ const CargaMasivaPage: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">Carga Masiva</h2>
-        <p className="text-neutral-600 mt-1">
-          Importa datos masivamente mediante archivos Excel o CSV
-        </p>
+        <h2 className="sr-only">Carga Masiva</h2>
       </div>
 
       {/* Plantillas */}

@@ -379,10 +379,7 @@ const ConfiguracionPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-bold text-neutral-900">Configuración</h2>
-        <p className="text-neutral-600 mt-1">Personaliza tu experiencia en el sistema</p>
-      </div>
+      <h2 className="sr-only">Configuración</h2>
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}

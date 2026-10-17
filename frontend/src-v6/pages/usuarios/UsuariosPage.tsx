@@ -457,7 +457,7 @@ const UsuariosPage: React.FC = () => {
       <div className="space-y-5 pt-4">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Usuarios</h2>
+            <h2 className="sr-only">Usuarios</h2>
             <p className="mt-1 text-sm text-neutral-600" aria-live="polite">
               {apiLoading ? 'Cargando usuarios…' : apiError ? 'No se pudo actualizar el listado.' : `${totalItems} ${totalItems === 1 ? 'perfil encontrado' : 'perfiles encontrados'}`}
             </p>

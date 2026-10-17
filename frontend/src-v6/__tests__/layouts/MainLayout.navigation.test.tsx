@@ -102,3 +102,10 @@ describe('Sidebar: one visible current destination',()=>{
     expect(help.parentElement).toHaveClass('shrink-0');
   });
 });
+describe('Header names pages that are not in the side menu',()=>{
+  beforeEach(()=>{authState.rol='GENERADOR';authState.esInspector=false;});
+  it.each([['/configuracion','Configuración'],['/mi-perfil/solicitar-cambios','Mi Perfil'],['/mobile/notificaciones','Notificaciones'],['/estadisticas','Estadísticas']])('%s is titled %s instead of SITREP',(path,title)=>{
+    show(path);
+    expect(within(screen.getByRole('banner')).getByRole('heading',{name:title,exact:true})).toBeVisible();
+  });
+});

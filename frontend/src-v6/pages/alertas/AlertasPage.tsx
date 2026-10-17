@@ -843,7 +843,7 @@ export const AlertasPage: React.FC = () => {
             )}
           </div>
           <div>
-            <h2 className="text-xl font-bold text-neutral-900">Alertas</h2>
+            <h2 className="sr-only">Alertas</h2>
             <p className="text-sm text-neutral-500">
               {isLoading ? (
                 <span className="flex items-center gap-1.5">
