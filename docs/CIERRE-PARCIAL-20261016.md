@@ -2,6 +2,60 @@
 
 16/10/2026. Es un punto de traspaso de desarrollo, **no una publicación ni un GO global**. No mezclar SITREP con Precrimen u otros proyectos.
 
+## Retomar la revisión UI/UX — estado al 17/10/2026 (leer primero)
+
+**Fuente:**
+- Rama `codex/sitrep-uiux-review-20261016` en origin, partiendo del tag `sitrep-uiux-baseline-20261016`.
+- Todo commit lleva `[skip ci]`. No se hizo merge a `main` ni deploy.
+- El detalle completo de hallazgos (H01–H31, O1), pruebas y capturas está en [HALLAZGOS-UIUX-20261016.md](HALLAZGOS-UIUX-20261016.md).
+
+**Hecho y validado en el preview aislado.** Última corrida sobre `16100dd`: build web/app, integraciones HTTP, **E2E completo 39/39** en 1440/360/app390 y 18/18 pantallas.
+- **Errores y datos:**
+  - errores de red en español (H01);
+  - coeficientes TEF (H06);
+  - textos DGFA que sobreviven al cierre (H07);
+  - chat sin duplicados (H08);
+  - botones que enviaban formularios (H11).
+- **Shell `/app`:** CUIT de `/reclamar` (H09 parcial), zoom (H20), ErrorBoundary (H21) y zonas seguras (H22).
+- **Avisos:** evidencia offline anunciada como local (H25) y aviso de soporte que se oculta (H28).
+- **Manifiestos:**
+  - edición in situ y fecha (H10);
+  - la ayuda ya no tapa contenido (H27);
+  - papelera sólo donde el servidor permite borrar (O1).
+- **Eventuales:** «Baja intensidad» se muestra como **Eventuales** (sólo textos; rutas, API y datos sin cambio).
+- **Listado de manifiestos compacto en teléfono:** una fila de acciones y una de búsqueda+filtros, con chips.
+
+**Pendiente:**
+- **Funcional:**
+  - pesaje vacío enviado como 0 (H13, con una decisión de negocio);
+  - sesión del alta administrativa (H04);
+  - avance del wizard sin servidor (H03);
+  - Enter en eventuales (H17);
+  - catálogos sin reintento (H19).
+- **Interfaz:**
+  - patrón compacto en otros listados;
+  - título repetido en Nuevo/Editar y en escritorio;
+  - «Editar» en manifiestos tratados.
+- **Decisiones del dueño:**
+  - confirmar pasos irreversibles (H15);
+  - persistencia de errores (H14);
+  - texto «Baja intensidad» en la validación del backend.
+- **Antes de producción, sin hacer:**
+  - versión del service worker;
+  - `VITE_API_URL` del dominio final;
+  - suites unitarias completas sobre el commit final;
+  - decidir qué flags se encienden (`ENTERPRISE_ENABLED`, `VITE_MANIFEST_EXCEPTIONAL_ENABLED`, multirol).
+
+**Preview vivo** (sintético, en `76.13.234.213`):
+- **Contenedor:** gemelo `sitrep-qa-live-20261017`.
+  - Imagen `sitrep-qa-enterprise-20261016:live-20261017` (2,2 GB), creada con commit del original.
+  - Mismos límites: 1 CPU, 2 GiB, swap 0, red interna sin gateway, sin puertos.
+  - Se apaga solo el 18/10 cerca de las 15:32 UTC.
+  - El original `sitrep-qa-enterprise-20261016` quedó detenido e intacto.
+- **Acceso:** sólo por túnel SSH con [live-bridge.py](../frontend/cloud-qa/live-bridge.py). El puente vive con la sesión SSH, no deja procesos ni archivos y no publica puertos.
+- **Limpieza pendiente:** cuando ya no se use, borrar el contenedor gemelo y la imagen.
+- **Memoria:** la validación completa llegó a 1,94 GiB de 2 GiB. Una corrida a la vez.
+
 ## Revisión UI/UX — primera tanda (rama `codex/sitrep-uiux-review-20261016`)
 
 **Qué es.** Una revisión estática de código; en esta tanda no se ejecutó la aplicación. El detalle está en [hallazgos, cobertura y pruebas](HALLAZGOS-UIUX-20261016.md).
