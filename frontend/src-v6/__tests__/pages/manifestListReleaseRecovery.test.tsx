@@ -1,4 +1,4 @@
-import { cleanup,fireEvent,render,screen } from '@testing-library/react';
+import { cleanup,fireEvent,render,screen,within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 import ManifiestosPage from '../../pages/manifiestos/ManifiestosPage';
@@ -42,4 +42,25 @@ it('offers delete only for states the server can delete',()=>{
  mock.query.mockReturnValue(query([draft,treated]));render(<View/>);
  expect(screen.getAllByRole('button',{name:'Eliminar manifiesto QA-DRAFT-001'}).length).toBeGreaterThan(0);
  expect(screen.queryAllByRole('button',{name:'Eliminar manifiesto QA-TREATED-001'})).toHaveLength(0);
+});
+it('keeps applied filters visible as removable chips and announces how many are active',()=>{
+ render(<MemoryRouter initialEntries={['/manifiestos?estado=TRATADO&fechaDesde=2026-10-01']}><ManifiestosPage/></MemoryRouter>);
+ expect(screen.getByRole('button',{name:'Filtros, 2 activos'})).toHaveAttribute('aria-expanded','false');
+ const chips=screen.getByRole('list',{name:'Filtros activos'});
+ expect(within(chips).getAllByRole('button').map(b=>b.getAttribute('aria-label'))).toEqual(['Quitar filtro Tratado','Quitar filtro Desde 01/10/2026']);
+ fireEvent.click(within(chips).getByRole('button',{name:'Quitar filtro Desde 01/10/2026'}));
+ expect(mock.query).toHaveBeenLastCalledWith(expect.objectContaining({estado:'TRATADO',fechaDesde:undefined}));
+ expect(screen.getByRole('button',{name:'Filtros, 1 activos'})).toBeInTheDocument();
+});
+it('keeps the accessible names of compact header actions',()=>{
+ render(<View/>);
+ expect(screen.getByRole('button',{name:'Actualizar listado'})).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Nuevo Manifiesto'})).toBeInTheDocument();
+ expect(screen.getByRole('heading',{name:'Manifiestos'})).toBeInTheDocument();
+});
+it('names the exceptional circuit Eventuales only where it is enabled',()=>{
+ vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED','true');
+ try{render(<View/>);expect(screen.getByRole('link',{name:'Eventuales'})).toHaveAttribute('href','/manifiestos/baja-intensidad');}
+ finally{vi.unstubAllEnvs();}
+ cleanup();render(<View/>);expect(screen.queryByRole('link',{name:'Eventuales'})).not.toBeInTheDocument();
 });

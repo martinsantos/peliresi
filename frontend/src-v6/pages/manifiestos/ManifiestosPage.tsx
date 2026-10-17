@@ -151,7 +151,7 @@ const ManifiestosPage: React.FC = () => {
   }, []);
   useEffect(() => {
     if (filterBarRef.current) setFilterBarH(filterBarRef.current.offsetHeight);
-  }, [showFilters]);
+  }, [showFilters, estadoFilter, generadorFilter, operadorFilter, fechaDesde, fechaHasta]);
 
   // Callback ref: measures thead height the instant it mounts in the DOM
   const theadRefCb = useCallback((node: HTMLTableSectionElement | null) => {
@@ -169,6 +169,8 @@ const ManifiestosPage: React.FC = () => {
   };
 
   const filterCount = [fechaDesde, fechaHasta, estadoFilter, generadorFilter, operadorFilter].filter(Boolean).length;
+  const estadoOptions = [{ value: '', label: 'Todos los estados' }, ...Object.values(EstadoManifiesto).map((e) => ({ value: e, label: ESTADO_LABELS[e] || e }))];
+  const showEventuales = import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true' && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '');
 
   // Reset accumulator when any filter/sort changes
   const filterKey = `${searchTerm}|${estadoFilter}|${generadorFilter}|${operadorFilter}|${fechaDesde}|${fechaHasta}|${sortBy}|${sortOrder}`;
@@ -194,6 +196,16 @@ const ManifiestosPage: React.FC = () => {
     sortBy,
     sortOrder,
   });
+
+  // Applied filters stay visible and removable while the panel is closed.
+  const dateLabel = (iso: string) => iso.split('-').reverse().join('/');
+  const activeFilters = [
+    estadoFilter && { key: 'estado', label: ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter, clear: () => setEstadoFilter('') },
+    generadorFilter && { key: 'generador', label: generadoresData?.items?.find((g: any) => g.id === generadorFilter)?.razonSocial || 'Generador', clear: () => setGeneradorFilter('') },
+    operadorFilter && { key: 'operador', label: operadoresData?.items?.find((o: any) => o.id === operadorFilter)?.razonSocial || 'Operador', clear: () => setOperadorFilter('') },
+    fechaDesde && { key: 'desde', label: `Desde ${dateLabel(fechaDesde)}`, clear: () => setFechaDesde('') },
+    fechaHasta && { key: 'hasta', label: `Hasta ${dateLabel(fechaHasta)}`, clear: () => setFechaHasta('') },
+  ].filter((filter): filter is { key: string; label: string; clear: () => void } => Boolean(filter));
 
   const totalPages = apiData?.totalPages || 1;
   const hasMore = page < totalPages;
@@ -276,11 +288,12 @@ const ManifiestosPage: React.FC = () => {
 
   return (
     <>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 xl:max-w-7xl xl:mx-auto">
-        <h2 className="text-xl font-bold text-neutral-900">Manifiestos</h2>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" variant="outline" disabled={isFetching} leftIcon={<RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}>Actualizar listado</Button>
+      {/* Header — on phones the shell bar already names the page: one compact row of actions. */}
+      <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-4 xl:max-w-7xl xl:mx-auto">
+        <h2 className="sr-only md:not-sr-only text-xl font-bold text-neutral-900">Manifiestos</h2>
+        {showEventuales && <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-semibold text-primary-800 md:order-last md:basis-full md:border-0 md:bg-transparent md:px-0 md:font-medium md:text-primary-700 md:underline" to={mp('/manifiestos/baja-intensidad')}>Eventuales</Link>}
+        <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="outline" aria-label="Actualizar listado" disabled={isFetching} leftIcon={<RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}><span className="sr-only sm:not-sr-only">Actualizar listado</span></Button>
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-neutral-600 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir">
             <Printer size={13} />
           </button>
@@ -298,34 +311,43 @@ const ManifiestosPage: React.FC = () => {
             }}
             className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
           ><FileDown size={13} /> PDF</button>
-          <Button size="sm" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo Manifiesto</Button>
+          <Button size="sm" aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>
         </div>
       </div>
 
-      {import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true' && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '') && <div className="py-3">
-        <Link className="inline-flex min-h-11 items-center text-primary-700 underline font-medium" to={mp('/manifiestos/baja-intensidad')}>Baja intensidad · revisión posterior</Link>
-      </div>}
-      {/* Filters — sticky */}
-      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-2 pb-2">
-        <Card padding="base">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1">
+      {/* Filters — sticky. Phones: search + Filtros in one row; state joins the other filters. */}
+      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-1 pb-2 md:pt-2">
+        <Card padding="sm" className="md:p-5">
+          <div className="flex gap-2 md:gap-3">
+            <div className="min-w-0 flex-1">
               <Input aria-label="Buscar manifiestos" placeholder="Buscar por número o generador..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} leftIcon={<Search size={18} />} />
             </div>
-            <div className="flex gap-2 items-center">
-              <div className="w-full md:w-48">
-                <Select value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={[{ value: '', label: 'Todos los estados' }, ...Object.values(EstadoManifiesto).map((e) => ({ value: e, label: ESTADO_LABELS[e] || e }))]} placeholder="Filtrar estado..." size="sm" clearable />
-              </div>
-              <button type="button" aria-label="Filtros" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className={`flex min-h-11 shrink-0 items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || filterCount > 0 ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-neutral-50 text-neutral-600 border-neutral-300 hover:border-neutral-400'}`}>
-                <Filter size={15} />
-                <span className="hidden sm:inline">Filtros</span>
-                {filterCount > 0 && <span className="bg-primary-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{filterCount}</span>}
-                <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </button>
+            <div className="hidden md:block md:w-48">
+              <Select value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={estadoOptions} placeholder="Filtrar estado..." size="sm" clearable />
             </div>
+            <button type="button" aria-label={filterCount > 0 ? `Filtros, ${filterCount} activos` : 'Filtros'} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || filterCount > 0 ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-neutral-50 text-neutral-600 border-neutral-300 hover:border-neutral-400'}`}>
+              <Filter size={15} />
+              <span className="hidden sm:inline">Filtros</span>
+              {filterCount > 0 && <span aria-hidden="true" className="bg-primary-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{filterCount}</span>}
+              <ChevronDown size={14} className={`hidden sm:block transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+            </button>
           </div>
+          {!showFilters && activeFilters.length > 0 && (
+            <ul aria-label="Filtros activos" className="mt-2 flex flex-wrap gap-2">
+              {activeFilters.map(filter => (
+                <li key={filter.key}>
+                  <button type="button" aria-label={`Quitar filtro ${filter.label}`} onClick={filter.clear} className="inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-3 text-sm text-primary-800 hover:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                    <span className="truncate">{filter.label}</span><X size={14} aria-hidden="true" className="shrink-0" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
+              <div className="md:hidden">
+                <Select label="Estado" value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={estadoOptions} placeholder="Todos los estados" size="sm" clearable />
+              </div>
               <div className="flex flex-col gap-1 w-full sm:w-auto">
                 <label className="text-xs font-medium text-neutral-500">Ordenar por</label>
                 <div className="flex gap-2">
