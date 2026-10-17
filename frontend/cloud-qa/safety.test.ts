@@ -33,6 +33,13 @@ test('mail QA branch uses the same isolated target and delivery locks', () => {
   assert.throws(() => assertCloudEnvironment({ ...mail, DISABLE_EMAILS: 'false' }));
   assert.throws(() => assertCloudEnvironment({ ...mail, SMTP_HOST: 'smtp.example.invalid' }));
 });
+test('UI/UX review branch uses the same isolated target and delivery locks', () => {
+  const review = { ...safe, GITHUB_REF: 'refs/heads/codex/sitrep-uiux-review-20261016' };
+  assert.doesNotThrow(() => assertCloudEnvironment(review));
+  assert.throws(() => assertCloudEnvironment({ ...review, DISABLE_EMAILS: 'false' }));
+  assert.throws(() => assertCloudEnvironment({ ...review, VAPID_PUBLIC_KEY: 'public-key' }));
+  assert.throws(() => assertCloudEnvironment({ ...review, DATABASE_URL: 'postgresql://qa@23.105.176.45:5432/trazabilidad_rrpp' }));
+});
 for(const[key,value] of Object.entries({
   CI:'false', GITHUB_ACTIONS:'false', GITHUB_REPOSITORY:'martinsantos/another-project',
   GITHUB_REF:'refs/heads/main', ALLOW_SYNTHETIC_QA:'0', NODE_ENV:'production', NODE_APP_INSTANCE:'0',

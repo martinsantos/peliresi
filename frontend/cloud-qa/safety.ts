@@ -37,7 +37,8 @@ export function assertCloudEnvironment(env = process.env) {
   assert.equal(env.GITHUB_REPOSITORY, 'martinsantos/peliresi');
   assert.ok(['refs/heads/codex/sitrep-cloud-qa-20261002',
     'refs/heads/codex/sitrep-mail-safety-20261011',
-    'refs/heads/codex/sitrep-manifiestos-v2-20261014'].includes(env.GITHUB_REF || ''), 'Unapproved QA branch');
+    'refs/heads/codex/sitrep-manifiestos-v2-20261014',
+    'refs/heads/codex/sitrep-uiux-review-20261016'].includes(env.GITHUB_REF || ''), 'Unapproved QA branch');
   assert.equal(env.ALLOW_SYNTHETIC_QA, '1');
   const database = new URL(env.DATABASE_URL || '');
   assert.equal(database.hostname, '127.0.0.1');
