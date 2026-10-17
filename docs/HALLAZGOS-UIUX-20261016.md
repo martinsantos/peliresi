@@ -296,6 +296,23 @@ Revisión de código sin ejecutar. **Verificados a mano** en el código: S1–S5
 - `solicitud.controller.ts:42` sigue guardando por defecto en `cwd/uploads`. Con `UPLOADS_DIR` definido no afecta a producción; alinear ese valor por defecto es opcional.
 - El log de datos personales de WhatsApp/Telegram en el backend (S5) sigue pendiente.
 
+## Séptima tanda — un solo título por página (17/10/2026)
+
+Pedido del dueño: el título de la página repetía el de la barra superior, también en escritorio. Ejemplo: Inspecciones.
+
+**Commit `a713f2f`:**
+- **11 páginas:** el título queda sólo para lectores de pantalla y se quitan los subtítulos decorativos. Son Notificaciones, Mi Perfil, Tratamientos, Carga Masiva, Vehículos, Alertas, Configuración, Usuarios, Estadísticas, Auditoría e Inspecciones.
+- **Se conservan** los subtítulos con datos reales: cantidades y estados de carga.
+- **Barra superior:** Configuración, Mi Perfil, Notificaciones, Estadísticas y Ayuda ya no muestran «SITREP» (corrige O2).
+
+**Pruebas:**
+- **Unitarias:** 8 archivos afectados, 96/96. La prueba nueva de la barra (4 casos) falla sin el cambio.
+- **Preview,** fuente `c0aee8b`:
+  - **E2E 39/39**;
+  - pantallas 20/20, más 1 omitida a propósito;
+  - `alert-catalogue.spec` en verde, incluido el título «Mi Perfil» con `sr-only`, que Playwright sigue considerando visible.
+  - `inbox.spec` tiene 3 fallas: el mismo caso en los tres tamaños, por datos de prueba. Espera un seguimiento preparado por otra integración que este preview no corre (`fixture...numero` indefinido), y falla antes de mirar el título. **El título de Notificaciones no quedó verificado en E2E**; sí en las capturas y en las unitarias.
+
 ## Comprobado y sin defecto
 
 `Modal` (bloqueo de scroll, trampa de foco, Escape, alto por viewport visible, pie fijo), `Select` (abre en una opción, no en la búsqueda: no abre el teclado), `Input`, `ButtonV2` (44 px en móvil), `Tabs`, `NativeSelect`, `MapLayerToggle`, badges pendiente≠sin leer, wizard público con reintento por documento y envío protegido contra doble toque, `SupportReportDialog` con borrador local.
