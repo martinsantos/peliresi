@@ -265,8 +265,12 @@ model TipoResiduo {
 // Provisional V2 ledger: never consumes official ranges or mutates legacy manifests.
 model RegistroManifiestoExcepcional {
   id         String   @id
-  operadorId String
+  // NULL when the operator is external (spec v2 §4). Legacy rows keep their operator.
+  operadorId String?
   creadoPorId String
+  // NULL on rows created before 2026-10-17: read as created by the operator in operadorId.
+  autorRol     String?
+  autorActorId String?
   impersonadoPorId String?
   huellaSolicitud String
   datos      Json
@@ -277,6 +281,7 @@ model RegistroManifiestoExcepcional {
   updatedAt  DateTime @updatedAt
 
   @@index([operadorId, createdAt])
+  @@index([creadoPorId, createdAt])
   @@map("registros_manifiesto_excepcional")
 }
 

@@ -12,7 +12,7 @@ export function verifiedCuit(value: string): string | null {
 }
 export const reconciliationCommand = z.object({
   id: z.string().uuid(), revision: z.number().int().nonnegative(),
-  rol: z.enum(['generador', 'transportista']), accion: z.enum(['VINCULAR', 'DESVINCULAR']),
+  rol: z.enum(['generador', 'transportista', 'operador']), accion: z.enum(['VINCULAR', 'DESVINCULAR']),
   actorId: z.string().min(1).max(100).optional(), motivo: z.string().trim().min(1).max(500),
 }).strict().refine(c => (c.accion === 'VINCULAR') === Boolean(c.actorId), 'El vínculo requiere una ficha; la desvinculación no');
 export function csvCell(value: unknown): string {

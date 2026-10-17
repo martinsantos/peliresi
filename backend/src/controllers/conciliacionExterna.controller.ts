@@ -4,23 +4,22 @@ import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
-import { externalTrackingScope } from './seguimientoExterno.controller';
+import { exceptionalDesignatedReviewer, exceptionalReadWhere } from './manifiesto-excepcional.controller';
 import { reconciliationCommand, verifiedCuit } from '../domain/conciliacionExterna';
 
-const roleQuery = z.object({ rol: z.enum(['generador', 'transportista']) }).strict();
-type Role = 'generador' | 'transportista';
+const roleQuery = z.object({ rol: z.enum(['generador', 'transportista', 'operador']) }).strict();
+type Role = 'generador' | 'transportista' | 'operador';
 type Tx = Prisma.TransactionClient;
 async function context(tx: Tx, req: AuthRequest, rol: Role) {
-  const operatorId = externalTrackingScope(req.user);
-  const record = await tx.registroManifiestoExcepcional.findFirst({ where: { id: req.params.id,
-    ...(operatorId ? { operadorId: operatorId } : {}) } });
+  // Spec v2 §4-5: read follows the record scope; confirming stays with the designated reviewer.
+  const record = await tx.registroManifiestoExcepcional.findFirst({ where: { id: req.params.id, ...exceptionalReadWhere(req.user) } });
   if (!record) throw new AppError('Registro no encontrado', 404);
   const declared = (record.datos as Record<string, { identificacion: string; nombre: string; padronId?: string }>)[rol];
-  if (!declared || declared.padronId) throw new AppError('El participante ya fue declarado con ficha de padrón', 400);
+  if (!declared || declared.padronId || (rol === 'operador' && record.operadorId)) throw new AppError('El participante ya fue declarado con ficha de padrón', 400);
   const cuit = verifiedCuit(declared.identificacion);
   // Only the existing designated authority can confirm identity; no automatic
   // merge, counterpart permission, official number or notification is granted.
-  const canReview = operatorId === null && record.creadoPorId !== req.user.id && record.impersonadoPorId !== req.user.id;
+  const canReview = exceptionalDesignatedReviewer(req.user) && record.creadoPorId !== req.user.id && record.impersonadoPorId !== req.user.id;
   const latest = await tx.conciliacionParticipanteExterno.findFirst({ where: { registroId: record.id, rol }, orderBy: { revision: 'desc' } });
   return { record, declared, cuit, canReview, latest };
 }
@@ -29,7 +28,7 @@ async function candidates(tx: Tx, rol: Role, cuit: string | null) {
   const formatted = cuit.slice(0, 2) + '-' + cuit.slice(2, 10) + '-' + cuit.slice(10);
   const args = { where: { cuit: { in: [cuit, formatted] } },
     select: { id: true, razonSocial: true, cuit: true, domicilio: true }, take: 3 };
-  return rol === 'generador' ? tx.generador.findMany(args) : tx.transportista.findMany(args);
+  return rol === 'generador' ? tx.generador.findMany(args) : rol === 'transportista' ? tx.transportista.findMany(args) : tx.operador.findMany(args);
 }
 export async function getExternalReconciliation(req: AuthRequest, res: Response, next: NextFunction) {
   try {

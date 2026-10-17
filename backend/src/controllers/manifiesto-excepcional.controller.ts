@@ -6,18 +6,21 @@ import { noticeNewCurrents } from '../services/postFactoNotice.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
-import { advanceExceptional, exceptionalCreateSchema, exceptionalEventSchema, exceptionalPending,
-  ExceptionalEvent, ExceptionalStage } from '../domain/manifiestoExcepcional';
+import { advanceExceptional, exceptionalApproval, exceptionalApprovers, exceptionalCanApprove, exceptionalCanRegister,
+  exceptionalCreateSchema, exceptionalCreator, exceptionalEventSchema, exceptionalPending, planExceptionalSlots,
+  EXCEPTIONAL_SLOTS, ExceptionalApprover, ExceptionalEvent, ExceptionalSlot, ExceptionalStage } from '../domain/manifiestoExcepcional';
 
 // Fail closed. No runtime enablement on existing deployments.
 export function exceptionalEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
   if (process.env.MANIFEST_EXCEPTIONAL_ENABLED !== 'true') return next(new AppError('Circuito no habilitado', 404));
   next();
 }
-function reviewer(req: AuthRequest) {
-  return req.user.rol === 'ADMIN' && !req.user.impersonatedBy &&
-    (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').includes(req.user.id);
+/** Existing designated-reviewer boundary, not every administrator. */
+export function exceptionalDesignatedReviewer(user: AuthRequest['user']) {
+  return user?.rol === 'ADMIN' && !user.impersonatedBy &&
+    (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').filter(Boolean).includes(user.id);
 }
+function reviewer(req: AuthRequest) { return exceptionalDesignatedReviewer(req.user); }
 export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId?: unknown; datos?: unknown; operadorId?: unknown }) {
   const data = record.datos as { generador?: { padronId?: string }; transportista?: { padronId?: string } } | undefined;
   const counterpart = process.env.MANIFEST_PARTY_REVIEW_ENABLED === 'true' && data && canReviewAsCounterpart(req.user, record, {
@@ -26,32 +29,47 @@ export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: st
   });
   return Boolean(counterpart || (reviewer(req) && record.creadoPorId !== req.user.id && record.impersonadoPorId !== req.user.id));
 }
-function scope(req: AuthRequest): Prisma.RegistroManifiestoExcepcionalWhereInput {
-  if (reviewer(req)) return {};
-  if (req.user.rol === 'OPERADOR' && req.user.operador?.id) return { operadorId: req.user.operador.id };
-  if (req.user.rol === 'GENERADOR' && req.user.generador?.id) return { datos: { path: ['generador', 'padronId'], equals: req.user.generador.id } };
-  if (req.user.rol === 'TRANSPORTISTA' && req.user.transportista?.id) return { datos: { path: ['transportista', 'padronId'], equals: req.user.transportista.id } };
-  throw new AppError('Acceso reservado al operador y revisor designado', 403);
+/** Spec v2 §5: the reviewer reads all; the creator its own; each party where it figures with padrón. */
+export function exceptionalReadWhere(user: AuthRequest['user']): Prisma.RegistroManifiestoExcepcionalWhereInput {
+  if (exceptionalDesignatedReviewer(user)) return {};
+  if (!user.restricted) {
+    const own = { creadoPorId: user.id };
+    if (user.rol === 'ADMIN') return own;
+    if (user.rol === 'OPERADOR' && user.operador?.id) return { OR: [own, { operadorId: user.operador.id }] };
+    if (user.rol === 'GENERADOR' && user.generador?.id) return { OR: [own, { datos: { path: ['generador', 'padronId'], equals: user.generador.id } }] };
+    if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) return { OR: [own, { datos: { path: ['transportista', 'padronId'], equals: user.transportista.id } }] };
+  }
+  throw new AppError('Acceso reservado a las partes del eventual y al revisor designado', 403);
 }
+const scope = (req: AuthRequest) => exceptionalReadWhere(req.user);
 export async function exceptionalParticipants(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (req.user.rol !== 'OPERADOR' || !req.user.operador?.id) throw new AppError('Sólo el operador selecciona participantes', 403);
+    exceptionalCreator(req.user);
     const type = req.query.tipo;
-    if (type !== 'generador' && type !== 'transportista') throw new AppError('Tipo de participante inválido', 400);
+    if (type !== 'generador' && type !== 'transportista' && type !== 'operador') throw new AppError('Tipo de participante inválido', 400);
     const search = String(req.query.q || '').trim().slice(0, 100);
     const where = search ? { OR: [{ razonSocial: { contains: search, mode: 'insensitive' as const } }, { cuit: { contains: search } }] } : {};
     const args = { where, select: { id: true, razonSocial: true, cuit: true, domicilio: true }, orderBy: { razonSocial: 'asc' as const }, take: 20 };
-    const records = type === 'generador' ? await prisma.generador.findMany(args) : await prisma.transportista.findMany(args);
+    const records = type === 'generador' ? await prisma.generador.findMany(args)
+      : type === 'transportista' ? await prisma.transportista.findMany(args) : await prisma.operador.findMany(args);
     res.json({ success: true, data: { participantes: records.map(r => ({
       padronId: r.id, nombre: r.razonSocial, identificacion: r.cuit, domicilio: r.domicilio || '',
     })) } });
   } catch (error) { next(error); }
 }
-function present(record: { id: string; creadoPorId: string; eventos: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
+type StoredRecord = { id: string; creadoPorId: string; autorRol?: string | null; operadorId?: string | null; datos: Prisma.JsonValue; eventos: Prisma.JsonValue; [key: string]: unknown };
+const approversOf = (record: StoredRecord) => (record.datos as { aprobaciones?: ExceptionalApprover[] } | null)?.aprobaciones;
+function canApproveParts(req: AuthRequest, record: StoredRecord) {
+  return (approversOf(record) || []).filter(a => exceptionalCanApprove(req.user, a)).map(a => a.parte);
+}
+function present(record: StoredRecord, req: AuthRequest) {
+  const events = record.eventos as unknown as ExceptionalEvent[];
+  const aprobacion = exceptionalApproval(approversOf(record), events);
   return { ...record, referencia: 'BI-' + record.id, numeroOficial: null,
-    revisiones: exceptionalPending(record.id, record.eventos as unknown as ExceptionalEvent[]),
+    revisiones: exceptionalPending(record.id, events), aprobacion,
+    puedeAprobar: canApproveParts(req, record).filter(p => aprobacion.partes.some(a => a.parte === p && a.estado === 'PENDIENTE')),
     puedeResolver: exceptionalCanReview(req, record),
-    puedeRegistrar: req.user.rol === 'OPERADOR' && req.user.operador?.id === record.operadorId };
+    puedeRegistrar: exceptionalCanRegister(req.user, record) };
 }
 export async function listExceptional(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -73,8 +91,7 @@ export async function getExceptional(req: AuthRequest, res: Response, next: Next
 }
 export async function createExceptional(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    scope(req);
-    if (req.user.rol !== 'OPERADOR' || !req.user.operador?.id) throw new AppError('El operador registra su propia operación', 403);
+    const creator = exceptionalCreator(req.user);
     const input = exceptionalCreateSchema.safeParse(req.body);
     if (!input.success) throw new AppError(input.error.issues[0].message, 400);
     const huellaSolicitud = createHash('sha256').update(JSON.stringify(input.data)).digest('hex');
@@ -83,20 +100,26 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
       if (existing.creadoPorId !== req.user.id || existing.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || existing.huellaSolicitud !== huellaSolicitud) throw new AppError('La referencia ya se usó para otro registro', 409);
       res.status(201).json({ success: true, data: { registro: present(existing, req) } }); return;
     }
-    const snapshot = async (type: 'generador' | 'transportista') => {
-      const declared = input.data[type];
+    const slots = planExceptionalSlots(creator, input.data);
+    const active: Partial<Record<ExceptionalSlot, boolean>> = {};
+    const snapshot = async (type: ExceptionalSlot) => {
+      const declared = slots[type];
       if (!declared.padronId) return declared;
-      const args = { where: { id: declared.padronId }, select: { id: true, razonSocial: true, cuit: true, domicilio: true } };
-      const actor = type === 'generador' ? await prisma.generador.findUnique(args) : await prisma.transportista.findUnique(args);
+      const args = { where: { id: declared.padronId }, select: { id: true, razonSocial: true, cuit: true, domicilio: true, usuario: { select: { activo: true } } } };
+      const actor = type === 'generador' ? await prisma.generador.findUnique(args)
+        : type === 'transportista' ? await prisma.transportista.findUnique(args) : await prisma.operador.findUnique(args);
       if (!actor) throw new AppError('El participante seleccionado no existe en el padrón', 400);
+      active[type] = actor.usuario?.activo === true;
       return { padronId: actor.id, nombre: actor.razonSocial, identificacion: actor.cuit, domicilio: actor.domicilio || '' };
     };
-    const [generador, transportista] = await Promise.all([snapshot('generador'), snapshot('transportista')]);
-    const datos = { ...input.data, generador, transportista } as unknown as Prisma.InputJsonValue;
+    const [generador, transportista, operador] = await Promise.all(EXCEPTIONAL_SLOTS.map(snapshot));
+    const aprobaciones = exceptionalApprovers(creator, req.user.id, { generador, transportista, operador }, active);
+    const datos = { ...input.data, generador, transportista, operador, aprobaciones } as unknown as Prisma.InputJsonValue;
     // Upsert with an empty update gives retry-safe creation without changing facts.
     const record = await prisma.registroManifiestoExcepcional.upsert({
       where: { id: input.data.id }, update: {},
-      create: { id: input.data.id, operadorId: req.user.operador.id, creadoPorId: req.user.id,
+      create: { id: input.data.id, operadorId: operador.padronId || null, creadoPorId: req.user.id,
+        autorRol: creator.rol, autorActorId: creator.rol === 'ADMIN' ? null : creator.actorId,
         impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud, datos, eventos: [] },
     });
     // Compare the normalized request fingerprint; the original padrón snapshot remains immutable.
@@ -128,11 +151,12 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
         return current;
       }
       if (command.version !== current.version) throw new AppError('Otro usuario actualizó el registro; recargá antes de continuar', 409);
-      if (command.tipo !== 'RESOLVER' && (req.user.rol !== 'OPERADOR' || req.user.operador?.id !== current.operadorId)) {
-        throw new AppError('Sólo el operador registra hechos y solicita revisión', 403);
+      const decision = command.tipo === 'APROBAR_PARTE' || command.tipo === 'RECHAZAR_PARTE';
+      if (command.tipo !== 'RESOLVER' && !decision && !exceptionalCanRegister(req.user, current)) {
+        throw new AppError('Registran hechos quien creó el eventual y las partes con usuario que figuran en él', 403);
       }
       const etapa = advanceExceptional(current.id, current.etapa as ExceptionalStage, events, command,
-        exceptionalCanReview(req, current));
+        exceptionalCanReview(req, current), { aprobaciones: approversOf(current), puedeAprobar: canApproveParts(req, current) });
       const updated = await tx.registroManifiestoExcepcional.updateMany({
         where: { id: current.id, version: current.version },
         data: { etapa, version: { increment: 1 }, eventos: [...events,

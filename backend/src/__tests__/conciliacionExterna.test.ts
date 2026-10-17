@@ -13,6 +13,9 @@ it('requires explicit audited commands and rejects forged or ambiguous fields', 
     { ...base, accion: 'DESVINCULAR' }, { ...base, autorId: 'forged' }])
     expect(reconciliationCommand.safeParse(value).success).toBe(false);
   expect(reconciliationCommand.safeParse({ ...base, accion: 'DESVINCULAR', actorId: undefined }).success).toBe(true);
+  // Spec v2 §4: an external operator is reconciled like the other roles; unknown roles stay rejected.
+  expect(reconciliationCommand.safeParse({ ...base, rol: 'operador' }).success).toBe(true);
+  expect(reconciliationCommand.safeParse({ ...base, rol: 'otro' }).success).toBe(false);
 });
 it('quotes separators/newlines and neutralizes spreadsheet formulas, including leading whitespace', () => {
   expect(csvCell('a;"b\nc')).toBe('"a;""b\nc"');

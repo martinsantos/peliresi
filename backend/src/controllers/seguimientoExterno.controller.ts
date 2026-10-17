@@ -6,35 +6,44 @@ import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import { csvCell } from '../domain/conciliacionExterna';
+import { exceptionalDesignatedReviewer } from './manifiesto-excepcional.controller';
 
 export const externalTrackingQuery = z.object({
-  rol: z.enum(['generador', 'transportista']).default('generador'),
+  rol: z.enum(['generador', 'transportista', 'operador']).default('generador'),
   identificacion: z.string().trim().max(500).default(''),
   page: z.coerce.number().int().min(1).max(100000).default(1),
 }).strict();
 
-/** Reuses the existing designated-reviewer boundary, not every administrator. */
-export function externalTrackingScope(user: AuthRequest['user']): string | null {
-  if (user?.rol === 'OPERADOR' && user.operador?.id) return user.operador.id;
-  if (user?.rol === 'ADMIN' && !user.impersonatedBy &&
-    (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').filter(Boolean).includes(user.id)) return null;
-  throw new AppError('Seguimiento reservado al operador y revisor designado', 403);
+/** Spec v2 §5: the designated reviewer reads all; the creator and registered parties only their own records. */
+export function externalTrackingAccess(user: AuthRequest['user']): { reviewer: boolean; filter: Prisma.Sql | null } {
+  if (exceptionalDesignatedReviewer(user)) return { reviewer: true, filter: null };
+  if (user?.id && !user.restricted) {
+    const own = Prisma.sql`r."creadoPorId" = ${user.id}`;
+    if (user.rol === 'ADMIN') return { reviewer: false, filter: own };
+    if (user.rol === 'OPERADOR' && user.operador?.id) return { reviewer: false, filter: Prisma.sql`(${own} OR r."operadorId" = ${user.operador.id})` };
+    if (user.rol === 'GENERADOR' && user.generador?.id) return { reviewer: false, filter: Prisma.sql`(${own} OR r.datos -> 'generador' ->> 'padronId' = ${user.generador.id})` };
+    if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) return { reviewer: false, filter: Prisma.sql`(${own} OR r.datos -> 'transportista' ->> 'padronId' = ${user.transportista.id})` };
+  }
+  throw new AppError('Seguimiento reservado a las partes del eventual y al revisor designado', 403);
 }
 
-function trackingWhere(rol: string, identificacion: string, operatorId: string | null) {
-  return Prisma.sql`COALESCE(r.datos -> ${rol} ->> 'padronId', '') = ''
-    ${operatorId ? Prisma.sql`AND r."operadorId" = ${operatorId}` : Prisma.empty}
+function trackingWhere(rol: string, identificacion: string, access: Prisma.Sql | null) {
+  // Legacy rows have no datos.operador but a registered operator: external means no operadorId.
+  const external = rol === 'operador' ? Prisma.sql`r."operadorId" IS NULL` : Prisma.sql`COALESCE(r.datos -> ${rol} ->> 'padronId', '') = ''`;
+  return Prisma.sql`${external}
+    ${access ? Prisma.sql`AND ${access}` : Prisma.empty}
     ${identificacion ? Prisma.sql`AND btrim(COALESCE(r.datos -> ${rol} ->> 'identificacion', '')) = ${identificacion}` : Prisma.empty}`;
 }
+const operatorName = Prisma.sql`COALESCE(o."razonSocial", NULLIF(r.datos -> 'operador' ->> 'nombre', ''), 'Operador no disponible')`;
 
 /** Read-only declared movements. Reconciled records stay present and counted exactly once. */
 export async function externalTracking(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const operatorId = externalTrackingScope(req.user);
+    const access = externalTrackingAccess(req.user).filter;
     const parsed = externalTrackingQuery.safeParse(req.query);
     if (!parsed.success) throw new AppError('Filtros de seguimiento inválidos', 400);
     const { rol, identificacion, page } = parsed.data;
-    const where = trackingWhere(rol, identificacion, operatorId);
+    const where = trackingWhere(rol, identificacion, access);
     // Aggregate all matches, not the visible page. Repeatable-read keeps the
     // three bounded queries on one snapshot while another user records a trip.
     const result = await prisma.$transaction(async tx => {
@@ -50,7 +59,7 @@ export async function externalTracking(req: AuthRequest, res: Response, next: Ne
         ORDER BY corriente, unidad`);
       const registros = await tx.$queryRaw<Array<{ id: string; createdAt: Date; etapa: string; operador: string;
         participante: Prisma.JsonValue; residuos: Prisma.JsonValue }>>(Prisma.sql`
-        SELECT r.id, r."createdAt", r.etapa, COALESCE(o."razonSocial", 'Operador no disponible') AS operador,
+        SELECT r.id, r."createdAt", r.etapa, ${operatorName} AS operador,
           r.datos -> ${rol} AS participante, r.datos -> 'residuos' AS residuos
         FROM registros_manifiesto_excepcional r LEFT JOIN operadores o ON o.id = r."operadorId"
         WHERE ${where} ORDER BY r."createdAt" DESC, r.id DESC LIMIT 20 OFFSET ${(page - 1) * 20}`);
@@ -64,18 +73,18 @@ export async function externalTracking(req: AuthRequest, res: Response, next: Ne
 /** Full filtered export, bounded by waste rows; never silently truncates a page. */
 export async function exportExternalTracking(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const operatorId = externalTrackingScope(req.user);
+    const access = externalTrackingAccess(req.user).filter;
     const parsed = externalTrackingQuery.omit({ page: true }).safeParse(req.query);
     if (!parsed.success) throw new AppError('Filtros de exportación inválidos', 400);
     const { rol, identificacion } = parsed.data;
-    const where = trackingWhere(rol, identificacion, operatorId);
+    const where = trackingWhere(rol, identificacion, access);
     const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
       SELECT 'BI-' || r.id AS referencia, r."createdAt" AS fecha_utc, ${rol} AS rol,
         r.datos -> ${rol} ->> 'nombre' AS nombre_declarado,
         r.datos -> ${rol} ->> 'identificacion' AS identificacion_declarada,
         r.datos -> ${rol} ->> 'domicilio' AS domicilio_declarado,
         r.datos -> ${rol} ->> 'telefono' AS telefono_declarado,
-        o."razonSocial" AS operador, r.etapa,
+        ${operatorName} AS operador, r.etapa,
         w.ordinality AS renglon_original, w.item ->> 'corriente' AS corriente,
         w.item ->> 'cantidad' AS cantidad_original, w.item ->> 'unidad' AS unidad,
         COALESCE(c.accion, 'PENDIENTE') AS conciliacion, c."actorId" AS ficha_id,
