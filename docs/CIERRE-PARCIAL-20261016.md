@@ -2,6 +2,8 @@
 
 16/10/2026. Es un punto de traspaso de desarrollo, **no una publicación ni un GO global**. No mezclar SITREP con Precrimen u otros proyectos.
 
+> **Actualización 17/10/2026, cierre de sesión:** el punto de entrada para seguir hacia producción es [TRASPASO-CODEX-20261017.md](TRASPASO-CODEX-20261017.md). El resumen de abajo quedó superado: no incluye los eventuales nuevos ni las últimas tandas.
+
 ## Retomar la revisión UI/UX — estado al 17/10/2026 (leer primero)
 
 **Fuente:**

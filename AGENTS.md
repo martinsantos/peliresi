@@ -1,5 +1,10 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Punto de entrada vigente — traspaso 17/10/2026 (leer primero)
+
+- **Retomar desde [docs/TRASPASO-CODEX-20261017.md](docs/TRASPASO-CODEX-20261017.md).** Ahí está el estado de la rama `codex/sitrep-uiux-review-20261016` (subida a origin, 57 commits sobre el candidato, nada desplegado), la validación hecha en el preview (E2E 45/45), los pasos ordenados para producción y las decisiones abiertas.
+- Lo que sigue de este apartado es el cierre del 16/10, que conserva su contexto. Para el estado actual vale el traspaso.
+
 ## Punto de entrada vigente — cierre parcial 16/10/2026
 
 - Desarrollo funcional actual: `codex/sitrep-manifiestos-v2-20261014`. Revisión UI/UX independiente: `codex/sitrep-uiux-review-20261016`, desde el tag `sitrep-uiux-baseline-20261016`. Leer [cierre y estado](docs/CIERRE-PARCIAL-20261016.md) y [guía para la otra IA](docs/REVISION-UIUX-20261016.md) antes de trabajar.
