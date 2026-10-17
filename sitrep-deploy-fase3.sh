@@ -42,6 +42,7 @@ DOMAIN="${DOMAIN:-rptrazar.mendoza.gov.ar}"
 PORT="${PORT:-3002}"
 VM_BACKEND_DIR="${VM_BACKEND_DIR:-/home/ubuntu/sitrep-backend}"
 VM_FRONTEND_DIR="${VM_FRONTEND_DIR:-/var/www/sitrep}"
+VM_UPLOADS_DIR="${VM_UPLOADS_DIR:-/var/www/sitrep-uploads}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/ambiente.pem}"
 TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
 LOCAL_LOG="/tmp/sitrep-deploy-fase3-${TIMESTAMP}.log"
@@ -196,6 +197,7 @@ EMAIL_DAILY_LIMIT_TRANSACCIONAL=500
 EMAIL_DAILY_LIMIT_ALERTA=200
 LOG_LEVEL=info
 BLOCKCHAIN_ENABLED=false
+UPLOADS_DIR=${VM_UPLOADS_DIR}
 EOF
   ssh_vm "chmod 600 ${VM_BACKEND_DIR}/.env"
   ok ".env creado"
@@ -203,6 +205,12 @@ EOF
 else
   ok ".env ya existe — NO sobreescrito"
 fi
+
+# Uploaded documents must live outside ${VM_BACKEND_DIR}: step 7 replaces that directory
+# on every deploy. Idempotent: only appends UPLOADS_DIR when the existing .env lacks it.
+ssh_vm "sudo mkdir -p ${VM_UPLOADS_DIR} && sudo chown ubuntu:ubuntu ${VM_UPLOADS_DIR} && sudo chmod 750 ${VM_UPLOADS_DIR}"
+ssh_vm "grep -q '^UPLOADS_DIR=' ${VM_BACKEND_DIR}/.env || echo 'UPLOADS_DIR=${VM_UPLOADS_DIR}' >> ${VM_BACKEND_DIR}/.env"
+ok "Archivos subidos en ${VM_UPLOADS_DIR}, fuera del directorio que se reemplaza"
 
 # ---- 6/10  Deploy Frontend -------------------------------------------------
 
