@@ -4,8 +4,8 @@ import { login, prefix } from './helpers';
 // Read-only visual pass of the UI/UX review branch: real synthetic logins, no API interception
 // beyond the shared offline font/tile fixtures, no submissions.
 const journeys: Record<string, string[]> = {
-  admin: ['/dashboard', '/admin/solicitudes', '/admin/actores/generadores/nuevo', '/centro-control'],
-  generador: ['/dashboard', '/manifiestos', '/manifiestos/nuevo'],
+  admin: ['/dashboard', '/admin/solicitudes', '/admin/actores/generadores/nuevo', '/centro-control', '/admin/carga-masiva', '/admin/vehiculos', '/configuracion?tab=notificaciones'],
+  generador: ['/dashboard', '/manifiestos', '/manifiestos/nuevo', '/configuracion?tab=seguridad', '/mi-perfil/solicitar-cambios'],
   transportista: ['/dashboard', '/manifiestos'],
   operador: ['/dashboard', '/manifiestos'],
   inspector: ['/dashboard', '/inspecciones'],
@@ -91,7 +91,17 @@ for (const [user, paths] of Object.entries(journeys)) {
     await login(page, info, user);
     for (const route of paths) {
       await page.goto(prefix(info) + route);
-      await capture(page, info, user + route.replaceAll('/', '-'), seen);
+      await capture(page, info, user + route.replace(/[/?=]/g, '-'), seen);
     }
   });
 }
+
+test('account menu offers the profile, not an empty demo switcher', async ({ page }, info) => {
+  test.skip(info.project.name === 'app', 'The /app shell has no header account menu');
+  await login(page, info, 'generador');
+  await page.getByRole('button', { name: /^Opciones de cuenta de / }).click();
+  await expect(page.getByRole('link', { name: 'Mi perfil', exact: true })).toBeVisible();
+  await expect(page.getByText('Cambiar a:', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/usuarios disponibles/)).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('account-menu.png'), fullPage: false });
+});
