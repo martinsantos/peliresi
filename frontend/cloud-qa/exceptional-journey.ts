@@ -4,11 +4,16 @@ async function press(page: Page, control: Locator) {
   if (await page.evaluate(() => navigator.maxTouchPoints > 0)) await control.tap();
   else await control.click();
 }
-export async function createExceptionalJourney(page: Page, prefix: string, hideKeyboard = async () => {}, linked?: 'Generador' | 'Transportista', assertNoKeyboard = async () => {}) {
+type Slot = 'Generador' | 'Transportista' | 'Operador';
+const padronOption: Record<Slot, RegExp> = { Generador: /^QA Generador 1 ·/, Transportista: /^QA Transporte 1 ·/, Operador: /^QA Operador 1 ·/ };
+const padronName: Record<Slot, string> = { Generador: 'QA Generador 1', Transportista: 'QA Transporte 1', Operador: 'QA Operador 1' };
+export async function createExceptionalJourney(page: Page, prefix: string, hideKeyboard = async () => {}, linked?: Slot, assertNoKeyboard = async () => {}) {
   await page.goto('http://127.0.0.1:4177' + prefix + '/manifiestos');
   await press(page, page.getByRole('link', { name: 'Eventuales', exact: true }));
   await press(page, page.getByRole('button', { name: 'Registrar operación', exact: true }));
-  for (const actor of ['Generador', 'Transportista']) {
+  // The creator's own slot comes from the session (spec v2 §1); only the other slots are on the form.
+  for (const actor of ['Generador', 'Transportista', 'Operador']) {
+    if (!(await page.getByLabel(actor + ' · Nombre o razón social', { exact: true }).count())) continue;
     await page.getByLabel(actor + ' · Nombre o razón social', { exact: true }).fill('QA Externo ' + actor);
     await page.getByLabel(actor + ' · Identificación declarada', { exact: true }).fill('QA identidad sintética sin alta');
     await page.getByLabel(actor + ' · Domicilio', { exact: true }).fill('QA Calle de prueba 123');
@@ -17,12 +22,12 @@ export async function createExceptionalJourney(page: Page, prefix: string, hideK
     await hideKeyboard();
     await press(page, page.getByRole('button', { name: linked + ' · Buscar en padrón', exact: true }));
     await press(page, page.getByLabel(linked + ' del padrón', { exact: true }));
-    await expect(page.getByRole('option', { name: linked === 'Generador' ? /^QA Generador 1 ·/ : /^QA Transporte 1 ·/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: padronOption[linked] })).toBeVisible();
     expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT');
     await assertNoKeyboard();
-    await press(page, page.getByRole('option', { name: linked === 'Generador' ? /^QA Generador 1 ·/ : /^QA Transporte 1 ·/ }));
+    await press(page, page.getByRole('option', { name: padronOption[linked] }));
     await assertNoKeyboard();
-    await expect(page.getByLabel(linked + ' · Nombre o razón social', { exact: true })).toHaveValue(linked === 'Generador' ? 'QA Generador 1' : 'QA Transporte 1');
+    await expect(page.getByLabel(linked + ' · Nombre o razón social', { exact: true })).toHaveValue(padronName[linked]);
   }
   await page.getByLabel('Patente declarada', { exact: true }).fill('QA-EXTERNO');
   await page.getByLabel('Corriente', { exact: true }).fill('Y1');
@@ -45,7 +50,16 @@ export async function createExceptionalJourney(page: Page, prefix: string, hideK
   await page.reload();
   await expect(page.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Registrado');
   await expect(page.getByRole('region', { name: 'Revisión original' })).toContainText('Pendiente de conformidad');
+  // Spec v2 §3: nothing advances until every required party approves.
+  await expect(page.getByText('Aprobación de las partes: pendiente', { exact: true })).toBeVisible();
   return record.id as string;
+}
+export async function approveExceptionalJourney(page: Page, parte: string, hideKeyboard = async () => {}) {
+  await hideKeyboard();
+  const response = page.waitForResponse(r => /\/baja-intensidad\/[^/]+\/eventos$/.test(r.url()) && r.request().method() === 'POST');
+  await press(page, page.getByRole('button', { name: 'Aprobar como ' + parte, exact: true }));
+  expect((await response).status()).toBe(200);
+  await expect(page.getByRole('button', { name: 'Aprobar como ' + parte, exact: true })).toHaveCount(0);
 }
 async function action(page: Page, button: string, hideKeyboard: () => Promise<void>, region?: string) {
   await page.getByLabel('Nota de la acción', { exact: true }).fill('QA evidencia registrada ' + button);

@@ -56,6 +56,26 @@ try {
   const reconciliationMigration = await readFile(path.join(root, 'backend/prisma/migrations/20261016140000_external_reconciliation/migration.sql'), 'utf8');
   await db.$executeRawUnsafe(reconciliationMigration);
   assert.equal(await db.conciliacionParticipanteExterno.count(), 0);
+  // Spec v2 §6-7: a row written under the previous contract survives the additive migration unchanged.
+  const legacyRow = 'SELECT * FROM registros_manifiesto_excepcional WHERE id = $1';
+  const legacyDatos = { id: 'qa-legacy-exceptional', generador: { nombre: 'QA legado', identificacion: 'QA-LEGACY', domicilio: '' },
+    transportista: { nombre: '', identificacion: '', domicilio: '' }, patente: 'QA-OLD', motivo: 'QA contrato anterior',
+    residuos: [{ corriente: 'Y1', cantidad: 5, unidad: 'kg' }] };
+  const legacyEvents = [{ id: 'qa-legacy-event', version: 0, tipo: 'AVANCE', etapa: 'RETIRADO', nota: '', autorId: fixture.users.operador, fecha: '2026-10-15T12:00:00.000Z' }];
+  await db.$executeRawUnsafe(`INSERT INTO registros_manifiesto_excepcional (id, "operadorId", "creadoPorId", "huellaSolicitud", datos, eventos, etapa, version, "updatedAt")
+    VALUES ($1, $2, $3, 'qa-legacy-fingerprint', $4::jsonb, $5::jsonb, 'RETIRADO', 1, now())`,
+    'qa-legacy-exceptional', fixture.actors.operador, fixture.users.operador, JSON.stringify(legacyDatos), JSON.stringify(legacyEvents));
+  const [legacyBefore] = await db.$queryRawUnsafe(legacyRow, 'qa-legacy-exceptional');
+  const anyPartyMigration = await readFile(path.join(root, 'backend/prisma/migrations/20261017140000_exceptional_any_party/migration.sql'), 'utf8');
+  assert.ok(!/\b(UPDATE|DELETE|DROP COLUMN|DROP TABLE|TRUNCATE)\b/i.test(anyPartyMigration.replace(/--.*$/gm, '')), 'additive only');
+  for (const statement of anyPartyMigration.replace(/--.*$/gm, '').split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement);
+  const [legacyAfter] = await db.$queryRawUnsafe(legacyRow, 'qa-legacy-exceptional');
+  const { autorRol, autorActorId, ...legacyKept } = legacyAfter;
+  assert.equal(autorRol, null); assert.equal(autorActorId, null);
+  assert.deepEqual(legacyKept, legacyBefore, 'datos, eventos, huella, etapa, version and dates unchanged');
+  const [operatorColumn] = await db.$queryRawUnsafe(`SELECT is_nullable FROM information_schema.columns
+    WHERE table_name = 'registros_manifiesto_excepcional' AND column_name = 'operadorId'`);
+  assert.equal(operatorColumn.is_nullable, 'YES');
   const addendumMigration = await readFile(path.join(root, 'backend/prisma/migrations/20261015010000_manifest_addenda/migration.sql'), 'utf8');
   for (const statement of addendumMigration.split(';').filter(s => s.trim())) await db.$executeRawUnsafe(statement);
   assert.equal(await db.adendaManifiesto.count(), 0);
@@ -78,7 +98,7 @@ try {
   await oldDb.manifiesto.create({ data: { ...scalars, id: 'manifest-qa-old-client', numero: 'QA-OLD-CLIENT' } });
   assert.equal((await db.manifiesto.findUniqueOrThrow({ where: { id: 'manifest-qa-old-client' } })).asignacionTransporte, null);
   await writeFile(path.join(output, 'manifest-migration.json'), JSON.stringify({ passed: true,
-    additiveOnly: true, historicalUnchanged: true, oldClientReadsAndWrites: true, newSnapshotsPreserved: true,
+    additiveOnly: true, historicalUnchanged: true, legacyExceptionalUnchanged: true, oldClientReadsAndWrites: true, newSnapshotsPreserved: true,
     rollback: 'Application rollback retains nullable column and recorded snapshots; no destructive down migration',
     scope: 'Previous Prisma schema/client on synthetic DB; not a production migration or full previous-backend rollout' }, null, 2));
 } finally { await oldDb?.$disconnect(); await db.$disconnect(); }

@@ -54,7 +54,7 @@ try {
   const view = await request(admin, route + '?rol=generador');
   assert.equal(view.candidato.id, actor.id); assert.equal(view.revision, 0); assert.equal(view.puedeRevisar, true);
   assert.equal((await request(operator, route + '?rol=generador')).puedeRevisar, false);
-  await request(other, route + '?rol=generador', 404); await request(outsider, route + '?rol=generador', 403);
+  await request(other, route + '?rol=generador', 404); await request(outsider, route + '?rol=generador', 404); // spec v2 §5: not a party of this record
   const command = { id: randomUUID(), revision: 0, rol: 'generador', accion: 'VINCULAR', actorId: actor.id, motivo: 'QA revisión explícita' };
   await request(operator, route, 403, command);
   await request(admin, '/' + self + '/conciliacion', 403, command);
@@ -79,7 +79,10 @@ try {
   assert.ok(linkedCsv.includes('"VINCULAR"') && linkedCsv.includes('"QA Ficha conciliada"') && linkedCsv.includes('"QA Conciliación HTTP"'));
   const formulaCsv = await request(operator, '/seguimiento/exportar?identificacion=QA-CSV-INJECTION');
   assert.ok(formulaCsv.includes('"\'=HYPERLINK(') && formulaCsv.includes(injection));
-  await request(outsider, '/seguimiento/exportar', 403);
+  // Spec v2 §5: a generator exports only its own records; sector administrators stay denied.
+  const outsiderCsv = await request(outsider, '/seguimiento/exportar?rol=generador&identificacion=30-71234567-1');
+  assert.equal(outsiderCsv.split('\r\n').length, 1, 'header only: none of these records belongs to that generator');
+  await request(await login('jefe-operadores'), '/seguimiento/exportar', 403);
   await request(operator, '/seguimiento/exportar?page=2', 400);
   await request(operator, '/seguimiento/exportar?identificacion=QA-EXPORT-LIMIT', 422);
   await request(admin, route, 409, { ...command, id: randomUUID() });

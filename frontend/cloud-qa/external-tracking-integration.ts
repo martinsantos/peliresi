@@ -29,9 +29,10 @@ try {
   const participant = { nombre: 'QA Participante homónimo', identificacion: identity, domicilio: 'QA nube, sin domicilio real' };
   const waste = [{ corriente: 'Y1', cantidad: 2, unidad: 'kg' }, { corriente: 'Y1', cantidad: 3, unidad: 'kg' },
     { corriente: 'Y1', cantidad: 1, unidad: 'l' }, { corriente: 'Y2', cantidad: 4, unidad: 'kg' }];
-  async function seed(generador: object, transportista: object, operadorId = fixture.actors.operador) {
+  // Each record is created by the account of its own operator, as the API does.
+  async function seed(generador: object, transportista: object, operadorId = fixture.actors.operador, creadoPorId = fixture.users.operador) {
     const id = randomUUID();
-    await db.registroManifiestoExcepcional.create({ data: { id, operadorId, creadoPorId: fixture.users.operador,
+    await db.registroManifiestoExcepcional.create({ data: { id, operadorId, creadoPorId,
       huellaSolicitud: id, datos: { id, generador, transportista, patente: 'QA-TRACK', motivo: 'QA seguimiento aislado', residuos: waste }, eventos: [] } });
     return id;
   }
@@ -39,7 +40,14 @@ try {
   for (let i = 0; i < 21; i++) ids.push(await seed(participant, { ...participant, identificacion: 'QA-OTHER-CARRIER' }));
   await seed({ ...participant, identificacion: 'QA-DIFFERENT-ID' }, participant);
   await seed({ ...participant, padronId: fixture.actors.generador }, { ...participant, padronId: fixture.actors.transportista });
-  await seed(participant, participant, fixture.actors.operador2);
+  await seed(participant, participant, fixture.actors.operador2, fixture.users.operador2);
+  // Spec v2: a generator-created eventual with an external operator and the shared carrier identity.
+  const fromGenerator = randomUUID();
+  await db.registroManifiestoExcepcional.create({ data: { id: fromGenerator, operadorId: null, creadoPorId: fixture.users.generador,
+    autorRol: 'GENERADOR', autorActorId: fixture.actors.generador, huellaSolicitud: fromGenerator, eventos: [],
+    datos: { id: fromGenerator, generador: { ...participant, padronId: fixture.actors.generador }, transportista: participant,
+      operador: { nombre: 'QA planta sin alta', identificacion: 'QA-TRACK-OPERATOR', domicilio: '' },
+      patente: 'QA-TRACK', motivo: 'QA seguimiento aislado', residuos: waste } } });
   const anonymous = await Promise.all([1, 2].map(() => seed({ nombre: '', identificacion: '', domicilio: '' }, { nombre: '', identificacion: '', domicilio: '' })));
   const snapshot = async () => ({
     records: await db.registroManifiestoExcepcional.findMany({ orderBy: { id: 'asc' } }),
@@ -64,7 +72,17 @@ try {
   const all = await query(operator);
   const allRows = [...all.registros, ...(await query(operator, { page: '2' })).registros];
   assert.ok(anonymous.every(id => allRows.some(r => r.id === id)), 'unknown identities remain distinct movements');
-  for (const token of [generator, carrier, sector]) await query(token, {}, 403);
+  // Spec v2 §5 (B): creator and registered parties read tracking of their own records only.
+  assert.equal((await query(generator, filter)).total, 0, 'generator is registered there, never external');
+  const generatorCarrier = await query(generator, { ...filter, rol: 'transportista' });
+  assert.equal(generatorCarrier.total, 1); assert.equal(generatorCarrier.registros[0].id, fromGenerator);
+  assert.equal(generatorCarrier.registros[0].operador, 'QA planta sin alta');
+  assert.equal((await query(generator, { rol: 'operador', identificacion: 'QA-TRACK-OPERATOR' })).total, 1);
+  assert.equal((await query(operator, { rol: 'operador', identificacion: 'QA-TRACK-OPERATOR' })).total, 0);
+  assert.equal((await query(admin, { rol: 'operador', identificacion: 'QA-TRACK-OPERATOR' })).total, 1);
+  assert.equal((await query(admin, { ...filter, rol: 'transportista' })).total, 3);
+  for (const token of [carrier]) assert.equal((await query(token, { ...filter, rol: 'transportista' })).total, 0);
+  await query(sector, {}, 403);
   await query(pending, {}, 403);
   await query('', {}, 401);
   await query(operator, { operadorId: fixture.actors.operador2 }, 400);
@@ -73,7 +91,7 @@ try {
   await writeFile(path.join(process.env.QA_ARTIFACTS!, 'external-tracking-http.json'), JSON.stringify({ passed: true, cases: [
     '21 movements across two pages with whole-result totals', 'distinct roles, waste types and units',
     'homonyms not merged; unknown identities preserved; registered participants excluded',
-    'operator scope, reviewer overview and unauthorized roles denied', 'exact identifier and SQL literal safety',
+    'operator scope, reviewer overview and unauthorized roles denied', 'creator and registered parties see only their own records; external operator tracked', 'exact identifier and SQL literal safety',
     'all records, manifests, users and notices unchanged by read-only queries',
   ] }, null, 2));
 } finally { await db.$disconnect(); }
