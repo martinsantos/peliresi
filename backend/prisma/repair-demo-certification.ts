@@ -84,6 +84,11 @@ async function ensureTipoResiduo() {
 }
 
 async function main() {
+  // Demo data: resets known passwords and (seed-admin-data) clears audit tables.
+  // Refuse unless explicitly requested, and never with NODE_ENV=production.
+  if (process.env.ALLOW_DEMO_SEED !== '1' || process.env.NODE_ENV === 'production') {
+    throw new Error('Script de datos demo bloqueado: requiere ALLOW_DEMO_SEED=1 y no corre con NODE_ENV=production.');
+  }
   console.log('SITREP demo certification repair');
 
   const generadorUser = await ensureUser(demoUsers.generador);
