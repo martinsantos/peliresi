@@ -290,6 +290,7 @@ export interface Manifiesto {
   estado: EstadoManifiesto;
   observaciones: string | null;
   fechaFirma: string | null;
+  fechaEstimadaRetiro?: string | null;
   fechaRetiro: string | null;
   fechaEntrega: string | null;
   fechaRecepcion: string | null;
