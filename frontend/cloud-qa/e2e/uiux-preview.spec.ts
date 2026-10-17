@@ -4,7 +4,7 @@ import { login, prefix } from './helpers';
 // Read-only visual pass of the UI/UX review branch: real synthetic logins, no API interception
 // beyond the shared offline font/tile fixtures, no submissions.
 const journeys: Record<string, string[]> = {
-  admin: ['/dashboard', '/admin/solicitudes', '/admin/actores/generadores/nuevo', '/centro-control', '/admin/carga-masiva', '/admin/vehiculos', '/configuracion?tab=notificaciones'],
+  admin: ['/dashboard', '/admin/solicitudes', '/admin/actores/generadores/nuevo', '/centro-control', '/admin/carga-masiva', '/admin/vehiculos', '/configuracion?tab=notificaciones', '/admin/usuarios', '/admin/auditoria', '/admin/tratamientos', '/alertas', '/estadisticas', '/notificaciones', '/mi-perfil'],
   generador: ['/dashboard', '/manifiestos', '/manifiestos/nuevo', '/configuracion?tab=seguridad', '/mi-perfil/solicitar-cambios'],
   transportista: ['/dashboard', '/manifiestos'],
   operador: ['/dashboard', '/manifiestos'],
