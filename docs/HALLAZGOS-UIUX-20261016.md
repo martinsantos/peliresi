@@ -182,6 +182,51 @@ Pedido de revisión humana sobre el preview: títulos repetidos y filtros que oc
 - «Editar» se ofrece en manifiestos tratados en la tabla de escritorio.
 - El mensaje de validación del backend todavía dice «Baja intensidad»: es un cambio de backend que requiere tu decisión.
 
+## Cuarta pasada — formularios, avisos, maquetas y scripts (17/10/2026, estática)
+
+Revisión de código sin ejecutar. **Verificados a mano** en el código: S1–S5 y F1, F2, F3, F5. El resto es hipótesis de código de alta certeza. Nada de esto está corregido todavía.
+
+### Release y scripts (riesgo operativo)
+
+| ID | P | Dónde | Problema | Acción sugerida |
+| --- | --- | --- | --- | --- |
+| S1 | P0 | `sitrep-deploy-fase3.sh:245` | El redeploy borra todo el directorio del backend salvo `.env`. El `.env` generado no define `UPLOADS_DIR`, y `solicitud.controller.ts:42` guarda documentos de inscripción en `cwd/uploads`. **Cada redeploy con fase3 borraría esos documentos** | Definir `UPLOADS_DIR` fuera del directorio de despliegue y excluir `uploads`. Confirmar el `.env` real del servidor |
+| S2 | P1 | `backend/prisma/seed-admin-data.ts` | Sin guarda de `NODE_ENV`. Restablece contraseñas de cuentas administrativas con un valor fijo y ejecuta `deleteMany({})` sobre auditoría, logs y alertas | Guarda de producción o sacarlo del release |
+| S3 | P1 | `backend/package.json` `demo:repair` → `repair-demo-certification.ts` | Crea cuentas demo activas con contraseñas conocidas, sin guarda | Guarda de producción o quitar el script |
+| S4 | P1 | `MainLayout.tsx:515` → `ui/UserSwitcher.tsx` | El selector de usuarios demo aparece en la cabecera para todos («Cambiar a:», «0 usuarios disponibles») | Mostrarlo sólo en modo demo y dejar un menú de perfil/salida |
+| S5 | P1 | `ConfiguracionPage.tsx:304,347` + `notification-dispatcher.service.ts:51-60` | WhatsApp y Telegram «(próximamente)» se activan y confirman, pero no envían nada. El backend registra el teléfono o chat y el texto del aviso en logs | Deshabilitar u ocultar, y no registrar datos personales |
+| S6 | P2 | `sitrep-deploy-fase3.sh:184-199` | `DISABLE_EMAILS=true`: recuperación de contraseña y verificación de correo no envían | Confirmar que es intencional y anotarlo en el checklist |
+| S7 | P2 | `scripts/health-check.sh` | URL antigua y alertas enviadas a un dominio ajeno | Quitar o reescribir |
+| S8 | P2 | `frontend/scripts/capture-*.cjs/ts`, `debug-*.cjs` | Apuntan a producción con credenciales fijas en el código | Pasar a variables de entorno y **rotar si son cuentas reales** |
+| S9 | P2 | `scripts/migration/migration-db-restore.sh` | `DROP DATABASE` sin confirmación y nombre de base desactualizado | Confirmación tipeada o archivar |
+| S10 | P2 | `scripts/**` | Scripts que apuntan a hosts distintos (`sitrep.ultimamilla.com.ar` vs `rptrazar.mendoza.gov.ar`) | Destino explícito y único |
+| S11 | P2 | `vite.config.v6.ts`, `package.v6.json`, `RUN_V6.sh` | Configuración duplicada cuyo dev proxy apunta a producción | Quitar |
+| S12 | P2 | `public/test.html`, `public/generate_icons.html` | Se publican con el sitio | Quitar |
+| S13 | P3 | `public/sw.js:3` | Versión de caché manual (`v115`) sin subir desde el 13/10 | Subirla en el release o inyectarla como en `sw-app.js` |
+| S14 | P3 | `DemoAppOnboarding`, `ViajeEnCursoPage` (sin ruta), `ui/QRCode.tsx` (QR simulado), componentes no importados | Maquetas o código muerto | Quitar, sobre todo el QR simulado |
+| S15 | P3 | `MapaActoresTab.tsx:203` | `console.debug` residual | Quitar |
+| — | — | `frontend/dist` local | Compilación vieja (`sw` v81) | No desplegar ese `dist`: recompilar |
+
+### Formularios y avisos
+
+| ID | P | Dónde | Problema | Aceptación |
+| --- | --- | --- | --- | --- |
+| F1 | P1 | `PerfilPage.tsx:75`, `ConfiguracionPage.tsx:109` → `PUT /admin/usuarios/:id` (`hasRole('ADMIN')`) | Ningún rol salvo ADMIN puede guardar nombre o teléfono: 403. Mi perfil culpa a la conexión | Endpoint propio limitado a nombre/teléfono (**requiere backend**), o no ofrecer edición y mostrar el motivo |
+| F2 | P1 | `push.controller.ts:25-28`, `AuthContext.logout` | En un dispositivo compartido, la suscripción push sigue del usuario anterior: B no recibe y A sigue recibiendo en un equipo que ya no usa. Es una **fuga de privacidad** | `usuarioId` en el `update` (**backend**) y desuscribir al cerrar sesión |
+| F3 | P1 | `CargaMasivaPage.tsx:147-165` | El backend no devuelve `fallidos`, así que siempre dice «completado», aunque fallen todas las filas. Los errores por línea no se muestran y el archivo se borra aunque haya error | Contar `errores`, mostrarlos y conservar el archivo si falla |
+| F4 | P1 | `SolicitarCambiosPage.tsx:151` | Oculta el motivo del servidor (una solicitud por actor y año) y sugiere reintentar | Mostrar el motivo. **D:** regla anual |
+| F5 | P1 | `ConfiguracionPage.tsx:122-140,214` | Valida 6 caracteres; el servidor exige 8 con mayúscula y número. Culpa a la contraseña actual. Permite doble envío | Misma regla que en el registro, mensaje del servidor y bloqueo mientras envía |
+| F6 | P1 | `AdminVehiculosPage.tsx:115,405,224` | Al editar, una capacidad con decimales se re-parsea multiplicada (1500,5 → 15005). Un año vacío se guarda como 0 | Partir del número crudo y no enviar vacíos |
+| F7 | P2 | `TransportistaDetallePage.tsx:803-811` | Capacidad o año vacíos se envían como 0 y el error es genérico | Igual que H13 |
+| F8 | P2 | `LoginPage.tsx:41` | Puede mostrar el error del intento anterior | Usar sólo el error del intento actual |
+| F9 | P2 | `ViajeEnCursoTransportista.tsx:241-273` | Incidente y pausa no se encolan sin señal (retiro y entrega sí). El modal de incidente no es un diálogo accesible | `offlineSafeMutation` y `Modal` |
+| F10 | P2 | `AlertasPage.tsx:302,406` | El contador cuenta sólo los primeros 20 avisos; difiere de la campana y la barra inferior | Usar `noLeidas` del servidor |
+| F11 | P2 | `GeneradorDetallePage.tsx:230,256,292` | `confirm()` nativo para borrar pagos, DDJJ y documentos | `ConfirmModal` |
+| F12 | P2 | `AdminTratamientosPage.tsx:265,276`, Reclamar/Forgot/Reset | Mensajes en inglés o genéricos (fuera del arreglo H01) | `getApiErrorMessage` |
+| F13 | P2 | `NotificacionesPoller` montado por cada layout | El aviso «N sin leer» se repite al cambiar de grupo de rutas, se re-registra push y se hacen 3 consultas cada 30 s | Montarlo una sola vez y usar una sola consulta |
+| F14 | P3 | `usePushNotifications.ts:44` | Pide permiso de push al cargar, sin gesto del usuario y sin opción para reactivarlo | Botón en Configuración |
+| F15 | P3 | `RegistroPage.tsx`, `EscanerQRPage.tsx:84`, interruptores de Configuración | Etiquetas sin vincular, sin `inputMode`/`tel`; QR pendiente que nadie lee; interruptores sin `role="switch"` | Accesibilidad básica |
+
 ## Comprobado y sin defecto
 
 `Modal` (bloqueo de scroll, trampa de foco, Escape, alto por viewport visible, pie fijo), `Select` (abre en una opción, no en la búsqueda: no abre el teclado), `Input`, `ButtonV2` (44 px en móvil), `Tabs`, `NativeSelect`, `MapLayerToggle`, badges pendiente≠sin leer, wizard público con reintento por documento y envío protegido contra doble toque, `SupportReportDialog` con borrador local.
