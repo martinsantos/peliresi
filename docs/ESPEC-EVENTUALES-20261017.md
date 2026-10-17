@@ -1,6 +1,6 @@
 # Especificación — Manifiesto eventual (17/10/2026, versión 2)
 
-**Estado:** incorpora las respuestas del dueño a A y B. Falta la aprobación final de la especificación completa y la respuesta a C. **Todavía no se tocó código.**
+**Estado:** **aprobada por el dueño el 17/10/2026, tal cual, con C sí.** Implementada en commits locales (ver [Implementación](#implementación-17102026)); la validación completa en el preview aislado está pendiente.
 
 No entra en la publicación a producción del lunes: queda detrás de `MANIFEST_EXCEPTIONAL_ENABLED` (cerrado por defecto) y se valida sólo en el preview aislado.
 
@@ -193,3 +193,49 @@ SUPOSICIONES:
 7. La revisión posterior del revisor designado no cambia.
 
 → Corregime o procedo. Para aprobar, responder por ejemplo: **«Especificación aprobada, C sí»**.
+
+## Implementación (17/10/2026)
+
+Commits locales en `codex/sitrep-uiux-review-20261016`, todos con `[skip ci]`. Sin push, merge ni deploy.
+
+| Commit | Qué |
+|---|---|
+| `d00ed3b` | Dominio (`manifiestoExcepcional.ts`): quién crea, lugar propio desde la sesión, aprobadores, aprobación por lugar, bloqueo de hechos, registros viejos sin bloqueo |
+| `4f097c3` | Migración aditiva `20261017140000_exceptional_any_party`, API, alcance de lectura, seguimiento y conciliación con rol `operador` |
+| `c7d01d8` | Pantalla: formulario según el rol, tarjeta «Aprobación de las partes», botones Aprobar/Rechazar por lugar, seguimiento de operadores |
+| `cc597f6` | Pruebas HTTP, de migración y E2E del preview |
+
+**Decisiones de implementación** (dentro de la especificación):
+
+- «Ficha con usuario activo» se toma de `usuario.activo` de la cuenta titular de la ficha (`usuarioId`). Los delegados de empresa no cuentan para decidir si se requiere aprobación.
+- Las aprobaciones se guardan en `datos.aprobaciones` (aprobadores) y en `eventos` (`APROBAR_PARTE` / `RECHAZAR_PARTE` con `parte`, autor, versión y fecha). Rechazar exige nota; aprobar no.
+- Los campos `generador`, `transportista` y `operador` del pedido son opcionales y no tienen valor por defecto, así que la huella de un pedido con la forma anterior no cambia.
+- C aplicado: el mensaje dice «Un eventual requiere al menos un participante sin alta».
+- En el seguimiento, el operador externo se muestra con el nombre declarado (si falta, «Operador no disponible»).
+
+**Pruebas que cambian por la especificación** (no se borró ninguna negativa; cada cambio tiene una negativa equivalente):
+
+| Antes | Ahora | § | Negativa que la reemplaza |
+|---|---|---|---|
+| ADMIN crea → 403 | ADMIN crea → 201 | 1 | `ADMIN_*` (jefe de sector) crea → 403; el ADMIN creador no puede revisar su propio registro |
+| Generador con alta en un registro mixto: `puedeRegistrar` falso | Verdadero, y `puedeAprobar` = su lugar | 3 | Operador, transportista y generador ajenos → 404 |
+| El operador avanza sin aprobación | RETIRADO → 409 hasta aprobar | 3 | Aprobación con sesión ajena → 403/404; segunda decisión → 409; rechazo bloquea |
+| `datos` = pedido | `datos` = lo que se creó (suma `operador` y `aprobaciones`) y cada campo declarado igual al pedido | 6 | Inmutabilidad tras hechos, sin cambios |
+| Seguimiento: generador y transportista → 403 | 200, sólo sus registros | 5 | Jefe de sector → 403; transportista no parte → 0; operador no ve al operador externo de otro |
+| Conciliación: generador no parte → 403 | 404 | 5 | Sigue sin acceso; confirmar sigue exclusivo del revisor |
+| Exportación: generador → 403 | Sólo encabezado (ningún registro propio) | 5 | Jefe de sector → 403 |
+| Rol `operador` en seguimiento → 400 | Aceptado | 4 | Rol desconocido → 400 |
+| E2E: el transportista vinculado no ve «Registrar retirado» | Lo ve deshabilitado y aprueba su lugar | 3 | Sigue sin «Aprobar post facto»; no puede aprobar como creador |
+| Seed del seguimiento: registro del operador 2 creado por el usuario del operador 1 | Creado por el usuario del operador 2, como lo hace la API | 5 | Sin cambio en los totales esperados (21 y 1) |
+
+**Evidencia hasta ahora:**
+
+- **Backend:** en una copia temporal dentro del contenedor (`/tmp/evt`), sin tocar `/work/sitrep`, y sólo con el lock de QA libre.
+  - Rojo: 15 fallidas / 15 aprobadas en 4 archivos.
+  - Verde: 34/34 en 5 archivos (`manifiestoExcepcional`, `manifiestoExcepcionalGuard`, `seguimientoExterno`, `conciliacionExterna` y `partyReview`).
+  - `prisma generate` con el esquema nuevo, en un `node_modules/.prisma` propio de la copia (el cliente compartido del preview quedó intacto), y `tsc -p tsconfig.build.json --noEmit` sin errores.
+- **Frontend (Mac):**
+  - rojo: 6 fallidas / 9 aprobadas;
+  - verde: 25/25 en `BajaIntensidadPage`, `SeguimientoExterno` y `manifestListReleaseRecovery`;
+  - `tsc -b` sin errores.
+- **Preview aislado:** falta correr build, base nueva (incluye la prueba de migración con una fila del contrato anterior), HTTP y E2E. Se hace coordinado con la sesión principal, porque usa la fuente compartida `/work/sitrep` y el límite es una corrida a la vez.
