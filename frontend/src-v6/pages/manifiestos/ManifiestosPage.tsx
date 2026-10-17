@@ -20,6 +20,7 @@ import { toast } from '../../components/ui/Toast';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useAuth } from '../../contexts/AuthContext';
+import { canOfferManifestDelete } from '../../utils/manifestActions';
 import { useGeneradores } from '../../hooks/useGeneradores';
 import { useOperadores } from '../../hooks/useOperadores';
 import { manifiestoService } from '../../services/manifiesto.service';
@@ -429,7 +430,7 @@ const ManifiestosPage: React.FC = () => {
                       <span className="text-[11px] text-neutral-400">{formatDateTime(m.actividad)}</span>
                       <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
                         <Button aria-label={`Ver manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}><Eye size={14} /></Button>
-                        <Button aria-label={`Eliminar manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1 text-error-700" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}><Trash2 size={14} /></Button>
+                        {canOfferManifestDelete(currentUser?.rol, m.estado) && <Button aria-label={`Eliminar manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1 text-error-700" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}><Trash2 size={14} /></Button>}
                       </div>
                     </div>
                   </div>
@@ -493,7 +494,7 @@ const ManifiestosPage: React.FC = () => {
                     <div className="px-3 py-2 flex items-center justify-end gap-0.5">
                       <button aria-label={`Ver manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`)); }}><Eye size={15} /></button>
                       <button aria-label={`Editar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>
-                      <button aria-label={`Eliminar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>
+                      {canOfferManifestDelete(currentUser?.rol, m.estado) && <button aria-label={`Eliminar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>}
                     </div>
                   </div>
                 </React.Fragment>

@@ -37,3 +37,9 @@ it('does not label a failed first request as an empty registry',()=>{
 it('supports an explicit refresh without reloading the app',()=>{
  render(<View/>);fireEvent.click(screen.getByRole('button',{name:'Actualizar listado'}));expect(mock.refetch).toHaveBeenCalledOnce();
 });
+it('offers delete only for states the server can delete',()=>{
+ const draft={...item,id:'qa-draft',numero:'QA-DRAFT-001',estado:'BORRADOR'},treated={...item,id:'qa-treated',numero:'QA-TREATED-001',estado:'TRATADO'};
+ mock.query.mockReturnValue(query([draft,treated]));render(<View/>);
+ expect(screen.getAllByRole('button',{name:'Eliminar manifiesto QA-DRAFT-001'}).length).toBeGreaterThan(0);
+ expect(screen.queryAllByRole('button',{name:'Eliminar manifiesto QA-TREATED-001'})).toHaveLength(0);
+});
