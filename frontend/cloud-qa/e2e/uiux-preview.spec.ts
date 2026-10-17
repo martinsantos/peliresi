@@ -34,6 +34,32 @@ async function capture(page: Page, info: TestInfo, name: string, seen: ReturnTyp
   expect.soft(proof.overflowX, name + ' no horizontal page scroll').toBeLessThanOrEqual(1);
   expect.soft(proof.errors, name + ' no page errors').toEqual([]);
   seen.errors.length = 0; seen.messages.length = 0;
+  if (info.project.name !== 'web-desktop') await endOfContent(page, info, name);
+}
+
+// At the end of the scroll, the last visible content must sit above the floating help button.
+async function endOfContent(page: Page, info: TestInfo, name: string) {
+  const help = page.getByRole('button', { name: 'Ayuda y soporte técnico' });
+  const main = page.locator('main').first();
+  if (!await main.count()) return;
+  await main.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await page.waitForTimeout(150);
+  const fixed = await help.count() && await help.isVisible() && await help.evaluate(button => getComputedStyle(button.closest('[data-support-ui]')!).position === 'fixed');
+  const geometry = await main.evaluate(element => {
+    const view = element.getBoundingClientRect();
+    let contentBottom = 0;
+    for (const node of element.querySelectorAll('*')) {
+      if (node.children.length) continue;
+      const box = node.getBoundingClientRect();
+      if (!box.width || !box.height || box.bottom <= view.top || box.top >= view.bottom) continue;
+      contentBottom = Math.max(contentBottom, box.bottom);
+    }
+    return { contentBottom };
+  });
+  const helpTop = fixed ? (await help.boundingBox())!.y : null;
+  await page.screenshot({ path: info.outputPath(name + '-fin.png'), fullPage: false });
+  await info.attach(name + '-fin', { body: Buffer.from(JSON.stringify({ name: name + '-fin', ...geometry, helpTop })), contentType: 'application/json' });
+  if (helpTop !== null) expect.soft(geometry.contentBottom, name + ' last content above the help button').toBeLessThanOrEqual(helpTop + 1);
 }
 
 test('public entry: account claim and app viewport', async ({ page }, info) => {
