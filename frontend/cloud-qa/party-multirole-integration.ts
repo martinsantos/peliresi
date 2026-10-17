@@ -81,10 +81,19 @@ try {
     assert.equal(record.datos.generador.nombre, ''); assert.equal(record.datos.patente, '');
     const ownReview = { id: randomUUID(), version: 0, tipo: 'RESOLVER', objetivo: record.id, nota: 'QA autoaprobación prohibida', decision: 'APROBADA' };
     await call(token, '/manifiestos/baja-intensidad/' + record.id + '/eventos', 'POST', ownReview, 403, 'OPERADOR');
-    const requested = (await call(token, '/manifiestos/baja-intensidad/' + record.id + '/eventos', 'POST', {
-      id: randomUUID(), version: 0, tipo: 'SOLICITAR_REVISION', objetivo: record.id, nota: 'QA contraparte vinculada',
-    }, 200, 'OPERADOR')).registro;
+    // Spec v2 §3 (docs/ESPEC-EVENTUALES-20261017.md): the creator and the registered carrier approve before any fact.
+    const reviewRequest = { tipo: 'SOLICITAR_REVISION', objetivo: record.id, nota: 'QA contraparte vinculada' };
+    await call(token, '/manifiestos/baja-intensidad/' + record.id + '/eventos', 'POST', { ...reviewRequest, id: randomUUID(), version: 0 }, 409, 'OPERADOR');
+    assert.deepEqual(record.aprobacion.partes.map((p: { parte: string }) => p.parte), ['creador', 'transportista']);
     const carrier = await login('transportista'), unrelated = await login('transportista2');
+    const ownApproval = (await call(token, '/manifiestos/baja-intensidad/' + record.id + '/eventos', 'POST', {
+      id: randomUUID(), version: 0, tipo: 'APROBAR_PARTE', parte: 'creador', nota: '' }, 200, 'OPERADOR')).registro;
+    const carrierApproval = (await call(carrier, '/manifiestos/baja-intensidad/' + record.id + '/eventos', 'POST', {
+      id: randomUUID(), version: ownApproval.version, tipo: 'APROBAR_PARTE', parte: 'transportista', nota: '' })).registro;
+    assert.equal(carrierApproval.aprobacion.estado, 'APROBADO');
+    const requested = (await call(token, '/manifiestos/baja-intensidad/' + record.id + '/eventos', 'POST', {
+      ...reviewRequest, id: randomUUID(), version: carrierApproval.version,
+    }, 200, 'OPERADOR')).registro;
     await call(unrelated, '/manifiestos/baja-intensidad/' + record.id, 'GET', undefined, 404);
     const command = { ...ownReview, id: randomUUID(), version: requested.version, nota: 'QA aprobación de contraparte' };
     const reviewed = (await call(carrier, '/manifiestos/baja-intensidad/' + record.id + '/eventos', 'POST', command)).registro;
