@@ -149,7 +149,7 @@ export async function readableMapLayers(group: Locator) {
 export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';
 
 const fixturePages = new WeakSet<Page>();
-async function isolatedMapTiles(page: Page, info: TestInfo) {
+export async function isolatedMapTiles(page: Page, info: TestInfo) {
   if (process.env.SITREP_QA_EXECUTOR !== 'preview-container' || fixturePages.has(page)) return;
   fixturePages.add(page);
   const fontRoot=path.resolve(process.env.QA_ARTIFACTS!,'../.qa-fonts');

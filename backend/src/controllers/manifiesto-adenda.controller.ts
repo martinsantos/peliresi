@@ -1,3 +1,4 @@
+import { manifestFeatureEnabled, manifestPracticeIdentity } from '../lib/manifestTraining';
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
@@ -13,7 +14,7 @@ import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
-  if (process.env.MANIFEST_ADDENDA_ENABLED !== 'true') return next(new AppError('Adendas no habilitadas', 404));
+  if (!manifestFeatureEnabled('MANIFEST_ADDENDA_ENABLED')) return next(new AppError('Adendas no habilitadas', 404));
   next();
 }
 async function accessibleManifest(req: AuthRequest) {
@@ -23,8 +24,8 @@ async function accessibleManifest(req: AuthRequest) {
   return manifest;
 }
 function canReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue }) {
-  return exceptionalCanReview(req, record) || (process.env.MANIFEST_PARTY_REVIEW_ENABLED === 'true'
-    && canReviewAsCounterpart(req.user, record, record.declaracion as ReviewParties));
+  return exceptionalCanReview(req, record) || (manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED')
+    && canReviewAsCounterpart(manifestPracticeIdentity(req.user), record, record.declaracion as ReviewParties));
 }
 function present(record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
   const reviews = record.revisiones as unknown as AddendumReview[];
@@ -128,19 +129,19 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
       const reviews = current.revisiones as unknown as AddendumReview[];
       const repeated = reviews.find(r => r.id === command.id);
       if (repeated) {
-        if (repeated.autorId !== req.user.id || repeated.version !== command.version || repeated.nota !== command.nota || repeated.decision !== command.decision) {
+        if (repeated.autorId !== req.user.id || repeated.impersonadoPorId !== req.user.impersonatedBy?.id || repeated.version !== command.version || repeated.nota !== command.nota || repeated.decision !== command.decision) {
           throw new AppError('La resolución ya tiene otro contenido', 409);
         }
         return current;
       }
       if (current.version !== command.version) throw new AppError('La revisión cambió; recargá antes de resolver', 409);
       const updated = await tx.adendaManifiesto.updateMany({ where: { id: current.id, version: command.version }, data: {
-        version: { increment: 1 }, revisiones: [...reviews, { ...command, autorId: req.user.id, fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue,
+        version: { increment: 1 }, revisiones: [...reviews, { ...command, autorId: req.user.id, ...(req.user.impersonatedBy ? { impersonadoPorId: req.user.impersonatedBy.id } : {}), fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue,
       } });
       if (updated.count !== 1) throw new AppError('Otro revisor resolvió esta versión; recargá', 409);
       if (command.decision === 'APROBADA') {
         await noticeNewCurrents(tx, (current.declaracion as { residuos?: unknown }).residuos, current.residuos,
-          '/manifiestos/' + current.manifiestoId + '/adendas', command.id);
+          '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id);
       }
       return tx.adendaManifiesto.findUniqueOrThrow({ where: { id: current.id } });
     });

@@ -26,7 +26,7 @@ it('retains training on refresh despite an expired bearer token', () => {
   const { next } = run('/api/auth/refresh-token', expired, { refreshToken: sign({ realm: TRAINING_REALM, impersonatedBy: 'real-admin' }) });
   expect(next.mock.results[0].value).toBe(true);
 });
-it.each(['/api/admin/jobs/vencimientos', '/api/auth/register', '/api/blockchain', '/api/pdf/certificado/one', '/api/inspecciones/one/acta.pdf', '/api/inspecciones/one/acta%2epdf'])('blocks irreversible or external capabilities: %s', path => {
+it.each(['/api/manifiestos/one/adendas/two/anexo', '/api/manifiestos/one/adendas/two/%61nexo', '/api/admin/jobs/vencimientos', '/api/auth/register', '/api/blockchain', '/api/pdf/certificado/one', '/api/inspecciones/one/acta.pdf', '/api/inspecciones/one/acta%2epdf'])('blocks irreversible or external capabilities: %s', path => {
   const { next } = run(path, sign({ realm: TRAINING_REALM, impersonatedBy: 'real-admin' }));
   expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
   expect(isTrainingSession()).toBe(false);

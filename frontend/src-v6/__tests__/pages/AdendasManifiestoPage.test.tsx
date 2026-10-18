@@ -3,9 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AdendasManifiestoPage from '../../pages/manifiestos/AdendasManifiestoPage';
-const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
+const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), training: false }));
 vi.mock('../../services/api', () => ({ api: mock }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user' } }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user', training: mock.training } }) }));
 const record = { id: 'qa-adenda', motivo: 'Diferencia de carga', rectificaId: null, version: 0, estadoRevision: 'PENDIENTE', puedeResolver: false,
   creadoPorId: 'qa-carrier', createdAt: '2026-10-15T00:00:00Z', residuos: [{ corriente: 'Y2', cantidad: 12, unidad: 'kg' }],
   declaracion: { numero: 'QA-1', residuos: [{ corriente: 'Y1', cantidad: 10, unidad: 'kg' }] }, revisiones: [] };
@@ -15,7 +15,7 @@ function view() {
     <MemoryRouter initialEntries={['/manifiestos/qa-id/adendas']}><Routes><Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} /></Routes></MemoryRouter>
   </QueryClientProvider>);
 }
-beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true'); mock.get.mockResolvedValue({ data: { data } }); });
+beforeEach(() => { mock.training = false; vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true'); mock.get.mockResolvedValue({ data: { data } }); });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 it('flag off makes no request', () => { vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'false'); view(); expect(mock.get).not.toHaveBeenCalled(); });
 it('keeps original and observed loads separate; read-only participant has no write controls', async () => {
@@ -82,5 +82,17 @@ it('download failure keeps existing facts and offers retry without false success
   await screen.findByText('No se pudo descargar el anexo. Tus datos y revisiones no cambiaron.');
   expect(screen.getByText('Y1 · 10 kg')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Descargar anexo v0' })).toBeEnabled();
+  expect(mock.post).not.toHaveBeenCalled();
+});
+
+it('school session can practice with operational flag off, while both annex downloads stay disabled', async () => {
+  vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'false'); mock.training = true;
+  mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, version: 2 }] } } });
+  view(); await screen.findByText('Y1 · 10 kg');
+  expect(screen.getByText('Y2 · 12 kg')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Descargar anexo v2' })).toBeDisabled();
+  fireEvent.click(screen.getByText('Trazabilidad de la adenda'));
+  expect(screen.getByRole('button', { name: 'Descargar versión anterior' })).toBeDisabled();
+  expect(screen.getByText('Capacitación: sin anexos ni documentos oficiales.')).toBeVisible();
   expect(mock.post).not.toHaveBeenCalled();
 });

@@ -70,3 +70,15 @@ it('user scroll takes priority and later image loads do not pull them back',()=>
   document.querySelector('img.guide-image')!.dispatchEvent(new Event('load'));
   vi.advanceTimersByTime(100); expect(scroll).toHaveBeenCalledTimes(previous);
 });
+
+it('an explicit index destination survives intermediate smooth-scroll events until user input',()=>{
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount();
+  (document.querySelectorAll('#tutorialIndex a')[2] as HTMLElement).click();
+  window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(20);
+  expect(current()).toContain('Paso 3');
+  expect(window.location.hash).toBe('#paso-3-paso-3');
+  window.dispatchEvent(new Event('wheel')); targetTop=600;
+  window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(20);
+  expect(current()).toContain('Paso 2');
+});

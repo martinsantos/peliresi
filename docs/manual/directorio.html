@@ -888,16 +888,26 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <h4>Crear Nuevo (<code>/manifiestos/nuevo</code>)</h4>
 <p>Formulario multi-paso guiado:</p>
 <ol>
-<li><strong>Paso 1:</strong> Seleccion de tipo de residuo del catalogo de categorias Y.</li>
-<li><strong>Paso 2:</strong> Cantidad y unidad de medida.</li>
-<li><strong>Paso 3:</strong> Seleccion de transportista (auto-completa CUIT, telefono, domicilio, habilitacion).</li>
-<li><strong>Paso 4:</strong> Seleccion de operador destino (auto-completa datos).</li>
-<li><strong>Paso 5:</strong> Revision del resumen y firma electronica.</li>
+<li><strong>Paso 1 · Generador:</strong> Confirmar el establecimiento que declara los residuos.</li>
+<li><strong>Paso 2 · Residuos:</strong> Elegir corriente, cantidad y unidad; agregar las filas necesarias.</li>
+<li><strong>Paso 3 · Destino:</strong> Elegir transportista, vehículo y chofer de su nómina, y operador habilitado. Al cambiar de transportista se limpian vehículo y chofer; no se asignan reemplazos automáticamente.</li>
 </ol>
 <p>El manifiesto se guarda como <strong>BORRADOR</strong> hasta que se firma electronicamente.</p>
 <div class="callout callout-warning" style="margin-top:1rem;">
   <strong>Filtrado inteligente:</strong> Al seleccionar residuos, el sistema muestra solo los operadores habilitados para tratar esos tipos de residuos. Si se elige modalidad IN SITU, el transportista no es requerido.
 </div>
+
+<h4>Eventuales y adendas</h4>
+<div class="callout callout-info">
+<strong>Práctica de capacitación:</strong> Eventuales y adendas están disponibles con la banda «Capacitación · sin validez oficial». Permanecen apagados en la operación real de esta instalación.
+<a href="tutorial.html?guide=capacitacion-novedades">Abrir la guía simple para web y app</a>.
+</div>
+<ul>
+<li><strong>Eventual:</strong> al menos una parte está fuera del padrón. Se registra lo conocido y se conservan los datos pendientes. Quien lo crea y las otras partes con cuenta aprueban su participación antes de registrar los movimientos. No otorga número oficial ni habilitación.</li>
+<li><strong>Adenda:</strong> transporte u operador vinculados registran la carga observada completa y el motivo después de la aprobación del manifiesto. Una contraparte vinculada o un revisor designado revisa, sin autoaprobación. La declaración original permanece intacta y el circuito operativo continúa.</li>
+<li><strong>Rectificación:</strong> se agrega otra adenda que referencia a la anterior; no se borra el antecedente. Una diferencia no acredita por sí sola la intención de quien declaró.</li>
+<li>En capacitación no se descargan anexos, PDF ni certificados oficiales, ni se entregan correos o push.</li>
+</ul>
 
 <h4>Detalle (<code>/manifiestos/:id</code>)</h4>
 <ul>

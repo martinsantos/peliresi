@@ -1,3 +1,4 @@
+import { manifestFeatureEnabled, manifestPracticeIdentity } from '../lib/manifestTraining';
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
@@ -10,9 +11,9 @@ import { advanceExceptional, exceptionalApproval, exceptionalApprovers, exceptio
   exceptionalCreateSchema, exceptionalCreator, exceptionalEventSchema, exceptionalPending, planExceptionalSlots,
   EXCEPTIONAL_SLOTS, ExceptionalApprover, ExceptionalEvent, ExceptionalSlot, ExceptionalStage } from '../domain/manifiestoExcepcional';
 
-// Fail closed. No runtime enablement on existing deployments.
+// Operational sessions stay fail-closed; school sessions use their isolated store.
 export function exceptionalEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
-  if (process.env.MANIFEST_EXCEPTIONAL_ENABLED !== 'true') return next(new AppError('Circuito no habilitado', 404));
+  if (!manifestFeatureEnabled('MANIFEST_EXCEPTIONAL_ENABLED')) return next(new AppError('Circuito no habilitado', 404));
   next();
 }
 /** Existing designated-reviewer boundary, not every administrator. */
@@ -23,7 +24,7 @@ export function exceptionalDesignatedReviewer(user: AuthRequest['user']) {
 function reviewer(req: AuthRequest) { return exceptionalDesignatedReviewer(req.user); }
 export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId?: unknown; datos?: unknown; operadorId?: unknown }) {
   const data = record.datos as { generador?: { padronId?: string }; transportista?: { padronId?: string } } | undefined;
-  const counterpart = process.env.MANIFEST_PARTY_REVIEW_ENABLED === 'true' && data && canReviewAsCounterpart(req.user, record, {
+  const counterpart = manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED') && data && canReviewAsCounterpart(manifestPracticeIdentity(req.user), record, {
     generadorId: data.generador?.padronId, transportistaId: data.transportista?.padronId,
     operadorId: typeof record.operadorId === 'string' ? record.operadorId : undefined,
   });
@@ -44,7 +45,7 @@ export function exceptionalReadWhere(user: AuthRequest['user']): Prisma.Registro
 const scope = (req: AuthRequest) => exceptionalReadWhere(req.user);
 export async function exceptionalParticipants(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    exceptionalCreator(req.user);
+    exceptionalCreator(manifestPracticeIdentity(req.user));
     const type = req.query.tipo;
     if (type !== 'generador' && type !== 'transportista' && type !== 'operador') throw new AppError('Tipo de participante inválido', 400);
     const search = String(req.query.q || '').trim().slice(0, 100);
@@ -60,7 +61,7 @@ export async function exceptionalParticipants(req: AuthRequest, res: Response, n
 type StoredRecord = { id: string; creadoPorId: string; autorRol?: string | null; operadorId?: string | null; datos: Prisma.JsonValue; eventos: Prisma.JsonValue; [key: string]: unknown };
 const approversOf = (record: StoredRecord) => (record.datos as { aprobaciones?: ExceptionalApprover[] } | null)?.aprobaciones;
 function canApproveParts(req: AuthRequest, record: StoredRecord) {
-  return (approversOf(record) || []).filter(a => exceptionalCanApprove(req.user, a)).map(a => a.parte);
+  return (approversOf(record) || []).filter(a => exceptionalCanApprove(manifestPracticeIdentity(req.user), a)).map(a => a.parte);
 }
 function present(record: StoredRecord, req: AuthRequest) {
   const events = record.eventos as unknown as ExceptionalEvent[];
@@ -91,7 +92,7 @@ export async function getExceptional(req: AuthRequest, res: Response, next: Next
 }
 export async function createExceptional(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const creator = exceptionalCreator(req.user);
+    const creator = exceptionalCreator(manifestPracticeIdentity(req.user));
     const input = exceptionalCreateSchema.safeParse(req.body);
     if (!input.success) throw new AppError(input.error.issues[0].message, 400);
     const huellaSolicitud = createHash('sha256').update(JSON.stringify(input.data)).digest('hex');
@@ -167,7 +168,7 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
       if (command.tipo === 'RESOLVER' && command.decision === 'APROBADA' && command.objetivo !== current.id) {
         await noticeNewCurrents(tx, (current.datos as { residuos?: unknown }).residuos,
           events.find(e => e.id === command.objetivo && e.tipo === 'DIFERENCIA')?.residuos,
-          '/manifiestos/baja-intensidad?registro=' + current.id, command.id);
+          '/manifiestos/baja-intensidad?registro=' + current.id, command.id, req.user.id);
       }
       return tx.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: current.id } });
     });

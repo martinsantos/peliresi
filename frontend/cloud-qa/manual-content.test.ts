@@ -153,7 +153,7 @@ test('classroom records keep five teams and distinct actor/authority views', () 
 test('all classroom links remain on the current/future domain; trial stays trial', () => {
   const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
   const resources = workshop.steps.flatMap((s: any) => [...(s.resources || []), ...(s.teams || []).flatMap((t: any) => t.records)]);
-  assert.equal(resources.length, 73);
+  assert.equal(resources.length, 75);
   for (const r of resources) {
     const href = r.path || r.href;
     assert.match(href, /^\/(?!\/)[a-zA-Z0-9/?=&._-]+$/);
@@ -166,4 +166,17 @@ test('all classroom links remain on the current/future domain; trial stays trial
   const fixture = resources.find((r: any) => r.download);
   assert.equal(fixture.href, '/manual/fixtures/licencia-capacitacion.png');
   assert.ok(existsSync(fileURLToPath(new URL('fixtures/licencia-capacitacion.png', root))));
+});
+
+
+test('classroom new features explain incomplete identities, registered fleet and preserved declarations', () => {
+  const guide = guides.find((g: any) => g.id === 'capacitacion-novedades');
+  assert.equal(guide.steps.length, 4);
+  assert.match(guide.safety, /siguen apagadas en la operación real/);
+  assert.match(JSON.stringify(guide), /no inventes datos/i);
+  assert.match(JSON.stringify(guide), /otra.*conserva el antecedente/);
+  assert.match(JSON.stringify(guide), /no se aprueba a sí mismo/);
+  assert.match(JSON.stringify(guide), /no se reemplazan|elegilas otra vez/);
+  assert.equal(guide.steps[0].resources[0].path, '/switch-user?modo=capacitacion');
+  assert.match(read('index.html'), /guide=capacitacion-novedades/);
 });

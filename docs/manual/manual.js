@@ -339,7 +339,7 @@
       link.href = '#' + id;
       link.innerHTML = '<span class="index-marker">' + (index + 1) + '</span><span>' + escapeHTML(step.title) + '</span>';
       link.addEventListener('click', function () {
-        releaseHashRestoration();
+        restoringHashIndex = index;
         updateActive(index, true);
         if (window.innerWidth <= 820) setMobileIndex(false);
       });
@@ -392,6 +392,7 @@
         window.location.href = './';
         return;
       }
+      restoringHashIndex = target;
       stepSections[target].scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
       updateActive(target, true);
     }
@@ -447,12 +448,15 @@
         });
       });
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(restoreHashStep);
-      window.addEventListener('wheel', releaseHashRestoration, { passive: true });
-      window.addEventListener('touchmove', releaseHashRestoration, { passive: true });
-      window.addEventListener('keydown', function (event) {
-        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].indexOf(event.key) >= 0) releaseHashRestoration();
-      });
     }
+    // Explicit navigation owns its destination while native smooth scrolling
+    // crosses other steps. Only a new user gesture resumes reading-position sync.
+    window.addEventListener('wheel', releaseHashRestoration, { passive: true });
+    window.addEventListener('touchmove', releaseHashRestoration, { passive: true });
+    window.addEventListener('pointerdown', releaseHashRestoration, { passive: true });
+    window.addEventListener('keydown', function (event) {
+      if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].indexOf(event.key) >= 0) releaseHashRestoration();
+    });
 
     var mobileToggle = document.getElementById('mobileIndexToggle');
     var sidebar = document.getElementById('tutorialSidebar');

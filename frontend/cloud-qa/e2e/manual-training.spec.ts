@@ -1,5 +1,7 @@
+import { isolatedMapTiles } from './helpers';
 import { expect, test } from '@playwright/test';
 test('classroom: direct CAP records, collapsible teams, mobile index and reusable OCR', async ({ page }, info) => {
+  await isolatedMapTiles(page, info);
   const errors: string[] = [], writes: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -8,7 +10,7 @@ test('classroom: direct CAP records, collapsible teams, mobile index and reusabl
     if (!['GET', 'HEAD'].includes(r.method()) || new URL(r.url()).pathname.startsWith('/api/')) {
       writes.push(r.method() + ' ' + r.url()); await route.abort(); return;
     }
-    await route.continue();
+    await route.fallback();
   });
   await page.goto('/manual/');
   await page.getByRole('link', { name: 'Recorrido de capacitación por rol', exact: true }).click();

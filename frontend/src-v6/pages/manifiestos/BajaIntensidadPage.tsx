@@ -1,3 +1,4 @@
+import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import React, { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -84,7 +85,7 @@ export default function BajaIntensidadPage() {
   const id = params.get('registro');
   const tracking = !id && params.get('vista') === 'seguimiento';
   const listPage = Math.max(1, Math.floor(Number(params.get('pagina')) || 1));
-  const enabled = import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true';
+  const enabled = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED, currentUser);
   const qc = useQueryClient();
   const queryKey = id ? ['baja-intensidad', currentUser?.id, id] : ['baja-intensidad', currentUser?.id, null, listPage];
   const query = useQuery({ queryKey, enabled: enabled && !!currentUser && !tracking,

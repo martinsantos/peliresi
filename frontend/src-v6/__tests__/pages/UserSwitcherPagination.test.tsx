@@ -64,3 +64,13 @@ it('never queries the roster for non-admins', () => {
   expect(screen.getByText('Cambio de usuario no disponible')).toBeVisible();
   expect(mocks.query).not.toHaveBeenCalled();
 });
+
+it('direct classroom entry only requests the training roster', async () => {
+  const { api } = await import('../../services/api');
+  const get = vi.spyOn(api, 'get').mockResolvedValue({ data: { data: { usuarios: [], pagination: { total: 0, pages: 0 } } } });
+  render(<MemoryRouter initialEntries={['/switch-user?modo=capacitacion']}><UserSwitcherPage /></MemoryRouter>);
+  for (const [options] of mocks.query.mock.calls) await options.queryFn();
+  expect(get).toHaveBeenCalledTimes(8);
+  expect(get.mock.calls.every(([url]) => url === '/admin/training/usuarios')).toBe(true);
+  get.mockRestore();
+});

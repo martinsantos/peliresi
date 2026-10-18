@@ -11,7 +11,7 @@ export const addendumReviewSchema = z.object({
   nota: z.string().trim().min(1).max(500), decision: z.enum(['APROBADA', 'OBSERVADA', 'RECHAZADA']),
 }).strict();
 export type AddendumReview = z.infer<typeof addendumReviewSchema> & {
-  autorId: string; fecha: string;
+  autorId: string; impersonadoPorId?: string; fecha: string;
 };
 export function addendumStageAllowed(stage: string) {
   return ['APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'RECHAZADO'].includes(stage);

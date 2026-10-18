@@ -1,3 +1,4 @@
+import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import React, { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
@@ -21,7 +22,7 @@ function Load({ rows }: { rows: Waste[] }) {
 }
 export default function AdendasManifiestoPage() {
   const { id } = useParams(); const { currentUser } = useAuth(); const mp = useMobilePrefix();
-  const enabled = import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED === 'true';
+  const enabled = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser);
   const [page, setPage] = useState(1); const qc = useQueryClient();
   const key = ['manifiesto-adendas', currentUser?.id, id];
   const endpoint = `/manifiestos/${encodeURIComponent(id || '')}/adendas`;
@@ -93,6 +94,7 @@ export default function AdendasManifiestoPage() {
       <Input label="Motivo de la adenda" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
       <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy}>Guardar y solicitar revisión</Button><Button type="button" variant="outline" disabled={busy} onClick={() => setCreating(false)}>Cerrar formulario</Button></div>
     </form></Card>}
+    {currentUser?.training && <p className="text-sm text-neutral-600">Capacitación: sin anexos ni documentos oficiales.</p>}
     {data && <>
       {data.total === 0 && <p>Todavía no hay adendas.</p>}
       {data.adendas.map((item, i) => <Card key={item.id} className="p-4 space-y-3" role="region" aria-label={`Adenda ${item.id}`}>
@@ -101,7 +103,7 @@ export default function AdendasManifiestoPage() {
         <div className="grid gap-4 sm:grid-cols-2"><div><h3 className="font-medium">Declaración conservada</h3><Load rows={item.declaracion.residuos} /></div><div><h3 className="font-medium">Carga observada</h3><Load rows={item.residuos} /></div></div>
         {item.rectificaId && <p className="text-sm break-all">Rectifica adenda {item.rectificaId}; el antecedente se conserva.</p>}
         <p className="text-sm text-amber-800">Compatibilidad de corrientes sin verificar. Registrar no implica habilitación.</p>
-        <Button variant="outline" disabled={busy} onClick={() => void download(item, item.version)}>Descargar anexo v{item.version}</Button>
+        <Button variant="outline" disabled={busy || currentUser?.training} onClick={() => void download(item, item.version)}>Descargar anexo v{item.version}</Button>
         {item.puedeResolver && <div className="space-y-2"><Input id={`resolucion-${item.id}`} label="Motivo de resolución" maxLength={500} value={notes[item.id] || ''} onChange={e => setNotes({ ...notes, [item.id]: e.target.value })} />
           <div className="flex flex-wrap gap-2">{[['APROBADA', 'Aprobar post facto'], ['OBSERVADA', 'Observar'], ['RECHAZADA', 'Rechazar conformidad']].map(([decision, label]) => <Button key={decision} variant="outline" disabled={busy || !notes[item.id]?.trim()} onClick={() => void send(endpoint + '/' + item.id + '/revisiones', { version: item.version, decision, nota: notes[item.id] })}>{label}</Button>)}</div>
         </div>}
@@ -109,7 +111,7 @@ export default function AdendasManifiestoPage() {
         <details><summary className="cursor-pointer py-2 text-sm">Trazabilidad de la adenda</summary><p className="text-sm break-all">{item.id} · {item.createdAt} · {item.creadoPorId}</p>
           {item.version > 0 && <div className="flex flex-wrap gap-2" aria-label="Versiones anteriores">
             <Input label="Versión anterior" type="number" inputMode="numeric" min={0} max={item.version - 1} step={1} value={versions[item.id] ?? 0} onChange={e => setVersions({ ...versions, [item.id]: Number(e.target.value) })} />
-            <Button variant="outline" disabled={busy || !Number.isSafeInteger(versions[item.id] ?? 0) || (versions[item.id] ?? 0) < 0 || (versions[item.id] ?? 0) >= item.version} onClick={() => void download(item, versions[item.id] ?? 0)}>Descargar versión anterior</Button>
+            <Button variant="outline" disabled={busy || currentUser?.training || !Number.isSafeInteger(versions[item.id] ?? 0) || (versions[item.id] ?? 0) < 0 || (versions[item.id] ?? 0) >= item.version} onClick={() => void download(item, versions[item.id] ?? 0)}>Descargar versión anterior</Button>
           </div>}
           <ul className="space-y-2">{item.revisiones.map(r => <li key={r.id} className="text-sm break-words">{labels[r.decision]} · {r.nota}<span className="block text-neutral-600 break-all">{r.fecha} · {r.autorId}</span></li>)}</ul>
         </details>

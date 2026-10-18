@@ -1,3 +1,4 @@
+import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Manifiestos Page
  * ============================
@@ -170,7 +171,7 @@ const ManifiestosPage: React.FC = () => {
 
   const filterCount = [fechaDesde, fechaHasta, estadoFilter, generadorFilter, operadorFilter].filter(Boolean).length;
   const estadoOptions = [{ value: '', label: 'Todos los estados' }, ...Object.values(EstadoManifiesto).map((e) => ({ value: e, label: ESTADO_LABELS[e] || e }))];
-  const showEventuales = import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED === 'true' && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '');
+  const showEventuales = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED, currentUser) && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '');
 
   // Reset accumulator when any filter/sort changes
   const filterKey = `${searchTerm}|${estadoFilter}|${generadorFilter}|${operadorFilter}|${fechaDesde}|${fechaHasta}|${sortBy}|${sortOrder}`;

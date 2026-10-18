@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Shield, Factory, Truck, FlaskConical, ClipboardCheck, User, ChevronRight, ChevronDown, Loader2, Search, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
@@ -119,7 +119,8 @@ export const UserSwitcherPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
-  const [training, setTraining] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [training, setTraining] = useState(() => searchParams.get('modo') === 'capacitacion');
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => window.clearTimeout(timer);

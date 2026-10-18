@@ -28,7 +28,8 @@
           { title: 'Generador → transportista → operador · 20 min', body: ['Con la banda de capacitación visible, elegí un manifiesto CAP del equipo: generador revisa y firma; transportista confirma retiro y entrega; operador recibe, pesa, registra tratamiento y cierra.', 'Cada equipo verifica el estado y la línea de tiempo antes de entregar el turno al siguiente. Las descargas oficiales están deshabilitadas en capacitación. En Operación real sólo se muestran registros existentes, sin accionarlos.'], image: S + 'desktop/training-manifest-20261012.png', caption: QA_TRAINING, alt: 'Manifiesto de capacitación tratado, sin emisión de documentos oficiales', expected: 'Las tres partes completan el relevo y comprueban el cierre sin alterar un manifiesto ni emitir un certificado real.' },
           { title: 'Inspector y autoridad · 20 min', body: ['El inspector identifica Visita, Controles, Registro y Expediente; contrasta lo declarado, documenta un hallazgo y verifica el guardado de su evidencia.', 'La autoridad revisa el expediente; el actor localiza el requerimiento que le corresponde. En el entorno escuela, demostrar respuesta vinculada y decisión autorizada. Una respuesta no equivale a conformidad.'], image: S + 'mobile/training-inspection-20261012.png', caption: QA_TRAINING, alt: 'Inspector de capacitación: secciones numeradas, control revisado y guardado confirmado', expected: 'Se distinguen acta, informe, respuesta del actor y decisión de la autoridad.' },
           { title: 'Administración y soporte · 15 min', body: ['Administración localiza una solicitud, sus documentos y correcciones; consulta el padrón, el CAA oficial y Monitor con el período del ejercicio.', 'El equipo de soporte muestra un ticket escuela: Asignarme, Derivar, nota interna y respuesta pública. El autor verifica el aviso y la respuesta en el mismo ticket.'], image: S + 'desktop/support-actions-20261012.png', caption: QA_TRAINING, alt: 'Acciones del equipo de soporte: responder, nota interna, derivar y cerrar', expected: 'Se identifica quién debe actuar y qué ve el usuario final; las notas internas quedan separadas.' },
-          { title: 'Comprobación final · 10 min', body: ['Cada participante encuentra su próxima tarea y explica cómo pedir ayuda. Registrar dudas con pantalla, rol y resultado esperado.', 'GPS, cámara QR y recuperación de conexión deben comprobarse en los teléfonos de la jornada; una prueba en navegador o emulador no certifica batería ni segundo plano. No borrar ni reiniciar datos productivos para repetir ejercicios.'], expected: 'El instructor registra resultados y pendientes reales, sin declarar un GO global por completar el tour.' }
+          { title: 'Comprobación final · 10 min', body: ['Monitor → Historial → Pausar → mové la barra → Reproducir. Pendientes muestra lo que falta; En vivo vuelve al estado actual. Son ubicaciones sintéticas, no un viaje físico en vivo.',
+    'Cada participante encuentra su próxima tarea y explica cómo pedir ayuda. Registrar dudas con pantalla, rol y resultado esperado.', 'GPS, cámara QR y recuperación de conexión deben comprobarse en los teléfonos de la jornada; una prueba en navegador o emulador no certifica batería ni segundo plano. No borrar ni reiniciar datos productivos para repetir ejercicios.'], expected: 'El instructor registra resultados y pendientes reales, sin declarar un GO global por completar el tour.' }
         ]
       },
       {
@@ -320,6 +321,18 @@
     ]
   };
 
+  // Keep the existing guide and visual treatment; align its order with the three-step form.
+  var createGuide = window.SITREP_HELP.guides.find(function (guide) { return guide.id === 'generador-crear-manifiesto'; });
+  var actorStep = createGuide.steps[1];
+  createGuide.steps[1] = createGuide.steps[2];
+  createGuide.steps[2] = actorStep;
+  actorStep.image = S + 'desktop/training-fleet-20261018.png';
+  actorStep.caption = 'Datos sintéticos · preview aislado · 18/10/2026. No acredita Android físico.';
+  actorStep.alt = 'Vehículo y chofer de la nómina del transportista CAP seleccionados';
+  actorStep.body.push('En Destino, elegí el vehículo y el chofer ya registrados del transportista. Si cambiás de transportista, volvé a seleccionarlos. Después de crear, verificá Transporte asignado en el detalle.');
+  createGuide.steps[3].body = ['Revisá los datos y pulsá Crear Manifiesto. Se guarda como BORRADOR.', 'Reabrí el detalle antes de firmar; si necesitás corregirlo, hacelo mientras siga en borrador.'];
+  createGuide.steps[4].body = ['Abrí el borrador validado y pulsá Firmar Manifiesto.', 'Dibujá la firma → Usar firma → Confirmar y Firmar. Comprobá APROBADO antes de pasar el turno al transportista.'];
+
   // Classroom links identify existing synthetic records; they never switch
   // identity, enable training, create records or bypass the application's ACL.
   var workshop = window.SITREP_HELP.guides[0];
@@ -332,7 +345,7 @@
     'Las cuentas se llaman CAP · ADMIN N, INSPECTOR N, GENERADOR N, TRANSPORTISTA N y OPERADOR N. También hay ADMIN_GENERADOR N, ADMIN_TRANSPORTISTA N y ADMIN_OPERADOR N para consulta sectorial. Reemplazá N por tu equipo, del 1 al 5.',
     'Los enlaces App abren la web móvil. Dentro del APK, seguí estos mismos números desde su menú si el manual se abrió en otro navegador. No instales ni actualices el APK para hacer este recorrido.'
   ];
-  workshop.steps[0].resources = [{ label: 'Elegir cuenta CAP · requiere administrador', path: '/switch-user' }];
+  workshop.steps[0].resources = [{ label: 'Elegir cuenta CAP · requiere administrador', path: '/switch-user?modo=capacitacion' }];
   workshop.steps[1].body = [
     'Abrí un alta en modo revisión. Para la demostración, usá Transportista: completá datos ficticios y agregá un chofer en Flota y choferes. No uses documentos personales.',
     'Descargá la licencia sintética de abajo y elegila en el campo de licencia. Compará las propuestas OCR con el original antes de usar los datos seleccionados. OCR no aprueba identidad, pagos ni habilitación.',
@@ -347,6 +360,8 @@
     'Elegí OPERADOR N: recibí, revisá pesaje, registrá tratamiento y cerrá. Verificá TRATADO y la cronología. Las descargas oficiales están deshabilitadas en capacitación.',
     'Si falta tiempo, CAP-N-APROBADO es otro caso para empezar desde retiro. CAP-N-TRATADO sirve de consulta. No finjas continuidad entre ellos ni reinicies un caso ya utilizado.'
   ];
+  workshop.steps[2].body.push('Para practicar un alta de manifiesto: Nuevo manifiesto → residuo → transportista de tu equipo → vehículo y chofer de su nómina → operador del mismo equipo → Crear Manifiesto. Anotá el nuevo número y usalo en todos los relevos. Si cambiás de transportista, volvé a elegir vehículo y chofer; no se reemplazan automáticamente.');
+  workshop.steps[2].resources = [{ label: 'Crear un caso nuevo · cuenta GENERADOR CAP', path: '/manifiestos/nuevo' }, { label: 'Eventuales y adendas · práctica adicional', href: '/manual/tutorial.html?guide=capacitacion-novedades' }];
   workshop.steps[3].body = [
     'Campo: INSPECTOR N abre CAP-I-N-GENERADOR → Visita → Iniciar visita → Controles. Marcá un control, guardá y reabrí. Es trabajo de campo, todavía no el expediente publicado que verá el actor.',
     'Intercambio: GENERADOR, TRANSPORTISTA u OPERADOR N abre su CAP-P-N-ROL-A en Mis inspecciones. Leé el último requerimiento → Responder esta actuación → Presentar en expediente. Reabrí para verificar el guardado.',
@@ -360,7 +375,8 @@
   ];
   workshop.steps[4].resources = [{ label: 'Mis tickets / Mesa de soporte · según cuenta CAP', path: '/soporte' }];
   workshop.steps[5].body = [
-    'ADMIN CAP: consultá Centro de Control y Monitor con un rango que incluya el 12/10/2026. Los puntos preparados no necesariamente aparecen en «Hoy». Son ubicaciones sintéticas, no un viaje físico en vivo.',
+    'ADMIN CAP: Centro de Control → 30 días → Viajes Activos → buscá CAP-1-EN_TRANSITO y seleccionalo. Activá y desactivá En Tránsito para comprobar las capas. El rango debe incluir el 12/10/2026; no uses Hoy para buscar los casos preparados.',
+    'Monitor → Historial → Pausar → mové la barra → Reproducir. Pendientes muestra lo que falta; En vivo vuelve al estado actual. Son ubicaciones sintéticas, no un viaje físico en vivo.',
     'Cada participante encuentra su próxima tarea y sabe volver al manual o pedir ayuda. En los teléfonos, comprobar cámara QR, permisos GPS y recuperación de red. Navegador y emulador no certifican batería ni segundo plano.',
     'Si falta confirmación, conservá el formulario y consultá estado/historial antes de reintentar. Si desaparece la banda CAP, detené las modificaciones. No borres almacenamiento ni reinicies registros.',
     'Anotá cualquier pendiente con rol, pantalla, número CAP, hora y resultado esperado. No activar correos, push, reglas masivas ni documentos oficiales durante el taller.'
@@ -393,4 +409,37 @@
       return { label: 'CAP · Consulta de ' + role + ' ' + n, role: 'Reserva · autor ' + role + ' ' + n + ' / ADMIN ' + n, path: '/soporte/cap-20261012-ticket-' + role + '-' + n };
     });
   });
+  window.SITREP_HELP.guides.push({
+    id: 'capacitacion-novedades', profile: 'generador', audiences: ['transportista', 'operador', 'administrador'],
+    title: 'Eventuales, adendas y transporte · práctica simple',
+    summary: 'Tres novedades en web y app. Elegí un equipo CAP y seguí los mismos botones.', duration: '15 min', icon: 'school',
+    keywords: ['eventual', 'eventuales', 'adenda', 'adendas', 'móvil', 'vehículo', 'chofer', 'incompleto', 'capacitación', 'novedades'],
+    safety: 'Sólo con la banda «Capacitación · sin validez oficial». Estas funciones están habilitadas en el aula; siguen apagadas en la operación real. No se envían correos ni push ni se emiten documentos oficiales.',
+    steps: [
+      { title: 'Entrar al aula y elegir un equipo', body: [
+        'Ingresá como administrador. Abrí Elegir cuenta CAP y seleccioná CAP · GENERADOR N. Usá el mismo N para todos los roles; 1 es demostración, 2–4 práctica y 5 reserva.',
+        'Comprobá la banda «Capacitación · sin validez oficial». Para cambiar de rol: Volver a mi cuenta → Capacitación → cuenta del mismo equipo. Web y App usan los mismos pasos.',
+        'Cada ejercicio crea su propio registro. Anotá su número o guardá su enlace; no reinicies los casos anteriores.'
+      ], expected: 'Estás en el aula con un equipo identificado.', resources: [{ label: 'Elegir cuenta CAP', path: '/switch-user?modo=capacitacion' }] },
+      { title: 'Elegir móvil y chofer ya registrados', body: [
+        'GENERADOR CAP: Manifiestos → Nuevo manifiesto. Completá el residuo de práctica y elegí el transportista de tu equipo.',
+        'En Vehículo y Chofer, seleccioná CAP00N y Chofer ficticio N de las listas de ese transportista. Elegí el operador del mismo equipo y creá el manifiesto.',
+        'Reabrí el detalle y verificá Transporte asignado. Si cambiás de transportista, las selecciones anteriores se limpian: elegilas otra vez. No inventes una asignación si la nómina está vacía.',
+        'Firmá el manifiesto. Este nuevo número sirve para el recorrido Generador → Transportista → Operador y para la adenda del último paso.'
+      ], image: S + 'desktop/training-fleet-20261018.png', alt: 'Asignación de vehículo y chofer del equipo CAP', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El manifiesto conserva el vehículo y el chofer elegidos.', resources: [{ label: 'Nuevo manifiesto', path: '/manifiestos/nuevo' }] },
+      { title: 'Registrar un Eventual con datos pendientes', body: [
+        'GENERADOR CAP: Manifiestos → Eventuales → Registrar operación. Tu parte se toma de la sesión. Al menos una de las otras partes debe estar fuera del padrón; si todas están registradas, usá el manifiesto ordinario.',
+        'Para la práctica: dejá Transportista fuera del padrón y buscá al OPERADOR CAP de tu equipo en el padrón. Cargá sólo los datos conocidos. Podés dejar identificación o domicilio pendientes; no inventes datos. Completá corriente Y1, cantidad 10 kg y el motivo ficticio.',
+        'Guardá y anotá el registro BI-. Aprobá como quien lo creó. El retiro sigue bloqueado hasta que el operador registrado apruebe como operador: cambiale el rol y abrí el mismo registro.',
+        'Con todas las aprobaciones, registrá retiro, recepción y tratamiento. Si hay una diferencia, registrala por separado. La revisión documental no cambia esos hechos ni otorga un número oficial.'
+      ], image: S + 'desktop/training-eventual-20261018.png', alt: 'Eventual CAP tratado con una revisión observada que conserva los hechos', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'Se conserva lo declarado, los datos pendientes y la aprobación de cada participante con cuenta.', resources: [{ label: 'Eventuales · cuenta CAP', path: '/manifiestos/baja-intensidad' }] },
+      { title: 'Agregar lo observado sin reescribir el original', body: [
+        'TRANSPORTISTA CAP: abrí el manifiesto ordinario ya firmado del paso 2 → Adendas → Registrar diferencia. También puede registrar el operador vinculado.',
+        'Ingresá la carga observada completa, por ejemplo Y1 · 12 kg, y un motivo concreto: «CAP: se observaron 12 kg frente a 10 kg declarados». Guardá y solicitá revisión. No se suma automáticamente a la carga original.',
+        'GENERADOR CAP: abrí las Adendas del mismo manifiesto. Compará Declaración conservada y Carga observada. Escribí el fundamento y elegí Aprobar post facto, Observar o Rechazar conformidad. Quien creó la adenda no se aprueba a sí mismo.',
+        'Reabrí y verificá la revisión y el original intacto. Si la adenda estaba equivocada, Agregar rectificación crea otra y conserva el antecedente. Registrar una diferencia no demuestra intención ni habilita una corriente; el circuito operativo continúa y la revisión queda trazada.'
+      ], image: S + 'desktop/training-addendum-20261018.png', alt: 'Adenda CAP con declaración original y carga observada separadas', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El original sigue intacto y la diferencia tiene autor, motivo y revisión. En capacitación no se descargan anexos oficiales.' }
+    ]
+  });
+
 })();
