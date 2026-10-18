@@ -136,6 +136,18 @@ describe.each([false, true])('service worker scope/app=%s', (app) => {
     expect(await (await worker.request(asset, 'cors'))?.text()).toBe('export {}');
   });
 
+  it.each(['icon-192.png', 'icon-512.png'])('restores its installed %s before any runtime image request', async (icon) => {
+    const worker = workerHarness(app), url = `${base}/${icon}`;
+    const bytes = new Uint8Array(readFileSync('public/' + icon));
+    await worker.cacheFor(worker.precacheName).put(url, new Response(bytes, { headers: { 'Content-Type': 'image/png' } }));
+    expect(await worker.cacheFor(worker.runtimeName).match(url)).toBeUndefined();
+    const response = await worker.request(url, 'cors');
+    expect(response?.status).toBe(200);
+    expect(response?.headers.get('Content-Type')).toBe('image/png');
+    expect(new Uint8Array(await response!.arrayBuffer())).toEqual(bytes);
+    expect(worker.fetch).toHaveBeenCalledOnce();
+  });
+
   it('activation removes only its own old caches', async () => {
     const worker = workerHarness(app);
     worker.cacheFor('trazabilidad-rrpp-old');

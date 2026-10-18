@@ -1,4 +1,31 @@
-# Android TWA release - rptrazar.mendoza.gov.ar
+# Android SITREP — candidato de marca (12/10/2026)
+
+La instalación vigente de este hilo es **SITREP**, en
+`https://sitrep.ultimamilla.com.ar/app/`. Los apuntes RP Trazar de abajo son
+históricos: no autorizan cambiar el dominio, el package ni la app instalada.
+
+`scripts/generate-sitrep-brand.ts` genera en GitHub Actions una TWA con la marca
+aprobada del repositorio, package `ar.com.ultimamilla.sitrep`, versión 1.0.2/code4.
+La entrada `branding_review` de Mail Safety QA compila un release **sin firma**
+y una versión debug para un emulador desechable. No publica ni instala nada
+en teléfonos reales. Los recursos se obtienen de archivos versionados; no se
+envían documentos personales ni secretos de firma a la nube.
+
+**Bloqueo de instalación comprobado:** el certificado del APK original code2
+es `14:30:25:00:EF:38:5B:21:7B:03:EF:D8:21:18:BB:B4:5C:68:DE:11:93:0F:C8:03:CC:50:0F:02:0E:08:E1:D7`.
+La keystore RP Trazar disponible, leída nuevamente con keytool sin revelar
+contraseñas, tiene certificado
+`81:20:6C:4C:4D:39:CB:05:79:DF:33:84:6C:EF:E9:86:F7:DA:8E:DC:A9:9C:E0:07:32:5C:B8:28:A6:42:9F:CE`.
+Son distintas aunque correspondan al mismo proyecto interno.
+
+Para una actualización sobre el APK existente falta recuperar su clave de
+firma original (y acceso a ella), firmar el candidato y comprobar
+instalación sobre code2 sin pérdida de datos. No desinstalar, no forzar
+firmas ni cambiar Digital Asset Links para aparentar compatibilidad.
+La prueba debug no certifica confianza TWA de release: el fallback a
+Chrome Custom Tab es esperable con una firma de prueba no autorizada por el host.
+
+## Archivo histórico: RP Trazar
 
 Este directorio documenta la configuracion de release para reconstruir la TWA Android de SITREP apuntando al dominio productivo `rptrazar.mendoza.gov.ar`.
 

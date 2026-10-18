@@ -29,6 +29,8 @@ export const VerificarInspeccionPage = lazy(() => import('../pages/inspecciones/
 
 // Manifiestos
 export const ManifiestosPage = lazy(() => import('../pages/manifiestos/ManifiestosPage'));
+export const BajaIntensidadPage = lazy(() => import('../pages/manifiestos/BajaIntensidadPage'));
+export const AdendasManifiestoPage = lazy(() => import('../pages/manifiestos/AdendasManifiestoPage'));
 export const ManifiestoDetallePage = lazy(() => import('../pages/manifiestos/ManifiestoDetallePage'));
 export const NuevoManifiestoPage = lazy(() => import('../pages/manifiestos/NuevoManifiestoPage'));
 export const EditarManifiestoPage = lazy(() => import('../pages/manifiestos/EditarManifiestoPage'));
@@ -77,6 +79,8 @@ export const CargaMasivaPage = lazy(() => import('../pages/carga-masiva/CargaMas
 
 // Perfil
 export const PerfilPage = lazy(() => import('../pages/perfil/PerfilPage'));
+export const EmpresasPage = lazy(() => import('../pages/empresas/EmpresasPage'));
+export const EmpresaInvitacionPage = lazy(() => import('../pages/empresas/EmpresaInvitacionPage'));
 export const SolicitarCambiosPage = lazy(() => import('../pages/perfil/SolicitarCambiosPage'));
 
 // Mobile
@@ -85,6 +89,7 @@ export const MobileDashboardPage = lazy(() => import('../pages/mobile/MobileDash
 // Notificaciones, Ayuda, QR, Estadísticas
 export const NotificacionesPage = lazy(() => import('../pages/notificaciones/NotificacionesPage'));
 export const AyudaPage = lazy(() => import('../pages/ayuda/AyudaPage'));
+export const SoportePage = lazy(() => import('../pages/soporte/SoportePage'));
 export const EscanerQRPage = lazy(() => import('../pages/escaner/EscanerQRPage'));
 export const EstadisticasPage = lazy(() => import('../pages/estadisticas/EstadisticasPage'));
 

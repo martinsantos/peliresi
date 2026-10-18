@@ -15,10 +15,11 @@ export default defineConfig({
       include: ['src-v6/**/*.{ts,tsx}'],
       exclude: ['src-v6/**/*.test.{ts,tsx}', 'src-v6/__tests__/**'],
       thresholds: {
-        statements: 5.9,
-        branches: 4.4,
-        functions: 3.8,
-        lines: 6.2,
+        // Ratchet from the measured night suite, not a claim of full coverage.
+        statements: 22,
+        branches: 20,
+        functions: 17,
+        lines: 22,
       },
     },
   },

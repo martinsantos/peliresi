@@ -12,12 +12,13 @@ import {
   TrendingUp,
   Clock,
   ChevronRight,
-  Package,
+  ClipboardCheck,
+  Factory,
+  Bell,
+  Truck,
   CheckCircle2,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
-import { AndroidFieldReadinessPanel } from '../../components/mobile/AndroidFieldReadinessPanel';
-import { MobileRoleHero } from '../../components/mobile/MobileRoleHero';
 import { OperatorActionQueue } from '../../components/mobile/OperatorActionQueue';
 import { TransportistaTripQueue } from '../../components/mobile/TransportistaTripQueue';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,11 +31,12 @@ import { EstadoManifiesto } from '../../types/models';
 export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { data: dashData, isLoading: dashLoading } = useDashboardStats();
+  const { data: dashData, isLoading: dashLoading, isError: dashError } = useDashboardStats();
   const connectivity = useConnectivity({ pingInterval: 60_000 });
   const mp = useMobilePrefix();
   const isTransportista = currentUser?.rol === 'TRANSPORTISTA';
   const isOperador = currentUser?.rol === 'OPERADOR';
+  const isInspector = Boolean(currentUser?.esInspector);
 
   // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
   const { data: tripsEnTransito } = useManifiestos(
@@ -98,39 +100,51 @@ export const MobileDashboardPage: React.FC = () => {
     return displayModeStandalone || navigatorStandalone;
   }, []);
 
-  const accesosRapidos = useMemo(() => [
-    { id: 1, label: 'Nuevo Manifiesto', icon: FileText, path: mp('/manifiestos/nuevo'), color: 'primary' },
-    { id: 2, label: 'Escanear QR', icon: MapPin, path: mp('/escaner-qr'), color: 'success' },
-    { id: 3, label: 'Ver Tracking', icon: Package, path: mp('/centro-control'), color: 'info' },
-    { id: 4, label: 'Reportes', icon: TrendingUp, path: mp('/reportes'), color: 'purple' },
-  ], [mp]);
+  const accesosRapidos = useMemo(() => {
+    if (isInspector) return [
+      { id: 'inspecciones', label: 'Continuar inspección', icon: ClipboardCheck, path: mp('/inspecciones') },
+      { id: 'actores', label: 'Consultar actores', icon: Factory, path: mp('/actores') },
+    ];
+    if (isTransportista) return [
+      { id: 'viajes', label: 'Mis viajes', icon: Truck, path: mp('/transporte/perfil') },
+      { id: 'manifiestos', label: 'Manifiestos', icon: FileText, path: mp('/manifiestos') },
+    ];
+    if (isOperador) return [
+      { id: 'recepciones', label: 'Revisar cargas', icon: FileText, path: mp('/manifiestos') },
+      { id: 'avisos', label: 'Avisos', icon: Bell, path: mp('/notificaciones') },
+    ];
+    if (currentUser?.rol === 'GENERADOR') return [
+      { id: 'manifiestos', label: 'Mis manifiestos', icon: FileText, path: mp('/manifiestos') },
+      { id: 'nuevo', label: 'Nuevo manifiesto', icon: ClipboardCheck, path: mp('/manifiestos/nuevo') },
+    ];
+    return [
+      { id: 'inspecciones', label: 'Inspecciones', icon: ClipboardCheck, path: mp('/inspecciones') },
+      { id: 'generadores', label: 'Generadores', icon: Factory, path: mp('/admin/generadores') },
+      { id: 'alertas', label: 'Alertas', icon: Bell, path: mp('/alertas') },
+      { id: 'reportes', label: 'Reportes', icon: TrendingUp, path: mp('/reportes') },
+    ];
+  }, [currentUser?.rol, isInspector, isOperador, isTransportista, mp]);
 
-  const dashStats = dashData;
+  const est = dashData?.estadisticas;
+  const count = (value: number | undefined) => dashLoading || dashError || value == null ? '—' : String(value);
 
   const stats = [
-    { id: 1, label: 'Manifiestos Total', value: String(dashStats?.manifiestos?.total ?? 0), change: undefined, icon: FileText, color: 'primary', href: '/manifiestos' },
-    { id: 2, label: 'En Tránsito', value: String(dashStats?.manifiestos?.enTransito ?? 0), change: undefined, icon: MapPin, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
-    { id: 3, label: 'Pendientes', value: String(dashStats?.manifiestos?.pendientes ?? 0), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
-    { id: 4, label: 'Completados', value: String(dashStats?.manifiestos?.completados ?? 0), change: undefined, icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
+    { id: 1, label: 'Manifiestos', value: count(est?.total), icon: FileText, color: 'primary', href: '/manifiestos' },
+    { id: 2, label: 'En tránsito', value: count(est?.enTransito), icon: MapPin, color: 'info', href: '/manifiestos?estado=EN_TRANSITO' },
+    { id: 3, label: 'Borradores', value: count(est?.borradores), icon: Clock, color: 'warning', href: '/manifiestos?estado=BORRADOR' },
+    { id: 4, label: 'Tratados', value: count(est?.tratados), icon: CheckCircle2, color: 'success', href: '/manifiestos?estado=TRATADO' },
   ];
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <MobileRoleHero
-        role={currentUser?.rol || 'ADMIN'}
-        userName={currentUser?.nombre || 'Usuario'}
-        activeCount={isTransportista ? activeQueueTrips.length : 0}
-        pendingCount={isTransportista ? pendingTrips.length : isOperador ? operatorQueue.length : 0}
-      />
+      <header>
+        <p className="text-sm text-neutral-600">Hola, {currentUser?.nombre || 'Usuario'}</p>
+        <h2 className="text-xl font-bold text-neutral-900">
+          {isInspector ? 'Trabajo de inspección' : isTransportista ? 'Mi viaje' : isOperador ? 'Cargas por resolver' : currentUser?.rol === 'GENERADOR' ? 'Mis trámites' : 'Trabajo pendiente'}
+        </h2>
+      </header>
 
-      <AndroidFieldReadinessPanel
-        role={currentUser?.rol || 'ADMIN'}
-        isOnline={connectivity.isOnline}
-        isApiReachable={connectivity.isApiReachable}
-        activeCount={isTransportista ? activeQueueTrips.length : Number(dashStats?.manifiestos?.enTransito ?? 0)}
-        pendingCount={isTransportista ? pendingTrips.length : isOperador ? operatorQueue.length : Number(dashStats?.manifiestos?.pendientes ?? 0)}
-        isStandalone={isStandalone}
-      />
+      {!connectivity.isOnline && <p role="status" className="rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900">Sin conexión. Revisá abajo qué trabajo quedó guardado en este dispositivo.</p>}
 
       {isTransportista && (
         <TransportistaTripQueue
@@ -147,12 +161,25 @@ export const MobileDashboardPage: React.FC = () => {
         />
       )}
 
+      <section aria-label="Acciones principales">
+        <div className="grid grid-cols-2 gap-2">
+          {accesosRapidos.map((item) => {
+            const Icon = item.icon;
+            return <button key={item.id} type="button" onClick={() => navigate(item.path)} className="flex min-h-14 items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-sm font-semibold text-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600">
+              <Icon size={19} className="shrink-0 text-primary-700" aria-hidden="true" />{item.label}
+            </button>;
+          })}
+        </div>
+      </section>
+
+      {dashError && <p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800">No se pudieron actualizar las cifras. Abrí el listado para consultar los datos actuales.</p>}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(mp(stat.href))}>
+            <button key={stat.id} type="button" className="rounded-xl border border-neutral-200 bg-white text-left transition-colors hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" onClick={() => navigate(mp(stat.href))}>
               <CardContent className="p-3">
                 <div className="flex items-start justify-between mb-2">
                   <div className={`p-2 rounded-lg ${
@@ -168,50 +195,13 @@ export const MobileDashboardPage: React.FC = () => {
                       'text-success-600'
                     } />
                   </div>
-                  {stat.change && (
-                    <span className="text-xs font-medium text-success-600">{stat.change}</span>
-                  )}
                 </div>
                 <p className="text-2xl font-bold text-neutral-900">{stat.value}</p>
                 <p className="text-xs text-neutral-500">{stat.label}</p>
               </CardContent>
-            </Card>
+            </button>
           );
         })}
-      </div>
-
-      {/* Quick Access */}
-      <div>
-        <h3 className="text-sm font-semibold text-neutral-900 mb-3">Accesos Rápidos</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {accesosRapidos.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.path)}
-                className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-neutral-100 active:scale-95 transition-transform"
-              >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  item.color === 'primary' ? 'bg-primary-100' :
-                  item.color === 'success' ? 'bg-success-100' :
-                  item.color === 'info' ? 'bg-info-100' :
-                  'bg-purple-100'
-                }`}>
-                  <Icon size={22} className={
-                    item.color === 'primary' ? 'text-primary-600' :
-                    item.color === 'success' ? 'text-success-600' :
-                    item.color === 'info' ? 'text-info-600' :
-                    'text-purple-600'
-                  } />
-                </div>
-                <span className="text-[10px] font-medium text-neutral-700 text-center leading-tight">
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* Recent Activity */}
@@ -235,49 +225,21 @@ export const MobileDashboardPage: React.FC = () => {
                 <p className="text-xs text-neutral-400">Cargando...</p>
               </CardContent>
             </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-sm text-neutral-500">
-                  {(dashStats?.manifiestos?.enTransito ?? 0) > 0
-                    ? `${dashStats?.manifiestos?.enTransito} manifiestos en tránsito`
-                    : 'Sin actividad reciente'}
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          ) : dashError ? null : dashData?.recientes?.length ? dashData.recientes.slice(0, 3).map((m) => (
+            <button key={m.id} type="button" onClick={() => navigate(mp(`/manifiestos/${m.id}`))} className="flex w-full min-h-14 items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left">
+              <span className="min-w-0"><span className="block truncate text-sm font-semibold text-neutral-900">{m.numero}</span><span className="block truncate text-xs text-neutral-600">{m.generador?.razonSocial || 'Generador sin nombre'} · {m.estado}</span></span><ChevronRight size={18} className="shrink-0 text-neutral-400" />
+            </button>
+          )) : <p className="rounded-xl border border-neutral-200 bg-white p-4 text-sm text-neutral-600">Sin actividad reciente</p>}
         </div>
       </div>
 
-      {/* Resumen del día */}
-      <Card className="bg-gradient-to-br from-primary-500 to-primary-600 text-white">
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-primary-100 text-sm">Resumen del día</p>
-              <h3 className="text-xl font-bold mt-1">{dashStats?.manifiestos?.enTransito ?? 0} manifiestos activos</h3>
-              <p className="text-primary-100 text-sm mt-1">{dashStats?.manifiestos?.pendientes ?? 0} pendientes</p>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <TrendingUp size={24} className="text-white" />
-            </div>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button 
-              onClick={() => navigate(mp('/manifiestos'))}
-              className="min-h-11 flex-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-primary-600"
-            >
-              Ver manifiestos
-            </button>
-            <button 
-              onClick={() => navigate(mp('/centro-control'))}
-              className="min-h-11 flex-1 rounded-lg bg-primary-400/50 px-3 py-2 text-sm font-medium text-white"
-            >
-              Ver tracking
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+      <details className="rounded-xl border border-neutral-200 bg-white">
+        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-neutral-800">Conexión y dispositivo</summary>
+        <div className="space-y-1 px-4 pb-4 text-sm text-neutral-700">
+          <p>{!connectivity.isOnline ? 'Sin red' : connectivity.isApiReachable ? 'Conectado al servidor' : 'Sin respuesta del servidor'}</p>
+          <p>{isStandalone ? 'Abierto como app instalada' : 'Abierto en el navegador'}</p>
+        </div>
+      </details>
     </div>
   );
 };

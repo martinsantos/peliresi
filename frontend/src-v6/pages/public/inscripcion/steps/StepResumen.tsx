@@ -5,11 +5,15 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { SectionTitle } from '../SectionTitle';
 import type { RegistrationData, TipoActor } from '../shared';
+import type { DocumentoSolicitud } from '../../../../types/api';
+import { ZONAS } from '../../../../utils/calculoTEF';
+import { RegistrationFleetSummary } from '../../../../components/registration/RegistrationFleetSummary';
 
 interface StepResumenProps {
   reg: RegistrationData;
   form: Record<string, string>;
   adjuntos: Record<string, File>;
+  uploadedDocs: Record<string, DocumentoSolicitud>;
   tipoActor: TipoActor;
   isGenerador: boolean;
   isOperador: boolean;
@@ -21,6 +25,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
   reg,
   form,
   adjuntos,
+  uploadedDocs,
   tipoActor,
   isGenerador,
   isOperador,
@@ -72,6 +77,7 @@ export const StepResumen: React.FC<StepResumenProps> = ({
       { label: 'Expediente', value: form.expedienteInscripcion || '' },
       { label: 'Certificado N', value: form.certificadoNumero || '' },
       { label: 'Resolucion DPA', value: form.resolucionDPA || '' },
+      { label: 'Vencimiento habilitacion', value: form.vencimientoHabilitacion || '' },
     );
   }
   if (regFields.length > 0) {
@@ -124,18 +130,16 @@ export const StepResumen: React.FC<StepResumenProps> = ({
     });
   }
 
-  // TEF
+  // Operational declarations only. Never present a calculated fee to applicants.
   if (!isTransportista) {
     const tefFields: { label: string; value: string }[] = [
-      { label: 'Factor R', value: form.factorR || '' },
-      { label: 'Monto MxR', value: form.montoMxR ? `$ ${form.montoMxR}` : '' },
       { label: 'Personal', value: form.tefPersonal || '' },
       { label: 'Superficie (m2)', value: form.tefSuperficie || '' },
-      { label: 'Zona', value: form.tefZona || '' },
+      { label: 'Potencia (HP)', value: form.tefPotencia || '' },
+      { label: 'Zona', value: ZONAS.find(zona => zona.id === form.tefZona)?.label || form.tefZona || '' },
     ];
-    if (isGenerador) tefFields.push({ label: 'Potencia (HP)', value: form.tefPotencia || '' });
     if (isOperador) tefFields.push({ label: 'Capacidad (tn/mes)', value: form.tefCapacidad || '' });
-    sections.push({ label: 'Calculo TEF', fields: tefFields });
+    sections.push({ label: 'Actividad', fields: tefFields });
   }
 
   // Transportista-specific
@@ -149,6 +153,10 @@ export const StepResumen: React.FC<StepResumenProps> = ({
         { label: 'Resolucion DPA', value: form.resolucionDPA || '' },
         { label: 'Resolucion SSP', value: form.resolucionSSP || '' },
         { label: 'Corrientes', value: form.corrientesAutorizadas || '' },
+        { label: 'Acta Inspeccion', value: form.actaInspeccion || '' },
+        { label: 'Acta Inspeccion 2', value: form.actaInspeccion2 || '' },
+        { label: 'Localidad', value: form.localidad || '' },
+        { label: 'Coordenadas', value: form.coordenadas || '' },
       ],
     });
     if (form.vehiculosDesc || form.choferesDesc) {
@@ -163,13 +171,18 @@ export const StepResumen: React.FC<StepResumenProps> = ({
   }
 
   // Documents
-  const docEntries = Object.entries(adjuntos);
+  const docEntries = [
+    ...Object.entries(uploadedDocs).map(([tipo, document]) => [tipo, { name: document.nombre, size: document.size, saved: true }] as const),
+    ...Object.entries(adjuntos)
+      .filter(([tipo]) => !uploadedDocs[tipo])
+      .map(([tipo, file]) => [tipo, { name: file.name, size: file.size, saved: false }] as const),
+  ];
   if (docEntries.length > 0) {
     sections.push({
       label: 'Documentos adjuntos',
       fields: docEntries.map(([tipo, file]) => ({
         label: tipo.replace(/_/g, ' '),
-        value: `${file.name} (${(file.size / 1024).toFixed(0)} KB)`,
+        value: `${file.name} (${(file.size / 1024).toFixed(0)} KB)${file.saved ? ' · Guardado' : ' · Pendiente'}`,
       })),
     });
   }
@@ -178,11 +191,11 @@ export const StepResumen: React.FC<StepResumenProps> = ({
     <div className="space-y-4">
       <SectionTitle icon={Check} title="Resumen de la Solicitud" />
       <p className="text-sm text-neutral-500">
-        Revise los datos antes de enviar. Podra volver a pasos anteriores para corregir.
+        Revisá los datos; podés corregirlos en cada paso.
       </p>
 
       {regError && (
-        <div className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
+        <div role="alert" className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
           {regError}
         </div>
       )}
@@ -192,21 +205,22 @@ export const StepResumen: React.FC<StepResumenProps> = ({
           <div className="bg-neutral-50 px-4 py-2 border-b border-neutral-200">
             <h4 className="text-sm font-semibold text-neutral-700">{section.label}</h4>
           </div>
-          <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+          <dl className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
             {section.fields
               .filter(f => f.value)
               .map(f => (
-                <div key={f.label} className="flex justify-between text-sm py-0.5">
-                  <span className="text-neutral-500">{f.label}</span>
-                  <span className="text-neutral-900 font-medium text-right max-w-[60%] truncate">{f.value}</span>
+                <div key={f.label} className="grid min-w-0 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 text-sm py-0.5">
+                  <dt className="text-neutral-600">{f.label}</dt>
+                  <dd className="min-w-0 text-neutral-900 font-medium text-right [overflow-wrap:anywhere]">{f.value}</dd>
                 </div>
               ))}
             {section.fields.every(f => !f.value) && (
-              <p className="text-sm text-neutral-400 italic col-span-2">Sin datos ingresados</p>
+              <div className="text-sm text-neutral-600 italic sm:col-span-2"><dt className="sr-only">Datos de {section.label}</dt><dd>Sin datos ingresados</dd></div>
             )}
-          </div>
+          </dl>
         </div>
       ))}
+      {isTransportista && <RegistrationFleetSummary form={form} />}
     </div>
   );
 };

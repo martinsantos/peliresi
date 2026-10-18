@@ -41,6 +41,14 @@ const config: Config = {
         // Bordes
         border: tokens.colors.border,
       },
+      // Text must remain readable; pale neutrals are still available for borders
+      // and backgrounds. Previously text-neutral-500 was only ~3:1 on white.
+      textColor: {
+        neutral: { 400: '#667085', 500: '#5E6A7E' },
+      },
+      placeholderColor: {
+        neutral: { 400: '#667085', 500: '#5E6A7E' },
+      },
       
       // ========================================
       // TYPOGRAPHY

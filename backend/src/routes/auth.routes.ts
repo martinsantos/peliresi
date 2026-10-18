@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { register, login, getProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
-import { isAuthenticated } from '../middlewares/auth.middleware';
+import { register, login, getProfile, updateOwnProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
+import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -202,8 +202,8 @@ router.post('/reset-password', resetPassword);
  * /auth/claim-account:
  *   post:
  *     tags: [Auth]
- *     summary: Reclamar cuenta existente
- *     description: Permite a usuarios con email placeholder reclamar su cuenta verificando CUIT y Razon Social.
+ *     summary: Solicitar recuperación de una cuenta existente
+ *     description: Envía un enlace únicamente al correo ya registrado. CUIT y razón social no autorizan cambios de correo, contraseña ni estado. Los correos ficticios requieren intervención administrativa.
  *     security: []
  *     requestBody:
  *       required: true
@@ -211,12 +211,10 @@ router.post('/reset-password', resetPassword);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [cuit, razonSocial, nuevoEmail, password]
+ *             required: [cuit, razonSocial]
  *             properties:
  *               cuit: { type: string, example: "30-71123596-1" }
  *               razonSocial: { type: string, example: "HUMBERTO MORILLAS S.A." }
- *               nuevoEmail: { type: string, format: email, example: "contacto@empresa.com" }
- *               password: { type: string, minLength: 8, example: "NuevaPass123" }
  *     responses:
  *       200:
  *         description: Solicitud procesada (respuesta generica por seguridad)
@@ -250,6 +248,23 @@ router.post('/claim-account', claimAccount);
  */
 // Protegidas
 router.get('/profile', isAuthenticated, getProfile);
+
+/**
+ * @openapi
+ * /auth/profile:
+ *   put:
+ *     tags: [Auth]
+ *     summary: Actualizar el propio nombre y teléfono
+ *     description: Sólo acepta nombre y telefono de la persona autenticada. No disponible durante una suplantación.
+ *     responses:
+ *       200:
+ *         description: Perfil actualizado
+ *       400:
+ *         description: Campo no permitido o inválido
+ *       403:
+ *         description: Sesión suplantada o restringida
+ */
+router.put('/profile', isAuthenticated, requireFullAccess, updateOwnProfile);
 
 /**
  * @openapi

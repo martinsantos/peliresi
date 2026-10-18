@@ -4,7 +4,7 @@
  * Layout optimizado para dispositivos móviles - Adaptado por rol
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -20,9 +20,10 @@ import {
   User,
   Settings,
   LogOut,
-  QrCode,
   Plus,
   SwitchCamera,
+  Eye,
+  ArrowLeft,
   BarChart3,
   AlertTriangle,
   Truck,
@@ -39,20 +40,33 @@ import {
   Navigation,
   ClipboardCheck,
   Scale,
+  Radio,
+  LifeBuoy,
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
+import { SitrepMark } from '../components/SitrepMark';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
+import CompanyContextBar from '../components/CompanyContextBar';
+import { canUseCompanySection } from '../services/companyContext';
 import { InstallPWAButton } from '../components/InstallPWAButton';
 import { InstallPWAModal } from '../components/InstallPWAModal';
 import { useAuth } from '../contexts/AuthContext';
+import { useImpersonation } from '../contexts/ImpersonationContext';
 import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
+import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
+import { useAttentionCounts } from '../hooks/useAttentionCounts';
+import { AttentionBadge } from '../components/AttentionBadge';
+import { inspectionContextLabel } from '../utils/inspectionContextLabel';
+import { SupportEntry } from '../components/SupportReportDialog';
+import { SupportBubble, mobileSupportClearance } from '../components/SupportBubble';
+import { ApplicantLayout } from './ApplicantLayout';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -62,14 +76,14 @@ function cn(...inputs: ClassValue[]) {
 // ROLE CONFIG
 // ========================================
 const roleConfig: Record<UserRole, { label: string; color: string; bgColor: string }> = {
-  ADMIN: { label: 'Admin', color: 'text-primary-600', bgColor: 'bg-primary-500' },
-  GENERADOR: { label: 'Generador', color: 'text-purple-600', bgColor: 'bg-purple-500' },
-  TRANSPORTISTA: { label: 'Transportista', color: 'text-orange-600', bgColor: 'bg-orange-500' },
-  OPERADOR: { label: 'Operador', color: 'text-blue-600', bgColor: 'bg-blue-500' },
-  AUDITOR: { label: 'Auditor', color: 'text-info-600', bgColor: 'bg-info-500' },
+  ADMIN: { label: 'Admin', color: 'text-primary-800', bgColor: 'bg-primary-700' },
+  GENERADOR: { label: 'Generador', color: 'text-purple-700', bgColor: 'bg-purple-700' },
+  TRANSPORTISTA: { label: 'Transportista', color: 'text-orange-800', bgColor: 'bg-orange-700' },
+  OPERADOR: { label: 'Operador', color: 'text-blue-700', bgColor: 'bg-blue-700' },
+  AUDITOR: { label: 'Auditor', color: 'text-info-700', bgColor: 'bg-info-700' },
   ADMIN_TRANSPORTISTA: { label: 'Adm. Transportistas', color: 'text-slate-600', bgColor: 'bg-slate-500' },
   ADMIN_GENERADOR: { label: 'Adm. Generadores', color: 'text-green-600', bgColor: 'bg-green-600' },
-  ADMIN_OPERADOR: { label: 'Adm. Operadores', color: 'text-teal-600', bgColor: 'bg-teal-500' },
+  ADMIN_OPERADOR: { label: 'Adm. Operadores', color: 'text-teal-700', bgColor: 'bg-teal-700' },
 };
 
 // ========================================
@@ -81,29 +95,28 @@ interface NavItemProps {
   label: string;
   badge?: number;
   isActive?: boolean;
-  roleColor?: string;
 }
 
-const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive, roleColor = 'text-primary-600' }) => {
+const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) => {
   return (
     <NavLink
       to={to}
       className={({ isActive: active }) => cn(
-        'flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-w-[64px] min-h-[48px] transition-colors',
+        'flex flex-1 flex-col items-center justify-center gap-1 border-t-2 py-2 px-1 min-w-0 min-h-14 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700',
         active || isActive
-          ? roleColor
-          : 'text-neutral-400'
+          ? 'text-primary-800 border-current bg-primary-50'
+          : 'border-transparent text-neutral-600 hover:bg-neutral-50'
       )}
     >
       <div className="relative">
         {icon}
         {badge ? (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-error-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-error-700 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
             {badge > 9 ? '9+' : badge}
           </span>
         ) : null}
       </div>
-      <span className="text-[10px] font-medium">{label}</span>
+      <span className="text-xs font-semibold">{label}</span>
     </NavLink>
   );
 };
@@ -115,16 +128,55 @@ export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, users, switchUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo, isRestricted } = useAuth();
+  const { impersonationData, exitImpersonation } = useImpersonation();
   const mp = useMobilePrefix();
   const isInspector = Boolean(currentUser?.esInspector);
+  const isInspectionRoute = /\/inspecciones(?:\/|$)/.test(location.pathname);
+  const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
+  const isAddendaRoute = /\/manifiestos\/[^/]+\/adendas\/?$/.test(location.pathname);
+  const boundedViewport = isInspectionCase || isAddendaRoute;
+  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
+  const inspectionShell = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const shell = inspectionShell.current, viewport = window.visualViewport;
+    if (!boundedViewport || !shell || !viewport) return;
+    let frame = 0;
+    const reset = () => {
+      for (const property of ['position', 'top', 'left', 'width', 'height']) shell.style.removeProperty(property);
+    };
+    const measure = () => {
+      // Android pans the visual viewport to the focused editor. Moving only
+      // the footer leaves the header and server confirmation above the screen.
+      // Keep the same mounted flex shell in the visible frame, not an overlay
+      // toast or a focus/scroll reset. Do not counteract deliberate pinch zoom.
+      // Addenda also return from Android's native PDF viewer: browser scroll
+      // restoration must not leave the header partially above the visible frame.
+      if (viewport.scale !== 1) { reset(); return; }
+      const { height, width, offsetTop, offsetLeft } = viewport;
+      if (![height, width, offsetTop, offsetLeft].every(Number.isFinite) || height <= 0 || width <= 0) return;
+      Object.assign(shell.style, { position: 'fixed', top: `${offsetTop}px`, left: `${offsetLeft}px`, width: `${width}px`, height: `${height}px` });
+    };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+    measure();
+    viewport.addEventListener('resize', schedule, { passive: true });
+    viewport.addEventListener('scroll', schedule, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport.removeEventListener('resize', schedule);
+      viewport.removeEventListener('scroll', schedule);
+      reset();
+    };
+  }, [boundedViewport, isLoading, currentUser?.id]);
   const canInspect = Boolean(isInspector || currentUser?.rol === 'ADMIN' || currentUser?.rol.startsWith('ADMIN_'));
+  const { data: unreadNotificationCount = 0 } = useNotificacionesNoLeidas();
+  const attention = useAttentionCounts();
 
   // Recover active trip from API after reinstall/crash
   useActiveTripRecovery();
 
   // Auto-sync data to IndexedDB for offline use
-  useOfflineSync();
+  const offlineSync = useOfflineSync({ downloadManifests: !isInspectionRoute });
 
   // Bienvenida al cambiar de perfil (solo PWA)
   const prevUserIdRef = React.useRef<string | null>(null);
@@ -178,11 +230,11 @@ export const MobileLayout: React.FC = () => {
     if (isAdmin) {
       items.push({ to: mp('/actores'), icon: <Users size={22} />, label: 'Actores' });
     } else {
-      items.push({ to: mp('/alertas'), icon: <Bell size={22} />, label: 'Alertas', badge: 3 });
+      items.push({ to: mp('/notificaciones'), icon: <Bell size={22} />, label: 'Avisos', badge: unreadNotificationCount });
     }
 
-    return items;
-  }, [currentUser?.rol, currentUser?.esInspector, isInspector, isTransportista, isAdmin, mp]);
+    return items.filter(item=>canUseCompanySection(currentUser?.empresaContexto,item.to));
+  }, [currentUser?.rol, currentUser?.esInspector, currentUser?.empresaContexto, isInspector, isTransportista, isAdmin, mp, unreadNotificationCount]);
 
   // Menu items según rol
   const menuItems = useMemo(() => {
@@ -214,17 +266,24 @@ export const MobileLayout: React.FC = () => {
     }
 
     if (isAdmin) {
+      items.push({ to: mp('/monitor'), icon: <Radio size={20} />, label: 'Monitor', section: 'main' });
       items.push({ to: mp('/actores'), icon: <Users size={20} />, label: 'Actores', section: 'main' });
     }
 
     items.push({ to: mp('/reportes'), icon: <BarChart3 size={20} />, label: 'Reportes', section: 'main' });
-    items.push({ to: mp('/alertas'), icon: <Bell size={20} />, label: 'Alertas', badge: 3, section: 'main' });
+    items.push({ to: mp('/notificaciones'), icon: <Bell size={20} />, label: 'Avisos', badge: unreadNotificationCount, section: 'main' });
+    if (isAdmin) {
+      items.push({ to: mp('/alertas'), icon: <AlertTriangle size={20} />, label: 'Alertas operativas', section: 'main' });
+    }
 
     // Admin section
+    if (currentUser && ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'].includes(currentUser.rol)) {
+      items.push({ to: mp('/admin/solicitudes'), icon: <FileText size={20} />, label: 'Solicitudes', badge: attention.applicationPending, section: 'main' });
+    }
     if (isAdmin) {
       items.push({ to: mp('/admin/usuarios'), icon: <User size={20} />, label: 'Usuarios', section: 'admin' });
-      items.push({ to: mp('/admin/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
-      items.push({ to: mp('/admin/operadores'), icon: <FlaskConical size={20} />, label: 'Operadores', section: 'admin' });
+      items.push({ to: mp('/admin/actores/generadores'), icon: <Factory size={20} />, label: 'Generadores', section: 'admin' });
+      items.push({ to: mp('/admin/actores/operadores'), icon: <FlaskConical size={20} />, label: 'Operadores', section: 'admin' });
       items.push({ to: mp('/admin/vehiculos'), icon: <Truck size={20} />, label: 'Vehículos', section: 'admin' });
       items.push({ to: mp('/admin/residuos'), icon: <Database size={20} />, label: 'Catálogo Residuos', section: 'admin' });
       items.push({ to: mp('/admin/auditoria'), icon: <Shield size={20} />, label: 'Auditoría', section: 'admin' });
@@ -240,9 +299,10 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mi Transporte', section: 'tools' });
     }
     items.push({ to: mp('/ayuda'), icon: <HelpCircle size={20} />, label: 'Ayuda', section: 'tools' });
+    items.push({ to: mp('/soporte'), icon: <LifeBuoy size={20} />, label: 'Soporte', badge: attention.support, section: 'tools' });
 
-    return items;
-  }, [currentUser?.rol, currentUser?.esInspector, canInspect, isAdmin, isTransportista, mp, activeTripId]);
+    return items.filter(item=>canUseCompanySection(currentUser?.empresaContexto,item.to));
+  }, [currentUser?.rol, currentUser?.esInspector, currentUser?.empresaContexto, canInspect, isAdmin, isTransportista, mp, activeTripId, unreadNotificationCount, attention.applicationPending, attention.support]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -252,29 +312,38 @@ export const MobileLayout: React.FC = () => {
   // Auth is handled by AuthGate in AppMobile — this is a safety net.
   // Returns null while loading or if no user (AuthGate will redirect to /login).
   if (isLoading || !currentUser) return null;
+  if (isRestricted) return <ApplicantLayout />;
 
-  const config = roleConfig[currentUser.rol];
+  const inspectionLabel = inspectionContextLabel(currentUser, location.pathname);
+  const config = inspectionLabel ? { label: inspectionLabel, color: 'text-teal-700', bgColor: 'bg-teal-700' } : roleConfig[currentUser.rol];
 
   // Título según la ruta actual
   const getPageTitle = () => {
+    if (isInspectionCase) return 'Inspección';
     const path = location.pathname;
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
+    if (path.includes('/manifiestos/baja-intensidad')) return 'Eventuales';
     if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
     if (path.includes('/inspecciones')) return 'Inspecciones';
     if (path.includes('/transporte/perfil')) return 'Mis Viajes';
     if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';
+    if (path.includes('/admin/actores/generadores')) return 'Generadores';
+    if (path.includes('/admin/actores/operadores')) return 'Operadores';
+    if (path.includes('/admin/actores/transportistas')) return 'Transportistas';
     if (path.includes('/actores')) return 'Actores';
     if (path.includes('/reportes')) return 'Reportes';
     if (path.includes('/alertas')) return 'Alertas';
     if (path.includes('/configuracion')) return 'Configuración';
     if (path.includes('/mi-perfil')) return 'Mi Perfil';
-    if (path.includes('/notificaciones')) return 'Notificaciones';
+    if (path.includes('/empresas')) return 'Empresas y sedes';
+    if (path.includes('/notificaciones')) return 'Avisos';
     if (path.includes('/estadisticas')) return 'Estadísticas';
     if (path.includes('/escaner-qr')) return 'Escanear QR';
     if (path.includes('/ayuda')) return 'Ayuda';
-    if (path.includes('/switch-user')) return 'Cambiar Usuario';
+    if (path.includes('/soporte')) return 'Soporte';
+    if (path.includes('/switch-user')) return 'Cuenta';
     if (path.includes('/centro-control')) return 'Centro de Control';
     if (path.includes('/admin/usuarios')) return 'Usuarios';
     if (path.includes('/admin/generadores')) return 'Generadores';
@@ -286,38 +355,52 @@ export const MobileLayout: React.FC = () => {
     return 'SITREP';
   };
 
-  // Determinar si mostrar FAB
-  const showFab = location.pathname.includes('/manifiestos') && !location.pathname.includes('/nuevo') && (isAdmin || isGenerador);
+  // Create belongs to the list, not over the current record's fields or actor links.
+  const showFab = /^\/(?:app\/)?manifiestos\/?$/.test(location.pathname) && (isAdmin || isGenerador);
   const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
-
-  const handleSwitchUser = (userId: number | string) => {
-    if (userId === currentUser.id) return;
-    switchUser(Number(userId));
-    // Brief delay so the user sees the menu update before it closes
-    setTimeout(() => setIsMenuOpen(false), 200);
-  };
+  const floatingSupport = !inlineSupport;
+  const supportAboveTrip = showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute);
 
   return (
-    <div className="h-screen overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
+    <div ref={inspectionShell} data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
       <NotificacionesPoller />
-      <ToastContainer />
       {/* Demo mode banner */}
       {isDemo && (
-        <div className="bg-amber-500 text-white text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
+        <div className="shrink-0 bg-amber-100 text-amber-950 text-center text-xs sm:text-sm py-1 font-medium sticky top-0 z-50">
           Modo Demo — Los datos no son reales
         </div>
       )}
 
       {/* Connectivity indicator - always visible at top */}
-      <ConnectivityIndicator />
+      {!isInspectionCase && <ConnectivityIndicator />}
+
+      {(offlineSync.terminal > 0 || offlineSync.auth > 0 || offlineSync.retryable > 0) && (
+        <div role="status" className={`flex items-center justify-between gap-3 border-b px-4 py-2 text-xs ${offlineSync.terminal > 0 || offlineSync.auth > 0 ? 'border-error-200 bg-error-50 text-error-900' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
+          <span className="flex min-w-0 items-center gap-2"><AlertTriangle size={16} className="shrink-0" /><span className="min-w-0"><strong>{offlineSync.auth > 0 ? 'La sesión debe renovarse' : offlineSync.terminal > 0 ? 'Hay cambios que requieren revisión' : 'Hay cambios esperando reintento'}</strong><span className="ml-1">· {offlineSync.pending} pendientes</span>{offlineSync.lastError && <span className="block truncate opacity-80">{offlineSync.lastError}</span>}</span></span>
+          <button type="button" disabled={offlineSync.syncing} onClick={() => void offlineSync.retry()} className="min-h-9 shrink-0 rounded-md border border-current bg-white px-2 font-bold disabled:opacity-50">{offlineSync.syncing ? 'Reintentando…' : 'Reintentar'}</button>
+        </div>
+      )}
 
       {/* SW update banner - shown when new version available */}
       <SWUpdateBanner />
 
+      {impersonationData && (
+        <div data-testid="impersonation-banner" className="flex shrink-0 items-center gap-2 border-b border-amber-300 bg-amber-100 px-3 py-2 text-amber-950">
+          <Eye size={18} className="shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1 text-sm font-semibold leading-tight">
+            <span className="block">{impersonationData.impersonatedUser.training ? 'Capacitación · sin validez oficial' : 'Vista temporal'}</span>
+            <span className="block truncate text-xs font-medium">{impersonationData.impersonatedUser.nombre}</span>
+          </span>
+          <button type="button" data-testid="exit-impersonation" onClick={exitImpersonation} className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-amber-700 bg-white px-3 text-sm font-bold text-amber-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-900">
+            <ArrowLeft size={16} aria-hidden="true" /> Volver a mi cuenta
+          </button>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="sticky top-0 z-40 sidebar-polished safe-area-top">
-        <div className="flex items-center justify-between h-14 px-4 safe-top">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 shrink-0 sidebar-polished safe-area-top">
+        <div className="flex items-center justify-between gap-2 h-16 px-4 safe-top">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <button
               onClick={() => setIsMenuOpen(true)}
               className="p-2 -ml-2 text-white/80 hover:bg-white/10 rounded-xl transition-colors touch-target"
@@ -325,30 +408,37 @@ export const MobileLayout: React.FC = () => {
             >
               <Menu size={24} />
             </button>
-            <h1 className="text-lg font-bold text-white">{getPageTitle()}</h1>
+            <SitrepMark size={24} />
+            <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+              <h1 className="min-w-0 whitespace-normal break-words text-base font-bold leading-5 text-white">{getPageTitle()}</h1>
+              <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="w-fit max-w-full whitespace-normal break-normal text-xs leading-4 font-medium px-2 py-0.5 rounded-full bg-white/20 text-white">
+                {config.label}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Badge de rol */}
-            <span className="text-xs font-medium px-2 py-1 rounded-full bg-white/20 text-white">
-              {config.label}
-            </span>
-            <NotificationBell basePath={mp('')} />
+          <div className="flex shrink-0 items-center gap-2">
+            {inlineSupport && <SupportBubble mobile inline hidden={isMenuOpen} />}
+            <NotificationBell basePath={mp('')} inverse />
           </div>
         </div>
       </header>
+      <ToastContainer />
+      <CompanyContextBar />
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
-      <main className="relative flex-1 overflow-y-auto">
-        <div className={cn('p-4', isFieldTripRoute ? 'pb-6' : 'pb-28')}>
+      <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>
+        <div className={cn(isInspectionCase ? 'h-full min-h-0 p-3' : 'p-4', isInspectionCase ? '' : isFieldTripRoute ? 'pb-6' : 'pb-28')}
+          style={floatingSupport && !isFieldTripRoute ? { paddingBottom: mobileSupportClearance(supportAboveTrip) } : undefined}>
           <Outlet />
         </div>
       </main>
 
       {/* Floating Action Button */}
+      {floatingSupport && <SupportBubble mobile hidden={isMenuOpen} aboveTrip={supportAboveTrip} />}
       {showFab && (
         <button
           onClick={() => navigate(mp('/manifiestos/nuevo'))}
-          className={`fixed right-4 bottom-24 w-14 h-14 ${config.bgColor} text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-all z-30 hover-glow animate-scale-in-bounce`}
+          className="fixed right-4 bottom-24 w-14 h-14 bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors z-30 hover:bg-primary-800"
           aria-label="Nuevo manifiesto"
         >
           <Plus size={28} />
@@ -371,7 +461,7 @@ export const MobileLayout: React.FC = () => {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
+      {!isInspectionCase && <nav className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
         <div className="flex items-center justify-around safe-bottom">
           {bottomNavItems.map((item) => (
             <NavItem 
@@ -380,14 +470,13 @@ export const MobileLayout: React.FC = () => {
               icon={item.icon} 
               label={item.label}
               badge={item.badge}
-              roleColor={config.color}
             />
           ))}
         </div>
-      </nav>
+      </nav>}
 
       {/* PWA Install Modal (appears after 45s of use) */}
-      <InstallPWAModal />
+      {!isInspectionRoute && <InstallPWAModal />}
 
       {/* Side Menu Drawer */}
       {isMenuOpen && (
@@ -404,9 +493,7 @@ export const MobileLayout: React.FC = () => {
             <div className={`p-4 border-b ${config.bgColor} bg-opacity-10`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 ${config.bgColor} rounded-xl flex items-center justify-center`}>
-                    <QrCode size={20} className="text-white" />
-                  </div>
+                  <SitrepMark size={40} />
                   <div>
                     <h2 className="font-bold text-neutral-900">SITREP</h2>
                     <p className={`text-xs ${config.color} font-medium`}>{config.label}</p>
@@ -435,10 +522,13 @@ export const MobileLayout: React.FC = () => {
 
             {/* Drawer Menu Items — scrollable on mobile */}
             <div
+              role="navigation"
+              aria-label="Menú de la aplicación"
               className="flex-1 overflow-y-auto p-2"
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
             >
               <div className="space-y-1">
+                <SupportEntry onSubmitted={() => setIsMenuOpen(false)} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium text-neutral-900 transition-colors hover:bg-primary-50 focus-visible:outline-primary-700" />
                 {mainItems.map((item) => (
                   <MenuItem 
                     key={item.to}
@@ -447,7 +537,6 @@ export const MobileLayout: React.FC = () => {
                     label={item.label} 
                     badge={item.badge}
                     onClick={() => setIsMenuOpen(false)}
-                    activeColor={config.color}
                   />
                 ))}
               </div>
@@ -466,7 +555,6 @@ export const MobileLayout: React.FC = () => {
                         icon={item.icon} 
                         label={item.label}
                         onClick={() => setIsMenuOpen(false)}
-                        activeColor={config.color}
                       />
                     ))}
                   </div>
@@ -486,8 +574,8 @@ export const MobileLayout: React.FC = () => {
                         to={item.to}
                         icon={item.icon}
                         label={item.label}
+                        badge={item.badge}
                         onClick={() => setIsMenuOpen(false)}
-                        activeColor={config.color}
                       />
                     ))}
                     <a
@@ -502,48 +590,20 @@ export const MobileLayout: React.FC = () => {
                 </>
               )}
 
-              {/* User Switcher en Menu */}
-              <div className="border-t border-neutral-100 my-2" />
-              <p className="px-3 py-2 text-xs font-semibold text-neutral-400 uppercase">
-                Cambiar Usuario
-              </p>
-              <div className="space-y-1 px-2">
-                {users.slice(0, 5).map((user) => {
-                  const userConfig = roleConfig[user.rol];
-                  const isCurrent = user.id === currentUser.id;
-                  return (
-                    <button
-                      key={user.id}
-                      onClick={() => handleSwitchUser(user.id)}
-                      disabled={isCurrent}
-                      className={cn(
-                        'w-full flex items-center gap-2 px-2 py-2 rounded-lg transition-colors text-left',
-                        isCurrent
-                          ? `${userConfig.bgColor} bg-opacity-20`
-                          : 'hover:bg-neutral-100'
-                      )}
-                    >
-                      <div className={`w-8 h-8 ${userConfig.bgColor} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>
-                        {user.avatar}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isCurrent ? userConfig.color : 'text-neutral-700'}`}>
-                          {user.nombre}
-                        </p>
-                      </div>
-                      {isCurrent && <div className={`w-2 h-2 ${userConfig.bgColor} rounded-full`} />}
-                    </button>
-                  );
-                })}
+              {/* Switching is an ADMIN tool, never a role selector for an actor. */}
+              {isAdmin && <>
+                <div className="border-t border-neutral-100 my-2" />
+                <div className="px-2">
                 <NavLink
                   to={mp('/switch-user')}
                   onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center gap-2 px-2 py-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                  className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-800 hover:bg-primary-50"
                 >
                   <SwitchCamera size={18} />
-                  <span className="text-sm font-medium">Ver todos los usuarios</span>
+                  <span>Ver como otro usuario</span>
                 </NavLink>
-              </div>
+                </div>
+              </>}
 
               <div className="border-t border-neutral-100 my-2" />
               <div className="space-y-1">
@@ -552,20 +612,18 @@ export const MobileLayout: React.FC = () => {
                   icon={<Settings size={20} />}
                   label="Configuración"
                   onClick={() => setIsMenuOpen(false)}
-                  activeColor={config.color}
                 />
                 <MenuItem
                   to={mp('/mi-perfil')}
                   icon={<User size={20} />}
                   label="Mi Perfil"
                   onClick={() => setIsMenuOpen(false)}
-                  activeColor={config.color}
                 />
               </div>
             </div>
 
             {/* Drawer Footer */}
-            <div className="p-4 border-t border-neutral-100 bg-white safe-area-bottom space-y-2">
+            <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-neutral-100 bg-white space-y-2">
               <InstallPWAButton />
               <button
                 onClick={async () => { setIsMenuOpen(false); await logout(); }}
@@ -594,28 +652,23 @@ interface MenuItemProps {
   label: string;
   badge?: number;
   onClick?: () => void;
-  activeColor?: string;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick, activeColor = 'text-primary-600' }) => {
+const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick }) => {
   return (
     <NavLink
       to={to}
       onClick={onClick}
       className={({ isActive }) => cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+        'flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700',
         isActive 
-          ? `${activeColor.replace('text-', 'bg-').replace('600', '50')} ${activeColor}` 
+          ? 'bg-primary-50 text-primary-900'
           : 'text-neutral-600 hover:bg-neutral-100'
       )}
     >
       {icon}
       <span className="flex-1 font-medium">{label}</span>
-      {badge && (
-        <span className="px-2 py-0.5 bg-error-500 text-white text-xs font-bold rounded-full">
-          {badge}
-        </span>
-      )}
+      <AttentionBadge count={badge} label={label === 'Avisos' ? 'avisos sin leer' : 'pendientes de atender'} />
       <ChevronRight size={16} className="text-neutral-400" />
     </NavLink>
   );

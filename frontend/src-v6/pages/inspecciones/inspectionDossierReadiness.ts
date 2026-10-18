@@ -87,7 +87,7 @@ export function getInspectionDossierReadiness(
     [hasText(report.conclusion), 'Conclusión técnica'],
     [hasText(report.recomendacion), 'Recomendación técnica'],
     [draft.items.filter((item) => item.obligatorio).every((item) => item.resultado !== 'PENDIENTE'), 'Checklist obligatorio completo'],
-    [draft.comparaciones.every((row) => row.resultado !== 'PENDIENTE'), 'Comparativa declarado/verificado completa'],
+    [draft.comparaciones.length > 0 && draft.comparaciones.every((row) => row.resultado !== 'PENDIENTE'), 'Comparativa declarado/verificado completa'],
   ];
   const missing = checks.filter(([passed]) => !passed).map(([, label]) => label);
   return {

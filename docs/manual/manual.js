@@ -32,6 +32,12 @@
     return data.guides.find(function (guide) { return guide.id === id; });
   }
 
+  function guideProfileLabel(guide) {
+    if (guide.audiences && guide.audiences.length > 1) return 'Varios perfiles';
+    var profile = profileById(guide.profile);
+    return profile ? profile.label : guide.profile;
+  }
+
   function readProgress() {
     try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); }
     catch (_error) { return {}; }
@@ -73,7 +79,7 @@
     var nativeHashes = ['perfiles', 'frecuentes', 'tutoriales', 'main'];
     if (nativeHashes.indexOf(hash) >= 0) return;
     var mapped = {
-      capacitacion: 'index.html#tutoriales',
+      capacitacion: 'tutorial.html?guide=capacitacion-por-rol',
       'ft-5': 'tutorial.html?guide=transportista-confirmar-retiro#paso-3-confirmar-el-retiro',
       'ft-9': 'tutorial.html?guide=transportista-confirmar-entrega#paso-3-confirmar-la-entrega',
       'fg-3': 'tutorial.html?guide=generador-crear-manifiesto#paso-1-iniciar-un-manifiesto',
@@ -107,6 +113,10 @@
     });
 
     var popularIds = [
+      'capacitacion-por-rol',
+      'alta-borradores-ocr',
+      'soporte-enviar-seguir',
+      'administrador-alertas-proactivas',
       'inspector-completar-inspeccion',
       'generador-crear-manifiesto',
       'transportista-confirmar-retiro',
@@ -131,7 +141,7 @@
       link.href = tutorialURL(guide);
       link.innerHTML = '<span class="tutorial-card-icon"><span class="material-symbols-rounded" aria-hidden="true">' + escapeHTML(guide.icon) + '</span></span>' +
         '<h3>' + escapeHTML(guide.title) + '</h3><p>' + escapeHTML(guide.summary) + '</p>' +
-        '<span class="tutorial-card-meta"><span>' + escapeHTML(profile ? profile.label : guide.profile) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span>';
+        '<span class="tutorial-card-meta"><span>' + escapeHTML(guideProfileLabel(guide)) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span>';
       tutorialGrid.appendChild(link);
     });
 
@@ -142,7 +152,7 @@
       var profile = profileById(guide.profile);
       var nextStep = Math.min(recent.step || 0, guide.steps.length - 1);
       var percent = Math.round(((nextStep + 1) / guide.steps.length) * 100);
-      document.getElementById('continueDescription').textContent = (profile ? profile.label + ' · ' : '') + guide.title + ' · Paso ' + (nextStep + 1) + ' de ' + guide.steps.length;
+      document.getElementById('continueDescription').textContent = (guideProfileLabel(guide) + ' · ') + guide.title + ' · Paso ' + (nextStep + 1) + ' de ' + guide.steps.length;
       document.getElementById('continueProgress').style.width = percent + '%';
       document.getElementById('continueLink').href = tutorialURL(guide, nextStep);
       continuePanel.hidden = false;
@@ -210,7 +220,7 @@
       });
       var profile = profileById(guide.profile);
       var preview = document.getElementById('searchPreview');
-      preview.innerHTML = '<p class="preview-profile">' + escapeHTML(profile ? profile.label : guide.profile) + '</p>' +
+      preview.innerHTML = '<p class="preview-profile">' + escapeHTML(guideProfileLabel(guide)) + '</p>' +
         '<h2>' + escapeHTML(guide.title) + '</h2>' +
         '<div class="preview-meta"><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">format_list_numbered</span>' + guide.steps.length + ' pasos</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></div>' +
         '<p class="preview-summary">' + escapeHTML(guide.summary) + '</p>' +
@@ -225,7 +235,7 @@
 
     function drawResults() {
       var ranked = data.guides.map(function (guide) { return { guide: guide, score: scoreGuide(guide, query) }; })
-        .filter(function (item) { return item.score > 0 && (activeProfile === 'all' || item.guide.profile === activeProfile); })
+        .filter(function (item) { return item.score > 0 && (activeProfile === 'all' || item.guide.profile === activeProfile || (item.guide.audiences || []).indexOf(activeProfile) !== -1); })
         .sort(function (a, b) { return b.score - a.score || a.guide.title.localeCompare(b.guide.title); });
       var results = document.getElementById('searchResults');
       results.innerHTML = '';
@@ -239,7 +249,7 @@
         result.className = 'search-result';
         result.href = tutorialURL(guide);
         result.setAttribute('data-guide', guide.id);
-        result.innerHTML = '<span class="result-number">' + (index + 1) + '</span><span><h2>' + escapeHTML(guide.title) + '</h2><p>' + escapeHTML(guide.summary) + '</p><span class="result-meta"><span>' + escapeHTML(profile ? profile.label : guide.profile) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span></span><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>';
+        result.innerHTML = '<span class="result-number">' + (index + 1) + '</span><span><h2>' + escapeHTML(guide.title) + '</h2><p>' + escapeHTML(guide.summary) + '</p><span class="result-meta"><span>' + escapeHTML(guideProfileLabel(guide)) + '</span><span><span class="material-symbols-rounded" aria-hidden="true">menu_book</span>Tutorial</span><span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>' + escapeHTML(guide.duration) + '</span></span></span><span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>';
         result.addEventListener('click', function (event) {
           var modifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
           var keyboardActivation = event.detail === 0;
@@ -272,17 +282,40 @@
     drawResults();
   }
 
+  function resourceLinks(records) {
+    return '<ul class="practice-records">' + records.map(function (record) {
+      var href = record.path || record.href;
+      // Only installation-relative URLs; no external origins or protocol URLs.
+      if (!/^\/(?!\/)[a-zA-Z0-9/?=&._-]+$/.test(href)) return '';
+      function anchor(url, label) {
+        return '<a href="' + escapeHTML(url) + '" target="_blank" rel="noopener"' +
+          (record.download ? ' download' : '') + ' aria-label="' + escapeHTML(record.label + ' · ' + (record.role || '') + ' · ' + label + ' (otra pestaña)') + '">' + escapeHTML(label) + '</a>';
+      }
+      return '<li><div><strong>' + escapeHTML(record.label) + '</strong>' +
+        (record.role ? '<span>' + escapeHTML(record.role) + '</span>' : '') +
+        '</div><div class="practice-actions">' + (record.path ? anchor(href, 'Web') + anchor('/app' + href, 'App') : anchor(href, record.action || 'Abrir')) + '</div></li>';
+    }).join('') + '</ul>';
+  }
+
+  function practiceResources(step) {
+    var html = step.resources ? resourceLinks(step.resources) : '';
+    if (step.teams) html += '<div class="practice-teams"><p class="practice-hint">Elegí tu equipo. Abrí el registro después de seleccionar la cuenta CAP; los enlaces no cambian la sesión. Web y App abren otra pestaña.</p>' + step.teams.map(function (team) {
+      return '<details class="practice-team"><summary><strong>' + escapeHTML(team.label) + '</strong><span>' + escapeHTML(team.note) + '</span></summary>' + resourceLinks(team.records) + '</details>';
+    }).join('') + '</div>';
+    return html;
+  }
+
   function renderTutorial() {
     var guide = guideById(params.get('guide')) || guideById('transportista-confirmar-retiro') || data.guides[0];
     if (!guide) return;
     var profile = profileById(guide.profile) || { label: guide.profile, icon: guide.icon };
     document.title = guide.title + ' — Centro de Ayuda SITREP';
-    document.getElementById('sidebarProfile').textContent = profile.label;
+    document.getElementById('sidebarProfile').textContent = guideProfileLabel(guide);
     document.getElementById('sidebarProfileIcon').textContent = profile.icon;
-    document.getElementById('breadcrumbProfile').textContent = profile.label;
-    document.getElementById('breadcrumbProfile').href = 'search.html?profile=' + encodeURIComponent(profile.id || guide.profile);
+    document.getElementById('breadcrumbProfile').textContent = guideProfileLabel(guide);
+    document.getElementById('breadcrumbProfile').href = guide.audiences && guide.audiences.length > 1 ? 'search.html' : 'search.html?profile=' + encodeURIComponent(profile.id || guide.profile);
     document.getElementById('breadcrumbTitle').textContent = guide.title;
-    document.getElementById('tutorialProfile').textContent = profile.label;
+    document.getElementById('tutorialProfile').textContent = guideProfileLabel(guide);
     document.getElementById('tutorialTitle').textContent = guide.title;
     document.getElementById('tutorialSummary').textContent = guide.summary;
     document.getElementById('stepCount').textContent = guide.steps.length + ' pasos';
@@ -294,6 +327,10 @@
     var activeIndex = 0;
     var stepSections = [];
     var stepLinks = [];
+    // Native scroll restoration and late images must not replace a requested
+    // deep link with an intermediate step. User scrolling always takes priority.
+    var restoringHashIndex = -1;
+    function releaseHashRestoration() { restoringHashIndex = -1; }
 
     guide.steps.forEach(function (step, index) {
       var id = 'paso-' + (index + 1) + '-' + slugify(step.title);
@@ -302,6 +339,7 @@
       link.href = '#' + id;
       link.innerHTML = '<span class="index-marker">' + (index + 1) + '</span><span>' + escapeHTML(step.title) + '</span>';
       link.addEventListener('click', function () {
+        releaseHashRestoration();
         updateActive(index, true);
         if (window.innerWidth <= 820) setMobileIndex(false);
       });
@@ -316,7 +354,8 @@
       section.innerHTML = '<p class="step-kicker">Paso ' + (index + 1) + ' de ' + guide.steps.length + '</p>' +
         '<div class="step-title-row"><h2>' + escapeHTML(step.title) + '</h2><button class="copy-step-link" type="button" data-copy-step="' + index + '"><span class="material-symbols-rounded" aria-hidden="true">link</span>Copiar enlace a este paso</button></div>' +
         '<ol class="step-instructions">' + step.body.map(function (instruction) { return '<li><span>' + escapeHTML(instruction) + '</span></li>'; }).join('') + '</ol>' +
-        (step.image ? '<figure class="guide-image-wrap' + (step.image.indexOf('/mobile/') >= 0 ? ' is-mobile-capture' : ' is-desktop-capture') + '"><a class="guide-image-link" href="' + escapeHTML(step.image) + '" target="_blank" rel="noopener" aria-label="Abrir captura a tamaño completo"><img class="guide-image" src="' + escapeHTML(step.image) + '" width="1600" height="900" loading="lazy" alt="' + escapeHTML(step.alt) + '"></a><figcaption class="guide-image-caption">' + (step.image.indexOf('inspection_') >= 0 ? 'Simulación de capacitación con datos de prueba' : 'Captura de SITREP') + ' · Tocá para verla completa.</figcaption></figure>' : '') +
+        practiceResources(step) +
+        (step.image ? '<figure class="guide-image-wrap' + (step.image.indexOf('/mobile/') >= 0 ? ' is-mobile-capture' : ' is-desktop-capture') + '"><a class="guide-image-link" href="' + escapeHTML(step.image) + '" target="_blank" rel="noopener" aria-label="Abrir captura a tamaño completo"><img class="guide-image" src="' + escapeHTML(step.image) + '" width="1600" height="900" loading="lazy" alt="' + escapeHTML(step.alt) + '"></a><figcaption class="guide-image-caption">' + escapeHTML(step.caption || (step.image.indexOf('inspection_') >= 0 ? 'Simulación de capacitación con datos de prueba' : 'Captura de SITREP')) + ' · Tocá para verla completa.</figcaption></figure>' : '') +
         '<div class="expected-result"><span class="material-symbols-rounded" aria-hidden="true">check</span><div><strong>Resultado esperado</strong><p>' + escapeHTML(step.expected) + '</p></div></div>';
       stepsRoot.appendChild(section);
       stepSections.push(section);
@@ -345,6 +384,7 @@
     }
 
     function goToStep(index) {
+      releaseHashRestoration();
       var target = Math.max(0, Math.min(index, guide.steps.length - 1));
       if (index >= guide.steps.length) {
         writeProgress(guide, guide.steps.length - 1);
@@ -369,6 +409,7 @@
 
     var scrollTicking = false;
     function syncStepFromScroll() {
+      if (restoringHashIndex >= 0) return;
       var readingLine = window.innerWidth <= 820 ? 240 : 170;
       var current = 0;
       stepSections.forEach(function (section, index) {
@@ -389,7 +430,29 @@
     var saved = readProgress()[guide.id];
     var initial = hashIndex >= 0 ? hashIndex : (saved ? Math.min(saved.step || 0, guide.steps.length - 1) : 0);
     updateActive(initial, false);
-    if (hashIndex >= 0) window.setTimeout(function () { stepSections[hashIndex].scrollIntoView({ block: 'start' }); }, 60);
+    if (hashIndex >= 0) {
+      restoringHashIndex = hashIndex;
+      var restoreHashStep = function () {
+        if (restoringHashIndex < 0) return;
+        stepSections[restoringHashIndex].scrollIntoView({ behavior: 'instant', block: 'start' });
+      };
+      window.setTimeout(restoreHashStep, 60);
+      window.addEventListener('load', restoreHashStep, { once: true });
+      stepSections.slice(0, hashIndex + 1).forEach(function (section) {
+        section.querySelectorAll('img.guide-image').forEach(function (image) {
+          if (image.complete) return;
+          image.loading = 'eager';
+          image.addEventListener('load', restoreHashStep, { once: true });
+          image.addEventListener('error', restoreHashStep, { once: true });
+        });
+      });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(restoreHashStep);
+      window.addEventListener('wheel', releaseHashRestoration, { passive: true });
+      window.addEventListener('touchmove', releaseHashRestoration, { passive: true });
+      window.addEventListener('keydown', function (event) {
+        if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].indexOf(event.key) >= 0) releaseHashRestoration();
+      });
+    }
 
     var mobileToggle = document.getElementById('mobileIndexToggle');
     var sidebar = document.getElementById('tutorialSidebar');

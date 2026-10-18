@@ -11,15 +11,20 @@ export const DATE_PRESETS = [
   { label: '30 días', days: 30 },
 ] as const;
 
-/** days=0 → empty strings (no date filter, returns all data) */
-export function computeDateRange(days: number): { desde: string; hasta: string } {
+const mendozaCalendar = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+
+/** Inclusive civil days in Mendoza. days=0 keeps the query unfiltered. */
+export function computeDateRange(days: number, now = new Date()): { desde: string; hasta: string } {
   if (days === 0) return { desde: '', hasta: '' };
-  const today = new Date().toISOString().split('T')[0];
-  if (days === 1) return { desde: today, hasta: today };
-  const d = new Date();
-  d.setDate(d.getDate() - days);
+  const parts = mendozaCalendar.formatToParts(now);
+  const part = (type: string) => parts.find(value => value.type === type)!.value;
+  const today = `${part('year')}-${part('month')}-${part('day')}`;
+  // UTC is used only for arithmetic on date keys, not to choose Mendoza's day.
+  const first = new Date(Date.parse(today + 'T00:00:00Z') - (days - 1) * 86400000);
   return {
-    desde: d.toISOString().split('T')[0],
+    desde: first.toISOString().slice(0, 10),
     hasta: today,
   };
 }

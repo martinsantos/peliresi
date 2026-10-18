@@ -1,0 +1,114 @@
+{
+  "run": "38268869991",
+  "commit": "2d3bdd226df4eb4a336f0d7944d94e489b8f0b73",
+  "capturedAt": "2026-10-12",
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "files": [
+    {
+      "file": "desktop/training-selector-20261012.png",
+      "source": "mail-e2e-training-training-f5dad-and-return-to-administrator-web-desktop/training-selector.png",
+      "sha256": "5adeb9d1bdd96de56ea3e5a9091ef54fd84787cf97d081aad71b654f02a65cdf",
+      "width": 1440,
+      "height": 900,
+      "bytes": 141173
+    },
+    {
+      "file": "mobile/training-inspection-20261012.png",
+      "source": "mail-e2e-training-school-i-49411-e-operational-administrator-app/training-inspection-resumed.png",
+      "sha256": "c6f094c753dcbd712a5c5d5219e8929c74f38fdeea3000406e29346459424e9a",
+      "width": 945,
+      "height": 2100,
+      "bytes": 193860
+    },
+    {
+      "file": "desktop/training-manifest-20261012.png",
+      "source": "mail-e2e-training-school-t-2f662-nifest-through-real-buttons-web-desktop/training-manifest-finished.png",
+      "sha256": "368f0a5d1619b4b4aa34f100e0a6c9cdc18557feb52e14682e410241d763c485",
+      "width": 1440,
+      "height": 900,
+      "bytes": 142142
+    },
+    {
+      "file": "desktop/registration-draft-20261012.png",
+      "source": "mail-e2e-mail-links-public-445d4-overs-the-owned-application-web-desktop/verification-draft-recovered.png",
+      "sha256": "bbaf30f78fbff71322c2ce5d793541a1ad7715c64f42a249dabfb62b7dc68334",
+      "width": 1440,
+      "height": 900,
+      "bytes": 147697
+    },
+    {
+      "file": "mobile/registration-observed-20261012.png",
+      "source": "mail-e2e-mail-links-mail-d-82037-s-login-application-pending-app/application-pending.png",
+      "sha256": "852a8ed295c85b5273b388bc50d6f79868f75ceab2dc39e4e202289180b8b6cf",
+      "width": 945,
+      "height": 2100,
+      "bytes": 121621
+    },
+    {
+      "file": "mobile/support-report-20261012.png",
+      "source": "e2e-support-native-support-57930--reopen-with-actual-notices-app/support-report-form.png",
+      "sha256": "85accf2fc6ebf87f35035e2d903b810304fe077e384e5920f8c31ce21455f89f",
+      "width": 945,
+      "height": 2100,
+      "bytes": 161873
+    },
+    {
+      "file": "mobile/support-created-20261012.png",
+      "source": "e2e-support-native-support-57930--reopen-with-actual-notices-app/support-report-created.png",
+      "sha256": "a863833a9b772d7ef0308c0a6cac64d22778a3f59bdab65b87b2ea168382fc1c",
+      "width": 945,
+      "height": 2100,
+      "bytes": 160857
+    },
+    {
+      "file": "desktop/support-answer-20261012.png",
+      "source": "e2e-support-support-impers-a4af8--to-the-represented-account-web-desktop/support-response-delivered-to-owner.png",
+      "sha256": "d680f8829b1b039b48a049978c8c5e981fafe0b20801d87cdcb6909491085702",
+      "width": 1440,
+      "height": 900,
+      "bytes": 126719
+    },
+    {
+      "file": "desktop/support-assigned-20261012.png",
+      "source": "e2e-support-brief-reports--08a34-lves-or-claim-in-one-action-web-desktop/support-one-action-assignment.png",
+      "sha256": "8c4a97a9848371d8e4a55cb65a1f4a195c3ec02a08e05501d64575ffc799951b",
+      "width": 1440,
+      "height": 900,
+      "bytes": 123703
+    },
+    {
+      "file": "desktop/support-triage-20261012.png",
+      "source": "e2e-support-support-triage-a36a2-classification-and-priority-web-desktop/support-triage-form.png",
+      "sha256": "42aaee198b3518da0de3b0388b6580bd2c68e57d7a630e53b2a3e1580c58952b",
+      "width": 1440,
+      "height": 900,
+      "bytes": 134113
+    },
+    {
+      "file": "desktop/support-actions-20261012.png",
+      "source": "e2e-support-brief-reports--08a34-lves-or-claim-in-one-action-web-desktop/support-direct-self-routing.png",
+      "sha256": "1a17680adf1bde8478360e1a573c32da560f3fd22418be50af9a689d2284b963",
+      "width": 1440,
+      "height": 900,
+      "bytes": 122710
+    },
+    {
+      "file": "mobile/actor-inspection-20261012.png",
+      "source": "mail-e2e-training-school-T-da805-ponse-and-authority-closure-app/training-TRANSPORTISTA-response.png",
+      "sha256": "5baac2854068faf7e84bba7dcae9d2e12a09bad96582a2550861792b30cf094f",
+      "width": 945,
+      "height": 2100,
+      "bytes": 179036
+    },
+    {
+      "file": "desktop/actor-inspection-closed-20261012.png",
+      "source": "mail-e2e-training-school-T-da805-ponse-and-authority-closure-web-desktop/training-TRANSPORTISTA-closed.png",
+      "sha256": "10620d950e3449ef34bc50aad3291cdeb2af33e4ad1e117754643dd0ec5acb52",
+      "width": 1440,
+      "height": 900,
+      "bytes": 170832
+    }
+  ]
+}

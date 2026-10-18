@@ -31,6 +31,7 @@ export interface ActionButtonsProps {
   userRol: string;
   isActionPending: boolean;
   isInSitu?: boolean;
+  training?: boolean;
   isCancelling: boolean;
   mutations: {
     firmar: MutationState;
@@ -63,6 +64,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   userRol,
   isActionPending,
   isInSitu,
+  training,
   isCancelling,
   mutations,
   onOpenFirmaModal,
@@ -81,7 +83,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   onDescargarCertificado,
 }) => {
   return (
-    <div className="space-y-2 animate-fade-in">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {/* State-based action buttons with role guards */}
       {estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
         <Button
@@ -202,18 +204,20 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
         </Button>
       )}
 
-      <Button variant="outline" fullWidth leftIcon={<Download size={16} />} onClick={onDescargarPDF}>
+      <Button variant="outline" fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Download size={16} />} onClick={onDescargarPDF}>
         Descargar PDF
       </Button>
 
       {estado === EstadoManifiesto.TRATADO && (
-        <Button fullWidth leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="!bg-success-600 hover:!bg-success-700">
+        <Button fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="!bg-success-600 hover:!bg-success-700">
           Descargar Certificado
         </Button>
       )}
 
+      {training && <p id="training-document-limit" className="col-span-full text-sm text-neutral-600">Capacitación: no se emiten documentos oficiales.</p>}
+
       {estado !== EstadoManifiesto.CANCELADO && estado !== EstadoManifiesto.TRATADO && (isAdmin || userRol === 'GENERADOR') && (
-        <Button variant="danger" fullWidth leftIcon={<XCircle size={16} />} onClick={onOpenCancelModal}>
+        <Button variant="outline" fullWidth leftIcon={<XCircle size={16} />} onClick={onOpenCancelModal} disabled={isActionPending || isCancelling} className="!text-error-800 !border-error-300 hover:!bg-error-50">
           Cancelar Manifiesto
         </Button>
       )}
@@ -224,7 +228,8 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           fullWidth
           leftIcon={<RotateCcw size={16} />}
           onClick={onOpenReversionModal}
-          className="!text-amber-600 !border-amber-200 hover:!bg-amber-50"
+          disabled={isActionPending}
+          className="!text-amber-800 !border-amber-400 hover:!bg-amber-50"
         >
           Revertir Estado
         </Button>

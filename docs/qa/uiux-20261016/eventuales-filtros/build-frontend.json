@@ -1,0 +1,15 @@
+{
+  "phase": "build-frontend",
+  "attempt": "1",
+  "source": "16100dd",
+  "status": "passed",
+  "startedAt": "2026-10-17T11:16:02.738Z",
+  "steps": [
+    "web build",
+    "app build"
+  ],
+  "current": "app build",
+  "finishedAt": "2026-10-17T11:17:40.144Z",
+  "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "memoryPeak": "1907314688"
+}

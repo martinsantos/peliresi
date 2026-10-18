@@ -34,6 +34,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
+import { capacityFormValue, vehicleUpdatePayload } from '../../utils/vehicleUpdate';
 
 interface VehiculoDisplay {
   id: string;
@@ -43,6 +44,7 @@ interface VehiculoDisplay {
   modelo: string;
   anio: number;
   capacidad: string;
+  capacidadKg: number | null;
   transportista: string;
   habilitacion: string;
   estado: string;
@@ -113,6 +115,7 @@ export const AdminVehiculosPage: React.FC = () => {
         modelo: v.modelo,
         anio: v.anio,
         capacidad: typeof v.capacidad === 'number' ? `${v.capacidad.toLocaleString()} kg` : '',
+        capacidadKg: typeof v.capacidad === 'number' ? v.capacidad : null,
         transportista: t.razonSocial,
         habilitacion: v.numeroHabilitacion || '',
         estado: v.activo ? 'disponible' : 'inactivo',
@@ -213,20 +216,16 @@ export const AdminVehiculosPage: React.FC = () => {
   // Handlers
   const handleEditVehiculo = async () => {
     if (!editingVehiculo) return;
+    const payload = vehicleUpdatePayload(vehiculoForm);
+    if ('error' in payload) {
+      toast.error('Revisá el vehículo', payload.error);
+      return;
+    }
     try {
       await updateVehiculoMut.mutateAsync({
         transportistaId: editingVehiculo.transportistaId,
         vehiculoId: editingVehiculo.id,
-        data: {
-          patente: vehiculoForm.patente,
-          marca: vehiculoForm.marca,
-          modelo: vehiculoForm.modelo,
-          anio: Number(vehiculoForm.anio),
-          capacidad: Number(vehiculoForm.capacidad),
-          numeroHabilitacion: vehiculoForm.numeroHabilitacion || undefined,
-          vencimiento: vehiculoForm.vencimiento || undefined,
-          activo: vehiculoForm.activo,
-        },
+        data: payload.data,
       });
       toast.success('Actualizado', 'Vehículo actualizado exitosamente');
       setEditingVehiculo(null);
@@ -289,7 +288,6 @@ export const AdminVehiculosPage: React.FC = () => {
   const columns = [
     {
       key: 'vehiculo',
-      width: '22%',
       header: 'Vehículo',
       sortable: true,
       render: (row: VehiculoDisplay) => (
@@ -306,8 +304,8 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'detalles',
-      width: '20%',
-      hiddenBelow: 'lg' as const,
+      width: '8rem',
+      hiddenBelow: 'xl' as const,
       header: 'Detalles',
       render: (row: VehiculoDisplay) => (
         <div className="text-sm min-w-0">
@@ -318,7 +316,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'transportista',
-      width: '20%',
+      width: '10rem',
       sortable: true,
       hiddenBelow: 'lg' as const,
       header: 'Transportista',
@@ -328,7 +326,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'vtv',
-      width: '15%',
+      width: '9rem',
       sortable: true,
       hiddenBelow: 'xl' as const,
       header: 'Vencimiento',
@@ -365,7 +363,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '12%',
+      width: '7rem',
       sortable: true,
       header: 'Estado',
       render: (row: VehiculoDisplay) => {
@@ -381,7 +379,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '11%',
+      width: '7.5rem',
       header: '',
       align: 'right' as const,
       render: (row: VehiculoDisplay) => (
@@ -403,7 +401,7 @@ export const AdminVehiculosPage: React.FC = () => {
                 marca: row.marca,
                 modelo: row.modelo,
                 anio: String(row.anio || ''),
-                capacidad: row.capacidad.replace(/[^\d]/g, ''),
+                capacidad: capacityFormValue(row.capacidadKg),
                 numeroHabilitacion: row.habilitacion || '',
                 vencimiento: row.vencimiento ? new Date(row.vencimiento).toISOString().split('T')[0] : '',
                 activo: row.activo,
@@ -428,7 +426,6 @@ export const AdminVehiculosPage: React.FC = () => {
   const choferColumns = [
     {
       key: 'chofer',
-      width: '22%',
       sortable: true,
       header: 'Chofer',
       render: (row: ChoferDisplay) => (
@@ -445,8 +442,8 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'licencia',
-      width: '15%',
-      hiddenBelow: 'md' as const,
+      width: '7rem',
+      hiddenBelow: 'xl' as const,
       header: 'Licencia',
       render: (row: ChoferDisplay) => (
         <span className="text-sm text-neutral-700">{row.licencia || 'Sin licencia'}</span>
@@ -454,9 +451,9 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'transportista',
-      width: '25%',
+      width: '10rem',
       sortable: true,
-      hiddenBelow: 'md' as const,
+      hiddenBelow: 'lg' as const,
       header: 'Transportista',
       render: (row: ChoferDisplay) => (
         <span className="text-sm text-neutral-700 truncate block">{row.transportista}</span>
@@ -464,7 +461,8 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'vencimiento',
-      width: '15%',
+      width: '9rem',
+      hiddenBelow: 'xl' as const,
       header: 'Vencimiento',
       render: (row: ChoferDisplay) => {
         if (!row.vencimiento) {
@@ -499,7 +497,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '12%',
+      width: '7rem',
       sortable: true,
       header: 'Estado',
       render: (row: ChoferDisplay) => (
@@ -510,7 +508,7 @@ export const AdminVehiculosPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '11%',
+      width: '7.5rem',
       header: '',
       align: 'right' as const,
       render: (row: ChoferDisplay) => (
@@ -585,10 +583,7 @@ export const AdminVehiculosPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Vehículos</h2>
-          <p className="text-neutral-600 mt-1">
-            Gestión de flota de transporte
-          </p>
+          <h2 className="sr-only">Vehículos</h2>
         </div>
         <div className="flex gap-2">
           <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
@@ -715,7 +710,7 @@ export const AdminVehiculosPage: React.FC = () => {
                                 marca: v.marca,
                                 modelo: v.modelo,
                                 anio: String(v.anio || ''),
-                                capacidad: v.capacidad.replace(/[^\d]/g, ''),
+                                capacidad: capacityFormValue(v.capacidadKg),
                                 numeroHabilitacion: v.habilitacion || '',
                                 vencimiento: v.vencimiento ? new Date(v.vencimiento).toISOString().split('T')[0] : '',
                                 activo: v.activo,
@@ -770,6 +765,7 @@ export const AdminVehiculosPage: React.FC = () => {
               ) : (
                 <>
                   <Table
+                    className="[&_table]:min-w-[38rem]"
                     data={paginatedData}
                     columns={columns}
                     keyExtractor={(row) => row.id}
@@ -891,6 +887,7 @@ export const AdminVehiculosPage: React.FC = () => {
               ) : (
                 <>
                   <Table
+                    className="[&_table]:min-w-[38rem]"
                     data={paginatedChoferes}
                     columns={choferColumns}
                     keyExtractor={(row) => row.id}

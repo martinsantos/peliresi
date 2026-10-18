@@ -1,4 +1,21 @@
 export type InspectionActorType = 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR';
+export type InspectionType = InspectionActorType | 'PETROLEO' | 'AIRE' | 'ESPONTANEA';
+export const INSPECTION_TYPES: Record<InspectionType, { label: string; serie: string }> = {
+  GENERADOR: { label: 'Generador', serie: 'GRP' }, TRANSPORTISTA: { label: 'Transporte', serie: 'TRP' },
+  OPERADOR: { label: 'Operador', serie: 'ORP' }, PETROLEO: { label: 'Petróleo', serie: 'PRP' },
+  AIRE: { label: 'Aire', serie: 'ARP' }, ESPONTANEA: { label: 'Espontánea / denuncia', serie: 'IRP' },
+};
+
+/** The official series is immutable, independent of a later actor association. */
+export function inspectionTypeOf(record: { numero: string; tipoActor?: InspectionActorType | null }): InspectionType {
+  const serie = /^(GRP|TRP|ORP|PRP|ARP|IRP)-\d{4}-\d{5}$/.exec(record.numero)?.[1];
+  return (Object.keys(INSPECTION_TYPES) as InspectionType[]).find((type) => INSPECTION_TYPES[type].serie === serie) || record.tipoActor || 'ESPONTANEA';
+}
+
+export function inspectionNumberExample(type: InspectionType): string {
+  const year = new Intl.DateTimeFormat('en', { year: 'numeric', timeZone: 'America/Argentina/Mendoza' }).format(new Date());
+  return `${INSPECTION_TYPES[type].serie}-${year}-00001`;
+}
 export type InspectionItemResult = 'PENDIENTE' | 'CUMPLE' | 'NO_CUMPLE' | 'NO_APLICA';
 export type InspectionEvidenceType = 'FOTO' | 'AUDIO' | 'DOCUMENTO';
 export type InspectionComparisonResult = 'PENDIENTE' | 'COINCIDE' | 'DIFIERE' | 'NO_VERIFICADO' | 'NO_APLICA';
@@ -129,6 +146,23 @@ export interface InspectionComparison {
   evidencias: InspectionEvidence[];
 }
 
+export interface InspectionDeclaredDocument {
+  id: string;
+  tipo: string;
+  nombre: string;
+  anio?: number | null;
+  estado: string;
+  createdAt: string;
+}
+
+export interface InspectionDeclaredSnapshot {
+  schemaVersion: number;
+  capturedAt: string;
+  actorType: InspectionActorType;
+  actorId: string;
+  documents?: InspectionDeclaredDocument[];
+}
+
 export interface InspectionEvent {
   id: string;
   tipo: string;
@@ -164,6 +198,7 @@ export interface InspectionExchange {
   respondeAId?: string | null;
   tipo: InspectionExchangeType;
   parte: InspectionExchangeParty;
+  destinatario: InspectionExchangeParty;
   asunto: string;
   cuerpo: string;
   plazoRespuestaAt?: string | null;
@@ -174,6 +209,8 @@ export interface InspectionExchange {
   hashAnterior?: string | null;
   hashCadena: string;
   autorId: string;
+  puestaDisposicionAt: string;
+  vistaPorDestinatarioAt?: string | null;
   createdAt: string;
   autor: { id: string; nombre: string; apellido?: string | null; rol: string };
   adjuntos: InspectionExchangeAttachment[];
@@ -185,7 +222,7 @@ export interface InspectionExchangeTimeline {
     numero: string;
     numeroActa?: string | null;
     estado: InspectionState;
-    tipoActor: InspectionActorType;
+    tipoActor: InspectionActorType | null;
     actor: InspectionActor | null;
     plazoRespuestaAt?: string | null;
     version: number;
@@ -199,7 +236,7 @@ export interface Inspection {
   id: string;
   numero: string;
   numeroActa?: string | null;
-  tipoActor: InspectionActorType;
+  tipoActor: InspectionActorType | null;
   estado: InspectionState;
   inspectorId: string;
   inspector: { id: string; nombre: string; apellido?: string | null; email?: string };
@@ -220,6 +257,7 @@ export interface Inspection {
   createdAt: string;
   updatedAt: string;
   verificacion?: InspectionVerification | null;
+  declaradoSnapshot?: InspectionDeclaredSnapshot | null;
   items: InspectionItem[];
   comparaciones: InspectionComparison[];
   evidencias: InspectionEvidence[];

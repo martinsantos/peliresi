@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  FileText, Building2, Truck, Factory, Calendar, Shield,
+  FileText, FlaskConical, Truck, Factory, Calendar, Shield,
   AlertTriangle, CheckCircle2, Clock, ArrowRight, Loader2
 } from 'lucide-react';
 import axios from 'axios';
@@ -127,11 +127,15 @@ const VerificarManifiestoPage: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-lg border border-neutral-200 max-w-lg w-full overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-5 text-white">
-          <div className="flex items-center gap-3 mb-1">
-            <Shield className="w-6 h-6 opacity-80" />
-            <span className="text-sm font-medium opacity-80">SITREP — Verificación de Manifiesto</span>
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-white" aria-hidden="true">
+              <Shield size={20} className="block" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <span className="block text-sm font-medium leading-6 text-white/90">SITREP — Verificación de Manifiesto</span>
+              <h1 className="mt-1 break-words text-2xl font-bold font-mono tracking-wide text-white">{data.numero}</h1>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold font-mono tracking-wide">{data.numero}</h1>
         </div>
 
         {/* Estado */}
@@ -165,7 +169,7 @@ const VerificarManifiestoPage: React.FC = () => {
           </div>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-              <Building2 size={16} className="text-blue-600" />
+              <FlaskConical size={16} className="text-blue-600" />
             </div>
             <div>
               <p className="text-xs text-neutral-500">Operador</p>

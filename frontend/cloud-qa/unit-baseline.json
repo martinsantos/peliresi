@@ -1,0 +1,19 @@
+{
+  "productCommit": "fb7b8d948af9ce99308779d92d9831c8b8cf8bf5",
+  "hash": "ef0a216ffc074b98bd7c11ee5212967562ae79f9ee93f0efa22cc475bf41d22d",
+  "trackedFiles": 926,
+  "scope": "All tracked backend, frontend and scripts except the isolated cloud-qa harness",
+  "measuredUnitRun": 37719090788,
+  "measuredUnitCommit": "fb7b8d948af9ce99308779d92d9831c8b8cf8bf5",
+  "approvalScope": "Unit stage and raw reports only; 12 focal browser E2E passed but one Android input failed, so NOT release approval",
+  "backend": {
+    "passed": 543,
+    "failed": 0,
+    "pending": 0
+  },
+  "frontend": {
+    "passed": 1190,
+    "failed": 0,
+    "pending": 0
+  }
+}

@@ -11,6 +11,17 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
+import { registrationActorFields } from '../domain/registrationActorData';
+import { registrationFleet, declaredLicenseDocument, isLicenseDocument } from '../domain/registrationFleet';
+import { licenseFields } from '../domain/licenseReading';
+import { describeDocument, readReceipt, mergeReceiptRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import {
+  getMissingRequiredDocumentTypes,
+  getSolicitudRequirements,
+  isSolicitudActorType,
+  SOLICITUD_DOCUMENT_ACCEPT,
+  SOLICITUD_DOCUMENT_MAX_BYTES,
+} from '../services/solicitudRequirements.service';
 
 // ── CUIT normalization (same pattern as auth.controller) ────────────
 function normalizeCuit(raw: string): string | null {
@@ -28,17 +39,17 @@ function validatePasswordStrength(password: string): string | null {
 }
 
 // ── Multer setup for document uploads ───────────────────────────────
-const uploadDir = path.join(process.cwd(), 'uploads', 'solicitudes');
+const uploadDir = path.join(process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads'), 'solicitudes');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  filename: (_req, file, cb) => cb(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
 });
-const SOLICITUD_DOCUMENT_MIMES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const SOLICITUD_DOCUMENT_MIMES = new Set<string>(SOLICITUD_DOCUMENT_ACCEPT);
 export const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  limits: { fileSize: SOLICITUD_DOCUMENT_MAX_BYTES, files: 1 },
   fileFilter: (_req, file, callback) => {
     if (SOLICITUD_DOCUMENT_MIMES.has(file.mimetype)) callback(null, true);
     else callback(new AppError('Tipo de archivo no permitido. Solo PDF, JPG o PNG.', 400));
@@ -51,9 +62,49 @@ function isAdmin(rol: string): boolean {
   return ADMIN_ROLES.includes(rol);
 }
 
+function assertReviewPermission(req: AuthRequest, solicitud: { tipoActor: string }) {
+  if (!req.user || req.user.restricted || !['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(req.user.rol)) {
+    throw new AppError('No tiene permisos para modificar una solicitud de este sector', 403);
+  }
+}
+
+function jsonObject(value: unknown, allowArray = false): string {
+  let parsed: unknown = value;
+  if (typeof value === 'string') {
+    try { parsed = JSON.parse(value); } catch { throw new AppError('Los datos deben ser un objeto JSON válido', 400); }
+  }
+  if (!parsed || typeof parsed !== 'object' || (!allowArray && Array.isArray(parsed))) throw new AppError('Los datos deben ser un objeto JSON válido', 400);
+  return JSON.stringify(parsed);
+}
+
 // =====================================================================
 // PUBLIC (no auth)
 // =====================================================================
+
+/**
+ * GET /solicitudes/requisitos/:tipoActor
+ * Canonical document requirements consumed by both the UI and submit validation.
+ */
+export const getRequisitosSolicitud = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const tipoActor = String(req.params.tipoActor || '').toUpperCase();
+    if (!isSolicitudActorType(tipoActor)) {
+      throw new AppError('tipoActor debe ser GENERADOR, OPERADOR o TRANSPORTISTA', 400);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        tipoActor,
+        documentos: getSolicitudRequirements(tipoActor),
+        acceptedMimeTypes: [...SOLICITUD_DOCUMENT_ACCEPT],
+        maxBytes: SOLICITUD_DOCUMENT_MAX_BYTES,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * POST /solicitudes/iniciar
@@ -111,6 +162,7 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
           nombre,
           cuit: normalizedCuit,
           activo: false,
+          motivoInactividad: 'PENDIENTE_APROBACION',
           emailVerified: false,
           emailVerificationToken: hashedToken,
         },
@@ -209,7 +261,8 @@ export const getSolicitud = async (req: AuthRequest, res: Response, next: NextFu
 export const updateSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { datosActor, datosResiduos, datosTEF, datosRegulatorio } = req.body;
+    const { datosActor, datosResiduos, datosTEF, datosRegulatorio, expectedUpdatedAt } = req.body;
+    if (expectedUpdatedAt !== undefined && (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt)))) throw new AppError('La versión del borrador es inválida', 400);
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
@@ -223,14 +276,18 @@ export const updateSolicitud = async (req: AuthRequest, res: Response, next: Nex
     }
 
     const data: any = {};
-    if (datosActor !== undefined) data.datosActor = typeof datosActor === 'string' ? datosActor : JSON.stringify(datosActor);
-    if (datosResiduos !== undefined) data.datosResiduos = typeof datosResiduos === 'string' ? datosResiduos : JSON.stringify(datosResiduos);
-    if (datosTEF !== undefined) data.datosTEF = typeof datosTEF === 'string' ? datosTEF : JSON.stringify(datosTEF);
-    if (datosRegulatorio !== undefined) data.datosRegulatorio = typeof datosRegulatorio === 'string' ? datosRegulatorio : JSON.stringify(datosRegulatorio);
+    if (datosActor !== undefined) data.datosActor = jsonObject(datosActor);
+    if (datosResiduos !== undefined) data.datosResiduos = jsonObject(datosResiduos, true);
+    if (datosTEF !== undefined) data.datosTEF = jsonObject(datosTEF);
+    if (datosRegulatorio !== undefined) data.datosRegulatorio = jsonObject(datosRegulatorio);
 
-    const updated = await prisma.solicitudInscripcion.update({
-      where: { id },
-      data,
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya no admite cambios', 409);
+      if (expectedUpdatedAt !== undefined && current.updatedAt.toISOString() !== expectedUpdatedAt) throw new AppError('El borrador cambió en SITREP. Recuperá la versión actual antes de guardar; tus cambios siguen en pantalla.', 409);
+      // Monotonic even when two serialized edits land in the same millisecond.
+      return tx.solicitudInscripcion.update({ where: { id }, data: { ...data, updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) } });
     });
 
     res.json({ success: true, data: { solicitud: updated } });
@@ -240,22 +297,54 @@ export const updateSolicitud = async (req: AuthRequest, res: Response, next: Nex
 };
 
 /**
- * POST /solicitudes/:id/enviar
- * BORRADOR/OBSERVADA -> ENVIADA. Validate required fields.
+ * PATCH /solicitudes/:id/datos-revision
+ * Correct declarations during administrative review, with revision and history.
  */
+export const editarDatosRevision = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const { datosActor, expectedUpdatedAt } = req.body;
+    if (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt))) throw new AppError('Recuperá la versión actual antes de corregir los datos.', 400);
+    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id }, include: { usuario: { select: { cuit: true } } } });
+    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
+    const changes = JSON.parse(jsonObject(datosActor));
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || current.estado !== 'EN_REVISION' || current.updatedAt.toISOString() !== expectedUpdatedAt) throw new AppError('La solicitud cambió o ya no está en revisión. Actualizá antes de guardar; tus cambios siguen en pantalla.', 409);
+      const previous = JSON.parse(jsonObject(current.datosActor));
+      const corrected = { ...previous, ...changes };
+      if (corrected.cuit && normalizeCuit(String(corrected.cuit)) !== solicitud.usuario.cuit) throw new AppError('El CUIT debe seguir correspondiendo a la cuenta solicitante.', 400);
+      registrationActorFields(solicitud.tipoActor, corrected);
+      const saved = await tx.solicitudInscripcion.update({ where: { id }, data: { datosActor: JSON.stringify(corrected), updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) } });
+      await tx.auditoria.create({ data: { accion: 'UPDATE', modulo: 'SOLICITUD', usuarioId: req.user!.id,
+        datosAntes: JSON.stringify({ solicitudId: id, datosActor: previous }), datosDespues: JSON.stringify({ solicitudId: id, datosActor: corrected }), ip: req.ip, userAgent: req.headers['user-agent'] } });
+      return saved;
+    });
+    res.json({ success: true, data: { solicitud: updated } });
+  } catch (error) { next(error); }
+};
+
+/** BORRADOR/OBSERVADA -> ENVIADA. Validate required data and documents. */
 export const enviarSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-
-    const solicitud = await prisma.solicitudInscripcion.findUnique({
+    const updated = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+    const solicitud = await tx.solicitudInscripcion.findUnique({
       where: { id },
-      include: { usuario: { select: { email: true, nombre: true } } },
+      include: {
+        usuario: { select: { email: true, nombre: true } },
+        documentos: { select: { tipo: true, estado: true } },
+      },
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
 
     if (solicitud.usuarioId !== req.user!.id) {
       throw new AppError('No tiene permisos para enviar esta solicitud', 403);
     }
+    if (solicitud.estado === 'ENVIADA') return solicitud;
 
     if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
       throw new AppError('Solo se pueden enviar solicitudes en estado BORRADOR u OBSERVADA', 400);
@@ -266,7 +355,9 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('Datos del actor son obligatorios', 400);
     }
 
-    const datosActor = JSON.parse(solicitud.datosActor);
+    const datosActor = JSON.parse(jsonObject(solicitud.datosActor));
+    registrationActorFields(solicitud.tipoActor, datosActor);
+    if (solicitud.tipoActor === 'TRANSPORTISTA') registrationFleet(datosActor);
     if (!datosActor.razonSocial && !datosActor.nombre) {
       throw new AppError('La razon social o nombre es obligatorio', 400);
     }
@@ -277,7 +368,17 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
       throw new AppError('El domicilio es obligatorio', 400);
     }
 
-    const updated = await prisma.solicitudInscripcion.update({
+    const missingTypes = getMissingRequiredDocumentTypes(
+      solicitud.tipoActor,
+      solicitud.documentos.filter(documento => documento.estado !== 'RECHAZADO').map((documento) => documento.tipo),
+    );
+    if (missingTypes.length > 0) {
+      const namesByType = new Map(getSolicitudRequirements(solicitud.tipoActor).map((item) => [item.tipo, item.nombre]));
+      const missingNames = missingTypes.map((type) => namesByType.get(type) || type).join(', ');
+      throw new AppError(`Faltan documentos obligatorios: ${missingNames}`, 400);
+    }
+
+    const saved = await tx.solicitudInscripcion.update({
       where: { id },
       data: {
         estado: 'ENVIADA',
@@ -286,13 +387,13 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
     });
 
     // Notify admins via in-app notification
-    const admins = await prisma.usuario.findMany({
+    const admins = await tx.usuario.findMany({
       where: { rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] }, activo: true },
       select: { id: true },
     });
 
     await Promise.all(admins.map((admin) =>
-      prisma.notificacion.create({
+      tx.notificacion.create({
         data: {
           usuarioId: admin.id,
           tipo: 'SOLICITUD_ENVIADA',
@@ -307,6 +408,8 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
         },
       })
     ));
+    return saved;
+    });
 
     res.json({ success: true, data: { solicitud: updated } });
   } catch (error) {
@@ -319,6 +422,7 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
  * Upload file (multer middleware applied in route)
  */
 export const uploadDocumento = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  let persisted = false;
   try {
     const { id } = req.params;
     const { tipo } = req.body;
@@ -336,23 +440,116 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
     if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
       throw new AppError('No tiene permisos para subir documentos a esta solicitud', 403);
     }
+    if (solicitud.usuarioId !== req.user!.id) assertReviewPermission(req, solicitud);
 
-    const documento = await prisma.documentoSolicitud.create({
-      data: {
-        solicitudId: id,
-        tipo,
-        nombre: req.file.originalname,
-        path: req.file.path,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        estado: 'PENDIENTE',
-      },
+    const requirement = getSolicitudRequirements(solicitud.tipoActor).find((item) => item.tipo === tipo);
+    const license = isLicenseDocument(tipo) && solicitud.tipoActor === 'TRANSPORTISTA' && declaredLicenseDocument(JSON.parse(jsonObject(solicitud.datosActor)), tipo);
+    if (!requirement && !license) {
+      throw new AppError('El tipo de documento no corresponde a esta inscripcion', 400);
+    }
+
+    const description = describeDocument(req.file);
+    const input = { path: req.file.path, mimeType: description.mimeType };
+    const reading = license ? await readReceipt(input, 'LICENCIA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt(input) : undefined;
+    const analysis = reading && license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : reading;
+    let previous: Array<{ id: string; path: string; sha256: string | null }> = [];
+    const documento = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya fue enviada; no se reemplazó ningún archivo.', 409);
+      if (license && !declaredLicenseDocument(JSON.parse(jsonObject(current.datosActor)), tipo)) throw new AppError('El chofer cambió durante la carga. Guardá la lista y reintentá.', 409);
+      previous = await tx.documentoSolicitud.findMany({ where: { solicitudId: id, tipo }, select: { id: true, path: true, sha256: true } });
+      if (previous[0]?.sha256 === description.sha256) {
+        const original = await tx.documentoSolicitud.findUniqueOrThrow({ where: { id: previous[0].id } });
+        if (analysis && analysis.lectura === 'LEIDO' && (original.analisis as { lectura?: string } | null)?.lectura !== 'LEIDO') {
+          return tx.documentoSolicitud.update({ where: { id: original.id }, data: { analisis: license ? analysis : mergeReceiptRead(original.analisis, analysis) } });
+        }
+        return original;
+      }
+      if (analysis && !license) analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
+      await tx.documentoSolicitud.deleteMany({ where: { solicitudId: id, tipo } });
+      const saved = await tx.documentoSolicitud.create({
+        data: {
+          solicitudId: id,
+          tipo,
+          nombre: req.file!.originalname,
+          path: req.file!.path,
+          ...description,
+          ...(analysis ? { analisis: analysis } : {}),
+          estado: 'PENDIENTE',
+        },
+      });
+      if (analysis && !license) await retainReceiptDigest(tx, description.sha256, saved.id, 'SOLICITUD');
+      if (analysis?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: saved.id });
+      return saved;
     });
+    persisted = true;
+    if (documento.path !== req.file.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    for (const oldDocument of previous) {
+      if (oldDocument.path !== documento.path && fs.existsSync(oldDocument.path)) {
+        try { fs.unlinkSync(oldDocument.path); } catch (error) {
+          logger.warn({ error, path: oldDocument.path }, 'No se pudo eliminar el archivo reemplazado de solicitud');
+        }
+      }
+    }
 
     res.status(201).json({ success: true, data: { documento } });
   } catch (error) {
+    if (!persisted && req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (cleanupError) {
+        logger.warn({ cleanupError, path: req.file.path }, 'No se pudo limpiar un archivo de solicitud rechazado');
+      }
+    }
     next(error);
   }
+};
+
+/** Retry only OCR metadata; never replace the original or approve a payment. */
+export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id, docId } = req.params;
+    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
+    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    if (solicitud.usuarioId !== req.user?.id) assertReviewPermission(req, solicitud);
+    const original = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
+    if (!original || original.solicitudId !== id) throw new AppError('Documento no encontrado', 404);
+    const license = isLicenseDocument(original.tipo) && solicitud.tipoActor === 'TRANSPORTISTA';
+    if (original.tipo !== 'COMPROBANTE_PAGO' && !license) throw new AppError('La lectura automática corresponde a comprobantes o licencias de chofer', 400);
+    if (!fs.existsSync(original.path)) throw new AppError('Archivo no disponible', 404);
+    const description = describeDocument({ path: original.path, mimetype: original.mimeType });
+    if (original.sha256 && original.sha256 !== description.sha256) throw new AppError('El archivo no coincide con su huella registrada; requiere revisión.', 409);
+    const input = { path: original.path, mimeType: description.mimeType };
+    const reading = license ? await readReceipt(input, 'LICENCIA') : await readReceipt(input);
+    const documento = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!current || current.solicitudId !== id || current.path !== original.path || current.sha256 !== original.sha256) {
+        throw new AppError('El adjunto cambió durante la lectura. Actualizá la solicitud para continuar.', 409);
+      }
+      if (!license) reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
+      const analisis = license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : mergeReceiptRead(current.analisis, reading);
+      const saved = await tx.documentoSolicitud.update({ where: { id: docId }, data: { sha256: description.sha256, analisis } });
+      if (!license) await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
+      if (analisis.duplicado && !(current.analisis as { duplicado?: boolean } | null)?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: docId });
+      return saved;
+    });
+    res.json({ success: true, data: { documento } });
+  } catch (error) { next(error); }
+};
+
+/** Protected original-file download; filesystem paths are never browser URLs. */
+export const downloadDocumentoSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id: req.params.id } });
+    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    if (solicitud.usuarioId !== req.user?.id && (!req.user || req.user.restricted || !isAdmin(req.user.rol))) throw new AppError('No tiene permisos para consultar este documento', 403);
+    const documento = await prisma.documentoSolicitud.findUnique({ where: { id: req.params.docId } });
+    if (!documento || documento.solicitudId !== solicitud.id) throw new AppError('Documento no encontrado', 404);
+    if (!fs.existsSync(documento.path)) throw new AppError('Archivo no disponible', 404);
+    res.setHeader('Content-Type', documento.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(documento.nombre)}`);
+    fs.createReadStream(documento.path).on('error', next).pipe(res);
+  } catch (error) { next(error); }
 };
 
 /**
@@ -369,17 +566,28 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
     if (solicitud.usuarioId !== req.user!.id && !isAdmin(req.user!.rol)) {
       throw new AppError('No tiene permisos para eliminar documentos de esta solicitud', 403);
     }
+    if (solicitud.usuarioId !== req.user!.id) assertReviewPermission(req, solicitud);
 
-    const documento = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
-    if (!documento) throw new AppError('Documento no encontrado', 404);
-    if (documento.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
-
-    // Delete file from disk
-    if (fs.existsSync(documento.path)) {
-      fs.unlinkSync(documento.path);
+    if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
+      throw new AppError('No se pueden eliminar archivos de una solicitud enviada o cerrada', 400);
     }
 
-    await prisma.documentoSolicitud.delete({ where: { id: docId } });
+    const documento = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya fue enviada; no se eliminó ningún archivo.', 409);
+      const saved = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!saved) throw new AppError('Documento no encontrado', 404);
+      if (saved.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
+      return tx.documentoSolicitud.delete({ where: { id: docId } });
+    });
+    // Remove bytes only AFTER the database commit. A failed transaction must
+    // leave the original available to the applicant and reviewer.
+    if (fs.existsSync(documento.path)) {
+      try { fs.unlinkSync(documento.path); } catch (error) {
+        logger.warn({ error, path: documento.path }, 'No se pudo limpiar un archivo de solicitud eliminado');
+      }
+    }
 
     res.json({ success: true, message: 'Documento eliminado' });
   } catch (error) {
@@ -444,6 +652,9 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const autorRol = isAdmin(req.user!.rol) ? 'ADMIN' : 'CANDIDATO';
+    if (req.user!.restricted && solicitud.estado === 'RECHAZADA') {
+      throw new AppError('La solicitud rechazada sólo permite consultar el resultado', 403);
+    }
 
     const mensaje = await prisma.mensajeSolicitud.create({
       data: {
@@ -554,6 +765,7 @@ export const revisarSolicitud = async (req: AuthRequest, res: Response, next: Ne
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
 
     if (solicitud.estado !== 'ENVIADA') {
       throw new AppError('Solo se pueden tomar en revision solicitudes en estado ENVIADA', 400);
@@ -591,6 +803,7 @@ export const observarSolicitud = async (req: AuthRequest, res: Response, next: N
       include: { usuario: { select: { id: true, nombre: true, email: true } } },
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
 
     if (solicitud.estado !== 'EN_REVISION') {
       throw new AppError('Solo se pueden observar solicitudes en estado EN_REVISION', 400);
@@ -650,14 +863,24 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       include: { usuario: { select: { id: true, email: true, nombre: true, cuit: true } } },
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
 
     if (solicitud.estado !== 'EN_REVISION') {
       throw new AppError('Solo se pueden aprobar solicitudes en estado EN_REVISION', 400);
     }
 
-    const datosActor = JSON.parse(solicitud.datosActor);
-
     const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true') {
+        await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${solicitud.usuarioId} FOR UPDATE`;
+      }
+      const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
+      if (!current || current.estado !== 'EN_REVISION') throw new AppError('La solicitud ya fue procesada por otro usuario', 409);
+      const datosActor = JSON.parse(jsonObject(current.datosActor));
+      if (datosActor.cuit && normalizeCuit(String(datosActor.cuit)) !== solicitud.usuario.cuit) throw new AppError('El CUIT declarado no coincide con el de la cuenta solicitante', 400);
+      const declared = registrationActorFields(solicitud.tipoActor, datosActor);
+      const contact = typeof datosActor.emailContacto === 'string' && datosActor.emailContacto.trim()
+        ? datosActor.emailContacto.trim() : solicitud.usuario.email;
       let generadorId: string | undefined;
       let operadorId: string | undefined;
       let transportistaId: string | undefined;
@@ -667,16 +890,13 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           data: {
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
-            cuit: datosActor.cuit || solicitud.usuario.cuit || '',
+            cuit: solicitud.usuario.cuit || '',
             domicilio: datosActor.domicilio || '',
             telefono: datosActor.telefono || '',
-            email: datosActor.email || solicitud.usuario.email,
+            email: contact,
             numeroInscripcion: datosActor.numeroInscripcion || 'PENDIENTE',
             categoria: datosActor.categoria || 'PENDIENTE',
-            actividad: datosActor.actividad,
-            rubro: datosActor.rubro,
-            latitud: datosActor.latitud ? parseFloat(datosActor.latitud) : undefined,
-            longitud: datosActor.longitud ? parseFloat(datosActor.longitud) : undefined,
+            ...declared,
           },
         });
         generadorId = generador.id;
@@ -685,16 +905,13 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           data: {
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
-            cuit: datosActor.cuit || solicitud.usuario.cuit || '',
+            cuit: solicitud.usuario.cuit || '',
             domicilio: datosActor.domicilio || '',
             telefono: datosActor.telefono || '',
-            email: datosActor.email || solicitud.usuario.email,
+            email: contact,
             numeroHabilitacion: datosActor.numeroHabilitacion || 'PENDIENTE',
             categoria: datosActor.categoria || 'PENDIENTE',
-            tipoOperador: datosActor.tipoOperador,
-            tecnologia: datosActor.tecnologia,
-            latitud: datosActor.latitud ? parseFloat(datosActor.latitud) : undefined,
-            longitud: datosActor.longitud ? parseFloat(datosActor.longitud) : undefined,
+            ...declared,
           },
         });
         operadorId = operador.id;
@@ -703,21 +920,13 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           data: {
             usuarioId: solicitud.usuarioId,
             razonSocial: datosActor.razonSocial || datosActor.nombre || solicitud.usuario.nombre,
-            cuit: datosActor.cuit || solicitud.usuario.cuit || '',
+            cuit: solicitud.usuario.cuit || '',
             domicilio: datosActor.domicilio || '',
             telefono: datosActor.telefono || '',
-            email: datosActor.email || solicitud.usuario.email,
+            email: contact,
             numeroHabilitacion: datosActor.numeroHabilitacion || 'PENDIENTE',
-            ...(datosActor.localidad && { localidad: datosActor.localidad }),
-            ...(datosActor.vencimientoHabilitacion && { vencimientoHabilitacion: new Date(datosActor.vencimientoHabilitacion) }),
-            ...(datosActor.corrientesAutorizadas && { corrientesAutorizadas: datosActor.corrientesAutorizadas }),
-            ...(datosActor.expedienteDPA && { expedienteDPA: datosActor.expedienteDPA }),
-            ...(datosActor.resolucionDPA && { resolucionDPA: datosActor.resolucionDPA }),
-            ...(datosActor.resolucionSSP && { resolucionSSP: datosActor.resolucionSSP }),
-            ...(datosActor.actaInspeccion && { actaInspeccion: datosActor.actaInspeccion }),
-            ...(datosActor.actaInspeccion2 && { actaInspeccion2: datosActor.actaInspeccion2 }),
-            ...(datosActor.latitud && { latitud: parseFloat(datosActor.latitud) }),
-            ...(datosActor.longitud && { longitud: parseFloat(datosActor.longitud) }),
+            ...declared,
+            ...registrationFleet(datosActor),
           },
         });
         transportistaId = transportista.id;
@@ -737,20 +946,22 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         },
       });
 
-      // Activate user + set correct role
+      // Additional approved activity must not replace the existing active role.
+      const account = process.env.ACTOR_MULTIROLE_ENABLED === 'true'
+        ? await tx.usuario.findUniqueOrThrow({ where: { id: solicitud.usuarioId }, select: { activo: true, rol: true, motivoInactividad: true } }) : null;
+      if (account?.motivoInactividad === 'SUSPENDIDA') throw new AppError('La cuenta está suspendida; no se puede reactivar desde esta solicitud', 409);
       await tx.usuario.update({
         where: { id: solicitud.usuarioId },
         data: {
           activo: true,
-          rol: solicitud.tipoActor as Rol,
+          motivoInactividad: null,
+          rol: account?.activo ? account.rol : solicitud.tipoActor as Rol,
         },
       });
 
-      return updated;
-    });
-
-    // Notify candidate
-    await prisma.notificacion.create({
+      // Same transaction: a failed internal notice must not leave a committed
+      // approval reported as failed to the administrator.
+      await tx.notificacion.create({
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_APROBADA',
@@ -759,6 +970,8 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
         prioridad: 'ALTA',
         datos: JSON.stringify({ tipo: 'solicitud_aprobada', solicitudId: id }),
       },
+      });
+      return updated;
     });
 
     res.json({ success: true, data: { solicitud: result } });
@@ -785,6 +998,7 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response, next: N
       include: { usuario: { select: { id: true, nombre: true } } },
     });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
 
     if (solicitud.estado !== 'EN_REVISION') {
       throw new AppError('Solo se pueden rechazar solicitudes en estado EN_REVISION', 400);
@@ -834,6 +1048,7 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
 
     const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id } });
     if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
 
     const documento = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
     if (!documento) throw new AppError('Documento no encontrado', 404);

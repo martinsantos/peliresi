@@ -23,6 +23,7 @@ interface ManifiestoActionsProps {
   userRol: string;
   isActionPending: boolean;
   isInSitu?: boolean;
+  training?: boolean;
   mutations: {
     firmar: MutationState;
     confirmarRetiro: MutationState;
@@ -36,18 +37,18 @@ interface ManifiestoActionsProps {
     registrarIncidente: MutationState;
     revertir: MutationState;
   };
-  onFirmar: () => void;
+  onFirmar: (firma: string) => Promise<boolean>;
   onConfirmarRetiro: () => void;
   onConfirmarEntrega: () => void;
   onConfirmarRecepcion: () => void;
   onConfirmarRecepcionInSitu: () => void;
-  onPesaje: (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => void;
-  onTratamiento: (metodo: string, observaciones?: string) => void;
+  onPesaje: (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => Promise<boolean>;
+  onTratamiento: (metodo: string, observaciones?: string) => Promise<boolean>;
   onCerrar: () => void;
-  onRechazar: (motivo: string, descripcion?: string) => void;
-  onIncidente: (tipo: string, descripcion: string) => void;
-  onCancelar: () => void;
-  onRevertir: (estadoNuevo: string, motivo?: string) => void;
+  onRechazar: (motivo: string, descripcion?: string) => Promise<boolean>;
+  onIncidente: (tipo: string, descripcion: string) => Promise<boolean>;
+  onCancelar: () => Promise<boolean>;
+  onRevertir: (estadoNuevo: string, motivo?: string) => Promise<boolean>;
   onDescargarPDF: () => void;
   onDescargarCertificado: () => void;
   isCancelling: boolean;
@@ -60,6 +61,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   userRol,
   isActionPending,
   isInSitu,
+  training,
   mutations,
   onFirmar,
   onConfirmarRetiro,
@@ -120,6 +122,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             onOpenCancelModal={() => setShowCancelModal(true)}
             onOpenReversionModal={() => setShowReversionModal(true)}
             onDescargarPDF={onDescargarPDF}
+            training={training}
             onDescargarCertificado={onDescargarCertificado}
           />
         </CardContent>

@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useBlockchainStatus } from '../hooks/useBlockchain';
 import { manifiestoService } from '../services/manifiesto.service';
 import type { BlockchainSello } from '../types/models';
+import { toast } from './ui/Toast';
 
 const ETHERSCAN_BASE = 'https://sepolia.etherscan.io';
 
@@ -17,10 +18,14 @@ function truncateHash(hash: string, chars = 8): string {
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('No se pudo copiar', 'El navegador no habilitó el portapapeles.');
+    }
   };
   return (
     <button onClick={handleCopy} className="p-1 hover:bg-white/20 rounded transition-colors" title="Copiar">
@@ -66,7 +71,7 @@ function SelloCard({ sello, label }: { sello: BlockchainSello; label: string }) 
       <div className="flex items-center gap-2 mb-2">
         <ShieldCheck size={14} className="text-emerald-600" />
         <span className="text-xs font-semibold text-emerald-900">{label}</span>
-        <span className="ml-auto text-[10px] text-emerald-600 font-medium px-1.5 py-0.5 bg-emerald-100 rounded-full">Verificado</span>
+        <span className="ml-auto text-[10px] text-emerald-800 font-medium px-1.5 py-0.5 bg-emerald-100 rounded-full">Registrado</span>
       </div>
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
@@ -106,9 +111,10 @@ interface BlockchainPanelProps {
 export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockchainStatus: initialStatus }: BlockchainPanelProps) {
   const [expanded, setExpanded] = useState(true);
   const queryClient = useQueryClient();
-  const { data, isLoading } = useBlockchainStatus(manifiestoId, true);
+  const { data, isLoading, isError } = useBlockchainStatus(manifiestoId, true);
 
   const registrarMutation = useMutation({
+    networkMode: 'always', retry: false,
     mutationFn: () => manifiestoService.registrarBlockchain(manifiestoId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blockchain', manifiestoId] });
@@ -120,7 +126,8 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
   const genesisSello = sellos.find(s => s.tipo === 'GENESIS');
   const cierreSello = sellos.find(s => s.tipo === 'CIERRE');
   const status = data?.blockchainStatus || initialStatus;
-  const canCertify = !status && !genesisSello && !isLoading && manifiestoEstado !== 'BORRADOR' && manifiestoEstado !== 'CANCELADO';
+  const registrationEnabled = data?.enabled === true && !isError;
+  const canCertify = registrationEnabled && !status && !genesisSello && !isLoading && manifiestoEstado !== 'BORRADOR' && manifiestoEstado !== 'CANCELADO';
 
   // While loading, show nothing
   if (isLoading && !status && sellos.length === 0) return null;
@@ -135,7 +142,7 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
         <Shield size={32} className="mx-auto text-emerald-400 mb-2" />
         <p className="text-sm font-semibold text-emerald-800 mb-1">Certificacion Blockchain</p>
         <p className="text-xs text-emerald-600 mb-3">
-          Registra este manifiesto en la blockchain de Ethereum para garantizar su inmutabilidad
+          Registra un sello del manifiesto en Ethereum Sepolia, una red de pruebas.
         </p>
         <button
           onClick={() => registrarMutation.mutate()}
@@ -166,7 +173,7 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
       {/* Header banner */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 px-5 py-4 text-left"
+        className="w-full bg-[#1B5E3C] px-5 py-4 text-left"
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center ring-2 ring-white/30">
@@ -184,7 +191,7 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
             </p>
             <p className="text-emerald-100 text-xs">
               Ethereum Sepolia
-              {confirmedCount > 0 && ` \u00b7 ${confirmedCount} sello${confirmedCount > 1 ? 's' : ''} verificado${confirmedCount > 1 ? 's' : ''}`}
+              {confirmedCount > 0 && ` \u00b7 ${confirmedCount} sello${confirmedCount > 1 ? 's' : ''} registrado${confirmedCount > 1 ? 's' : ''}`}
             </p>
           </div>
           {expanded ? <ChevronUp size={16} className="text-white/70" /> : <ChevronDown size={16} className="text-white/70" />}
@@ -199,9 +206,8 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
               <SelloCard sello={genesisSello} label="Sello Genesis (APROBADO)" />
               {genesisSello.status === 'CONFIRMADO' && (
                 <p className="text-xs text-neutral-500 leading-relaxed px-4 -mt-1">
-                  Este sello certifica la identidad del manifiesto al momento de su firma legal: numero, CUIT del generador,
-                  transportista y operador, residuos declarados y fecha de firma. Cualquier modificacion posterior a estos datos
-                  seria detectable.
+                  Sello registrado al aprobar: número, CUIT de los actores, residuos declarados y fecha de firma.
+                  Su estado de registro no equivale a una nueva comprobación de los datos actuales.
                 </p>
               )}
             </>
@@ -221,7 +227,7 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
                 </div>
                 <button
                   onClick={() => registrarMutation.mutate()}
-                  disabled={registrarMutation.isPending}
+                  disabled={registrarMutation.isPending || !registrationEnabled}
                   className="text-[11px] text-red-600 hover:text-red-800 font-medium"
                 >
                   {registrarMutation.isPending ? 'Reintentando...' : 'Reintentar'}
@@ -236,15 +242,14 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
               <div className="flex items-center gap-2">
                 <div className="flex-1 border-t border-dashed border-emerald-300" />
                 <span className="text-[10px] text-emerald-500 font-medium uppercase tracking-wider shrink-0">
-                  cadena de integridad
-                  {data?.rollingHash && ' \u00b7 chain activa'}
+                  Registro acumulativo
+                  {data?.rollingHash ? ' disponible' : ' no disponible'}
                 </span>
                 <div className="flex-1 border-t border-dashed border-emerald-300" />
               </div>
               <p className="text-xs text-neutral-500 leading-relaxed">
-                En cada cambio de estado se calcula un hash acumulativo que encadena todos los datos anteriores.
-                Si alguien modificara cualquier dato intermedio, la cadena se romperia y el sello de cierre no
-                coincidiria con blockchain.
+                La existencia de un hash no verifica por sí solo los eventos intermedios.
+                La reconstrucción completa de la cadena no está implementada en esta consulta.
               </p>
             </div>
           )}
@@ -255,9 +260,8 @@ export default function BlockchainPanel({ manifiestoId, manifiestoEstado, blockc
               <SelloCard sello={cierreSello} label="Sello de Cierre (TRATADO)" />
               {cierreSello.status === 'CONFIRMADO' && (
                 <p className="text-xs text-neutral-500 leading-relaxed px-4 -mt-1">
-                  Este sello certifica el ciclo de vida completo del manifiesto: todas las fechas de transicion
-                  (retiro, entrega, recepcion, cierre), estados intermedios, eventos registrados y observaciones.
-                  Garantiza que ningun dato fue alterado durante todo el proceso.
+                  Sello registrado al cerrar: datos de cierre, fechas, hash acumulativo y cantidad de eventos.
+                  No demuestra por sí solo que todas las observaciones históricas permanezcan intactas.
                 </p>
               )}
             </>

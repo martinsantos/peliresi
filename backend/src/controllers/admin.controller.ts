@@ -5,9 +5,10 @@ import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { verificarVencimientos } from '../jobs/vencimiento.job';
-import { emailService } from '../services/email.service';
 import { generateTokens } from './auth.controller';
 import { parseDateRange } from '../utils/dateRange';
+import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
+import { recordAccountMail, recordAccountChanges } from '../services/account-mail.service';
 
 // ============== USUARIOS CRUD (Admin) ==============
 
@@ -39,7 +40,13 @@ const updateUsuarioSchema = z.object({
 
 export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { search, rol, activo, page = 1, limit = 10, sortBy, sortOrder } = req.query;
+    const { search, rol, roles, activo, emailVerified, esInspector, excludeSelf, page = 1, limit = 10, sortBy, sortOrder } = req.query;
+    if (!/^\d+$/.test(String(page)) || !/^\d+$/.test(String(limit)) || !Number.isSafeInteger(Number(page)) || !Number.isSafeInteger(Number(limit)) || Number(page) < 1 || Number(limit) < 1) {
+      throw new AppError('Paginación inválida', 400);
+    }
+    for (const value of [esInspector, excludeSelf]) {
+      if (value !== undefined && value !== 'true' && value !== 'false') throw new AppError('Filtro de usuarios inválido', 400);
+    }
     const skip = (Number(page) - 1) * Number(limit);
     const order: 'asc' | 'desc' = sortOrder === 'desc' ? 'desc' : 'asc';
     const USR_SORT: Record<string, any> = {
@@ -51,15 +58,41 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
     const orderBy = USR_SORT[sortBy as string] ?? { createdAt: 'desc' };
 
     const where: any = {};
-    if (search) {
-      where.OR = [
-        { nombre: { contains: search as string, mode: 'insensitive' } },
-        { email: { contains: search as string, mode: 'insensitive' } },
-        { empresa: { contains: search as string, mode: 'insensitive' } },
-      ];
+    if (search !== undefined) {
+      if (typeof search !== 'string') throw new AppError('Búsqueda inválida', 400);
+      const terms = search.trim().split(/\s+/).filter(Boolean);
+      if (terms.length) where.AND = terms.map(term => ({ OR: [
+        { nombre: { contains: term, mode: 'insensitive' } },
+        { apellido: { contains: term, mode: 'insensitive' } },
+        { email: { contains: term, mode: 'insensitive' } },
+        { empresa: { contains: term, mode: 'insensitive' } },
+        { generador: { razonSocial: { contains: term, mode: 'insensitive' } } },
+        { transportista: { razonSocial: { contains: term, mode: 'insensitive' } } },
+        { operador: { razonSocial: { contains: term, mode: 'insensitive' } } },
+      ] }));
     }
-    if (rol) where.rol = rol;
+    if (rol) {
+      if (!createUsuarioSchema.shape.rol.safeParse(rol).success) throw new AppError('Rol inválido', 400);
+      where.rol = rol;
+    }
+    if (esInspector !== undefined) where.esInspector = esInspector === 'true';
+    if (excludeSelf === 'true') {
+      if (!req.user?.id) throw new AppError('Sesión requerida', 401);
+      where.id = { not: req.user.id };
+    }
+    if (roles !== undefined) {
+      if (typeof roles !== 'string') throw new AppError('Filtro de roles inválido', 400);
+      const selectedRoles = roles.split(',');
+      if (!selectedRoles.length || selectedRoles.some(value => !createUsuarioSchema.shape.rol.safeParse(value).success)) {
+        throw new AppError('Filtro de roles inválido', 400);
+      }
+      where.rol = { in: selectedRoles };
+    }
     if (activo !== undefined) where.activo = activo === 'true';
+    if (emailVerified !== undefined) {
+      if (emailVerified !== 'true' && emailVerified !== 'false') throw new AppError('Filtro de verificación inválido', 400);
+      where.emailVerified = emailVerified === 'true';
+    }
 
     const [usuarios, total] = await Promise.all([
       prisma.usuario.findMany({
@@ -83,7 +116,7 @@ export const getUsuarios = async (req: AuthRequest, res: Response, next: NextFun
           transportista: { select: { id: true, razonSocial: true } },
           operador: { select: { id: true, razonSocial: true } },
         },
-        orderBy,
+        orderBy: [orderBy, { id: 'asc' }],
       }),
       prisma.usuario.count({ where }),
     ]);
@@ -164,7 +197,8 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      usuario = await prisma.usuario.create({
+      usuario = await prisma.$transaction(async tx => {
+      const created = await tx.usuario.create({
         data: {
           email,
           password: hashedPassword,
@@ -175,8 +209,12 @@ export const createUsuario = async (req: AuthRequest, res: Response, next: NextF
           telefono,
           cuit,
           activo: activo ?? true,
+          motivoInactividad: activo === false ? 'SUSPENDIDA' : null,
           emailVerified: emailVerified ?? true,
         },
+      });
+      await recordAccountMail(tx, created, 'created');
+      return created;
       });
     }
 
@@ -210,9 +248,12 @@ export const updateUsuario = async (req: AuthRequest, res: Response, next: NextF
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const usuario = await prisma.usuario.update({
+    const usuario = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${id} FOR UPDATE`;
+    const before = await tx.usuario.findUniqueOrThrow({ where: { id } });
+    const updated = await tx.usuario.update({
       where: { id },
-      data: parsed.data,
+      data: { ...parsed.data, ...(parsed.data.activo !== undefined ? { motivoInactividad: parsed.data.activo ? null : 'SUSPENDIDA' } : {}) },
       select: {
         id: true,
         email: true,
@@ -226,6 +267,9 @@ export const updateUsuario = async (req: AuthRequest, res: Response, next: NextF
       },
     });
 
+    await recordAccountChanges(tx, before, updated);
+    return updated;
+    });
     res.json({ success: true, data: { usuario } });
   } catch (error) {
     next(error);
@@ -266,10 +310,12 @@ export const deleteUsuario = async (req: AuthRequest, res: Response, next: NextF
     }
 
     // Eliminar actor asociado primero, luego usuario
-    if (usuario.generador) await prisma.generador.delete({ where: { id: usuario.generador.id } });
-    if (usuario.transportista) await prisma.transportista.delete({ where: { id: usuario.transportista.id } });
-    if (usuario.operador) await prisma.operador.delete({ where: { id: usuario.operador.id } });
-    await prisma.usuario.delete({ where: { id } });
+    await deleteAccountPreservingSupport(id, async db => {
+      await recordAccountMail(db, usuario, 'deleted');
+      if (usuario.generador) await db.generador.delete({ where: { id: usuario.generador.id } });
+      if (usuario.transportista) await db.transportista.delete({ where: { id: usuario.transportista.id } });
+      if (usuario.operador) await db.operador.delete({ where: { id: usuario.operador.id } });
+    });
 
     res.json({ success: true, message: 'Usuario eliminado' });
   } catch (error) {
@@ -281,14 +327,16 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
   try {
     const { id } = req.params;
 
-    const usuario = await prisma.usuario.findUnique({ where: { id } });
+    const updated = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${id} FOR UPDATE`;
+    const usuario = await tx.usuario.findUnique({ where: { id } });
     if (!usuario) {
       throw new AppError('Usuario no encontrado', 404);
     }
 
-    const updated = await prisma.usuario.update({
+    const changed = await tx.usuario.update({
       where: { id },
-      data: { activo: !usuario.activo },
+      data: { activo: !usuario.activo, motivoInactividad: usuario.activo ? 'SUSPENDIDA' : null },
       select: {
         id: true,
         email: true,
@@ -302,10 +350,9 @@ export const toggleActivo = async (req: AuthRequest, res: Response, next: NextFu
       },
     });
 
-    // Si se activa la cuenta (false → true), notificar al usuario
-    if (!usuario.activo && updated.activo) {
-      emailService.sendCuentaAprobadaEmail(updated.email, updated.nombre).catch(console.error);
-    }
+    await recordAccountChanges(tx, usuario, changed);
+    return changed;
+    });
 
     res.json({ success: true, data: { usuario: updated } });
   } catch (error) {
@@ -347,6 +394,7 @@ export const updatePreferenciasNotificacion = async (req: AuthRequest, res: Resp
 
 export const impersonateUsuario = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    if (req.user.impersonatedBy) throw new AppError('Volvé a tu cuenta administradora antes de cambiar de usuario otra vez', 400);
     const { userId } = req.params;
 
     const target = await prisma.usuario.findUnique({
@@ -358,7 +406,7 @@ export const impersonateUsuario = async (req: AuthRequest, res: Response, next: 
     if (!target.activo) throw new AppError('Usuario inactivo', 400);
     if (target.id === req.user.id) throw new AppError('No podés impersonarte a vos mismo', 400);
 
-    const { accessToken, refreshToken } = generateTokens(target.id);
+    const { accessToken, refreshToken } = generateTokens(target.id, false, undefined, req.user.id);
 
     try {
       await prisma.auditoria.create({

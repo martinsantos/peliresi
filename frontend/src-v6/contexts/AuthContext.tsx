@@ -9,9 +9,9 @@ import OnboardingWizard from '../components/OnboardingWizard';
 import { authService } from '../services/auth.service';
 import { useQueryClient } from '@tanstack/react-query';
 import { clearUserOfflineData } from '../services/offline-sync';
-import { clearSyncQueue } from '../services/indexeddb';
 import { useSessionTimeout } from '../hooks/useSessionTimeout';
-import { getAccessToken, clearTokens } from '../services/api';
+import { api, getAccessToken, clearTokens, restoreSessionCheckpoint, confirmSessionCheckpoint } from '../services/api';
+import { registrationDraftHint, restrictedSessionHint } from '../services/registrationSession';
 import { clearOfflineSession, isOfflineNetworkError, readOfflineSession, saveOfflineSession } from '../services/offlineSession';
 import { ImpersonationProvider } from './ImpersonationContext';
 import type { Usuario } from '../types/models';
@@ -22,6 +22,11 @@ import type { Usuario } from '../types/models';
 export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 export interface User {
+  empresaContexto?:import('../services/companyContext').CompanyContext;
+  contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
+  empresaContextoError?:string;
+  actividades?: UserRole[];
+  training?: boolean;
   id: number | string;
   nombre: string;
   email: string;
@@ -80,6 +85,7 @@ export const DEMO_CREDENTIALS: Record<number, { email: string; password: string;
 
 /** Convert a real API Usuario to the local User shape used throughout the app */
 function apiUserToUser(u: Usuario): User {
+  const activeActor = u.rol === 'GENERADOR' ? u.generador : u.rol === 'TRANSPORTISTA' ? u.transportista : u.rol === 'OPERADOR' ? u.operador : null;
   const initials = u.nombre
     ? u.nombre.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : u.email.slice(0, 2).toUpperCase();
@@ -99,13 +105,16 @@ function apiUserToUser(u: Usuario): User {
     nombre: [u.nombre, u.apellido].filter(Boolean).join(' '),
     email: u.email,
     rol: u.rol as UserRole,
-    sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
-    actorId: u.generador?.id || u.transportista?.id || u.operador?.id,
+    actividades: u.actividades,
+    empresaContexto:u.empresaContexto,contextosEmpresa:u.contextosEmpresa,empresaContextoError:u.empresaContextoError,
+    sector: activeActor?.razonSocial || u.empresa || '',
+    actorId: u.rol === 'GENERADOR' ? u.generador?.id : u.rol === 'TRANSPORTISTA' ? u.transportista?.id : u.rol === 'OPERADOR' ? u.operador?.id : undefined,
     avatar: initials,
     telefono: u.telefono || '',
     ubicacion: '',
     permisos: rolPermisos[u.rol] || [],
     esInspector: u.esInspector ?? false,
+    training: u.training === true,
   };
 }
 
@@ -160,10 +169,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // failure. Reconnect/focus always asks the server again before renewing it.
   useEffect(() => {
     let disposed = false;
+    let sessionReady = false;
     let pendingToken: string | null = null;
     const validateSession = async () => {
-      if (sessionChanging.current) return;
+      if (!sessionReady || sessionChanging.current) return;
       const token = getAccessToken();
+      const draftHint = token ? registrationDraftHint(token) : null;
       if (token && pendingToken === token) return;
       const generation = ++authGeneration.current;
       pendingToken = token;
@@ -174,15 +185,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCurrentUser(null);
           return;
         }
+        if (draftHint) {
+          const response = await api.get(`/solicitudes/${encodeURIComponent(draftHint)}`);
+          if (!isCurrent()) return;
+          if (response.data?.data?.solicitud?.id !== draftHint) throw new Error('Solicitud incompatible');
+          clearOfflineSession();
+          setCurrentUser(null); setOfflineExpiresAt(null);
+          setIsRestricted(true); setSolicitudId(draftHint); setAuthError(null);
+          return;
+        }
         const apiUser = await authService.getMe();
         if (!isCurrent()) return;
         const mapped = apiUserToUser(apiUser);
-        if (apiUser.activo) saveOfflineSession(mapped, token);
+        const restricted = apiUser.activo === false || restrictedSessionHint(token);
+        setIsRestricted(restricted);
+        if (!restricted) setSolicitudId(null);
+        if (apiUser.activo && !restricted) saveOfflineSession(mapped, token);
         else clearOfflineSession();
         setOfflineExpiresAt(null);
         setCurrentUser(mapped);
       } catch (error) {
         if (!isCurrent()) return;
+        if (draftHint && isOfflineNetworkError(error)) {
+          // Preserve credentials for retry, granting no profile from a hint.
+          clearOfflineSession(); setCurrentUser(null); setOfflineExpiresAt(null);
+          setAuthError('No se pudo consultar tu solicitud. Revisá la conexión para continuar.');
+          return;
+        }
         const cached = token && isOfflineNetworkError(error) ? readOfflineSession(token) : null;
         if (cached) {
           setCurrentUser(cached.user);
@@ -220,7 +249,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       qc.clear();
       reconnect();
     };
-    reconnect();
+    void restoreSessionCheckpoint().then(() => {
+      if (disposed) return;
+      sessionReady = true;
+      reconnect();
+    }).catch(() => {
+      if (disposed) return;
+      sessionReady = true;
+      clearOfflineSession();
+      setCurrentUser(null);
+      setAuthError('No pudimos recuperar la sesión de forma segura. Ingresá nuevamente.');
+      setIsLoading(false);
+    });
     window.addEventListener('online', reconnect);
     window.addEventListener('focus', reconnect);
     window.addEventListener('storage', storage);
@@ -253,6 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Real login via API — accepts email or CUIT
   const login = useCallback(async (identifier: string, password: string) => {
     sessionChanging.current = true;
+    setShowOnboarding(false);
     ++authGeneration.current;
     clearOfflineSession();
     setOfflineExpiresAt(null);
@@ -278,7 +319,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(user);
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
       const isPostReset = localStorage.getItem('sitrep_post_reset') === '1';
-      if (isFirstSession || isPostReset) setShowOnboarding(true);
+      // A verified applicant may edit drafts, but has no approved operational role.
+      // Do not consume their first operational welcome before approval.
+      setShowOnboarding(!response.restricted && response.user.activo && (isFirstSession || isPostReset));
       return user;
     } catch (err: any) {
       clearTokens();
@@ -295,40 +338,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Logout
   const logout = useCallback(async () => {
     sessionChanging.current = true;
+    setShowOnboarding(false);
     ++authGeneration.current;
+    const confirmation = authService.logout().catch(() => {});
+    clearTokens();
+    const localConfirmation = confirmSessionCheckpoint();
     clearOfflineSession();
     setOfflineExpiresAt(null);
     setCurrentUser(null);
     setIsLoading(false);
-    qc.clear();
-    try {
-      await authService.logout();
-    } catch {
-      // ignore logout errors
-    } finally {
-      clearTokens();
-      setIsRestricted(false);
-      setSolicitudId(null);
-      // Clean up impersonation and trip-related localStorage
-      localStorage.removeItem('sitrep_impersonation');
-      localStorage.removeItem('sitrep_active_trip_id');
-      const keysToClean: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('gps_pending_'))) {
-          keysToClean.push(key);
-        }
-      }
-      keysToClean.forEach(k => localStorage.removeItem(k));
-      // Clear IndexedDB offline data and sync queue for this user
-      if (currentUser) {
-        clearUserOfflineData(currentUser.id).catch(() => {});
-      }
-      clearSyncQueue().catch(() => {});
-      qc.clear();
-      setCurrentUser(null);
-      sessionChanging.current = false;
+    setIsRestricted(false);
+    setSolicitudId(null);
+    localStorage.removeItem('sitrep_impersonation');
+    localStorage.removeItem('sitrep_active_trip_id');
+    const keysToClean: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('gps_pending_'))) keysToClean.push(key);
     }
+    keysToClean.forEach(key => localStorage.removeItem(key));
+    // Pending actions stay owner-scoped; only re-downloadable snapshots go.
+    if (currentUser) void clearUserOfflineData(currentUser.id).catch(() => {});
+    qc.clear();
+    sessionChanging.current = false;
+    try {
+      await localConfirmation;
+    } catch {
+      if (!getAccessToken()) setAuthError('Sesión cerrada, pero el dispositivo no confirmó el guardado. Reintentá antes de cerrar la app.');
+    }
+    await confirmation;
   }, [currentUser, qc]);
 
   const dismissOnboarding = useCallback(() => {
@@ -422,9 +460,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       <ImpersonationProvider>
         {children}
       </ImpersonationProvider>
-      {showOnboarding && currentUser && (
+      {showOnboarding && currentUser && !isRestricted && (
         <OnboardingWizard
           rol={currentUser.rol}
+          esInspector={currentUser.esInspector}
           userId={currentUser.id}
           onDismiss={dismissOnboarding}
         />

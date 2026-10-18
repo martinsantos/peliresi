@@ -4,12 +4,13 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, CheckCircle, Clock, AlertTriangle, XCircle, Send,
-  Loader2, ArrowRight, Eye, MessageSquare,
+  ArrowRight, Eye, MessageSquare,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
+import { FormSkeleton } from '../../components/ui/LoadingState';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
@@ -20,6 +21,7 @@ import {
   useEnviarSolicitud,
 } from '../../hooks/useSolicitudes';
 import type { EstadoSolicitud, SolicitudInscripcion, MensajeSolicitud } from '../../types/api';
+import ActorActivities from '../../components/ActorActivities';
 
 // ── Status config ──
 
@@ -48,52 +50,84 @@ const STEPS = [
 
 const MiSolicitudPage: React.FC = () => {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [replyText, setReplyText] = useState('');
   const [messageText, setMessageText] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesPanelRef = useRef<HTMLDivElement>(null);
 
-  const { data: solicitudes, isLoading } = useMisSolicitudes();
-  const solicitud = solicitudes?.[0] as SolicitudInscripcion | undefined;
+  const { data: solicitudes, isLoading, isError, refetch } = useMisSolicitudes();
+  const [selectedId, setSelectedId] = useState('');
+  const solicitud = (solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
+  const conversations = useRef<Record<string, { reply: string; message: string }>>({});
+  useEffect(() => { if (!selectedId && solicitud) setSelectedId(solicitud.id); }, [selectedId, solicitud?.id]);
+  const requestedId = params.get('solicitud');
+  useEffect(() => {
+    if (!requestedId || requestedId === selectedId || !solicitudes?.some(s => s.id === requestedId)) return;
+    if (solicitud) conversations.current[solicitud.id] = { reply: replyText, message: messageText };
+    const previous = conversations.current[requestedId];
+    setSelectedId(requestedId); setReplyText(previous?.reply || ''); setMessageText(previous?.message || '');
+  }, [requestedId, selectedId, solicitudes, solicitud, replyText, messageText]);
 
   const { data: mensajes } = useMensajesSolicitud(solicitud?.id || '');
   const enviarMensaje = useEnviarMensaje();
   const enviarSolicitud = useEnviarSolicitud();
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Updating the conversation must not scroll the whole application past
+    // its heading and observations, especially when arriving from an email.
+    const panel = messagesPanelRef.current;
+    if (panel) panel.scrollTop = panel.scrollHeight;
   }, [mensajes]);
 
   // ── Handlers ──
 
+  const sendingMessage = useRef(false);
   const handleSendMessage = async () => {
-    if (!solicitud || !messageText.trim()) return;
+    if (!solicitud || !messageText.trim() || sendingMessage.current) return;
+    sendingMessage.current = true;
     try {
       await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido: messageText.trim() });
       setMessageText('');
     } catch {
       toast.error('Error', 'No se pudo enviar el mensaje');
+    } finally {
+      sendingMessage.current = false;
     }
   };
 
+  // A retry after a failed resend must not post the same reply twice.
+  const postedReply = useRef<{ solicitudId: string; contenido: string } | null>(null);
   const handleReplyAndResend = async () => {
     if (!solicitud || !replyText.trim()) return;
+    const contenido = replyText.trim();
     try {
-      await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido: replyText.trim() });
+      const alreadyPosted = postedReply.current?.solicitudId === solicitud.id && postedReply.current.contenido === contenido;
+      if (!alreadyPosted) {
+        await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido });
+        postedReply.current = { solicitudId: solicitud.id, contenido };
+      }
       await enviarSolicitud.mutateAsync(solicitud.id);
+      postedReply.current = null;
       setReplyText('');
       toast.success('Enviada', 'Tu solicitud fue re-enviada con la respuesta');
     } catch {
-      toast.error('Error', 'No se pudo re-enviar la solicitud');
+      const replySaved = postedReply.current?.solicitudId === solicitud.id && postedReply.current.contenido === contenido;
+      toast.error('Error', replySaved ? 'La respuesta quedó guardada, pero no se re-envió la solicitud. Reintentá.' : 'No se pudo re-enviar la solicitud');
     }
   };
 
   // ── Loading / Empty ──
 
-  if (isLoading) {
+  if (isLoading && !solicitudes) {
+    return <FormSkeleton label="Cargando tu solicitud…" />;
+  }
+
+  if (isError && !solicitudes) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-primary-500" />
-      </div>
+      <Card><div role="alert" className="space-y-3">
+        <p>No se pudo cargar tu solicitud.</p>
+        <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
+      </div></Card>
     );
   }
 
@@ -120,6 +154,9 @@ const MiSolicitudPage: React.FC = () => {
 
   const cfg = ESTADO_CONFIG[solicitud.estado];
   const currentStep = cfg.stepIndex;
+  const sentAt = solicitud.fechaEnvio ? new Date(solicitud.fechaEnvio) : null;
+  const sentDate = sentAt && Number.isFinite(sentAt.getTime())
+    ? sentAt.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) : null;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -131,13 +168,27 @@ const MiSolicitudPage: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-neutral-900">Mi Solicitud de Inscripcion</h2>
           <p className="text-sm text-neutral-500">
-            Tipo: {solicitud.tipoActor} &middot; Enviada {solicitud.fechaEnvio
-              ? new Date(solicitud.fechaEnvio).toLocaleDateString('es-AR')
-              : 'pendiente'}
+            Tipo: {solicitud.tipoActor}{sentDate ? <> &middot; Enviada {sentDate}</> : null}
           </p>
         </div>
       </div>
 
+      {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <>
+        <ActorActivities />
+        {(solicitudes?.length || 0) > 1 && <div>
+          <label htmlFor="application-activity" className="block text-sm font-medium">Solicitud por actividad</label>
+          <select id="application-activity" className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base"
+            value={solicitud.id} onChange={event => {
+              conversations.current[solicitud.id] = { reply: replyText, message: messageText };
+              const previous = conversations.current[event.target.value];
+              setSelectedId(event.target.value); setReplyText(previous?.reply || ''); setMessageText(previous?.message || '');
+              setParams({ solicitud: event.target.value }, { replace: true });
+            }}>
+            {solicitudes?.map(item => <option key={item.id} value={item.id}>{item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
+          </select>
+        </div>}
+        {solicitud.estado === 'BORRADOR' && <Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>Continuar borrador</Button>}
+      </>}
       {/* Stepper */}
       <Card>
         <div className="flex items-center justify-between">
@@ -236,7 +287,7 @@ const MiSolicitudPage: React.FC = () => {
           <div className="text-4xl mb-3">&#127881;</div>
           <h3 className="text-xl font-bold text-green-800 mb-2">Tu inscripcion fue aprobada</h3>
           <p className="text-sm text-green-700 mb-6">
-            Ya puedes acceder al sistema como {solicitud.tipoActor}.
+            Tu inscripción como {solicitud.tipoActor} fue aprobada. El acceso al sistema requiere ingresar con tu cuenta habilitada y verificada.
           </p>
           <Button variant="primary" onClick={() => navigate('/dashboard')}>
             Ir al Dashboard <ArrowRight size={16} className="ml-1" />
@@ -276,7 +327,7 @@ const MiSolicitudPage: React.FC = () => {
           )}
         </div>
 
-        <div className="max-h-80 overflow-y-auto p-4 space-y-3">
+        <div ref={messagesPanelRef} role="region" aria-label="Mensajes de la solicitud" className="max-h-80 overflow-y-auto p-4 space-y-3">
           {(!mensajes || mensajes.length === 0) ? (
             <p className="text-center text-sm text-neutral-400 py-6">No hay mensajes aun</p>
           ) : (
@@ -307,7 +358,6 @@ const MiSolicitudPage: React.FC = () => {
               );
             })
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Compose */}

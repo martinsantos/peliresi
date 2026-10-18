@@ -1,0 +1,21 @@
+{
+  "phase": "http",
+  "attempt": "1",
+  "source": "16100dd",
+  "status": "passed",
+  "startedAt": "2026-10-17T11:17:51.036Z",
+  "steps": [
+    "manifest-integration",
+    "exceptional-integration",
+    "addenda-integration",
+    "party-multirole-integration",
+    "external-tracking-integration",
+    "reconciliation-integration",
+    "enterprise-integration",
+    "PDF text"
+  ],
+  "current": "PDF text",
+  "finishedAt": "2026-10-17T11:18:11.626Z",
+  "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "memoryPeak": "1907314688"
+}

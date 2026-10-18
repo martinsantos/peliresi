@@ -59,10 +59,9 @@ export const Skeleton: React.FC<SkeletonProps> = ({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
+          aria-hidden="true"
           className={cn(
-            'bg-neutral-200 animate-shimmer',
-            'bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200',
-            'bg-[length:200%_100%]',
+            'bg-neutral-200 sitrep-skeleton',
             circle ? 'rounded-full' : 'rounded-lg',
             className
           )}
@@ -161,7 +160,7 @@ export const SkeletonTable: React.FC<{ rows?: number; cols?: number }> = ({
             <Skeleton
               key={i}
               height={16}
-              width={i === 0 ? '30%' : `${20 + Math.random() * 20}%`}
+              width={i === 0 ? '30%' : `${20 + (i % 3) * 5}%`}
             />
           ))}
         </div>
@@ -175,7 +174,7 @@ export const SkeletonTable: React.FC<{ rows?: number; cols?: number }> = ({
               <Skeleton
                 key={colIndex}
                 height={16}
-                width={colIndex === 0 ? '30%' : `${20 + Math.random() * 20}%`}
+                width={colIndex === 0 ? '30%' : `${20 + (colIndex % 3) * 5}%`}
               />
             ))}
           </div>

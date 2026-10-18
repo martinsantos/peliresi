@@ -55,8 +55,8 @@ const colorStyles: Record<BadgeVariant, Record<string, string>> = {
   },
   solid: {
     primary: 'bg-primary-600 text-white border border-primary-600',
-    success: 'bg-success-600 text-white border border-success-600',
-    warning: 'bg-warning-500 text-white border border-warning-500',
+    success: 'bg-success-700 text-white border border-success-700',
+    warning: 'bg-warning-100 text-warning-900 border border-warning-300',
     error: 'bg-error-600 text-white border border-error-600',
     info: 'bg-info-600 text-white border border-info-600',
     neutral: 'bg-neutral-700 text-white border border-neutral-700',
@@ -65,7 +65,7 @@ const colorStyles: Record<BadgeVariant, Record<string, string>> = {
 };
 
 const sizeStyles: Record<BadgeSize, string> = {
-  sm: 'px-2 py-0.5 text-[10px]',
+  sm: 'px-2 py-0.5 text-xs',
   md: 'px-2.5 py-1 text-xs',
   lg: 'px-3 py-1.5 text-sm',
 };

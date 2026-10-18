@@ -26,6 +26,18 @@ SITREP esta en estado MVP avanzado / beta operativa. Backend, frontend web, PWA 
 
 ## Backlog recomendado
 
+### Prioridad de producción agregada el 11/10/2026
+
+**MAIL-PROD-01 — Correos transaccionales y alertas, objetivo martes 13/10.**
+Estado: planificado, no implementado ni certificado. Inventario de todos los
+eventos, plantillas, destinatarios, cola y trazabilidad; pruebas aisladas y
+habilitación posterior autorizada. Incluye altas/bajas/modificaciones de usuarios,
+trámites, inspecciones, manifiestos, vencimientos y soporte.
+Ver [backlog y matriz de aceptación](BACKLOG-CORREOS-PRODUCCION-20261013.md).
+Correo/push siguen apagados; no liberar la cola histórica por esta planificación.
+
+### Backlog histórico
+
 1. Integracion API/DB
    - Crear una base PostgreSQL efimera para tests.
    - Cubrir auth, manifiestos, workflow, GPS, PDF, blockchain y permisos por rol.

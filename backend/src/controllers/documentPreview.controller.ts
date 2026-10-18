@@ -1,0 +1,38 @@
+import type { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
+import { randomUUID } from 'node:crypto';
+import { unlink } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { AppError } from '../middlewares/errorHandler';
+import { describeDocument, readReceipt } from '../services/documentAnalysis.service';
+import { licenseFields } from '../domain/licenseReading';
+
+// Volatile single-file read. No Prisma, mail, account, application, payment or
+// provider call. Native extraction already has a cross-worker flock and deadline.
+export const previewUpload = multer({ storage: multer.diskStorage({
+  destination: os.tmpdir(), filename: (_req, _file, done) => done(null, `sitrep-preview-${randomUUID()}`),
+}), limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 1, parts: 2 },
+  fileFilter: (_req, file, done) => ['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimetype)
+    ? done(null, true) : done(new AppError('Elegí un PDF, JPG o PNG de hasta 10 MB.', 400)) });
+
+export async function previewDocument(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new AppError('Seleccioná un documento para leer.', 400);
+    if (!['LICENCIA', 'DOCUMENTO'].includes(req.body.tipo)) throw new AppError('Tipo de lectura no permitido.', 400);
+    const description = describeDocument(req.file);
+    const file = { path: req.file.path, mimeType: description.mimeType };
+    const analisis = req.body.tipo === 'LICENCIA' ? await readReceipt(file, 'LICENCIA') : await readReceipt(file);
+    // Preserve the failure category. A busy/missing engine is not a poor photo,
+    // and this stateless endpoint removes its temporary original after reading.
+    if (analisis.lectura === 'SIN_TEXTO') {
+      analisis.aviso = `${req.body.tipo === 'LICENCIA' ? 'No se obtuvieron campos legibles de la licencia.' : 'No se encontró texto legible.'} Podés completar los campos manualmente o reintentar con una imagen más clara.`;
+    } else if (analisis.lectura === 'NO_DISPONIBLE') {
+      const reason = analisis.aviso?.replace('El archivo se conserva para revisión manual.', '').trim();
+      analisis.aviso = `${reason || 'La lectura automática no está disponible.'} Tu formulario sigue intacto. Podés reintentar o completar los campos manualmente.`;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, data: { analisis, campos: req.body.tipo === 'LICENCIA' ? licenseFields(analisis.texto) : {}, persistido: false } });
+  } catch (error) { next(error); }
+  finally { if (req.file?.path?.startsWith(path.join(os.tmpdir(), 'sitrep-preview-'))) await unlink(req.file.path).catch(() => undefined); }
+}

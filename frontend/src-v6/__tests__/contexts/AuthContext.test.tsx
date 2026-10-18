@@ -54,6 +54,8 @@ vi.mock('../../services/api', () => ({
   getRefreshToken: vi.fn().mockReturnValue(null),
   setTokens: vi.fn(),
   clearTokens: vi.fn(),
+  restoreSessionCheckpoint: vi.fn().mockResolvedValue(undefined),
+  confirmSessionCheckpoint: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../services/offline-sync', () => ({
@@ -73,13 +75,14 @@ vi.mock('../../hooks/useSessionTimeout', () => ({
 }));
 
 vi.mock('../../components/OnboardingWizard', () => ({
-  default: () => null,
+  default: () => <div data-testid="operational-onboarding" />,
 }));
 
 // Import AFTER mocks are declared
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/auth.service';
-import { clearTokens, getAccessToken } from '../../services/api';
+import { api, clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
+import { clearSyncQueue } from '../../services/indexeddb';
 import { OFFLINE_SESSION_KEY, MAX_OFFLINE_SESSION_MS } from '../../services/offlineSession';
 import type { Usuario } from '../../types/models';
 
@@ -109,6 +112,8 @@ function AuthConsumer() {
       <span data-testid="isAnyAdmin">{String(auth.isAnyAdmin)}</span>
       <span data-testid="isLoading">{String(auth.isLoading)}</span>
       <span data-testid="authError">{auth.authError ?? 'none'}</span>
+      <span data-testid="restricted">{String(auth.isRestricted)}</span>
+      <span data-testid="draft">{auth.solicitudId ?? 'none'}</span>
       <button data-testid="login-btn" onClick={() => auth.login('admin@test.com', 'pass123')}>Login</button>
       <button data-testid="logout-btn" onClick={() => auth.logout()}>Logout</button>
       <button data-testid="switch-btn" onClick={() => auth.switchUser(-1)}>Switch</button>
@@ -133,6 +138,20 @@ function renderWithProviders() {
 // ========================================
 
 describe('AuthContext', () => {
+  it('restores a draft-only registration via its protected draft, without asking for a forbidden full profile', async () => {
+    const token = `header.${btoa(JSON.stringify({ id: 'candidate', restricted: true, registrationDraft: 'draft-only' }))}.signature`;
+    vi.mocked(getAccessToken).mockReturnValue(token);
+    vi.mocked(api.get).mockResolvedValue({ data: { data: { solicitud: { id: 'draft-only' } } } });
+    vi.mocked(authService.getMe).mockRejectedValue({ response: { status: 403 } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(api.get).toHaveBeenCalledWith('/solicitudes/draft-only');
+    expect(authService.getMe).not.toHaveBeenCalled(); expect(clearTokens).not.toHaveBeenCalled();
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('true');
+    expect(screen.getByTestId('draft')).toHaveTextContent('draft-only');
+  });
+
   const inspector = { id: 'inspector-1', email: 'inspector@test.invalid', nombre: 'Inspectora', apellido: 'Uno', rol: 'AUDITOR', activo: true, esInspector: true } as Usuario;
   const networkError = { isAxiosError: true, code: 'ERR_NETWORK' };
   const tokenFor = (id = inspector.id, expiresAt = Date.now() + 24 * 60 * 60 * 1000) =>
@@ -158,6 +177,55 @@ describe('AuthContext', () => {
   });
 
   afterEach(() => vi.useRealTimers());
+
+  it('restores the restricted UI after server validation and clears it after a full session', async () => {
+    localStorage.setItem('sitrep_access_token', `header.${btoa(JSON.stringify({ id: inspector.id, restricted: true }))}.signature`);
+    vi.mocked(authService.getMe).mockResolvedValue({ ...inspector, activo: false });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('restricted')).toHaveTextContent('true'));
+    expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno');
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValue(inspector);
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('restricted')).toHaveTextContent('false'));
+  });
+
+  it('does not authorize a restricted token hint when the server rejects its profile', async () => {
+    localStorage.setItem('sitrep_access_token', `header.${btoa(JSON.stringify({ id: inspector.id, restricted: true }))}.signature`);
+    vi.mocked(authService.getMe).mockRejectedValue({ response: { status: 401 } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('false');
+    expect(clearTokens).toHaveBeenCalled();
+  });
+
+  it('does not request a profile with stale credentials before durable recovery completes', async () => {
+    localStorage.setItem('sitrep_access_token', 'old-administrator');
+    let restored!: () => void;
+    vi.mocked(restoreSessionCheckpoint).mockImplementationOnce(() => new Promise(resolve => { restored = resolve; }));
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    expect(authService.getMe).not.toHaveBeenCalled();
+    expect(screen.getByTestId('isLoading')).toHaveTextContent('true');
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    await act(async () => restored());
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    expect(authService.getMe).toHaveBeenCalledOnce();
+  });
+
+  it('refuses to display a cached account when safe session recovery fails', async () => {
+    await cacheVerifiedSession();
+    vi.mocked(authService.getMe).mockClear();
+    vi.mocked(restoreSessionCheckpoint).mockRejectedValueOnce(new Error('durable storage unavailable'));
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('authError')).toHaveTextContent('recuperar la sesión');
+    expect(authService.getMe).not.toHaveBeenCalled();
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
+  });
 
   it('starts with no user and isLoading transitions to false', async () => {
     renderWithProviders();
@@ -200,6 +268,23 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('isAdmin').textContent).toBe('true');
     expect(screen.getByTestId('isAnyAdmin').textContent).toBe('true');
     expect(screen.getByTestId('isGenerador').textContent).toBe('false');
+    expect(screen.getByTestId('operational-onboarding')).toBeInTheDocument();
+  });
+
+  it.each([false, true])('does not introduce pending applicants as approved actors (post-reset: %s)', async (postReset) => {
+    if (postReset) localStorage.setItem('sitrep_post_reset', '1');
+    vi.mocked(authService.login).mockResolvedValueOnce({
+      user: { ...inspector, id: 'pending-multirole', rol: 'GENERADOR', activo: false, esInspector: false },
+      accessToken: 'restricted-token', refreshToken: 'restricted-refresh', restricted: true, solicitudId: 'pending-draft',
+    });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    await userEvent.setup().click(screen.getByTestId('login-btn'));
+    await waitFor(() => expect(screen.getByTestId('restricted')).toHaveTextContent('true'));
+    expect(screen.getByTestId('draft')).toHaveTextContent('pending-draft');
+    expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
+    expect(localStorage.getItem('sitrep_onboarding_pending-multirole')).toBeNull();
+    if (postReset) expect(localStorage.getItem('sitrep_post_reset')).toBe('1');
   });
 
   it('logout clears the current user', async () => {
@@ -222,6 +307,8 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('user').textContent).toBe('null');
     });
     expect(screen.getByTestId('isAdmin').textContent).toBe('false');
+    expect(clearSyncQueue).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
   });
 
   it('useAuth throws when used outside AuthProvider', () => {
@@ -348,5 +435,33 @@ describe('AuthContext', () => {
     await act(async () => resolveProfile(inspector));
     expect(screen.getByTestId('user')).toHaveTextContent('null');
     expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
+  });
+
+  it('clears local credentials immediately even if logout confirmation has not arrived', async () => {
+    let finish!: () => void;
+    vi.mocked(authService.logout).mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
+    localStorage.setItem('sitrep_access_token',tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(()=>expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    try {
+      await userEvent.setup().click(screen.getByTestId('logout-btn'));
+      expect(screen.getByTestId('user')).toHaveTextContent('null');
+      expect(getAccessToken()).toBeNull();
+    } finally { await act(async()=>finish()); }
+  });
+
+  it('an old logout completion cannot erase a subsequently authenticated user', async () => {
+    let finish!: () => void;
+    vi.mocked(authService.logout).mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
+    renderWithProviders();
+    await waitFor(()=>expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    await userEvent.setup().click(screen.getByTestId('logout-btn'));
+    await userEvent.setup().click(screen.getByTestId('login-btn'));
+    await waitFor(()=>expect(screen.getByTestId('user')).toHaveTextContent('Admin User'));
+    localStorage.setItem('sitrep_access_token','next-session');
+    await act(async()=>finish());
+    expect(screen.getByTestId('user')).toHaveTextContent('Admin User');
+    expect(getAccessToken()).toBe('next-session');
   });
 });

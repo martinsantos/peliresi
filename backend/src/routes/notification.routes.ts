@@ -14,6 +14,10 @@ import {
     eliminarReglaAlerta,
     getAlertasGeneradas,
     resolverAlerta,
+    simularSeguimientoAlerta,
+    evaluarSeguimientoAlerta,
+    simularCatalogoAlerta,
+    evaluarCatalogoAlerta,
     detectarAnomalias,
     getAnomalias,
     resolverAnomalia,
@@ -167,6 +171,11 @@ router.get('/alertas/reglas', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPO
  *         description: Solo ADMIN
  */
 router.post('/alertas/reglas', hasRole('ADMIN'), crearReglaAlerta);
+// Simulation is read-only; evaluation writes internal cases/notices, never external messages.
+router.post('/alertas/seguimiento/simular', hasRole('ADMIN'), simularSeguimientoAlerta);
+router.post('/alertas/seguimiento/evaluar', hasRole('ADMIN'), evaluarSeguimientoAlerta);
+router.post('/alertas/catalogo/simular', hasRole('ADMIN'), simularCatalogoAlerta);
+router.post('/alertas/catalogo/evaluar', hasRole('ADMIN'), evaluarCatalogoAlerta);
 
 /**
  * @openapi

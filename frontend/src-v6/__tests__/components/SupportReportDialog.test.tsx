@@ -1,0 +1,270 @@
+import React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+const mocks = vi.hoisted(() => ({ create: vi.fn(), sent: vi.fn(), digests: vi.fn(), navigate: vi.fn(), invalidate: vi.fn(), user: { id: 'owner', nombre: 'Usuario', rol: 'GENERADOR' }, impersonation: null as unknown }));
+vi.mock('../../utils/supportDraft', async original => ({ ...await original<object>(), supportFileDigests: mocks.digests }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidate }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mocks.user }) }));
+vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: mocks.impersonation, exitImpersonation: vi.fn() }) }));
+vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
+vi.mock('../../hooks/useMobilePrefix', () => ({ useMobilePrefix: () => (value: string) => value }));
+vi.mock('../../services/support.service', () => ({ supportService: { create: mocks.create, sent: mocks.sent }, supportError: (error: Error) => error?.name === 'SupportSessionChangedError' ? error.message : 'No se confirmó el envío.' }));
+import { SupportReportDialog } from '../../components/SupportReportDialog';
+const fill = () => {
+  fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'No abre el manifiesto' } });
+  fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'El detalle queda vacío después de entrar.' } });
+};
+// Unsigned unit marker only. No API/DB/browser authentication is injected.
+const token = (id: string, iat = 1) => 'unit.' + btoa(JSON.stringify({ id, iat })) + '.not-a-credential';
+describe('report problem preserves the human workflow', () => {
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); mocks.digests.mockResolvedValue([]); mocks.user.id = 'owner'; mocks.impersonation = null; mocks.create.mockResolvedValue({ id: 'ticket' }); mocks.sent.mockResolvedValue({ id: 'ticket' }); localStorage.setItem('sitrep_access_token', token('owner')); Object.defineProperty(navigator, 'onLine', { configurable: true, value: true }); });
+  it('accepts a short report without forcing a title or attachment', async () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'QR' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][0]).toMatchObject({ asunto: 'QR', descripcion: 'QR', categoria: 'GENERAL' });
+    expect(mocks.create.mock.calls[0][1]).toEqual([]);
+  });
+  it('guides an empty report to the description without sending or freezing it', () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    expect(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?')).toHaveFocus();
+    expect(screen.getByText('Describí el problema para enviar el ticket.')).toBeInTheDocument();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?')).toBeEnabled();
+  });
+  it('retains an optional short title and sends one acknowledged report', async () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'QR' } });
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'No aparece' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][0]).toMatchObject({ asunto: 'QR', descripcion: 'No aparece' });
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+  });
+  it('rejects whitespace-only content without counting an optional title', () => {
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: '     ' } });
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: '          ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?')).toHaveFocus();
+  });
+  it('keeps a timeout request frozen, retries the same key and clears only after acknowledgement', async () => {
+    mocks.create.mockRejectedValueOnce(new Error('timeout'));
+    render(<SupportReportDialog open onClose={vi.fn()} />); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket' }));
+    await screen.findByText('Envío pendiente de confirmación. El texto se conserva sin cambios.');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Enviar ticket' })).not.toBeDisabled());
+    expect(screen.getByLabelText('Asunto')).toBeDisabled();
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('No abre el manifiesto');
+    expect(mocks.invalidate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket' }));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(mocks.create.mock.calls[0]).toEqual(mocks.create.mock.calls[1]);
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toBeNull();
+    expect(mocks.invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: ['soporte', 'owner'] });
+  });
+  it('lets a user close without submitting or losing the locally saved text', async () => {
+    const close = vi.fn(); render(<SupportReportDialog open onClose={close} />); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar luego' }));
+    expect(close).toHaveBeenCalled(); expect(mocks.create).not.toHaveBeenCalled();
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('No abre el manifiesto');
+  });
+  const pendingReport = () => {
+    const input = { asunto: 'No puedo enviar el ticket', descripcion: 'El envío falló y perdí la captura después de recargar.', categoria: 'GENERAL', contexto: { ruta: '/dashboard' } };
+    const pending = { key: 'existing-send-key', input, files: [{ nombre: 'pantalla.jpg', sha256: 'old-screen-digest' }] };
+    localStorage.setItem('sitrep-soporte:v1:owner', JSON.stringify({ ...input, pendiente: pending }));
+    return pending;
+  };
+  it('recovers a reloaded report without requiring a lost optional screenshot or creating a new key', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValue({ response: { status: 404 } });
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    expect(screen.getByLabelText('Asunto')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(pending.input, [], pending.key));
+    expect(mocks.sent).toHaveBeenCalledExactlyOnceWith(pending.key);
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toBeNull();
+  });
+  it('uses the prior server receipt instead of resending when optional files were lost', async () => {
+    const pending = pendingReport();
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(mocks.sent).toHaveBeenCalledExactlyOnceWith(pending.key);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it('does not discard lost-attachment delivery evidence or send when receipt verification is unavailable', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValue(new Error('offline'));
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await screen.findByRole('alert');
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual(pending);
+    expect(screen.getByLabelText('Asunto')).toBeDisabled();
+  });
+  it('preserves the same text-only retry after a timeout without demanding the lost screenshot again', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValue({ response: { status: 404 } });
+    mocks.create.mockRejectedValueOnce(new Error('timeout'));
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await screen.findByRole('alert');
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual({ ...pending, files: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(mocks.create).toHaveBeenCalledTimes(2);
+    expect(mocks.create.mock.calls[0]).toEqual(mocks.create.mock.calls[1]);
+  });
+  it('reconciles a racing original attachment request instead of creating a duplicate', async () => {
+    const pending = pendingReport();
+    mocks.sent.mockRejectedValueOnce({ response: { status: 404 } }).mockResolvedValueOnce({ id: 'already-created' });
+    mocks.create.mockRejectedValue({ response: { status: 409 } });
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/already-created'));
+    expect(mocks.create).toHaveBeenCalledExactlyOnceWith(pending.input, [], pending.key);
+    expect(mocks.sent).toHaveBeenCalledTimes(2);
+  });
+  it('does not resend a recovered report under an account that changed during receipt verification', async () => {
+    const pending = pendingReport();
+    let rejectReceipt!: (error: unknown) => void;
+    mocks.sent.mockImplementation(() => new Promise((_, reject) => { rejectReceipt = reject; }));
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await waitFor(() => expect(mocks.sent).toHaveBeenCalledOnce());
+    localStorage.setItem('sitrep_access_token', token('second-owner'));
+    await act(async () => { rejectReceipt({ response: { status: 404 } }); });
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual(pending);
+    expect(screen.getByRole('alert')).toHaveTextContent('La sesión cambió');
+  });
+  it('does not verify or send a recovered report while offline', async () => {
+    const pending = pendingReport();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solo texto', exact: true }));
+    await screen.findByRole('alert');
+    expect(mocks.sent).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('sitrep-soporte:v1:owner')!).pendiente).toEqual(pending);
+  });
+  it('does not claim delivery or call the network while offline', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    render(<SupportReportDialog open onClose={vi.fn()} />); fill(); fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket' }));
+    await screen.findByRole('alert'); expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('No abre el manifiesto');
+  });
+  it('does not send a human administrator report under an impersonated customer', () => {
+    mocks.impersonation = { adminUser: { id: 'admin' } };
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Volver a mi sesión' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enviar ticket' })).not.toBeInTheDocument();
+  });
+  it('permits a verified impersonation report for the represented account, never a client-chosen owner', async () => {
+    mocks.impersonation = { adminUser: { id: 'admin', nombre: 'Administradora' } };
+    localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner', impersonatedBy: 'admin' })) + '.not-a-credential');
+    render(<SupportReportDialog open onClose={vi.fn()} />);
+    expect(screen.getByText(/El ticket y las respuestas quedarán para Usuario/)).toBeVisible();
+    fill(); fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('autorId');
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('registradoPorId');
+  });
+  it('does not leak the previous account draft after a role/session switch', () => {
+    const { rerender } = render(<SupportReportDialog open onClose={vi.fn()} />); fill(); mocks.user.id = 'second-owner';
+    rerender(<SupportReportDialog open onClose={vi.fn()} />); expect(screen.getByLabelText('Asunto')).toHaveValue('');
+  });
+  it('does not submit an unmounted owner report after asynchronous file preparation finishes', async () => {
+    let finish!: (value: []) => void;
+    mocks.digests.mockImplementation(() => new Promise<[]>(resolve => { finish = resolve; }));
+    const { rerender } = render(<SupportReportDialog open onClose={vi.fn()} />); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    mocks.user.id = 'second-owner'; localStorage.setItem('sitrep_access_token', token('second-owner'));
+    rerender(<SupportReportDialog open onClose={vi.fn()} />);
+    await act(async () => { finish([]); });
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Asunto')).toHaveValue('');
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('No abre el manifiesto');
+  });
+  it('rejects a new credential owner before React has reconciled the old report view', async () => {
+    let finish!: (value: []) => void;
+    mocks.digests.mockImplementation(() => new Promise<[]>(resolve => { finish = resolve; }));
+    render(<SupportReportDialog open onClose={vi.fn()} />); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    localStorage.setItem('sitrep_access_token', token('second-owner'));
+    await act(async () => { finish([]); });
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('La sesión cambió');
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('No abre el manifiesto');
+  });
+  it('allows a genuine same-owner renewal during file preparation without rejecting the report', async () => {
+    let finish!: (value: []) => void;
+    mocks.digests.mockImplementation(() => new Promise<[]>(resolve => { finish = resolve; }));
+    render(<SupportReportDialog open onClose={vi.fn()} />); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    localStorage.setItem('sitrep_access_token', token('owner', 2));
+    await act(async () => { finish([]); });
+    await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
+    expect(mocks.create).toHaveBeenCalledOnce();
+  });
+  it('does not navigate a new session when the old owner request receives its acknowledgement', async () => {
+    let finish!: (value: { id: string }) => void;
+    mocks.create.mockImplementation(() => new Promise<{ id: string }>(resolve => { finish = resolve; }));
+    const close = vi.fn(); render(<SupportReportDialog open onClose={close} />); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    localStorage.setItem('sitrep_access_token', token('second-owner'));
+    await act(async () => { finish({ id: 'old-owner-ticket' }); });
+    expect(mocks.navigate).not.toHaveBeenCalled(); expect(close).not.toHaveBeenCalled(); expect(mocks.invalidate).not.toHaveBeenCalled();
+    // The acknowledged old-owner report exists: only its draft may be cleared.
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toBeNull();
+  });
+  it('does not query the old owner receipt using a different current credential', async () => {
+    mocks.create.mockRejectedValueOnce(new Error('timeout'));
+    render(<SupportReportDialog open onClose={vi.fn()} />); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar si llegó', exact: true })).toBeEnabled());
+    localStorage.setItem('sitrep_access_token', token('second-owner'));
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar si llegó', exact: true }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar si llegó', exact: true })).toBeEnabled());
+    expect(mocks.sent).not.toHaveBeenCalled();
+    expect(localStorage.getItem('sitrep-soporte:v1:owner')).toContain('pendiente');
+  });
+  it('shows the captured screen for review and lets the user remove it without sending a completed form', async () => {
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:screen');
+    const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    render(<SupportReportDialog open onClose={vi.fn()} screenshot={new File(['screen'], 'pantalla.jpg', { type: 'image/jpeg' })} />);
+    expect(screen.getByRole('img', { name: 'Captura de la pantalla que estabas usando' })).toHaveAttribute('src', 'blob:screen');
+    fill();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Quitar captura' })); });
+    expect(screen.queryByRole('img', { name: 'Captura de la pantalla que estabas usando' })).not.toBeInTheDocument();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:screen');
+    expect(mocks.create).not.toHaveBeenCalled();
+    createUrl.mockRestore(); revokeUrl.mockRestore();
+  });
+  it('sends the reviewed screen only on confirmation and stays on the current task', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:screen');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const screenshot = new File(['screen'], 'pantalla.jpg', { type: 'image/jpeg' });
+    const submitted = vi.fn();
+    render(<SupportReportDialog open onClose={vi.fn()} onSubmitted={submitted} screenshot={screenshot} returnToTask />);
+    expect(mocks.create).not.toHaveBeenCalled(); fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await waitFor(() => expect(submitted).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][1]).toEqual([screenshot]);
+    expect(mocks.navigate).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+  it('explains a capture failure but still permits reporting without an image', () => {
+    render(<SupportReportDialog open onClose={vi.fn()} captureError="No pudimos capturar esta pantalla. Podés adjuntar una imagen o enviar sólo el texto." />);
+    expect(screen.getByText(/No pudimos capturar esta pantalla/)).toBeInTheDocument();
+    fill(); expect(screen.getByRole('button', { name: 'Enviar ticket' })).toBeEnabled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+});

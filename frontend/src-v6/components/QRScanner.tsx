@@ -51,6 +51,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraRequestRef = useRef(0);
 
   // State
   const [status, setStatus] = useState<ScannerStatus>('initializing');
@@ -64,6 +65,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
   // Stop any running stream
   // -----------------------------------------------------------
   const stopStream = useCallback(() => {
+    // getUserMedia cannot be cancelled; invalidate pending acquisitions instead.
+    cameraRequestRef.current += 1;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -80,6 +83,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const startCamera = useCallback(
     async (facingMode: CameraFacing) => {
       stopStream();
+      const request = cameraRequestRef.current;
       setStatus('initializing');
 
       try {
@@ -93,6 +97,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
         };
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (request !== cameraRequestRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
 
         // Check torch capability
@@ -103,9 +111,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
+          if (request !== cameraRequestRef.current) return;
           setStatus('scanning');
         }
       } catch (err: unknown) {
+        if (request !== cameraRequestRef.current) return;
         const error = err as DOMException;
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
           setStatus('denied');
@@ -361,7 +371,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 stopStream();
                 onClose();
               }}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-white bg-white text-neutral-900 hover:border-white hover:bg-neutral-100 hover:text-neutral-900 active:border-white active:bg-neutral-200 focus-visible:outline-white"
             >
               Volver
             </Button>
@@ -386,7 +396,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   stopStream();
                   onClose();
                 }}
-                className="border-white/20 text-white hover:bg-white/10"
+                className="border-white bg-white text-neutral-900 hover:border-white hover:bg-neutral-100 hover:text-neutral-900 active:border-white active:bg-neutral-200 focus-visible:outline-white"
               >
                 Cancelar
               </Button>

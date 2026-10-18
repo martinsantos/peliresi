@@ -28,14 +28,19 @@ vi.mock('../../../contexts/AuthContext', () => ({
 vi.mock('../../../hooks/useDashboard', () => ({
   useDashboardStats: () => ({
     data: {
-      manifiestos: {
-        total: 0,
-        enTransito: 0,
-        pendientes: 0,
-        completados: 0,
+      estadisticas: {
+        borradores: 12,
+        aprobados: 7,
+        enTransito: 17,
+        entregados: 6,
+        recibidos: 9,
+        tratados: 88,
+        total: 295,
       },
+      recientes: [],
     },
     isLoading: false,
+    isError: false,
   }),
 }));
 
@@ -75,9 +80,15 @@ describe('MobileDashboardPage operator queue', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Score operativo Android')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cargas por resolver' })).toBeInTheDocument();
+    expect(screen.getByText('295')).toBeInTheDocument();
+    expect(screen.getByText('17')).toBeInTheDocument();
     expect(screen.getByText('Cerrar tratamiento')).toBeInTheDocument();
-    expect(screen.getByText('1 pendientes')).toBeInTheDocument();
     expect(screen.queryByText('Sin acciones de operador')).not.toBeInTheDocument();
+    const deviceStatus = screen.getByText('Conexión y dispositivo');
+    expect(deviceStatus).toBeInTheDocument();
+    deviceStatus.click();
+    expect(screen.getByText('Conectado al servidor')).toBeInTheDocument();
+    expect(screen.queryByText('Score operativo Android')).not.toBeInTheDocument();
   });
 });

@@ -16,16 +16,18 @@ import { EstadoManifiesto } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 import { computeDateRange } from '../../utils/date-presets';
 
+import { useInspectionOperations } from '../../hooks/useInspectionOperations';
+import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
 import { ControlFilters, type LayerState } from './components/ControlFilters';
 import { ControlStats } from './components/ControlStats';
 import { ControlMap } from './components/ControlMap';
-import { ViajesPanel } from './components/ViajesPanel';
+import { ViajesPanel, type TripPanel } from './components/ViajesPanel';
 
 // ── Constants ──
 const POLL_INTERVAL = 30;
 
 export const CentroControlPage: React.FC = () => {
-  const { currentUser, isAdmin, isTransportista } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
 
   const [countdown, setCountdown] = useState(POLL_INTERVAL);
 
@@ -33,7 +35,10 @@ export const CentroControlPage: React.FC = () => {
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [selectedRealizadoId, setSelectedRealizadoId] = useState<string | null>(null);
   const [tripFilter, setTripFilter] = useState('');
-  const [tripPanel, setTripPanel] = useState<'activos' | 'realizados'>('activos');
+  const [tripPanel, setTripPanel] = useState<TripPanel>('activos');
+  // The first response may choose a default only before the user's first action.
+  const panelInitialized = useRef(false);
+  const handleTripPanelChange = (panel: TripPanel) => { panelInitialized.current = true; setTripPanel(panel); };
 
   // ── Layer toggles ──
   const [layers, setLayers] = useState<LayerState>({
@@ -41,24 +46,37 @@ export const CentroControlPage: React.FC = () => {
     transportistas: true,
     operadores: true,
     transito: true,
+    ...(canUseInspectionOperations(currentUser) ? { inspecciones: true } : {}),
   });
 
   // ── Date range (default: 30 días) ──
   const [datePreset, setDatePreset] = useState(30);
-  const [fechaDesde, setFechaDesde] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0];
-  });
-  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0]);
+  const [dateRange, setDateRange] = useState(() => computeDateRange(30));
+  const { desde: fechaDesde, hasta: fechaHasta } = dateRange;
 
   // ── Map zoom ──
   const [mapZoom, setMapZoom] = useState(10);
+
+  const inspections = useInspectionOperations({ limit: 100 });
+  const [selectedInspectionId, setSelectedInspectionId] = useState<string | null>(null);
+  const selectInspection = (id: string) => { panelInitialized.current = true; setSelectedInspectionId(id); setTripPanel('inspecciones'); setLayers((previous) => ({ ...previous, inspecciones: true })); };
+  const selectTrip = (id: string | null) => {
+    panelInitialized.current = true;
+    setSelectedTripId(id);
+    if (id) {
+      setTripPanel('activos');
+      setLayers(previous => ({ ...previous, transito: true }));
+    }
+  };
 
   // ── API Hooks ──
   const { refetch: refetchStats } = useDashboardStats();
   const { data: ccData, refetch: refetchCC } = useCentroControl({
     fechaDesde,
     fechaHasta,
-    capas: Object.entries(layers).filter(([, v]) => v).map(([k]) => k),
+    // These rows also supply the agenda and statistics. Map visibility is a
+    // local presentation choice, not an operational-data filter or new fetch.
+    capas: ['generadores', 'transportistas', 'operadores', 'transito'],
   });
   // Only fetch alertas for ADMIN — TRANSPORTISTA gets 403
   const { data: alertasData } = useAlertas({ limit: 10 }, isAdmin);
@@ -98,14 +116,13 @@ export const CentroControlPage: React.FC = () => {
   const handleManualRefresh = useCallback(() => {
     refetchStats();
     refetchCC();
+    if (canUseInspectionOperations(currentUser)) void inspections.refetch();
     setCountdown(POLL_INTERVAL);
-  }, [refetchStats, refetchCC]);
+  }, [refetchStats, refetchCC, inspections.refetch, currentUser]);
 
   const handleDatePreset = useCallback((days: number) => {
     setDatePreset(days);
-    const range = computeDateRange(days);
-    setFechaDesde(range.desde);
-    setFechaHasta(range.hasta);
+    setDateRange(computeDateRange(days));
   }, []);
 
   const toggleLayer = useCallback((layer: keyof LayerState) => {
@@ -127,26 +144,21 @@ export const CentroControlPage: React.FC = () => {
     }));
   }, [alertasData]);
 
-  // ── Filtered trips (TRANSPORTISTA sees only own trips) ──
-  const userTransportista = isTransportista ? (currentUser?.sector || '') : '';
+  // Global authenticated consultation; private destinations use server permissions.
   const filteredEnTransito = useMemo(() => {
     if (!cc?.enTransito) return [];
-    let items = cc.enTransito;
-    if (userTransportista) {
-      items = items.filter(m => m.transportista === userTransportista);
-    }
+    const items = cc.enTransito;
     if (!tripFilter.trim()) return items;
     const q = tripFilter.toLowerCase();
     return items.filter(m =>
-      m.numero.toLowerCase().includes(q) || m.transportista.toLowerCase().includes(q)
+      m.numero.toLowerCase().includes(q) || (m.transportista || '').toLowerCase().includes(q)
     );
-  }, [cc?.enTransito, tripFilter, userTransportista]);
+  }, [cc?.enTransito, tripFilter]);
 
   const enTransitoForMap = useMemo(() => {
     if (!cc?.enTransito) return [];
-    if (!userTransportista) return cc.enTransito;
-    return cc.enTransito.filter(m => m.transportista === userTransportista);
-  }, [cc?.enTransito, userTransportista]);
+    return cc.enTransito;
+  }, [cc?.enTransito]);
 
   // ── Trip fly-to points ──
   const activeTripFlyPoints = useMemo((): [number, number][] => {
@@ -205,8 +217,11 @@ export const CentroControlPage: React.FC = () => {
     return pts;
   }, [selectedRealizadoId, viajesRealizados]);
 
+  // Choose an initial panel only; polling must not override the user's selection.
   // Auto-switch to realizados if no active trips
   useEffect(() => {
+    if (!cc || panelInitialized.current) return;
+    panelInitialized.current = true;
     if (cc && filteredEnTransito.length === 0 && viajesRealizados.length > 0) {
       setTripPanel('realizados');
     } else if (cc && filteredEnTransito.length > 0) {
@@ -228,12 +243,10 @@ export const CentroControlPage: React.FC = () => {
         datePreset={datePreset}
         fechaDesde={fechaDesde}
         fechaHasta={fechaHasta}
-        layers={layers}
         onManualRefresh={handleManualRefresh}
         onDatePreset={handleDatePreset}
-        onFechaDesde={(val) => { setFechaDesde(val); setDatePreset(-1); }}
-        onFechaHasta={(val) => { setFechaHasta(val); setDatePreset(-1); }}
-        onToggleLayer={toggleLayer}
+        onFechaDesde={(val) => { setDateRange(previous => ({ ...previous, desde: val })); setDatePreset(-1); }}
+        onFechaHasta={(val) => { setDateRange(previous => ({ ...previous, hasta: val })); setDatePreset(-1); }}
       />
 
       {/* ══════ Main Content ══════ */}
@@ -244,18 +257,22 @@ export const CentroControlPage: React.FC = () => {
         cc={cc}
         alertas={alertas}
         datePreset={datePreset}
-      />
+        inspectionCount={canUseInspectionOperations(currentUser) ? inspections.isError || !inspections.data ? null : inspections.data.total : undefined}
+      >
+
+
 
       {/* ══════ Mapa de Actividad + Viajes Activos ══════ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <ControlMap
           cc={cc}
           layers={layers}
+          onToggleLayer={toggleLayer}
           mapZoom={mapZoom}
           onZoomChange={setMapZoom}
           enTransitoForMap={enTransitoForMap}
           selectedTripId={selectedTripId}
-          onSelectTrip={setSelectedTripId}
+          onSelectTrip={selectTrip}
           selectedRealizadoId={selectedRealizadoId}
           tripPanel={tripPanel}
           viajesRealizados={viajesRealizados}
@@ -263,6 +280,9 @@ export const CentroControlPage: React.FC = () => {
           panelBoundsPoints={panelBoundsPoints}
           realizadoFlyPoints={realizadoFlyPoints}
           mapColRef={mapColRef}
+          inspections={inspections.data?.items || []}
+          selectedInspectionId={tripPanel === 'inspecciones' ? selectedInspectionId : null}
+          onSelectInspection={selectInspection}
         />
 
         <ViajesPanel
@@ -271,15 +291,21 @@ export const CentroControlPage: React.FC = () => {
           tripFilter={tripFilter}
           onTripFilterChange={setTripFilter}
           tripPanel={tripPanel}
-          onTripPanelChange={setTripPanel}
+          onTripPanelChange={handleTripPanelChange}
           selectedTripId={selectedTripId}
-          onSelectTrip={setSelectedTripId}
+          onSelectTrip={selectTrip}
           selectedRealizadoId={selectedRealizadoId}
           onSelectRealizado={setSelectedRealizadoId}
           viajesRef={viajesRef}
+          inspections={canUseInspectionOperations(currentUser) ? inspections.data?.items || [] : undefined}
+          inspectionTotal={inspections.data?.total}
+          inspectionError={inspections.isError}
+          inspectionLoading={inspections.isPending}
+          selectedInspectionId={selectedInspectionId}
+          onSelectInspection={selectInspection}
         />
       </div>
-
+      </ControlStats>
       </div>
     </>
   );

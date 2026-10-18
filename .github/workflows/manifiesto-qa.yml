@@ -1,0 +1,167 @@
+name: SITREP Manifest V2 Isolated QA
+on:
+  # Expensive full regression: explicit execution only, never on every push.
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sitrep-cloud-qa-20261002
+  cancel-in-progress: false
+jobs:
+  manifests:
+    if: github.ref == 'refs/heads/codex/sitrep-manifiestos-v2-20261014'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      NODE_APP_INSTANCE: qa
+      ALLOW_SYNTHETIC_QA: '1'
+      NODE_OPTIONS: --max-old-space-size=2048
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=3
+      PORT: '3037'
+      DISABLE_EMAILS: 'true'
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      JWT_SECRET: only-cloud-synthetic-qa-20261002-never-production
+      INSPECTION_TRACE_SECRET: only-cloud-inspection-qa-20261002-never-production
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      VITE_API_URL: /api
+      MANIFEST_EXCEPTIONAL_ENABLED: 'true'
+      VITE_MANIFEST_EXCEPTIONAL_ENABLED: 'true'
+      MANIFEST_ADDENDA_ENABLED: 'true'
+      VITE_MANIFEST_ADDENDA_ENABLED: 'true'
+      MANIFEST_PARTY_REVIEW_ENABLED: 'true'
+      ACTOR_MULTIROLE_ENABLED: 'true'
+      VITE_ACTOR_MULTIROLE_ENABLED: 'true'
+      ENTERPRISE_ENABLED: 'true'
+      VITE_ENTERPRISE_ENABLED: 'true'
+      QA_ARTIFACTS: /tmp/sitrep-manifest-v2
+      UPLOADS_DIR: /tmp/sitrep-manifest-v2/uploads
+      QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
+      QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Guard isolation before installs and writes
+        run: |
+          test ! -f backend/.env
+          test ! -f frontend/.env
+          node --experimental-strip-types --input-type=module -e "import { assertCloudEnvironment } from './frontend/cloud-qa/safety.ts'; assertCloudEnvironment();"
+          node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/apk-signature.test.ts
+          node --experimental-strip-types --test frontend/cloud-qa/native-window.test.ts
+          mkdir -p "$QA_ARTIFACTS"
+      - name: Locked dependencies only on ephemeral VM
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+          cd backend
+          npx --no-install prisma generate
+      - name: Build exact candidate, never deploy
+        run: |
+          npm run build --prefix backend
+          cd frontend
+          NODE_ENV=production npm run build
+          NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+      - name: Backend unit suite, database disconnected
+        env:
+          ACTOR_MULTIROLE_ENABLED: 'false'
+          MANIFEST_PARTY_REVIEW_ENABLED: 'false'
+          ENTERPRISE_ENABLED: 'false'
+        # Existing PDF unit tests parse actual PDF bytes, not a renderer mock.
+        # Install the parser on the VM before running the suite.
+        if: success()
+        working-directory: backend
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/backend-unit.json"
+      - name: Cloud browser and isolated PostgreSQL
+        run: |
+          sudo apt-get install -y --no-install-recommends postgresql-16
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+          /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-manifest-pg" --username=qa --auth-local=trust --auth-host=trust
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-manifest-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=20" -w start
+          /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
+      - name: Verify database identity, additive candidate schema and synthetic seed
+        run: |
+          node --experimental-strip-types --input-type=module -e "import { assertCloudDatabase } from './frontend/cloud-qa/safety.ts'; await assertCloudDatabase();"
+          node --experimental-strip-types frontend/cloud-qa/manifest-migration.ts
+          node --experimental-strip-types frontend/cloud-qa/manifest-fixture.ts
+          node --experimental-strip-types frontend/cloud-qa/start.ts
+      - name: Real authenticated HTTP, assignment, history and PDF
+        run: |
+          node --experimental-strip-types frontend/cloud-qa/manifest-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/exceptional-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/addenda-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/party-multirole-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/external-tracking-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/reconciliation-integration.ts
+          node --experimental-strip-types frontend/cloud-qa/enterprise-integration.ts
+          pdftotext "$QA_ARTIFACTS/empresa-north.pdf" "$QA_ARTIFACTS/empresa-north.txt"
+          node --input-type=module -e "import fs from 'node:fs'; import assert from 'node:assert/strict';const t=fs.readFileSync(process.env.QA_ARTIFACTS+'/empresa-north.txt','utf8');for(const v of ['Productiva QA 200','Legal QA 100','Planta Norte'])assert.ok(t.includes(v),v);"
+          mkdir -p "$QA_ARTIFACTS/qa-planner"
+          cp backend/dist/domain/padronEmpresaPlan.js backend/dist/domain/conciliacionExterna.js "$QA_ARTIFACTS/qa-planner/"
+      - name: Web, responsive mobile and app journeys with actual backend
+        working-directory: frontend
+        run: npx --no-install playwright test --config cloud-qa/manifest.playwright.config.ts
+      - name: Frontend unit suite, providers mocked
+        env:
+          VITE_ACTOR_MULTIROLE_ENABLED: 'false'
+          VITE_ENTERPRISE_ENABLED: 'false'
+        working-directory: frontend
+        run: npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+      - name: Build separately identified loopback QA APK, no release key
+        run: |
+          npm install --prefix "$RUNNER_TEMP/sitrep-bubblewrap" --save-exact @bubblewrap/core@1.24.1 --no-audit --no-fund
+          node --experimental-strip-types android-twa/scripts/generate-sitrep-brand.ts --isolated-manifest-qa
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          cd "$RUNNER_TEMP/sitrep-manifest-apk/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=1 assembleDebug
+      - name: Enable cloud VM hardware acceleration
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Installed QA APK on Android 15, synthetic roles only
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: true
+          script: timeout --signal=TERM --kill-after=20s 12m node --experimental-strip-types frontend/cloud-qa/manifest-apk.ts
+      - name: Historical synthetic manifests remain byte-identical
+        if: always()
+        run: |
+          if test -f "$QA_ARTIFACTS/manifest-legacy-before.json"; then node --experimental-strip-types frontend/cloud-qa/manifest-integration.ts --verify-history; fi
+      - name: Stop owned processes
+        if: always()
+        run: |
+          node --experimental-strip-types frontend/cloud-qa/close.ts
+          if test -f "$RUNNER_TEMP/sitrep-manifest-pg/postmaster.pid"; then /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-manifest-pg" -m fast -w stop; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-manifest-v2-${{ github.run_id }}
+          path: /tmp/sitrep-manifest-v2
+          retention-days: 3
+          if-no-files-found: error

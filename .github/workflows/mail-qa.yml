@@ -1,0 +1,632 @@
+name: SITREP Mail Safety QA
+on:
+  push:
+    branches: [codex/sitrep-mail-safety-20261011]
+  workflow_dispatch:
+    inputs:
+      attention_published:
+        description: Final public web/app assets and synthetic read-only UI contracts; no real sessions, records or mail
+        type: boolean
+        default: false
+      landing_review:
+        description: Public landing identity and entry links; compiled web/app, one browser, no backend or credentials
+        type: boolean
+        default: false
+      cap5_review:
+        description: Published CAP 5 rehearsal only; existing tickets, teams 1–4 protected, no deployment or mail
+        type: boolean
+        default: false
+      manual_review:
+        description: Static manual only, no backend or credentials (candidate or published)
+        type: choice
+        options: ['', candidate, published]
+        default: ''
+      branding_review:
+        description: Synthetic OCR manual evidence and unsigned Android branding candidate; cloud only, no release or mail
+        type: boolean
+        default: false
+      training_review:
+        description: Focused repeat of classroom journeys after test-only corrections; prior full suites remain separate evidence
+        type: boolean
+        default: false
+      workshop_review:
+        description: Full units plus classroom, OCR, registration, sessions, maps and QR on isolated cloud data
+        type: boolean
+        default: false
+      training_apk:
+        description: Original APK on Android 15, temporary instructor and isolated school only
+        type: boolean
+        default: false
+      design_review:
+        description: Targeted identity/header regression only; no release package or deployment
+        type: boolean
+        default: false
+      final_go:
+        description: Published authenticated web/app and Android gates; temporary QA only, no deployment
+        type: boolean
+        default: false
+      production_readonly:
+        description: Public final URL checks only, no authentication or production writes
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: sitrep-mail-safety-qa
+  cancel-in-progress: false
+jobs:
+  landing-review:
+    if: ${{ inputs.landing_review || inputs.attention_published }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=2048
+      VITE_API_URL: /api
+      QA_LANDING_PUBLISHED: ${{ inputs.attention_published }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Candidate dependencies, focused units, web and app builds on cloud only
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          if [ "$QA_LANDING_PUBLISHED" != "true" ]; then
+          npm test -- src-v6/__tests__/pages/LandingPage.test.tsx src-v6/__tests__/components/LoadingState.test.tsx src-v6/__tests__/layouts/ src-v6/__tests__/services/attentionCounts.test.ts src-v6/__tests__/components/Toast.test.tsx src-v6/__tests__/utils/notificationNavigation.test.ts src-v6/__tests__/pages/SoportePage.cache.test.tsx --maxWorkers=1
+          npm run build
+          npx --no-install vite build --config vite.config.app.ts
+          fi
+          npx --no-install playwright install --with-deps chromium
+      - name: Four screen widths and app login, no authenticated sessions or writes
+        working-directory: frontend
+        run: npx --no-install playwright test --config cloud-qa/landing.playwright.config.ts
+      - name: Preserve exactly the tested static candidate, excluding manual and user data
+        if: ${{ !inputs.attention_published }}
+        run: |
+          tar czf /tmp/sitrep-landing-qa/candidate.tar.gz -C frontend dist/assets dist/index.html dist/sw.js dist/sitrep-mark-green.svg dist/logo-mendoza.webp dist-app/assets dist-app/app.html dist-app/index.html dist-app/sw-app.js dist-app/sw-precache-manifest.js dist-app/sitrep-mark-green.svg
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-landing-qa-${{ github.run_id }}
+          path: /tmp/sitrep-landing-qa/
+          retention-days: 3
+  cap5-review:
+    if: ${{ inputs.cap5_review }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      NODE_OPTIONS: --max-old-space-size=1024
+      QA_CAP5_AUTHORIZED: 'true'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Deny other teams and operational writes
+        run: node --experimental-strip-types --test frontend/cloud-qa/cap5-policy.test.ts
+      - name: One browser in the cloud; no build, server or database copy
+        run: |
+          npm ci --prefix frontend --no-audit --no-fund
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Published classroom journey with CAP 5 only
+        env:
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        run: node --experimental-strip-types frontend/cloud-qa/cap5-rehearsal.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-cap5-${{ github.run_id }}
+          path: /tmp/sitrep-cap5/
+          retention-days: 3
+  manual-review:
+    if: ${{ inputs.manual_review != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      QA_MANUAL_PUBLISHED: ${{ inputs.manual_review == 'published' }}
+      NODE_OPTIONS: --max-old-space-size=1024
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Static content contracts
+        run: node --experimental-strip-types --test frontend/cloud-qa/manual-content.test.ts frontend/cloud-qa/manual-build.test.ts
+      - name: Single browser on cloud only
+        run: |
+          npm ci --prefix frontend --no-audit --no-fund
+          cd frontend
+          npm test -- src-v6/__tests__/manual/manualDocumentation.test.ts --maxWorkers=1
+          npx --no-install playwright install --with-deps chromium
+          npx --no-install playwright test --config cloud-qa/manual.playwright.config.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-manual-qa-${{ github.run_id }}
+          path: /tmp/sitrep-manual-qa/
+          retention-days: 3
+  isolated-mail:
+    if: ${{ !inputs.attention_published && !inputs.landing_review && !inputs.cap5_review && !inputs.manual_review && !inputs.production_readonly && !inputs.final_go && !inputs.training_apk && !inputs.branding_review }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: qa
+          POSTGRES_PASSWORD: synthetic-mail-qa
+          POSTGRES_DB: sitrep_night_qa_20260926
+        ports:
+          - 55440:5432
+        options: >-
+          --health-cmd "pg_isready -U qa -d sitrep_night_qa_20260926"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      NODE_ENV: test
+      NODE_OPTIONS: --max-old-space-size=1536
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926
+      DISABLE_EMAILS: 'true'
+      EMAIL_DELIVERY_NOT_BEFORE: ''
+      BLOCKCHAIN_ENABLED: 'false'
+      SMTP_HOST: '127.0.0.1'
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      FRONTEND_URL: http://127.0.0.1:4177
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Locked dependencies in cloud only
+        run: npm ci --prefix backend --no-audit --no-fund
+      - name: PDF regression dependency in cloud only
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - name: Generate types, no database connection or server
+        working-directory: backend
+        run: npx --no-install prisma generate
+      - name: All backend units, one worker, providers mocked
+        id: units
+        continue-on-error: true
+        working-directory: backend
+        run: npm test -- --maxWorkers=1 --reporter=json --outputFile=/tmp/sitrep-mail-unit.json
+      - name: Backend type check
+        working-directory: backend
+        run: npx --no-install tsc --noEmit -p tsconfig.build.json
+      - name: Brand vector and raster derivatives remain identical
+        run: |
+          node --experimental-strip-types scripts/qa/brand-assets.ts --check
+          node --experimental-strip-types scripts/qa/mail-brand-assets.ts --check
+      - name: Real queue and SMTP capture, cloud loopback only
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://qa:synthetic-mail-qa@127.0.0.1:55440/sitrep_night_qa_20260926
+        run: |
+          npx --no-install prisma db push --skip-generate
+          npx --no-install tsc -p tsconfig.build.json
+          node --experimental-strip-types qa/mail-migration.integration.ts
+          node --experimental-strip-types qa/mail.integration.ts
+          node --experimental-strip-types qa/mail-previews.ts
+      - name: Require units
+        if: always()
+        run: test '${{ steps.units.outcome }}' = success
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-mail-qa-${{ github.run_id }}
+          path: |
+            /tmp/sitrep-mail-*.json
+            /tmp/sitrep-mail-templates/
+          retention-days: 3
+          if-no-files-found: error
+  authenticated-links:
+    needs: isolated-mail
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      CI: 'true'
+      NODE_ENV: test
+      NODE_OPTIONS: --max-old-space-size=2048
+      NODE_APP_INSTANCE: qa
+      PORT: '3037'
+      ALLOW_SYNTHETIC_QA: '1'
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=8&pool_timeout=10
+      DISABLE_EMAILS: 'true'
+      EMAIL_DELIVERY_NOT_BEFORE: ''
+      EMAIL_NOTIFICATION_FAMILIES: ''
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      VITE_API_URL: /api
+      JWT_SECRET: cloud-qa-only-not-a-production-secret-20261011
+      INSPECTION_TRACE_SECRET: cloud-qa-only-trace-secret-20261011
+      QA_ARTIFACTS: /tmp/sitrep-mail-browser
+      QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
+      QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
+      UPLOADS_DIR: /tmp/sitrep-mail-browser/uploads
+      PGUSER: qa
+      TRAINING_DATABASE_URL: postgresql://sitrep_training_role@127.0.0.1:55440/sitrep_night_qa_20260926?schema=sitrep_training
+      QA_MANUAL_ROOT: ${{ github.workspace }}/frontend/dist/manual
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Verify strict cloud delivery guards
+        run: node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts
+      - name: Install only on cloud VM
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-16 poppler-utils tesseract-ocr tesseract-ocr-spa
+          tesseract --version
+          tesseract --list-langs | grep -x spa
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Compile and run full frontend units without database
+        run: |
+          mkdir -p "$QA_ARTIFACTS"
+          cd backend
+          npx --no-install prisma generate
+          npm run build
+          cd ../frontend
+          if test '${{ inputs.training_review }}' = true; then
+            npm test -- src-v6/__tests__/pages/InspeccionesPage.test.tsx --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          elif test '${{ inputs.design_review }}' = true; then
+            npm test -- src-v6/__tests__/components/InspectionBrand.test.tsx src-v6/__tests__/pages/ActorIdentity.test.tsx src-v6/__tests__/pages/VerificarEmail.test.tsx --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          else
+            npm test -- --maxWorkers=1 --reporter=json --outputFile="$QA_ARTIFACTS/frontend-unit.json"
+          fi
+          NODE_ENV=production npm run build
+          NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+          node --experimental-strip-types cloud-qa/brand-fixture.ts
+      - name: Freeze release bytes before real HTTP and E2E
+        if: ${{ !inputs.design_review }}
+        run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts freeze
+      - name: Synthetic PostgreSQL on VM loopback
+        run: |
+          /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-mail-pg" --username=qa --auth-local=trust --auth-host=trust
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-mail-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=20" -w start
+          /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
+          cd backend
+          npx --no-install prisma db push --skip-generate
+          cd ..
+          node --experimental-strip-types frontend/cloud-qa/prepare.ts
+          node --experimental-strip-types frontend/cloud-qa/mail-fixture.ts
+          node --experimental-strip-types frontend/cloud-qa/training-fixture.ts
+          node --experimental-strip-types frontend/cloud-qa/start.ts
+      - name: Account lifecycle through real HTTP, suppressed outbox only
+        run: node --experimental-strip-types frontend/cloud-qa/account-mail-http.ts
+      - name: Bounded simultaneous classroom identities on VM only
+        if: ${{ inputs.workshop_review }}
+        run: node --experimental-strip-types frontend/cloud-qa/training-concurrency.ts
+      - name: Real login and destinations, desktop and mobile web and app, one browser worker
+        working-directory: frontend
+        run: |
+          if test '${{ inputs.workshop_review }}' = true; then
+            npx --no-install playwright test --config cloud-qa/workshop.playwright.config.ts
+          elif test '${{ inputs.training_review }}' = true; then
+            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'training|school'
+          elif test '${{ inputs.design_review }}' = true; then
+            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts --grep 'brand|all templates|verification|verifying|clean browser'
+          else
+            npx --no-install playwright test --config cloud-qa/mail.playwright.config.ts
+          fi
+      - name: Verify training separation after real browser journeys
+        if: ${{ !inputs.design_review }}
+        run: node --experimental-strip-types frontend/cloud-qa/training-after.ts
+      - name: Package the exact tested bytes, full suites only
+        if: ${{ !inputs.design_review && !inputs.training_review }}
+        run: node --experimental-strip-types frontend/cloud-qa/mail-package.ts package
+      - name: Stop only this QA runtime
+        if: always()
+        run: |
+          if test -d "$QA_ARTIFACTS"; then node --experimental-strip-types frontend/cloud-qa/close.ts; fi
+          if test -f "$RUNNER_TEMP/sitrep-mail-pg/postmaster.pid"; then /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-mail-pg" -m fast -w stop; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-mail-browser-${{ github.run_id }}
+          path: /tmp/sitrep-mail-browser/
+          retention-days: 3
+          if-no-files-found: warn
+  production-readonly:
+    if: ${{ inputs.production_readonly && !inputs.final_go }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      NODE_OPTIONS: --max-old-space-size=1536
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Single browser on cloud VM only
+        run: |
+          npm ci --prefix frontend --no-audit --no-fund
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Read-only final web and app URL checks
+        run: node --experimental-strip-types scripts/qa/mail-production-readonly.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-mail-production-${{ github.run_id }}
+          path: /tmp/sitrep-mail-production/
+          retention-days: 3
+  stage-final-apk:
+    if: ${{ inputs.final_go || inputs.training_apk }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env: &final_qa_env
+      CI: 'true'
+      NODE_ENV: test
+      NODE_APP_INSTANCE: qa
+      ALLOW_SYNTHETIC_QA: '1'
+      DATABASE_URL: postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=public&connection_limit=3
+      PORT: '3037'
+      DISABLE_EMAILS: 'true'
+      BLOCKCHAIN_ENABLED: 'false'
+      ENABLE_ANALYTICS: 'false'
+      SMTP_HOST: ''
+      SMTP_USER: ''
+      SMTP_PASS: ''
+      VAPID_PUBLIC_KEY: ''
+      VAPID_PRIVATE_KEY: ''
+      BLOCKCHAIN_RPC_URL: ''
+      BLOCKCHAIN_CONTRACT_ADDRESS: ''
+      FRONTEND_URL: http://127.0.0.1:4177
+      CORS_ORIGIN: http://127.0.0.1:4177
+      VITE_API_URL: /api
+      QA_ARTIFACTS: /tmp/sitrep-final-go
+      NODE_OPTIONS: --max-old-space-size=2048
+      JWT_SECRET: cloud-only-final-go-not-production-20261011
+      INSPECTION_TRACE_SECRET: cloud-only-final-trace-20261011
+      QA_WEB_BUILD: ${{ github.workspace }}/frontend/dist
+      QA_APP_BUILD: ${{ github.workspace }}/frontend/dist-app
+      UPLOADS_DIR: /tmp/sitrep-final-go/uploads
+      PGUSER: qa
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Original fixed APK, no production credential in transfer job
+        env:
+          QA_GITHUB_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types frontend/cloud-qa/apk-download.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sitrep-final-original-apk-${{ github.run_id }}
+          path: ${{ runner.temp }}/sitrep-original-candidate.apk
+          retention-days: 1
+          if-no-files-found: error
+  final-go:
+    if: ${{ inputs.final_go }}
+    needs: stage-final-apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env: *final_qa_env
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Require published product unchanged and safety policies
+        run: |
+          test -z "$(git diff --name-only dc7e521cf5beff87e7973e88e2ae9862919eb5f5 HEAD -- backend frontend/src frontend/src-v6 frontend/public frontend/package.json frontend/package-lock.json frontend/vite.config.ts frontend/vite.config.app.ts)"
+          node --experimental-strip-types --test frontend/cloud-qa/safety.test.ts frontend/cloud-qa/apk-auth-policy.test.ts
+          mkdir -p "$QA_ARTIFACTS"
+      - name: Dependencies and builds on cloud only
+        run: |
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-16 poppler-utils tesseract-ocr tesseract-ocr-spa
+          cd backend
+          npx --no-install prisma generate
+          npm run build
+          cd ../frontend
+          NODE_ENV=production npm run build
+          NODE_ENV=production npx --no-install vite build --config vite.config.app.ts
+          npx --no-install playwright install --with-deps chromium
+      - name: Freeze exact build evidence required by Android icon integrity checks
+        run: node --experimental-strip-types frontend/cloud-qa/build-artifact.ts freeze
+      - name: Synthetic QA only, no copied production database
+        run: |
+          /usr/lib/postgresql/16/bin/initdb -D "$RUNNER_TEMP/sitrep-final-pg" --username=qa --auth-local=trust --auth-host=trust
+          /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-final-pg" -l "$QA_ARTIFACTS/postgres.log" -o "-h 127.0.0.1 -p 55440 -k $RUNNER_TEMP -c shared_buffers=32MB -c max_connections=20" -w start
+          /usr/lib/postgresql/16/bin/createdb -h 127.0.0.1 -p 55440 -U qa sitrep_night_qa_20260926
+          cd backend
+          npx --no-install prisma db push --skip-generate
+          cd ..
+          node --experimental-strip-types frontend/cloud-qa/prepare.ts
+          node --experimental-strip-types frontend/cloud-qa/start.ts
+      - name: Published web and app authentication, one temporary account
+        id: production-session
+        continue-on-error: true
+        env:
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        run: node --experimental-strip-types frontend/cloud-qa/production-session.ts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: sitrep-final-original-apk-${{ github.run_id }}
+          path: ${{ runner.temp }}/sitrep-apk-transfer
+      - name: Enable hardware acceleration only in the disposable cloud VM
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Android 15 synthetic journeys and unchanged original APK production session
+        env:
+          QA_APK_AUTHENTICATED: 'true'
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: true
+          script: node --experimental-strip-types frontend/cloud-qa/android-run.ts
+      - name: Require final URL authentication
+        if: always()
+        run: test '${{ steps.production-session.outcome }}' = success
+      - name: Stop owned QA processes and database
+        if: always()
+        run: |
+          if test -f "$QA_ARTIFACTS/processes.json"; then node --experimental-strip-types frontend/cloud-qa/close.ts; fi
+          if test -f "$RUNNER_TEMP/sitrep-final-pg/postmaster.pid"; then /usr/lib/postgresql/16/bin/pg_ctl -D "$RUNNER_TEMP/sitrep-final-pg" -m fast -w stop; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-final-go-${{ github.run_id }}
+          path: /tmp/sitrep-final-go/
+          retention-days: 3
+          if-no-files-found: warn
+  training-apk:
+    if: ${{ inputs.training_apk }}
+    needs: stage-final-apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env: *final_qa_env
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Guard policy and frontend dependencies, cloud only
+        run: |
+          node --experimental-strip-types --test frontend/cloud-qa/apk-training-policy.test.ts
+          npm ci --prefix frontend --no-audit --no-fund
+          mkdir -p "$QA_ARTIFACTS"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: sitrep-final-original-apk-${{ github.run_id }}
+          path: ${{ runner.temp }}/sitrep-apk-transfer
+      - name: Hardware acceleration on disposable cloud VM only
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Signed production APK, no operational business writes
+        env:
+          QA_APK_TRAINING: 'true'
+          QA_APK_AUTHENTICATED: 'true'
+          QA_APK_CREDENTIALS: ${{ secrets.SITREP_APK_TEMP_QA }}
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: true
+          script: timeout --signal=TERM --kill-after=20s 8m node --experimental-strip-types frontend/cloud-qa/apk.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-training-apk-${{ github.run_id }}
+          path: /tmp/sitrep-final-go/apk/
+          retention-days: 3
+          if-no-files-found: warn
+  branding-review:
+    if: ${{ inputs.branding_review }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env: *final_qa_env
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Dependencies in disposable VM only
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ffmpeg
+          ffmpeg -version | head -1
+          npm ci --prefix backend --no-audit --no-fund
+          npm ci --prefix frontend --no-audit --no-fund
+          npm install --prefix "$RUNNER_TEMP/sitrep-bubblewrap" --save-exact @bubblewrap/core@1.24.1 --no-audit --no-fund
+          cd frontend
+          npx --no-install playwright install --with-deps chromium
+      - name: Manual OCR through real public trial, no persistent upload
+        run: node --experimental-strip-types frontend/cloud-qa/manual-ocr-capture.ts
+      - name: Generate Android resources from approved brand
+        timeout-minutes: 2
+        run: |
+          node --experimental-strip-types scripts/qa/brand-assets.ts --check
+          node --experimental-strip-types android-twa/scripts/generate-sitrep-brand.ts
+      - name: Build unsigned release and isolated VM debug candidate
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          cd "$RUNNER_TEMP/sitrep-brand-review/android"
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=1 assembleDebug assembleRelease
+          tar czf "$RUNNER_TEMP/sitrep-brand-review/android-source.tar.gz" app/src app/build.gradle build.gradle settings.gradle gradle.properties gradle gradlew twa-manifest.json
+      - name: Acceleration only in cloud
+        run: |
+          test -e /dev/kvm
+          sudo chmod 666 /dev/kvm
+      - name: Observe new splash and real login, never override domain trust
+        uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 35
+          target: google_apis_playstore
+          arch: x86_64
+          profile: pixel_7
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2 -dns-server 8.8.8.8,8.8.4.4
+          disable-animations: false
+          script: node --experimental-strip-types --test frontend/cloud-qa/apk-relaunch.test.ts && timeout --signal=TERM --kill-after=20s 4m node --experimental-strip-types frontend/cloud-qa/apk-brand-review.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sitrep-brand-review-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/sitrep-brand-review/ocr/
+            ${{ runner.temp }}/sitrep-brand-review/native/
+            ${{ runner.temp }}/sitrep-brand-review/candidate.json
+            ${{ runner.temp }}/sitrep-brand-review/android-source.tar.gz
+            ${{ runner.temp }}/sitrep-brand-review/android/app/build/outputs/apk/release/*unsigned.apk
+            ${{ runner.temp }}/sitrep-brand-review/android/app/src/main/res/drawable-xxhdpi/splash.png
+          retention-days: 3
+          if-no-files-found: error

@@ -13,7 +13,8 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import {
   ArrowLeft, Truck, MapPin, Clock, Package,
   CheckCircle2, AlertTriangle, Radio, Map as MapIcon, List,
@@ -34,7 +35,8 @@ import {
   useRegistrarIncidente,
 } from '../../hooks/useManifiestos';
 import { EstadoManifiesto, type EventoManifiesto, type Manifiesto, type ManifiestoResiduo } from '../../types/models';
-import { formatDateTime, formatWeight } from '../../utils/formatters';
+import { formatDateTime } from '../../utils/formatters';
+import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
 import { useAuth } from '../../contexts/AuthContext';
@@ -60,6 +62,7 @@ function RecenterMap({ position, onUserInteract, followUser }: {
 const ViajeEnCursoTransportista: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const { currentUser } = useAuth();
   // Map recenter control
   const [followUser, setFollowUser] = useState(true);
@@ -78,6 +81,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
     } catch { return null; }
   }, [id]);
   const m: Partial<Manifiesto> = apiData || cachedSnapshot || {};
+  const assignment = m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId
+    ? m.asignacionTransporte : null;
 
   // Persist active trip snapshot to localStorage for recovery after app restart
   useEffect(() => {
@@ -89,6 +94,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
         generador: m.generador ? { razonSocial: m.generador.razonSocial, domicilio: m.generador.domicilio } : undefined,
         operador: m.operador ? { razonSocial: m.operador.razonSocial, domicilio: m.operador.domicilio } : undefined,
         transportista: m.transportista ? { razonSocial: m.transportista.razonSocial } : undefined,
+        transportistaId: m.transportistaId,
+        asignacionTransporte: m.asignacionTransporte,
         residuos: m.residuos,
         eventos: m.eventos,
         fechaRetiro: m.fechaRetiro,
@@ -97,7 +104,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
       localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
       localStorage.setItem('sitrep_active_trip_id', id);
     }
-  }, [id, m.id, m.numero, m.estado, m.generador, m.operador, m.transportista, m.residuos, m.eventos, m.fechaRetiro]);
+  }, [id, m.id, m.numero, m.estado, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -361,7 +368,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
     );
   }
 
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum: number, residue: ManifiestoResiduo) => sum + (residue.cantidad || 0), 0) : 0;
+  const cantidadesDeclaradas = declaredQuantities(m.residuos || [])
+    .map(({ unidad, cantidad }) => `${formatDeclaredQuantity(cantidad)} ${unidad}`).join(' · ') || 'Sin cantidades informadas';
   const eventos: EventoManifiesto[] = Array.isArray(m.eventos) ? m.eventos : [];
 
   return (
@@ -391,6 +399,11 @@ const ViajeEnCursoTransportista: React.FC = () => {
       </header>
 
       <div className="p-4 space-y-4">
+        {import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED === 'true' && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
+        {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
+          <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
+          <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>
+        </dl>}
         {/* APROBADO state: Show confirm pickup */}
         {m.estado === EstadoManifiesto.APROBADO && (
           <>
@@ -403,7 +416,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 <p className="text-neutral-600 mb-1">Generador: <span className="font-semibold">{m.generador?.razonSocial || '-'}</span></p>
                 <p className="text-sm text-neutral-500">{m.generador?.domicilio || '-'}</p>
                 <div className="mt-4 p-3 bg-neutral-50 rounded-lg">
-                  <p className="text-sm text-neutral-600">Residuos: <span className="font-semibold">{m.residuos?.length || 0} items</span> — {formatWeight(totalPeso)}</p>
+                  <p className="text-sm text-neutral-600">Residuos: <span className="font-semibold">{m.residuos?.length || 0} items</span> — {cantidadesDeclaradas}</p>
                 </div>
               </CardContent>
             </Card>
@@ -446,8 +459,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
                     <p className="text-sm font-bold text-white drop-shadow-sm">{m.operador?.razonSocial || '-'}</p>
                   </div>
                   <div className="text-center border-l border-white/30">
-                    <p className="text-xs text-white/90 mb-1 font-medium tracking-wide">PESO TOTAL</p>
-                    <p className="text-lg font-bold text-white drop-shadow-sm">{formatWeight(totalPeso)}</p>
+                    <p className="text-xs text-white/90 mb-1 font-medium tracking-wide">CANTIDADES DECLARADAS</p>
+                    <p className="text-lg font-bold text-white drop-shadow-sm">{cantidadesDeclaradas}</p>
                   </div>
                 </div>
               </CardContent>

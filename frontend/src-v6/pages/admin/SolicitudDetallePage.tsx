@@ -7,9 +7,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FileText, CheckCircle, XCircle, AlertTriangle, Eye,
-  Send, Download, Loader2, MessageSquare, User, File, Clock,
+  Send, Download, MessageSquare, User, File, Clock,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
+import { FormSkeleton } from '../../components/ui/LoadingState';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal } from '../../components/ui/Modal';
@@ -25,6 +26,14 @@ import {
   useRevisarDocumento,
 } from '../../hooks/useSolicitudes';
 import type { EstadoSolicitud, DocumentoSolicitud, MensajeSolicitud } from '../../types/api';
+import { solicitudService } from '../../services/solicitud.service';
+import { DocumentAnalysis } from '../../components/DocumentAnalysis';
+import { AdministrativeTEF } from '../../components/AdministrativeTEF';
+import { useAuth } from '../../contexts/AuthContext';
+import { getApiErrorMessage } from '../../utils/api-error';
+import { RegistrationFleetSummary } from '../../components/registration/RegistrationFleetSummary';
+import { RegistrationReviewEditor } from '../../components/registration/RegistrationReviewEditor';
+import { EMPTY_DRIVER, fleetRows, licenseDocumentType } from '../../services/registrationFleet';
 
 // ── Status config ──
 
@@ -79,6 +88,7 @@ function fieldLabel(key: string): string {
 const SolicitudDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [messageText, setMessageText] = useState('');
@@ -87,8 +97,11 @@ const SolicitudDetallePage: React.FC = () => {
   const [rechazarModal, setRechazarModal] = useState(false);
   const [rechazarText, setRechazarText] = useState('');
   const [confirmarAprobar, setConfirmarAprobar] = useState(false);
+  const [readingReceipt, setReadingReceipt] = useState(false);
+  const [editingData, setEditingData] = useState(false);
+  const readingInFlight = useRef(false);
 
-  const { data: solicitud, isLoading } = useSolicitud(id || '');
+  const { data: solicitud, isLoading, refetch } = useSolicitud(id || '');
   const { data: mensajes } = useMensajesSolicitud(id || '');
 
   const enviarMensaje = useEnviarMensaje();
@@ -104,21 +117,32 @@ const SolicitudDetallePage: React.FC = () => {
 
   // Auto-mark as EN_REVISION when admin opens an ENVIADA solicitud
   useEffect(() => {
-    if (solicitud?.estado === 'ENVIADA' && id) {
+    if (solicitud?.estado === 'ENVIADA' && id && currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)) {
       revisarSolicitud.mutate(id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [solicitud?.estado, id]);
+  }, [solicitud?.estado, solicitud?.tipoActor, currentUser?.rol, id]);
 
   // ── Handlers ──
+  const handleRetryReading = async (docId: string) => {
+    if (!id || !solicitud || !currentUser || !['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol) || readingInFlight.current) return;
+    readingInFlight.current = true; setReadingReceipt(true);
+    try { await solicitudService.analizarDocumento(id, docId); await refetch(); }
+    catch (error) { toast.error('Lectura del comprobante', getApiErrorMessage(error, 'No se pudo reintentar. El original sigue guardado.')); }
+    finally { readingInFlight.current = false; setReadingReceipt(false); }
+  };
 
+  const sendingMessage = useRef(false);
   const handleSendMessage = async () => {
-    if (!id || !messageText.trim()) return;
+    if (!id || !messageText.trim() || sendingMessage.current) return;
+    sendingMessage.current = true;
     try {
       await enviarMensaje.mutateAsync({ solicitudId: id, contenido: messageText.trim() });
       setMessageText('');
     } catch {
       toast.error('Error', 'No se pudo enviar el mensaje');
+    } finally {
+      sendingMessage.current = false;
     }
   };
 
@@ -169,18 +193,28 @@ const SolicitudDetallePage: React.FC = () => {
 
   // ── Loading ──
 
-  if (isLoading || !solicitud) {
+  if (isLoading && !solicitud) {
+    return <FormSkeleton label="Cargando solicitud…" fields={8} />;
+  }
+
+  if (!solicitud) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-primary-500" />
-      </div>
+      <Card><div role="alert" className="space-y-3">
+        <p>No se pudo cargar la solicitud.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
+          <Button variant="ghost" onClick={() => navigate('/admin/solicitudes')}>Volver a solicitudes</Button>
+        </div>
+      </div></Card>
     );
   }
 
   const eCfg = ESTADO_CONFIG[solicitud.estado] || ESTADO_CONFIG.ENVIADA;
   const datosActor = parseDatosActor(solicitud.datosActor || '{}');
+  const declaredDrivers = fleetRows(datosActor.choferesJson, EMPTY_DRIVER);
   const documentos = solicitud.documentos || [];
-  const canAct = solicitud.estado === 'EN_REVISION' || solicitud.estado === 'OBSERVADA';
+  const canAct = !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)
+    && (solicitud.estado === 'EN_REVISION' || solicitud.estado === 'OBSERVADA');
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -214,19 +248,25 @@ const SolicitudDetallePage: React.FC = () => {
         </div>
       </div>
 
+      <AdministrativeTEF actorType={solicitud.tipoActor} identity={solicitud.id}
+        declaration={datosActor}
+        corrientesY={(datosActor.corrientesControl || datosActor.corrientesY || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
+        tieneISO={!!datosActor.certificacionISO} />
+
       {/* 3-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Column 1: Datos del Actor */}
         <Card padding="none">
-          <div className="px-5 py-4 border-b border-neutral-200 flex items-center gap-2">
+          <div className="px-5 py-4 border-b border-neutral-200 flex flex-wrap items-center gap-2">
             <User size={16} className="text-neutral-500" />
             <h3 className="font-semibold text-neutral-800">Datos del Actor</h3>
+            {canAct && solicitud.estado === 'EN_REVISION' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => setEditingData(true)}>Corregir datos</Button>}
           </div>
           <div className="p-5 space-y-3">
             {Object.keys(datosActor).length === 0 ? (
               <p className="text-sm text-neutral-400">Sin datos cargados</p>
             ) : (
-              Object.entries(datosActor).map(([key, value]) => (
+              Object.entries(datosActor).filter(([key]) => !['choferesJson', 'vehiculosJson'].includes(key)).map(([key, value]) => (
                 <div key={key}>
                   <p className="text-xs text-neutral-500 mb-0.5">{fieldLabel(key)}</p>
                   <p className="text-sm font-medium text-neutral-800 break-words">{value || '-'}</p>
@@ -234,6 +274,7 @@ const SolicitudDetallePage: React.FC = () => {
               ))
             )}
 
+            <RegistrationFleetSummary form={datosActor} />
             {/* Extra JSON sections */}
             {solicitud.datosResiduos && (
               <div className="pt-3 border-t border-neutral-100">
@@ -280,9 +321,13 @@ const SolicitudDetallePage: React.FC = () => {
                         <p className="text-sm font-medium text-neutral-800 truncate" title={doc.nombre}>
                           {doc.nombre}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-neutral-400">{doc.tipo}</span>
-                          <span className="text-[10px] text-neutral-400">{formatFileSize(doc.size)}</span>
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-600">
+                          <span className="min-w-0 break-words">{doc.tipo.startsWith('LICENCIA_CHOFER_') ? (() => {
+                            const index = declaredDrivers.findIndex(driver => licenseDocumentType(driver.key) === doc.tipo);
+                            const driver = declaredDrivers[index];
+                            return driver ? `Licencia · Chofer ${index + 1} · ${driver.nombre} ${driver.apellido}` : 'Licencia de chofer · declaración original';
+                          })() : doc.tipo.replaceAll('_', ' ')}</span>
+                          <span className="shrink-0">{formatFileSize(doc.size)}</span>
                         </div>
                       </div>
                       <Badge variant="soft" color={dCfg.color} size="sm">{dCfg.label}</Badge>
@@ -293,22 +338,24 @@ const SolicitudDetallePage: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
+                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : 'document'} retrying={readingReceipt} onRetry={canAct && (doc.tipo === 'COMPROBANTE_PAGO' || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
 
                     <div className="flex items-center gap-1.5">
-                      <a
-                        href={doc.path}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500"
+                      <button
+                        type="button"
+                        aria-label={`Descargar ${doc.nombre}`}
+                        onClick={() => { if (id) void solicitudService.downloadDocumento(id, doc).catch(() => toast.error('Error', 'No se pudo descargar el documento')); }}
+                        className="flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-700 focus-visible:ring-2 focus-visible:ring-primary-700"
                         title="Descargar"
                       >
                         <Download size={13} />
-                      </a>
+                      </button>
                       {doc.estado === 'PENDIENTE' && canAct && (
                         <>
                           <button
                             onClick={() => handleDocReview(doc.id, 'APROBADO')}
-                            className="p-1.5 rounded-lg hover:bg-green-50"
+                            aria-label={`Aprobar documento ${doc.nombre}`}
+                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-green-800 hover:bg-green-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Aprobar documento"
                             disabled={revisarDocumento.isPending}
                           >
@@ -316,7 +363,8 @@ const SolicitudDetallePage: React.FC = () => {
                           </button>
                           <button
                             onClick={() => handleDocReview(doc.id, 'RECHAZADO')}
-                            className="p-1.5 rounded-lg hover:bg-red-50"
+                            aria-label={`Rechazar documento ${doc.nombre}`}
+                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-red-800 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Rechazar documento"
                             disabled={revisarDocumento.isPending}
                           >
@@ -400,6 +448,7 @@ const SolicitudDetallePage: React.FC = () => {
       </div>
 
       {/* Action Bar */}
+      {editingData && canAct && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor key={solicitud.id} application={solicitud} onClose={() => setEditingData(false)} onSaved={async () => { const current = await refetch(); if (current.isError) throw current.error; }} />}
       {canAct && (
         <Card className="!bg-neutral-50 flex items-center justify-end gap-3 flex-wrap">
           <Button
@@ -454,14 +503,15 @@ const SolicitudDetallePage: React.FC = () => {
 
       {/* Observar Modal */}
       {observarModal && (
-        <Modal isOpen onClose={() => { setObservarModal(false); setObservarText(''); }} title="Observar Solicitud" size="sm">
+        <Modal isOpen onClose={() => setObservarModal(false)} isBusy={observarSolicitud.isPending} title="Observar Solicitud" size="sm">
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
               La solicitud volvera al candidato con tus observaciones para que corrija y re-envie.
             </p>
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones *</label>
+              <label htmlFor="solicitud-observaciones" className="block text-sm font-medium text-neutral-700 mb-1">Observaciones *</label>
               <textarea
+                id="solicitud-observaciones"
                 value={observarText}
                 onChange={e => setObservarText(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"
@@ -489,14 +539,15 @@ const SolicitudDetallePage: React.FC = () => {
 
       {/* Rechazar Modal */}
       {rechazarModal && (
-        <Modal isOpen onClose={() => { setRechazarModal(false); setRechazarText(''); }} title="Rechazar Solicitud" size="sm">
+        <Modal isOpen onClose={() => setRechazarModal(false)} isBusy={rechazarSolicitud.isPending} title="Rechazar Solicitud" size="sm">
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
               Rechazar la solicitud de <strong>{solicitud.usuario?.nombre}</strong>. Esta accion es definitiva.
             </p>
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
+              <label htmlFor="solicitud-motivo-rechazo" className="block text-sm font-medium text-neutral-700 mb-1">Motivo de rechazo *</label>
               <textarea
+                id="solicitud-motivo-rechazo"
                 value={rechazarText}
                 onChange={e => setRechazarText(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:outline-none text-sm"

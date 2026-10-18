@@ -36,9 +36,6 @@ function applyClientFilters(items: Manifiesto[], filters?: ManifiestoFilters): M
       m.generador?.razonSocial?.toLowerCase().includes(q)
     );
   }
-  if (filters.limit) {
-    result = result.slice(0, filters.limit);
-  }
   return result;
 }
 
@@ -51,16 +48,29 @@ export function useManifiestos(filters?: ManifiestoFilters, options?: { enabled?
   return useQuery({
     queryKey: KEYS.list(filters, userScope),
     enabled: options?.enabled ?? true,
-    staleTime: 60_000, // 1 min — avoids refetch on every focus/mount
+    // New filters must run the offline cache reader instead of remaining paused.
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
+    // A local snapshot is never a fresh server response after returning online.
+    staleTime: query => query.state.data && 'offline' in query.state.data && query.state.data.offline ? 0 : 60_000,
     queryFn: async () => {
+      const readOffline = async () => {
+        const cached = currentUser?.id ? await getCachedManifiestos(currentUser.id) : [];
+        // Reconnection may happen while IndexedDB is pending. The reconnect
+        // refetch shares this in-flight query, so finish with live data instead.
+        if (navigator.onLine) return manifiestoService.list(filters);
+        const filtered = applyClientFilters(cached, filters);
+        const limit = Math.min(500, Math.max(1, Math.trunc(filters?.limit || 10)));
+        const page = Math.max(1, Math.trunc(filters?.page || 1));
+        return { items: filtered.slice((page - 1) * limit, page * limit), total: filtered.length, page, limit, totalPages: Math.ceil(filtered.length / limit), offline: true as const };
+      };
+      if (!navigator.onLine) return readOffline();
       try {
         return await manifiestoService.list(filters);
       } catch (err) {
         // Offline fallback: read from IndexedDB
         if (!navigator.onLine && currentUser?.id) {
-          const cached = await getCachedManifiestos(currentUser.id);
-          const filtered = applyClientFilters(cached, filters);
-          return { items: filtered, total: filtered.length, page: 1, limit: filtered.length || 10, totalPages: 1 };
+          return readOffline();
         }
         throw err;
       }
@@ -72,16 +82,23 @@ export function useManifiesto(id: string) {
   const { currentUser } = useAuth();
   return useQuery({
     queryKey: KEYS.detail(id),
-    queryFn: async () => {
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
+    retry: (count, error) => navigator.onLine && error.message !== 'No hay una copia descargada de este manifiesto.' && count < 3,
+    queryFn: async (): Promise<Manifiesto & { offline?: true }> => {
+      const readOffline = async () => {
+        const cached = currentUser?.id ? await getCachedManifiestos(currentUser.id) : [];
+        if (navigator.onLine) return manifiestoService.getById(id);
+        const found = cached.find(m => m.id === id);
+        if (found) return { ...found, offline: true as const };
+        throw new Error('No hay una copia descargada de este manifiesto.');
+      };
+      if (!navigator.onLine) return readOffline();
       try {
         return await manifiestoService.getById(id);
       } catch (err) {
         // Offline fallback: find in cached list
-        if (!navigator.onLine && currentUser?.id) {
-          const cached = await getCachedManifiestos(currentUser.id);
-          const found = cached.find(m => m.id === id);
-          if (found) return found;
-        }
+        if (!navigator.onLine) return readOffline();
         throw err;
       }
     },

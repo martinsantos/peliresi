@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { InspectionDocumentsPanel } from '../../pages/inspecciones/InspectionDocumentsPanel';
 
 describe('InspectionDocumentsPanel', () => {
-  it('explains and edits the two complementary outputs independently', () => {
+  it('edits field and technical data independently without a duplicate document introduction', () => {
     const onActDataChange = vi.fn();
     const onReportChange = vi.fn();
     render(<InspectionDocumentsPanel
+      actorType="GENERADOR"
       actData={{}}
       report={{}}
       actEditable
@@ -15,18 +16,21 @@ describe('InspectionDocumentsPanel', () => {
       onReportChange={onReportChange}
     />);
 
-    expect(screen.getByText(/se remiten juntos a legales/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Atendido por'), { target: { value: 'Responsable de planta' } });
+    expect(screen.getByLabelText('Residuos generados y almacenamiento observado')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Personas y lugar'));
+    fireEvent.click(screen.getByText('Constancias de la visita'));
+    fireEvent.click(screen.getByText('Documentación y comunicación'));
+    fireEvent.change(screen.getByLabelText('Persona que atendió'), { target: { value: 'Responsable de planta' } });
     fireEvent.change(screen.getByLabelText('Plazo de descargo (días hábiles)'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('Daños a personas o bienes'), { target: { value: 'NO_OBSERVADOS' } });
     fireEvent.change(screen.getByLabelText('Libro de Registro de Operaciones'), { target: { value: 'EXHIBIDO' } });
     fireEvent.change(screen.getByLabelText('Constancia del libro'), { target: { value: 'Libro RP-2026 verificado.' } });
     fireEvent.change(screen.getByLabelText('Firma de la persona interviniente'), { target: { value: 'NEGATIVA' } });
     fireEvent.change(screen.getByLabelText('Constancia de firma, negativa o imposibilidad'), { target: { value: 'Negativa asentada en campo.' } });
-    fireEvent.change(screen.getByLabelText('Entrega de copia del acta'), { target: { value: 'ENTREGADA' } });
+    fireEvent.change(screen.getByLabelText('Entrega de copia'), { target: { value: 'ENTREGADA' } });
     fireEvent.change(screen.getByLabelText('Domicilio legal constituido'), { target: { value: 'Calle Legal 123' } });
     fireEvent.change(screen.getByLabelText('Comunicación de lo actuado'), { target: { value: 'COMUNICADA_EN_ACTA' } });
-    fireEvent.change(screen.getByLabelText('3. Evaluación'), { target: { value: 'Evaluación técnica fundada en acta y evidencias.' } });
+    fireEvent.change(screen.getByLabelText('Evaluación'), { target: { value: 'Evaluación técnica fundada en acta y evidencias.' } });
 
     expect(onActDataChange).toHaveBeenCalledWith({ atendidoPor: 'Responsable de planta' });
     expect(onActDataChange).toHaveBeenCalledWith({ plazoDescargoDias: 5 });
@@ -43,6 +47,7 @@ describe('InspectionDocumentsPanel', () => {
 
   it('freezes the field act while allowing the later technical report', () => {
     render(<InspectionDocumentsPanel
+      actorType="GENERADOR"
       actData={{ atendidoPor: 'Persona constatada' }}
       report={{ objetivo: 'Evaluar lo constatado' }}
       actEditable={false}
@@ -51,7 +56,7 @@ describe('InspectionDocumentsPanel', () => {
       onReportChange={vi.fn()}
     />);
 
-    expect(screen.getByLabelText('Atendido por')).toBeDisabled();
-    expect(screen.getByLabelText('1. Objetivo')).not.toBeDisabled();
+    expect(screen.getByLabelText('Persona que atendió')).toBeDisabled();
+    expect(screen.getByLabelText('Objetivo')).not.toBeDisabled();
   });
 });

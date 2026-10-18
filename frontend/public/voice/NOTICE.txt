@@ -1,0 +1,9 @@
+SITREP local Spanish dictation
+
+Model: vosk-model-small-es-0.42 (Alpha Cephei), Apache License 2.0.
+Source: https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip
+Original ZIP SHA256: 09b239888f633ef2f0b4e09736e3d9936acfd810bc65d53fad45261762c6511f
+Repacked tar.gz SHA256: c7d3e3527767db2c1462ab54d6f5bf971cc47012a0de8498ce1b8bd65d01c137
+Model contents are unchanged; only archive format was converted for vosk-browser.
+Browser binding: vosk-browser 0.0.8, https://github.com/ccoreilly/vosk-browser (Apache-2.0).
+See LICENSE-2.0.txt. Audio is processed in memory on the device, not uploaded.

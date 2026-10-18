@@ -152,7 +152,9 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(async () => {
-          const cached = await cache.match(request);
+          // Installation already saves the brand icons in the release cache.
+          // A first offline manifest download must not overlook that precache.
+          const cached = await matchOwnCache(request);
           return (isCacheableAsset(request, cached) && cached) || new Response('', { status: 408, statusText: 'Offline' });
         });
     })
@@ -215,7 +217,13 @@ console.log(`[SW-App] Service Worker ${SW_VERSION} loaded`);
 // ========================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/app/';
+  const requestedPath = event.notification.data?.url || '/';
+  const appPath = requestedPath.startsWith('/app/')
+    ? requestedPath
+    : requestedPath.startsWith('/')
+      ? `/app${requestedPath}`
+      : '/app/';
+  const url = new URL(appPath, self.location.origin).href;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {

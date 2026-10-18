@@ -1,0 +1,132 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { lstat, readFile, readdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { assertCloudEnvironment, root } from './safety.ts';
+import { synchronizeManual } from './manual-build.ts';
+import { assertFullE2EEvidence } from './e2e-evidence.ts';
+
+assertCloudEnvironment();
+const output = process.env.QA_ARTIFACTS!;
+const mode = process.argv[2];
+assert.ok(['freeze', 'package'].includes(mode));
+await synchronizeManual(path.join(root, 'docs/manual'), path.join(root, 'frontend/dist/manual'), mode === 'freeze');
+type Item = { file: string; sha256: string };
+async function inventory(directory: string, prefix: string): Promise<Item[]> {
+  const items: Item[] = [];
+  for (const name of (await readdir(directory)).sort()) {
+    assert.ok(!name.startsWith('._') && name !== '.env', 'No local metadata or environment secrets');
+    const file = path.posix.join(prefix, name);
+    const absolute = path.join(directory, name);
+    const info = await lstat(absolute);
+    assert.equal(info.isSymbolicLink(), false, 'No dependency symlinks in build artifact');
+    if (info.isDirectory()) items.push(...await inventory(absolute, file));
+    else {
+      assert.equal(info.isFile(), true);
+      items.push({ file, sha256: createHash('sha256').update(await readFile(absolute)).digest('hex') });
+    }
+  }
+  return items;
+}
+const files = [...await inventory(path.join(root, 'frontend/dist'), 'dist'),
+  ...await inventory(path.join(root, 'frontend/dist-app'), 'dist-app')];
+// A schema change needs the exact generated client used by the real HTTP/E2E
+// tests. Include only Prisma's runtime/client, not a duplicate dependency tree.
+const prismaFiles = [...await inventory(path.join(root, 'backend/node_modules/.prisma/client'), 'node_modules/.prisma/client'),
+  ...await inventory(path.join(root, 'backend/node_modules/@prisma/client'), 'node_modules/@prisma/client')];
+assert.ok(prismaFiles.some(item => item.file.endsWith('libquery_engine-rhel-openssl-3.0.x.so.node')), 'Production engine must be present');
+const schemaFile = { file: 'prisma/schema.prisma', sha256: createHash('sha256').update(await readFile(path.join(root, 'backend/prisma/schema.prisma'))).digest('hex') };
+const backendFiles = [...await inventory(path.join(root, 'backend/dist'), 'dist'), schemaFile, ...prismaFiles];
+assert.ok(backendFiles.some(item => item.file === 'dist/index.js'));
+assert.ok(files.length > 50 && files.length < 5000);
+assert.ok(files.some(item => item.file === 'dist/index.html'));
+assert.ok(files.some(item => item.file === 'dist-app/app.html'));
+const readJson = async (name: string) => JSON.parse(await readFile(path.join(output, name), 'utf8'));
+if (mode === 'freeze') {
+  await writeFile(path.join(output, 'build-frozen.json'), JSON.stringify({ commit: process.env.GITHUB_SHA, files, backendFiles }, null, 2));
+  console.log('Frozen complete backend/web/app inventories before serving any test');
+} else {
+  const frozen = await readJson('build-frozen.json');
+  assert.equal(frozen.commit, process.env.GITHUB_SHA);
+  assert.deepEqual(files, frozen.files, 'Never package rebuilt or changed bytes after testing');
+  assert.deepEqual(backendFiles, frozen.backendFiles, 'Never package a rebuilt backend after testing');
+  const units = [await readJson('backend-unit.json'), await readJson('frontend-unit.json')];
+  for (const unit of units) {
+    assert.equal(unit.success, true);
+    assert.equal(unit.numFailedTests + unit.numPendingTests, 0);
+    assert.ok(unit.numPassedTests > 0);
+  }
+  const e2e = await readJson('e2e.json');
+  const http = await readJson('http-summary.json');
+  assert.equal(http.passed, 54);
+  assert.equal(http.failed, 0);
+  const expiry = await readJson('expiry-identity.json');
+  assert.equal(expiry.commit, process.env.GITHUB_SHA);
+  assert.equal(expiry.passed, 2); assert.equal(expiry.failed, 0);
+  assert.equal(expiry.compiledSubscriber, true); assert.equal(expiry.externalProvidersDisabled, true);
+  const calendar = await readJson('monitor-calendar.json');
+  assert.equal(calendar.commit, process.env.GITHUB_SHA);
+  assert.equal(calendar.passed, 4); assert.equal(calendar.failed, 0);
+  assert.equal(calendar.compiledApi, true); assert.equal(calendar.realLogin, true);
+  assert.equal(calendar.externalProvidersDisabled, true);
+  const territorial = await readJson('territorial-access.json');
+  assert.equal(territorial.commit, process.env.GITHUB_SHA);
+  assert.equal(territorial.passed, 5); assert.equal(territorial.failed, 0);
+  assert.equal(territorial.compiledApi, true); assert.equal(territorial.realLogin, true);
+  assert.equal(territorial.externalProvidersDisabled, true);
+  const support = await readJson('support-integration.json');
+  assert.equal(support.commit, process.env.GITHUB_SHA);
+  assert.equal(support.passed, 20); assert.equal(support.failed, 0);
+  assert.equal(support.compiledApi, true); assert.equal(support.realLogin, true);
+  assert.equal(support.externalProvidersDisabled, true);
+  const coherence = await readJson('operational-coherence.json');
+  assert.equal(coherence.commit, process.env.GITHUB_SHA);
+  assert.equal(coherence.passed, 6); assert.equal(coherence.failed, 0);
+  assert.equal(coherence.compiledApi, true); assert.equal(coherence.realLogin, true);
+  assert.equal(coherence.externalProvidersDisabled, true);
+  assert.equal(coherence.database, 'sitrep_night_qa_20260926'); assert.equal(coherence.port, 55440);
+  assertFullE2EEvidence(e2e);
+  const receiptMigration = await readJson('receipt-migration.json');
+  assert.equal(receiptMigration.commit, process.env.GITHUB_SHA);
+  assert.equal(receiptMigration.migrationSha256, createHash('sha256').update(await readFile(path.join(root, 'backend/prisma/migrations/20261008220000_document_analysis/migration.sql'))).digest('hex'));
+  assert.equal(receiptMigration.passed, 4); assert.equal(receiptMigration.failed, 0);
+  assert.equal(receiptMigration.exactSql, true); assert.equal(receiptMigration.committed, false);
+  assert.equal(receiptMigration.productionDataWritten, false);
+  assert.equal(receiptMigration.externalProvidersDisabled, true);
+  const android = await readJson('android/result.json');
+  const apk = await readJson('apk/result.json');
+  assert.equal(android.completed,true,'An interrupted Android suite cannot pass the package gate');
+  assert.equal(android.failed + apk.failed, 0);
+  assert.equal(android.passed, 17);
+  assert.equal(apk.passed, 4);
+  const androidSystemPackages = await readJson('android-system-packages.json');
+  assert.equal(androidSystemPackages.stable, true, 'Require fixed Android dependency versions');
+  assert.equal(androidSystemPackages.updater, 'com.android.vending');
+  assert.equal(androidSystemPackages.state, 'disabled-user');
+  assert.deepEqual(androidSystemPackages.after, androidSystemPackages.dependencies);
+  const archive = path.join(output, 'tested-frontend.tar.gz');
+  execFileSync('tar', ['-czf', archive, '-C', path.join(root, 'frontend'), 'dist', 'dist-app'], { timeout: 30000 });
+  await writeFile(path.join(output, 'tested-build.json'), JSON.stringify({
+    commit: process.env.GITHUB_SHA, run: process.env.GITHUB_RUN_ID,
+    archiveSha256: createHash('sha256').update(await readFile(archive)).digest('hex'), files,
+    units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })),
+    e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed }, androidSystemPackages,
+    builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
+  }, null, 2));
+  const backendArchive = path.join(output, 'tested-backend.tar.gz');
+  execFileSync('tar', ['-czf', backendArchive, '-C', path.join(root, 'backend'), 'dist', 'prisma/schema.prisma', 'node_modules/.prisma/client', 'node_modules/@prisma/client'], { timeout: 30000 });
+  const sourceHashes = await Promise.all(['package.json', 'package-lock.json', 'prisma/schema.prisma'].map(async file => ({
+    file, sha256: createHash('sha256').update(await readFile(path.join(root, 'backend', file))).digest('hex'),
+  })));
+  await writeFile(path.join(output, 'tested-backend.json'), JSON.stringify({
+    commit: process.env.GITHUB_SHA, run: process.env.GITHUB_RUN_ID,
+    archiveSha256: createHash('sha256').update(await readFile(backendArchive)).digest('hex'),
+    files: backendFiles, sourceHashes, http: { passed: http.passed, failed: http.failed },
+    units: units.map(unit => ({ passed: unit.numPassedTests, failed: unit.numFailedTests, pending: unit.numPendingTests })),
+    e2e: e2e.stats, android: { passed: android.passed, failed: android.failed }, apk: { passed: apk.passed, failed: apk.failed }, androidSystemPackages,
+    builtInCloud: true, rebuiltAfterTesting: false, productionDataWritten: false,
+    containsDependencies: 'prisma-client-only', containsEnvironment: false, containsUploads: false,
+  }, null, 2));
+  console.log('Exact tested backend/web/app and Prisma client retained after all gates; no other dependencies, uploads or secrets');
+}

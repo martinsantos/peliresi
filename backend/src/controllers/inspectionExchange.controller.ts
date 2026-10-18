@@ -165,6 +165,10 @@ export async function obtenerIntercambiosInspeccion(req: AuthRequest, res: Respo
     });
     if (!inspection) throw new AppError('Inspección no encontrada', 404);
     const party = assertExchangeAccess(req.user, inspection);
+    await prisma.intercambioInspeccion.updateMany({
+      where: { inspeccionId: inspection.id, destinatario: party, vistaPorDestinatarioAt: null },
+      data: { vistaPorDestinatarioAt: new Date() },
+    });
     const exchanges = await prisma.intercambioInspeccion.findMany({
       where: { inspeccionId: inspection.id },
       include: exchangeInclude,
@@ -254,6 +258,7 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
       const secuencia = (previous?.secuencia || 0) + 1;
       const createdAt = new Date();
       const nextState = nextInspectionStateForExchange(locked.estado, party, input.tipo);
+      const destinatario: ParteIntercambioInspeccion = party === 'AUTORIDAD' ? 'INSPECCIONADO' : 'AUTORIDAD';
       const late = party === 'INSPECCIONADO'
         && Boolean(locked.plazoRespuestaAt && createdAt.getTime() > locked.plazoRespuestaAt.getTime());
       const digests = buildInspectionExchangeDigests({
@@ -262,6 +267,7 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
         respondeAId: input.respondeAId || null,
         tipo: input.tipo,
         parte: party,
+        destinatario,
         asunto: input.asunto,
         cuerpo: input.cuerpo,
         plazoRespuestaAt: input.plazoRespuestaAt || null,
@@ -285,6 +291,7 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
           respondeAId: input.respondeAId || null,
           tipo: input.tipo,
           parte: party,
+          destinatario,
           asunto: input.asunto,
           cuerpo: input.cuerpo,
           plazoRespuestaAt: input.plazoRespuestaAt ? new Date(input.plazoRespuestaAt) : null,
@@ -408,6 +415,7 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
         respondeAId: null,
         tipo,
         parte: 'AUTORIDAD',
+        destinatario: 'INSPECCIONADO',
         asunto,
         cuerpo,
         plazoRespuestaAt: null,
@@ -429,6 +437,7 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
           clienteId: input.clienteId || null,
           tipo,
           parte: 'AUTORIDAD',
+          destinatario: 'INSPECCIONADO',
           asunto,
           cuerpo,
           canal: 'PORTAL_SITREP',

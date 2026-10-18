@@ -6,8 +6,10 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useAuth } from '../../contexts/AuthContext';
+import { canReadActorDetail, type ActorReadType } from '../../utils/actorReadAccess';
 import {
   Users,
   Factory,
@@ -15,7 +17,7 @@ import {
   FlaskConical,
   Search,
   Plus,
-  Edit,
+  ExternalLink,
   Eye,
   FileText,
   Phone,
@@ -23,6 +25,8 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
+  Check,
+  Funnel,
   Trash2,
   ArrowLeft,
   Download,
@@ -76,7 +80,19 @@ const INITIAL_FORM = {
 
 export const ActoresPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const mp = useMobilePrefix();
+  const { currentUser, isRestricted } = useAuth();
+  // Mirror the existing API's category mutation roles; inspection is consultation.
+  const canManageActor = (tipo: string) => Boolean(!isRestricted && currentUser
+    && (currentUser.rol === 'ADMIN' || currentUser.rol === `ADMIN_${tipo.toUpperCase()}`));
+  const allowedActorTypes = (Object.keys(tipoConfig) as Array<keyof typeof tipoConfig>).filter(canManageActor);
+  const canOpenFicha = (actor: any) => canReadActorDetail(currentUser, actor.tipo.toUpperCase() as ActorReadType, actor.id);
+  const openFicha = (actor: any) => {
+    if (!canOpenFicha(actor)) return;
+    const category = actor.tipo === 'generador' ? 'generadores' : actor.tipo === 'transportista' ? 'transportistas' : 'operadores';
+    navigate(mp(`/admin/actores/${category}/${encodeURIComponent(actor.id)}`), { state: { actorReturn: location.pathname } });
+  };
   const [activeTab, setActiveTab] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
@@ -158,6 +174,17 @@ export const ActoresPage: React.FC = () => {
   const operadoresCount = operadoresData?.total ?? actoresData.filter(a => a.tipo === 'operador').length;
   const totalCount = generadoresCount + transportistasCount + operadoresCount;
 
+  const summaries = [
+    { label: 'Generadores', tipo: 'generador', count: generadoresCount, route: '/admin/actores/generadores', Icon: Factory,
+      surface: 'bg-purple-50 border-purple-200 hover:border-purple-300 active:bg-purple-100', symbol: 'bg-purple-100 text-purple-600', ink: 'text-purple-900', caption: 'text-purple-700' },
+    { label: 'Transportistas', tipo: 'transportista', count: transportistasCount, route: '/admin/actores/transportistas', Icon: Truck,
+      surface: 'bg-orange-50 border-orange-200 hover:border-orange-300 active:bg-orange-100', symbol: 'bg-orange-100 text-orange-600', ink: 'text-orange-900', caption: 'text-orange-700' },
+    { label: 'Operadores', tipo: 'operador', count: operadoresCount, route: '/admin/actores/operadores', Icon: FlaskConical,
+      surface: 'bg-blue-50 border-blue-200 hover:border-blue-300 active:bg-blue-100', symbol: 'bg-blue-100 text-blue-600', ink: 'text-blue-900', caption: 'text-blue-700' },
+    { label: 'Total', tipo: null, count: totalCount, route: null, Icon: Users,
+      surface: 'bg-neutral-50 border-neutral-200', symbol: 'bg-neutral-100 text-neutral-600', ink: 'text-neutral-900', caption: 'text-neutral-700' },
+  ];
+
   const tabCounts = {
     todos: totalCount,
     generador: generadoresCount,
@@ -221,6 +248,7 @@ export const ActoresPage: React.FC = () => {
   };
 
   const handleCrear = async () => {
+    if (!canManageActor(form.tipo)) return;
     try {
       const base = {
         email: form.email,
@@ -247,7 +275,7 @@ export const ActoresPage: React.FC = () => {
   };
 
   const handleEliminar = async () => {
-    if (!actorEliminar) return;
+    if (!actorEliminar || !canManageActor(actorEliminar.tipo)) return;
     try {
       if (actorEliminar.tipo === 'generador') await deleteGenerador.mutateAsync(actorEliminar.id);
       else if (actorEliminar.tipo === 'transportista') await deleteTransportista.mutateAsync(actorEliminar.id);
@@ -292,7 +320,7 @@ export const ActoresPage: React.FC = () => {
   const columns = [
     {
       key: 'actor',
-      width: '28%',
+      // Keep identity flexible so selection cannot absorb unused percentages.
       header: 'Actor',
       sortable: true,
       render: (row: any) => {
@@ -360,18 +388,18 @@ export const ActoresPage: React.FC = () => {
       align: 'right' as const,
       render: (row: any) => (
         <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => { e.stopPropagation(); verDetalle(row); }}>
+          <Button variant="ghost" size="sm" className="p-2" aria-label={`Vista rápida de ${row.razonSocial}`} onClick={(e: any) => { e.stopPropagation(); verDetalle(row); }}>
             <Eye size={16} />
           </Button>
-          <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => {
+          {canOpenFicha(row) && <Button variant="ghost" size="sm" className="p-2" aria-label={`Abrir ficha de ${row.razonSocial}`} onClick={(e: any) => {
             e.stopPropagation();
-            const base = row.tipo === 'generador' ? '/admin/actores/generadores' : row.tipo === 'transportista' ? '/actores/transportistas' : '/admin/actores/operadores';
-            navigate(`${base}/${row.id}`);
+            openFicha(row);
           }}>
-            <Edit size={16} />
-          </Button>
-          <Button
+            <ExternalLink size={16} />
+          </Button>}
+          {canManageActor(row.tipo) && <Button
             variant="ghost" size="sm" className="p-2 text-error-500 hover:text-error-600"
+            aria-label={`Eliminar ${row.razonSocial}`}
             onClick={(e: any) => {
               e.stopPropagation();
               setActorEliminar({ id: row.id, tipo: row.tipo, razonSocial: row.razonSocial });
@@ -379,7 +407,7 @@ export const ActoresPage: React.FC = () => {
             }}
           >
             <Trash2 size={16} />
-          </Button>
+          </Button>}
         </div>
       ),
     },
@@ -498,70 +526,40 @@ export const ActoresPage: React.FC = () => {
               CSV
             </Button>
             <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
-            <Button leftIcon={<Plus size={18} />} onClick={() => setModalCrear(true)}>
+            {allowedActorTypes.length > 0 && <Button leftIcon={<Plus size={18} />} onClick={() => {
+              setForm({ ...INITIAL_FORM, tipo: allowedActorTypes[0] });
+              setModalCrear(true);
+            }}>
               Nuevo Actor
-            </Button>
+            </Button>}
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card
-            className="bg-purple-50 border-purple-200 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer group"
-            onClick={() => navigate(mp('/admin/actores/generadores'))}
-          >
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg group-hover:scale-110 transition-transform">
-                <Factory size={20} className="text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-purple-700">Generadores</p>
-                <p className="text-2xl font-bold text-purple-900">{generadoresCount}</p>
-              </div>
-              <ChevronRight size={16} className="text-purple-400" />
-            </CardContent>
-          </Card>
-          <Card
-            className="bg-orange-50 border-orange-200 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer group"
-            onClick={() => navigate(mp('/admin/actores/transportistas'))}
-          >
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg group-hover:scale-110 transition-transform">
-                <Truck size={20} className="text-orange-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-orange-700">Transportistas</p>
-                <p className="text-2xl font-bold text-orange-900">{transportistasCount}</p>
-              </div>
-              <ChevronRight size={16} className="text-orange-400" />
-            </CardContent>
-          </Card>
-          <Card
-            className="bg-blue-50 border-blue-200 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer group"
-            onClick={() => navigate(mp('/admin/actores/operadores'))}
-          >
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg group-hover:scale-110 transition-transform">
-                <FlaskConical size={20} className="text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-blue-700">Operadores</p>
-                <p className="text-2xl font-bold text-blue-900">{operadoresCount}</p>
-              </div>
-              <ChevronRight size={16} className="text-blue-400" />
-            </CardContent>
-          </Card>
-          <Card className="bg-neutral-50 border-neutral-200">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="p-2 bg-neutral-100 rounded-lg">
-                <Users size={20} className="text-neutral-600" />
-              </div>
-              <div>
-                <p className="text-sm text-neutral-700">Total</p>
-                <p className="text-2xl font-bold text-neutral-900">{totalCount}</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+          {summaries.map(({ label, tipo, count, route, Icon, surface, symbol, ink, caption }) => {
+            const navigates = Boolean(route && canManageActor(tipo!));
+            const ActionIcon = navigates ? ChevronRight : activeTab === tipo ? Check : Funnel;
+            const card = (
+              <Card key={label} padding="none" className={`h-full min-w-0 ${surface} ${route ? 'hover:shadow-md transition-colors' : ''}`}>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${symbol}`}><Icon size={20} aria-hidden="true" /></div>
+                    <p data-actor-summary-value className={`min-w-0 flex-1 text-lg sm:text-2xl font-bold break-words ${ink}`}>{count}</p>
+                    {route && <ActionIcon size={16} className={`shrink-0 ${caption}`} aria-hidden="true" />}
+                  </div>
+                  <p data-actor-summary-label className={`mt-1 text-xs sm:text-sm leading-5 whitespace-normal break-normal ${caption}`}>{label}</p>
+                </CardContent>
+              </Card>
+            );
+            return route && navigates ? (
+              <Link key={label} to={mp(route)} aria-label={`${label} ${count}`} className="block min-w-0 rounded-[12px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">{card}</Link>
+            ) : tipo ? (
+              <button key={label} type="button" aria-label={`${label} ${count}`} aria-pressed={activeTab === tipo}
+                onClick={() => { setActiveTab(tipo); setCurrentPage(1); }}
+                className="block min-w-0 rounded-[12px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700">{card}</button>
+            ) : card;
+          })}
         </div>
 
         {/* Table or Grid */}
@@ -588,32 +586,32 @@ export const ActoresPage: React.FC = () => {
                 return (
                   <Card
                     key={`m-${actor.tipo}-${actor.id}`}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => verDetalle(actor)}
+                    padding="none"
                   >
-                    <CardContent className="p-4">
+                    <button
+                      type="button"
+                      aria-label={`Vista rápida de ${actor.razonSocial}`}
+                      className="w-full rounded-[12px] p-4 text-left transition-colors hover:bg-primary-50 active:bg-primary-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700"
+                      onClick={() => verDetalle(actor)}
+                    >
                       <div className="flex items-start gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-${config.color}-100`}>
                           <Icon size={18} className={`text-${config.color}-600`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-neutral-900 truncate">{actor.razonSocial}</p>
-                              <p className="text-xs text-neutral-500 font-mono">{actor.cuit}</p>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <Badge variant="soft" color={config.color} className="text-xs">{config.label}</Badge>
-                              <Badge variant="soft" color={isActivo ? 'success' : 'neutral'} className="text-xs">
-                                {isActivo ? 'Activo' : 'Inactivo'}
-                              </Badge>
-                            </div>
+                          <p className="whitespace-normal break-words font-semibold text-neutral-900">{actor.razonSocial}</p>
+                          <p className="text-xs text-neutral-500 font-mono">{actor.cuit}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <Badge variant="soft" color={config.color} className="text-xs">{config.label}</Badge>
+                            <Badge variant="soft" color={isActivo ? 'success' : 'neutral'} className="text-xs">
+                              {isActivo ? 'Activo' : 'Inactivo'}
+                            </Badge>
                           </div>
                           {(actor.email || actor.telefono) && (
-                            <div className="flex items-center gap-3 mt-2 text-xs text-neutral-500">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-neutral-500">
                               {actor.email && (
-                                <span className="flex items-center gap-1 truncate">
-                                  <Mail size={12} /> {actor.email}
+                                <span className="flex min-w-0 items-start gap-1 break-all">
+                                  <Mail size={12} className="shrink-0 mt-0.5" /> {actor.email}
                                 </span>
                               )}
                               {actor.telefono && (
@@ -626,7 +624,7 @@ export const ActoresPage: React.FC = () => {
                         </div>
                         <ChevronRight size={16} className="text-neutral-300 shrink-0 mt-2" />
                       </div>
-                    </CardContent>
+                    </button>
                   </Card>
                 );
               })}
@@ -694,11 +692,15 @@ export const ActoresPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center justify-end gap-1 pt-3 border-t border-neutral-100">
-                      <Button variant="ghost" size="sm" className="p-2" onClick={(e: any) => { e.stopPropagation(); verDetalle(actor); }}>
+                      <Button variant="ghost" size="sm" className="p-2" aria-label={`Vista rápida de ${actor.razonSocial}`} onClick={(e: any) => { e.stopPropagation(); verDetalle(actor); }}>
                         <Eye size={16} />
                       </Button>
-                      <Button
+                      {canOpenFicha(actor) && <Button variant="ghost" size="sm" className="p-2" aria-label={`Abrir ficha de ${actor.razonSocial}`} onClick={(e: any) => { e.stopPropagation(); openFicha(actor); }}>
+                        <ExternalLink size={16} />
+                      </Button>}
+                      {canManageActor(actor.tipo) && <Button
                         variant="ghost" size="sm" className="p-2 text-error-500"
+                        aria-label={`Eliminar ${actor.razonSocial}`}
                         onClick={(e: any) => {
                           e.stopPropagation();
                           setActorEliminar({ id: actor.id, tipo: actor.tipo, razonSocial: actor.razonSocial });
@@ -706,7 +708,7 @@ export const ActoresPage: React.FC = () => {
                         }}
                       >
                         <Trash2 size={16} />
-                      </Button>
+                      </Button>}
                     </div>
                   </CardContent>
                 </Card>
@@ -786,21 +788,15 @@ export const ActoresPage: React.FC = () => {
               </div>
             </div>
             <div className="flex justify-end pt-2 border-t border-neutral-100">
-              <Button
+              {canOpenFicha(actorSeleccionado) && <Button
                 leftIcon={<Eye size={16} />}
                 onClick={() => {
-                  const tipo = actorSeleccionado.tipo;
-                  const detailPath = tipo === 'generador'
-                    ? mp(`/admin/actores/generadores/${actorSeleccionado.id}`)
-                    : tipo === 'transportista'
-                    ? mp(`/admin/actores/transportistas/${actorSeleccionado.id}`)
-                    : mp(`/admin/actores/operadores/${actorSeleccionado.id}`);
                   setModalDetalle(false);
-                  navigate(detailPath);
+                  openFicha(actorSeleccionado);
                 }}
               >
                 Ver detalle completo
-              </Button>
+              </Button>}
             </div>
           </div>
         )}
@@ -808,7 +804,7 @@ export const ActoresPage: React.FC = () => {
 
       {/* Modal crear actor */}
       <Modal
-        isOpen={modalCrear}
+        isOpen={modalCrear && allowedActorTypes.length > 0}
         onClose={() => { setModalCrear(false); setForm(INITIAL_FORM); }}
         title="Nuevo Actor"
         size="lg"
@@ -819,7 +815,7 @@ export const ActoresPage: React.FC = () => {
             </Button>
             <Button
               onClick={handleCrear}
-              disabled={createGenerador.isPending || createTransportista.isPending || createOperador.isPending}
+              disabled={!canManageActor(form.tipo) || createGenerador.isPending || createTransportista.isPending || createOperador.isPending}
             >
               {(createGenerador.isPending || createTransportista.isPending || createOperador.isPending) ? 'Guardando...' : 'Crear Actor'}
             </Button>
@@ -830,12 +826,12 @@ export const ActoresPage: React.FC = () => {
           <Select
             label="Tipo de Actor"
             value={form.tipo}
-            onChange={(val) => updateField('tipo', val)}
+            onChange={(val) => { if (canManageActor(val)) updateField('tipo', val); }}
             options={[
               { value: 'generador', label: 'Generador' },
               { value: 'transportista', label: 'Transportista' },
               { value: 'operador', label: 'Operador' },
-            ]}
+            ].filter(option => canManageActor(option.value))}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input label="Razon Social" value={form.razonSocial} onChange={(e) => updateField('razonSocial', e.target.value)} placeholder="Empresa S.A." />
@@ -870,7 +866,7 @@ export const ActoresPage: React.FC = () => {
 
       {/* Modal confirmar eliminar */}
       <ConfirmModal
-        isOpen={modalEliminar}
+        isOpen={Boolean(modalEliminar && actorEliminar && canManageActor(actorEliminar.tipo))}
         onClose={() => { setModalEliminar(false); setActorEliminar(null); }}
         onConfirm={handleEliminar}
         title="Eliminar Actor"

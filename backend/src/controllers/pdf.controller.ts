@@ -4,6 +4,7 @@ import PDFDocument from 'pdfkit';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { canAccessManifiesto } from '../utils/roleFilter';
+import { readTransportAssignment } from '../domain/manifiestoTransportAssignment';
 
 // ── Shared PDF helpers ──
 
@@ -148,10 +149,10 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             where: { id },
             include: {
                 generador: true,
-                transportista: { include: { vehiculos: true, choferes: true } },
+                transportista: true,
                 operador: true,
                 residuos: { include: { tipoResiduo: true } },
-                eventos: { orderBy: { createdAt: 'asc' } },
+                eventos: { orderBy: { createdAt: 'asc' }, include: { usuario: { select: { nombre: true, apellido: true } } } },
             },
         });
 
@@ -206,8 +207,15 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
         drawField(doc, 'CUIT', manifiesto.generador.cuit, 290, gY, 100);
         drawField(doc, 'N\u00BA Inscripcion', manifiesto.generador.numeroInscripcion || 'N/A', 400, gY, 140);
         doc.y = gY + 28;
-        drawField(doc, 'Domicilio', manifiesto.generador.domicilio, 58, doc.y, 350);
+        const companySnapshot = manifiesto.contextoEmpresa as any;
+        const productive = companySnapshot?.rol==='GENERADOR' ? companySnapshot.establecimiento : null;
+        drawField(doc, productive?'Domicilio productivo':'Domicilio', productive?.domicilio ?? manifiesto.generador.domicilio, 58, doc.y, 350);
         doc.y += 30;
+        if(productive) {
+          drawField(doc, 'Establecimiento', productive.nombre, 58, doc.y, 235);
+          drawField(doc, 'Domicilio legal al declarar', companySnapshot.domicilioLegal?.calle || 'No informado', 310, doc.y, 230);
+          doc.y += 30;
+        }
 
         // ── 2. Transportista ──
         if (manifiesto.transportista) {
@@ -217,15 +225,13 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             drawField(doc, 'CUIT', manifiesto.transportista.cuit, 290, tY, 100);
             drawField(doc, 'N\u00BA Habilitacion', manifiesto.transportista.numeroHabilitacion || 'N/A', 400, tY, 140);
             doc.y = tY + 28;
-            if (manifiesto.transportista.vehiculos?.[0]) {
-                const v = manifiesto.transportista.vehiculos[0];
-                drawField(doc, 'Vehiculo', `${v.marca} ${v.modelo} \u2014 ${v.patente}`, 58, doc.y, 220);
-            }
-            if (manifiesto.transportista.choferes?.[0]) {
-                const c = manifiesto.transportista.choferes[0];
-                drawField(doc, 'Chofer', `${c.nombre} \u2014 DNI ${c.dni}`, 290, doc.y, 250);
-            }
-            doc.y += 30;
+            const assignment = readTransportAssignment(manifiesto.asignacionTransporte, manifiesto.transportistaId);
+            const v = assignment?.vehiculo, c = assignment?.chofer;
+            const assignmentY = doc.y;
+            drawField(doc, 'Vehiculo', v ? `${v.marca} ${v.modelo} — ${v.patente}` : 'Sin asignación registrada', 58, assignmentY, 220);
+            const vehicleEnd = doc.y;
+            drawField(doc, 'Chofer', c ? `${c.nombre} ${c.apellido} — DNI ${c.dni}` : 'Sin asignación registrada', 290, assignmentY, 250);
+            doc.y = Math.max(vehicleEnd, doc.y) + 10;
         } else {
             drawSectionTitle(doc, '02', 'MODALIDAD IN SITU');
             drawField(doc, 'Modalidad', 'Tratamiento in situ — sin transporte', 58, doc.y, 400);
@@ -312,6 +318,29 @@ export const generarPDFManifiesto = async (req: AuthRequest, res: Response, next
             drawField(doc, label, new Date(val).toLocaleDateString('es-AR'), 58 + col * fColW, fY + row * 28, fColW - 10);
         });
         doc.y = fY + (Math.ceil(dates.length / 4)) * 28 + 8;
+
+        // Use the latest approval event; a reverted draft must never display an old signature.
+        if (manifiesto.fechaFirma) {
+            const firma = [...manifiesto.eventos].reverse().find(evento => evento.tipo === 'FIRMA');
+            if (firma?.firmaImagen) {
+                if (doc.y > 630) {
+                    doc.addPage();
+                    drawSectionTitle(doc, '06', `FIRMA ADJUNTA - MANIFIESTO ${manifiesto.numero}`);
+                }
+                const signatureY = doc.y;
+                doc.image(firma.firmaImagen, 58, signatureY, { fit: [200, 90] });
+                doc.y = signatureY + 96;
+                doc.font('Helvetica').fontSize(8).fillColor(COLORS.dark)
+                   .text(`Firma manuscrita adjunta - ${[firma.usuario.nombre, firma.usuario.apellido].filter(Boolean).join(' ')}`, 58, doc.y, { width: doc.page.width - 116 });
+                doc.fontSize(7).fillColor(COLORS.gray)
+                   .text(`Registro: ${firma.createdAt.toLocaleString('es-AR')} | SHA-256: ${firma.firmaSha256}`, 58, doc.y, { width: doc.page.width - 116 });
+                doc.moveDown(0.7);
+            } else {
+                doc.font('Helvetica').fontSize(8).fillColor(COLORS.gray)
+                   .text('Aprobacion registrada en SITREP. Sin firma manuscrita adjunta.', 58, doc.y, { width: doc.page.width - 116 });
+                doc.moveDown(0.7);
+            }
+        }
 
         // ── QR + Blockchain side by side ──
         if (manifiesto.qrCode || (manifiesto.blockchainStatus === 'CONFIRMADO' && manifiesto.blockchainHash)) {

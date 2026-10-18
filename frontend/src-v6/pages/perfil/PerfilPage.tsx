@@ -24,14 +24,25 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
-import { usuarioService } from '../../services/usuario.service';
-import api from '../../services/api';
+import { authService } from '../../services/auth.service';
+import { getApiErrorMessage } from '../../utils/api-error';
+import { useGenerador, useOperador } from '../../hooks/useActores';
+import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
+import ActorCertificates from '../../components/ActorCertificates';
+import ActorActivities from '../../components/ActorActivities';
 
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, isGenerador, isOperador } = useAuth();
-  const [actorData, setActorData] = useState<Record<string, any> | null>(null);
+  const { currentUser, isGenerador:personalGenerador, isOperador:personalOperador } = useAuth();
+  const isGenerador=personalGenerador&&!currentUser?.empresaContexto;
+  const isOperador=personalOperador&&!currentUser?.empresaContexto;
+  // Reuse the actor queries that normalize the API's {generador}/{operador}
+  // envelope. Keys follow identity changes instead of retaining the prior actor.
+  const generador = useGenerador(isGenerador ? currentUser?.actorId || '' : '');
+  const operador = useOperador(isOperador ? currentUser?.actorId || '' : '');
+  const actorQuery = isGenerador ? generador : operador;
+  const actorData: Record<string, any> | undefined = (isGenerador || isOperador) ? actorQuery.data : undefined;
   const [user, setUser] = useState({
     nombre: '',
     email: '',
@@ -58,47 +69,40 @@ const PerfilPage: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Fetch actor data for GENERADOR/OPERADOR
-  useEffect(() => {
-    if (currentUser?.actorId && (isGenerador || isOperador)) {
-      const tipo = isGenerador ? 'generadores' : 'operadores';
-      api.get(`/actores/${tipo}/${currentUser.actorId}`)
-        .then(res => setActorData(res.data.data))
-        .catch(() => { /* silently ignore */ });
-    }
-  }, [currentUser?.actorId, isGenerador, isOperador]);
-
   const guardarCambios = async () => {
     setGuardando(true);
     try {
       if (currentUser?.id) {
-        await usuarioService.update(String(currentUser.id), {
-          nombre: user.nombre,
-          telefono: user.telefono,
-        });
+        await authService.updateOwnProfile({ nombre: user.nombre, telefono: user.telefono });
       }
       toast.success('Perfil actualizado', 'Tus cambios se guardaron correctamente');
-    } catch {
-      toast.warning('Cambios locales', 'Los cambios se aplicaron localmente');
+      setEditando(false);
+    } catch (error) {
+      toast.error('No se guardaron los cambios', getApiErrorMessage(error, 'Revisá la conexión y reintentá; tus cambios siguen en pantalla.'));
+      return;
     } finally {
       setGuardando(false);
-      setEditando(false);
     }
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-neutral-900">Mi Perfil</h2>
-        <p className="text-neutral-600 mt-1">Gestiona tu información personal</p>
-      </div>
+      <h2 className="sr-only">Mi Perfil</h2>
+
+      <ActorActivities />
+      {import.meta.env.VITE_ENTERPRISE_ENABLED==='true'&&<Button variant="outline" onClick={()=>navigate(location.pathname.startsWith('/mobile/')?'/mobile/empresas':'/empresas')}>Empresas y establecimientos</Button>}
+      {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y sede en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}
+      {!currentUser?.empresaContexto&&currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}
-      {(isGenerador || isOperador) && actorData && (
+      {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isLoading && <p role="status">Cargando datos de tu establecimiento…</p>}
+      {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isError && <div role="alert" className="rounded-lg border border-error-200 p-4"><p>No se pudieron cargar los datos de tu establecimiento.</p><Button variant="outline" onClick={() => void actorQuery.refetch()}>Reintentar datos del establecimiento</Button></div>}
+      {(isGenerador || isOperador) && actorData && !actorQuery.isError && (
         <Card>
           <CardHeader
             title="Datos de mi Establecimiento"
+            className="flex-col sm:flex-row"
             icon={<Building2 size={18} />}
             action={
               <Button
@@ -159,6 +163,11 @@ const PerfilPage: React.FC = () => {
                   {(isGenerador ? actorData.numeroInscripcion : actorData.numeroHabilitacion) || '-'}
                 </p>
               </div>
+              {isOperador && <div className="p-3 bg-neutral-50 rounded-xl">
+                <p className="text-xs font-medium uppercase text-neutral-600 mb-1">Fecha de habilitación registrada</p>
+                <p className="font-medium text-neutral-900">{actorData.vencimientoHabilitacion ? formatActorCalendarDate(actorData.vencimientoHabilitacion) : 'No informada'}</p>
+                {actorData.vencimientoHabilitacion && <p className="text-xs text-neutral-600 mt-1">Vigencia hasta finalizar ese día en Mendoza.</p>}
+              </div>}
             </div>
           </CardContent>
         </Card>

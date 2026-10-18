@@ -1,0 +1,121 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { assertCloudDatabase, backendRequire, root } from './safety.ts';
+import assert from 'node:assert/strict';
+import { loadSeed } from './load-seed.ts';
+
+await assertCloudDatabase();
+const output=process.env.QA_ARTIFACTS!;
+await mkdir(path.join(output,'uploads'),{recursive:true});
+const {seedNightDatabase}=loadSeed();
+const fixture=await seedNightDatabase();
+const {PrismaClient}=backendRequire('@prisma/client');
+const db=new PrismaClient();
+try {
+  // Address assistance uses real catalog fields, populated only in the guarded synthetic DB.
+  await db.generador.update({ where: { id: fixture.actors.generador }, data: {
+    domicilio: 'QA Registro 100', domicilioRealCalle: 'QA Planta 200', domicilioRealLocalidad: 'Las Heras',
+    domicilioLegalCalle: 'QA Oficina 300', domicilioLegalDepto: 'Capital',
+  } });
+  await db.generador.update({ where: { id: fixture.actors.generador2 }, data: { domicilio: 'QA Otro 400', domicilioLegalCalle: 'A'.repeat(301) } });
+  // Missing location stays missing. No real address is sent to a geocoder.
+  await db.transportista.update({ where: { id: fixture.actors.transportista2 }, data: {
+    domicilio: '', latitud: null, longitud: null,
+  } });
+  await db.operador.update({ where: { id: fixture.actors.operador }, data: {
+    domicilioRealCalle: 'QA Tratamiento 500', domicilioRealDepto: 'Godoy Cruz',
+  } });
+  await db.sedeOperador.upsert({ where: { id: 'cloud-qa-operator-site' },
+    create: { id: 'cloud-qa-operator-site', operadorId: fixture.actors.operador, nombre: 'QA Sede norte', tipo: 'FIJO', domicilio: 'QA Acceso 600', activo: true },
+    update: { domicilio: 'QA Acceso 600', activo: true },
+  });
+  const deviceManifest = await db.manifiesto.create({data:{
+    numero:'2026-990001', generadorId:fixture.actors.generador,
+    transportistaId:fixture.actors.transportista, operadorId:fixture.actors.operador,
+    creadoPorId:fixture.users.admin, estado:'EN_TRANSITO', isDemoData:true, modalidad:'FIJO',
+    fechaRetiro:new Date(), observaciones:'QA Android GPS y lector QR; datos completamente sintéticos',
+    residuos:{create:[{tipoResiduoId:fixture.wastes[0],cantidad:10,unidad:'kg',estado:'SOLIDO'}]},
+  }});
+  // Stable persisted event for playback controls, independent of whether the
+  // suite crosses civil midnight or the newest manifest is still eventless.
+  await db.eventoManifiesto.create({data:{id:'cloud-qa-device-created',
+    manifiestoId:deviceManifest.id,usuarioId:fixture.users.admin,tipo:'CREACION',
+    descripcion:'QA creación de viaje completamente sintético',isDemoData:true,
+    createdAt:deviceManifest.createdAt,
+  }});
+  const playbackProbe = {date:new Intl.DateTimeFormat('en-CA',{
+    timeZone:'America/Argentina/Mendoza',year:'numeric',month:'2-digit',day:'2-digit',
+  }).format(deviceManifest.createdAt),eventId:'EVENTO:cloud-qa-device-created'};
+  // Forecast navigation must not depend on another HTTP suite having left an
+  // approved manifest behind. Persist our own read-only probe in this QA DB.
+  await db.manifiesto.create({ data: {
+    id: 'cloud-qa-monitor-pending', numero: 'QA-MONITOR-PENDING',
+    generadorId: fixture.actors.generador, transportistaId: fixture.actors.transportista,
+    operadorId: fixture.actors.operador, creadoPorId: fixture.users.admin,
+    estado: 'APROBADO', isDemoData: true, modalidad: 'FIJO',
+    fechaEstimadaRetiro: new Date(Date.now() + 86400000),
+    observaciones: 'QA Monitor: pendiente sintético reservado para consulta',
+    residuos: { create: [{ tipoResiduoId: fixture.wastes[0], cantidad: 10, unidad: 'kg', estado: 'SOLIDO' }] },
+  } });
+  // LIVE popup checks need a genuinely persisted observation. The earlier
+  // fixture had no GPS until the later Android phase, so no marker was correct.
+  // Coordinates are explicit synthetic inputs, not a UI/API fallback location.
+  await db.trackingGPS.create({ data: { id: 'cloud-qa-live-current',
+    manifiestoId: deviceManifest.id, latitud: -32.8895, longitud: -68.8458,
+    velocidad: 0, timestamp: new Date(),
+  } });
+  // The PDF emits this JSON shape. Only optical input is synthetic: jsQR,
+  // navigation, real login and the business API remain unmodified during E2E.
+  const payload=JSON.stringify({numero:deviceManifest.numero,id:deviceManifest.id,timestamp:new Date().toISOString()});
+  const matrix=backendRequire('qrcode').create(payload,{errorCorrectionLevel:'M'}).modules;
+  const size=320,scale=Math.floor(size/(matrix.size+8)),offset=Math.floor((size-matrix.size*scale)/2);
+  const frame=Buffer.alloc(size*size*3/2,128);frame.fill(235,0,size*size);
+  for(let y=0;y<matrix.size;y++)for(let x=0;x<matrix.size;x++)if(matrix.get(y,x)){
+    for(let dy=0;dy<scale;dy++)frame.fill(16,(offset+y*scale+dy)*size+offset+x*scale,(offset+y*scale+dy)*size+offset+(x+1)*scale);
+  }
+  await writeFile(path.join(output,'qr-camera.y4m'),Buffer.concat([
+    Buffer.from(`YUV4MPEG2 W${size} H${size} F5:1 Ip A1:1 C420\n`),
+    ...Array.from({length:5},()=>[Buffer.from('FRAME\n'),frame]).flat(),
+  ]));
+  // Explicit synthetic page-two/mixed-unit data, not business responses or fake auth.
+  for(let i=0;i<155;i++)await db.manifiesto.upsert({
+    where:{id:'cloud-qa-report-'+i},
+    create:{id:'cloud-qa-report-'+i,numero:'QA-CLOUD-'+String(i+1).padStart(5,'0'),
+      generadorId:fixture.actors.generador,transportistaId:fixture.actors.transportista,
+      operadorId:fixture.actors.operador,creadoPorId:fixture.users.admin,
+      estado:'TRATADO',isDemoData:true,modalidad:'FIJO',fechaCierre:new Date(),
+      observaciones:'QA nube: expediente completamente sintético',
+      residuos:{create:[{tipoResiduoId:fixture.wastes[i%2],cantidad:i+1,
+        cantidadRecibida:i+1,unidad:['kg','lt','tn'][i%3],estado:'SOLIDO'}]}},
+    update:{},
+  });
+  // A real persisted observation older than seven days proves the restored month
+  // is not merely a new selector over the former seven-day API cap.
+  const historicalTimestamp = new Date(Date.now() - 20 * 86400000);
+  await db.manifiesto.update({ where: { id: 'cloud-qa-report-0' }, data: {
+    createdAt: historicalTimestamp, fechaRetiro: historicalTimestamp,
+  } });
+  await db.trackingGPS.create({ data: { id: 'cloud-qa-monitor-20-days',
+    manifiestoId: 'cloud-qa-report-0', latitud: -32.8895, longitud: -68.8458,
+    timestamp: historicalTimestamp,
+  } });
+  const followup = await db.manifiesto.create({ data: {
+    numero: 'QA-FOLLOWUP-00001', generadorId: fixture.actors.generador,
+    transportistaId: fixture.actors.transportista, operadorId: fixture.actors.operador,
+    creadoPorId: fixture.users.admin, estado: 'RECIBIDO', isDemoData: true, modalidad: 'FIJO',
+    fechaRecepcion: new Date(Date.now() - 3 * 86400000),
+    residuos: { create: [{ tipoResiduoId: fixture.wastes[0], cantidad: 10, cantidadRecibida: 10, unidad: 'kg', estado: 'SOLIDO' }] },
+  } });
+  // Actual server evaluator, not a fabricated API response or browser notice.
+  const { ejecutarSeguimientoCierre } = backendRequire(path.join(root, 'backend/src/jobs/seguimientoCierre.job.ts'));
+  await ejecutarSeguimientoCierre();
+  await ejecutarSeguimientoCierre();
+  const operator = await db.operador.findUniqueOrThrow({ where: { id: fixture.actors.operador } });
+  const notices = await db.notificacion.findMany({ where: { manifiestoId: followup.id } });
+  assert.equal(notices.length, 1, 'Retry must not duplicate the internal follow-up');
+  assert.equal(notices[0].usuarioId, operator.usuarioId);
+  await writeFile(path.join(output,'fixture.json'),JSON.stringify({
+    ...fixture,followup:{id:followup.id,numero:followup.numero},deviceManifest:{id:deviceManifest.id,numero:deviceManifest.numero},database:'sitrep_night_qa_20260926',source:process.env.GITHUB_SHA,
+    externalDelivery:false,syntheticReportRecords:155,playbackProbe},null,2));
+}finally{await db.$disconnect();}
+console.log('Synthetic cloud fixture ready; no production data or credentials');

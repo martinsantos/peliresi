@@ -4,6 +4,8 @@
  * PLAYBACK mode: HIDES static actors, shows only event action (trips, flashes, camera follows)
  */
 
+import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
+import type { InspectionOperation } from '../../../services/inspectionOperations.service';
 import React, { useMemo, useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -16,6 +18,9 @@ import {
   createOperadorIcon,
 } from '../utils/war-room-icons';
 import { EVENT_COLORS } from '../utils/war-room-icons';
+import { ACTOR_ICONS } from '../../../utils/map-icons';
+import { MapCategorySymbol, type MapCategory } from '../../../components/ui/MapLayerToggle';
+import { MonitorPopupBounds } from './MonitorPopupBounds';
 
 // Keep the Monitor on the same keyless base map already used by SITREP's
 // other map views. The former CARTO endpoint now paints API KEY REQUIRED.
@@ -24,25 +29,32 @@ const ATTRIBUTION = '&copy; OpenStreetMap contributors';
 const MENDOZA_CENTER: [number, number] = [-32.9287, -68.8535];
 const MAX_GENERADORES = 50;
 
-const TRUCK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>`;
-
-function makeTruckIcon(): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: `<div style="position:relative;width:48px;height:48px;"><div style="position:absolute;inset:-8px;border-radius:50%;border:3px solid #EF4444;opacity:0.5;animation:wr-ring-pulse 1.5s ease-out infinite;"></div><div style="position:absolute;inset:-16px;border-radius:50%;border:2px solid #EF4444;opacity:0.3;animation:wr-ring-pulse 2s ease-out infinite 0.5s;"></div><div style="width:48px;height:48px;background:#DC2626;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px 4px rgba(239,68,68,0.6),0 4px 12px rgba(0,0,0,0.4);border:3px solid #fff;">${TRUCK_SVG}</div></div>`,
-    iconSize: [48, 48],
-    iconAnchor: [24, 24],
-  });
+const POPUP_LABELS = { generador: 'Generador', transportista: 'Transportista', operador: 'Operador', enTransito: 'En tránsito' };
+/** One bounded live detail; identity is the shared symbol, not a colored title strip. */
+function LivePopup({ category, name, children }: { category: Exclude<MapCategory, 'inspeccion'>; name: string; children: React.ReactNode }) {
+  return <section data-testid="monitor-live-popup" aria-label={`${POPUP_LABELS[category]} ${name}`} tabIndex={0}
+    style={{ width: 'min(240px, calc(100vw - 96px))', minWidth: 0, maxWidth: '100%', overflowWrap: 'anywhere', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, lineHeight: 1.5, color: '#374151' }}
+    className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+    <header style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 24, paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid #e5e7eb' }}>
+      <MapCategorySymbol category={category} />
+      <strong style={{ fontSize: 12, color: '#262626' }}>{POPUP_LABELS[category]}</strong>
+    </header>
+    {children}
+  </section>;
 }
 
-function makeTooltipIcon(text: string): L.DivIcon {
-  // All content is hardcoded strings from our own system — not user input
-  return L.divIcon({
-    className: '',
-    html: `<div style="background:rgba(0,0,0,0.88);color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;font-family:monospace;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);pointer-events:none;">${text}</div>`,
-    iconSize: [180, 50],
-    iconAnchor: [-30, 25],
-  });
+const ADDRESS_STYLE: React.CSSProperties = { fontSize: 12, color: '#4b5563', marginTop: 6, whiteSpace: 'normal', overflowWrap: 'anywhere' };
+
+function tripPopup(id: string, points: number): HTMLElement {
+  const content = document.createElement('div');
+  content.style.cssText = 'color:#262626;font:13px/1.5 Inter,system-ui,sans-serif;overflow-wrap:anywhere';
+  const heading = document.createElement('strong');
+  heading.textContent = 'EN TRÁNSITO';
+  heading.style.cssText = 'display:block;color:#b91c1c';
+  const detail = document.createElement('div');
+  detail.textContent = `${id.slice(0, 10).toUpperCase()} · ${points} puntos GPS`;
+  content.append(heading, detail);
+  return content;
 }
 
 // ─── PlaybackCamera — pan suave solo si el evento está fuera del viewport ────
@@ -67,7 +79,7 @@ function PlaybackCamera({ currentEvent }: { currentEvent: { lat: number; lng: nu
   return null;
 }
 
-// ─── Imperative layer: truck markers + trails degradados + floating tooltips ──
+// One selectable marker per trip; details open on demand, never competing labels.
 function PlaybackLayer({ trips }: {
   trips: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
 }) {
@@ -75,8 +87,6 @@ function PlaybackLayer({ trips }: {
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   // Trail: múltiples segmentos por trip (gradiente de opacidad)
   const polylinesRef = useRef<Map<string, L.Polyline[]>>(new Map());
-  const tooltipsRef = useRef<Map<string, L.Marker>>(new Map());
-  const truckIconRef = useRef(makeTruckIcon());
 
   useEffect(() => {
     const currentIds = new Set(trips.keys());
@@ -86,18 +96,20 @@ function PlaybackLayer({ trips }: {
     polylinesRef.current.forEach((segs, id) => {
       if (!currentIds.has(id)) { segs.forEach(p => map.removeLayer(p)); polylinesRef.current.delete(id); }
     });
-    tooltipsRef.current.forEach((t, id) => { if (!currentIds.has(id)) { map.removeLayer(t); tooltipsRef.current.delete(id); } });
 
     trips.forEach((trip, id) => {
       const pos: L.LatLngExpression = [trip.lat, trip.lng];
-      const shortId = id.slice(0, 10).toUpperCase();
 
       // Truck marker
       let marker = markersRef.current.get(id);
       if (marker) {
         marker.setLatLng(pos);
+        marker.setPopupContent(tripPopup(id, trip.trail.length));
       } else {
-        marker = L.marker(pos, { icon: truckIconRef.current, zIndexOffset: 3000 }).addTo(map);
+        marker = L.marker(pos, { icon: ACTOR_ICONS.enTransitoSelected, zIndexOffset: 3000,
+          keyboard: true, title: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase(),
+          alt: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase() })
+          .bindPopup(tripPopup(id, trip.trail.length), { minWidth: 160, maxWidth: 240, autoPan: true }).addTo(map);
         markersRef.current.set(id, marker);
       }
 
@@ -121,16 +133,6 @@ function PlaybackLayer({ trips }: {
       }
       polylinesRef.current.set(id, newSegs);
 
-      // Floating tooltip
-      const tooltipContent = `<span style="font-weight:800;color:#EF4444;">EN TRÁNSITO</span> ${shortId} <span style="color:#9ca3af;">${trail.length}pts</span>`;
-      let tt = tooltipsRef.current.get(id);
-      if (tt) {
-        tt.setLatLng(pos);
-        tt.setIcon(makeTooltipIcon(tooltipContent));
-      } else {
-        tt = L.marker(pos, { icon: makeTooltipIcon(tooltipContent), zIndexOffset: 4000, interactive: false }).addTo(map);
-        tooltipsRef.current.set(id, tt);
-      }
     });
   }, [trips, map]);
 
@@ -139,17 +141,16 @@ function PlaybackLayer({ trips }: {
     return () => {
       markersRef.current.forEach(m => map.removeLayer(m));
       polylinesRef.current.forEach(segs => segs.forEach(p => map.removeLayer(p)));
-      tooltipsRef.current.forEach(t => map.removeLayer(t));
       markersRef.current.clear();
       polylinesRef.current.clear();
-      tooltipsRef.current.clear();
     };
   }, [map]);
 
   return null;
 }
 
-// ─── EventFlash — expanding circle + momentary popup with event info ─────────
+// Event details already live in the selectable current-event control and feed.
+// Keep only the territorial flash, and cancel owned animation work on reset/exit.
 // Tracks shown events by ID. Clears shownRef when events list shrinks (new day).
 function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo: string; id: string; numero?: string; desc?: string }> }) {
   const map = useMap();
@@ -157,7 +158,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
   const shownIdsRef = useRef<string[]>([]);
   const shownSetRef = useRef<Set<string>>(new Set());
   const prevCountRef = useRef(0);
-  const pendingTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const pendingFramesRef = useRef<Set<number>>(new Set());
   const pendingMarkersRef = useRef<Set<L.Layer>>(new Set());
 
   // Clear state when events list shrinks (new day / reset)
@@ -167,8 +168,8 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
       shownSetRef.current.clear();
       pendingMarkersRef.current.forEach(m => map.removeLayer(m));
       pendingMarkersRef.current.clear();
-      pendingTimersRef.current.forEach(t => clearTimeout(t));
-      pendingTimersRef.current.clear();
+      pendingFramesRef.current.forEach(frame => cancelAnimationFrame(frame));
+      pendingFramesRef.current.clear();
     }
     prevCountRef.current = events.length;
   }, [events.length, map]);
@@ -192,63 +193,37 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
       pendingMarkersRef.current.add(circle);
 
       let frame = 0;
+      const scheduleFrame = () => {
+        const handle = requestAnimationFrame(() => {
+          pendingFramesRef.current.delete(handle);
+          animateCircle();
+        });
+        pendingFramesRef.current.add(handle);
+      };
       const animateCircle = () => {
+        if (!pendingMarkersRef.current.has(circle)) return;
         frame++;
         circle.setRadius(20 + frame * 2);
         circle.setStyle({ opacity: Math.max(0, 0.8 - frame * 0.04), fillOpacity: Math.max(0, 0.4 - frame * 0.02) });
         if (frame < 25) {
-          requestAnimationFrame(animateCircle);
+          scheduleFrame();
         } else {
           map.removeLayer(circle);
           pendingMarkersRef.current.delete(circle);
         }
       };
-      requestAnimationFrame(animateCircle);
-
-      // Momentary info popup — shows for 3 seconds then removes
-      const label = ev.tipo === 'RETIRO' ? 'RETIRO' : ev.tipo === 'ENTREGA' ? 'ENTREGA'
-        : ev.tipo === 'RECEPCION' ? 'RECEPCIÓN' : ev.tipo === 'TRATAMIENTO' ? 'TRATAMIENTO'
-        : ev.tipo === 'CIERRE' ? 'CIERRE' : ev.tipo === 'FIRMA' ? 'FIRMA'
-        : ev.tipo === 'CREACION' ? 'NUEVO' : ev.tipo === 'INCIDENTE' ? 'INCIDENTE' : ev.tipo;
-
-      const popupIcon = L.divIcon({
-        className: '',
-        html: `<div style="
-          background:${color};color:#fff;padding:6px 12px;border-radius:6px;
-          font-size:11px;font-weight:800;letter-spacing:0.04em;
-          white-space:nowrap;box-shadow:0 4px 16px ${color}80,0 2px 8px rgba(0,0,0,0.3);
-          font-family:system-ui,sans-serif;pointer-events:none;
-          animation:wr-popup-appear 0.3s ease-out;
-          text-transform:uppercase;
-        ">
-          <span style="margin-right:4px;">${ev.tipo === 'CREACION' ? '✦' : ev.tipo === 'INCIDENTE' ? '⚠' : '●'}</span>
-          ${label}${ev.numero ? ' — ' + ev.numero : ''}
-        </div>`,
-        iconSize: [200, 30],
-        iconAnchor: [100, 50],
-      });
-
-      const popup = L.marker([ev.lat, ev.lng], { icon: popupIcon, zIndexOffset: 5000, interactive: false }).addTo(map);
-      pendingMarkersRef.current.add(popup);
-
-      // Remove after 3 seconds
-      const timer = setTimeout(() => {
-        map.removeLayer(popup);
-        pendingMarkersRef.current.delete(popup);
-        pendingTimersRef.current.delete(timer);
-      }, 3000);
-      pendingTimersRef.current.add(timer);
+      scheduleFrame();
     }
     // (FIFO eviction above — no hard-clear needed)
   }, [events, map]);
 
-  // Cleanup on unmount — remove all pending markers and clear timers
+  // Cleanup on unmount — no detached map animations survive navigation.
   useEffect(() => {
     return () => {
       pendingMarkersRef.current.forEach(m => map.removeLayer(m));
       pendingMarkersRef.current.clear();
-      pendingTimersRef.current.forEach(t => clearTimeout(t));
-      pendingTimersRef.current.clear();
+      pendingFramesRef.current.forEach(frame => cancelAnimationFrame(frame));
+      pendingFramesRef.current.clear();
     };
   }, [map]);
 
@@ -258,6 +233,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
 // ─── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
+  inspections?: InspectionOperation[];
   cinemaMode: boolean;
   actores: { generadores: ActorPosition[]; transportistas: ActorPosition[]; operadores: ActorPosition[] } | null;
   enTransito: EnTransitoItem[];
@@ -269,7 +245,7 @@ interface Props {
   playbackEvents?: Array<{ id: string; tipo: string; lat: number; lng: number; numero?: string }>;
 }
 
-export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
+export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
 
   // Overlay día/noche — sutil, máx opacity 0.12
   const dayOverlayColor = useMemo(() => {
@@ -292,15 +268,13 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
       .map(e => ({ lat: e.lat, lng: e.lng, tipo: e.tipo, id: e.id, numero: e.numero }));
   }, [playbackEvents]);
 
-  const prominentIcon = useMemo(() => L.divIcon({
-    className: '',
-    html: `<div style="position:relative;width:44px;height:44px;"><div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #EF4444;opacity:0.5;animation:wr-ring-pulse 2s ease-out infinite;"></div><div style="width:44px;height:44px;background:#EF4444;border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px 2px rgba(239,68,68,0.5),0 2px 8px rgba(0,0,0,0.3);border:2px solid #fff;">${TRUCK_SVG}</div></div>`,
-    iconSize: [44, 44], iconAnchor: [22, 22], popupAnchor: [0, -24],
-  }), []);
+  const prominentIcon = ACTOR_ICONS.enTransitoSelected;
 
   return (
     <div className="relative w-full h-full">
     <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false}>
+      {mode === 'LIVE' && <MonitorPopupBounds />}
+      {mode === 'LIVE' && <InspectionMapLayer items={inspections} />}
       <TileLayer url={MAP_TILES} attribution={ATTRIBUTION} />
 
       {/* PLAYBACK: camera + imperative trucks + event flashes */}
@@ -317,12 +291,9 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
         <>
           {/* Generadores — low z */}
           {visibleGeneradores.map(g => (
-            <Marker key={`gen-${g.id}`} position={[g.lat!, g.lng!]} icon={createGeneradorIcon()} zIndexOffset={-1000}>
-              <Popup maxWidth={300}>
-                <div style={{ minWidth: 240, fontFamily: 'sans-serif' }}>
-                  <div style={{ background: '#7c3aed', color: '#fff', padding: '8px 12px', margin: '-12px -20px 8px', borderRadius: '4px 4px 0 0', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-                    &#9724; GENERADOR
-                  </div>
+            <Marker key={`gen-${g.id}`} position={[g.lat!, g.lng!]} icon={createGeneradorIcon()} zIndexOffset={-1000} title={`Generador: ${g.razonSocial}`} alt={`Generador: ${g.razonSocial}`}>
+              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+                <LivePopup category="generador" name={g.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{g.razonSocial}</div>
                   {g.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 6 }}>CUIT {g.cuit}</div>}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
@@ -349,36 +320,33 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
                       <div style={{ color: '#374151', fontFamily: 'monospace' }}>{g.lat!.toFixed(3)},{g.lng!.toFixed(3)}</div>
                     </div>
                   </div>
-                  {g.domicilio && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{g.domicilio}</div>}
-                </div>
+                  {g.domicilio && <div style={ADDRESS_STYLE}>{g.domicilio}</div>}
+                </LivePopup>
               </Popup>
             </Marker>
           ))}
 
           {/* Transportistas — low z */}
           {actores?.transportistas.filter(t => t.lat && t.lng).map(t => (
-            <Marker key={`trans-${t.id}`} position={[t.lat!, t.lng!]} icon={createTransportistaIcon()} zIndexOffset={-800}>
-              <Popup maxWidth={300}>
-                <div style={{ minWidth: 240, fontFamily: 'sans-serif' }}>
-                  <div style={{ background: '#D97706', color: '#fff', padding: '8px 12px', margin: '-12px -20px 8px', borderRadius: '4px 4px 0 0', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-                    &#9724; TRANSPORTISTA
-                  </div>
+            <Marker key={`trans-${t.id}`} position={[t.lat!, t.lng!]} icon={createTransportistaIcon()} zIndexOffset={-800} title={`Transportista: ${t.razonSocial}`} alt={`Transportista: ${t.razonSocial}`}>
+              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+                <LivePopup category="transportista" name={t.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{t.razonSocial}</div>
                   {t.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 6 }}>CUIT {t.cuit}</div>}
-                  {t.domicilio && <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260 }}>{t.domicilio}</div>}
+                  {t.domicilio && <div style={{ ...ADDRESS_STYLE, marginBottom: 6 }}>{t.domicilio}</div>}
                   {t.vehiculos && t.vehiculos.length > 0 && (
                     <div style={{ marginBottom: 4 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#D97706', textTransform: 'uppercase' as const, marginBottom: 2 }}>Vehiculos</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#9a3412', marginBottom: 2 }}>Vehículos</div>
                       {t.vehiculos.slice(0, 3).map((v, i) => (
                         <div key={i} style={{ fontSize: 11, color: '#374151', fontFamily: 'monospace' }}>
-                          {v.patente} <span style={{ color: '#9ca3af', fontFamily: 'sans-serif' }}>{v.tipo}</span>
+                          {v.patente} <span style={{ color: '#4b5563', fontFamily: 'Inter, system-ui, sans-serif' }}>{v.tipo}</span>
                         </div>
                       ))}
                     </div>
                   )}
                   {t.choferes && t.choferes.length > 0 && (
                     <div style={{ marginBottom: 4 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#D97706', textTransform: 'uppercase' as const, marginBottom: 2 }}>Choferes</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#9a3412', marginBottom: 2 }}>Choferes</div>
                       {t.choferes.slice(0, 3).map((c, i) => (
                         <div key={i} style={{ fontSize: 11, color: '#374151' }}>{c.nombre}</div>
                       ))}
@@ -386,23 +354,20 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 4, fontSize: 11 }}>
                     <div style={{ background: '#fffbeb', padding: '4px 6px', borderRadius: 4 }}>
-                      <div style={{ color: '#D97706', fontWeight: 700 }}>Coord</div>
+                      <div style={{ color: '#9a3412', fontWeight: 700 }}>Coord</div>
                       <div style={{ color: '#374151', fontFamily: 'monospace' }}>{t.lat!.toFixed(3)},{t.lng!.toFixed(3)}</div>
                     </div>
                   </div>
-                </div>
+                </LivePopup>
               </Popup>
             </Marker>
           ))}
 
           {/* Operadores — low z */}
           {actores?.operadores.filter(o => o.lat && o.lng).map(o => (
-            <Marker key={`oper-${o.id}`} position={[o.lat!, o.lng!]} icon={createOperadorIcon()} zIndexOffset={-900}>
-              <Popup maxWidth={320}>
-                <div style={{ minWidth: 260, fontFamily: 'sans-serif' }}>
-                  <div style={{ background: '#2563EB', color: '#fff', padding: '8px 12px', margin: '-12px -20px 8px', borderRadius: '4px 4px 0 0', fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
-                    &#9724; OPERADOR
-                  </div>
+            <Marker key={`oper-${o.id}`} position={[o.lat!, o.lng!]} icon={createOperadorIcon()} zIndexOffset={-900} title={`Operador: ${o.razonSocial}`} alt={`Operador: ${o.razonSocial}`}>
+              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+                <LivePopup category="operador" name={o.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{o.razonSocial}</div>
                   {o.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 4 }}>CUIT {o.cuit}</div>}
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, marginBottom: 6 }}>
@@ -419,7 +384,7 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
                       {o.tratamientos.slice(0, 3).map((t, i) => (
                         <div key={i} style={{ fontSize: 11, color: '#374151', paddingLeft: 8, borderLeft: '2px solid #93c5fd' }}>{t}</div>
                       ))}
-                      {o.tratamientos.length > 3 && <div style={{ fontSize: 10, color: '#9ca3af', paddingLeft: 8 }}>+{o.tratamientos.length - 3} mas</div>}
+                      {o.tratamientos.length > 3 && <div style={{ fontSize: 12, color: '#4b5563', paddingLeft: 8 }}>+{o.tratamientos.length - 3} más</div>}
                     </div>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
@@ -434,8 +399,8 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
                       <div style={{ color: '#374151', fontFamily: 'monospace' }}>{o.lat!.toFixed(3)},{o.lng!.toFixed(3)}</div>
                     </div>
                   </div>
-                  {o.domicilio && <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{o.domicilio}</div>}
-                </div>
+                  {o.domicilio && <div style={ADDRESS_STYLE}>{o.domicilio}</div>}
+                </LivePopup>
               </Popup>
             </Marker>
           ))}
@@ -452,18 +417,15 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
               <Polyline positions={routePoints} pathOptions={{ color: '#EF4444', weight: 3, opacity: 0.7, dashArray: '8 4' }} />
             )}
             {lastPos && (
-              <Marker position={[lastPos.latitud, lastPos.longitud]} icon={prominentIcon} zIndexOffset={2000}>
-                <Popup maxWidth={320}>
-                  <div style={{ minWidth: 260, fontFamily: 'sans-serif' }}>
-                    <div style={{ background: '#DC2626', color: '#fff', padding: '8px 12px', margin: '-12px -20px 8px', borderRadius: '4px 4px 0 0', fontWeight: 800, fontSize: 11, letterSpacing: '0.05em' }}>
-                      &#9679; EN TR&Aacute;NSITO
-                    </div>
+              <Marker position={[lastPos.latitud, lastPos.longitud]} icon={prominentIcon} zIndexOffset={2000} title={`Viaje en tránsito: ${trip.numero}`} alt={`Viaje en tránsito: ${trip.numero}`}>
+                <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+                  <LivePopup category="enTransito" name={trip.numero}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{trip.numero}</div>
                     <div style={{ fontSize: 11, color: '#6b7280' }}>{trip.transportista}</div>
                     {trip.vehiculo && (
                       <div style={{ fontSize: 11, color: '#374151', marginTop: 2 }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{trip.vehiculo.patente}</span>
-                        <span style={{ color: '#9ca3af' }}> {trip.vehiculo.descripcion}</span>
+                        <span style={{ color: '#4b5563' }}> {trip.vehiculo.descripcion}</span>
                       </div>
                     )}
                     {trip.chofer && (
@@ -480,15 +442,15 @@ export const WarRoomMap: React.FC<Props> = ({ cinemaMode, actores, enTransito, m
                     )}
                     <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
                       <div style={{ background: '#fef2f2', padding: '4px 6px', borderRadius: 4 }}>
-                        <div style={{ color: '#DC2626', fontWeight: 700 }}>Velocidad</div>
+                        <div style={{ color: '#b91c1c', fontWeight: 700 }}>Velocidad</div>
                         <div style={{ fontFamily: 'monospace' }}>{lastPos.velocidad != null ? `${lastPos.velocidad} km/h` : '—'}</div>
                       </div>
                       <div style={{ background: '#fef2f2', padding: '4px 6px', borderRadius: 4 }}>
-                        <div style={{ color: '#DC2626', fontWeight: 700 }}>GPS</div>
+                        <div style={{ color: '#b91c1c', fontWeight: 700 }}>GPS</div>
                         <div style={{ fontFamily: 'monospace' }}>{trip.ruta.length} pts</div>
                       </div>
                     </div>
-                  </div>
+                  </LivePopup>
                 </Popup>
               </Marker>
             )}

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
+import { candidatosTerritorialesInspeccion, listarInspectores, operacionesInspecciones, organizarInspeccion } from '../controllers/inspectionOperations.controller';
 import {
   actualizarInspeccion,
   actualizarInformeTecnico,
@@ -13,6 +14,7 @@ import {
   crearInspeccion,
   descargarEvidencia,
   generarActaInspeccionPdf,
+  generarExpedienteInspeccionPdf,
   generarInformeTecnicoInspeccionPdf,
   guardarBorradorInspeccion,
   listarInspecciones,
@@ -53,6 +55,9 @@ router.get('/verificar/:token', inspectionTraceLimiter, verificarInspeccionPubli
 router.use(isAuthenticated);
 router.use(requireFullAccess);
 router.get('/participacion', listarParticipacionInspeccionado);
+router.get('/operaciones', operacionesInspecciones);
+router.get('/operaciones/exportar', operacionesInspecciones);
+router.get('/inspectores', listarInspectores);
 router.get('/', listarInspecciones);
 router.post('/', crearInspeccion);
 router.get('/:id/intercambios', obtenerIntercambiosInspeccion);
@@ -61,6 +66,8 @@ router.post('/:id/intercambios/decision', exchangeUpload.array('files', 5), deci
 router.get('/:id/intercambios/:intercambioId/adjuntos/:evidenciaId', descargarAdjuntoIntercambio);
 router.get('/:id', obtenerInspeccion);
 router.patch('/:id', actualizarInspeccion);
+router.patch('/:id/organizacion', organizarInspeccion);
+router.get('/:id/candidatos', candidatosTerritorialesInspeccion);
 router.patch('/:id/borrador', guardarBorradorInspeccion);
 router.patch('/:id/informe-tecnico', actualizarInformeTecnico);
 router.patch('/:id/items', actualizarItems);
@@ -68,6 +75,7 @@ router.patch('/:id/comparaciones', actualizarComparaciones);
 router.post('/:id/estado', cambiarEstadoInspeccion);
 router.post('/:id/eventos', agregarEventoInspeccion);
 router.get('/:id/acta.pdf', generarActaInspeccionPdf);
+router.get('/:id/expediente.pdf', generarExpedienteInspeccionPdf);
 router.get('/:id/informe-tecnico.pdf', generarInformeTecnicoInspeccionPdf);
 router.post('/:id/evidencias', evidenceUpload.single('file'), subirEvidencia);
 router.patch('/:id/evidencias/:evidenciaId/anular', anularEvidencia);

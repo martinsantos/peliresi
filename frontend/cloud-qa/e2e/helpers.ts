@@ -1,0 +1,211 @@
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+
+/** Tooltip/accessible name alone does not prove that a page title is readable. */
+export async function readablePageHeading(page: Page) {
+  const heading = page.locator('header h1:visible').first();
+  if (await heading.count() === 0) return { applicable: false, reason: 'No shell H1 on this surface; custom/public headings require their own evidence' };
+  const geometry = await heading.evaluate(element => {
+    const frame = element.closest('header')!.getBoundingClientRect();
+    const bounds = element.getBoundingClientRect();
+    const range = document.createRange(); range.selectNodeContents(element);
+    const text = [...range.getClientRects()].filter(r => r.width > 0).map(r => ({ x: r.x, y: r.y, right: r.right, bottom: r.bottom }));
+    return { applicable: true, label: element.textContent, height: frame.height, text,
+      insideHeader: text.every(r => r.x >= frame.left - 1 && r.right <= frame.right + 1 && r.y >= frame.top - 1 && r.bottom <= frame.bottom + 1),
+      insideTitle: text.every(r => r.x >= bounds.left - 1 && r.right <= bounds.right + 1 && r.y >= bounds.top - 1 && r.bottom <= bounds.bottom + 1),
+      insideViewport: text.every(r => r.x >= -1 && r.right <= innerWidth + 1) };
+  });
+  expect(geometry, `Complete visible shell title: ${geometry.label}`).toMatchObject({ insideHeader: true, insideTitle: true, insideViewport: true });
+  return geometry;
+}
+
+/** Staying inside a box is insufficient if the category or role is broken mid-word. */
+export async function readableWholeWords(label: Locator) {
+  await expect(label).toBeVisible();
+  const result = await label.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    const words: Array<{ word: string; lines: number; inside: boolean }> = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      for (const match of (node.textContent || '').matchAll(/\S+/gu)) {
+        const range = document.createRange();
+        range.setStart(node, match.index!); range.setEnd(node, match.index! + match[0].length);
+        const rects = [...range.getClientRects()].filter(rect => rect.width > 0);
+        words.push({ word: match[0], lines: new Set(rects.map(rect => Math.round(rect.y * 10))).size,
+          inside: rects.every(rect => rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1
+            && rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1) });
+      }
+    }
+    return { label: element.textContent, words, width: bounds.width, height: bounds.height };
+  });
+  expect(result.words.length, 'Require rendered words, not an empty accessible name').toBeGreaterThan(0);
+  for (const word of result.words) expect(word, `Complete readable word: ${word.word}`).toMatchObject({ lines: 1, inside: true });
+  return result;
+}
+
+/** A real notice must not cover the identity, tabs or the scrollable workspace. */
+export async function nonObstructingNotices(page: Page) {
+  const notice = page.getByRole('region', { name: 'Avisos del sistema', exact: true });
+  await expect(notice).toBeVisible();
+  const geometry = await notice.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const overlaps = (other: Element | null) => {
+      if (!other) return false;
+      const r = other.getBoundingClientRect();
+      return Math.min(rect.right, r.right) - Math.max(rect.left, r.left) > 1
+        && Math.min(rect.bottom, r.bottom) - Math.max(rect.top, r.top) > 1;
+    };
+    const viewport = visualViewport;
+    return {
+      headerOverlap: overlaps(document.querySelector('header')),
+      formOverlap: overlaps(document.querySelector('main')),
+      overlayPosition: ['fixed', 'absolute'].includes(getComputedStyle(element).position),
+      insideViewport: rect.top >= (viewport?.offsetTop ?? 0) - 1
+        && rect.bottom <= (viewport ? viewport.offsetTop + viewport.height : innerHeight) + 1,
+    };
+  });
+  expect(geometry).toEqual({ headerOverlap: false, formOverlap: false, overlayPosition: false, insideViewport: true });
+  await readableFixedAction(notice.getByRole('button', { name: 'Cerrar notificación' }).first(), notice);
+}
+
+/** Page overflow alone misses clipped text in fixed navigation and dialog actions. */
+export async function readableFixedAction(action: Locator, container: Locator) {
+  await expect(action).toBeVisible();
+  const containerBounds = await container.boundingBox();
+  expect(containerBounds).not.toBeNull();
+  const result = await action.evaluate((element, parent) => {
+    const bounds = element.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const visible = { left: viewport?.offsetLeft ?? 0, top: viewport?.offsetTop ?? 0,
+      right: (viewport?.offsetLeft ?? 0) + (viewport?.width ?? document.documentElement.clientWidth),
+      bottom: (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) };
+    const inside = (rect: { left: number; right: number; top: number; bottom: number }, area: typeof visible) =>
+      rect.left >= area.left - 1 && rect.right <= area.right + 1 && rect.top >= area.top - 1 && rect.bottom <= area.bottom + 1;
+    const texts: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      if (node.textContent?.trim()) {
+        const range = document.createRange(); range.selectNodeContents(node);
+        texts.push(...Array.from(range.getClientRects()).map(rect => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom })));
+      }
+      node = walker.nextNode();
+    }
+    return { name: element.textContent?.trim(), width: bounds.width, height: bounds.height,
+      button: { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom }, visible,
+      containedByParent: inside(bounds, { left: parent.x, top: parent.y, right: parent.x + parent.width, bottom: parent.y + parent.height }),
+      containedByViewport: inside(bounds, visible), textContained: texts.every(rect => inside(rect, bounds)), texts };
+  }, containerBounds!);
+  expect(result, `Readable fixed action: ${result.name}`).toMatchObject({ containedByParent: true, containedByViewport: true, textContained: true });
+  expect(result.height).toBeGreaterThanOrEqual(44);
+}
+
+/** Real text geometry, not just a page-overflow check: long names/counts must not collide. */
+export async function readableMapLayers(group: Locator) {
+  const measurements = [];
+  for (const button of await group.getByRole('button').all()) {
+    const result = await button.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const content = { left: bounds.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft),
+        right: bounds.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight),
+        top: bounds.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop),
+        bottom: bounds.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom) };
+      const pieces = Array.from(element.querySelectorAll('[data-map-label], [data-map-count]')).flatMap(text => {
+        const range = document.createRange(); range.selectNodeContents(text);
+        return Array.from(range.getClientRects()).map(rect => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }));
+      });
+      const label = document.createRange();
+      label.selectNodeContents(element.querySelector('[data-map-label]')!);
+      const singleLineLabel = label.getClientRects().length === 1;
+      const state = element.querySelector('[data-map-state]')!.getBoundingClientRect();
+      const labelBox = element.querySelector('[data-map-label]')!.getBoundingClientRect();
+      const symbolBox = element.querySelector('[data-map-symbol] svg')!.getBoundingClientRect();
+      const stateBox = element.querySelector('[data-map-state] svg')!.getBoundingClientRect();
+      const middle = (rect: DOMRect) => rect.top + rect.height / 2;
+      const alignment = { symbolLabel: Math.abs(middle(symbolBox) - middle(labelBox)),
+        stateLabel: Math.abs(middle(stateBox) - middle(labelBox)) };
+      const ordered = symbolBox.right <= labelBox.left && labelBox.right <= stateBox.left;
+      const statePadded = stateBox.left >= content.left - 1 && stateBox.right <= content.right + 1
+        && stateBox.top >= content.top - 1 && stateBox.bottom <= content.bottom + 1;
+      const collides = pieces.some(rect => Math.min(rect.right, state.right) - Math.max(rect.left, state.left) > 1 && Math.min(rect.bottom, state.bottom) - Math.max(rect.top, state.top) > 1);
+      const contained = pieces.every(rect => rect.left >= bounds.left && rect.right <= bounds.right + 1 && rect.top >= bounds.top && rect.bottom <= bounds.bottom + 1);
+      const padded = pieces.every(rect => rect.left >= content.left - 1 && rect.right <= content.right + 1 && rect.top >= content.top - 1 && rect.bottom <= content.bottom + 1);
+      return { name: element.getAttribute('aria-label'), collides, contained, padded, singleLineLabel, ordered, statePadded, alignment, height: bounds.height,
+        content, texts: pieces };
+    });
+    expect(result, `Readable map control: ${result.name}, ${JSON.stringify({ content: result.content, texts: result.texts, alignment: result.alignment })}`).toMatchObject({ collides: false, contained: true, padded: true, singleLineLabel: true, ordered: true, statePadded: true });
+    expect(result.alignment.symbolLabel, `${result.name}: category icon and label share one row`).toBeLessThanOrEqual(1);
+    expect(result.alignment.stateLabel, `${result.name}: check/hidden indicator and label share one row`).toBeLessThanOrEqual(1);
+    expect(result.height).toBeGreaterThanOrEqual(44);
+    measurements.push(result);
+  }
+  return measurements;
+}
+
+export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';
+
+const fixturePages = new WeakSet<Page>();
+async function isolatedMapTiles(page: Page, info: TestInfo) {
+  if (process.env.SITREP_QA_EXECUTOR !== 'preview-container' || fixturePages.has(page)) return;
+  fixturePages.add(page);
+  const fontRoot=path.resolve(process.env.QA_ARTIFACTS!,'../.qa-fonts');
+  const fonts=JSON.parse(readFileSync(path.join(fontRoot,'manifest.json'),'utf8'));
+  info.annotations.push({type:'provider-cache',description:'Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography.'});
+  await page.route(/^https:\/\/fonts\.(?:googleapis|gstatic)\.com\//,async route=>{
+    expect(route.request().method()).toBe('GET');
+    const asset=fonts[route.request().url()];expect(asset,'Known public font asset').toBeDefined();
+    expect(asset.file).toMatch(/^[a-f0-9]{64}\.(?:css|woff2)$/);
+    const body=readFileSync(path.join(fontRoot,asset.file));
+    expect(createHash('sha256').update(body).digest('hex')).toBe(asset.sha256);
+    await route.fulfill({body,contentType:asset.contentType,headers:{'access-control-allow-origin':'*'}});
+  });
+  info.annotations.push({ type: 'provider-fixture', description: 'OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified.' });
+  await page.route('https://tile.openstreetmap.org/**', async route => {
+    expect(route.request().method()).toBe('GET');
+    expect(new URL(route.request().url()).pathname).toMatch(/^\/\d+\/\d+\/\d+\.png$/);
+    await route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><path fill="#edf2ef" d="M0 0h256v256H0z"/><path fill="none" stroke="#c6d5cc" d="M0 64h256M0 128h256M0 192h256M64 0v256M128 0v256M192 0v256"/><text x="18" y="32" fill="#52655a" font-size="12">QA - MAPA SIMULADO</text></svg>' });
+  });
+}
+
+/** Real synthetic-account login; no auth storage or business API interception. */
+export async function login(page: Page, info: TestInfo, user = 'admin', options: { showWelcome?: boolean } = {}) {
+  await isolatedMapTiles(page, info);
+  // Metadata consumed only by the loopback QA reverse proxy. Login still goes
+  // through the real form and real backend; this cookie carries no credentials.
+  await page.context().addCookies([{ name: 'sitrep_qa_client', value: `127.11.${Math.floor(Math.random() * 250)}.${1 + Math.floor(Math.random() * 250)}`, url: 'http://127.0.0.1:4177' }]);
+  if (!options.showWelcome) await page.addInitScript(() => {
+    // Only presentation preferences. Authentication still uses the actual form.
+    for (const role of ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'AUDITOR',
+      'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'INSPECTOR']) localStorage.setItem(`sitrep_onboarding_${role}`, 'true');
+  });
+  await page.goto(`${prefix(info)}/login`);
+  await page.getByLabel('Correo electrónico o CUIT').fill(`${user}@night-qa.invalid`);
+  await page.getByLabel('Contraseña', { exact: true }).fill('OnlyLocal-NightQA-2026!');
+  const response = page.waitForResponse(res => res.url().endsWith('/api/auth/login') && res.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  expect((await response).status()).toBe(200);
+  await expect(page).not.toHaveURL(/\/login$/);
+  await expect(page.getByRole('banner')).toBeVisible();
+  const skipWelcome = page.getByRole('button', { name: 'Saltar introducción', exact: true });
+  if (!options.showWelcome && await skipWelcome.isVisible()) await skipWelcome.click();
+}
+
+export async function createSpontaneousInspection(page: Page, info: TestInfo) {
+  await page.goto(`${prefix(info)}/inspecciones`);
+  await page.getByRole('button', { name: 'Nueva inspección', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Tipo de inspección', exact: true }).selectOption('ESPONTANEA');
+  await page.getByLabel('Descripción inicial').fill('QA hallazgo sintético de resiliencia');
+  await page.getByLabel('Ubicación prevista').fill('QA lugar sintético sin actor');
+  const response = page.waitForResponse(res => res.url().endsWith('/api/inspecciones') && res.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Crear expediente', exact: true }).click();
+  const saved = await response;
+  expect(saved.status()).toBe(201);
+  const inspection = (await saved.json()).data;
+  await page.getByRole('navigation', { name: 'Secciones del expediente' }).getByRole('link', { name: 'Registro', exact: true }).click();
+  await expect(page.locator('#inspection-observations')).toBeVisible();
+  return inspection as { id: string; numero: string; items: Array<{ id: string; etiqueta: string }> };
+}

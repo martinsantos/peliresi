@@ -1,22 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { inspeccionService } from '../services/inspeccion.service';
 import { getAllOffline, getOffline, saveOffline } from '../services/indexeddb';
 import { isOfflineNetworkError } from '../services/offlineSession';
 import type { PaginatedInspections } from '../services/inspeccion.service';
-import { inspectionActor, type Inspection } from '../types/inspection';
+import { inspectionActor, inspectionTypeOf, type Inspection, type InspectionType } from '../types/inspection';
 import type { InspectionActorType, InspectionState } from '../types/inspection';
 
 export interface InspectionListResult extends PaginatedInspections { offline?: true }
 
-type InspectionListParams = { estado?: InspectionState; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number };
+type InspectionListParams = { estado?: InspectionState; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number };
 
 export function filterCachedInspections(inspections: Inspection[], params?: InspectionListParams): InspectionListResult {
   const search = params?.search?.trim().toLocaleLowerCase('es-AR') || '';
   const filtered = inspections.filter((inspection) => {
     const actor = inspectionActor(inspection);
     return (!params?.estado || inspection.estado === params.estado)
+      && (!params?.tipoInspeccion || inspectionTypeOf(inspection) === params.tipoInspeccion)
       && (!params?.tipoActor || inspection.tipoActor === params.tipoActor)
       && (!params?.actorId || actor?.id === params.actorId)
       && (!search || [inspection.numero, inspection.numeroActa, actor?.razonSocial, actor?.cuit]
@@ -51,8 +53,12 @@ export function useInspections(params?: InspectionListParams) {
 export function useInspection(id: string) {
   const { currentUser } = useAuth();
   const cacheKey = currentUser?.id && id ? `${currentUser.id}:${id}` : '';
+  const [offlineCacheStatus, setOfflineCacheStatus] = useState({ cacheKey, problem: false });
+  const cacheAttempt = useRef(0);
+  const activeCacheKey = useRef(cacheKey);
+  activeCacheKey.current = cacheKey;
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['inspecciones', 'detail', currentUser?.id, id],
     // Run the query even offline: its network-only catch reads the scoped
     // IndexedDB snapshot. React Query's default would pause before that catch.
@@ -60,7 +66,14 @@ export function useInspection(id: string) {
     queryFn: async () => {
       try {
         const inspection = await inspeccionService.get(id);
-        await saveOffline('inspection_cases', { id: cacheKey, inspection }).catch(() => undefined);
+        const attempt = ++cacheAttempt.current;
+        setOfflineCacheStatus({ cacheKey, problem: false });
+        // A blocked IndexedDB upgrade must never hold an online dossier behind
+        // the loading screen. The server copy is usable while the local backup
+        // settles independently, and a failed backup is reported to the user.
+        void saveOffline('inspection_cases', { id: cacheKey, inspection })
+          .then(() => { if (activeCacheKey.current === cacheKey && cacheAttempt.current === attempt) setOfflineCacheStatus({ cacheKey, problem: false }); })
+          .catch(() => { if (activeCacheKey.current === cacheKey && cacheAttempt.current === attempt) setOfflineCacheStatus({ cacheKey, problem: true }); });
         return inspection;
       } catch (error) {
         // A cached case is a connectivity fallback, never a replacement for an
@@ -75,6 +88,7 @@ export function useInspection(id: string) {
     },
     enabled: Boolean(id && cacheKey),
   });
+  return { ...query, offlineCacheProblem: offlineCacheStatus.cacheKey === cacheKey && offlineCacheStatus.problem };
 }
 
 export function useInspectionMutation<TInput, TData = unknown>(
@@ -86,7 +100,7 @@ export function useInspectionMutation<TInput, TData = unknown>(
   return useMutation({
     mutationFn,
     onSuccess: async () => {
-      const refreshes = [queryClient.invalidateQueries({ queryKey: ['inspecciones', 'list'] })];
+      const refreshes = [queryClient.invalidateQueries({ queryKey: ['inspecciones', 'list'] }), queryClient.invalidateQueries({ queryKey: ['inspecciones', 'operaciones'] })];
       if (inspectionId) {
         // El detalle incluye el usuario para no mezclar datos al impersonar.
         // La clave anterior omitía ese segmento y nunca refrescaba el expediente activo.

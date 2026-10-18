@@ -7,7 +7,8 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
-import { parseDateParam } from '../utils/dateRange';
+import { parseOperationalDateParam } from '../utils/dateRange';
+import { canAccessManifiesto } from '../utils/roleFilter';
 
 /**
  * GET /api/centro-control/actividad
@@ -22,17 +23,12 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     const { fechaDesde, fechaHasta, capas, incluirTodos } = req.query;
     const showAll = incluirTodos === 'true';
 
-    // Date range — ensure "hasta" covers the full day (end-of-day, not midnight)
-    // parseDateParam throws AppError(400) if the input is malformed
-    const desdeParsed = parseDateParam(fechaDesde, 'fechaDesde');
-    const hastaRawParsed = parseDateParam(fechaHasta, 'fechaHasta');
+    // The selector supplies Mendoza civil days, not UTC days. A timestamp
+    // supplied explicitly remains an instant, even when its time is midnight.
+    const desdeParsed = parseOperationalDateParam(fechaDesde, 'fechaDesde');
+    const hastaParsed = parseOperationalDateParam(fechaHasta, 'fechaHasta', true);
     const desde = desdeParsed ?? new Date(Date.now() - 30 * 24 * 3600000);
-    const hastaRaw = hastaRawParsed ?? new Date();
-    // If fechaHasta is a date-only string (e.g. "2026-02-05"), it parses to midnight.
-    // Bump to 23:59:59.999 so the entire day is included.
-    const hasta = hastaRawParsed && hastaRaw.getUTCHours() === 0 && hastaRaw.getUTCMinutes() === 0
-      ? new Date(hastaRaw.getTime() + 86399999)
-      : hastaRaw;
+    const hasta = hastaParsed ?? new Date();
 
     // Layers to include — empty string means zero layers (not all layers)
     const layerList = capas !== undefined
@@ -40,6 +36,12 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       : ['generadores', 'transportistas', 'operadores', 'transito'];
 
     const dateFilter = { gte: desde, lte: hasta };
+    // One activity cohort for the map, agenda, KPI and operational pipeline.
+    // An older trip can be active through its actual start or a GPS observation.
+    const transitWhere = { estado: 'EN_TRANSITO' as const, OR: [
+      { createdAt: dateFilter }, { fechaRetiro: dateFilter },
+      { tracking: { some: { timestamp: dateFilter } } },
+    ] };
 
     const result: any = {
       generadores: [],
@@ -193,19 +195,16 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     }
 
     // ── En Tránsito layer — trips with real activity in the period ──
-    // Show EN_TRANSITO if created in range OR has GPS tracking in range
+    // Use the same actual trip cohort as the KPI, including starts without GPS.
     if (layerList.includes('transito')) {
       const enTransito = await prisma.manifiesto.findMany({
-        where: {
-          estado: 'EN_TRANSITO',
-          OR: [
-            { createdAt: dateFilter },
-            { tracking: { some: { timestamp: dateFilter } } },
-          ],
-        },
+        where: transitWhere,
         select: {
           id: true,
           numero: true,
+          generadorId: true,
+          transportistaId: true,
+          operadorId: true,
           transportista: {
             select: { razonSocial: true },
           },
@@ -232,6 +231,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
       result.enTransito = enTransito.map(m => ({
         manifiestoId: m.id,
         numero: m.numero,
+        // Global operation is not permission to open a private dossier.
+        canViewDetail: !!req.user && canAccessManifiesto(req.user, m),
         transportista: m.transportista?.razonSocial ?? null,
         origen: m.generador?.razonSocial ?? null,
         origenLatLng: m.generador?.latitud && m.generador?.longitud
@@ -252,15 +253,18 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     // ── Estadísticas ──
     // 4 Prisma queries + 1 raw SQL replaces the previous 12 individual count() calls
     const [
-      totalManifiestos,
+      distributionCounts,
       generadoresActivos,
       operadoresActivos,
+      enTransitoCount,
       // Single raw SQL GROUP BY replaces 8 per-estado count() queries
       estadoCounts,
       residuosAgg,
       manifiestosPorDia,
     ] = await Promise.all([
-      prisma.manifiesto.count({ where: { createdAt: dateFilter } }),
+      // Historical total and distribution share one cohort and one DB snapshot.
+      // Stage activity below retains its separate event-date contract.
+      prisma.manifiesto.groupBy({ by: ['estado'], where: { createdAt: dateFilter }, _count: { _all: true } }),
       prisma.generador.count({
         where: {
           activo: true,
@@ -273,12 +277,14 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           manifiestos: { some: { fechaRecepcion: dateFilter } },
         },
       }),
+      // Reuse the actual returned map rows when visible, so a concurrent state
+      // transition cannot make the map and its KPI disagree within one response.
+      layerList.includes('transito') ? Promise.resolve(result.enTransito.length) : prisma.manifiesto.count({ where: transitWhere }),
       // One query for all 8 estado counts (replaces 8 individual prisma.manifiesto.count calls)
       prisma.$queryRaw<{ estado: string; cnt: bigint }[]>`
         SELECT estado, COUNT(*)::bigint as cnt FROM manifiestos
         WHERE (
           (estado IN ('BORRADOR', 'APROBADO', 'RECHAZADO') AND "createdAt" >= ${desde} AND "createdAt" <= ${hasta})
-          OR (estado = 'EN_TRANSITO' AND "fechaRetiro" >= ${desde} AND "fechaRetiro" <= ${hasta})
           OR (estado = 'ENTREGADO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaEntrega" >= ${desde} AND "fechaEntrega" <= ${hasta}))
           OR (estado = 'RECIBIDO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaRecepcion" >= ${desde} AND "fechaRecepcion" <= ${hasta}))
           OR (estado = 'EN_TRATAMIENTO' AND ("createdAt" >= ${desde} AND "createdAt" <= ${hasta} OR "fechaRecepcion" >= ${desde} AND "fechaRecepcion" <= ${hasta}))
@@ -313,7 +319,6 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     }
     const borradores = countMap['BORRADOR'] || 0;
     const aprobados = countMap['APROBADO'] || 0;
-    const enTransitoCount = countMap['EN_TRANSITO'] || 0;
     const entregados = countMap['ENTREGADO'] || 0;
     const recibidos = countMap['RECIBIDO'] || 0;
     const enTratamiento = countMap['EN_TRATAMIENTO'] || 0;
@@ -324,7 +329,8 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
     const enTransitoActivos = enTransitoCount;
 
     result.estadisticas = {
-      totalManifiestos,
+      totalManifiestos: distributionCounts.reduce((total, row) => total + row._count._all, 0),
+      distribucionPorEstado: Object.fromEntries(distributionCounts.map(row => [row.estado, row._count._all])),
       enTransitoActivos,
       generadoresActivos,
       operadoresActivos,

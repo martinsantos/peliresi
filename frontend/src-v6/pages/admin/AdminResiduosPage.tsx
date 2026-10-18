@@ -10,7 +10,6 @@ import {
   FlaskConical,
   AlertTriangle,
   Leaf,
-  Beaker,
   Download,
   FileDown,
   Loader2,
@@ -27,6 +26,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
+import { CRUDSummary } from '../../components/crud/CRUDSummary';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -436,22 +436,19 @@ export const AdminResiduosPage: React.FC = () => {
   const columns = [
     {
       key: 'residuo',
-      width: '24%',
       header: 'Residuo',
       sortable: true,
       render: (row: ResiduoDisplay) => (
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          <div role="img" aria-label={row.tipo} className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
             row.peligrosidad === 'alta' ? 'bg-error-100' :
-            row.peligrosidad === 'media' ? 'bg-warning-100' :
+            row.tipo === 'Peligroso' ? 'bg-warning-100' :
             'bg-success-100'
           }`}>
-            {row.peligrosidad === 'alta' ? (
-              <AlertTriangle size={20} className="text-error-600" />
-            ) : row.peligrosidad === 'media' ? (
-              <Beaker size={20} className="text-warning-600" />
+            {row.tipo === 'Peligroso' ? (
+              <AlertTriangle size={20} aria-hidden="true" className={row.peligrosidad === 'alta' ? 'text-error-700' : 'text-warning-700'} />
             ) : (
-              <Leaf size={20} className="text-success-600" />
+              <Leaf size={20} aria-hidden="true" className="text-success-700" />
             )}
           </div>
           <div className="min-w-0">
@@ -463,7 +460,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'corrienteY',
-      width: '8%',
+      width: '7rem',
       header: 'Corriente Y',
       sortable: true,
       hiddenBelow: 'md' as const,
@@ -477,7 +474,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'peligrosidad',
-      width: '10%',
+      width: '9rem',
       header: 'Peligrosidad',
       sortable: true,
       render: (row: ResiduoDisplay) => {
@@ -488,7 +485,7 @@ export const AdminResiduosPage: React.FC = () => {
           ninguna: 'success',
         };
         return (
-          <Badge variant="soft" color={colors[row.peligrosidad]}>
+          <Badge variant="soft" color={colors[row.peligrosidad.toLowerCase()] || (row.tipo === 'Peligroso' ? 'warning' : 'success')}>
             {row.peligrosidad.charAt(0).toUpperCase() + row.peligrosidad.slice(1)}
           </Badge>
         );
@@ -496,10 +493,10 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'generadores',
-      width: '10%',
+      width: '9rem',
       header: 'Generadores',
       sortable: true,
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: ResiduoDisplay) => row.generadoresCount > 0 ? (
         <div className="flex items-center gap-1.5">
           <Factory size={14} className="text-purple-500" />
@@ -511,10 +508,10 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'operadores',
-      width: '10%',
+      width: '8rem',
       header: 'Operadores',
       sortable: true,
-      hiddenBelow: 'lg' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: ResiduoDisplay) => {
         const count = Math.max(row.operadoresCount, row.operadoresDbCount);
         return count > 0 ? (
@@ -529,10 +526,10 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'manifiestos',
-      width: '10%',
+      width: '8rem',
       header: 'Manifiestos',
       sortable: true,
-      hiddenBelow: 'xl' as const,
+      hiddenBelow: '2xl' as const,
       render: (row: ResiduoDisplay) => row.manifestosCount > 0 ? (
         <div className="flex items-center gap-1.5">
           <FileText size={14} className="text-primary-500" />
@@ -544,7 +541,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '8%',
+      width: '7rem',
       header: 'Estado',
       sortable: true,
       render: (row: ResiduoDisplay) => (
@@ -555,7 +552,7 @@ export const AdminResiduosPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '8%',
+      width: '7rem',
       header: 'Acciones',
       render: (row: ResiduoDisplay) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -603,80 +600,19 @@ export const AdminResiduosPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-info-100 rounded-lg">
-                <FlaskConical size={20} className="text-info-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{statsTotal}</p>
-                <p className="text-sm text-neutral-600 truncate">Total Tipos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-error-100 rounded-lg">
-                <AlertTriangle size={20} className="text-error-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{statsPeligrosos}</p>
-                <p className="text-sm text-neutral-600 truncate">Peligrosos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <Leaf size={20} className="text-success-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{statsNoPeligrosos}</p>
-                <p className="text-sm text-neutral-600 truncate">No Peligrosos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning-100 rounded-lg">
-                <Flame size={20} className="text-warning-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{corrientesActivas}</p>
-                <p className="text-sm text-neutral-600 truncate">Corrientes Y</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <FileText size={20} className="text-primary-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold text-neutral-900">{totalManifiestos}</p>
-                <p className="text-sm text-neutral-600 truncate">Manifiestos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <CRUDSummary desktopColumns={5} stats={[
+        { label: 'Total Tipos', value: statsTotal, icon: <FlaskConical size={20} />, iconBg: 'bg-info-100', iconColor: 'text-info-600' },
+        { label: 'Peligrosos', value: statsPeligrosos, icon: <AlertTriangle size={20} />, iconBg: 'bg-error-100', iconColor: 'text-error-600' },
+        { label: 'No Peligrosos', value: statsNoPeligrosos, icon: <Leaf size={20} />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+        { label: 'Corrientes Y', value: corrientesActivas, icon: <Flame size={20} />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
+        { label: 'Manifiestos', value: totalManifiestos, icon: <FileText size={20} />, iconBg: 'bg-primary-100', iconColor: 'text-primary-600' },
+      ]} />
 
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-wrap gap-4">
+            <div className="min-w-0 flex-[1_1_18rem]">
               <SearchInput
                 value={searchQuery}
                 onChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
@@ -792,6 +728,8 @@ export const AdminResiduosPage: React.FC = () => {
               onSort={(key, dir) => setSortConfig({ key, direction: dir })}
               onRowClick={openDetalle}
               stickyHeader
+              fixedLayout
+              className="[&_table]:min-w-[40rem]"
             />
             </div>
             <Pagination

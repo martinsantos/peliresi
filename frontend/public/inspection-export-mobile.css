@@ -1,0 +1,20 @@
+/* Keep the inspection export menu inside the mobile viewport.
+   The trigger wraps to the left below the expediente title on narrow screens. */
+@media (max-width: 639px) {
+  header.space-y-3:has(a[aria-label^="Abrir actor inspeccionado"])
+    > .flex.flex-wrap.items-start.justify-between
+    > .relative.inline-block {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  header.space-y-3:has(a[aria-label^="Abrir actor inspeccionado"])
+    > .flex.flex-wrap.items-start.justify-between
+    > .relative.inline-block
+    > .absolute.top-full {
+    left: 0 !important;
+    right: auto !important;
+    width: min(18rem, calc(100vw - 2rem)) !important;
+    min-width: 0 !important;
+  }
+}

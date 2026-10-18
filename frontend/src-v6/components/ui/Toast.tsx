@@ -5,7 +5,6 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { CheckCircle, AlertCircle, Info, X, AlertTriangle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -25,6 +24,9 @@ interface Toast {
   title: string;
   message?: string;
   duration?: number;
+  actionLabel?: string;
+  onAction?: () => void;
+  compact?: boolean;
 }
 
 interface ToastItemProps extends Toast {
@@ -36,6 +38,7 @@ interface ToastItemProps extends Toast {
 // ========================================
 let toastListeners: ((toasts: Toast[]) => void)[] = [];
 let toasts: Toast[] = [];
+const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 const notifyListeners = () => {
   toastListeners.forEach((listener) => listener([...toasts]));
@@ -43,20 +46,35 @@ const notifyListeners = () => {
 
 export const toast = {
   add: (t: Omit<Toast, 'id'>) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    toasts = [...toasts, { ...t, id }];
+    // Success confirmations are a current-state signal, not an accumulating
+    // timeline. Never supersede errors, warnings or duration-zero notices.
+    if (t.type === 'success' && (t.duration ?? 5000) > 0) {
+      toasts = toasts.filter(item => {
+        const superseded = item.type === 'success' && (item.duration ?? 5000) > 0;
+        if (superseded) {
+          clearTimeout(expiryTimers.get(item.id));
+          expiryTimers.delete(item.id);
+        }
+        return !superseded;
+      });
+    }
+    const existing = toasts.find(item => item.type === t.type && item.title === t.title && item.message === t.message);
+    const id = existing?.id ?? Math.random().toString(36).slice(2, 11);
+    if (existing) toasts = toasts.map(item => item.id === id ? { ...t, id } : item);
+    else toasts = [...toasts, { ...t, id }];
     notifyListeners();
-
-    // Auto remove
-    const duration = t.duration || 5000;
-    setTimeout(() => {
-      toast.remove(id);
-    }, duration);
+    clearTimeout(expiryTimers.get(id));
+    expiryTimers.delete(id);
+    // An explicit zero keeps an actionable notice until the user dismisses it.
+    const duration = t.duration ?? 5000;
+    if (duration > 0) expiryTimers.set(id, setTimeout(() => toast.remove(id), duration));
 
     return id;
   },
   
   remove: (id: string) => {
+    clearTimeout(expiryTimers.get(id));
+    expiryTimers.delete(id);
     toasts = toasts.filter((t) => t.id !== id);
     notifyListeners();
   },
@@ -79,6 +97,7 @@ export const toast = {
   
   subscribe: (listener: (toasts: Toast[]) => void) => {
     toastListeners.push(listener);
+    listener([...toasts]);
     return () => {
       toastListeners = toastListeners.filter((l) => l !== listener);
     };
@@ -111,35 +130,44 @@ const ToastItem: React.FC<ToastItemProps> = ({
   title,
   message,
   onRemove,
+  actionLabel,
+  onAction,
+  compact,
 }) => {
-  const [isExiting, setIsExiting] = useState(false);
-
-  const handleRemove = () => {
-    setIsExiting(true);
-    setTimeout(() => onRemove(id), 300);
-  };
-
+  // Only the unread summary uses the compact row. Full warnings/errors keep
+  // their explanation and actions; never truncate critical information.
+  if (compact && !message && type === 'info') return <div role="status" aria-atomic="true" data-compact-notice="true"
+    className={cn('flex w-full items-center gap-2 rounded-xl border px-2 py-1', toastStyles[type])}>
+    <span className="shrink-0" aria-hidden="true">{toastIcons[type]}</span>
+    {onAction ? <button type="button" className="min-h-11 min-w-0 flex-1 rounded-lg text-left text-sm font-semibold text-primary-800 underline focus-visible:outline-primary-700"
+      aria-label={title + '. ' + (actionLabel || 'Abrir')} onClick={() => { onAction(); onRemove(id); }}>{title}</button>
+      : <p className="min-w-0 flex-1 break-words text-sm font-semibold text-neutral-900">{title}</p>}
+    <button type="button" aria-label="Cerrar notificación" onClick={() => onRemove(id)}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline-primary-700"><X size={16} /></button>
+  </div>;
   return (
     <div
       className={cn(
-        'w-full rounded-xl border p-3 shadow-3 sm:p-4',
-        'animate-slide-in-right',
-        toastStyles[type],
-        isExiting && 'animate-fade-out'
+        'w-full rounded-xl border p-3 shadow-3',
+        toastStyles[type]
       )}
-      role="alert"
+      role={type === 'error' || type === 'warning' ? 'alert' : 'status'}
+      aria-atomic="true"
     >
       <div className="flex gap-3">
         <div className="shrink-0">{toastIcons[type]}</div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-neutral-900 sm:text-base">{title}</p>
           {message && (
-            <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-neutral-600 sm:text-sm">{message}</p>
+            <p className="mt-1 break-words text-sm leading-relaxed text-neutral-700">{message}</p>
           )}
+          {onAction && <button type="button" className="mt-1 min-h-11 rounded-lg px-2 text-sm font-semibold text-primary-800 underline focus-visible:outline-primary-700"
+            onClick={() => { onAction(); onRemove(id); }}>{actionLabel || 'Abrir'}</button>}
         </div>
         <button
-          onClick={handleRemove}
-          className="shrink-0 text-neutral-400 hover:text-neutral-600 transition-colors"
+          type="button"
+          onClick={() => onRemove(id)}
+          className="flex min-h-11 min-w-11 shrink-0 items-center justify-center self-start rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
           aria-label="Cerrar notificación"
         >
           <X size={16} />
@@ -161,8 +189,12 @@ export const ToastContainer: React.FC = () => {
     });
   }, []);
 
-  const container = (
-    <div className="pointer-events-none fixed inset-x-3 top-3 z-[9999] flex flex-col gap-2 sm:left-auto sm:right-4 sm:top-4 sm:w-96 sm:gap-3">
+  if (activeToasts.length === 0) return null;
+
+  // Layouts provide an outlet outside the scrollable form. Notices occupy real
+  // space instead of covering case identity, tabs, maps or fixed field actions.
+  return (
+    <div aria-label="Avisos del sistema" role="region" className="relative flex max-h-[30dvh] shrink-0 flex-col gap-2 overflow-y-auto border-b border-neutral-200 bg-neutral-50 px-3 py-2 sm:px-4">
       {activeToasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastItem {...t} onRemove={toast.remove} />
@@ -171,7 +203,6 @@ export const ToastContainer: React.FC = () => {
     </div>
   );
 
-  return createPortal(container, document.body);
 };
 
 export default ToastContainer;

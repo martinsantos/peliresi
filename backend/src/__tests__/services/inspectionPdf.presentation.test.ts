@@ -5,7 +5,7 @@ import { spawnSync } from 'child_process';
 import { PassThrough } from 'stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { demoEvidenceIds, demoInspection, demoPhotoCaption, DemoVariant } from '../../../scripts/generate-inspection-pdf-demos';
-import { streamInspectionTechnicalReportPdf } from '../../services/inspectionActPdf.service';
+import { streamInspectionDossierPdf, streamInspectionTechnicalReportPdf } from '../../services/inspectionActPdf.service';
 import { streamInspectionActPdf } from '../../services/inspectionFieldActPdf.service';
 
 type PdfRenderer = typeof streamInspectionActPdf;
@@ -86,6 +86,49 @@ beforeAll(async () => {
 }, 30_000);
 
 describe('inspection PDF presentation regressions', () => {
+  it('unifies recorded field facts, formalities, technical evaluation and photos without duplicating the conclusion', async () => {
+    const inspection = demoInspection('long');
+    const document = await renderAndExtract(streamInspectionDossierPdf, inspection);
+    expect(document.text).toContain('EXPEDIENTE DE INSPECCIÓN');
+    expect(document.text).toContain('Acta de campo');
+    expect(document.text).toContain(inspection.datosActa.requerimientos);
+    expect(document.text).toContain(inspection.datosActa.notificacionDetalle);
+    expect(document.text).toContain(inspection.datosActa.firmaIntervinienteDetalle);
+    expect(document.text).toContain('FIN-EVALUACION-EXTENSA');
+    expect(document.text.split(inspection.informeTecnico!.conclusion)).toHaveLength(2);
+    expect(document.text).not.toContain('Documento 2 de 2');
+    expect(document.text).not.toContain('CONCLUSIÓN TÉCNICA · EXTRACTO');
+    const gallery = sectionText(document, 'Evidencia fotográfica', 'Inventario de evidencias');
+    expectCompleteText(gallery, demoPhotoCaption('long'));
+    expect(gallery).not.toContain(ref(demoEvidenceIds.annulled));
+    expect(document.text).toContain('ANULADA');
+    expect(document.text).toContain('no sustituye una firma digital');
+  });
+
+  it('keeps human notes and state decisions while omitting repetitive automatic saves from the unified copy', async () => {
+    const inspection = demoInspection('short');
+    inspection.eventos = [
+      { id: 'note', tipo: 'COMENTARIO_INTERNO', titulo: 'Nota de constatación', detalle: 'TESTIMONIO-QUE-DEBE-PERMANECER', createdAt: new Date(), usuario: inspection.inspector, adjuntos: [] },
+      { id: 'save', tipo: 'BORRADOR_ACTUALIZADO', titulo: 'GUARDADO-AUTOMATICO-REPETIDO', createdAt: new Date(), usuario: inspection.inspector, adjuntos: [] },
+    ] as any;
+    const document = await renderAndExtract(streamInspectionDossierPdf, inspection);
+    expect(document.text).toContain('TESTIMONIO-QUE-DEBE-PERMANECER');
+    expect(document.text).not.toContain('GUARDADO-AUTOMATICO-REPETIDO');
+  });
+
+  it('exports unknown-responsible cases without invented actors, conclusions or empty optional forms', async () => {
+    const inspection = { ...demoInspection('short'), tipoActor: null, generador: null, operador: null, transportista: null, comparaciones: [], datosActa: {} };
+    const document = await renderAndExtract(streamInspectionDossierPdf, inspection as any);
+    expect(document.text).toContain('Responsable por identificar');
+    expect(document.text).toContain('OBSERVACION-DE-CAMPO-SIN-CONCLUSION');
+    expect(document.text).toContain('Evaluación técnica pendiente');
+    expect(document.text).toContain('BORRADOR');
+    expect(document.text).not.toContain('CUIT s/d');
+    expect(document.text).not.toContain('Declarado y verificado');
+    expect(document.text).not.toContain('Código postal:');
+    expect(document.text).not.toContain('null');
+  });
+
   it('never promotes field observations into an absent executive conclusion', () => {
     const report = documentFor('report', 'short');
     const summary = sectionText(report, 'TÉCNICA · EXTRACTO', 'RECOMENDACIÓN');

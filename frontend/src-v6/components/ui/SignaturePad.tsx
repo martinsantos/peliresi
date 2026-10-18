@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Button } from './ButtonV2';
 
 interface SignaturePadProps {
   onConfirm: (dataUrl: string) => void;
@@ -42,6 +43,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
   }, [penColor, lineWidth]);
 
   const isDrawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
   const getPos = (e: MouseEvent | TouchEvent) => {
     const canvas = canvasRef.current!;
@@ -70,9 +72,9 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     const { x, y } = getPos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
+    lastPointRef.current = { x, y };
     isDrawingRef.current = true;
     setIsDrawing(true);
-    setHasContent(true);
   }, [getCtx]);
 
   const draw = useCallback((e: MouseEvent | TouchEvent) => {
@@ -81,12 +83,18 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     const ctx = getCtx();
     if (!ctx) return;
     const { x, y } = getPos(e);
+    const previous = lastPointRef.current;
+    // Pressing the canvas (or a stationary move) is not a handwritten stroke.
+    if (!previous || (x === previous.x && y === previous.y)) return;
     ctx.lineTo(x, y);
     ctx.stroke();
+    lastPointRef.current = { x, y };
+    setHasContent(true);
   }, [getCtx]);
 
   const endDraw = useCallback(() => {
     isDrawingRef.current = false;
+    lastPointRef.current = null;
     setIsDrawing(false);
   }, []);
 
@@ -99,6 +107,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     canvas.addEventListener('touchstart', startDraw, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('touchcancel', endDraw);
     canvas.addEventListener('mousedown', startDraw as EventListener);
     canvas.addEventListener('mousemove', draw as EventListener);
     canvas.addEventListener('mouseup', endDraw);
@@ -107,6 +116,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
       canvas.removeEventListener('touchstart', startDraw);
       canvas.removeEventListener('touchmove', draw);
       canvas.removeEventListener('touchend', endDraw);
+      canvas.removeEventListener('touchcancel', endDraw);
       canvas.removeEventListener('mousedown', startDraw as EventListener);
       canvas.removeEventListener('mousemove', draw as EventListener);
       canvas.removeEventListener('mouseup', endDraw);
@@ -119,6 +129,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    endDraw();
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.strokeStyle = penColor;
@@ -142,31 +153,33 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
           ref={canvasRef}
           width={width}
           height={height}
+          aria-label="Lienzo de firma"
           className="w-full cursor-crosshair touch-none"
           style={{ aspectRatio: `${width}/${height}` }}
         />
         {!hasContent && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-neutral-400 text-sm">Firme aquí</span>
+            <span className="text-neutral-600 text-sm">Firme aquí</span>
           </div>
         )}
       </div>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={handleClear}
-          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
+          className="flex-1"
         >
           Limpiar
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleConfirm}
           disabled={!hasContent}
-          className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex-1"
         >
-          Confirmar Firma
-        </button>
+          Usar firma
+        </Button>
       </div>
     </div>
   );

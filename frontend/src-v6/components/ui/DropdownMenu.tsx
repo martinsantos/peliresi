@@ -96,19 +96,23 @@ interface DropdownContentProps {
 }
 
 export function DropdownContent({ children, align = 'end', className }: DropdownContentProps) {
-  const { isOpen, setIsOpen } = useDropdown();
+  const { isOpen, setIsOpen, triggerRef } = useDropdown();
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (contentRef.current && !contentRef.current.contains(event.target as Node)) {
+      if (contentRef.current && !contentRef.current.contains(event.target as Node) && !triggerRef.current?.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
+      const closeOnEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') { setIsOpen(false); triggerRef.current?.focus({ preventScroll: true }); }
+      };
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', closeOnEscape);
+      return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', closeOnEscape); };
     }
   }, [isOpen, setIsOpen]);
 
@@ -124,9 +128,9 @@ export function DropdownContent({ children, align = 'end', className }: Dropdown
     <div
       ref={contentRef}
       className={cn(
-        'absolute top-full mt-1 min-w-[200px] z-50',
+        'absolute top-full mt-1 min-w-[200px] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain z-50',
         'bg-white rounded-xl shadow-4 border border-neutral-200',
-        'py-1 animate-in fade-in zoom-in-95 duration-100',
+        'py-1',
         alignStyles[align],
         className
       )}
@@ -172,7 +176,7 @@ export function DropdownItem({
       onClick={handleClick}
       disabled={disabled}
       className={cn(
-        'w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors',
+        'min-h-11 w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors',
         'hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none',
         disabled && 'opacity-50 cursor-not-allowed',
         destructive && 'text-error-600 hover:bg-error-50',

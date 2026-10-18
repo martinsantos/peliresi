@@ -3,15 +3,17 @@ export function safeLocalRedirect(from: unknown, fallback = '/dashboard'): strin
   return typeof from === 'string'
     && from.startsWith('/')
     && !from.startsWith('//')
+    && !/[\\\s\u0000-\u001f]/.test(from)
+    && !/%(?:2f|5c|0[ad])/i.test(from)
     ? from
     : fallback;
 }
 
 const INSPECTED_PARTY_ROLES = new Set(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']);
 
-export function postLoginDestination(from: unknown, role?: string): string {
+export function postLoginDestination(from: unknown, role?: string, isInspector = false): string {
   const localPath = safeLocalRedirect(from);
-  return role && INSPECTED_PARTY_ROLES.has(role)
+  return role && !isInspector && INSPECTED_PARTY_ROLES.has(role)
     ? localPath.replace(/^\/inspecciones\//, '/mis-inspecciones/')
     : localPath;
 }

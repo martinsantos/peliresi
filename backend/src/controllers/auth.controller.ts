@@ -2,12 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { isTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
 import { StringValue } from 'ms';
 import { z } from 'zod';
 import { config } from '../config/config';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { emailService } from '../services/email.service';
+import { verifiedImpersonator } from '../services/impersonationIdentity.service';
+import { recordAccountMail } from '../services/account-mail.service';
+import { accountActivities } from '../services/actorActivities.service';
+import { companyContexts } from '../services/empresa.service';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -44,8 +49,8 @@ function validatePasswordStrength(password: string): string | null {
 }
 
 // Generar tokens JWT
-export const generateTokens = (userId: string, restricted = false, registrationDraft?: string) => {
-  const payload = { id: userId, ...(restricted ? { restricted: true } : {}), ...(registrationDraft ? { registrationDraft } : {}) };
+export const generateTokens = (userId: string, restricted = false, registrationDraft?: string, impersonatedBy?: string) => {
+  const payload = { id: userId, ...(isTrainingSession() ? { realm: TRAINING_REALM } : {}), ...(restricted ? { restricted: true } : {}), ...(registrationDraft ? { registrationDraft } : {}), ...(impersonatedBy ? { impersonatedBy } : {}) };
   const options: SignOptions = { expiresIn: config.JWT_EXPIRES_IN as StringValue };
   const accessToken = jwt.sign(payload, config.JWT_SECRET as string, options);
   const refreshOptions: SignOptions = { expiresIn: '7d' as StringValue };
@@ -73,6 +78,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     let isMultiRol = false;
 
     if (existingByCuit && existingByEmail && existingByCuit.id === existingByEmail.id) {
+      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true') throw new AppError('Ingresá a tu cuenta y solicitá otra actividad desde Mi Perfil', 409);
       // Mismo CUIT y mismo email → multi-rol legítimo
       isMultiRol = true;
       user = { id: existingByCuit.id, email: existingByCuit.email, rol, nombre: existingByCuit.nombre };
@@ -101,6 +107,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           telefono,
           cuit: normalizedCuit || cuit,
           activo: false,
+          motivoInactividad: 'PENDIENTE_APROBACION',
           emailVerified: false,
           emailVerificationToken: hashedToken,
         },
@@ -211,7 +218,15 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
       });
     } catch { /* ignore audit errors */ }
 
-    res.json({ success: true, message: 'Email verificado. Tu cuenta está pendiente de aprobación del administrador.' });
+    const application = await prisma.solicitudInscripcion.findFirst({
+      where: { usuarioId: user.id }, orderBy: { createdAt: 'desc' },
+      select: { tipoActor: true, estado: true },
+    });
+    const nextPath = application && ['BORRADOR', 'OBSERVADA'].includes(application.estado)
+      ? `/inscripcion/${application.tipoActor.toLowerCase()}` : application ? '/mi-solicitud' : '/dashboard';
+    // Navigation only: verification never creates/replaces a login session.
+    res.json({ success: true, message: application ? 'Tu correo quedó verificado. Podés continuar con tu inscripción.' : 'Email verificado. Tu cuenta está pendiente de aprobación del administrador.',
+      verifiedUserId: user.id, nextPath });
   } catch (error) {
     next(error);
   }
@@ -240,12 +255,16 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Verificá tu email antes de iniciar sesión', 403);
     }
 
-    // Restricted access for candidates with pending solicitudes
-    if (!user.activo && user.emailVerified) {
+    if (!user.activo && user.motivoInactividad === 'SUSPENDIDA') {
+      throw new AppError('Tu cuenta está suspendida. Contactá a la administración de SITREP.', 403);
+    }
+    // Candidates can also consult their rejected result, without operational access.
+    // Only the explicit pending-account state grants this additional read-only case.
+    if (!user.activo && user.emailVerified && user.motivoInactividad !== 'SUSPENDIDA') {
       const solicitudPendiente = await prisma.solicitudInscripcion.findFirst({
         where: {
           usuarioId: user.id,
-          estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA'] },
+          estado: { in: ['BORRADOR', 'ENVIADA', 'EN_REVISION', 'OBSERVADA', ...(user.motivoInactividad === 'PENDIENTE_APROBACION' ? ['RECHAZADA' as const] : [])] },
         },
         select: { id: true },
       });
@@ -323,6 +342,23 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 };
 
 // ── FORGOT PASSWORD (público) ──────────────────────────────────────
+// Seeded placeholder mailboxes are not evidence of account ownership.
+function canRecoverByEmail(email: string): boolean {
+  if (!z.string().email().safeParse(email).success) return false;
+  const domain = email.split('@')[1].toLowerCase();
+  return domain !== 'sitrep.local' && domain !== 'placeholder.com';
+}
+
+async function issuePasswordRecovery(user: { id: string; email: string; nombre: string }) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  await prisma.usuario.update({
+    where: { id: user.id },
+    data: { passwordResetToken: hashedToken, passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000) },
+  });
+  await emailService.sendPasswordResetEmail(user.email, user.nombre, rawToken);
+}
+
 export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, cuit } = req.body;
@@ -334,20 +370,11 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     });
 
     // Responder 200 siempre (no revelar existencia)
-    if (!user) {
+    if (!user || !canRecoverByEmail(user.email)) {
       return res.json({ success: true, message: 'Si el email/CUIT existe, recibirás un enlace.' });
     }
 
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
-
-    await prisma.usuario.update({
-      where: { id: user.id },
-      data: { passwordResetToken: hashedToken, passwordResetExpires: expires },
-    });
-
-    await emailService.sendPasswordResetEmail(user.email, user.nombre, rawToken);
+    await issuePasswordRecovery(user);
 
     res.json({ success: true, message: 'Si el email/CUIT existe, recibirás un enlace.' });
   } catch (error) {
@@ -359,7 +386,9 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { token, newPassword } = req.body;
-    if (!token || !newPassword) throw new AppError('Token y nueva contraseña son requeridos', 400);
+    if (typeof token !== 'string' || !token || typeof newPassword !== 'string' || !newPassword) {
+      throw new AppError('Token y nueva contraseña son requeridos', 400);
+    }
 
     const passwordError = validatePasswordStrength(newPassword);
     if (passwordError) throw new AppError(passwordError, 400);
@@ -378,9 +407,14 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await prisma.usuario.update({
-      where: { id: user.id },
+    // Lookup alone cannot consume a proof: a second request may have read it.
+    await prisma.$transaction(async tx => {
+    const consumed = await tx.usuario.updateMany({
+      where: { id: user.id, passwordResetToken: hashedToken, passwordResetExpires: { gt: new Date() } },
       data: { password: hashedPassword, passwordResetToken: null, passwordResetExpires: null },
+    });
+    if (consumed.count !== 1) throw new AppError('El enlace de recuperación es inválido o expiró', 400);
+    await recordAccountMail(tx, user, 'passwordChanged');
     });
 
     res.json({ success: true, message: 'Contraseña restablecida correctamente.' });
@@ -402,7 +436,58 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
       },
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);
-    res.json({ success: true, data: { user } });
+    const activities = await accountActivities(user);
+    const contexts = await companyContexts(req.user);
+    res.json({ success: true, data: { user: { ...user, rol: req.user.rolBase ? req.user.rol : user.rol, actividades: activities,
+      ...(req.user.empresaContexto?{generador:req.user.generador,transportista:req.user.transportista,operador:req.user.operador,esInspector:false,empresaContexto:req.user.empresaContexto}:{}),
+      ...(process.env.ENTERPRISE_ENABLED==='true'?{contextosEmpresa:contexts}:{}),...(isTrainingSession() ? { training: true } : {}) } } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── UPDATE OWN PROFILE ─────────────────────────────────────────────
+// Any authenticated person may correct their own name and phone; role, email,
+// activation and actor links stay with administrators.
+const OWN_PROFILE_FIELDS = ['nombre', 'telefono'] as const;
+const ownProfileSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(120, 'El nombre es demasiado largo').optional(),
+  telefono: z.string().trim().max(40, 'El teléfono es demasiado largo').optional(),
+});
+
+export const updateOwnProfile = async (req: Request & { user?: any }, res: Response, next: NextFunction) => {
+  try {
+    if (req.user.impersonatedBy) throw new AppError('Volvé a tu cuenta para modificar tu propio perfil', 403);
+    const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+    if (Object.keys(body).some(key => !(OWN_PROFILE_FIELDS as readonly string[]).includes(key))) {
+      throw new AppError('Sólo podés modificar tu nombre y tu teléfono', 400);
+    }
+    const parsed = ownProfileSchema.safeParse(body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
+    if (Object.keys(parsed.data).length === 0) throw new AppError('No hay cambios para guardar', 400);
+
+    const usuario = await prisma.$transaction(async tx => {
+      const before = await tx.usuario.findUnique({ where: { id: req.user.id }, select: { nombre: true, telefono: true } });
+      if (!before) throw new AppError('Usuario no encontrado', 404);
+      const updated = await tx.usuario.update({
+        where: { id: req.user.id },
+        data: parsed.data,
+        select: { id: true, email: true, nombre: true, telefono: true },
+      });
+      await tx.auditoria.create({
+        data: {
+          usuarioId: req.user.id,
+          accion: 'UPDATE_PERFIL_PROPIO',
+          modulo: 'AUTH',
+          datosAntes: JSON.stringify(before),
+          datosDespues: JSON.stringify({ nombre: updated.nombre, telefono: updated.telefono }),
+          ip: req.ip || 'unknown',
+          userAgent: req.headers['user-agent'] || 'unknown',
+        },
+      });
+      return updated;
+    });
+    res.json({ success: true, data: { usuario } });
   } catch (error) {
     next(error);
   }
@@ -435,7 +520,11 @@ export const changePassword = async (req: Request & { user?: any }, res: Respons
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await prisma.usuario.update({ where: { id: req.user.id }, data: { password: hashedPassword } });
+    await prisma.$transaction(async tx => {
+      const changed = await tx.usuario.updateMany({ where: { id: user.id, password: user.password }, data: { password: hashedPassword } });
+      if (changed.count !== 1) throw new AppError('La contraseña cambió durante la operación. Volvé a iniciar sesión.', 409);
+      await recordAccountMail(tx, user, 'passwordChanged');
+    });
     res.json({ success: true, message: 'Contraseña actualizada correctamente' });
   } catch (error) {
     next(error);
@@ -448,9 +537,9 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     const { refreshToken: token } = req.body;
     if (!token) throw new AppError('Refresh token es requerido', 400);
 
-    let decoded: { id: string; restricted?: boolean; registrationDraft?: string };
+    let decoded: { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
     try {
-      decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string };
+      decoded = jwt.verify(token, config.JWT_SECRET as string) as typeof decoded;
     } catch {
       throw new AppError('Refresh token inválido o expirado', 401);
     }
@@ -459,15 +548,16 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     if (!user) throw new AppError('Usuario no encontrado o inactivo', 401);
 
     // Allow refresh for restricted tokens (inactive users with pending solicitudes)
-    if (!user.activo && !decoded.restricted) {
+    if (!user.activo && (!decoded.restricted || user.motivoInactividad === 'SUSPENDIDA')) {
       throw new AppError('Usuario no encontrado o inactivo', 401);
     }
 
+    const impersonator = await verifiedImpersonator(decoded.impersonatedBy, user.id, decoded.restricted);
     if (decoded.restricted) {
       return res.json({ success: true, data: generateTokens(user.id, true, decoded.registrationDraft) });
     }
 
-    res.json({ success: true, data: generateTokens(user.id) });
+    res.json({ success: true, data: generateTokens(user.id, false, undefined, impersonator?.id) });
   } catch (error) {
     next(error);
   }
@@ -477,8 +567,6 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
 const claimSchema = z.object({
   cuit: z.string().min(8, 'CUIT es requerido'),
   razonSocial: z.string().min(2, 'Razón Social es requerida'),
-  nuevoEmail: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Contraseña es requerida'),
 });
 
 export const claimAccount = async (req: Request, res: Response, next: NextFunction) => {
@@ -486,11 +574,10 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
     const parsed = claimSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
 
-    const { cuit, razonSocial, nuevoEmail, password } = parsed.data;
-    const genericMsg = 'Si los datos coinciden con un registro existente, recibirás un email de verificación.';
-
-    const passwordError = validatePasswordStrength(password);
-    if (passwordError) throw new AppError(passwordError, 400);
+    // Legacy clients may still submit nuevoEmail/password. Zod strips those
+    // fields: public identity data must never authorize credential replacement.
+    const { cuit, razonSocial } = parsed.data;
+    const genericMsg = 'Si los datos coinciden, recibirás un enlace en el correo ya registrado. Si no tenés acceso a ese correo, contactá al administrador.';
 
     const normalizedCuit = normalizeCuit(cuit) || cuit;
 
@@ -500,7 +587,7 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
     });
 
     // Don't reveal whether the CUIT exists
-    if (!user) {
+    if (!user || !canRecoverByEmail(user.email)) {
       return res.json({ success: true, message: genericMsg });
     }
 
@@ -515,67 +602,18 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
       return res.json({ success: true, message: genericMsg });
     }
 
-    // Verify nuevoEmail is not used by another user
-    const existingEmail = await prisma.usuario.findUnique({ where: { email: nuevoEmail } });
-    if (existingEmail && existingEmail.id !== user.id) {
-      throw new AppError('El email ya está en uso por otro usuario', 400);
-    }
-
-    // Update user: new email, new password, deactivate until verified
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-    await prisma.usuario.update({
-      where: { id: user.id },
-      data: {
-        email: nuevoEmail,
-        password: hashedPassword,
-        emailVerified: false,
-        activo: false,
-        emailVerificationToken: hashedToken,
-      },
-    });
-
-    // Send verification email
-    await emailService.sendEmailVerification(nuevoEmail, user.nombre, rawToken);
-
-    // Notify admins via in-app notification
-    const admins = await prisma.usuario.findMany({
-      where: { rol: 'ADMIN', activo: true },
-      select: { id: true },
-    });
-    await Promise.all(admins.map(admin =>
-      prisma.notificacion.create({
-        data: {
-          usuarioId: admin.id,
-          tipo: 'ALERTA_SISTEMA',
-          titulo: 'Cuenta reclamada',
-          mensaje: `${user.nombre} (${user.rol}) reclamó su cuenta con el email ${nuevoEmail}.`,
-          prioridad: 'ALTA',
-          datos: JSON.stringify({
-            tipo: 'cuenta_reclamada',
-            usuarioId: user.id,
-            nombre: user.nombre,
-            cuit: normalizedCuit,
-            nuevoEmail,
-            rol: user.rol,
-          }),
-        },
-      })
-    ));
+    await issuePasswordRecovery(user);
 
     // Audit log
     try {
       await prisma.auditoria.create({
         data: {
           usuarioId: user.id,
-          accion: 'CLAIM_ACCOUNT',
+          accion: 'SOLICITUD_RECUPERACION_CUENTA',
           modulo: 'AUTH',
           ip: req.ip || req.headers['x-forwarded-for']?.toString() || 'unknown',
           userAgent: req.headers['user-agent'] || 'unknown',
-          datosDespues: JSON.stringify({ cuit: normalizedCuit, nuevoEmail, rol: user.rol, timestamp: new Date().toISOString() }),
+          datosDespues: JSON.stringify({ cuit: normalizedCuit, rol: user.rol, timestamp: new Date().toISOString() }),
         },
       });
     } catch { /* ignore audit errors */ }

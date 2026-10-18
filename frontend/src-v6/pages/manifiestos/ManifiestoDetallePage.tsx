@@ -9,7 +9,7 @@ import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   FileText,
-  User,
+  Factory,
   Truck,
   FlaskConical,
   Weight,
@@ -20,7 +20,6 @@ import {
   Download,
   Copy,
   Check,
-  Award,
   MapPin,
   ExternalLink,
 } from 'lucide-react';
@@ -50,13 +49,44 @@ import {
   useRegistrarIncidente,
   useRevertirEstado,
 } from '../../hooks/useManifiestos';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, type User } from '../../contexts/AuthContext';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { canReadActorDetail, type ActorReadType } from '../../utils/actorReadAccess';
 import { manifiestoService } from '../../services/manifiesto.service';
-import { formatDateTime, formatNumber, formatWeight, formatEstado, formatCuit } from '../../utils/formatters';
+import { formatDateTime, formatEstado, formatCuit } from '../../utils/formatters';
+import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import type { Manifiesto } from '../../types/models';
 import { EstadoManifiesto } from '../../types/models';
 import ManifiestoTimeline from './components/ManifiestoTimeline';
+import { companyGeneratorView } from '../../utils/enterprisePresentation';
 import ManifiestoActions from './components/ManifiestoActions';
+
+const ACTOR_SUMMARY = {
+  GENERADOR: { label: 'Generador', Icon: Factory, icon: 'bg-purple-50 text-purple-600', interactive: 'hover:bg-purple-50/50' },
+  TRANSPORTISTA: { label: 'Transportista', Icon: Truck, icon: 'bg-orange-50 text-orange-600', interactive: 'hover:bg-orange-50/50' },
+  OPERADOR: { label: 'Operador', Icon: FlaskConical, icon: 'bg-blue-50 text-blue-600', interactive: 'hover:bg-blue-50/50' },
+};
+
+function ActorSummary({ type, actorId, user, name, detail, to, returnTo }: {
+  type: ActorReadType; actorId?: string; user: User | null; name: string; detail: string; to: string; returnTo: string;
+}) {
+  const { label, Icon, icon, interactive } = ACTOR_SUMMARY[type];
+  const readable = canReadActorDetail(user, type, actorId);
+  const content = <>
+    <span className={`shrink-0 rounded-lg p-2 ${icon}`}><Icon size={20} aria-hidden="true" /></span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-sm text-neutral-500">{label}</span>
+      <span className="block break-words font-medium text-neutral-900">{name}</span>
+      <span className="block break-words text-sm text-neutral-600">{detail}</span>
+    </span>
+    {readable && <ExternalLink size={14} aria-hidden="true" className="mt-1 shrink-0 text-neutral-500" />}
+  </>;
+  const base = 'flex min-h-11 items-start gap-3 rounded-lg p-2';
+  return readable ? <Link to={to} state={{ actorReturn: returnTo }} aria-label={`Abrir ficha de ${label.toLowerCase()}: ${name}`}
+    className={`${base} !no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 ${interactive}`}>
+    {content}
+  </Link> : <div className={base}>{content}</div>;
+}
 
 function getEstadoBadgeColor(estado: EstadoManifiesto): 'info' | 'success' | 'warning' | 'error' | 'neutral' {
   switch (estado) {
@@ -76,6 +106,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const isApp = location.pathname.startsWith('/app');
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
@@ -109,7 +140,7 @@ const ManifiestoDetailPage: React.FC = () => {
   // Use API data only
   const manifiesto = apiData;
   const m = (manifiesto || {}) as Partial<Manifiesto>;
-  const totalPeso = Array.isArray(m.residuos) ? m.residuos.reduce((sum, r) => sum + (typeof r.cantidad === 'number' ? r.cantidad : 0), 0) : 0;
+  const quantityTotals = declaredQuantities(Array.isArray(m.residuos) ? m.residuos : []);
 
   // --- Tracking route for GPS map ---
   const trackingRoute = useMemo(() => {
@@ -130,8 +161,8 @@ const ManifiestoDetailPage: React.FC = () => {
 
   // Generador and Operador locations for planned route
   const generadorPos = useMemo(() => {
-    const g = m.generador;
-    return g?.latitud && g?.longitud ? [g.latitud, g.longitud] as [number, number] : null;
+    const g = companyGeneratorView(m.generador,m.contextoEmpresa);
+    return g?.latitud!=null && g?.longitud!=null ? [g.latitud, g.longitud] as [number, number] : null;
   }, [m]);
   const operadorPos = useMemo(() => {
     const o = m.operador;
@@ -161,20 +192,22 @@ const ManifiestoDetailPage: React.FC = () => {
     action: () => Promise<any>,
     successMsg: string,
   ) => {
-    if (actionInFlightRef.current) return;
+    if (actionInFlightRef.current) return false;
     actionInFlightRef.current = true;
     try {
       await action();
       toast.success(successMsg);
+      return true;
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || err?.message || 'Ocurrio un error');
+      return false;
     } finally {
       actionInFlightRef.current = false;
     }
   };
 
-  const handleFirmar = () => handleAction(
-    () => firmar.mutateAsync({ id: id! }),
+  const handleFirmar = (firma: string) => handleAction(
+    () => firmar.mutateAsync({ id: id!, firma }),
     'Manifiesto firmado exitosamente',
   );
 
@@ -199,14 +232,14 @@ const ManifiestoDetailPage: React.FC = () => {
   );
 
   const handlePesaje = (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => {
-    handleAction(
+    return handleAction(
       () => pesaje.mutateAsync({ id: id!, residuos, observaciones }),
       'Pesaje registrado exitosamente',
     );
   };
 
   const handleTratamiento = (metodo: string, observaciones?: string) => {
-    handleAction(
+    return handleAction(
       () => registrarTratamiento.mutateAsync({ id: id!, metodo, observaciones }),
       'Tratamiento registrado exitosamente',
     );
@@ -218,34 +251,39 @@ const ManifiestoDetailPage: React.FC = () => {
   );
 
   const handleRechazar = (motivo: string, descripcion?: string) => {
-    handleAction(
+    return handleAction(
       () => rechazar.mutateAsync({ id: id!, motivo, descripcion }),
       'Carga rechazada exitosamente',
     );
   };
 
   const handleIncidente = (tipo: string, descripcion: string) => {
-    handleAction(
+    return handleAction(
       () => registrarIncidente.mutateAsync({ id: id!, tipo, descripcion }),
       'Incidente registrado exitosamente',
     );
   };
 
   const handleCancelar = async () => {
+    if (actionInFlightRef.current) return false;
+    actionInFlightRef.current = true;
     setIsCancelling(true);
     try {
       await cancelar.mutateAsync({ id: id! });
       toast.success('Manifiesto cancelado');
       navigate('/manifiestos');
+      return true;
     } catch (err: any) {
       toast.error('Error al cancelar', err?.response?.data?.message || 'No se pudo cancelar el manifiesto');
+      return false;
     } finally {
+      actionInFlightRef.current = false;
       setIsCancelling(false);
     }
   };
 
   const handleRevertir = (estadoNuevo: string, motivo?: string) => {
-    handleAction(
+    return handleAction(
       () => revertir.mutateAsync({ id: id!, estadoNuevo, motivo }),
       'Estado revertido exitosamente',
     );
@@ -331,7 +369,7 @@ const ManifiestoDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Header */}
       <div className="space-y-2">
         <Link to="/manifiestos">
@@ -353,14 +391,6 @@ const ManifiestoDetailPage: React.FC = () => {
           Creado el {m.createdAt ? formatDateTime(m.createdAt) : '-'}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={handleDescargarPDF}>
-            Descargar PDF
-          </Button>
-          {m.estado === EstadoManifiesto.TRATADO && (
-            <Button variant="outline" size="sm" leftIcon={<Award size={16} />} onClick={handleDescargarCertificado} className="!border-success-300 !text-success-700 hover:!bg-success-50">
-              Certificado
-            </Button>
-          )}
           {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
             <Button size="sm" onClick={() => navigate(`/manifiestos/${id}/editar`)}>
               Editar
@@ -368,6 +398,39 @@ const ManifiestoDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* One action surface, before the long field context on every screen size. */}
+      <ManifiestoActions
+        manifiesto={m}
+        manifiestoId={id!}
+        isAdmin={isAdmin}
+        userRol={userRol}
+        isActionPending={isActionPending}
+        isInSitu={!m.transportistaId}
+        mutations={{
+          firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,
+          confirmarRecepcionInSitu,
+          pesaje, registrarTratamiento, cerrar, rechazar, registrarIncidente, revertir,
+        }}
+        onFirmar={handleFirmar}
+        onConfirmarRetiro={handleConfirmarRetiro}
+        onConfirmarEntrega={handleConfirmarEntrega}
+        onConfirmarRecepcion={handleConfirmarRecepcion}
+        onConfirmarRecepcionInSitu={handleConfirmarRecepcionInSitu}
+        onPesaje={handlePesaje}
+        onTratamiento={handleTratamiento}
+        onCerrar={handleCerrar}
+        onRechazar={handleRechazar}
+        onIncidente={handleIncidente}
+        onCancelar={handleCancelar}
+        onRevertir={handleRevertir}
+        onDescargarPDF={handleDescargarPDF}
+        training={currentUser?.training}
+        onDescargarCertificado={handleDescargarCertificado}
+        isCancelling={isCancelling}
+      />
+
+      {import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED === 'true' && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
 
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -377,36 +440,17 @@ const ManifiestoDetailPage: React.FC = () => {
           <Card>
             <CardHeader title="Información general" icon={<FileText size={20} />} />
             <CardContent>
+              {m.contextoEmpresa?.rol==='GENERADOR'&&<dl className="mb-5 grid gap-3 sm:grid-cols-2"><div><dt className="text-sm text-neutral-600">Domicilio legal al declarar</dt><dd className="break-words">{m.contextoEmpresa.domicilioLegal.calle||'No informado'}</dd></div><div><dt className="text-sm text-neutral-600">Establecimiento y domicilio productivo</dt><dd className="break-words">{m.contextoEmpresa.establecimiento?.nombre||'No identificado'} · {m.contextoEmpresa.establecimiento?.domicilio||'Por completar'}</dd></div></dl>}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div
-                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-purple-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.generadorId && navigate(`/admin/actores/generadores/${m.generadorId}`)}
-                >
-                  <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
-                    <User size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-neutral-500">Generador</p>
-                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-purple-700' : ''}`}>{m.generador?.razonSocial || '-'}</p>
-                    <p className="text-sm text-neutral-600">CUIT: {m.generador?.cuit ? formatCuit(m.generador.cuit) : '-'}</p>
-                  </div>
-                  {isAdmin && m.generadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-purple-400 mt-1 shrink-0" />}
-                </div>
+                <ActorSummary type="GENERADOR" actorId={m.generadorId} user={currentUser}
+                  name={m.generador?.razonSocial || '-'} detail={`CUIT: ${m.generador?.cuit ? formatCuit(m.generador.cuit) : '-'}`}
+                  to={mp(`/admin/actores/generadores/${encodeURIComponent(m.generadorId || '')}`)}
+                  returnTo={location.pathname + location.search + location.hash} />
                 {m.transportistaId ? (
-                  <div
-                    className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-orange-50/50 group' : ''}`}
-                    onClick={() => isAdmin && m.transportistaId && navigate(`/admin/actores/transportistas/${m.transportistaId}`)}
-                  >
-                    <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-                      <Truck size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-neutral-500">Transportista</p>
-                      <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-orange-700' : ''}`}>{m.transportista?.razonSocial || '-'}</p>
-                      <p className="text-sm text-neutral-600">Hab: {m.transportista?.numeroHabilitacion || '-'}</p>
-                    </div>
-                    {isAdmin && m.transportistaId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-orange-400 mt-1 shrink-0" />}
-                  </div>
+                  <ActorSummary type="TRANSPORTISTA" actorId={m.transportistaId} user={currentUser}
+                    name={m.transportista?.razonSocial || '-'} detail={`Hab: ${m.transportista?.numeroHabilitacion || '-'}`}
+                    to={mp(`/admin/actores/transportistas/${encodeURIComponent(m.transportistaId)}`)}
+                    returnTo={location.pathname + location.search + location.hash} />
                 ) : (
                   <div className="flex items-start gap-3 p-2 -m-2 rounded-lg">
                     <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
@@ -419,25 +463,30 @@ const ManifiestoDetailPage: React.FC = () => {
                     </div>
                   </div>
                 )}
-                <div
-                  className={`flex items-start gap-3 p-2 -m-2 rounded-lg transition-colors ${isAdmin ? 'cursor-pointer hover:bg-blue-50/50 group' : ''}`}
-                  onClick={() => isAdmin && m.operadorId && navigate(`/admin/actores/operadores/${m.operadorId}`)}
-                >
-                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                    <FlaskConical size={20} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-neutral-500">Operador</p>
-                    <p className={`font-medium text-neutral-900 ${isAdmin ? 'group-hover:text-blue-700' : ''}`}>{m.operador?.razonSocial || '-'}</p>
-                    <p className="text-sm text-neutral-600">Hab: {m.operador?.numeroHabilitacion || '-'}</p>
-                  </div>
-                  {isAdmin && m.operadorId && <ExternalLink size={12} className="text-neutral-300 group-hover:text-blue-400 mt-1 shrink-0" />}
-                </div>
+                <ActorSummary type="OPERADOR" actorId={m.operadorId} user={currentUser}
+                  name={m.operador?.razonSocial || '-'} detail={`Hab: ${m.operador?.numeroHabilitacion || '-'}`}
+                  to={mp(`/admin/actores/operadores/${encodeURIComponent(m.operadorId || '')}`)}
+                  returnTo={location.pathname + location.search + location.hash} />
               </div>
             </CardContent>
           </Card>
 
           {/* Residuos */}
+          {m.transportistaId && <Card>
+            <CardHeader title="Transporte asignado" icon={<Truck size={20} />} />
+            <CardContent>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                <div className="min-w-0"><dt className="text-sm text-neutral-600">Vehículo</dt>
+                  <dd className="break-words text-sm font-medium text-neutral-900">{m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId && m.asignacionTransporte.vehiculo
+                    ? `${m.asignacionTransporte.vehiculo.patente} · ${m.asignacionTransporte.vehiculo.marca} ${m.asignacionTransporte.vehiculo.modelo}`
+                    : 'Sin asignación registrada'}</dd></div>
+                <div className="min-w-0"><dt className="text-sm text-neutral-600">Chofer</dt>
+                  <dd className="break-words text-sm font-medium text-neutral-900">{m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId && m.asignacionTransporte.chofer
+                    ? `${m.asignacionTransporte.chofer.nombre} ${m.asignacionTransporte.chofer.apellido}`
+                    : 'Sin asignación registrada'}</dd></div>
+              </dl>
+            </CardContent>
+          </Card>}
           <Card>
             <CardHeader title="Residuos transportados" icon={<Package size={20} />} />
             <CardContent>
@@ -456,19 +505,21 @@ const ManifiestoDetailPage: React.FC = () => {
                       <tr key={residuo.id} className="hover:bg-neutral-50 transition-colors">
                         <td className="px-3 py-2.5 font-mono text-sm">{residuo.tipoResiduo?.codigo || '-'}</td>
                         <td className="px-3 py-2.5 text-neutral-700 truncate" title={residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}>{residuo.tipoResiduo?.nombre || residuo.descripcion || '-'}</td>
-                        <td className="px-3 py-2.5 font-medium">{formatNumber(residuo.cantidad)}</td>
+                        <td className="px-3 py-2.5 font-medium">{formatDeclaredQuantity(residuo.cantidad)}</td>
                         <td className="px-3 py-2.5 text-neutral-600">{residuo.unidad}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 </div>
-              <div className="mt-4 p-4 bg-neutral-50 rounded-xl flex items-center justify-between">
+              <div className="mt-4 p-4 bg-neutral-50 rounded-xl flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-neutral-600">
                   <Weight size={18} />
-                  <span className="font-medium">Peso total:</span>
+                  <span className="font-medium">Totales declarados:</span>
                 </div>
-                <span className="text-xl font-bold text-neutral-900">{formatWeight(totalPeso)}</span>
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-lg font-bold text-neutral-900">
+                  {quantityTotals.length ? quantityTotals.map(total => <span key={total.unidad}>{formatDeclaredQuantity(total.cantidad)} {total.unidad}</span>) : <span>Sin cantidades informadas</span>}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -480,7 +531,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <MapPin size={18} className="text-primary-600" />
                   <h3 className="font-semibold text-neutral-900">
-                    {trackingRoute ? 'Ruta del Viaje' : 'Mapa de Ruta'}
+                    {trackingRoute ? 'Ruta del Viaje' : 'Origen y destino'}
                   </h3>
                   {trackingRoute && (
                     <Badge variant="soft" color="info">{trackingRoute.count} puntos GPS</Badge>
@@ -538,7 +589,7 @@ const ManifiestoDetailPage: React.FC = () => {
                       <Popup>
                         <strong>Generador</strong><br />
                         {m.generador?.razonSocial || '-'}<br />
-                        <span style={{ fontSize: 11, color: '#666' }}>{m.generador?.domicilio || ''}</span>
+                        <span style={{ fontSize: 11, color: '#666' }}>{companyGeneratorView(m.generador,m.contextoEmpresa)?.domicilio || ''}</span>
                       </Popup>
                     </Marker>
                   )}
@@ -566,7 +617,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 {generadorPos && operadorPos && (
                   <span className="flex items-center gap-1.5">
                     <span style={{ width: 20, height: 3, background: '#6366f1', display: 'inline-block', borderRadius: 2, borderTop: '1px dashed #6366f1' }} />
-                    Ruta planificada
+                    Referencia entre establecimientos
                   </span>
                 )}
                 {generadorPos && (
@@ -577,7 +628,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 )}
                 {operadorPos && (
                   <span className="flex items-center gap-1.5">
-                    <svg width="12" height="12" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg>
+                    <FlaskConical size={14} color={ACTOR_COLORS.operador} />
                     Operador
                   </span>
                 )}
@@ -617,7 +668,7 @@ const ManifiestoDetailPage: React.FC = () => {
             <CardHeader title="QR de Control" icon={<QrCode size={20} />} />
             <CardContent>
               {(() => {
-                const numero = m.numero || id || 'M-2025-089';
+                const numero = m.numero || id!;
                 const qrUrl = `${window.location.origin}/manifiestos/verificar/${encodeURIComponent(numero)}`;
                 return (
                   <div className="flex flex-col items-center gap-4">
@@ -643,10 +694,14 @@ const ManifiestoDetailPage: React.FC = () => {
                         size="sm"
                         fullWidth
                         leftIcon={qrCopied ? <Check size={14} /> : <Copy size={14} />}
-                        onClick={() => {
-                          navigator.clipboard.writeText(qrUrl);
-                          setQrCopied(true);
-                          setTimeout(() => setQrCopied(false), 2000);
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(qrUrl);
+                            setQrCopied(true);
+                            setTimeout(() => setQrCopied(false), 2000);
+                          } catch {
+                            toast.error('No se pudo copiar el enlace', 'El navegador no permitió usar el portapapeles.');
+                          }
                         }}
                       >
                         {qrCopied ? 'Copiado' : 'Copiar enlace'}
@@ -681,66 +736,6 @@ const ManifiestoDetailPage: React.FC = () => {
                   </div>
                 );
               })()}
-            </CardContent>
-          </Card>
-
-          {/* Actions + Modals */}
-          <ManifiestoActions
-            manifiesto={m}
-            manifiestoId={id!}
-            isAdmin={isAdmin}
-            userRol={userRol}
-            isActionPending={isActionPending}
-            isInSitu={!m.transportistaId}
-            mutations={{
-              firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,
-              confirmarRecepcionInSitu,
-              pesaje, registrarTratamiento, cerrar, rechazar, registrarIncidente, revertir,
-            }}
-            onFirmar={handleFirmar}
-            onConfirmarRetiro={handleConfirmarRetiro}
-            onConfirmarEntrega={handleConfirmarEntrega}
-            onConfirmarRecepcion={handleConfirmarRecepcion}
-            onConfirmarRecepcionInSitu={handleConfirmarRecepcionInSitu}
-            onPesaje={handlePesaje}
-            onTratamiento={handleTratamiento}
-            onCerrar={handleCerrar}
-            onRechazar={handleRechazar}
-            onIncidente={handleIncidente}
-            onCancelar={handleCancelar}
-            onRevertir={handleRevertir}
-            onDescargarPDF={handleDescargarPDF}
-            onDescargarCertificado={handleDescargarCertificado}
-            isCancelling={isCancelling}
-          />
-
-          <Card>
-            <CardHeader title="Documentos" />
-            <CardContent>
-              <div className="space-y-2 animate-fade-in">
-                <button
-                  onClick={handleDescargarPDF}
-                  className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl w-full hover:bg-neutral-100 transition-colors text-left"
-                >
-                  <FileText size={20} className="text-primary-500" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-neutral-900 truncate">Manifiesto PDF</p>
-                    <p className="text-xs text-neutral-500">Descargar documento oficial</p>
-                  </div>
-                </button>
-                {m.estado === EstadoManifiesto.TRATADO && (
-                  <button
-                    onClick={handleDescargarCertificado}
-                    className="flex items-center gap-3 p-3 bg-success-50 rounded-xl w-full hover:bg-success-100 transition-colors text-left"
-                  >
-                    <Award size={20} className="text-success-600" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-success-900 truncate">Certificado de Disposición</p>
-                      <p className="text-xs text-success-600">Certificado de tratamiento final</p>
-                    </div>
-                  </button>
-                )}
-              </div>
             </CardContent>
           </Card>
 

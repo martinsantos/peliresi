@@ -18,13 +18,17 @@ export async function subscribe(req: Request, res: Response) {
     throw new AppError('Suscripción inválida', 400);
   }
 
-  const usuarioId = (req as any).user.id;
+  const user = (req as any).user;
+  const usuarioId = user.id;
+  // An administrator impersonating someone keeps their own device subscription.
+  if (user.impersonatedBy) { res.json({ success: true }); return; }
 
   const esNuevo = !(await prisma.pushSubscripcion.findUnique({ where: { endpoint }, select: { id: true } }));
 
   await prisma.pushSubscripcion.upsert({
     where:  { endpoint },
-    update: { p256dh: keys.p256dh, auth: keys.auth, userAgent: req.headers['user-agent'] ?? null },
+    // A shared device belongs to whoever is signed in now, not to the previous person.
+    update: { usuarioId, p256dh: keys.p256dh, auth: keys.auth, userAgent: req.headers['user-agent'] ?? null },
     create: { usuarioId, endpoint, p256dh: keys.p256dh, auth: keys.auth, userAgent: req.headers['user-agent'] ?? null },
   });
 
@@ -43,7 +47,10 @@ export async function subscribe(req: Request, res: Response) {
 export async function unsubscribe(req: Request, res: Response) {
   const { endpoint } = req.body ?? {};
   if (!endpoint) throw new AppError('endpoint requerido', 400);
+  const user = (req as any).user;
+  // Impersonation never changes device subscriptions, in either direction.
+  if (user.impersonatedBy) { res.json({ success: true }); return; }
 
-  await prisma.pushSubscripcion.deleteMany({ where: { endpoint } });
+  await prisma.pushSubscripcion.deleteMany({ where: { endpoint, usuarioId: user.id } });
   res.json({ success: true });
 }

@@ -28,11 +28,17 @@ import { eventoManifiestoSubscriber } from './subscribers/eventoManifiesto.subsc
 import { iniciarVencimientoJob } from './jobs/vencimiento.job';
 import { iniciarBlockchainJob } from './jobs/blockchain.job';
 import { iniciarRecordatorioJob } from './jobs/recordatorio.job';
+import { iniciarSeguimientoCierreJob } from './jobs/seguimientoCierre.job';
+import { iniciarAlertCatalogueJob } from './jobs/alertCatalogue.job';
 import blockchainRoutes from './routes/blockchain.routes';
 import renovacionRoutes from './routes/renovacion.routes';
 import solicitudRoutes from './routes/solicitud.routes';
 import inspeccionRoutes from './routes/inspeccion.routes';
+import supportRoutes from './routes/support.routes';
 import { startEmailFlushTimer } from './services/email.service';
+import { createAuthenticationLimiters } from './middlewares/authRateLimit';
+import { trainingSession } from './middlewares/trainingSession';
+import empresaRoutes from './routes/empresa.routes';
 
 // Inicializar la aplicación Express
 const app = express();
@@ -57,6 +63,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use(trainingSession);
 
 // Rate limiting - General API (600 req/min to support 50+ phones behind shared NAT/CGNAT)
 const generalLimiter = rateLimit({
@@ -68,16 +75,10 @@ const generalLimiter = rateLimit({
 });
 app.use('/api/', generalLimiter);
 
-// Rate limiting - Auth endpoints (stricter)
-const authLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // 5 attempts per minute per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Demasiados intentos de autenticación, intente de nuevo en un minuto' },
-});
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+// Shared Wi-Fi logins retain separate failure quotas for network and identity.
+const authLimiters = createAuthenticationLimiters();
+app.use('/api/auth/login', ...authLimiters.login);
+app.use('/api/auth/register', authLimiters.registration);
 
 // Analytics middleware (tracks all API requests)
 if (process.env.ENABLE_ANALYTICS === 'true') {
@@ -224,6 +225,7 @@ app.get('/api/health/ready', async (_req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/empresas',empresaRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
 app.use('/api/catalogos', catalogoRoutes);
 app.use('/api/pdf', pdfRoutes);
@@ -232,6 +234,7 @@ app.use('/api/actores', actorRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/solicitudes', solicitudRoutes);
 app.use('/api/inspecciones', inspeccionRoutes);
+app.use('/api/soporte', supportRoutes);
 app.use('/api', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
@@ -253,6 +256,8 @@ domainEvents.subscribe(alertaSubscriber);
 iniciarVencimientoJob();
 iniciarBlockchainJob();
 iniciarRecordatorioJob();
+iniciarSeguimientoCierreJob();
+iniciarAlertCatalogueJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;

@@ -93,6 +93,11 @@ export enum TipoDiferencia {
 // ========================================
 
 export interface Usuario {
+  empresaContexto?:import('../services/companyContext').CompanyContext;
+  contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
+  empresaContextoError?:string;
+  actividades?: Array<'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR'>;
+  training?: boolean;
   id: string;
   email: string;
   rol: Rol;
@@ -143,7 +148,20 @@ export interface Generador {
   categoriaIndividual?: string;
   libroOperatoria?: boolean;
   tefInputs?: Record<string, unknown>;
+  ultimaActividad?: string | null;
+  pagos?: Array<{ anio: number; fechaPago?: string | null; habilitado?: boolean | null }>;
+  ddjj?: Array<{ anio: number; presentada: boolean }>;
+  situacionFiscal?: SituacionFiscalGenerador;
   usuario?: Usuario;
+}
+
+export interface SituacionFiscalGenerador {
+  anio: number;
+  tef: 'PAGADO' | 'SIN_PAGO' | 'SIN_REGISTRO';
+  ddjj: 'PRESENTADA' | 'PENDIENTE' | 'SIN_REGISTRO';
+  habilitacion: 'HABILITADO' | 'NO_HABILITADO' | 'SIN_DATO';
+  resumen: 'AL_DIA' | 'REQUIERE_REVISION' | 'SIN_DATOS';
+  pendientes: string[];
 }
 
 export interface Transportista {
@@ -255,16 +273,24 @@ export interface TipoResiduo {
 }
 
 export interface Manifiesto {
+  contextoEmpresa?:import('../services/companyContext').CompanyContext|null;
   id: string;
   numero: string;
   generadorId: string;
   transportistaId: string | null;
+  asignacionTransporte?: {
+    version: 1;
+    transportistaId: string;
+    vehiculo: { id: string; patente: string; marca: string; modelo: string } | null;
+    chofer: { id: string; nombre: string; apellido: string; dni: string } | null;
+  } | null;
   operadorId: string;
   modalidad?: 'FIJO' | 'IN_SITU';
   creadoPorId: string;
   estado: EstadoManifiesto;
   observaciones: string | null;
   fechaFirma: string | null;
+  fechaEstimadaRetiro?: string | null;
   fechaRetiro: string | null;
   fechaEntrega: string | null;
   fechaRecepcion: string | null;
@@ -342,6 +368,7 @@ export interface TratamientoAutorizado {
 }
 
 export interface Notificacion {
+  seguimientoEstado?: EstadoAlerta | null;
   id: string;
   usuarioId: string;
   tipo: TipoNotificacion;
@@ -349,6 +376,7 @@ export interface Notificacion {
   mensaje: string;
   datos: string | null;
   manifiestoId: string | null;
+  manifiesto?: { numero: string; estado: EstadoManifiesto } | null;
   leida: boolean;
   fechaLeida: string | null;
   prioridad: PrioridadNotificacion;

@@ -6,10 +6,12 @@
  */
 
 import React, { useMemo } from 'react';
-import { Play, Pause, Calendar, FileText, Truck, Weight, TrendingUp, RotateCcw, ChevronLeft, ChevronRight, SkipBack, SkipForward, Sun, Sunrise, Sunset, Moon } from 'lucide-react';
+import { Play, Pause, Calendar, FileText, Truck, Weight, MapPin, TrendingUp, RotateCcw, ChevronLeft, ChevronRight, SkipBack, SkipForward, Sun, Sunrise, Sunset, Moon } from 'lucide-react';
 import type { MonitorMode } from '../WarRoomPage';
-import type { MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
+import type { ForecastResponse, MonitorLiveResponse, TimelineResponse } from '../api/monitor-api';
 import { formatNumber, formatTimeShort } from '../utils/formatters';
+import { periodEnd } from '../utils/playback-period';
+import { Select } from '../../../components/ui/Select';
 
 type PlaybackSpeed = 'fast' | 'normal' | 'slow';
 
@@ -26,6 +28,7 @@ interface PlaybackControls {
   setSpeed: (s: PlaybackSpeed) => void;
   skipToNext: () => void;
   skipToPrev: () => void;
+  seek: (progress: number) => void;
   currentEventTimestamp?: string | null;
 }
 
@@ -33,6 +36,8 @@ interface Props {
   mode: MonitorMode;
   liveData: MonitorLiveResponse | null;
   playbackDate: string | null;
+  playbackDias?: number;
+  onPeriodChange?: (days: number) => void;
   onDateChange: (date: string) => void;
   onSwitchToPlayback: (date?: string) => void;
   timelineData: TimelineResponse | null;
@@ -42,6 +47,8 @@ interface Props {
   onAutoContinueToggle?: () => void;
   activeDays?: string[];
   currentHour?: number; // 0–23 — para indicador hora en PLAYBACK
+  forecastData?: ForecastResponse | null;
+  liveCurrent?: boolean;
 }
 
 /** Format "2026-03-16" -> "16 mar 2026" */
@@ -59,8 +66,8 @@ const SPEED_LABELS: Record<PlaybackSpeed, string> = {
 const SPEED_ORDER: PlaybackSpeed[] = ['fast', 'normal', 'slow'];
 
 export const TimelineControls: React.FC<Props> = ({
-  mode, liveData, playbackDate, onDateChange, onSwitchToPlayback, timelineData, isLoading, playback,
-  autoContinue, onAutoContinueToggle, activeDays, currentHour,
+  mode, liveData, playbackDate, playbackDias = 1, onPeriodChange, onDateChange, onSwitchToPlayback, timelineData, isLoading, playback,
+  autoContinue, onAutoContinueToggle, activeDays, currentHour, forecastData, liveCurrent = false,
 }) => {
   // Smart date navigation — find prev/next active day relative to current playbackDate
   const sortedDays = useMemo(() => (activeDays || []).slice().sort(), [activeDays]);
@@ -83,9 +90,12 @@ export const TimelineControls: React.FC<Props> = ({
   const goToPrevDay = () => { if (prevDay) onDateChange(prevDay); };
   const goToNextDay = () => { if (nextDay) onDateChange(nextDay); };
   const stats = liveData?.estadisticas;
+  const tripsWithGps = liveData?.enTransito?.filter(trip => trip.ultimaPosicion != null
+    && Number.isFinite(trip.ultimaPosicion.latitud) && Number.isFinite(trip.ultimaPosicion.longitud)).length ?? 0;
 
   // In PLAYBACK mode, use playback counters for KPIs; in LIVE mode, use liveData
   const isPlayback = mode === 'PLAYBACK' && playback;
+  const hasKpiData=mode==='PLAYBACK'?!!playback:!!stats;
 
   const kpiManifiestos = isPlayback
     ? (playback.counters.totalCreated || 0)
@@ -103,44 +113,49 @@ export const TimelineControls: React.FC<Props> = ({
   return (
     <div className="wr-panel flex items-center gap-4 px-4 py-3">
       {/* KPI Cards */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+      <div className="wr-summary flex items-center gap-3 flex-shrink-0">
+        {mode === 'FORECAST' ? <>
+          <KpiCard icon={<Truck size={14}/>} label="Retiros pendientes" value={forecastData?forecastData.pendienteRetiro.length:null} color="#92400e"/>
+          <KpiCard icon={<Weight size={14}/>} label="Tratamientos pendientes" value={forecastData?forecastData.pendienteTratamiento.length:null} color="#6d28d9"/>
+          <KpiCard icon={<Calendar size={14}/>} label="Vencimientos a 7 días" value={forecastData?forecastData.vencimientosProximos.length:null} color="#b91c1c"/>
+        </> : <>
         <KpiCard
           icon={<FileText size={14} />}
-          label={isPlayback ? 'Creados' : 'Manifiestos Hoy'}
-          value={kpiManifiestos}
+          label={isPlayback ? 'Creados' : 'Creados hoy'}
+          value={hasKpiData?kpiManifiestos:null}
           color="#0D8A4F"
         />
         <KpiCard
           icon={<Truck size={14} />}
-          label="En Transito"
-          value={kpiEnTransito}
+          label="En tránsito"
+          value={hasKpiData?kpiEnTransito:null}
           color="#3b82f6"
         />
         <KpiCard
-          icon={<Weight size={14} />}
-          label={isPlayback ? 'Tratados' : 'Toneladas'}
-          value={isPlayback ? kpiTratados : (stats?.toneladas || 0)}
+          icon={isPlayback ? <Weight size={14} /> : <MapPin size={14} />}
+          label={isPlayback ? 'Tratados' : 'Viajes con GPS'}
+          value={hasKpiData?(isPlayback ? kpiTratados : tripsWithGps):null}
           color="#8b5cf6"
-          decimals={isPlayback ? 0 : 1}
         />
         <KpiCard
           icon={<TrendingUp size={14} />}
-          label="Total"
-          value={isPlayback ? kpiTotal : (stats?.total || 0)}
+          label={isPlayback ? 'En historial' : 'Manifiestos registrados'}
+          value={hasKpiData?(isPlayback ? kpiTotal : (stats?.total || 0)):null}
           color="#f97316"
         />
+        </>}
       </div>
 
       {/* Separator */}
-      <div className="w-px h-8 bg-neutral-200 flex-shrink-0" />
+      <div className="wr-summary-separator w-px h-8 bg-neutral-200 flex-shrink-0" />
 
       {/* Mode-specific controls */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="wr-timeline-actions flex items-center gap-3 flex-1 min-w-0">
         {mode === 'LIVE' && (
           <>
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
-              <span className="wr-live-dot" />
-              LIVE
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-green-800">
+              {liveCurrent && <span className="wr-live-dot" aria-hidden="true" />}
+              {liveCurrent ? 'Actualización automática' : 'Datos sin actualizar'}
             </span>
             <button
               onClick={() => onSwitchToPlayback()}
@@ -154,10 +169,17 @@ export const TimelineControls: React.FC<Props> = ({
 
         {mode === 'PLAYBACK' && (
           <>
+            {onPeriodChange && <div className="flex items-center gap-2 text-sm font-semibold text-[#1B5E3C]">
+              <Calendar size={18} aria-hidden="true" />
+              <div className="w-48"><Select placeholder="Período de reproducción" value={String(playbackDias)} onChange={value => onPeriodChange(Number(value))}
+                options={[{ value: '1', label: 'Un día' }, { value: '7', label: 'Últimos 7 días' }, { value: '30', label: 'Últimos 30 días' }]} /></div>
+            </div>}
+            {playbackDias > 1 && playbackDate && <span className="text-sm font-semibold tabular-nums text-neutral-800">{formatDateFull(playbackDate)} — {formatDateFull(periodEnd(playbackDate, playbackDias))}</span>}
             {/* Date navigator — only active days */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            {playbackDias === 1 && <div className="flex items-center gap-1 flex-shrink-0">
               <button
                 onClick={goToPrevDay}
+                aria-label="Día activo anterior"
                 disabled={!prevDay}
                 className="w-7 h-7 rounded flex items-center justify-center text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
               >
@@ -168,12 +190,13 @@ export const TimelineControls: React.FC<Props> = ({
               </span>
               <button
                 onClick={goToNextDay}
+                aria-label="Día activo siguiente"
                 disabled={!nextDay}
                 className="w-7 h-7 rounded flex items-center justify-center text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
               >
                 <ChevronRight size={14} />
               </button>
-            </div>
+            </div>}
 
             {isLoading && (
               <span className="text-xs text-neutral-400 flex-shrink-0">Cargando...</span>
@@ -184,10 +207,12 @@ export const TimelineControls: React.FC<Props> = ({
                 {/* Play/Pause button */}
                 <button
                   onClick={playback.isPlaying ? playback.pause : playback.play}
+                  aria-label={playback.isPlaying ? 'Pausar historial' : 'Reproducir historial'}
+                  disabled={playback.totalEventCount === 0}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors flex-shrink-0 shadow-md ${
                     playback.isPlaying
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                      ? 'bg-[#1B5E3C] hover:bg-[#14482e] text-white'
+                      : 'bg-[#0D8A4F] hover:bg-[#096c3d] text-white disabled:opacity-50'
                   }`}
                   title={playback.isPlaying ? 'Pausar (Espacio)' : 'Reproducir (Espacio)'}
                 >
@@ -217,13 +242,13 @@ export const TimelineControls: React.FC<Props> = ({
 
                 {/* Event counter — prominent */}
                 <span className="text-xs font-bold text-neutral-700 tabular-nums font-mono">
-                  {playback.currentEventIndex + 1} / {playback.totalEventCount}
+                  {playback.totalEventCount ? playback.currentEventIndex + 1 : 0} / {playback.totalEventCount}
                 </span>
 
                 {/* Current event timestamp + indicador hora día/noche */}
                 {playback.currentEventTimestamp && (
                   <span className="text-[11px] font-mono text-neutral-500 tabular-nums flex-shrink-0">
-                    {formatTimeShort(playback.currentEventTimestamp)}
+                  {playbackDias > 1 && `${new Date(playback.currentEventTimestamp).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza', day: '2-digit', month: 'short' })} · `}{formatTimeShort(playback.currentEventTimestamp)}
                   </span>
                 )}
                 {currentHour !== undefined && (() => {
@@ -257,14 +282,15 @@ export const TimelineControls: React.FC<Props> = ({
                 </div>
 
                 {/* Progress scrubber — 0 to 1 based on event progress */}
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className="flex-1 min-w-[100px] relative">
+                <div className="wr-progress-control flex items-center gap-2 flex-1 min-w-[140px]">
+                  <div className="flex-1 min-w-0 relative">
                     <input
                       type="range"
                       min={0}
                       max={1000}
                       value={Math.round(playback.progress * 1000)}
-                      readOnly
+                      aria-label="Recorrer historial"
+                      onChange={event=>playback.seek(Number(event.target.value)/1000)}
                       className="wr-scrubber w-full"
                       style={{ '--progress': `${playback.progress * 100}%` } as React.CSSProperties}
                     />
@@ -277,7 +303,7 @@ export const TimelineControls: React.FC<Props> = ({
                 )}
 
                 {/* Auto-continue toggle */}
-                {onAutoContinueToggle && (
+                {onAutoContinueToggle && playbackDias === 1 && (
                   <button
                     onClick={onAutoContinueToggle}
                     className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-colors flex-shrink-0 ${
@@ -286,6 +312,7 @@ export const TimelineControls: React.FC<Props> = ({
                         : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
                     }`}
                     title="Continuar automaticamente al dia siguiente"
+                    aria-pressed={autoContinue}
                   >
                     <RotateCcw size={10} />
                     Auto
@@ -293,13 +320,14 @@ export const TimelineControls: React.FC<Props> = ({
                 )}
               </>
             )}
+            {!isLoading && timelineData?.eventos.length === 0 && <span className="text-sm text-neutral-700">Sin movimientos registrados en este período.</span>}
           </>
         )}
 
         {mode === 'FORECAST' && (
           <span className="text-xs font-semibold text-purple-600 flex items-center gap-1.5">
             <Calendar size={12} />
-            Proximos 7 dias
+            Pendientes actuales · vencimientos a 7 días
           </span>
         )}
       </div>
@@ -311,15 +339,15 @@ export const TimelineControls: React.FC<Props> = ({
 const KpiCard: React.FC<{
   icon: React.ReactNode;
   label: string;
-  value: number;
+  value: number | null;
   color: string;
   decimals?: number;
 }> = ({ icon, label, value, color, decimals = 0 }) => (
   <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-50 rounded-lg border border-neutral-100 hover:shadow-sm transition-shadow">
     <div className="flex-shrink-0" style={{ color }}>{icon}</div>
     <div>
-      <p className="text-sm font-bold text-neutral-900 tabular-nums leading-none">{formatNumber(value, decimals)}</p>
-      <p className="text-[10px] text-neutral-500 leading-tight">{label}</p>
+      <p className="text-lg font-bold text-neutral-900 tabular-nums leading-none">{value == null ? '—' : formatNumber(value, decimals)}</p>
+      <p className="text-xs text-neutral-700 leading-tight mt-1">{label}</p>
     </div>
   </div>
 );

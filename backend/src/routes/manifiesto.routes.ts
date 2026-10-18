@@ -28,6 +28,10 @@ import {
 } from '../controllers/manifiesto.controller';
 
 const router = Router();
+import { exceptionalEnabled, exceptionalParticipants, listExceptional, getExceptional, createExceptional, eventExceptional } from '../controllers/manifiesto-excepcional.controller';
+import { externalTracking, exportExternalTracking } from '../controllers/seguimientoExterno.controller';
+import { getExternalReconciliation, reconcileExternal } from '../controllers/conciliacionExterna.controller';
+import { addendaEnabled, listAddenda, createAddendum, reviewAddendum, downloadAddendum } from '../controllers/manifiesto-adenda.controller';
 
 /**
  * @openapi
@@ -66,6 +70,20 @@ router.get('/verificar/:numero', verificarManifiesto);
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+
+router.get('/baja-intensidad', exceptionalEnabled, listExceptional);
+router.get('/baja-intensidad/participantes', exceptionalEnabled, exceptionalParticipants);
+router.get('/baja-intensidad/seguimiento', exceptionalEnabled, externalTracking);
+router.get('/baja-intensidad/seguimiento/exportar', exceptionalEnabled, exportExternalTracking);
+router.get('/baja-intensidad/:id/conciliacion', exceptionalEnabled, getExternalReconciliation);
+router.post('/baja-intensidad/:id/conciliacion', exceptionalEnabled, reconcileExternal);
+router.post('/baja-intensidad', exceptionalEnabled, createExceptional);
+router.get('/baja-intensidad/:id', exceptionalEnabled, getExceptional);
+router.post('/baja-intensidad/:id/eventos', exceptionalEnabled, eventExceptional);
+router.get('/:id/adendas', addendaEnabled, listAddenda);
+router.get('/:id/adendas/:adendaId/anexo', addendaEnabled, downloadAddendum);
+router.post('/:id/adendas', addendaEnabled, createAddendum);
+router.post('/:id/adendas/:adendaId/revisiones', addendaEnabled, reviewAddendum);
 
 /**
  * @openapi

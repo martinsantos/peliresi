@@ -4,45 +4,36 @@
  * Each widget: collapsible header + closeable. Closed → tray.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  Factory, FlaskConical, Package, Beaker, Droplets,
+  ClipboardCheck, Factory, FlaskConical, Package, Beaker, Droplets,
   ChevronUp, ChevronDown, X, Truck, GitBranch, Radio,
-  FileText, ArrowRight, Users, GripHorizontal,
+  FileText, ArrowRight, Users,
   MapPin, CheckCircle, Clock,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { hasInspectionCoordinates, operationSubject, type InspectionOperation } from '../../../services/inspectionOperations.service';
+import { INSPECTION_STATE_LABELS } from '../../inspecciones/inspectionPresentation';
 import type { MonitorMode } from '../WarRoomPage';
 import type { MonitorLiveResponse, ForecastResponse, TimelineResponse, EnTransitoItem } from '../api/monitor-api';
-import { formatNumber, formatTimeShort } from '../utils/formatters';
+import { formatTimeShort } from '../utils/formatters';
 import { EventFeed } from './EventFeed';
+import { MonitorActorRow } from './MonitorActorRow';
 import { EVENT_COLORS } from '../utils/war-room-icons';
-
-// ─── AnimatedCounter ─────────────────────────────────────────────────────────
-
-function AnimatedCounter({ value }: { value: number }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const prevRef = useRef(value);
-  useEffect(() => {
-    const start = prevRef.current;
-    const end = value;
-    if (start === end || !ref.current) { prevRef.current = end; return; }
-    const duration = 300;
-    const startTime = performance.now();
-    const step = (now: number) => {
-      const t = Math.min((now - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
-      if (ref.current) ref.current.textContent = String(Math.round(start + (end - start) * eased));
-      if (t < 1) requestAnimationFrame(step);
-      else prevRef.current = end;
-    };
-    requestAnimationFrame(step);
-  }, [value]);
-  return <span ref={ref}>{value}</span>;
-}
 
 // ─── Palettes & colors ───────────────────────────────────────────────────────
 
 const RESIDUO_PALETTE = ['#059669', '#7c3aed', '#dc2626', '#d97706', '#2563eb', '#0891b2', '#be185d', '#65a30d'];
+
+/** A global operational row must not advertise a private, forbidden destination. */
+function PendingManifest({ id, numero, canViewDetail, className, children }: {
+  id: string; numero: string; canViewDetail?: boolean; className: string; children: React.ReactNode;
+}) {
+  return canViewDetail === true
+    ? <Link to={'/manifiestos/' + id} aria-label={'Abrir manifiesto ' + numero}
+        className={className + ' hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700'}>{children}</Link>
+    : <div role="group" aria-label={'Vista operativa ' + numero} className={className}><div className="min-w-0 flex-1">{children}<p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p></div></div>;
+}
 
 const ESTADO_COLORS: Record<string, { base: string; dark: string }> = {
   BORRADOR:       { base: '#94a3b8', dark: '#64748b' },
@@ -52,22 +43,26 @@ const ESTADO_COLORS: Record<string, { base: string; dark: string }> = {
   RECIBIDO:       { base: '#8b5cf6', dark: '#7c3aed' },
   EN_TRATAMIENTO: { base: '#a855f7', dark: '#9333ea' },
   TRATADO:        { base: '#eab308', dark: '#ca8a04' },
+  CANCELADO:      { base: '#737373', dark: '#525252' },
+  RECHAZADO:      { base: '#ef4444', dark: '#b91c1c' },
 };
 
 const ESTADO_LABELS: Record<string, string> = {
   BORRADOR: 'Borrador', APROBADO: 'Aprobado', EN_TRANSITO: 'En Tránsito',
   ENTREGADO: 'Entregado', RECIBIDO: 'Recibido', EN_TRATAMIENTO: 'En Tratam.', TRATADO: 'Tratado',
+  CANCELADO: 'Cancelado', RECHAZADO: 'Rechazado',
 };
 
 // ─── Widget system ────────────────────────────────────────────────────────────
 
-type WId = 'pipeline' | 'viajes' | 'actores' | 'residuos' | 'tratamiento' | 'manifiesto' | 'eventos';
+type WId = 'inspecciones' | 'pipeline' | 'viajes' | 'actores' | 'residuos' | 'tratamiento' | 'manifiesto' | 'eventos';
 type WState = 'visible' | 'minimized' | 'closed';
 
 const STORAGE_KEY = 'wr-widget-states-v2';
 const DIVIDER_KEY = 'wr-divider-pct-v1';
 
 const DEFAULTS: Record<WId, WState> = {
+  inspecciones: 'visible',
   pipeline:    'visible',
   viajes:      'visible',
   manifiesto:  'visible',
@@ -78,7 +73,8 @@ const DEFAULTS: Record<WId, WState> = {
 };
 
 const WIDGET_CONFIGS: { id: WId; label: string; icon: React.ElementType }[] = [
-  { id: 'pipeline',    label: 'Pipeline',    icon: GitBranch },
+  { id: 'inspecciones', label: 'Inspecciones', icon: ClipboardCheck },
+  { id: 'pipeline',    label: 'Estados del manifiesto', icon: GitBranch },
   { id: 'viajes',      label: 'Viajes',      icon: Truck },
   { id: 'manifiesto',  label: 'Manifiesto',  icon: FileText },
   { id: 'actores',     label: 'Actores',     icon: Users },
@@ -99,29 +95,29 @@ const WidgetShell: React.FC<{
 }> = ({ title, icon: Icon, state, onMin, onClose, className = '', children }) => (
   <div className={`wr-panel overflow-hidden flex flex-col flex-shrink-0 ${className}`}>
     <div
-      className="flex items-center gap-1.5 px-2.5 py-2 border-b border-black/5 cursor-pointer select-none"
-      onClick={onMin}
+      className="flex items-center gap-1 px-2 border-b border-neutral-200 bg-neutral-50 select-none"
     >
-      <Icon size={13} className="text-[#0D8A4F] shrink-0" />
-      <span className="text-[11px] font-bold text-neutral-700 uppercase tracking-wide flex-1">{title}</span>
       <button
-        className="p-0.5 rounded hover:bg-black/5 text-neutral-400 hover:text-neutral-600 transition-colors"
-        onClick={e => { e.stopPropagation(); onMin(); }}
+        type="button" aria-expanded={state !== 'minimized'}
+        className="flex flex-1 min-w-0 min-h-11 items-center gap-2 text-left rounded hover:bg-neutral-100 text-neutral-800 transition-colors"
+        onClick={onMin}
       >
-        {state === 'minimized' ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+        <Icon size={16} className="text-[#1B5E3C] shrink-0" />
+        <span className="text-sm font-semibold flex-1">{title}</span>
+        {state === 'minimized' ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
       </button>
       {onClose && (
         <button
-          className="p-0.5 rounded hover:bg-red-50 text-neutral-400 hover:text-red-400 transition-colors"
-          onClick={e => { e.stopPropagation(); onClose(); }}
-          title="Cerrar"
+          type="button" aria-label={`Ocultar ${title}`}
+          className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-red-50 text-neutral-600 hover:text-red-700 transition-colors"
+          onClick={onClose}
         >
           <X size={12} />
         </button>
       )}
     </div>
     {state !== 'minimized' && (
-      <div className="p-2.5">{children}</div>
+      <div className="wr-widget-content p-3 min-h-0">{children}</div>
     )}
   </div>
 );
@@ -164,14 +160,14 @@ const ManifiestoCard: React.FC<{
       {/* Header row */}
       <div className="flex items-center justify-between">
         <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
-          style={{ backgroundColor: color + '20', color }}
+          className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
+          style={{ backgroundColor: color + '20' }}
         >
           {tipo || 'EVENTO'}
         </span>
         <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono tabular-nums">
           <span>{formatTimeShort(event.timestamp)}</span>
-          {totalEvents > 0 && <span className="text-neutral-300">{eventIndex + 1}/{totalEvents}</span>}
+          {totalEvents > 0 && <span className="text-neutral-600">{eventIndex + 1}/{totalEvents}</span>}
         </div>
       </div>
 
@@ -182,26 +178,11 @@ const ManifiestoCard: React.FC<{
       </p>
 
       {/* Actors */}
-      <div className="space-y-1">
-        {event.generador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-purple-100 text-purple-700 shrink-0">GEN</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{event.generador.razonSocial}</span>
-          </div>
-        )}
-        {transNombre && (
-          <div className="flex items-center gap-1.5">
-            <ArrowRight size={9} className="text-neutral-400 shrink-0 ml-0.5" />
-            <span className="text-[11px] text-orange-600 truncate font-medium">{transNombre}</span>
-          </div>
-        )}
-        {event.operador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">OPE</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{event.operador.razonSocial}</span>
-          </div>
-        )}
-      </div>
+      <ul className="space-y-1" aria-label="Actores del evento">
+        {event.generador && <MonitorActorRow category="generador" name={event.generador.razonSocial} />}
+        {transNombre && <MonitorActorRow category="transportista" name={transNombre} />}
+        {event.operador && <MonitorActorRow category="operador" name={event.operador.razonSocial} />}
+      </ul>
 
       {/* Residuos pills */}
       {event.residuos && event.residuos.length > 0 && (
@@ -223,6 +204,10 @@ const ManifiestoCard: React.FC<{
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
+  inspections?: InspectionOperation[];
+  inspectionTotal?: number;
+  inspectionError?: boolean;
+  inspectionLoading?: boolean;
   mode: MonitorMode;
   liveData: MonitorLiveResponse | null;
   forecastData: ForecastResponse | null;
@@ -252,6 +237,7 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const DashboardPanels: React.FC<Props> = ({
+  inspections, inspectionTotal, inspectionError, inspectionLoading,
   mode, liveData, forecastData, timelineData, playbackCounters, playbackEvents,
   currentEventId, enTransito = [], currentEvent, currentEventIndex = 0,
   totalEventCount = 0, onTripClick, onEventOpen, onViajeOpen,
@@ -272,52 +258,22 @@ export const DashboardPanels: React.FC<Props> = ({
   const minimize = (id: WId) => setWs(p => ({ ...p, [id]: p[id] === 'minimized' ? 'visible' : 'minimized' }));
   const close    = (id: WId) => setWs(p => ({ ...p, [id]: 'closed' }));
   const restore  = (id: WId) => setWs(p => ({ ...p, [id]: 'visible' }));
-  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed');
+  const closedWidgets = WIDGET_CONFIGS.filter(w => ws[w.id] === 'closed' && (w.id !== 'inspecciones' || inspections !== undefined));
 
   // ── Drag divider ──
   const containerRef = useRef<HTMLDivElement>(null);
   const [dividerPct, setDividerPct] = useState<number>(() => {
-    try { const s = localStorage.getItem(DIVIDER_KEY); if (s) return parseFloat(s); } catch {}
+    try { const s = Number(localStorage.getItem(DIVIDER_KEY)); if (Number.isFinite(s) && s >= 25 && s <= 75) return s; } catch {}
     return 55; // 55% for stats zone by default
   });
-  const isDragging = useRef(false);
-
-  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const pct = ((ev.clientY - rect.top) / rect.height) * 100;
-      const clamped = Math.max(25, Math.min(75, pct));
-      setDividerPct(clamped);
-    };
-
-    const onMouseUp = () => {
-      isDragging.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      setDividerPct(prev => {
-        try { localStorage.setItem(DIVIDER_KEY, String(prev)); } catch {}
-        return prev;
-      });
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  }, []);
+  useEffect(() => { try { localStorage.setItem(DIVIDER_KEY, String(dividerPct)); } catch {} }, [dividerPct]);
 
   // ── Data ──
   const porEstado = mode === 'PLAYBACK'
     ? (playbackCounters || {})
     : (liveData?.estadisticas?.porEstado || {});
   const maxEstado = Math.max(...Object.values(porEstado), 1);
-  const stages = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
+  const stages = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
   const eventos = playbackEvents || liveData?.eventosRecientes || [];
 
   // In PLAYBACK: derive Residuos/Tratamiento/Actores from timelineData events
@@ -345,15 +301,20 @@ export const DashboardPanels: React.FC<Props> = ({
 
   const timelineActores = React.useMemo(() => {
     if (mode !== 'PLAYBACK' || !timelineData) return null;
-    const gen: Record<string, number> = {};
-    const ope: Record<string, number> = {};
+    const gen = new Map<string, Set<string>>();
+    const ope = new Map<string, Set<string>>();
+    const add = (actors: Map<string, Set<string>>, name: string | undefined, id: string) => {
+      if (!name || !id) return;
+      if (!actors.has(name)) actors.set(name,new Set());
+      actors.get(name)!.add(id);
+    };
     timelineData.eventos.forEach(ev => {
-      if (ev.generador?.razonSocial) gen[ev.generador.razonSocial] = (gen[ev.generador.razonSocial] || 0) + 1;
-      if (ev.operador?.razonSocial) ope[ev.operador.razonSocial] = (ope[ev.operador.razonSocial] || 0) + 1;
+      add(gen,ev.generador?.razonSocial,ev.manifiestoId);
+      add(ope,ev.operador?.razonSocial,ev.manifiestoId);
     });
     return {
-      generadores: Object.entries(gen).map(([razonSocial, cantidad]) => ({ razonSocial, cantidad })).sort((a, b) => b.cantidad - a.cantidad),
-      operadores: Object.entries(ope).map(([razonSocial, cantidad]) => ({ razonSocial, cantidad })).sort((a, b) => b.cantidad - a.cantidad),
+      generadores: Array.from(gen,([razonSocial, ids]) => ({ razonSocial, cantidad:ids.size })).sort((a, b) => b.cantidad - a.cantidad),
+      operadores: Array.from(ope,([razonSocial, ids]) => ({ razonSocial, cantidad:ids.size })).sort((a, b) => b.cantidad - a.cantidad),
     };
   }, [mode, timelineData]);
 
@@ -363,16 +324,17 @@ export const DashboardPanels: React.FC<Props> = ({
   const tratamientosActivos = timelineTratamientos || liveData?.tratamientosActivos || [];
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full overflow-hidden p-3 gap-0">
+    <div ref={containerRef} className={`wr-dashboard flex flex-col h-full overflow-hidden p-3 gap-0 ${mode === 'FORECAST' ? 'wr-dashboard-pending' : ''}`}>
 
       {/* ── ZONA STATS — altura controlada por divider ── */}
       <div
         className="flex flex-col gap-2 overflow-y-auto flex-shrink-0 pb-2"
-        style={{ height: `calc(${dividerPct}% - 16px)` }}
+        style={{ height: mode === 'FORECAST' ? '100%' : `calc(${dividerPct}% - 28px)` }}
       >
+        {mode !== 'FORECAST' && <>
         {/* Widget: Pipeline */}
         {ws.pipeline !== 'closed' && (
-          <WidgetShell title="Pipeline" icon={GitBranch}
+          <WidgetShell title="Estados del manifiesto" icon={GitBranch}
             state={ws.pipeline} onMin={() => minimize('pipeline')} onClose={() => close('pipeline')}>
             <div className="flex flex-col gap-1">
               {stages.map(estado => {
@@ -383,7 +345,7 @@ export const DashboardPanels: React.FC<Props> = ({
                 if (count === 0 && !isKeyStage && mode === 'LIVE') return null;
                 return (
                   <div key={estado} className="flex items-center gap-2">
-                    <span className="text-[10px] text-neutral-500 w-[58px] truncate font-medium flex-shrink-0">
+                    <span className="text-xs text-neutral-700 w-[100px] font-medium flex-shrink-0">
                       {ESTADO_LABELS[estado] || estado}
                     </span>
                     <div className="flex-1 h-4 rounded overflow-hidden relative" style={{ backgroundColor: colors.base + '12' }}>
@@ -396,8 +358,8 @@ export const DashboardPanels: React.FC<Props> = ({
                       />
                     </div>
                     <span className="text-xs font-black tabular-nums font-mono w-6 text-right flex-shrink-0"
-                      style={{ color: count > 0 ? colors.dark : '#d1d5db' }}>
-                      <AnimatedCounter value={count} />
+                      style={{ color: count > 0 ? colors.dark : '#525252' }}>
+                      {count}
                     </span>
                   </div>
                 );
@@ -406,6 +368,14 @@ export const DashboardPanels: React.FC<Props> = ({
           </WidgetShell>
         )}
 
+        {inspections && ws.inspecciones !== 'closed' && <WidgetShell title={`Inspecciones · ${inspectionError || inspectionLoading ? '—' : inspectionTotal ?? inspections.length}`} icon={ClipboardCheck} state={ws.inspecciones} onMin={() => minimize('inspecciones')} onClose={() => close('inspecciones')}>
+          <p className="mb-2 text-[11px] text-neutral-500">Agenda activa · lugares de visita</p>
+          {inspectionError ? <p className="text-xs text-amber-700">Agenda sin actualizar</p> : inspectionLoading ? <p className="text-xs text-neutral-500">Cargando…</p> : !inspections.length ? <p className="text-xs text-neutral-500">Sin inspecciones activas</p> : inspections.map((row) => <div key={row.id} className="border-t border-neutral-100 py-2">
+            <button disabled={!hasInspectionCoordinates(row)} onClick={() => onTripClick?.(row.latitud!, row.longitud!)} className="min-h-10 w-full text-left"><span className="block text-xs font-semibold text-neutral-800">{row.numero} · {operationSubject(row)}</span><span className="block text-[11px] text-neutral-500">{INSPECTION_STATE_LABELS[row.estado]} · {row.inspector.nombre}{!hasInspectionCoordinates(row) ? ' · sin coordenadas' : ''}</span></button>
+            <Link className="inline-flex min-h-8 items-center text-xs font-semibold text-primary-700" to={'/inspecciones/' + row.id}>Abrir expediente</Link>
+          </div>)}
+          {!!inspectionTotal && inspectionTotal > inspections.length && <Link className="text-xs text-primary-700" to="/inspecciones">Ver agenda completa ({inspectionTotal})</Link>}
+        </WidgetShell>}
         {/* Widget: Viajes */}
         {ws.viajes !== 'closed' && (
           <WidgetShell title="Viajes" icon={Truck}
@@ -415,12 +385,12 @@ export const DashboardPanels: React.FC<Props> = ({
             ) : (
               <div className="space-y-1">
                 {enTransito.map(v => (
-                  <div key={v.manifiestoId}
-                    className="flex items-start gap-2 py-1.5 px-1 rounded hover:bg-orange-50/60 cursor-pointer transition-colors"
+                  <button key={v.manifiestoId} type="button" aria-label={`Abrir viaje ${v.numero}`}
+                    className="w-full text-left min-h-11 flex items-start gap-2 py-2 px-1 rounded hover:bg-orange-50 cursor-pointer transition-colors"
                     onClick={() => {
                       onViajeOpen?.(v);
                       const pos = v.ultimaPosicion;
-                      if (pos?.latitud && pos?.longitud) onTripClick?.(pos.latitud, pos.longitud);
+                      if (pos?.latitud != null && pos?.longitud != null) onTripClick?.(pos.latitud, pos.longitud);
                     }}>
                     <div className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5 shrink-0" />
                     <div className="min-w-0 flex-1">
@@ -441,7 +411,7 @@ export const DashboardPanels: React.FC<Props> = ({
                         <span className="text-[9px] text-neutral-400 truncate">{v.destino.razonSocial}</span>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -476,7 +446,7 @@ export const DashboardPanels: React.FC<Props> = ({
                     <div className="absolute inset-0 rounded transition-all duration-300" style={{ width: `${(g.cantidad / maxGen) * 100}%`, backgroundColor: '#7c3aed10' }} />
                     <div className="relative flex items-center justify-between px-1 py-0.5">
                       <span className="text-[11px] font-semibold text-neutral-700 truncate">{g.razonSocial}</span>
-                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1"><AnimatedCounter value={g.cantidad} /></span>
+                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1">{g.cantidad}</span>
                     </div>
                   </div>
                 </div>
@@ -494,7 +464,7 @@ export const DashboardPanels: React.FC<Props> = ({
                     <div className="absolute inset-0 rounded transition-all duration-300" style={{ width: `${(o.cantidad / maxOper) * 100}%`, backgroundColor: '#2563eb10' }} />
                     <div className="relative flex items-center justify-between px-1 py-0.5">
                       <span className="text-[11px] font-semibold text-neutral-700 truncate">{o.razonSocial}</span>
-                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1"><AnimatedCounter value={o.cantidad} /></span>
+                      <span className="text-[11px] font-black text-neutral-900 tabular-nums font-mono ml-1">{o.cantidad}</span>
                     </div>
                   </div>
                 </div>
@@ -508,22 +478,17 @@ export const DashboardPanels: React.FC<Props> = ({
           <WidgetShell title="Residuos" icon={Droplets}
             state={ws.residuos} onMin={() => minimize('residuos')} onClose={() => close('residuos')}>
             {(() => {
-              const residuos = topResiduos.slice(0, 3);
+              // The API totals do not carry a unit: never rank or compare them as mass.
+              const residuos = [...new Set(topResiduos.map(r => r.nombre))].sort((a,b) => a.localeCompare(b,'es'));
               if (residuos.length === 0) return <p className="text-[11px] text-neutral-400 italic py-1 text-center">Sin datos</p>;
-              const maxTotal = Math.max(...residuos.map(r => r.total), 1);
-              return residuos.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 mb-1 relative">
+              return <div className="space-y-2">{residuos.map((nombre, i) => (
+                <div key={nombre} className="flex items-start gap-2">
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] }} />
-                  <div className="flex-1 min-w-0 relative">
-                    <div className="absolute inset-0 rounded transition-all duration-300"
-                      style={{ width: `${(r.total / maxTotal) * 100}%`, backgroundColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18' }} />
-                    <div className="relative flex items-center justify-between px-1 py-0.5">
-                      <span className="text-[11px] text-neutral-700 truncate">{r.nombre}</span>
-                      <span className="text-[11px] font-bold text-neutral-900 tabular-nums font-mono ml-1">{formatNumber(r.total)}</span>
-                    </div>
-                  </div>
+                  <span className="text-xs text-neutral-700 break-words">{nombre}</span>
                 </div>
-              ));
+              ))}<p className="text-xs text-neutral-600">Tipos presentes en los datos consultados · sin comparación de volumen.</p>
+                <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline underline-offset-2" to="/reportes">Cantidades por unidad en Reportes</Link>
+              </div>;
             })()}
           </WidgetShell>
         )}
@@ -554,7 +519,8 @@ export const DashboardPanels: React.FC<Props> = ({
           </WidgetShell>
         )}
 
-        {/* Forecast panels (FORECAST mode, no widget controls) */}
+        </>}
+        {/* Actual pending work, not a prediction or cached live snapshot. */}
         {mode === 'FORECAST' && forecastData && (
           <>
             <div className="wr-panel p-3">
@@ -564,7 +530,7 @@ export const DashboardPanels: React.FC<Props> = ({
               {forecastData.pendienteRetiro.length === 0
                 ? <p className="text-[11px] text-neutral-400 italic text-center py-1">Sin retiros pendientes</p>
                 : forecastData.pendienteRetiro.slice(0, 8).map(m => (
-                  <div key={m.manifiestoId} className="mb-2 p-2 rounded border border-amber-200 bg-amber-50/50">
+                  <PendingManifest key={m.manifiestoId} id={m.manifiestoId} numero={m.numero} canViewDetail={m.canViewDetail} className="block min-h-11 mb-2 p-2 rounded border border-amber-200 bg-amber-50/50">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono font-bold text-xs text-neutral-800">{m.numero}</span>
                       <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">{m.diasEspera}d</span>
@@ -574,8 +540,9 @@ export const DashboardPanels: React.FC<Props> = ({
                       <span className="mx-1 text-neutral-400">→</span>
                       <span className="font-semibold text-blue-600">{m.operador}</span>
                     </div>
-                  </div>
+                  </PendingManifest>
                 ))}
+              {forecastData.pendienteRetiro.length>8 && <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=APROBADO">Abrir listado de retiros</Link>}
             </div>
             <div className="wr-panel p-3">
               <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -584,7 +551,7 @@ export const DashboardPanels: React.FC<Props> = ({
               {forecastData.pendienteTratamiento.length === 0
                 ? <p className="text-[11px] text-neutral-400 italic text-center py-1">Sin tratamientos pendientes</p>
                 : forecastData.pendienteTratamiento.slice(0, 8).map(m => (
-                  <div key={m.manifiestoId} className="mb-1.5 flex items-center gap-2">
+                  <PendingManifest key={m.manifiestoId} id={m.manifiestoId} numero={m.numero} canViewDetail={m.canViewDetail} className="min-h-11 mb-1.5 flex items-center gap-2 rounded px-1">
                     <div className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: m.estado === 'EN_TRATAMIENTO' ? '#a855f7' : '#8b5cf6' }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -593,8 +560,12 @@ export const DashboardPanels: React.FC<Props> = ({
                       </div>
                       <div className="text-[10px] text-neutral-500 truncate">{m.operador}</div>
                     </div>
-                  </div>
+                  </PendingManifest>
                 ))}
+              {forecastData.pendienteTratamiento.length>8 && <div className="flex flex-wrap gap-x-4">
+                <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=RECIBIDO">Ver recibidos</Link>
+                <Link className="inline-flex min-h-11 items-center text-xs font-semibold text-primary-700 underline" to="/manifiestos?estado=EN_TRATAMIENTO">Ver en tratamiento</Link>
+              </div>}
             </div>
             {forecastData.vencimientosProximos.length > 0 && (
               <div className="wr-panel p-3">
@@ -613,10 +584,10 @@ export const DashboardPanels: React.FC<Props> = ({
         )}
 
         {/* Tray — closed widgets */}
-        {closedWidgets.length > 0 && (
+        {mode !== 'FORECAST' && closedWidgets.length > 0 && (
           <div className="flex flex-wrap gap-1 px-1 py-1.5 bg-neutral-50/80 rounded-xl border border-black/5 flex-shrink-0">
             {closedWidgets.map(({ id, label, icon: Icon }) => (
-              <button key={id} onClick={() => restore(id)}
+              <button key={id} onClick={() => restore(id)} aria-label={`Restaurar ${label}`}
                 className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-neutral-500
                            hover:text-[#0D8A4F] hover:bg-white rounded-lg border border-transparent
                            hover:border-black/8 transition-all uppercase tracking-wide">
@@ -628,17 +599,12 @@ export const DashboardPanels: React.FC<Props> = ({
       </div>
 
       {/* ── DRAG DIVIDER ── */}
-      <div
-        className="flex items-center justify-center h-4 flex-shrink-0 cursor-row-resize group"
-        onMouseDown={onDividerMouseDown}
-      >
-        <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-neutral-100 group-hover:bg-neutral-200 transition-colors">
-          <GripHorizontal size={12} className="text-neutral-400" />
-        </div>
-      </div>
+      {mode !== 'FORECAST' && <label className="wr-panel-divider flex items-center gap-2 min-h-7 px-1 text-xs text-neutral-600">
+        <span>Paneles</span><input type="range" min={25} max={75} value={dividerPct} aria-label="Espacio para paneles del Monitor" className="flex-1 min-w-0 accent-[#1B5E3C]" onChange={event=>setDividerPct(Number(event.target.value))}/><span>Eventos</span>
+      </label>}
 
       {/* ── ZONA EVENTOS — takes remaining height ── */}
-      <WidgetShell
+      {mode !== 'FORECAST' && <WidgetShell
         title="Eventos"
         icon={Radio}
         state={ws.eventos}
@@ -653,7 +619,7 @@ export const DashboardPanels: React.FC<Props> = ({
             onEventClick={onEventOpen}
           />
         </div>
-      </WidgetShell>
+      </WidgetShell>}
     </div>
   );
 };

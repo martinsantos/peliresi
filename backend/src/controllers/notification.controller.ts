@@ -1,8 +1,30 @@
 import { Request, Response, NextFunction } from 'express';
-import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia } from '@prisma/client';
+import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { domainEvents } from '../services/domainEvent.service';
+import { AppError } from '../middlewares/errorHandler';
+import { normalizeAlertCondition } from '../services/alertRuleCondition.service';
+import { validateFollowupRule, alertResolution, FOLLOWUP_RULE_ID, followupDays } from '../services/alertFollowupPolicy.service';
+import { ejecutarSeguimientoCierre, simularSeguimientoCierre } from '../jobs/seguimientoCierre.job';
+import { catalogueCondition, validateCatalogueRule, CATALOGUE_MARKER } from '../services/alertCataloguePolicy.service';
+import { ejecutarCatalogo, simularCatalogo } from '../jobs/alertCatalogue.job';
+
+const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'INSPECCIONADO', 'INSPECTOR_ASIGNADO']);
+function normalizeAlertRecipients(raw: unknown): string {
+    let parsed = raw;
+    if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw); } catch { throw new AppError('Los destinatarios no contienen JSON válido', 400); }
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 30) throw new AppError('Seleccione al menos un destinatario válido', 400);
+    const recipients = Array.from(new Set(parsed.map(String)));
+    for (const recipient of recipients) {
+        if (ALERT_RECIPIENT_ROLES.has(recipient)) continue;
+        if (recipient.startsWith('email:') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.slice(6))) continue;
+        throw new AppError(`Destinatario no permitido: ${recipient}`, 400);
+    }
+    return JSON.stringify(recipients);
+}
 
 // Re-export notificationService so existing imports continue to work
 export { notificationService } from '../services/notification-dispatcher.service';
@@ -35,11 +57,29 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
             prisma.notificacion.count({ where }),
             prisma.notificacion.count({ where: { usuarioId, leida: false } })
         ]);
+        const linked = notificaciones.flatMap<{ id: string; manifiestoId: string | null; noticeId: string }>(notice => {
+            try {
+                const data = JSON.parse(notice.datos || 'null');
+                if (data?.familia === 'catalogo_verificable' && data.version === 1 && typeof data.casoId === 'string') {
+                    return [{ id: data.casoId as string, manifiestoId: null, noticeId: notice.id }];
+                }
+                return data?.tipo === 'seguimiento_cierre' && data.version === 1 && typeof data.casoId === 'string' && notice.manifiestoId
+                    ? [{ id: data.casoId as string, manifiestoId: notice.manifiestoId, noticeId: notice.id }] : [];
+            } catch { return []; }
+        });
+        // Only linked cases for manifests already in this user's own notice page.
+        // One bounded batch; never expose the administrative case list to actors.
+        const cases = linked.length ? await prisma.alertaGenerada.findMany({
+            where: { OR: linked.map(({ id, manifiestoId }) => ({ id, manifiestoId })) }, select: { id: true, estado: true },
+        }) : [];
+        const stateByCase = new Map(cases.map(item => [item.id, item.estado]));
+        const caseByNotice = new Map(linked.map(item => [item.noticeId, item.id]));
 
         res.json({
             success: true,
             data: {
-                notificaciones,
+                notificaciones: notificaciones.map(notice => ({ ...notice,
+                    seguimientoEstado: stateByCase.get(caseByNotice.get(notice.id) || '') ?? null })),
                 total,
                 noLeidas,
                 pagina: Math.floor(parseInt(offset as string) / limitNum) + 1,
@@ -123,11 +163,15 @@ export const getReglasAlerta = async (req: Request, res: Response, next: NextFun
 export const crearReglaAlerta = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const usuarioId = (req as AuthRequest).user!.id;
-        const { nombre, descripcion, evento, condicion, destinatarios } = req.body;
+        const { nombre, descripcion, evento, condicion, destinatarios, activa = true } = req.body;
+        if (!Object.values(EventoAlerta).includes(evento) || typeof activa !== 'boolean' || typeof nombre !== 'string' || !nombre.trim()) throw new AppError('Nombre, evento y estado de regla inválidos', 400);
 
-        // Frontend already sends condicion and destinatarios as JSON strings — do NOT re-stringify
-        const condicionStr = typeof condicion === 'string' ? condicion : JSON.stringify(condicion);
-        const destinatariosStr = typeof destinatarios === 'string' ? destinatarios : JSON.stringify(destinatarios);
+        let condicionStr: string;
+        try { condicionStr = normalizeAlertCondition(condicion); }
+        catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
+        const destinatariosStr = normalizeAlertRecipients(destinatarios);
+        validateFollowupRule(evento, condicionStr, destinatariosStr);
+        validateCatalogueRule(evento, condicionStr, destinatariosStr);
 
         const regla = await prisma.reglaAlerta.create({
             data: {
@@ -136,7 +180,8 @@ export const crearReglaAlerta = async (req: Request, res: Response, next: NextFu
                 evento: evento as EventoAlerta,
                 condicion: condicionStr,
                 destinatarios: destinatariosStr,
-                creadoPorId: usuarioId
+                creadoPorId: usuarioId,
+                activa
             }
         });
 
@@ -153,12 +198,21 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
         const { nombre, descripcion, evento, condicion, destinatarios, activa } = req.body;
 
         // Frontend already sends condicion and destinatarios as JSON strings — do NOT re-stringify
-        const condicionStr = condicion
-            ? (typeof condicion === 'string' ? condicion : JSON.stringify(condicion))
-            : undefined;
-        const destinatariosStr = destinatarios
-            ? (typeof destinatarios === 'string' ? destinatarios : JSON.stringify(destinatarios))
-            : undefined;
+        let condicionStr: string | undefined;
+        if (condicion !== undefined) {
+            try { condicionStr = normalizeAlertCondition(condicion); }
+            catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
+        }
+        const destinatariosStr = destinatarios === undefined ? undefined : normalizeAlertRecipients(destinatarios);
+        const current = await prisma.reglaAlerta.findUnique({ where: { id } });
+        if (!current) throw new AppError('Regla no encontrada', 404);
+        if (evento !== undefined && !Object.values(EventoAlerta).includes(evento)) throw new AppError('Evento inválido', 400);
+        if (activa !== undefined && typeof activa !== 'boolean') throw new AppError('Estado de regla inválido', 400);
+        validateFollowupRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
+        validateCatalogueRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
+        if (catalogueCondition(current.condicion)?.tipo !== catalogueCondition(condicionStr ?? current.condicion)?.tipo &&
+            await prisma.alertaGenerada.count({ where: { reglaId: id } })) throw new AppError('Una regla con casos históricos no puede cambiar de familia; desactívela y cree otra', 409);
+        if (id === FOLLOWUP_RULE_ID && followupDays(condicionStr ?? current.condicion) === null) throw new AppError('La regla de seguimiento existente sólo puede configurarse o desactivarse', 400);
 
         const regla = await prisma.reglaAlerta.update({
             where: { id },
@@ -182,7 +236,8 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
 export const eliminarReglaAlerta = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-
+        if (id === FOLLOWUP_RULE_ID) throw new AppError('Desactive el seguimiento para conservar su configuración e historial', 409);
+        if (await prisma.alertaGenerada.count({ where: { reglaId: id } })) throw new AppError('Esta regla tiene casos históricos; desactívela para conservar la trazabilidad', 409);
         await prisma.reglaAlerta.delete({ where: { id } });
 
         res.json({ success: true, message: 'Regla eliminada' });
@@ -196,18 +251,38 @@ export const eliminarReglaAlerta = async (req: Request, res: Response, next: Nex
 // Obtener alertas generadas
 export const getAlertasGeneradas = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { estado, limit = 50, offset = 0 } = req.query;
-        const alertasLimit = Math.min(500, Math.max(1, parseInt(limit as string)));
-
-        const where: any = {};
-        if (estado) where.estado = estado;
+        const { estado, evento, reglaId, fechaDesde, limit = 50, page = 1, offset } = req.query;
+        const alertasLimit = Math.min(500, Math.max(1, Number(limit)));
+        const skip = offset === undefined ? (Number(page) - 1) * alertasLimit : Number(offset);
+        if (!Number.isInteger(alertasLimit) || !Number.isInteger(skip) || skip < 0) throw new AppError('Paginación inválida', 400);
+        const where: Prisma.AlertaGeneradaWhereInput = {};
+        const role = (req as AuthRequest).user?.rol;
+        if (role?.startsWith('ADMIN_')) where.AND = [{ OR: [
+            { NOT: { datos: { contains: CATALOGUE_MARKER } } },
+            { datos: { contains: JSON.stringify({ tipoActor: role.slice(6) }).slice(1, -1) } },
+        ] }];
+        if (estado) {
+            const states = String(estado).split(',');
+            if (states.some(state => !Object.values(EstadoAlerta).includes(state as EstadoAlerta))) throw new AppError('Estado de caso inválido', 400);
+            where.estado = { in: states as EstadoAlerta[] };
+        }
+        if (evento) {
+            if (!Object.values(EventoAlerta).includes(evento as EventoAlerta)) throw new AppError('Evento inválido', 400);
+            where.regla = { evento: evento as EventoAlerta };
+        }
+        if (reglaId) where.reglaId = String(reglaId);
+        if (fechaDesde) {
+            const date = new Date(String(fechaDesde));
+            if (!Number.isFinite(date.getTime())) throw new AppError('Fecha inválida', 400);
+            where.createdAt = { gte: date };
+        }
 
         const [alertas, total] = await Promise.all([
             prisma.alertaGenerada.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
                 take: alertasLimit,
-                skip: parseInt(offset as string),
+                skip,
                 include: {
                     regla: { select: { nombre: true, evento: true } },
                     manifiesto: { select: { numero: true, estado: true } }
@@ -221,8 +296,9 @@ export const getAlertasGeneradas = async (req: Request, res: Response, next: Nex
             data: {
                 alertas,
                 total,
-                pagina: Math.floor(parseInt(offset as string) / alertasLimit) + 1,
-                totalPaginas: Math.ceil(total / alertasLimit)
+                pagina: Math.floor(skip / alertasLimit) + 1,
+                limit: alertasLimit,
+                totalPaginas: Math.max(1, Math.ceil(total / alertasLimit))
             }
         });
     } catch (error) {
@@ -237,20 +313,45 @@ export const resolverAlerta = async (req: Request, res: Response, next: NextFunc
         const { estado, notas } = req.body;
         const usuarioId = (req as AuthRequest).user!.id;
 
+        const role = (req as AuthRequest).user!.rol;
+        if (role?.startsWith('ADMIN_')) {
+            const item = await prisma.alertaGenerada.findUnique({ where: { id } });
+            if (!item) throw new AppError('Caso no encontrado', 404);
+            if (item.datos.includes(CATALOGUE_MARKER) && JSON.parse(item.datos).tipoActor !== role.slice(6)) throw new AppError('Caso fuera de su ámbito', 403);
+        }
         const alerta = await prisma.alertaGenerada.update({
             where: { id },
-            data: {
-                estado: estado as EstadoAlerta,
-                notas,
-                resueltaPor: usuarioId,
-                fechaResolucion: new Date()
-            }
+            data: alertResolution(estado, notas, usuarioId)
         });
 
         res.json({ success: true, data: alerta });
     } catch (error) {
         next(error);
     }
+};
+
+export const simularSeguimientoAlerta = async (req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: await simularSeguimientoCierre(req.body.diasRecepcion) }); }
+    catch (error) { next(error); }
+};
+
+export const evaluarSeguimientoAlerta = async (_req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: { avisosActualizados: await ejecutarSeguimientoCierre(), canal: 'interno' } }); }
+    catch (error) { next(error); }
+};
+
+export const simularCatalogoAlerta = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        let raw: string;
+        try { raw = normalizeAlertCondition(req.body.condicion); if (!catalogueCondition(raw)) throw new AppError('Familia no admitida', 400); }
+        catch (error) { throw new AppError(error instanceof Error ? error.message : 'Condición inválida', 400); }
+        res.json({ success: true, data: await simularCatalogo(raw) });
+    } catch (error) { next(error); }
+};
+
+export const evaluarCatalogoAlerta = async (_req: Request, res: Response, next: NextFunction) => {
+    try { res.json({ success: true, data: { avisosActualizados: await ejecutarCatalogo(), canal: 'interno' } }); }
+    catch (error) { next(error); }
 };
 
 // ============ DETECCION DE ANOMALIAS GPS ============

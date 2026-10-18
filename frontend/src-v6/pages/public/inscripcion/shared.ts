@@ -5,7 +5,7 @@
 import React from 'react';
 import {
   Factory, FlaskConical, ClipboardList, MapPin, Users, Shield,
-  FileText, Check, Calculator, Truck, Car,
+  FileText, Check, Truck, Car,
 } from 'lucide-react';
 
 // ========================================
@@ -21,24 +21,6 @@ export const DEPARTAMENTOS_MENDOZA = [
 
 export const CATEGORIAS_GENERADOR = ['Grandes Generadores', 'Medianos Generadores', 'Pequenos Generadores'];
 
-export const DOCS_GENERADOR = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'MEMORIA_TECNICA', nombre: 'Memoria Tecnica' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Certificado de Habilitacion' },
-];
-
-export const DOCS_OPERADOR = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Certificado de Habilitacion' },
-  { tipo: 'RESOLUCION_DPA', nombre: 'Resolucion DPA' },
-];
-
-export const DOCS_TRANSPORTISTA = [
-  { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP' },
-  { tipo: 'CERTIFICADO_HABILITACION', nombre: 'Habilitacion de Transporte' },
-  { tipo: 'SEGURO_AMBIENTAL', nombre: 'Seguro Ambiental' },
-];
-
 export interface StepDef {
   id: number;
   label: string;
@@ -50,7 +32,7 @@ export const STEPS_GENERADOR: StepDef[] = [
   { id: 2, label: 'Regulatorio', icon: ClipboardList },
   { id: 3, label: 'Domicilios', icon: MapPin },
   { id: 4, label: 'Adicional', icon: Shield },
-  { id: 5, label: 'Calculo TEF', icon: Calculator },
+  { id: 5, label: 'Actividad', icon: Factory },
   { id: 6, label: 'Documentos', icon: FileText },
   { id: 7, label: 'Resumen', icon: Check },
 ];
@@ -61,7 +43,7 @@ export const STEPS_OPERADOR: StepDef[] = [
   { id: 3, label: 'Domicilios', icon: MapPin },
   { id: 4, label: 'Representantes', icon: Users },
   { id: 5, label: 'Corrientes', icon: Shield },
-  { id: 6, label: 'Calculo TEF', icon: Calculator },
+  { id: 6, label: 'Actividad', icon: FlaskConical },
   { id: 7, label: 'Documentos', icon: FileText },
   { id: 8, label: 'Resumen', icon: Check },
 ];
@@ -69,7 +51,7 @@ export const STEPS_OPERADOR: StepDef[] = [
 export const STEPS_TRANSPORTISTA: StepDef[] = [
   { id: 1, label: 'Datos Basicos', icon: Truck },
   { id: 2, label: 'Habilitacion', icon: Shield },
-  { id: 3, label: 'Vehiculos', icon: Car },
+  { id: 3, label: 'Flota y choferes', icon: Car },
   { id: 4, label: 'Documentos', icon: FileText },
   { id: 5, label: 'Resumen', icon: Check },
 ];
@@ -126,7 +108,7 @@ export function getReviewFixture(tipoActor: TipoActor): {
       categoriaIndividual: '1000-2000',
       libroOperatoria: 'LIB-QA-001',
       certificacionISO: '2027-06-30',
-      factorR: '1', montoMxR: '12500', tefPersonal: '24', tefSuperficie: '1800', tefPotencia: '450', tefZona: 'Industrial',
+      tefPersonal: '24', tefSuperficie: '1800', tefPotencia: '450', tefZona: 'zona_industrial',
     } };
   }
 
@@ -139,7 +121,7 @@ export function getReviewFixture(tipoActor: TipoActor): {
       expedienteInscripcion: 'EX-2026-00023456', certificadoNumero: 'CERT-QA-001', resolucionDPA: 'RES-DPA-QA-002/26',
       representanteLegalNombre: 'Laura Revision', representanteLegalDNI: '28123456', representanteLegalTelefono: '0261-555-0148',
       representanteTecnicoNombre: 'Martin Control', representanteTecnicoMatricula: 'MAT-QA-001', representanteTecnicoTelefono: '0261-555-0149',
-      corrientesY: 'Y8, Y12, Y48', factorR: '1', montoMxR: '18500', tefPersonal: '18', tefSuperficie: '2400', tefCapacidad: '800', tefZona: 'Industrial',
+      corrientesY: 'Y8, Y12, Y48', tefPersonal: '18', tefSuperficie: '2400', tefCapacidad: '800', tefZona: 'zona_industrial',
     } };
   }
 
@@ -157,6 +139,7 @@ export function getReviewFixture(tipoActor: TipoActor): {
 export interface DocDef {
   tipo: string;
   nombre: string;
+  required: boolean;
 }
 
 // ========================================
@@ -177,9 +160,9 @@ export function validatePassword(pw: string): { valid: boolean; errors: string[]
 }
 
 export const inputCls = (hasError = false) =>
-  `w-full px-4 h-10 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors`;
+  `w-full px-4 min-h-11 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-base sm:text-sm bg-white transition-colors`;
 
 export const selectCls = (hasError = false) =>
-  `w-full px-4 h-10 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-sm bg-white transition-colors`;
+  `w-full px-4 min-h-11 rounded-xl border ${hasError ? 'border-error-400 bg-error-50' : 'border-neutral-200'} focus:border-[#0D8A4F] focus:ring-2 focus:ring-[#0D8A4F]/20 focus:outline-none text-base sm:text-sm bg-white transition-colors`;
 
 export const labelCls = 'block text-sm font-medium text-neutral-700 mb-1';

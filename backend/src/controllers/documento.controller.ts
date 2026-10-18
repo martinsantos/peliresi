@@ -2,13 +2,38 @@ import { Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import { randomUUID } from 'node:crypto';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
-import { AuthRequest } from '../middlewares/auth.middleware';
+import { AuthRequest, canReadActorRecord } from '../middlewares/auth.middleware';
+import { auditarActor } from '../utils/auditoria';
+import { describeDocument, readReceipt, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { scopedUploadRoot } from '../lib/trainingScope';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/var/www/sitrep-uploads';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIMES = ['application/pdf', 'image/jpeg', 'image/png'];
+
+function documentActor(doc: { generadorId?: string | null; operadorId?: string | null; transportistaId?: string | null }) {
+    // Missing or ambiguous ownership never opens a document to any account.
+    if ([doc.generadorId, doc.operadorId, doc.transportistaId].filter(Boolean).length !== 1) throw new AppError('Documento sin actor válido', 403);
+    return doc.transportistaId ? { type: 'transportista' as const, id: doc.transportistaId, adminRole: 'ADMIN_TRANSPORTISTA' } : doc.operadorId
+        ? { type: 'operador' as const, id: doc.operadorId, adminRole: 'ADMIN_OPERADOR' }
+        : { type: 'generador' as const, id: doc.generadorId!, adminRole: 'ADMIN_GENERADOR' };
+}
+
+function assertDocumentWrite(req: AuthRequest, doc: { generadorId?: string | null; operadorId?: string | null; transportistaId?: string | null }) {
+    const scope = documentActor(doc);
+    if (!req.user || req.user.restricted || !['ADMIN', scope.adminRole].includes(req.user.rol)) {
+        throw new AppError('No tiene permisos para modificar este documento', 403);
+    }
+}
+
+function routeActor(req: AuthRequest) {
+    const sector = (req.originalUrl || '').split('?')[0].match(/\/(generadores|operadores|transportistas)\//)?.[1];
+    if (!sector) throw new AppError('Tipo de actor inválido', 400);
+    return sector === 'operadores' ? 'operador' as const : sector === 'transportistas' ? 'transportista' as const : 'generador' as const;
+}
 
 function ensureDir(dir: string) {
     if (!fs.existsSync(dir)) {
@@ -19,15 +44,15 @@ function ensureDir(dir: string) {
 const storage = multer.diskStorage({
     destination: (req, _file, cb) => {
         const actorId = (req as AuthRequest).params.id;
+        if (!/^[a-zA-Z0-9_-]{1,100}$/.test(actorId)) return cb(new AppError('Identificador de actor inválido', 400), '');
         // Determine actor type from route path
-        const isOperador = (req as AuthRequest).originalUrl?.includes('/operadores/');
-        const actorType = isOperador ? 'operadores' : 'generadores';
-        const dir = path.join(UPLOADS_DIR, actorType, actorId);
+        const actorType = routeActor(req as AuthRequest) === 'operador' ? 'operadores' : routeActor(req as AuthRequest) === 'transportista' ? 'transportistas' : 'generadores';
+        const dir = path.join(scopedUploadRoot(UPLOADS_DIR), actorType, actorId);
         ensureDir(dir);
         cb(null, dir);
     },
     filename: (_req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e6);
+        const uniqueSuffix = randomUUID();
         const ext = path.extname(file.originalname);
         cb(null, uniqueSuffix + ext);
     }
@@ -47,6 +72,7 @@ export const upload = multer({
 });
 
 export const uploadDocumento = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    let persisted = false;
     try {
         const { id } = req.params;
         const file = req.file;
@@ -56,32 +82,53 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
         if (!tipo) throw new AppError('El tipo de documento es obligatorio', 400);
 
         // Determine actor type from route
-        const isOperador = req.originalUrl?.includes('/operadores/');
-
-        if (isOperador) {
-            const operador = await prisma.operador.findUnique({ where: { id } });
-            if (!operador) throw new AppError('Operador no encontrado', 404);
-        } else {
-            const generador = await prisma.generador.findUnique({ where: { id } });
-            if (!generador) throw new AppError('Generador no encontrado', 404);
+        const actorType = routeActor(req);
+        const actor = actorType === 'operador' ? await prisma.operador.findUnique({ where: { id } })
+            : actorType === 'transportista' ? await prisma.transportista.findUnique({ where: { id } })
+            : await prisma.generador.findUnique({ where: { id } });
+        if (!actor) throw new AppError('Actor no encontrado', 404);
+        const ownership = actorType === 'operador' ? { operadorId: id } : actorType === 'transportista' ? { transportistaId: id } : { generadorId: id };
+        const official = tipo === 'CERTIFICADO_AMBIENTAL';
+        if (official) {
+            assertDocumentWrite(req, ownership);
+            if (!Number.isInteger(Number(anio)) || Number(anio) < 1900 || Number(anio) > 2100) throw new AppError('Indicá el año del certificado', 400);
+            if (file.mimetype !== 'application/pdf') throw new AppError('El certificado oficial debe ser un PDF', 400);
         }
-
-        const documento = await prisma.documento.create({
+        const description = describeDocument(file);
+        const analysis = tipo === 'COMPROBANTE_PAGO' ? await readReceipt({ path: file.path, mimeType: description.mimeType }) : undefined;
+        const documento = await prisma.$transaction(async transaction => {
+          if (analysis) analysis.duplicado = await receiptDuplicate(transaction, description.sha256);
+          const saved = await transaction.documento.create({
             data: {
-                ...(isOperador ? { operadorId: id } : { generadorId: id }),
+                ...ownership,
                 tipo,
                 nombre: file.originalname,
                 path: file.path,
-                mimeType: file.mimetype,
-                size: file.size,
+                ...description,
+                ...(analysis ? { analisis: analysis } : {}),
                 anio: anio ? Number(anio) : undefined,
                 observaciones,
-                subidoPor: req.user!.id
+                subidoPor: req.user!.id,
+                ...(official ? { estado: 'APROBADO', revisadoPor: req.user!.id, revisadoAt: new Date() } : {}),
             }
+          });
+          await auditarActor({ accion: 'UPDATE', modulo: actorType.toUpperCase() as 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA',
+            ...ownership, usuarioId: req.user!.id, datosDespues: { documentoId: saved.id, tipo, anio: saved.anio, nombre: saved.nombre, estado: saved.estado }, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
+          if (analysis) await retainReceiptDigest(transaction, description.sha256, saved.id, 'ACTOR');
+          if (analysis?.duplicado) await receiptNotice(transaction, actor.usuarioId, { actorTipo: actorType, actorId: id, documentoId: saved.id });
+          if (official) await transaction.notificacion.create({ data: {
+            usuarioId: actor.usuarioId, tipo: 'INFO_GENERAL',
+            titulo: 'Certificado ambiental disponible',
+            mensaje: 'DGFA cargó tu certificado oficial. Podés descargarlo desde tu ficha.',
+            datos: JSON.stringify({ tipo: 'certificado_ambiental', documentoId: saved.id, actorTipo: actorType, actorId: id }),
+          } });
+          return saved;
         });
 
+        persisted = true;
         res.status(201).json({ success: true, data: { documento } });
     } catch (error) {
+        if (!persisted && req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
         next(error);
     }
 };
@@ -89,10 +136,14 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
 export const getDocumentos = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const { id } = req.params;
-        const isOperador = req.originalUrl?.includes('/operadores/');
+        const actorType = routeActor(req);
+
+        if (!canReadActorRecord(req.user, actorType, id)) {
+            throw new AppError('No tiene permisos para consultar estos documentos', 403);
+        }
 
         const documentos = await prisma.documento.findMany({
-            where: isOperador ? { operadorId: id } : { generadorId: id },
+            where: actorType === 'operador' ? { operadorId: id } : actorType === 'transportista' ? { transportistaId: id } : { generadorId: id },
             orderBy: { createdAt: 'desc' }
         });
         res.json({ success: true, data: { documentos } });
@@ -106,6 +157,11 @@ export const downloadDocumento = async (req: AuthRequest, res: Response, next: N
         const { docId } = req.params;
         const doc = await prisma.documento.findUnique({ where: { id: docId } });
         if (!doc) throw new AppError('Documento no encontrado', 404);
+
+        const scope = documentActor(doc);
+        if (!canReadActorRecord(req.user, scope.type, scope.id)) {
+            throw new AppError('No tiene permisos para consultar este documento', 403);
+        }
 
         if (!fs.existsSync(doc.path)) {
             throw new AppError('Archivo no encontrado en disco', 404);
@@ -128,6 +184,10 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
             throw new AppError('Estado debe ser APROBADO o RECHAZADO', 400);
         }
 
+        const doc = await prisma.documento.findUnique({ where: { id: docId } });
+        if (!doc) throw new AppError('Documento no encontrado', 404);
+        assertDocumentWrite(req, doc);
+
         const documento = await prisma.documento.update({
             where: { id: docId },
             data: {
@@ -149,6 +209,7 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
         const { docId } = req.params;
         const doc = await prisma.documento.findUnique({ where: { id: docId } });
         if (!doc) throw new AppError('Documento no encontrado', 404);
+        assertDocumentWrite(req, doc);
 
         // Delete file from disk
         if (fs.existsSync(doc.path)) {

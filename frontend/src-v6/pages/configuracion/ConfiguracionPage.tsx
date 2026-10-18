@@ -4,7 +4,7 @@
  * Página de configuración del sistema
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   User,
@@ -29,7 +29,8 @@ import { InstallPWAButton } from '../../components/InstallPWAButton';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { authService } from '../../services/auth.service';
 import api from '../../services/api';
-import { usuarioService } from '../../services/usuario.service';
+import { getApiErrorMessage } from '../../utils/api-error';
+import { passwordRuleError } from '../../utils/passwordRule';
 
 /** Extended user profile fields from /auth/profile (notification preferences) */
 interface UserWithPreferences {
@@ -106,28 +107,32 @@ const ConfiguracionPage: React.FC = () => {
     setIsSaving(true);
     try {
       if (currentUser?.id) {
-        await usuarioService.update(String(currentUser.id), {
-          nombre: profile.nombre,
-          telefono: profile.telefono,
-        });
+        await authService.updateOwnProfile({ nombre: profile.nombre, telefono: profile.telefono });
       }
       toast.success('Configuración guardada', 'Los cambios se han guardado correctamente.');
-    } catch {
-      toast.error('Error al guardar', 'No se pudieron guardar los cambios. Intenta nuevamente.');
+    } catch (error) {
+      toast.error('Error al guardar', getApiErrorMessage(error, 'Revisá la conexión y reintentá; tus cambios siguen en pantalla.'));
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleChangePassword = async () => {
+  const changingPassword = useRef(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const handleChangePassword = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    if (changingPassword.current) return;
     if (passwordForm.nueva !== passwordForm.confirmar) {
       toast.error('Error', 'Las contraseñas no coinciden');
       return;
     }
-    if (passwordForm.nueva.length < 6) {
-      toast.error('Error', 'La contraseña debe tener al menos 6 caracteres');
+    const ruleError = passwordRuleError(passwordForm.nueva);
+    if (ruleError) {
+      toast.error('Error', ruleError);
       return;
     }
+    changingPassword.current = true;
+    setIsChangingPassword(true);
     try {
       await authService.changePassword({
         currentPassword: passwordForm.current,
@@ -135,8 +140,11 @@ const ConfiguracionPage: React.FC = () => {
       });
       toast.success('Contraseña cambiada', 'Tu contraseña se ha actualizado correctamente.');
       setPasswordForm({ current: '', nueva: '', confirmar: '' });
-    } catch {
-      toast.error('Error', 'No se pudo cambiar la contraseña. Verifica tu contraseña actual.');
+    } catch (error) {
+      toast.error('Error', getApiErrorMessage(error, 'No se pudo cambiar la contraseña. Revisá la conexión y reintentá.'));
+    } finally {
+      changingPassword.current = false;
+      setIsChangingPassword(false);
     }
   };
 
@@ -189,10 +197,11 @@ const ConfiguracionPage: React.FC = () => {
           <div className="space-y-6 animate-fade-in">
             <div>
               <h4 className="font-medium text-neutral-900 mb-4">Cambiar contraseña</h4>
-              <div className="space-y-4 max-w-md">
+              <form className="space-y-4 max-w-md" onSubmit={handleChangePassword}>
                 <Input
                   type="password"
                   label="Contraseña actual"
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   value={passwordForm.current}
                   onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
@@ -200,6 +209,8 @@ const ConfiguracionPage: React.FC = () => {
                 <Input
                   type="password"
                   label="Nueva contraseña"
+                  autoComplete="new-password"
+                  helperText="Al menos 8 caracteres, una mayúscula y un número."
                   placeholder="••••••••"
                   value={passwordForm.nueva}
                   onChange={(e) => setPasswordForm({ ...passwordForm, nueva: e.target.value })}
@@ -207,12 +218,13 @@ const ConfiguracionPage: React.FC = () => {
                 <Input
                   type="password"
                   label="Confirmar contraseña"
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   value={passwordForm.confirmar}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmar: e.target.value })}
                 />
-                <Button onClick={handleChangePassword}>Cambiar contraseña</Button>
-              </div>
+                <Button type="submit" isLoading={isChangingPassword} disabled={isChangingPassword}>Cambiar contraseña</Button>
+              </form>
             </div>
           </div>
         );
@@ -299,91 +311,13 @@ const ConfiguracionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* WhatsApp */}
-            <div>
-              <h4 className="font-medium text-neutral-900 mb-1">WhatsApp (proximamente)</h4>
-              <p className="text-sm text-neutral-500 mb-4">
-                Recibir notificaciones de manifiestos y alertas via WhatsApp.
-              </p>
-              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 text-sm">Recibir alertas por WhatsApp</p>
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Las alertas tambien llegaran a tu WhatsApp
-                  </p>
-                </div>
-                <button
-                  disabled={savingNotif}
-                  onClick={() => handleToggleNotif('notifWhatsapp', !notifWhatsapp)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifWhatsapp ? 'bg-green-600' : 'bg-neutral-300'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifWhatsapp ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
+            {/* WhatsApp/Telegram are not delivered yet: never offer them; only let a stored opt-in be turned off. */}
+            {([['notifWhatsapp', 'WhatsApp', notifWhatsapp], ['notifTelegram', 'Telegram', notifTelegram]] as const).filter(([, , on]) => on).map(([key, channel]) => (
+              <div key={key} role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <p className="text-sm text-amber-900">{channel} todavía no envía avisos. Tus alertas siguen llegando en SITREP y por email.</p>
+                <Button type="button" size="sm" variant="outline" disabled={savingNotif} onClick={() => handleToggleNotif(key, false)}>Desactivar {channel}</Button>
               </div>
-              {notifWhatsapp && (
-                <div className="mt-2">
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Telefono WhatsApp (con codigo de pais)</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="tel"
-                      value={whatsappPhone}
-                      onChange={(e) => setWhatsappPhone(e.target.value)}
-                      placeholder="+54 261 XXXXXXX"
-                      className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleToggleNotif('whatsappPhone', whatsappPhone)}
-                      className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Telegram */}
-            <div>
-              <h4 className="font-medium text-neutral-900 mb-1">Telegram (proximamente)</h4>
-              <p className="text-sm text-neutral-500 mb-4">
-                Recibir notificaciones via bot de Telegram.
-              </p>
-              <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-900 text-sm">Recibir alertas por Telegram</p>
-                  <p className="text-xs text-neutral-500 mt-0.5">
-                    Configura tu Chat ID de Telegram para recibir alertas
-                  </p>
-                </div>
-                <button
-                  disabled={savingNotif}
-                  onClick={() => handleToggleNotif('notifTelegram', !notifTelegram)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${notifTelegram ? 'bg-blue-500' : 'bg-neutral-300'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${notifTelegram ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-              </div>
-              {notifTelegram && (
-                <div className="mt-2">
-                  <label className="block text-xs font-medium text-neutral-600 mb-1">Chat ID de Telegram</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={telegramChatId}
-                      onChange={(e) => setTelegramChatId(e.target.value)}
-                      placeholder="Tu chat ID numerico"
-                      className="flex-1 px-3 py-2 rounded-lg border border-neutral-200 text-sm focus:border-[#1B5E3C] focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleToggleNotif('telegramChatId', telegramChatId)}
-                      className="px-3 py-2 bg-[#1B5E3C] text-white text-sm rounded-lg font-medium"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            ))}
 
             {/* Solo para ADMIN */}
             {isAdmin && (
@@ -445,10 +379,7 @@ const ConfiguracionPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-bold text-neutral-900">Configuración</h2>
-        <p className="text-neutral-600 mt-1">Personaliza tu experiencia en el sistema</p>
-      </div>
+      <h2 className="sr-only">Configuración</h2>
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}

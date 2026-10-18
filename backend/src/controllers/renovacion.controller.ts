@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { approvedOperatorModeChange } from '../domain/operatorModalities';
+import { notifyRenovacion } from '../services/renovacion-notification.service';
 import {
     canReviewRenovacion,
     canSubmitRenovacion,
@@ -101,7 +103,8 @@ export const createRenovacion = async (req: AuthRequest, res: Response, next: Ne
             throw new AppError('generadorId o operadorId requerido segun tipoActor', 400);
         }
 
-        const renovacion = await prisma.renovacion.create({
+        const renovacion = await prisma.$transaction(async tx => {
+          const saved = await tx.renovacion.create({
             data: {
                 anio: Number(anio),
                 tipoActor,
@@ -116,6 +119,9 @@ export const createRenovacion = async (req: AuthRequest, res: Response, next: Ne
                 tefNuevo: tefNuevo !== undefined ? Number(tefNuevo) : undefined,
                 observaciones,
             },
+          });
+          await notifyRenovacion(tx, saved, 'MODIFICACION_SOLICITADA');
+          return saved;
         });
 
         res.status(201).json({ success: true, data: { renovacion } });
@@ -151,7 +157,10 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
                 if (tipoActor === 'GENERADOR' && renovacion.generadorId) {
                     await tx.generador.update({ where: { id: renovacion.generadorId }, data: safeChanges as Prisma.GeneradorUpdateInput });
                 } else if (tipoActor === 'OPERADOR' && renovacion.operadorId) {
-                    await tx.operador.update({ where: { id: renovacion.operadorId }, data: safeChanges as Prisma.OperadorUpdateInput });
+                    const current = await tx.operador.findUnique({ where: { id: renovacion.operadorId }, select: { tipoOperador: true } });
+                    if (!current) throw new AppError('Operador no encontrado', 404);
+                    const mode = approvedOperatorModeChange(current, safeChanges.tipoOperador, true);
+                    await tx.operador.update({ where: { id: renovacion.operadorId }, data: { ...safeChanges, ...mode } as Prisma.OperadorUpdateInput });
                 }
             }
             const status = await tx.renovacion.updateMany({
@@ -162,7 +171,9 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
                 },
             });
             if (status.count !== 1) throw new AppError('La renovacion ya fue procesada por otro usuario', 409);
-            return tx.renovacion.findUniqueOrThrow({ where: { id } });
+            const saved = await tx.renovacion.findUniqueOrThrow({ where: { id } });
+            await notifyRenovacion(tx, saved, 'MODIFICACION_APROBADA');
+            return saved;
         });
 
         res.json({ success: true, data: { renovacion: updated } });
@@ -193,7 +204,9 @@ export const rechazarRenovacion = async (req: AuthRequest, res: Response, next: 
                 },
             });
             if (status.count !== 1) throw new AppError('La renovacion ya fue procesada por otro usuario', 409);
-            return tx.renovacion.findUniqueOrThrow({ where: { id } });
+            const saved = await tx.renovacion.findUniqueOrThrow({ where: { id } });
+            await notifyRenovacion(tx, saved, 'MODIFICACION_RECHAZADA');
+            return saved;
         });
 
         res.json({ success: true, data: { renovacion: updated } });

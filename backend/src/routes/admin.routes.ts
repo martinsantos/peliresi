@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { getTrainingUsers, impersonateTrainingUser } from '../controllers/training.controller';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import {
   getUsuarios,
@@ -80,6 +81,8 @@ router.use(hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPE
  *         description: Solo ADMIN
  */
 router.get('/usuarios', hasRole('ADMIN'), getUsuarios);
+router.get('/training/usuarios', hasRole('ADMIN'), getTrainingUsers);
+router.post('/training/impersonate/:userId', hasRole('ADMIN'), impersonateTrainingUser);
 
 /**
  * @openapi

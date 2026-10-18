@@ -8,9 +8,11 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { getAccessToken, getRefreshToken, setTokens, api } from '../services/api';
+import { getAccessToken, getRefreshToken, setTokensDurably, api } from '../services/api';
+import { toast } from '../components/ui/Toast';
 import { useAuth } from './AuthContext';
 import type { User } from './AuthContext';
+import { currentAppLocation, impersonationDestination, IMPERSONATION_STORAGE_KEY, safeAdminReturnPath } from '../utils/impersonationNavigation';
 
 // ========================================
 // TYPES
@@ -20,6 +22,7 @@ export interface ImpersonationData {
   adminRefreshToken: string;
   adminUser: User;
   impersonatedUser: User;
+  adminReturnPath: string;
 }
 
 export interface ImpersonationContextType {
@@ -31,8 +34,6 @@ export interface ImpersonationContextType {
 // ========================================
 // STORAGE KEY
 // ========================================
-const IMPERSONATION_KEY = 'sitrep_impersonation';
-
 // ========================================
 // CONTEXT
 // ========================================
@@ -51,43 +52,53 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
       setImpersonationData(null);
       return;
     }
-    const saved = localStorage.getItem(IMPERSONATION_KEY);
+    const saved = localStorage.getItem(IMPERSONATION_STORAGE_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (typeof parsed?.adminToken !== 'string' || typeof parsed?.adminRefreshToken !== 'string' || !parsed?.adminUser) {
+          throw new Error('Invalid impersonation session');
+        }
         setImpersonationData({
           adminToken: parsed.adminToken,
           adminRefreshToken: parsed.adminRefreshToken,
           adminUser: parsed.adminUser,
           impersonatedUser: currentUser, // fresh data from current JWT
+          adminReturnPath: safeAdminReturnPath(parsed.adminReturnPath, window.location.pathname),
         });
       } catch {
-        localStorage.removeItem(IMPERSONATION_KEY);
+        localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
       }
     }
   }, [currentUser]);
 
   // Impersonar usuario (solo ADMIN) — full page reload clears React Query cache
   const impersonateUser = useCallback(async (userId: string) => {
-    const adminToken = getAccessToken() || '';
-    const adminRefreshToken = getRefreshToken() || '';
-    const adminUser = currentUser!;
+    if (!currentUser || currentUser.rol !== 'ADMIN') throw new Error('Solo una cuenta administradora puede cambiar de usuario.');
+    const adminToken = getAccessToken();
+    const adminRefreshToken = getRefreshToken();
+    if (!adminToken || !adminRefreshToken) throw new Error('La sesión administradora debe renovarse antes de cambiar de usuario.');
+    const adminUser = currentUser;
+    const adminReturnPath = currentAppLocation(window.location);
 
-    const resp = await api.post(`/admin/impersonate/${userId}`);
+    const training = userId.startsWith('training:');
+    const target = training ? userId.slice('training:'.length) : userId;
+    const resp = await api.post(`/admin/${training ? 'training/' : ''}impersonate/${encodeURIComponent(target)}`);
     const { tokens } = resp.data.data;
 
     // Persist admin tokens in localStorage BEFORE reload (survives page unload)
-    localStorage.setItem(IMPERSONATION_KEY, JSON.stringify({
+    localStorage.setItem(IMPERSONATION_STORAGE_KEY, JSON.stringify({
       adminToken,
       adminRefreshToken,
       adminUser,
+      adminReturnPath,
     }));
 
     // Set the impersonated user's tokens
-    setTokens(tokens.accessToken, tokens.refreshToken);
+    await setTokensDurably(tokens.accessToken, tokens.refreshToken);
 
     // Full page reload: clears React Query cache + initAuth runs with new JWT
-    window.location.href = '/dashboard';
+    window.location.href = impersonationDestination(window.location.pathname, '/dashboard');
   }, [currentUser]);
 
   // Salir de impersonacion — full page reload to restore admin state cleanly
@@ -95,13 +106,12 @@ export const ImpersonationProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!impersonationData) return;
 
     // Restore admin tokens
-    setTokens(impersonationData.adminToken, impersonationData.adminRefreshToken);
-
-    // Clear impersonation from localStorage
-    localStorage.removeItem(IMPERSONATION_KEY);
-
-    // Full page reload to admin usuarios panel
-    window.location.href = '/admin/usuarios';
+    void setTokensDurably(impersonationData.adminToken, impersonationData.adminRefreshToken).then(() => {
+      localStorage.removeItem(IMPERSONATION_STORAGE_KEY);
+      window.location.href = safeAdminReturnPath(impersonationData.adminReturnPath, window.location.pathname);
+    }).catch(() => {
+      toast.warning('No se confirmó el cambio de cuenta', 'Reintentá antes de continuar.');
+    });
   }, [impersonationData]);
 
   const value: ImpersonationContextType = {

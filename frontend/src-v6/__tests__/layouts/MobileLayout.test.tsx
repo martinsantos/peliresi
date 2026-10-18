@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileLayout } from '../../layouts/MobileLayout';
+vi.mock('../../hooks/useAttentionCounts', () => ({ useAttentionCounts: () => ({ support: 0, applicationPending: 0 }) }));
 
 const authState = vi.hoisted(() => ({
   currentUser: {
@@ -14,7 +16,19 @@ const authState = vi.hoisted(() => ({
     telefono: '',
     ubicacion: '',
     permisos: [],
+    esInspector: false,
   },
+}));
+const impersonationState = vi.hoisted(() => ({
+  data: null as null | { impersonatedUser: { nombre: string } },
+  exit: vi.fn(),
+}));
+const notices = vi.hoisted(() => ({ unread: 0 }));
+const support = vi.hoisted(() => ({ create: vi.fn() }));
+vi.mock('../../services/support.service', () => ({ supportService: support, supportError: () => 'No se confirmó el ticket.' }));
+
+vi.mock('../../contexts/ImpersonationContext', () => ({
+  useImpersonation: () => ({ impersonationData: impersonationState.data, exitImpersonation: impersonationState.exit }),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -23,8 +37,8 @@ vi.mock('../../contexts/AuthContext', () => ({
     users: [authState.currentUser],
     switchUser: vi.fn(),
     logout: vi.fn(),
-    isAdmin: false,
-    isGenerador: false,
+    isAdmin: authState.currentUser.rol === 'ADMIN',
+    isGenerador: authState.currentUser.rol === 'GENERADOR',
     isTransportista: authState.currentUser.rol === 'TRANSPORTISTA',
     isOperador: false,
     isLoading: false,
@@ -37,7 +51,11 @@ vi.mock('../../hooks/useActiveTripRecovery', () => ({
 }));
 
 vi.mock('../../hooks/useOfflineSync', () => ({
-  useOfflineSync: vi.fn(),
+  useOfflineSync: vi.fn(() => ({ processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0, syncing: false, retry: vi.fn() })),
+}));
+
+vi.mock('../../hooks/useNotificaciones', () => ({
+  useNotificacionesNoLeidas: vi.fn(() => ({ data: notices.unread })),
 }));
 
 vi.mock('../../components/NotificationBell', () => ({
@@ -71,21 +89,133 @@ vi.mock('../../components/ui/Toast', () => ({
 
 function renderMobileLayout(initialPath = '/dashboard') {
   return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/" element={<MobileLayout />}>
           <Route path="dashboard" element={<div data-testid="dashboard-content">Dashboard</div>} />
+          <Route path="centro-control" element={<div>Centro de Control</div>} />
+          <Route path="monitor" element={<div>Monitor</div>} />
+          <Route path="actores" element={<div>Consulta de actores</div>} />
+          <Route path="notificaciones" element={<div>Bandeja de avisos</div>} />
+          <Route path="manifiestos" element={<div>Listado de manifiestos</div>} />
+          <Route path="manifiestos/nuevo" element={<div>Formulario de nuevo manifiesto</div>} />
+          <Route path="manifiestos/:id" element={<div>Detalle del manifiesto</div>} />
+          <Route path="manifiestos/:id/adendas" element={<div>Adendas</div>} />
+          <Route path="app/manifiestos/:id/adendas" element={<div>Adendas app</div>} />
+          <Route path="mobile/manifiestos/:id/adendas" element={<div>Adendas móvil</div>} />
           <Route path="transporte/viaje/:id" element={<div data-testid="trip-content">Trip</div>} />
+          <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
+          <Route path="inspecciones/:id" element={<div>Expediente de campo<textarea aria-label="Observación QA" /></div>} />
+          <Route path="mis-inspecciones/:id" element={<div>Inspección del actor</div>} />
+          <Route path="soporte/:id" element={<div>Ticket confirmado</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
 describe('MobileLayout Android shell', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   beforeEach(() => {
     localStorage.clear();
-    authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA' };
+    localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: String(authState.currentUser.id) })) + '.not-a-credential');
+    authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA', esInspector: false };
+    impersonationState.data = null;
+    impersonationState.exit.mockClear();
+    notices.unread = 0;
+    support.create.mockReset(); support.create.mockResolvedValue({ id: 'ticket' });
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it('closes the reporting drawer only after the server confirms the ticket', async () => {
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reportar problema', exact: true }));
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'El lector no responde' } });
+    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'Abrí el lector desde el viaje pero no responde.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
+    await screen.findByText('Ticket confirmado');
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Menú de la aplicación' })).not.toBeInTheDocument());
+    expect(support.create).toHaveBeenCalledOnce();
+  });
+  it('offers contextual help above navigation and hides it while the menu is open', () => {
+    renderMobileLayout('/dashboard');
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).not.toBeInTheDocument();
+  });
+  it('moves inspection help into the header rather than over the save bar', () => {
+    renderMobileLayout('/inspecciones/qa-expediente');
+    const button = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+    expect(screen.getByRole('heading', { name: 'Inspección', exact: true })).toBeVisible();
+    expect(button.closest('header')).toBe(screen.getByRole('banner'));
+    expect(button.parentElement).not.toHaveClass('fixed');
+    expect(screen.queryByRole('navigation', { name: /principal/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the inspection header and notice outlet in the panned keyboard viewport without replacing the editor', () => {
+    const viewport = Object.assign(new EventTarget(), { height: 783, width: 393, offsetTop: 0, offsetLeft: 0, scale: 1 });
+    vi.stubGlobal('visualViewport', viewport);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+    const remove = vi.spyOn(viewport, 'removeEventListener');
+    const view = renderMobileLayout('/inspecciones/qa-expediente');
+    const shell = screen.getByRole('banner').closest('[data-app-shell]') as HTMLElement;
+    const input = screen.getByRole('textbox', { name: 'Observación QA' }); input.focus();
+    fireEvent.change(input, { target: { value: 'Comentario conservado' } });
+    act(() => { viewport.height = 471; viewport.offsetTop = 190; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell).toHaveStyle({ position: 'fixed', top: '190px', height: '471px' });
+    expect(input).toHaveFocus(); expect(input).toHaveValue('Comentario conservado');
+    act(() => { viewport.offsetTop = 120; viewport.dispatchEvent(new Event('scroll')); });
+    expect(shell.style.top).toBe('120px');
+    act(() => { viewport.height = 0; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell.style.height).toBe('471px');
+    act(() => { viewport.height = 783; viewport.offsetTop = 0; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell).toHaveStyle({ top: '0px', height: '783px' });
+    expect(screen.getByRole('textbox', { name: 'Observación QA' })).toBe(input);
+    view.unmount(); expect(remove).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function));
+    expect(shell.style.height).toBe('');
+  });
+
+  it('leaves ordinary pages and pinch zoom under browser control', () => {
+    const viewport = Object.assign(new EventTarget(), { height: 471, width: 393, offsetTop: 90, offsetLeft: 0, scale: 2 });
+    vi.stubGlobal('visualViewport', viewport);
+    const view = renderMobileLayout('/inspecciones/qa-expediente');
+    expect(screen.getByRole('banner').closest('[data-app-shell]')).not.toHaveStyle({ position: 'fixed' });
+    view.unmount(); viewport.scale = 1;
+    renderMobileLayout('/dashboard');
+    expect(screen.getByRole('banner').closest('[data-app-shell]')).not.toHaveStyle({ position: 'fixed' });
+  });
+
+  it.each(['/manifiestos/qa/adendas', '/app/manifiestos/qa/adendas'])('keeps the addenda shell visible after native viewer restoration on %s', route => {
+    const viewport = Object.assign(new EventTarget(), { height: 783, width: 393, offsetTop: 0, offsetLeft: 0, scale: 1 });
+    vi.stubGlobal('visualViewport', viewport);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1; });
+    const view = renderMobileLayout(route);
+    const shell = screen.getByRole('banner').closest('[data-app-shell]') as HTMLElement;
+    const content = screen.getByText(route.startsWith('/app') ? 'Adendas app' : 'Adendas');
+    expect(shell).toHaveStyle({ position: 'fixed', top: '0px', height: '783px' });
+    act(() => { viewport.height = 720; viewport.offsetTop = 42; viewport.dispatchEvent(new Event('scroll')); });
+    expect(shell).toHaveStyle({ top: '42px', height: '720px' });
+    expect(screen.getByText(content.textContent!)).toBe(content);
+    act(() => { viewport.scale = 2; viewport.dispatchEvent(new Event('resize')); });
+    expect(shell.style.position).toBe('');
+    view.unmount();
+    expect(shell.style.height).toBe('');
+  });
+
+  it('keeps the original drawer and work when reporting is deferred without acknowledgement', () => {
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reportar problema', exact: true }));
+    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'El lector no responde' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar luego', exact: true }));
+    expect(screen.getByRole('navigation', { name: 'Menú de la aplicación' })).toBeVisible();
+    expect(screen.getByTestId('dashboard-content')).toBeInTheDocument();
+    expect(support.create).not.toHaveBeenCalled();
+    expect(localStorage.getItem('sitrep-soporte:v1:17')).toContain('El lector no responde');
   });
 
   it('uses a short transportista bottom navigation label', () => {
@@ -93,6 +223,116 @@ describe('MobileLayout Android shell', () => {
 
     expect(screen.getByText('Viajes')).toBeInTheDocument();
     expect(screen.queryByText('Mis Viajes')).not.toBeInTheDocument();
+  });
+
+  it('keeps the small bottom-navigation unread counter readable', () => {
+    notices.unread = 14;
+    renderMobileLayout('/dashboard');
+    expect(screen.getByText('9+', { exact: true })).toHaveClass('bg-error-700', 'text-white');
+    expect(screen.getByRole('link', { name: /Avisos/ })).toHaveAttribute('href', '/notificaciones');
+  });
+
+  it('uses the same readable unread token in the expanded menu without changing its count', () => {
+    notices.unread = 14;
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    expect(screen.getByText('14', { exact: true })).toHaveClass('bg-error-700', 'text-white');
+  });
+
+  it.each(['ADMIN', 'GENERADOR'])('keeps the list create action working for %s', role => {
+    authState.currentUser = { ...authState.currentUser, rol: role };
+    renderMobileLayout('/manifiestos');
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo manifiesto', exact: true }));
+    expect(screen.getByText('Formulario de nuevo manifiesto')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nuevo manifiesto', exact: true })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['ADMIN', '/manifiestos/qa-record'],
+    ['GENERADOR', '/manifiestos/qa-record'],
+    ['ADMIN', '/manifiestos/nuevo'],
+    ['GENERADOR', '/manifiestos/nuevo'],
+  ])('does not overlay %s work with a create action on %s', (role, path) => {
+    authState.currentUser = { ...authState.currentUser, rol: role };
+    renderMobileLayout(path);
+    expect(screen.queryByRole('button', { name: 'Nuevo manifiesto', exact: true })).not.toBeInTheDocument();
+  });
+  it('uses the same operational inspector label and exposes its unchanged base role', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
+    renderMobileLayout('/inspecciones/qa-expediente');
+    const badge = screen.getByRole('banner').querySelector('[aria-label="Función actual"]');
+    expect(badge).toHaveTextContent(/^Inspector$/);
+    expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
+    expect(authState.currentUser.rol).toBe('GENERADOR');
+  });
+  it.each(['/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip', '/manifiestos/qa-record/adendas', '/app/manifiestos/qa-record/adendas', '/mobile/manifiestos/qa-record/adendas'])('keeps technical help reachable without covering form/trip controls on %s', path => {
+    renderMobileLayout(path);
+    const help = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
+    expect(help.closest('header')).toBe(screen.getByRole('banner'));
+    expect(help.parentElement).not.toHaveClass('fixed');
+    expect(help).toHaveClass('h-11', 'w-11');
+  });
+  it('does not reinterpret the actor own inspection route as inspector work', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
+    renderMobileLayout('/mis-inspecciones/qa-expediente');
+    expect(screen.getByRole('banner').querySelector('[aria-label="Función actual"]')).toHaveTextContent(/^Generador$/);
+  });
+
+  it.each(['/dashboard', '/centro-control', '/monitor', '/actores'])('identifies inspection work on %s without changing the base role', path => {
+    authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
+    renderMobileLayout(path);
+    const badge = screen.getByRole('banner').querySelector('[aria-label="Función actual"]');
+    expect(badge).toHaveTextContent(/^Inspector$/);
+    expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
+    expect(authState.currentUser.rol).toBe('GENERADOR');
+  });
+
+  it('uses the short Avisos title so the app header retains room for role and bell', () => {
+    renderMobileLayout('/notificaciones');
+    expect(screen.getByRole('banner')).toHaveTextContent('Avisos');
+    expect(screen.getByRole('banner')).not.toHaveTextContent('Notificaciones');
+  });
+
+  it('keeps a complete long page title and sector role in a stable header frame', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'ADMIN_GENERADOR' };
+    renderMobileLayout('/manifiestos/nuevo');
+    const header = screen.getByRole('banner');
+    expect(header.querySelector('h1')).toHaveClass('whitespace-normal', 'break-words');
+    expect(header.querySelector('h1')).not.toHaveClass('truncate');
+    expect(header.firstElementChild).toHaveClass('h-16');
+    expect(header.querySelector('[aria-label="Función actual"]')).toHaveTextContent('Adm. Generadores');
+    const badge = header.querySelector('[aria-label="Función actual"]');
+    expect(badge).toHaveClass('w-fit', 'max-w-full', 'break-normal');
+    expect(badge?.parentElement).toBe(header.querySelector('h1')?.parentElement);
+    expect(badge?.parentElement).toHaveClass('min-w-0', 'flex-1', 'flex-col');
+    expect(header.querySelector('[aria-label="Función actual"]')).not.toHaveClass('break-words', 'max-w-24');
+  });
+
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('keeps active navigation green for %s without changing the role', role => {
+    authState.currentUser = { ...authState.currentUser, rol: role };
+    renderMobileLayout('/notificaciones');
+    const noticeLink = screen.getByRole('link', { name: 'Avisos', exact: true });
+    expect(noticeLink).toHaveAttribute('aria-current', 'page');
+    expect(noticeLink).toHaveClass('text-primary-800', 'bg-primary-50', 'border-current');
+    expect(screen.getByRole('banner')).toHaveTextContent(role === 'GENERADOR' ? 'Generador' : role === 'OPERADOR' ? 'Operador' : 'Transportista');
+  });
+
+  it('keeps menu destinations at least 44px with visible keyboard focus', () => {
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    const link = screen.getByRole('link', { name: 'Todos los Manifiestos', exact: true });
+    expect(link).toHaveClass('min-h-11', 'focus-visible:outline-2', 'transition-colors');
+  });
+
+  it('identifies the generator category on its canonical detail route', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'ADMIN' };
+    renderMobileLayout('/admin/actores/generadores/qa-generator');
+    expect(screen.getByRole('banner')).toHaveTextContent('Generadores');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    const link = screen.getByRole('link', { name: 'Generadores', exact: true });
+    expect(link).toHaveAttribute('href', '/admin/actores/generadores');
+    expect(link).toHaveAttribute('aria-current', 'page');
+    expect(link).toHaveClass('bg-primary-50', 'text-primary-900');
   });
 
   it('shows an accessible active trip return surface outside trip mode', async () => {
@@ -109,5 +349,21 @@ describe('MobileLayout Android shell', () => {
     const outletContainer = screen.getByTestId('trip-content').parentElement;
     expect(outletContainer).toHaveClass('pb-6');
     expect(outletContainer).not.toHaveClass('pb-28');
+  });
+
+  it('does not offer account switching to an operator', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'OPERADOR' };
+    renderMobileLayout('/dashboard');
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    expect(screen.queryByText('Ver como otro usuario')).not.toBeInTheDocument();
+  });
+
+  it('shows a readable return action during temporary access', () => {
+    authState.currentUser = { ...authState.currentUser, rol: 'OPERADOR' };
+    impersonationState.data = { impersonatedUser: { nombre: 'Operador QA' } };
+    renderMobileLayout('/dashboard');
+    expect(screen.getByTestId('impersonation-banner')).toHaveTextContent('Operador QA');
+    fireEvent.click(screen.getByTestId('exit-impersonation'));
+    expect(impersonationState.exit).toHaveBeenCalledOnce();
   });
 });

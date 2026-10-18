@@ -4,6 +4,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { AppError } from '../middlewares/errorHandler';
+import { scopedUploadRoot } from '../lib/trainingScope';
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/var/www/sitrep-uploads';
 const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
@@ -44,7 +45,7 @@ function storageKeyPath(storageKey: string): string {
   if (segments.some((segment) => !segment || segment === '.' || segment === '..' || segment.includes('\\'))) {
     throw new AppError('Clave de almacenamiento invalida', 400);
   }
-  const root = path.resolve(UPLOADS_DIR);
+  const root = scopedUploadRoot(UPLOADS_DIR);
   const resolved = path.resolve(root, ...segments);
   if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
     throw new AppError('Ruta de evidencia invalida', 400);

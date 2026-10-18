@@ -7,10 +7,16 @@ import type {
   IniciarSolicitudRequest,
   UpdateSolicitudRequest,
   PaginatedData,
+  SolicitudRequirements,
 } from '../types/api';
 
 export const solicitudService = {
   // ── Public ──
+  async getRequirements(tipoActor: string): Promise<SolicitudRequirements> {
+    const { data } = await api.get(`/solicitudes/requisitos/${tipoActor}`);
+    return data.data;
+  },
+
   async iniciar(req: IniciarSolicitudRequest): Promise<{ solicitudId: string; message: string }> {
     const { data } = await api.post('/solicitudes/iniciar', req);
     return data.data;
@@ -50,6 +56,18 @@ export const solicitudService = {
   async deleteDocumento(solicitudId: string, docId: string): Promise<void> {
     await api.delete(`/solicitudes/${solicitudId}/documentos/${docId}`);
   },
+  async analizarDocumento(solicitudId: string, docId: string): Promise<DocumentoSolicitud> {
+    const { data } = await api.post(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(docId)}/analizar`);
+    return data.data.documento;
+  },
+  async downloadDocumento(solicitudId: string, item: DocumentoSolicitud): Promise<void> {
+    const { data } = await api.get(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(item.id)}/download`, { responseType: 'blob' });
+    const url = URL.createObjectURL(data);
+    const link = document.createElement('a');
+    link.href = url; link.download = item.nombre;
+    try { document.body.appendChild(link); link.click(); }
+    finally { link.remove(); URL.revokeObjectURL(url); }
+  },
 
   async getMensajes(id: string): Promise<MensajeSolicitud[]> {
     const { data } = await api.get(`/solicitudes/${id}/mensajes`);
@@ -62,6 +80,10 @@ export const solicitudService = {
   },
 
   // ── Admin ──
+  async corregirDatos(id: string, datosActor: Record<string, unknown>, expectedUpdatedAt: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.patch(`/solicitudes/${encodeURIComponent(id)}/datos-revision`, { datosActor, expectedUpdatedAt });
+    return data.data.solicitud;
+  },
   async list(filters?: SolicitudFilters): Promise<PaginatedData<SolicitudInscripcion>> {
     const { data } = await api.get('/solicitudes', { params: filters });
     const raw = data.data;
@@ -80,7 +102,7 @@ export const solicitudService = {
   },
 
   async observar(id: string, mensaje: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/observar`, { mensaje });
+    const { data } = await api.post(`/solicitudes/${id}/observar`, { observaciones: mensaje });
     return data.data.solicitud;
   },
 

@@ -39,6 +39,12 @@ describe('local inspection discovery', () => {
     expect(result.current.data).toMatchObject({ offline: true, total: 1, items: [{ id: 'one' }] });
   });
 
+  it('filters by the immutable inspection subject even after a generator is linked', () => {
+    const cases = [cached('oil', 'PRP-2026-00001', 'a-1', '2026-09-20T00:00:00Z'), cached('legacy', 'I-2026-000002', 'a-2', '2026-09-22T00:00:00Z')];
+    expect(filterCachedInspections(cases, { tipoInspeccion: 'PETROLEO' }).items.map(row => row.id)).toEqual(['oil']);
+    expect(filterCachedInspections(cases, { tipoInspeccion: 'GENERADOR' }).items.map(row => row.id)).toEqual(['legacy']);
+  });
+
   it('never substitutes a local copy for a permission error', async () => {
     mocks.list.mockRejectedValue(Object.assign(new Error('Forbidden'), { isAxiosError: true, code: 'ERR_BAD_REQUEST', response: { status: 403 } }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -1,7 +1,6 @@
 import { Rol, TipoNotificacion, PrioridadNotificacion } from '@prisma/client';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
-import { emailService } from './email.service';
 import { enviarPushAlUsuario } from './push.service';
 
 class NotificationService {
@@ -45,16 +44,9 @@ class NotificationService {
                 });
                 if (!user) return;
 
-                // Email channel
-                if (user.notifEmail) {
-                    const subject = `[SITREP] ${data.titulo}`;
-                    emailService.sendAlertEmail(
-                        [user.email],
-                        { nombre: data.titulo, descripcion: data.mensaje },
-                        data.manifiestoId || null,
-                        { mensaje: data.mensaje, ...(data.datos || {}) },
-                    ).catch(() => {});
-                }
+                // Email is relayed from the committed notice by notification-mail.
+                // A single outbox ID prevents duplicate direct/digest sends and
+                // rechecks verification, preference, family and ownership at delivery.
 
                 // WhatsApp channel (placeholder — requires integration with WhatsApp Business API)
                 if (user.notifWhatsapp && user.whatsappPhone) {

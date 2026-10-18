@@ -26,6 +26,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/CardV2';
+import { CRUDSummary } from '../../components/crud/CRUDSummary';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -384,7 +385,7 @@ const TransportistasPage: React.FC = () => {
   const columns = [
     {
       key: 'transportista',
-      width: '30%',
+      // Leave remaining space to the actor, not to narrow status/action columns.
       header: 'Transportista',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -401,7 +402,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'habilitacion',
-      width: '12%',
+      width: '8rem',
       header: 'Habilitación',
       hiddenBelow: 'xl' as const,
       render: (row: typeof tableData[0]) => {
@@ -424,7 +425,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'localidad',
-      width: '10%',
+      width: '7rem',
       header: 'Localidad',
       sortable: true,
       hiddenBelow: 'xl' as const,
@@ -443,7 +444,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'flota',
-      width: '7%',
+      width: '7.5rem',
       header: 'Vehículos',
       sortable: true,
       hiddenBelow: 'xl' as const,
@@ -456,7 +457,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'choferes',
-      width: '7%',
+      width: '7rem',
       header: 'Choferes',
       sortable: true,
       hiddenBelow: 'xl' as const,
@@ -469,7 +470,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '15%',
+      width: '9rem',
       header: 'Contacto',
       hiddenBelow: '2xl' as const,
       render: (row: typeof tableData[0]) => (
@@ -492,7 +493,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'ultimaActividad',
-      width: '9%',
+      width: '7rem',
       header: 'Actividad',
       sortable: true,
       hiddenBelow: '2xl' as const,
@@ -504,7 +505,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '8%',
+      width: '6rem',
       header: 'Estado',
       sortable: true,
       render: (row: typeof tableData[0]) => (
@@ -515,7 +516,7 @@ const TransportistasPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '10%',
+      width: '10rem',
       header: '',
       align: 'right' as const,
       render: (row: typeof tableData[0]) => (
@@ -585,63 +586,15 @@ const TransportistasPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Truck size={20} className="text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
-                <p className="text-sm text-neutral-600">Total Transportistas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-success-100 rounded-lg">
-                <CheckCircle size={20} className="text-success-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.activos}</p>
-                <p className="text-sm text-neutral-600">Activos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-warning-100 rounded-lg">
-                <AlertTriangle size={20} className="text-warning-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.inactivos}</p>
-                <p className="text-sm text-neutral-600">Inactivos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Clock size={20} className="text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-neutral-900">{stats.porVencer}</p>
-                <p className="text-sm text-neutral-600">Vencen en 30 días</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <CRUDSummary stats={[
+        { label: 'Total Transportistas', value: stats.total, icon: <Truck size={20} className="text-orange-600" />, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+        { label: 'Activos · esta página', value: stats.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+        { label: 'Inactivos · esta página', value: stats.inactivos, icon: <AlertTriangle size={20} className="text-warning-600" />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
+        { label: 'Vencen en 30 días · esta página', value: stats.porVencer, icon: <Clock size={20} className="text-orange-600" />, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+      ]} />
 
       {/* Filters */}
-      <Card>
+      <Card padding="none">
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
@@ -724,6 +677,7 @@ const TransportistasPage: React.FC = () => {
             {/* Desktop table */}
             <div className="hidden md:block">
               <Table
+                className="[&_table]:min-w-[40rem] xl:[&_table]:min-w-[57rem] 2xl:[&_table]:min-w-[73rem]"
                 data={filteredData}
                 columns={columns}
                 keyExtractor={(row) => row.id}

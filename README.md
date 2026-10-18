@@ -1,5 +1,17 @@
 # SITREP — Sistema de Trazabilidad de Residuos Peligrosos
 
+## Continuar desde el cierre del 16/10/2026
+
+Fuente de desarrollo: `codex/sitrep-manifiestos-v2-20261014`. Para revisar/refactorizar UI/UX usar `codex/sitrep-uiux-review-20261016`, derivada del tag `sitrep-uiux-baseline-20261016`, sin mezclar cambios funcionales o producción.
+
+- [Cierre parcial: commits, pruebas, pendientes y worktrees](docs/CIERRE-PARCIAL-20261016.md).
+- [Brief y prompt para la revisión UI/UX](docs/REVISION-UIUX-20261016.md).
+- [QA de empresas, establecimientos y personas](docs/QA-EMPRESAS-SEDES-20261016.md).
+
+El candidato no está desplegado. Producción: https://sitrep.ultimamilla.com.ar/ ; app web: https://sitrep.ultimamilla.com.ar/app/ ; manual: https://sitrep.ultimamilla.com.ar/manual/ . Dominio final previsto: `sitrep.mendoza.gov.ar`.
+
+No iniciar instalaciones, DB, Docker Desktop, emuladores, correos ni despliegues para abrir este cierre. Las instrucciones de demo/infraestructura que siguen son **históricas**, no la guía operativa del candidato ni confirmación de accesos o permisos actuales.
+
 ## Instalacion Rapida
 
 | Archivo | Descripcion |

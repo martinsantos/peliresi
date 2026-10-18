@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -22,6 +23,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { UserRole } from '../../contexts/AuthContext';
 import { Button } from './ButtonV2';
 import { Badge } from './BadgeV2';
+import { ROLE_GROUP_LABELS } from '../../utils/roleGroupLabels';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -128,8 +130,10 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
         <button
           onClick={() => setIsOpen(!isOpen)}
           disabled={isSwitching}
+          aria-label={`Opciones de cuenta de ${currentUser.nombre}`}
+          aria-expanded={isOpen}
           className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-xl transition-all',
+            'flex h-11 w-11 shrink-0 items-center justify-center gap-0 rounded-xl transition-colors sm:h-auto sm:w-auto sm:gap-2 sm:px-3 sm:py-2',
             'border-2 hover:shadow-md',
             currentConfig.bgColor,
             currentConfig.borderColor,
@@ -147,11 +151,11 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
             <p className={cn('text-sm font-semibold', currentConfig.color)}>
               {currentUser.nombre}
             </p>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-neutral-700">
               {currentConfig.label}
             </p>
           </div>
-          <ChevronDown size={16} className={cn('ml-1', currentConfig.color)} />
+          <ChevronDown size={16} className={cn('hidden sm:block ml-1', currentConfig.color)} />
         </button>
 
         {isOpen && (
@@ -160,7 +164,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
               className="fixed inset-0 z-40"
               onClick={() => setIsOpen(false)}
             />
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-4 border border-neutral-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+            <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-4 border border-neutral-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
               {/* Header */}
               <div className={cn('p-4 border-b', currentConfig.bgColor, currentConfig.borderColor)}>
                 <p className="text-xs font-semibold uppercase tracking-wider opacity-70">
@@ -182,6 +186,14 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                 </div>
               </div>
 
+              {/* Outside demo mode there are no switchable accounts: offer the profile, not an empty switcher. */}
+              {users.length === 0 ? (
+                <div className="p-3">
+                  <Link to="/mi-perfil" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                    Mi perfil
+                  </Link>
+                </div>
+              ) : <>
               {/* Filtros por rol */}
               <div className="p-3 border-b border-neutral-100">
                 <p className="text-xs font-semibold text-neutral-500 uppercase mb-2">
@@ -278,6 +290,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                   {filteredUsers.length} usuarios disponibles
                 </p>
               </div>
+              </>}
             </div>
           </>
         )}
@@ -339,7 +352,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                 )}>
                   <Icon size={18} className={config.color} />
                   <span className={cn('font-semibold', config.color)}>
-                    {config.label}s
+                          {ROLE_GROUP_LABELS[role] || config.label}
                   </span>
                   <Badge variant="soft" color="neutral" size="sm">
                     {roleUsers.length}

@@ -1,0 +1,20 @@
+import { afterEach, expect, it, vi } from 'vitest';
+const state = vi.hoisted(() => ({ create: vi.fn(), user: vi.fn(), send: vi.fn(), push: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { notificacion: { create: state.create }, usuario: { findUnique: state.user } } }));
+vi.mock('../../services/email.service', () => ({ emailService: { sendAlertEmail: state.send } }));
+vi.mock('../../services/push.service', () => ({ enviarPushAlUsuario: state.push }));
+vi.mock('../../utils/logger', () => ({ default: { info: vi.fn(), error: vi.fn() } }));
+import { notificationService } from '../../services/notification-dispatcher.service';
+afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
+it('persists the notice without a second direct email path, leaving push independent', async () => {
+  vi.useFakeTimers();
+  state.create.mockResolvedValue({ id: 'committed-notice' });
+  state.user.mockResolvedValue({ notifEmail: true, email: 'qa@example.invalid' });
+  state.push.mockResolvedValue(undefined);
+  const result = await notificationService.crearNotificacion({ usuarioId: 'qa', tipo: 'MANIFIESTO_FIRMADO', titulo: 'QA', mensaje: 'QA', manifiestoId: 'manifest' });
+  await vi.runAllTimersAsync();
+  expect(result.id).toBe('committed-notice');
+  expect(state.create).toHaveBeenCalledOnce();
+  expect(state.send).not.toHaveBeenCalled();
+  expect(state.push).toHaveBeenCalledOnce();
+});

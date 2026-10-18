@@ -5,7 +5,9 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { currentNavigationItem } from '../utils/navigationSelection';
+import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
 import {
   LayoutDashboard,
@@ -18,7 +20,6 @@ import {
   User,
   ChevronDown,
   LogOut,
-  Leaf,
   Command,
   Users,
   BarChart3,
@@ -37,24 +38,41 @@ import {
   FileCheck,
   Radio,
   Scale,
+  LifeBuoy,
 } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
 import { UserSwitcher } from '../components/ui/UserSwitcher';
 import { NotificationBell } from '../components/NotificationBell';
+import { SitrepMark } from '../components/SitrepMark';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
+import CompanyContextBar from '../components/CompanyContextBar';
+import { canUseCompanySection } from '../services/companyContext';
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
+import { SupportEntry } from '../components/SupportReportDialog';
+import { SupportBubble } from '../components/SupportBubble';
+import { ApplicantLayout } from './ApplicantLayout';
+import { AttentionBadge } from '../components/AttentionBadge';
+import { useAttentionCounts } from '../hooks/useAttentionCounts';
 
 // ========================================
 // COMPONENT
 // ========================================
+const UNLISTED_PAGE_TITLES: Record<string, string> = {
+  '/configuracion': 'Configuración',
+  '/mi-perfil': 'Mi Perfil',
+  '/notificaciones': 'Notificaciones',
+  '/estadisticas': 'Estadísticas',
+  '/ayuda': 'Ayuda',
+};
+
 export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -73,9 +91,12 @@ export const MainLayout: React.FC = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
   const location = useLocation();
+  const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
+  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
+  const attention = useAttentionCounts();
 
   // Items de administración según rol. Hooks must stay before loading/null guards.
   const adminItems = useMemo(() => {
@@ -94,18 +115,21 @@ export const MainLayout: React.FC = () => {
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminGenerador) {
       items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminTransportista) {
       items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
       items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
     } else if (isAdminOperador) {
       items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
+      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
       items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
       items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
       items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
@@ -134,7 +158,10 @@ export const MainLayout: React.FC = () => {
     return null;
   }
 
+  if (isRestricted) return <ApplicantLayout />;
+
   // Configuración de colores según rol (para header badges)
+  const inspectionLabel = inspectionContextLabel(currentUser, location.pathname);
   const roleStyles = (() => {
     switch (currentUser.rol) {
       case 'ADMIN':
@@ -187,17 +214,19 @@ export const MainLayout: React.FC = () => {
     // Alertas para todos
     items.push({ path: '/alertas', icon: AlertTriangle, label: 'Alertas' });
     
-    return items;
+    return items.filter(item=>canUseCompanySection(currentUser?.empresaContexto,item.path));
   })();
 
-  // Get current page title
-  const currentPage = navItems.find(item => item.path === location.pathname)?.label || 
-    adminItems.find(item => item.path === location.pathname)?.label || 'SITREP';
+  // One current section, including detail routes; hidden role items never compete.
+  const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems, { path: '/soporte', icon: LifeBuoy, label: 'Soporte' }]);
+  // Pages outside the side menu still name themselves in the bar (their own heading is screen-reader only).
+  const sectionPath = location.pathname.replace(/^\/mobile(?=\/)/, '');
+  const unlistedPage = Object.entries(UNLISTED_PAGE_TITLES).find(([path]) => sectionPath === path || sectionPath.startsWith(path + '/'))?.[1];
+  const currentPage = isInspectionCase ? 'Inspección' : location.pathname.startsWith('/empresas')?'Empresas y sedes':currentItem?.label || unlistedPage || 'SITREP';
 
   return (
-    <div className={`h-screen bg-[#F8F8F6] flex flex-col overflow-hidden ${impersonationData ? 'pt-10' : ''}`}>
+    <div data-app-shell className="h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden">
       <NotificacionesPoller />
-      <ToastContainer />
       {/* Impersonation banner — amber bar above everything */}
       {impersonationData && (
         <ImpersonationBanner
@@ -222,7 +251,7 @@ export const MainLayout: React.FC = () => {
       <aside
         className={`
           fixed lg:sticky top-0 left-0 z-50
-          w-64 h-screen sidebar-polished border-r border-[#164D32]
+          w-64 h-full shrink-0 sidebar-polished border-r border-[#164D32]
           flex flex-col
           transition-transform duration-300 ease-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -230,29 +259,27 @@ export const MainLayout: React.FC = () => {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/15">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-[#1B5E3C] bg-white mr-3">
-            <Leaf size={20} />
-          </div>
+          <SitrepMark size={36} className="mr-3" />
           <div>
             <span className="font-bold text-lg text-white">SITREP</span>
-            <span className="text-xs font-medium ml-1 text-white/60">{currentUser.rol}</span>
+            <span title={`Rol base: ${currentUser.rol}`} className="text-xs font-medium ml-1 text-white/60">{inspectionLabel ?? currentUser.rol}</span>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto sidebar-scrollbar">
+        <nav aria-label="Navegación principal" className="flex-1 py-4 px-3 space-y-1 overflow-y-auto sidebar-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
-            // Custom isActive: match path prefix (for /actores/operadores/:id to highlight Actores)
-            const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            const isItemActive = currentItem?.path === item.path;
             return (
-              <NavLink
+              <Link
                 key={item.path}
                 to={item.path}
+                aria-current={isItemActive ? 'page' : undefined}
                 onClick={() => setSidebarOpen(false)}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-xl
-                  font-medium text-sm transition-all duration-200
+                  flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl
+                  font-medium text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
                   ${isItemActive
                     ? 'bg-white/20 text-white'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -261,7 +288,7 @@ export const MainLayout: React.FC = () => {
               >
                 <Icon size={20} />
                 {item.label}
-              </NavLink>
+              </Link>
             );
           })}
           
@@ -273,16 +300,16 @@ export const MainLayout: React.FC = () => {
               </p>
               {adminItems.map((item) => {
                 const Icon = item.icon;
-                // Custom isActive check: match path prefix for admin routes (to handle /admin/operadores/:id)
-                const isItemActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                const isItemActive = currentItem?.path === item.path;
                 return (
-                  <NavLink
+                  <Link
                     key={item.path}
                     to={item.path}
+                    aria-current={isItemActive ? 'page' : undefined}
                     onClick={() => setSidebarOpen(false)}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-xl
-                      font-medium text-sm transition-all duration-200
+                      flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl
+                      font-medium text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
                       ${isItemActive
                         ? 'bg-white/20 text-white'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -291,14 +318,15 @@ export const MainLayout: React.FC = () => {
                   >
                     <Icon size={20} />
                     {item.label}
-                  </NavLink>
+                    {item.path === '/admin/solicitudes' && <AttentionBadge count={attention.applicationPending} />}
+                  </Link>
                 );
               })}
             </div>
           )}
           
-          {/* User Switcher en Sidebar */}
-          <div className="mt-6 pt-6 border-t border-white/15">
+          {/* Only ADMIN can request a temporary view of another user. */}
+          {isAdmin && <div className="mt-6 pt-6 border-t border-white/15">
             <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
               Acceso Rápido
             </p>
@@ -315,12 +343,17 @@ export const MainLayout: React.FC = () => {
               `}
             >
               <SwitchCamera size={20} />
-              Cambiar Usuario
+              Ver como otro usuario
             </NavLink>
-          </div>
+          </div>}
           
           {/* Configuración y Ayuda al final */}
           <div className="mt-2">
+            <NavLink to="/soporte" onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}>
+              <LifeBuoy size={20} />Soporte <AttentionBadge count={attention.support} />
+            </NavLink>
+            <SupportEntry onSubmitted={() => setSidebarOpen(false)} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-white" />
             <NavLink
               to="/configuracion"
               onClick={() => setSidebarOpen(false)}
@@ -401,10 +434,10 @@ export const MainLayout: React.FC = () => {
                   <User size={16} />
                   Mi Perfil
                 </NavLink>
-                <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
+                {isAdmin && <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-primary-800 hover:bg-primary-50">
                   <SwitchCamera size={16} />
-                  Cambiar Usuario
-                </NavLink>
+                  Ver como otro usuario
+                </NavLink>}
                 <button
                   onClick={() => { navigate('/configuracion'); setUserMenuOpen(false); }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
@@ -427,38 +460,45 @@ export const MainLayout: React.FC = () => {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header */}
-        <header className="h-16 header-polished flex items-center justify-between px-4 lg:px-8 sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+        <header className="h-16 shrink-0 min-w-0 header-polished flex items-center justify-between gap-2 lg:gap-4 px-4 lg:px-8 sticky top-0 z-30">
+          <div className="flex min-w-0 flex-1 items-center gap-2 lg:gap-4">
             <Button
               variant="ghost"
               size="sm"
-              className="lg:hidden"
+              className="shrink-0 lg:hidden"
+              aria-label="Abrir menú"
+              aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen(true)}
             >
               <Menu size={20} />
             </Button>
-            <h1 className="text-xl font-semibold text-neutral-900">{currentPage}</h1>
-            
-            {/* Badge de rol actual */}
-            <Badge 
-              variant="soft" 
-              color={roleStyles.badge}
-              className="hidden sm:inline-flex"
-            >
-              {currentUser.rol}
-            </Badge>
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 sm:flex-row sm:items-center sm:justify-start sm:gap-4">
+              <h1 title={currentPage} className="min-w-0 whitespace-normal break-words text-base leading-5 sm:truncate sm:text-xl sm:leading-normal font-semibold text-neutral-900">{currentPage}</h1>
+
+              {/* Badge de rol actual */}
+              <Badge
+                variant="soft"
+                color={inspectionLabel ? 'primary' : roleStyles.badge}
+                className={inspectionLabel ? 'max-w-full self-start whitespace-normal break-words py-0.5 sm:py-1 sm:shrink-0 sm:self-auto' : 'hidden sm:inline-flex'}
+                aria-label="Función actual"
+                title={`Rol base: ${currentUser.rol}`}
+              >
+                {inspectionLabel ?? currentUser.rol}
+              </Badge>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
             {/* Global search trigger */}
             <button
               onClick={() => setSearchOpen(true)}
-              className="hidden md:flex items-center bg-neutral-100 hover:bg-neutral-200 rounded-xl px-4 py-2 gap-2 transition-colors w-52"
+              aria-label="Buscar en SITREP"
+              className="hidden h-11 w-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-neutral-100 px-3 transition-colors hover:bg-neutral-200 md:flex lg:w-52 lg:justify-start lg:px-4"
             >
               <Search size={18} className="text-neutral-400 shrink-0" />
-              <span className="text-sm text-neutral-400 flex-1 text-left">Buscar...</span>
+              <span className="hidden flex-1 text-left text-sm text-neutral-400 lg:block">Buscar...</span>
               <kbd className="hidden lg:flex items-center text-[10px] text-neutral-400 bg-white rounded px-1.5 py-0.5 border border-neutral-200 font-mono">
                 ⌘K
               </kbd>
@@ -467,17 +507,17 @@ export const MainLayout: React.FC = () => {
             {searchOpen && <GlobalSearchPanel onClose={() => setSearchOpen(false)} />}
 
             {/* Help / Tour restart */}
-            <button
+            {inlineSupport ? <SupportBubble inline hidden={sidebarOpen || searchOpen || showTour} /> : <button
               onClick={() => {
                 resetOnboardingTour();
                 setShowTour(true);
               }}
-              className="p-2 rounded-xl text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-neutral-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
               title="Ver tour de ayuda"
               aria-label="Ver tour de ayuda"
             >
               <HelpCircle size={20} />
-            </button>
+            </button>}
 
             {/* Notifications */}
             <NotificationBell />
@@ -488,14 +528,16 @@ export const MainLayout: React.FC = () => {
         </header>
 
         <SWUpdateBanner />
+        <CompanyContextBar />
+        <ToastContainer />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
-        <main className="relative flex-1 px-4 lg:px-8 pb-4 lg:pb-8 overflow-auto bg-[#FAFAF8]">
+        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'overflow-clip px-3 py-3 lg:px-8 lg:py-4' : 'overflow-auto px-4 lg:px-8 lg:pb-8 ' + (inlineSupport ? 'pb-4' : 'pb-12'))}>
           <Outlet />
         </main>
 
-        {/* Footer */}
-        <footer className="border-t border-neutral-100 bg-white px-4 py-2.5 flex items-center justify-center gap-3 shrink-0">
+        {/* Footer — on phones keep its text clear of the floating help button. */}
+        <footer className={'border-t border-neutral-100 bg-white pl-4 pr-16 sm:px-4 py-2.5 items-center justify-center gap-3 shrink-0 ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'hidden' : 'flex')}>
           <img src="/logo-mendoza.webp" alt="Gobierno de Mendoza" className="h-6 w-auto opacity-60" />
           <span className="text-xs text-neutral-400">Provincia de Mendoza — SITREP v6</span>
         </footer>
@@ -510,6 +552,7 @@ export const MainLayout: React.FC = () => {
 
       {/* Role-specific welcome modal */}
       <DemoAppOnboarding />
+      {!inlineSupport && <SupportBubble hidden={sidebarOpen || searchOpen || showTour} />}
     </div>
   );
 };

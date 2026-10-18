@@ -6,6 +6,8 @@ import { saveInspectionResume } from '../../services/inspectionResume';
 import type { Inspection } from '../../types/inspection';
 
 const mocks = vi.hoisted(() => ({ useInspections: vi.fn(), refetch: vi.fn() }));
+vi.mock('../../hooks/useInspectionOperations', () => ({ useInspectionOperations: () => ({ data: undefined, isLoading: false, isError: false }) }));
+vi.mock('../../services/inspectionOperations.service', async (original) => ({ ...await original<typeof import('../../services/inspectionOperations.service')>(), inspectionOperationsService: { inspectors: vi.fn().mockResolvedValue([]) } }));
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN', esInspector: false }, isAdmin: true }),
@@ -17,7 +19,10 @@ vi.mock('../../hooks/useInspecciones', () => ({
 }));
 
 vi.mock('../../hooks/useCatalogos', () => ({
-  useCatalogoGeneradores: () => ({ data: [{ id: 'g-1', razonSocial: 'Generador de prueba' }] }),
+  useCatalogoGeneradores: () => ({ data: [
+    { id: 'g-1', razonSocial: 'Generador de prueba', domicilio: 'Registro 100', domicilioRealCalle: 'Planta 200', domicilioRealLocalidad: 'Las Heras', domicilioLegalCalle: 'Oficina 300', domicilioLegalDepto: 'Capital' },
+    { id: 'g-2', razonSocial: 'Otro generador', domicilio: 'Otro 400' },
+  ] }),
   useCatalogoTransportistas: () => ({ data: [] }),
   useCatalogoOperadores: () => ({ data: [] }),
 }));
@@ -46,6 +51,53 @@ describe('InspeccionesPage', () => {
     expect(screen.queryByText('No hay inspecciones para estos filtros')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(mocks.refetch).toHaveBeenCalledOnce();
+  });
+
+  it('offers the selected generator real, registered and legal addresses without choosing for the inspector', () => {
+    render(<MemoryRouter><InspeccionesPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
+    fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
+    const location = screen.getByLabelText('Ubicación prevista');
+    expect(location).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Usar domicilio declarado: Registro 100' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Usar domicilio legal: Oficina 300, Capital' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Usar domicilio real: Planta 200, Las Heras' }));
+    expect(location).toHaveValue('Planta 200, Las Heras');
+  });
+
+  it('keeps the written location when the inspected actor changes and drops stale suggestions', () => {
+    render(<MemoryRouter><InspeccionesPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
+    fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
+    fireEvent.change(screen.getByLabelText('Ubicación prevista'), { target: { value: 'Portón norte constatado' } });
+    fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-2' } });
+    expect(screen.getByLabelText('Ubicación prevista')).toHaveValue('Portón norte constatado');
+    expect(screen.queryByRole('button', { name: /Registro 100|Planta 200/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Usar domicilio declarado: Otro 400' })).toBeInTheDocument();
+  });
+
+  it('does not offer a previously selected actor address for an unidentified finding', () => {
+    render(<MemoryRouter><InspeccionesPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
+    fireEvent.change(screen.getByLabelText('Actor inspeccionado'), { target: { value: 'g-1' } });
+    expect(screen.getByRole('group', { name: 'Direcciones declaradas' })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Responsable todavía sin identificar'));
+    expect(screen.queryByRole('group', { name: 'Direcciones declaradas' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Ubicación prevista')).toHaveValue('');
+  });
+
+  it('separates inspection classification from the responsible actor and explains the official number', () => {
+    render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva inspección' }));
+    const type = screen.getByLabelText('Tipo de inspección');
+    expect(screen.getByRole('option', { name: /Petróleo · PRP/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Aire · ARP/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Espontánea.*IRP/ })).toBeInTheDocument();
+    fireEvent.change(type, { target: { value: 'PETROLEO' } });
+    expect(screen.getByText(/PRP-\d{4}-00001/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Responsable todavía sin identificar')).toBeChecked();
+    expect(screen.queryByLabelText('Actor inspeccionado')).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /D · Reservada/ })).toBeDisabled();
   });
 
   it('distinguishes local copies and resumes at the last inspected control', () => {

@@ -1,13 +1,14 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v63';
-const RUNTIME_CACHE = 'runtime-cache-v63';
+const CACHE_NAME = 'trazabilidad-rrpp-v115';
+const RUNTIME_CACHE = 'runtime-cache-v115';
 
 // Recursos críticos para cachear en instalación
 const PRECACHE_URLS = [
     '/',
     '/index.html',
-    '/offline.html'
+    '/offline.html',
+    '/favicon.svg'
 ];
 
 function isSpaNavigation(pathname) {
@@ -115,7 +116,8 @@ self.addEventListener('fetch', (event) => {
                 }
                 return response;
             } catch {
-                const cached = await cache.match(request);
+                // Brand icons may exist only in the installed release cache.
+                const cached = await cache.match(request) || await (await caches.open(CACHE_NAME)).match(request);
                 // Always return a Response — never undefined
                 return (isCacheableAsset(request, cached) && cached) || new Response('', { status: 408, statusText: 'Offline' });
             }
@@ -165,7 +167,7 @@ self.addEventListener('push', (event) => {
         data,
     };
 
-    event.waitUntil(self.registration.showNotification(data.title || 'RP Trazar', options));
+    event.waitUntil(self.registration.showNotification(data.title || 'SITREP', options));
 });
 
 console.log('[SW] Service Worker cargado', CACHE_NAME);

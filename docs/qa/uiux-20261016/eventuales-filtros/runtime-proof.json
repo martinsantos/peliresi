@@ -1,0 +1,20 @@
+{
+  "source": "16100dd",
+  "executor": "preview-container",
+  "backend": "/work/sitrep/backend/dist/index.js",
+  "database": "sitrep_night_qa_20260926",
+  "emails": false,
+  "push": false,
+  "blockchain": false,
+  "processes": [
+    {
+      "pid": 1850,
+      "file": "runtime.ts"
+    },
+    {
+      "pid": 1851,
+      "file": "server.ts"
+    }
+  ],
+  "runner": "Linux cc9c132b55ef 6.12.0-124.27.1.el10_1.x86_64 #1 SMP PREEMPT_DYNAMIC Tue Jan 13 07:47:29 EST 2026 x86_64 GNU/Linux"
+}

@@ -1,57 +1,15 @@
 /**
- * Monitor API — Instancia axios independiente
- * =============================================
- * Self-contained: no importa de ../../services/ ni ../../contexts/
+ * Monitor API — Endpoints on the shared authenticated SITREP client.
+ * Token parsing, refresh queuing and logout handling must not diverge from
+ * the rest of the application when several monitor queries expire together.
  */
 
-import axios from 'axios';
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
-const monitorApi = axios.create({
-  baseURL: API_BASE,
-  timeout: 30000,
-});
-
-// Token keys — must match the main app's api.ts
-const TOKEN_KEY = 'sitrep_access_token';
-const REFRESH_TOKEN_KEY = 'sitrep_refresh_token';
-
-// Interceptor: añade token de auth desde localStorage
-monitorApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Interceptor: refresh token si 401
-monitorApi.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-      if (refreshToken) {
-        try {
-          const { data } = await axios.post(`${API_BASE}/auth/refresh-token`, { refreshToken });
-          localStorage.setItem(TOKEN_KEY, data.accessToken || data.token);
-          if (data.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-          error.config.headers.Authorization = `Bearer ${data.accessToken || data.token}`;
-          return monitorApi(error.config);
-        } catch {
-          // Refresh failed — don't redirect, just let it fail silently
-          // The main app's AuthContext will handle the redirect
-        }
-      }
-    }
-    return Promise.reject(error);
-  }
-);
+import monitorApi from '../../../services/api';
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
 export interface TimelineEvent {
+  id?: string;
   timestamp: string;
   type: 'EVENTO' | 'GPS';
   eventoTipo?: string;
@@ -95,6 +53,7 @@ export interface ActorPosition {
 }
 
 export interface TimelineResponse {
+  paginacion?: { pagina: number; siguiente: number | null };
   eventos: TimelineEvent[];
   actores: {
     generadores: ActorPosition[];
@@ -102,6 +61,9 @@ export interface TimelineResponse {
     operadores: ActorPosition[];
   };
   resumen: {
+    incompleto?: boolean;
+    eventosRecortados?: boolean;
+    gpsRecortados?: boolean;
     totalEventos: number;
     totalManifiestos: number;
     totalGpsPoints: number;
@@ -157,6 +119,7 @@ export interface MonitorLiveResponse {
 export interface ForecastResponse {
   pendienteRetiro: {
     manifiestoId: string;
+    canViewDetail?: boolean;
     numero: string;
     generador: string;
     operador: string;
@@ -168,6 +131,7 @@ export interface ForecastResponse {
   }[];
   pendienteTratamiento: {
     manifiestoId: string;
+    canViewDetail?: boolean;
     numero: string;
     operador: string;
     estado: string;
@@ -182,9 +146,34 @@ export interface ForecastResponse {
   }[];
 }
 
-export async function fetchTimeline(fecha: string, dias = 1): Promise<TimelineResponse> {
-  const { data } = await monitorApi.get('/centro-control/timeline', { params: { fecha, dias } });
-  return data.data;
+export async function fetchTimeline(fecha: string, dias = 1, signal?: AbortSignal): Promise<TimelineResponse> {
+  let result: TimelineResponse | undefined;
+  const seen = new Set<string>();
+  const corte = new Date().toISOString();
+  for (let pagina = 1; pagina <= 100; pagina++) {
+    const { data } = await monitorApi.get('/centro-control/timeline', { params: { fecha, dias, pagina, corte }, signal });
+    const batch = data.data as TimelineResponse;
+    if (!result) result = { ...batch, eventos: [], resumen: { ...batch.resumen } };
+    for (const event of batch.eventos) {
+      if (event.id && seen.has(event.id)) continue;
+      if (event.id) seen.add(event.id);
+      result.eventos.push(event);
+    }
+    // A phone must not allocate an unbounded month of GPS. Never turn this
+    // safety boundary into a partial movie labelled as the complete period.
+    if (result.eventos.length > 25000) throw new Error('El historial supera 25.000 registros. Elegí un período más corto para reproducirlo.');
+    if (!batch.paginacion?.siguiente) {
+      if (batch.resumen.incompleto) throw new Error('El servidor devolvió un historial incompleto. Elegí un período más corto.');
+      result.eventos.sort((a, b) => a.timestamp.localeCompare(b.timestamp) || (a.id || '').localeCompare(b.id || ''));
+      result.paginacion = { pagina, siguiente: null };
+      result.resumen = { ...result.resumen, incompleto: false, eventosRecortados: false, gpsRecortados: false,
+        totalEventos: result.eventos.length, totalGpsPoints: result.eventos.filter(e => e.type === 'GPS').length,
+        primeraActividad: result.eventos[0]?.timestamp ?? null, ultimaActividad: result.eventos.at(-1)?.timestamp ?? null };
+      return result;
+    }
+    if (batch.paginacion.siguiente !== pagina + 1) throw new Error('La paginación del historial no avanzó. Volvé a cargar el período.');
+  }
+  throw new Error('El historial es demasiado grande. Elegí un período más corto.');
 }
 
 export async function fetchMonitorLive(): Promise<MonitorLiveResponse> {

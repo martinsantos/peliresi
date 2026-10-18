@@ -5,6 +5,9 @@
  */
 
 import React, { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
@@ -24,10 +27,11 @@ import { downloadCsv } from '../../utils/exportCsv';
 import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import DocumentUpload from '../../components/DocumentUpload';
-import CalculadoraTEF from '../../components/CalculadoraTEF';
-import type { PagoTEF, DeclaracionJurada } from '../../services/generador-fiscal.service';
-import api from '../../services/api';
+import { AdministrativeTEF } from '../../components/AdministrativeTEF';
+import { generadorFiscalService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
+import HistorialCambiosActor from '../../components/HistorialCambiosActor';
+import ActorCertificates from '../../components/ActorCertificates';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 // ===== Inline CRUD Modal =====
@@ -136,6 +140,10 @@ const GeneradorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const mp = useMobilePrefix();
+  const { currentUser } = useAuth();
+  const canEdit = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_GENERADOR';
+  const showInspections = Boolean(actorInspectionAccess(currentUser, 'GENERADOR', id));
   // Removed isMobile — React Router handles basename
 
   const [pagoModal, setPagoModal] = useState<{ open: boolean; editing?: PagoTEF }>({ open: false });
@@ -166,7 +174,7 @@ const GeneradorDetallePage: React.FC = () => {
     fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
   } : null;
 
-  const backPath = '/admin/actores/generadores';
+  const backPath = actorReturnPath(location.state, mp(canEdit ? '/admin/actores/generadores' : '/dashboard'));
 
   if (isLoading) {
     return (
@@ -187,6 +195,7 @@ const GeneradorDetallePage: React.FC = () => {
   if (!generador) return null;
 
   const g = generador;
+  const categoriaLabel = generador.categoria?.replaceAll('_', ' ') || 'Sin categoría';
   const enriched = generador.cuit ? (GENERADORES_DATA[generador.cuit] || GENERADORES_DATA[generador.cuit.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
   const categorias = g.corrientesControl
     ? parseCorrientes(g.corrientesControl)
@@ -201,6 +210,7 @@ const GeneradorDetallePage: React.FC = () => {
 
   // Pago handlers
   const handleSavePago = async (data: any) => {
+    if (!canEdit) return;
     try {
       if (pagoModal.editing) {
         await updatePago.mutateAsync({ generadorId: id!, pagoId: pagoModal.editing.id, data });
@@ -216,6 +226,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const handleDeletePago = async (pagoId: string) => {
+    if (!canEdit) return;
     if (!confirm('Eliminar este pago?')) return;
     try {
       await deletePago.mutateAsync({ generadorId: id!, pagoId });
@@ -225,6 +236,7 @@ const GeneradorDetallePage: React.FC = () => {
 
   // DDJJ handlers
   const handleSaveDDJJ = async (data: any) => {
+    if (!canEdit) return;
     try {
       if (ddjjModal.editing) {
         await updateDDJJ.mutateAsync({ generadorId: id!, ddjjId: ddjjModal.editing.id, data });
@@ -240,6 +252,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const handleDeleteDDJJ = async (ddjjId: string) => {
+    if (!canEdit) return;
     if (!confirm('Eliminar esta DDJJ?')) return;
     try {
       await deleteDDJJ.mutateAsync({ generadorId: id!, ddjjId });
@@ -249,6 +262,7 @@ const GeneradorDetallePage: React.FC = () => {
 
   // Doc handlers
   const handleUploadDoc = async (file: File, tipo: string, anio?: number) => {
+    if (!canEdit) return;
     try {
       await uploadDoc.mutateAsync({ generadorId: id!, file, tipo, anio });
       toast.success('Documento subido');
@@ -257,11 +271,16 @@ const GeneradorDetallePage: React.FC = () => {
     }
   };
 
-  const handleDownloadDoc = (doc: any) => {
-    window.open(`${api.defaults.baseURL}/actores/documentos/${doc.id}/download`, '_blank');
+  const handleDownloadDoc = async (doc: Documento) => {
+    try {
+      await generadorFiscalService.downloadDocumento(doc.id, doc.nombre);
+    } catch {
+      toast.error('No se pudo descargar el documento', 'Verificá la conexión e intentá nuevamente.');
+    }
   };
 
   const handleRevisarDoc = async (docId: string, estado: 'APROBADO' | 'RECHAZADO') => {
+    if (!canEdit) return;
     try {
       await revisarDoc.mutateAsync({ docId, estado, generadorId: id! });
       toast.success(estado === 'APROBADO' ? 'Documento aprobado' : 'Documento rechazado');
@@ -269,6 +288,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const handleDeleteDoc = async (docId: string) => {
+    if (!canEdit) return;
     if (!confirm('Eliminar documento?')) return;
     try {
       await deleteDoc.mutateAsync({ docId, generadorId: id! });
@@ -306,7 +326,7 @@ const GeneradorDetallePage: React.FC = () => {
                 {generador.estado === 'activo' ? <CheckCircle size={12} className="mr-1" /> : <AlertTriangle size={12} className="mr-1" />}
                 {generador.estado === 'activo' ? 'Activo' : 'Inactivo'}
               </Badge>
-              <Badge variant="outline" color="neutral" className="shrink-0">{generador.categoria}</Badge>
+              <Badge variant="outline" color="neutral" className="max-w-full whitespace-normal break-words">{categoriaLabel}</Badge>
             </div>
             <p className="text-neutral-600 mt-1 font-mono text-sm">CUIT: {generador.cuit}</p>
           </div>
@@ -315,9 +335,9 @@ const GeneradorDetallePage: React.FC = () => {
 
       {/* KPI Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4">
+        <Card className="min-w-0 p-4" aria-label="Categoría del generador">
           <p className="text-xs text-neutral-500 uppercase tracking-wider">Categoria</p>
-          <p className="text-lg font-bold text-neutral-900 mt-1">{generador.categoria || '-'}</p>
+          <p className="text-base sm:text-lg font-bold text-neutral-900 mt-1 break-words">{categoriaLabel}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs text-neutral-500 uppercase tracking-wider">Corrientes Y</p>
@@ -339,6 +359,9 @@ const GeneradorDetallePage: React.FC = () => {
         </Card>
       </div>
 
+      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`))}>Editar datos del padrón</Button>}
+      <ActorCertificates type="GENERADOR" actorId={id || ''} />
+
       {/* 5 Tabs */}
       <Tabs defaultTab="info" variant="default">
         <TabList>
@@ -346,7 +369,7 @@ const GeneradorDetallePage: React.FC = () => {
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>
           <Tab id="fiscal" icon={<DollarSign size={16} />}>Situacion Fiscal</Tab>
           <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ y Documentos</Tab>
-          <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>
+          {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
 
@@ -476,11 +499,9 @@ const GeneradorDetallePage: React.FC = () => {
 
             {/* CRUD Table */}
             <Card>
-              <CardHeader title="Registro de Pagos TEF" icon={<DollarSign size={20} />}>
-                <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setPagoModal({ open: true })}>
+              <CardHeader title="Registro de Pagos TEF" icon={<DollarSign size={20} />} action={canEdit ? <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setPagoModal({ open: true })}>
                   Registrar Pago
-                </Button>
-              </CardHeader>
+                </Button> : undefined} />
               <CardContent>
                 {pagos.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -493,7 +514,7 @@ const GeneradorDetallePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Notif.</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">F. Pago</th>
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Hab.</th>
-                          <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>
+                          {canEdit && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
@@ -513,10 +534,10 @@ const GeneradorDetallePage: React.FC = () => {
                                 </Badge>
                               )}
                             </td>
-                            <td className="px-3 py-2.5 text-right">
+                            {canEdit && <td className="px-3 py-2.5 text-right">
                               <button onClick={() => setPagoModal({ open: true, editing: p })} className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-primary-600"><Pencil size={14} /></button>
                               <button onClick={() => handleDeletePago(p.id)} className="p-1 rounded hover:bg-error-50 text-neutral-400 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
-                            </td>
+                            </td>}
                           </tr>
                         ))}
                       </tbody>
@@ -529,7 +550,8 @@ const GeneradorDetallePage: React.FC = () => {
             </Card>
 
             {/* Calculadora TEF */}
-            <CalculadoraTEF
+            <AdministrativeTEF
+              actorType="GENERADOR" identity={g.id} declaration={g}
               corrientesY={categorias}
               tieneISO={!!(g.certificacionISO)}
             />
@@ -562,11 +584,9 @@ const GeneradorDetallePage: React.FC = () => {
           <div className="space-y-8">
             {/* DDJJ Table */}
             <Card>
-              <CardHeader title="Declaraciones Juradas" icon={<ClipboardList size={20} />}>
-                <Button size="sm" leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
+              <CardHeader className="flex-col sm:flex-row" title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit ? <Button leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
                   Registrar DDJJ
-                </Button>
-              </CardHeader>
+                </Button> : undefined} />
               <CardContent>
                 {ddjjList.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -578,7 +598,7 @@ const GeneradorDetallePage: React.FC = () => {
                           <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Presentada</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Fecha</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Obs.</th>
-                          <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>
+                          {canEdit && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
@@ -593,10 +613,10 @@ const GeneradorDetallePage: React.FC = () => {
                             </td>
                             <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{fmtDate(d.fechaPresentacion)}</td>
                             <td className="px-3 py-2.5 text-neutral-500 text-xs hidden md:table-cell truncate max-w-[150px]" title={d.observaciones || '-'}>{d.observaciones || '-'}</td>
-                            <td className="px-3 py-2.5 text-right">
+                            {canEdit && <td className="px-3 py-2.5 text-right">
                               <button onClick={() => setDdjjModal({ open: true, editing: d })} className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-primary-600"><Pencil size={14} /></button>
                               <button onClick={() => handleDeleteDDJJ(d.id)} className="p-1 rounded hover:bg-error-50 text-neutral-400 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
-                            </td>
+                            </td>}
                           </tr>
                         ))}
                       </tbody>
@@ -618,7 +638,8 @@ const GeneradorDetallePage: React.FC = () => {
                   onDownload={handleDownloadDoc}
                   onRevisar={handleRevisarDoc}
                   onDelete={handleDeleteDoc}
-                  isAdmin={true}
+                  isAdmin={canEdit}
+                  readOnly={!canEdit}
                   isPending={uploadDoc.isPending}
                 />
               </CardContent>
@@ -627,11 +648,16 @@ const GeneradorDetallePage: React.FC = () => {
         </TabPanel>
 
         {/* ===== Tab 5: Trazabilidad ===== */}
-        <TabPanel id="inspecciones">
+        {showInspections && <TabPanel id="inspecciones">
           <ActorInspectionsPanel actorType="GENERADOR" actorId={id || ''} actorName={generador.razonSocial} />
-        </TabPanel>
+        </TabPanel>}
 
         <TabPanel id="historial">
+          <details className="mb-4 rounded-xl border border-neutral-200 bg-white p-4">
+            <summary className="min-h-11 cursor-pointer font-semibold text-neutral-900">Cambios de datos del padrón</summary>
+            <p className="mb-3 text-sm text-neutral-600">Quién cambió cada campo, cuándo y sus valores antes y después.</p>
+            <HistorialCambiosActor tipoActor="GENERADOR" actorId={id || ''} />
+          </details>
           <TrazabilidadTimeline
             actorType="generador"
             actorId={id || ''}
@@ -641,14 +667,14 @@ const GeneradorDetallePage: React.FC = () => {
       </Tabs>
 
       {/* Pago Modal */}
-      {pagoModal.open && (
+      {canEdit && pagoModal.open && (
         <CrudModal title={pagoModal.editing ? 'Editar Pago TEF' : 'Registrar Pago TEF'} onClose={() => setPagoModal({ open: false })}>
           <PagoForm initial={pagoModal.editing} onSave={handleSavePago} onCancel={() => setPagoModal({ open: false })} isPending={createPago.isPending || updatePago.isPending} />
         </CrudModal>
       )}
 
       {/* DDJJ Modal */}
-      {ddjjModal.open && (
+      {canEdit && ddjjModal.open && (
         <CrudModal title={ddjjModal.editing ? 'Editar DDJJ' : 'Registrar DDJJ'} onClose={() => setDdjjModal({ open: false })}>
           <DDJJForm initial={ddjjModal.editing} onSave={handleSaveDDJJ} onCancel={() => setDdjjModal({ open: false })} isPending={createDDJJ.isPending || updateDDJJ.isPending} />
         </CrudModal>

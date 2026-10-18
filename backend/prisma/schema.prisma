@@ -22,6 +22,8 @@ model Usuario {
   empresa                String?
   telefono               String?
   activo                 Boolean   @default(true)
+  // NULL: legacy/unspecified. Never infer pending-mail eligibility from activo=false.
+  motivoInactividad      String?
   esInspector            Boolean   @default(false)
   dosFaSecret            String?
   dosFaVerificado        Boolean   @default(false)
@@ -56,6 +58,12 @@ model Usuario {
   evidenciasAnuladasInspeccion EvidenciaInspeccion[]   @relation("UsuarioAnulacionEvidenciasInspeccion")
   eventosInspeccion            EventoInspeccion[]      @relation("UsuarioEventosInspeccion")
   intercambiosInspeccion       IntercambioInspeccion[] @relation("UsuarioIntercambiosInspeccion")
+  agenteSoporte               AgenteSoporte?
+  ticketsSoporte              TicketSoporte[] @relation("AutorTicketSoporte")
+  ticketsSoporteAsignados      TicketSoporte[] @relation("ResponsableTicketSoporte")
+  ticketsSoporteRegistrados    TicketSoporte[] @relation("RegistroTicketSoporte")
+  mensajesSoporte             MensajeSoporte[]
+  eventosSoporte              EventoSoporte[]
 
   @@map("usuarios")
 }
@@ -136,6 +144,7 @@ model Transportista {
   usuario      Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   vehiculos    Vehiculo[]
   choferes     Chofer[]
+  documentos   Documento[]
   manifiestos  Manifiesto[]
   inspecciones Inspeccion[]
 
@@ -253,11 +262,75 @@ model TipoResiduo {
   @@map("tipos_residuos")
 }
 
+// Provisional V2 ledger: never consumes official ranges or mutates legacy manifests.
+model RegistroManifiestoExcepcional {
+  id         String   @id
+  // NULL when the operator is external (spec v2 §4). Legacy rows keep their operator.
+  operadorId String?
+  creadoPorId String
+  // NULL on rows created before 2026-10-17: read as created by the operator in operadorId.
+  autorRol     String?
+  autorActorId String?
+  impersonadoPorId String?
+  huellaSolicitud String
+  datos      Json
+  eventos    Json
+  etapa      String   @default("REGISTRADO")
+  version    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([operadorId, createdAt])
+  @@index([creadoPorId, createdAt])
+  @@map("registros_manifiesto_excepcional")
+}
+
+// Append-only identity reconciliation. Never changes original declarations or access grants.
+model ConciliacionParticipanteExterno {
+  id String @id
+  registroId String
+  rol String
+  revision Int
+  accion String
+  actorId String?
+  ficha Json?
+  motivo String
+  autorId String
+  createdAt DateTime @default(now())
+
+  @@unique([registroId, rol, revision])
+  @@map("conciliaciones_participantes_externos")
+}
+
+// Additive observations/reviews only: original manifest and its signatures remain untouched.
+model AdendaManifiesto {
+  id String @id
+  manifiestoId String
+  creadoPorId String
+  impersonadoPorId String?
+  huellaSolicitud String
+  declaracion Json
+  residuos Json
+  motivo String
+  rectificaId String?
+  revisiones Json
+  version Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([manifiestoId, createdAt])
+  @@map("adendas_manifiesto")
+}
+
 model Manifiesto {
   id                      String           @id @default(cuid())
   numero                  String           @unique
   generadorId             String
   transportistaId         String?
+  // Explicit creation snapshot; no backfill from the current fleet.
+  asignacionTransporte    Json?
+  // Actor IDs and addresses in this snapshot never follow later registry edits.
+  contextoEmpresa        Json?
   operadorId              String
   modalidad               String?          @default("FIJO")
   tratamientoMetodo       String?
@@ -345,6 +418,8 @@ model EventoManifiesto {
   longitud      Float?
   usuarioId     String
   integrityHash String?
+  firmaImagen   String?
+  firmaSha256   String?
   isDemoData    Boolean  @default(false)
   createdAt     DateTime @default(now())
 
@@ -464,7 +539,9 @@ model Inspeccion {
   id                String              @id @default(cuid())
   numero            String              @unique
   numeroActa        String?
-  tipoActor         TipoActorInspeccion
+  tipoActor         TipoActorInspeccion?
+  clienteId         String?             @unique
+  huellaCreacion    String?
   generadorId       String?
   transportistaId   String?
   operadorId        String?
@@ -497,10 +574,20 @@ model Inspeccion {
 
   @@index([estado, createdAt])
   @@index([inspectorId, estado])
+  @@index([fechaProgramada, estado])
   @@index([generadorId])
   @@index([transportistaId])
   @@index([operadorId])
   @@map("inspecciones")
+}
+
+model SecuenciaInspeccion {
+  serie  String
+  anio   Int
+  ultimo Int    @default(0)
+
+  @@id([serie, anio])
+  @@map("secuencias_inspeccion")
 }
 
 model ComparacionInspeccion {
@@ -604,6 +691,7 @@ model IntercambioInspeccion {
   respondeAId        String?
   tipo               TipoIntercambioInspeccion
   parte              ParteIntercambioInspeccion
+  destinatario       ParteIntercambioInspeccion
   asunto             String
   cuerpo             String
   plazoRespuestaAt   DateTime?
@@ -614,6 +702,8 @@ model IntercambioInspeccion {
   hashAnterior       String?
   hashCadena         String
   autorId            String
+  puestaDisposicionAt DateTime                @default(now())
+  vistaPorDestinatarioAt DateTime?
   createdAt          DateTime                 @default(now())
 
   inspeccion Inspeccion              @relation(fields: [inspeccionId], references: [id], onDelete: Cascade)
@@ -627,6 +717,7 @@ model IntercambioInspeccion {
   @@unique([hashCadena])
   @@index([inspeccionId, createdAt])
   @@index([respondeAId])
+  @@index([inspeccionId, destinatario, vistaPorDestinatarioAt], map: "intercambios_inspeccion_destinatario_vista_idx")
   @@map("intercambios_inspeccion")
 }
 
@@ -652,6 +743,96 @@ model EventoInspeccion {
 
   @@index([inspeccionId, createdAt])
   @@map("eventos_inspeccion")
+}
+
+// Technical support is independent of legal dossiers and business-role grants.
+model AgenteSoporte {
+  usuarioId String @id
+  habilitado Boolean @default(true)
+  updatedAt DateTime @updatedAt
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  @@map("agentes_soporte")
+}
+
+model TicketSoporte {
+  id String @id @default(cuid())
+  numero Int @unique @default(autoincrement())
+  autorId String
+  responsableId String?
+  asunto String
+  categoria String @default("GENERAL")
+  tipo String?
+  prioridad String @default("NORMAL")
+  clasificadoAt DateTime?
+  registradoPorId String?
+  estado String @default("ABIERTO")
+  contexto Json
+  clienteId String
+  huella String
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cerradoAt DateTime?
+  autor Usuario @relation("AutorTicketSoporte", fields: [autorId], references: [id], onDelete: Restrict)
+  responsable Usuario? @relation("ResponsableTicketSoporte", fields: [responsableId], references: [id], onDelete: SetNull)
+  registradoPor Usuario? @relation("RegistroTicketSoporte", fields: [registradoPorId], references: [id], onDelete: Restrict)
+  mensajes MensajeSoporte[]
+  eventos EventoSoporte[]
+  @@unique([autorId, clienteId])
+  @@index([autorId, updatedAt])
+  @@index([estado, updatedAt])
+  @@index([responsableId, estado])
+  @@index([tipo, prioridad, estado])
+  @@map("tickets_soporte")
+}
+
+model MensajeSoporte {
+  id String @id @default(cuid())
+  ticketId String
+  autorId String
+  cuerpo String
+  interno Boolean @default(false)
+  createdAt DateTime @default(now())
+  ticket TicketSoporte @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  autor Usuario @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  adjuntos AdjuntoSoporte[]
+  @@index([ticketId, createdAt])
+  @@map("mensajes_soporte")
+}
+
+model AdjuntoSoporte {
+  id String @id @default(cuid())
+  mensajeId String
+  nombre String
+  mime String
+  bytes Int
+  sha256 String
+  storageKey String
+  mensaje MensajeSoporte @relation(fields: [mensajeId], references: [id], onDelete: Restrict)
+  @@index([mensajeId])
+  @@map("adjuntos_soporte")
+}
+
+model EventoSoporte {
+  id String @id @default(cuid())
+  ticketId String
+  usuarioId String
+  clienteId String
+  huella String
+  accion String
+  estadoAnterior String
+  estadoNuevo String
+  responsableAnteriorId String?
+  responsableNuevoId String?
+  interno Boolean @default(false)
+  detalle Json?
+  version Int
+  createdAt DateTime @default(now())
+  ticket TicketSoporte @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  @@unique([ticketId, usuarioId, clienteId])
+  @@index([ticketId, createdAt])
+  @@map("eventos_soporte")
 }
 
 // Enumeraciones
@@ -987,11 +1168,14 @@ model Documento {
   id            String    @id @default(cuid())
   generadorId   String?
   operadorId    String?
+  transportistaId String?
   tipo          String
   nombre        String
   path          String
   mimeType      String
   size          Int
+  sha256        String?
+  analisis      Json?
   anio          Int?
   estado        String    @default("PENDIENTE")
   observaciones String?
@@ -1003,9 +1187,12 @@ model Documento {
 
   generador Generador? @relation(fields: [generadorId], references: [id], onDelete: Cascade)
   operador  Operador?  @relation(fields: [operadorId], references: [id], onDelete: Cascade)
+  transportista Transportista? @relation(fields: [transportistaId], references: [id], onDelete: Cascade)
 
   @@index([generadorId])
   @@index([operadorId])
+  @@index([transportistaId])
+  @@index([sha256])
   @@map("documentos")
 }
 
@@ -1104,6 +1291,8 @@ model DocumentoSolicitud {
   path          String
   mimeType      String
   size          Int
+  sha256        String?
+  analisis      Json?
   estado        String    @default("PENDIENTE") // PENDIENTE | APROBADO | RECHAZADO
   observaciones String?
   revisadoPor   String?
@@ -1113,7 +1302,18 @@ model DocumentoSolicitud {
   solicitud SolicitudInscripcion @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
 
   @@index([solicitudId])
+  @@index([sha256])
   @@map("documentos_solicitud")
+}
+
+// Retain the first receipt digest even when its attachment is later replaced.
+// No actor/account details are exposed with duplicate warnings.
+model HuellaRecibo {
+  sha256 String @id
+  documentoId String
+  origen String
+  createdAt DateTime @default(now())
+  @@map("huellas_recibo")
 }
 
 model MensajeSolicitud {
@@ -1187,4 +1387,114 @@ model EmailQueue {
   @@index([to, createdAt])
   @@index([digestKey])
   @@map("email_queue")
+}
+
+// Additive enterprise boundary. Legacy actor/account links are retained.
+model Empresa {
+  id String @id @default(cuid())
+  cuit String @unique
+  razonSocial String
+  nombreFantasia String?
+  domicilioLegal Json
+  revision Int @default(0)
+  activa Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("empresas")
+}
+model EmpresaActividad {
+  id String @id @default(cuid())
+  empresaId String
+  rol String
+  actorId String
+  aprobadaPor String
+  activa Boolean @default(true)
+  createdAt DateTime @default(now())
+  @@unique([empresaId, rol])
+  @@unique([rol, actorId])
+  @@map("empresas_actividades")
+}
+model EstablecimientoEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  codigo String
+  nombre String
+  domicilio String
+  localidad String?
+  departamento String?
+  latitud Float?
+  longitud Float?
+  certificados Json
+  revision Int @default(0)
+  activo Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([empresaId, codigo])
+  @@map("empresas_establecimientos")
+}
+model ResponsableEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  usuarioId String
+  validadoPor String
+  validadoAt DateTime @default(now())
+  revocadoAt DateTime?
+  motivo String
+  @@unique([empresaId, usuarioId])
+  @@map("empresas_responsables")
+}
+model AutorizacionEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  actividadId String
+  usuarioId String
+  todosEstablecimientos Boolean
+  establecimientoIds String[]
+  activa Boolean @default(true)
+  revision Int @default(0)
+  otorgadaPor String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([actividadId, usuarioId])
+  @@index([usuarioId, activa])
+  @@map("empresas_autorizaciones")
+}
+model InvitacionEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  actividadId String
+  email String
+  tokenHash String @unique
+  todosEstablecimientos Boolean
+  establecimientoIds String[]
+  creadaPor String
+  venceAt DateTime
+  aceptadaPor String?
+  aceptadaAt DateTime?
+  revocadaAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([empresaId, email])
+  @@map("empresas_invitaciones")
+}
+model EventoEmpresa {
+  id String @id @default(cuid())
+  empresaId String
+  usuarioId String
+  tipo String
+  datos Json
+  createdAt DateTime @default(now())
+  @@index([empresaId, createdAt])
+  @@map("empresas_eventos")
+}
+model FuentePadronEmpresa {
+  id String @id @default(cuid())
+  sha256 String
+  archivo String
+  hoja String
+  fila Int
+  contenidoHash String
+  datos Json
+  createdAt DateTime @default(now())
+  @@unique([sha256, hoja, fila])
+  @@map("empresas_fuentes_padron")
 }

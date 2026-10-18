@@ -4,7 +4,7 @@
  * Formulario para editar manifiesto en estado BORRADOR
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import {
   Package,
   AlertTriangle,
   Loader2,
+  MapPin,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -53,6 +54,22 @@ export const EditarManifiestoPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [initialized, setInitialized] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+  const focusError = useRef(false);
+
+  useEffect(() => {
+    if (!focusError.current) return;
+    focusError.current = false;
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    field?.focus({ preventScroll: true });
+    field?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [validationErrors, step]);
+
+  // PUT /manifiestos/:id does not accept modalidad nor fechaEstimadaRetiro: both are read-only here.
+  const esInSitu = manifiesto?.modalidad === 'IN_SITU';
+  const fechaEstimadaRetiro = manifiesto?.fechaEstimadaRetiro
+    ? new Date(manifiesto.fechaEstimadaRetiro).toLocaleDateString('es-AR', { timeZone: 'UTC' })
+    : '';
 
   // Form state
   const [formData, setFormData] = useState({
@@ -60,7 +77,6 @@ export const EditarManifiestoPage: React.FC = () => {
     generador: '',
     transportista: '',
     operador: '',
-    fechaRetiro: new Date().toISOString().split('T')[0],
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }] as { tipo: string; cantidad: string; unidad: string }[],
   });
@@ -73,9 +89,6 @@ export const EditarManifiestoPage: React.FC = () => {
         generador: manifiesto.generador?.razonSocial || '',
         transportista: manifiesto.transportistaId || '',
         operador: manifiesto.operadorId || '',
-        fechaRetiro: manifiesto.fechaRetiro
-          ? new Date(manifiesto.fechaRetiro).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0],
         observaciones: manifiesto.observaciones || '',
         residuos: manifiesto.residuos && manifiesto.residuos.length > 0
           ? manifiesto.residuos.map((r) => ({
@@ -118,7 +131,7 @@ export const EditarManifiestoPage: React.FC = () => {
     if (!formData.generadorId) {
       errors.generador = 'El generador es requerido';
     }
-    if (!formData.transportista) {
+    if (!esInSitu && !formData.transportista) {
       errors.transportista = 'El transportista es requerido';
     }
     if (!formData.operador) {
@@ -133,12 +146,15 @@ export const EditarManifiestoPage: React.FC = () => {
     }
 
     setValidationErrors(errors);
+    if (Object.keys(errors).length) {
+      focusError.current = true;
+      setStep(errors.generador ? 1 : errors.residuos ? 2 : 3);
+    }
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async () => {
     if (!validateForm()) {
-      toast.warning('Formulario incompleto', 'Por favor completa todos los campos requeridos');
       return;
     }
 
@@ -146,7 +162,7 @@ export const EditarManifiestoPage: React.FC = () => {
       await updateManifiesto.mutateAsync({
         id: id!,
         generadorId: formData.generadorId,
-        transportistaId: formData.transportista,
+        ...(!esInSitu && { transportistaId: formData.transportista }),
         operadorId: formData.operador,
         observaciones: formData.observaciones || undefined,
         residuos: formData.residuos.map((r) => ({
@@ -245,7 +261,7 @@ export const EditarManifiestoPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-20">
+    <div ref={formRef} className="min-h-screen bg-neutral-50 pb-20">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white border-b border-neutral-200 px-4 py-3">
         <div className="flex items-center justify-between">
@@ -290,10 +306,8 @@ export const EditarManifiestoPage: React.FC = () => {
             />
             <CardContent className="space-y-4 animate-fade-in">
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Generador *
-                </label>
                 <Select
+                  label="Generador *"
                   value={formData.generadorId}
                   onChange={(val) => {
                     const gen = generadoresList.find((g: any) => g.id === val);
@@ -310,9 +324,6 @@ export const EditarManifiestoPage: React.FC = () => {
                   errorMessage={validationErrors.generador}
                   size="base"
                 />
-                {validationErrors.generador && (
-                  <p className="text-xs text-error-500 mt-1">{validationErrors.generador}</p>
-                )}
               </div>
 
               {selectedGenerador && (
@@ -398,14 +409,13 @@ export const EditarManifiestoPage: React.FC = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-neutral-600 mb-1">
-                        Cantidad *
-                      </label>
                       <Input
+                        label="Cantidad *"
                         type="number"
                         value={residuo.cantidad}
                         onChange={(e) => handleResiduoChange(index, 'cantidad', e.target.value)}
                         placeholder="0"
+                        errorMessage={validationErrors.residuos && (!residuo.cantidad || Number(residuo.cantidad) <= 0) ? 'Ingresá una cantidad mayor que cero.' : undefined}
                       />
                     </div>
                     <Select
@@ -423,6 +433,12 @@ export const EditarManifiestoPage: React.FC = () => {
                   </div>
                 </div>
               ))}
+
+              {validationErrors.residuos && (
+                <div className="bg-error-50 border border-error-200 rounded-xl p-3 text-sm text-error-700">
+                  {validationErrors.residuos}
+                </div>
+              )}
 
               <Button
                 variant="outline"
@@ -454,11 +470,17 @@ export const EditarManifiestoPage: React.FC = () => {
               subtitle="Información del transportista y destino final"
             />
             <CardContent className="space-y-4 animate-fade-in">
+              {esInSitu && (
+                <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
+                  <MapPin size={16} className="shrink-0 mt-0.5" />
+                  <span>Manifiesto in situ: el operador trabaja en el domicilio del generador. No se requiere transporte.</span>
+                </div>
+              )}
+
+              {!esInSitu && (
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Transportista *
-                </label>
                 <Select
+                  label="Transportista *"
                   value={formData.transportista}
                   onChange={(val) => setFormData({ ...formData, transportista: val })}
                   options={[...transportistasList]
@@ -473,8 +495,9 @@ export const EditarManifiestoPage: React.FC = () => {
                   size="base"
                 />
               </div>
+              )}
 
-              {selectedTransportista && (
+              {!esInSitu && selectedTransportista && (
                 <div className="p-4 bg-orange-50 rounded-xl border border-orange-100 space-y-2 animate-fade-in">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -500,10 +523,8 @@ export const EditarManifiestoPage: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Operador / Destino *
-                </label>
                 <Select
+                  label="Operador / Destino *"
                   value={formData.operador}
                   onChange={(val) => setFormData({ ...formData, operador: val })}
                   options={[...operadoresList]
@@ -551,14 +572,9 @@ export const EditarManifiestoPage: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Fecha Estimada de Retiro *
-                </label>
-                <Input
-                  type="date"
-                  value={formData.fechaRetiro}
-                  onChange={(e) => setFormData({ ...formData, fechaRetiro: e.target.value })}
-                />
+                <p className="block text-sm font-medium text-neutral-700 mb-1">Fecha estimada de retiro</p>
+                <p className="text-sm font-semibold text-neutral-900">{fechaEstimadaRetiro || 'Sin fecha estimada'}</p>
+                <p className="text-xs text-neutral-500 mt-0.5">No se puede modificar al editar el borrador.</p>
               </div>
 
               <div>

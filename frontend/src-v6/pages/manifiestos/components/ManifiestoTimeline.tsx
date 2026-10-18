@@ -5,42 +5,28 @@
  */
 
 import React from 'react';
-import { Route, CheckCircle } from 'lucide-react';
+import { Route, Clock } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
-import { formatDateTime, formatEstado } from '../../../utils/formatters';
+import { formatDateTime } from '../../../utils/formatters';
 import type { Manifiesto, EventoManifiesto } from '../../../types/models';
-import { EstadoManifiesto } from '../../../types/models';
 
 type TimelineEntry = {
   id: string;
   date: string;
   title: string;
   description: string;
-  status: string;
 };
 
 function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
   if (!manifiesto.eventos || !Array.isArray(manifiesto.eventos) || manifiesto.eventos.length === 0) return [];
 
-  const estadoOrder = [
-    EstadoManifiesto.BORRADOR,
-    EstadoManifiesto.PENDIENTE_APROBACION,
-    EstadoManifiesto.APROBADO,
-    EstadoManifiesto.EN_TRANSITO,
-    EstadoManifiesto.ENTREGADO,
-    EstadoManifiesto.RECIBIDO,
-    EstadoManifiesto.EN_TRATAMIENTO,
-    EstadoManifiesto.TRATADO,
-  ];
-
-  const currentIdx = estadoOrder.indexOf(manifiesto.estado || EstadoManifiesto.BORRADOR);
-
-  return manifiesto.eventos.map((ev, i) => ({
+  // Every item comes from a persisted event, not a future workflow step.
+  // Incidents/reversions mean event index and workflow stage are unrelated.
+  return manifiesto.eventos.map(ev => ({
     id: ev.id,
     date: formatDateTime(ev.createdAt),
     title: String(ev.tipo || '').replace(/_/g, ' '),
     description: String(ev.descripcion || '') + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
-    status: i < currentIdx ? 'completed' : i === currentIdx ? 'current' : 'pending',
   }));
 }
 
@@ -65,43 +51,28 @@ const ManifiestoTimeline: React.FC<ManifiestoTimelineProps> = ({ manifiesto }) =
 
             {/* Events */}
             <div className="space-y-6 animate-fade-in">
-              {timeline.map((event, index) => (
+              {timeline.map(event => (
                 <div key={event.id} className="relative flex gap-4">
                   {/* Dot */}
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 ${
-                      event.status === 'completed'
-                        ? 'bg-success-500 text-white'
-                        : event.status === 'current'
-                        ? 'bg-info-500 text-white ring-4 ring-info-100'
-                        : 'bg-neutral-200 text-neutral-400'
-                    }`}
+                    aria-label="Evento registrado"
+                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 z-10 bg-neutral-100 text-neutral-700"
                   >
-                    {event.status === 'completed' ? (
-                      <CheckCircle size={16} />
-                    ) : (
-                      <span className="text-xs font-bold">{index + 1}</span>
-                    )}
+                    <Clock size={16} aria-hidden="true" />
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 pb-6">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className={`font-semibold ${
-                          event.status === 'pending' ? 'text-neutral-400' : 'text-neutral-900'
-                        }`}>
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-neutral-900">
                           {event.title}
                         </p>
-                        <p className={`text-sm mt-0.5 ${
-                          event.status === 'pending' ? 'text-neutral-400' : 'text-neutral-600'
-                        }`}>
+                        <p className="text-sm mt-0.5 break-words text-neutral-600">
                           {event.description}
                         </p>
                       </div>
-                      <span className={`text-sm ${
-                        event.status === 'pending' ? 'text-neutral-400' : 'text-neutral-500'
-                      }`}>
+                      <span className="shrink-0 text-sm text-neutral-600">
                         {event.date}
                       </span>
                     </div>

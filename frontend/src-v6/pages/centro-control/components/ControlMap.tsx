@@ -9,9 +9,14 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
+import { MapLayerToggle } from '../../../components/ui/MapLayerToggle';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
+import { resolveActorLocation } from '../../../utils/actorLocation';
 import type { CentroControlData, EnTransitoItem } from '../../../hooks/useCentroControl';
 import type { LayerState } from './ControlFilters';
+
+import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
+import { hasInspectionCoordinates, type InspectionOperation } from '../../../services/inspectionOperations.service';
 
 // ── Cluster helper ──
 function clusterMarkers<T extends { latitud: number; longitud: number }>(
@@ -53,16 +58,17 @@ function ZoomTracker({ onZoom }: { onZoom: (z: number) => void }) {
   return null;
 }
 
-function FitBounds({ points }: { points: [number, number][] }) {
+function FitBounds({ points, animate = true }: { points: [number, number][]; animate?: boolean }) {
   const map = useMap();
   useEffect(() => {
     if (points.length === 0) return;
     if (points.length === 1) {
-      map.flyTo(points[0], 13, { duration: 0.8 });
+      if (animate) map.flyTo(points[0], 13, { duration: 0.8 });
+      else map.setView(points[0], 13, { animate: false });
     } else {
       map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], duration: 0.8, maxZoom: 14 });
     }
-  }, [points, map]);
+  }, [points, map, animate]);
   return null;
 }
 
@@ -81,13 +87,17 @@ interface ViajeRealizado {
 interface ControlMapProps {
   cc: CentroControlData | null;
   layers: LayerState;
+  onToggleLayer: (layer: keyof LayerState) => void;
   mapZoom: number;
   onZoomChange: (z: number) => void;
   enTransitoForMap: EnTransitoItem[];
   selectedTripId: string | null;
   onSelectTrip: (id: string | null) => void;
   selectedRealizadoId: string | null;
-  tripPanel: 'activos' | 'realizados';
+  tripPanel: 'activos' | 'realizados' | 'inspecciones' | null;
+  inspections: InspectionOperation[];
+  selectedInspectionId: string | null;
+  onSelectInspection: (id: string) => void;
   viajesRealizados: ViajeRealizado[];
   activeTripFlyPoints: [number, number][];
   panelBoundsPoints: [number, number][];
@@ -98,6 +108,7 @@ interface ControlMapProps {
 export const ControlMap: React.FC<ControlMapProps> = ({
   cc,
   layers,
+  onToggleLayer,
   mapZoom,
   onZoomChange,
   enTransitoForMap,
@@ -110,8 +121,19 @@ export const ControlMap: React.FC<ControlMapProps> = ({
   panelBoundsPoints,
   realizadoFlyPoints,
   mapColRef,
+  inspections,
+  selectedInspectionId,
+  onSelectInspection,
 }) => {
   const navigate = useNavigate();
+  const carrierLocations = useMemo(() => (cc?.transportistas || []).map(actor => ({
+    actor, location: resolveActorLocation(actor),
+  })), [cc?.transportistas]);
+  const unlocatedCarriers = carrierLocations.filter(item => !item.location.position).length;
+  const inspectionFlyPoints = useMemo((): [number, number][] => {
+    const selected = layers.inspecciones ? inspections.find((item) => item.id === selectedInspectionId) : undefined;
+    return selected && hasInspectionCoordinates(selected) ? [[selected.latitud!, selected.longitud!]] : [];
+  }, [inspections, selectedInspectionId, layers.inspecciones]);
 
   // Clustered generadores
   const generadoresClustered = useMemo(() => {
@@ -122,30 +144,35 @@ export const ControlMap: React.FC<ControlMapProps> = ({
   return (
     <div ref={mapColRef} className="lg:col-span-2">
       <Card padding="none">
-        <div className="flex items-center justify-between p-5 border-b border-neutral-100">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-b border-neutral-100">
           <div className="flex items-center gap-3">
             <h3 className="font-semibold text-neutral-900">Mapa de Actividad</h3>
             <Badge variant="soft" color="primary">
               {enTransitoForMap.length} en tránsito
             </Badge>
           </div>
-          {/* Map legend */}
-          <div className="hidden sm:flex items-center gap-3 text-xs text-neutral-500">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded" style={{ background: ACTOR_COLORS.generador }} /> Generadores</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Transportistas</span>
-            <span className="flex items-center gap-1.5"><svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg> Operadores</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} /> En Tránsito</span>
+        <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2 sm:flex sm:flex-wrap">
+            <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} onToggle={() => onToggleLayer('generadores')} />
+            <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} onToggle={() => onToggleLayer('transportistas')} />
+            <MapLayerToggle category="operador" label="Operadores" pressed={layers.operadores} onToggle={() => onToggleLayer('operadores')} />
+            {layers.inspecciones !== undefined && <MapLayerToggle category="inspeccion" label="Inspecciones" pressed={layers.inspecciones} onToggle={() => onToggleLayer('inspecciones')} />}
+            <MapLayerToggle category="enTransito" label="En Tránsito" pressed={layers.transito} onToggle={() => onToggleLayer('transito')} />
           </div>
         </div>
+
         <div className="p-5">
+          {layers.transportistas && unlocatedCarriers > 0 && <p className="mb-3 text-sm text-neutral-700">{unlocatedCarriers} {unlocatedCarriers === 1 ? 'transportista sin ubicación verificada' : 'transportistas sin ubicación verificada'}</p>}
           <div className="h-[20rem] sm:h-[28rem] lg:h-[32rem] rounded-xl overflow-hidden border border-neutral-200 relative isolate">
             <MapContainer
+              fadeAnimation={false}
               center={[-32.9287, -68.8535]}
               zoom={10}
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
               <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {layers.inspecciones && <InspectionMapLayer items={inspections} onSelect={onSelectInspection} />}
+              {inspectionFlyPoints.length > 0 && <FitBounds points={inspectionFlyPoints} animate={false} />}
               <ZoomTracker onZoom={onZoomChange} />
               {/* Fly to selected active trip (all points) */}
               {activeTripFlyPoints.length > 0 && (
@@ -173,16 +200,19 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               ))}
 
               {/* Transportistas */}
-              {layers.transportistas && cc?.transportistas?.filter(t => t.latitud != null && t.longitud != null).map((t, idx) => (
+              {layers.transportistas && carrierLocations.map(({ actor: t, location }, idx) => location.position && (
                 <Marker
                   key={`trans-${t.id}-${idx}`}
-                  position={[t.latitud!, t.longitud!]}
+                  position={location.position}
                   icon={ACTOR_ICONS.transportista}
+                  title={t.razonSocial}
+                  alt={'Transportista: ' + t.razonSocial}
                 >
                   <Popup>
                     <div className="text-sm">
                       <strong className="text-orange-700">{t.razonSocial}</strong><br />
                       <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
+                      <span className="text-xs text-neutral-700">{location.label}</span><br />
                       <span className="text-xs">Vehículos: {t.vehiculosActivos}</span><br />
                       <span className="text-xs font-medium">En tránsito: {t.enviosEnTransito}</span>
                     </div>
@@ -228,7 +258,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#b45309' }}>TRANSPORTE:</strong> {m.transportista}</span>
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#1d4ed8' }}>OPERADOR:</strong> {m.destino}</span>
                           </div>
-                          <a
+                          {m.canViewDetail === true ? <a
                             href="#"
                             onClick={(e) => {
                               e.preventDefault();
@@ -237,7 +267,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                             style={{ color: '#0D8A4F', fontWeight: 600, fontSize: '12px', display: 'block', marginTop: '6px' }}
                           >
                             Ver detalle
-                          </a>
+                          </a> : <p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p>}
                         </div>
                       </Popup>
                     </Marker>
@@ -255,7 +285,7 @@ export const ControlMap: React.FC<ControlMapProps> = ({
               ))}
 
               {/* Selected active trip: origin/destination markers */}
-              {tripPanel === 'activos' && selectedTripId && (() => {
+              {layers.transito && tripPanel === 'activos' && selectedTripId && (() => {
                 const trip = enTransitoForMap.find(m => m.manifiestoId === selectedTripId);
                 if (!trip) return null;
                 return (
@@ -333,16 +363,6 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                 <FitBounds points={realizadoFlyPoints} />
               )}
             </MapContainer>
-
-            {/* Mobile legend */}
-            <div className="sm:hidden absolute bottom-20 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded" style={{ background: ACTOR_COLORS.generador }} /> Gen</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: ACTOR_COLORS.transportista, transform: 'rotate(45deg)' }} /> Trans</span>
-                <span className="flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 14 14"><polygon points="7,1 13,4 13,10 7,13 1,10 1,4" fill={ACTOR_COLORS.operador}/></svg> Oper</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full" style={{ background: ACTOR_COLORS.enTransito }} /> Tránsito</span>
-              </div>
-            </div>
 
             {!cc && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-[400]">

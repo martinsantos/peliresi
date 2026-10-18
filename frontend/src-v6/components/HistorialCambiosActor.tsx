@@ -47,6 +47,7 @@ function formatDate(dateStr: string): string {
 }
 
 function DiffTable({ antes, despues, accion }: { antes?: string; despues?: string; accion: string }) {
+  const labels: Record<string, string> = { domicilio: 'Domicilio', domicilioLegalCalle: 'Domicilio legal · calle', domicilioLegalLocalidad: 'Domicilio legal · localidad', domicilioLegalDepto: 'Domicilio legal · departamento', domicilioRealCalle: 'Domicilio real · calle', domicilioRealLocalidad: 'Domicilio real · localidad', domicilioRealDepto: 'Domicilio real · departamento', razonSocial: 'Razón social', telefono: 'Teléfono', email: 'Correo', latitud: 'Latitud', longitud: 'Longitud', documentoId: 'Documento', nombre: 'Nombre', estado: 'Estado', anio: 'Año', tipo: 'Tipo' };
   const parsed = useMemo(() => {
     const a = antes ? JSON.parse(antes) : null;
     const d = despues ? JSON.parse(despues) : null;
@@ -75,10 +76,10 @@ function DiffTable({ antes, despues, accion }: { antes?: string; despues?: strin
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs">
+      <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-neutral-200">
-            <th className="text-left py-1.5 px-2 font-medium text-neutral-500 w-1/3">Campo</th>
+            <th className="text-left py-1.5 px-2 font-medium text-neutral-700 w-1/3">Campo</th>
             {accion !== 'CREATE' && <th className="text-left py-1.5 px-2 font-medium text-neutral-500 w-1/3">Antes</th>}
             {accion !== 'DELETE' && <th className="text-left py-1.5 px-2 font-medium text-neutral-500 w-1/3">Despues</th>}
           </tr>
@@ -86,15 +87,15 @@ function DiffTable({ antes, despues, accion }: { antes?: string; despues?: strin
         <tbody>
           {parsed.map(d => (
             <tr key={d.field} className="border-b border-neutral-100">
-              <td className="py-1.5 px-2 font-mono text-neutral-600">{d.field}</td>
+              <td className="py-1.5 px-2 text-neutral-700">{labels[d.field] || d.field}</td>
               {accion !== 'CREATE' && (
                 <td className="py-1.5 px-2">
-                  <span className="text-red-600 line-through">{d.before !== null ? String(d.before) : '-'}</span>
+                  <span className="break-words text-error-800">{d.before != null ? String(d.before) : '-'}</span>
                 </td>
               )}
               {accion !== 'DELETE' && (
                 <td className="py-1.5 px-2">
-                  <span className="text-green-600 font-medium">{d.after !== null ? String(d.after) : '-'}</span>
+                  <span className="break-words text-primary-800 font-medium">{d.after != null ? String(d.after) : '-'}</span>
                 </td>
               )}
             </tr>
@@ -112,7 +113,7 @@ const HistorialCambiosActor: React.FC<Props> = ({ tipoActor, actorId }) => {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const { data, isLoading } = useHistorialActor(tipoActor, actorId, { anio, modulo, page, limit: 20 });
+  const { data, isLoading, isError, refetch } = useHistorialActor(tipoActor, actorId, { anio, modulo, page, limit: 20 });
   const historial = data?.items || [];
   const total = data?.total || 0;
   const totalPages = data?.totalPages || 1;
@@ -135,40 +136,16 @@ const HistorialCambiosActor: React.FC<Props> = ({ tipoActor, actorId }) => {
 
   return (
     <div className="space-y-4">
-      {/* Stats header */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-neutral-200 p-3 text-center">
-          <p className="text-2xl font-bold text-neutral-900">{total}</p>
-          <p className="text-xs text-neutral-500">Total cambios</p>
-        </div>
-        <div className="bg-white rounded-xl border border-neutral-200 p-3 text-center">
-          <p className="text-2xl font-bold text-neutral-900">
-            {historial.length > 0 ? formatDate(historial[0].createdAt) : '-'}
-          </p>
-          <p className="text-xs text-neutral-500">Ultimo cambio</p>
-        </div>
-        <div className="bg-white rounded-xl border border-neutral-200 p-3 text-center">
-          <p className="text-2xl font-bold text-amber-600">
-            {historial.filter(h => h.accion === 'UPDATE').length}
-          </p>
-          <p className="text-xs text-neutral-500">Modificaciones</p>
-        </div>
-        <div className="bg-white rounded-xl border border-neutral-200 p-3 text-center">
-          <p className="text-2xl font-bold text-green-600">
-            {historial.filter(h => h.accion === 'CREATE').length}
-          </p>
-          <p className="text-xs text-neutral-500">Creaciones</p>
-        </div>
-      </div>
-
+      <p role="status" className="text-sm text-neutral-700">{total} cambios registrados{historial.length ? ` · Último en esta página: ${formatDate(historial[0].createdAt)}` : ''}</p>
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <Calendar size={14} className="text-neutral-400" />
           <select
+            aria-label="Año del historial"
             value={anio || ''}
             onChange={e => { setAnio(e.target.value ? Number(e.target.value) : undefined); setPage(1); }}
-            className="h-8 px-3 rounded-lg border border-neutral-200 text-sm bg-white"
+            className="min-h-11 px-3 rounded-lg border border-neutral-300 text-sm bg-white"
           >
             <option value="">Todos los anos</option>
             {years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -178,9 +155,10 @@ const HistorialCambiosActor: React.FC<Props> = ({ tipoActor, actorId }) => {
           <div className="flex items-center gap-2">
             <Filter size={14} className="text-neutral-400" />
             <select
+              aria-label="Módulo de cambios"
               value={modulo || ''}
               onChange={e => { setModulo(e.target.value || undefined); setPage(1); }}
-              className="h-8 px-3 rounded-lg border border-neutral-200 text-sm bg-white"
+              className="min-h-11 px-3 rounded-lg border border-neutral-300 text-sm bg-white"
             >
               <option value="">Todos</option>
               <option value="TRANSPORTISTA">Actor</option>
@@ -197,7 +175,7 @@ const HistorialCambiosActor: React.FC<Props> = ({ tipoActor, actorId }) => {
           <div className="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full mx-auto" />
           <p className="text-sm text-neutral-500 mt-3">Cargando historial...</p>
         </div>
-      ) : historial.length === 0 ? (
+      ) : isError ? <div role="alert" className="text-sm text-error-700">No se pudo consultar el historial. <button type="button" className="min-h-11 rounded-lg border border-neutral-300 px-3 text-neutral-900" onClick={() => void refetch()}>Reintentar historial</button></div> : historial.length === 0 ? (
         <Card>
           <CardContent className="text-center py-12">
             <Clock size={40} className="text-neutral-300 mx-auto mb-3" />
@@ -226,8 +204,10 @@ const HistorialCambiosActor: React.FC<Props> = ({ tipoActor, actorId }) => {
 
                   {/* Card */}
                   <button
+                    type="button"
+                    aria-expanded={isOpen}
                     onClick={() => toggle(entry.id)}
-                    className="w-full text-left bg-white rounded-xl border border-neutral-200 p-3 hover:border-neutral-300 hover:shadow-sm transition-all"
+                    className="min-h-11 w-full text-left bg-white rounded-xl border border-neutral-200 p-3 hover:bg-neutral-50 focus-visible:outline-primary-700 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap min-w-0">

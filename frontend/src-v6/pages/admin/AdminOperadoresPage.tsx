@@ -140,10 +140,10 @@ const AdminOperadoresPage: React.FC = () => {
   };
 
   const statCards: CRUDStatCard[] = [
-    { label: 'Total Operadores', value: statsData.total, icon: <FlaskConical size={20} className="text-emerald-600" />, iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600' },
-    { label: 'Activos', value: statsData.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
-    { label: 'Inactivos', value: statsData.inactivos, icon: <AlertTriangle size={20} className="text-warning-600" />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
-    { label: 'Filtrados', value: statsData.filtrados, icon: <Search size={20} className="text-info-600" />, iconBg: 'bg-info-100', iconColor: 'text-info-600' },
+    { label: 'Total Operadores', value: statsData.total, icon: <FlaskConical size={20} className="text-blue-700" />, iconBg: 'bg-blue-100', iconColor: 'text-blue-700' },
+    { label: 'Activos · esta página', value: statsData.activos, icon: <CheckCircle size={20} className="text-success-600" />, iconBg: 'bg-success-100', iconColor: 'text-success-600' },
+    { label: 'Inactivos · esta página', value: statsData.inactivos, icon: <AlertTriangle size={20} className="text-warning-600" />, iconBg: 'bg-warning-100', iconColor: 'text-warning-600' },
+    { label: 'Filtrados · esta página', value: statsData.filtrados, icon: <Search size={20} className="text-info-600" />, iconBg: 'bg-info-100', iconColor: 'text-info-600' },
   ];
 
   // ── Filters ──
@@ -200,17 +200,16 @@ const AdminOperadoresPage: React.FC = () => {
   const columns: Column<Row>[] = [
     {
       key: 'operador',
-      width: '20%',
       header: 'Operador',
       sortable: true,
       render: (row: Row) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <FlaskConical size={20} className="text-emerald-600" />
+          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <FlaskConical size={20} className="text-blue-700" />
           </div>
           <div className="min-w-0">
             <p className="font-medium text-neutral-900 text-sm leading-tight line-clamp-2">{row.razonSocial}</p>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex flex-wrap items-center gap-2 mt-0.5">
               <span className="text-xs text-neutral-500 font-mono">{row.cuit}</span>
               {row.certificado && (
                 <span className="text-[10px] font-mono text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded">{row.certificado}</span>
@@ -222,7 +221,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'tipo',
-      width: '10%',
+      width: '8rem',
       header: 'Tipo',
       sortable: true,
       hiddenBelow: 'lg' as const,
@@ -234,8 +233,8 @@ const AdminOperadoresPage: React.FC = () => {
         return (
           <div className="flex flex-wrap gap-1">
             {modalidades.map((mod: string) => (
-              <Badge key={mod} variant="soft" color={mod.includes('FIJO') ? 'primary' : 'success'}>
-                {mod}
+              <Badge key={mod} variant="soft" className="max-w-full" color={mod.includes('FIJO') ? 'primary' : 'success'}>
+                <span className="truncate" title={mod}>{mod}</span>
               </Badge>
             ))}
           </div>
@@ -244,14 +243,14 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'corrientes',
-      width: '12%',
+      width: '7rem',
       header: 'Corrientes',
       hiddenBelow: 'xl' as const,
       render: (row: Row) => row.corrientes.length > 0 ? (
         <div className="flex flex-wrap gap-1">
           {row.corrientes.slice(0, 3).map((code: string) => (
-            <Badge key={code} variant="outline" color="warning" className="text-xs" title={CORRIENTES_Y[code] || code}>
-              {code}
+            <Badge key={code} variant="outline" color="warning" className="max-w-full text-xs" title={CORRIENTES_Y[code] || code}>
+              <span className="truncate">{code}</span>
             </Badge>
           ))}
           {row.corrientes.length > 3 && (
@@ -266,7 +265,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'tecnologia',
-      width: '16%',
+      width: '9rem',
       header: 'Tecnologia',
       hiddenBelow: '2xl' as const,
       render: (row: Row) => row.tecnologia ? (
@@ -279,7 +278,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'contacto',
-      width: '14%',
+      width: '10rem',
       header: 'Contacto',
       hiddenBelow: '2xl' as const,
       render: (row: Row) => {
@@ -306,7 +305,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'ultimaActividad',
-      width: '9%',
+      width: '7rem',
       header: 'Actividad',
       sortable: true,
       hiddenBelow: '2xl' as const,
@@ -318,7 +317,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'estado',
-      width: '8%',
+      width: '6rem',
       header: 'Estado',
       sortable: true,
       render: (row: Row) => (
@@ -329,7 +328,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'acciones',
-      width: '11%',
+      width: '12rem',
       header: '',
       align: 'right' as const,
       render: (row: Row) => (
@@ -386,8 +385,8 @@ const AdminOperadoresPage: React.FC = () => {
       // Page metadata
       title="Admin Operadores"
       subtitle="Panel de gestion de operadores de tratamiento"
-      icon={<FlaskConical size={24} className="text-emerald-600" />}
-      iconBg="bg-emerald-100"
+      icon={<FlaskConical size={24} className="text-blue-700" />}
+      iconBg="bg-blue-100"
       // Data
       data={filteredData}
       isLoading={isLoading}
@@ -396,6 +395,7 @@ const AdminOperadoresPage: React.FC = () => {
       loadingMessage="Cargando operadores..."
       // Table
       columns={columns}
+      tableClassName="[&_table]:min-w-[40rem]"
       getRowKey={(row) => row.id}
       onRowClick={(row) => navigate(`/admin/actores/operadores/${row.id}`)}
       emptyMessage="No se encontraron operadores"
@@ -478,8 +478,8 @@ const AdminOperadoresPage: React.FC = () => {
         <Card className="p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0">
-                <FlaskConical size={16} className="text-emerald-600" />
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center shrink-0">
+                <FlaskConical size={16} className="text-blue-700" />
               </div>
               <div className="min-w-0">
                 <p className="font-medium text-sm text-neutral-900 truncate">{row.razonSocial}</p>

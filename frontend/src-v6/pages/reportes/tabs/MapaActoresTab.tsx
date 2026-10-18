@@ -1,19 +1,26 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Layers, Eye, EyeOff, Download, FileDown, Printer,
+  Download, FileDown, Printer,
 } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useQuery } from '@tanstack/react-query';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
+import { MapCategorySymbol, MapLayerToggle, type MapCategory } from '../../../components/ui/MapLayerToggle';
 import { ACTOR_ICONS, ACTOR_COLORS, createClusterIcon } from '../../../utils/map-icons';
 import { getDepartamento, DEPARTAMENTOS_MENDOZA } from '../../../utils/mendoza-departamentos';
+import { resolveActorLocation, validCoordinates } from '../../../utils/actorLocation';
 import { clusterMarkers, downloadCsv } from './shared';
 import { exportReportePDF } from '../../../utils/exportPdf';
 import type { CentroControlData, ActorTransportista } from '../../../hooks/useCentroControl';
+import { useAuth } from '../../../contexts/AuthContext';
+import { InspectionMapLayer } from '../../inspecciones/InspectionMapLayer';
+import { canUseInspectionOperations, hasInspectionCoordinates, inspectionOperationsService, operationSubject } from '../../../services/inspectionOperations.service';
+import { INSPECTION_STATE_LABELS } from '../../inspecciones/inspectionPresentation';
 
 // ActorTransportista may carry additional fields from the backend not declared in the hook type
 type ActorTransportistaExtra = ActorTransportista & {
@@ -23,28 +30,8 @@ type ActorTransportistaExtra = ActorTransportista & {
 };
 
 // ── Geocoding helpers para transportistas sin coords ──
-
-/** Offset determinístico por ID para evitar superposición en mismo centroide */
-function hashOffset(seed: string, range: number): number {
-  const h = seed.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return ((h % 200) / 200 - 0.5) * 2 * range;
-}
-
-const MENDOZA_CAP: [number, number] = [-32.8908, -68.8272];
-
-/** Nivel 1: centroide del departamento inferido desde domicilio + jitter */
-function deptFallback(id: string, domicilio?: string): [number, number] {
-  if (domicilio) {
-    const lower = domicilio.toLowerCase();
-    const dept = DEPARTAMENTOS_MENDOZA.find(d => lower.includes(d.nombre.toLowerCase()));
-    if (dept) {
-      return [
-        dept.centro[0] + hashOffset(id, 0.018),
-        dept.centro[1] + hashOffset(id + 'lng', 0.018),
-      ];
-    }
-  }
-  return [MENDOZA_CAP[0] + hashOffset(id, 0.05), MENDOZA_CAP[1] + hashOffset(id + 'lng', 0.05)];
+function geocodeKey(actor: ActorTransportista): string {
+  return `geo_trans_v2_${actor.id}_${actor.domicilio ?? ''}`;
 }
 
 // ── Leaflet default icon fix ──
@@ -68,23 +55,39 @@ export default function MapaActoresTab({
   ccData,
   onSelectDep,
   periodoLabel = '',
+  desde,
+  hasta,
   incluirTodos = true,
   onToggleIncluirTodos,
 }: {
   ccData: CentroControlData | null;
   onSelectDep: (dep: string) => void;
   periodoLabel: string;
+  desde?: string;
+  hasta?: string;
   incluirTodos?: boolean;
   onToggleIncluirTodos?: (value: boolean) => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const inspectionPrefix = location.pathname.startsWith('/mobile') ? '/mobile' : '';
+  const { currentUser } = useAuth();
   const [layers, setLayers] = useState({
     generadores: true,
     transportistas: true,
     operadoresFijos: true,
     operadoresInSitu: true,
+    inspecciones: true,
   });
   const [selectedDep, setSelectedDep] = useState('');
+  const inspectionQuery = useQuery({
+    queryKey: ['inspecciones', 'mapa-reportes', currentUser?.id, desde, hasta, layers.inspecciones],
+    queryFn: () => inspectionOperationsService.list({
+      fecha: 'creacion', activas: false, desde: desde || undefined, hasta: hasta || undefined, limit: 100,
+    }),
+    enabled: layers.inspecciones && canUseInspectionOperations(currentUser),
+    staleTime: 60_000, refetchOnWindowFocus: false, retry: 1,
+  });
 
   const toggleLayer = useCallback((layer: keyof typeof layers) => {
     setLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
@@ -96,7 +99,7 @@ export default function MapaActoresTab({
   useEffect(() => {
     if (!ccData?.transportistas) return;
     const missing = ccData.transportistas.filter(
-      t => (t.latitud == null || t.longitud == null) && t.domicilio,
+      t => !validCoordinates([t.latitud, t.longitud]) && t.domicilio,
     );
     if (missing.length === 0) return;
 
@@ -104,9 +107,14 @@ export default function MapaActoresTab({
     const toFetch: typeof missing = [];
     const fromCache: Record<string, [number, number]> = {};
     for (const t of missing) {
-      const hit = sessionStorage.getItem(`geo_trans_${t.id}`);
+      // An old address must not overwrite newly registered coordinates.
+      const hit = sessionStorage.getItem(geocodeKey(t));
       if (hit) {
-        try { fromCache[t.id] = JSON.parse(hit); } catch { toFetch.push(t); }
+        try {
+          const position: unknown = JSON.parse(hit);
+          if (validCoordinates(position)) fromCache[geocodeKey(t)] = position;
+          else toFetch.push(t);
+        } catch { toFetch.push(t); }
       } else {
         toFetch.push(t);
       }
@@ -131,8 +139,10 @@ export default function MapaActoresTab({
           const data = await res.json();
           if (!cancelled && Array.isArray(data) && data.length > 0) {
             const pos: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-            sessionStorage.setItem(`geo_trans_${t.id}`, JSON.stringify(pos));
-            setGeocodedPos(prev => ({ ...prev, [t.id]: pos }));
+            if (validCoordinates(pos)) {
+              sessionStorage.setItem(geocodeKey(t), JSON.stringify(pos));
+              setGeocodedPos(prev => ({ ...prev, [geocodeKey(t)]: pos }));
+            }
           }
         }
       } catch { /* Nominatim falló — centroide de dpto ya visible */ }
@@ -175,13 +185,19 @@ export default function MapaActoresTab({
 
   // Filtered counts for badges
   const filteredGen = useMemo(() => filterByDep(ccData?.generadores || []), [filterByDep, ccData?.generadores]);
-  const filteredTrans = useMemo(() => filterByDep(ccData?.transportistas?.filter(t => t.latitud != null && t.longitud != null) as any[] || []), [filterByDep, ccData?.transportistas]);
+  // One resolved collection drives markers, filter badges, list and exports.
+  const resolvedTrans = useMemo(() => (ccData?.transportistas || []).map(actor => ({
+    actor, location: resolveActorLocation(actor, geocodedPos[geocodeKey(actor)]),
+  })), [ccData?.transportistas, geocodedPos]);
+  const filteredTrans = useMemo(() => resolvedTrans.filter(item => !selectedDep || item.location.department === selectedDep), [resolvedTrans, selectedDep]);
   const filteredOpFijos = useMemo(() => filterByDep(operadoresFijos as any[]), [filterByDep, operadoresFijos]);
   const filteredOpInSitu = useMemo(() => filterByDep(operadoresInSitu as any[]), [filterByDep, operadoresInSitu]);
   const filteredGenClustered = useMemo(() => {
     if (!selectedDep) return generadoresClustered;
     return clusterMarkers(filteredGen);
   }, [selectedDep, filteredGen, generadoresClustered]);
+  const inspectedPlaces = useMemo(() => (inspectionQuery.data?.items || []).filter(hasInspectionCoordinates)
+    .filter((item) => !selectedDep || getDepartamento(item.latitud!, item.longitud!) === selectedDep), [inspectionQuery.data?.items, selectedDep]);
 
   if (import.meta.env.DEV) {
     console.debug('[MapaActores] Generadores:', totalGen, 'Transportistas:', totalTrans, 'Operadores:', totalOper, 'incluirTodos:', incluirTodos);
@@ -198,59 +214,47 @@ export default function MapaActoresTab({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* KPI + Layer toggles + "Todos" toggle — sticky below the date filter bar */}
-      <div className="sticky top-[92px] z-10 -mx-4 lg:-mx-8 px-4 lg:px-8 pb-3 bg-[#FAFAF8]">
-        <div className="flex flex-wrap items-center gap-3 p-3.5 bg-white rounded-2xl border border-neutral-100 shadow-sm">
-          <Layers size={16} className="text-neutral-400" />
-          {/* Departamento filter */}
-          <Select
-            value={selectedDep}
-            onChange={(val) => setSelectedDep(val)}
-            placeholder="Todos los deptos."
-            options={[
-              { value: '', label: 'Todos los deptos.' },
-              ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d.nombre, label: d.nombre })),
-            ]}
-            size="sm"
-            isFullWidth={false}
-          />
-          <span className="w-px h-5 bg-neutral-200" />
-          {([
-            { key: 'generadores' as const, label: 'Generadores', color: 'bg-purple-500', activeClass: 'bg-purple-50 border-purple-300 text-purple-700 shadow-sm', count: selectedDep ? filteredGen.length : totalGen },
-            { key: 'transportistas' as const, label: 'Transportistas', color: 'bg-orange-500', activeClass: 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm', count: selectedDep ? filteredTrans.length : totalTrans },
-            { key: 'operadoresFijos' as const, label: 'Op. Fijos', color: 'bg-blue-500', activeClass: 'bg-blue-50 border-blue-300 text-blue-700 shadow-sm', count: selectedDep ? filteredOpFijos.length : operadoresFijos.length },
-            { key: 'operadoresInSitu' as const, label: 'Op. In Situ', color: 'bg-emerald-500', activeClass: 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm', count: selectedDep ? filteredOpInSitu.length : operadoresInSitu.length },
-          ]).map(l => (
-            <button
-              key={l.key}
-              onClick={() => toggleLayer(l.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                layers[l.key]
-                  ? l.activeClass
-                  : 'bg-neutral-50 border-transparent text-neutral-400'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${layers[l.key] ? l.color : 'bg-neutral-300'}`} />
-              <span>{l.label}</span>
-              <Badge variant="soft" color="neutral" className="text-[10px] px-1.5 py-0 ml-1">{l.count}</Badge>
-              {layers[l.key] ? <Eye size={12} /> : <EyeOff size={12} />}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-3 text-xs text-neutral-500">
-            {totalGen + totalTrans + totalOper} actores ({totalOper} operadores)
+      {/* Layer controls stay in flow: the expanded mobile group must not cover rows. */}
+      <div className="-mx-4 lg:-mx-8 px-4 lg:px-8 pb-3 bg-[#FAFAF8]">
+        <div className="space-y-3 p-3.5 bg-white rounded-2xl border border-neutral-100 shadow-sm">
+          <div role="group" aria-label="Filtros y resumen del mapa" className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {/* Departamento filter */}
+            <Select
+              value={selectedDep}
+              onChange={(val) => setSelectedDep(val)}
+              placeholder="Todos los deptos."
+              options={[
+                { value: '', label: 'Todos los deptos.' },
+                ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d.nombre, label: d.nombre })),
+              ]}
+              size="base"
+              isFullWidth={false}
+            />
+            <span className="text-xs text-neutral-500 sm:ml-auto">
+              {totalGen + totalTrans + totalOper} actores ({totalOper} operadores)
+            </span>
             {onToggleIncluirTodos && (
-              <label className="flex items-center gap-1.5 cursor-pointer select-none border-l border-neutral-200 pl-3">
-                <span className="text-xs font-medium text-neutral-600">Todos</span>
+              <div className="ml-auto flex items-center gap-1.5 sm:ml-0">
+                <span className="text-xs font-medium text-neutral-700">Incluir sin actividad</span>
                 <button
+                  type="button"
                   role="switch"
+                  aria-label="Incluir actores sin actividad en el período"
                   aria-checked={incluirTodos}
                   onClick={() => onToggleIncluirTodos(!incluirTodos)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${incluirTodos ? 'bg-primary-500' : 'bg-neutral-300'}`}
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
                 >
-                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${incluirTodos ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
+                  <span aria-hidden="true" className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${incluirTodos ? 'bg-primary-700' : 'bg-neutral-500'}`}><span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${incluirTodos ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} /></span>
                 </button>
-              </label>
+              </div>
             )}
+          </div>
+          <div role="group" aria-label="Capas del mapa" className="grid w-full grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-2 sm:flex sm:flex-wrap">
+            <MapLayerToggle category="generador" label="Generadores" pressed={layers.generadores} count={selectedDep ? filteredGen.length : totalGen} onToggle={() => toggleLayer('generadores')} />
+            <MapLayerToggle category="transportista" label="Transportistas" pressed={layers.transportistas} count={selectedDep ? filteredTrans.length : totalTrans} onToggle={() => toggleLayer('transportistas')} />
+            <MapLayerToggle category="operador" label="Op. Fijos" pressed={layers.operadoresFijos} count={selectedDep ? filteredOpFijos.length : operadoresFijos.length} onToggle={() => toggleLayer('operadoresFijos')} />
+            <MapLayerToggle category="operador" label="Op. In Situ" pressed={layers.operadoresInSitu} count={selectedDep ? filteredOpInSitu.length : operadoresInSitu.length} onToggle={() => toggleLayer('operadoresInSitu')} />
+            {canUseInspectionOperations(currentUser) && <MapLayerToggle category="inspeccion" label="Inspecciones" pressed={layers.inspecciones} count={inspectedPlaces.length} onToggle={() => toggleLayer('inspecciones')} />}
           </div>
         </div>
       </div>
@@ -262,11 +266,13 @@ export default function MapaActoresTab({
             <MapContainer
               center={[-32.9287, -68.8535]}
               zoom={10}
+              keyboard={false}
               style={{ height: '100%', width: '100%', zIndex: 0 }}
               className="z-0"
             >
               <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <FlyToTarget target={flyTarget} zoom={12} />
+              {layers.inspecciones && canUseInspectionOperations(currentUser) && <InspectionMapLayer items={inspectedPlaces} />}
 
               {/* Generadores */}
               {layers.generadores && filteredGenClustered.map((g: any, idx: number) => (
@@ -305,29 +311,23 @@ export default function MapaActoresTab({
               ))}
 
               {/* Transportistas — coords reales > Nominatim geocoded > centroide de dpto */}
-              {layers.transportistas && ccData.transportistas?.filter(tRaw => {
-                if (!selectedDep) return true;
-                const t = tRaw as ActorTransportistaExtra;
-                const p = geocodedPos[t.id] ?? (t.latitud != null && t.longitud != null ? [t.latitud, t.longitud] as [number, number] : null) ?? deptFallback(t.id, t.domicilio);
-                return getDepartamento(p[0], p[1]) === selectedDep;
-              }).map((tRaw, idx) => {
-                const t = tRaw as ActorTransportistaExtra;
-                const pos: [number, number] =
-                  geocodedPos[t.id] ??
-                  (t.latitud != null && t.longitud != null
-                    ? [t.latitud, t.longitud] as [number, number]
-                    : null) ??
-                  deptFallback(t.id, t.domicilio);
+              {layers.transportistas && filteredTrans.map(({ actor, location }, idx) => {
+                const t = actor as ActorTransportistaExtra;
+                const pos = location.position;
+                if (!pos) return null;
                 return (
                   <Marker
                     key={`trans-${t.id}-${idx}`}
                     position={pos}
                     icon={ACTOR_ICONS.transportista}
+                    title={t.razonSocial}
+                    alt={'Transportista: ' + t.razonSocial}
                   >
                     <Popup>
                       <div className="text-sm">
                         <strong className="text-orange-700">{t.razonSocial}</strong><br />
                         <span className="text-xs text-neutral-500">CUIT: {t.cuit}</span><br />
+                        <span className="text-xs text-neutral-700">{location.label}</span><br />
                         {t.localidad && (
                           <span className="text-xs text-neutral-500">📍 {t.localidad}</span>
                         )}
@@ -353,7 +353,7 @@ export default function MapaActoresTab({
                         <div className="flex items-center gap-3 mt-1">
                           <button
                             className="text-xs text-primary-600 hover:underline"
-                            onClick={() => onSelectDep(getDepartamento(pos[0], pos[1]))}
+                            onClick={() => location.department && onSelectDep(location.department)}
                           >
                             Ver departamento
                           </button>
@@ -395,7 +395,7 @@ export default function MapaActoresTab({
                 </Marker>
               ))}
 
-              {/* Operadores IN SITU — icono verde */}
+              {/* Both operator modalities share the canonical blue category icon. */}
               {layers.operadoresInSitu && (selectedDep ? filteredOpInSitu : operadoresInSitu).map((o: any, idx: number) => (
                 <Marker
                   key={`oper-insitu-${o.id}-${idx}`}
@@ -422,18 +422,22 @@ export default function MapaActoresTab({
               ))}
             </MapContainer>
 
-            {/* Legend overlay */}
-            <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg z-[400] text-xs">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Generadores</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Transportistas</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Op. Fijos</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Op. In Situ</span>
-              </div>
-            </div>
           </div>
         </div>
       </Card>
+      {canUseInspectionOperations(currentUser) && layers.inspecciones && <p role={inspectionQuery.isError ? 'alert' : 'status'} className="text-xs text-neutral-600">
+        {inspectionQuery.isError ? 'No se pudieron actualizar las inspecciones del mapa.' : inspectionQuery.isLoading ? 'Cargando lugares de inspección…' : `${inspectedPlaces.length} lugares de inspección visibles · ${inspectionQuery.data?.summary.sinUbicacion || 0} legajos sin coordenadas en la consulta${(inspectionQuery.data?.total || 0) > 100 ? ' · sólo se muestran los primeros 100; acotá el período' : ''}. Cada punto indica el lugar del hecho, no la posición del inspector.`}
+      </p>}
+      {canUseInspectionOperations(currentUser) && layers.inspecciones && inspectedPlaces.length > 0 && <div className="rounded-xl border border-teal-100 bg-white p-3">
+        <h3 className="text-sm font-semibold text-neutral-900">Legajos en el mapa</h3>
+        <p className="mt-1 text-xs text-neutral-600">Acceso directo sin tener que tocar un marcador.</p>
+        <div className="mt-2 max-h-64 overflow-y-auto divide-y divide-neutral-100">
+          {inspectedPlaces.map((item) => <Link key={item.id} to={`${inspectionPrefix}/inspecciones/${item.id}`} className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm hover:bg-teal-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal-700">
+            <span className="min-w-0"><span className="font-semibold text-teal-800">{item.numero}</span><span className="block truncate text-neutral-600">{operationSubject(item)} · {item.ubicacion || 'Sin referencia escrita'}</span></span>
+            <span className="shrink-0 text-xs text-neutral-500">{INSPECTION_STATE_LABELS[item.estado]}</span>
+          </Link>)}
+        </div>
+      </div>}
 
       {/* Lista de actores visibles en el mapa */}
       {(() => {
@@ -446,13 +450,8 @@ export default function MapaActoresTab({
           }
         }
         if (layers.transportistas) {
-          for (const t of (ccData?.transportistas || []).filter((tRaw: any) => {
-            if (!selectedDep) return true;
-            const p = geocodedPos[tRaw.id] ?? (tRaw.latitud != null ? [tRaw.latitud, tRaw.longitud] : null) ?? deptFallback(tRaw.id, tRaw.domicilio);
-            return getDepartamento(p[0], p[1]) === selectedDep;
-          }) as any[]) {
-            const p = geocodedPos[t.id] ?? (t.latitud != null ? [t.latitud, t.longitud] : null) ?? deptFallback(t.id, t.domicilio);
-            visibleActors.push({ tipo: 'Transportista', color: 'orange', razonSocial: t.razonSocial, cuit: t.cuit, depto: getDepartamento(p[0], p[1]), detalle: `${t.vehiculosActivos || 0} veh. · ${t.enviosEnTransito || 0} en tránsito`, id: t.id, ruta: `/actores/transportistas/${t.id}` });
+          for (const { actor: t, location } of filteredTrans) {
+            visibleActors.push({ tipo: 'Transportista', color: 'orange', razonSocial: t.razonSocial, cuit: t.cuit, depto: location.department ? location.department + ' (aprox.)' : location.label, detalle: `${t.vehiculosActivos || 0} veh. · ${t.enviosEnTransito || 0} en tránsito · ${location.label}`, id: t.id, ruta: `/actores/transportistas/${t.id}` });
           }
         }
         if (layers.operadoresFijos) {
@@ -470,7 +469,7 @@ export default function MapaActoresTab({
 
         if (visibleActors.length === 0) return null;
 
-        const colorMap: Record<string, string> = { purple: 'bg-purple-500', orange: 'bg-orange-500', blue: 'bg-blue-500', emerald: 'bg-emerald-500' };
+        const categories: Record<string, MapCategory> = { purple: 'generador', orange: 'transportista', blue: 'operador', emerald: 'operador' };
         const badgeColorMap: Record<string, string> = { purple: 'text-purple-700 bg-purple-50', orange: 'text-orange-700 bg-orange-50', blue: 'text-blue-700 bg-blue-50', emerald: 'text-emerald-700 bg-emerald-50' };
 
         const handleExportCsv = () => {
@@ -514,7 +513,7 @@ export default function MapaActoresTab({
           <Card>
             <div className="px-4 py-3 border-b border-neutral-100 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-neutral-900 min-w-0 truncate">
-                Actores en el mapa {selectedDep && <span className="text-primary-600">— {selectedDep}</span>}
+                Actores de las capas seleccionadas {selectedDep && <span className="text-primary-600">— {selectedDep}</span>}
               </h3>
               <div className="flex items-center gap-2 shrink-0">
                 <Badge variant="soft" color="neutral">{visibleActors.length}</Badge>
@@ -542,9 +541,9 @@ export default function MapaActoresTab({
                 <button
                   key={`${a.tipo}-${a.id}-${i}`}
                   onClick={() => navigate(a.ruta)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-neutral-50 transition-colors text-left"
+                  className="flex min-h-11 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 active:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
                 >
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${colorMap[a.color] || 'bg-neutral-400'}`} />
+                  <MapCategorySymbol category={categories[a.color]} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-neutral-900 truncate">{a.razonSocial}</p>
                     <p className="text-xs text-neutral-500">{a.cuit} · {a.depto}</p>

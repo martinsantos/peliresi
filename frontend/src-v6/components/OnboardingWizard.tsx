@@ -3,12 +3,19 @@
  * Se activa en primera sesión y post-reset de contraseña
  */
 import React, { useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Leaf } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { SitrepMark } from './SitrepMark';
 import type { UserRole } from '../contexts/AuthContext';
 
 interface Step { title: string; desc: string; emoji: string }
 
 const STEPS_BY_ROLE: Record<string, Step[]> = {
+  INSPECTOR: [
+    { emoji: '📋', title: 'Tu trabajo como inspector', desc: 'En Inspecciones encontrás tus visitas asignadas y los expedientes que podés continuar.' },
+    { emoji: '🔔', title: 'Las asignaciones llegan a la campana', desc: 'Abrí SITREP y tocá la campana. Cada aviso abre el expediente asignado. No se envía correo ni push por esta asignación.' },
+    { emoji: '📍', title: 'Iniciá la visita en el lugar', desc: 'Iniciar visita registra la hora de comienzo. En campo registrás lo observado; en Datos declarados contrastás la información del responsable.' },
+    { emoji: '💾', title: 'Guardá y retomá', desc: 'Revisá la confirmación de guardado. Una copia en el dispositivo no significa que el servidor ya la recibió.' },
+  ],
   GENERADOR: [
     { emoji: '🏭', title: 'Sos un Generador de Residuos Peligrosos', desc: 'Desde SITREP podés gestionar todo el ciclo de tus residuos peligrosos de forma digital.' },
     { emoji: '📋', title: 'Crear un Manifiesto', desc: 'Registrá una generación desde el botón + en la sección Manifiestos.' },
@@ -58,12 +65,14 @@ const STEPS_BY_ROLE: Record<string, Step[]> = {
 };
 
 const ROL_LABELS: Record<string, string> = {
+  INSPECTOR: 'Inspector',
   ADMIN: 'Administrador', GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista',
   OPERADOR: 'Operador', ADMIN_TRANSPORTISTA: 'Adm. Transportistas',
   ADMIN_GENERADOR: 'Adm. Generadores', ADMIN_OPERADOR: 'Adm. Operadores',
 };
 
 const ROL_COLORS: Record<string, string> = {
+  INSPECTOR: 'bg-primary-800',
   ADMIN: 'bg-primary-500', GENERADOR: 'bg-purple-500', TRANSPORTISTA: 'bg-orange-500',
   OPERADOR: 'bg-blue-500', ADMIN_TRANSPORTISTA: 'bg-slate-500',
   ADMIN_GENERADOR: 'bg-green-600', ADMIN_OPERADOR: 'bg-teal-500',
@@ -71,12 +80,14 @@ const ROL_COLORS: Record<string, string> = {
 
 interface Props {
   rol: UserRole;
+  esInspector?: boolean;
   userId: string | number;
   onDismiss: () => void;
 }
 
-const OnboardingWizard: React.FC<Props> = ({ rol, userId, onDismiss }) => {
-  const steps = STEPS_BY_ROLE[rol] ?? STEPS_BY_ROLE['GENERADOR'];
+const OnboardingWizard: React.FC<Props> = ({ rol, esInspector = false, userId, onDismiss }) => {
+  const presentationRole = esInspector && !rol.startsWith('ADMIN') ? 'INSPECTOR' : rol;
+  const steps = STEPS_BY_ROLE[presentationRole] ?? STEPS_BY_ROLE['GENERADOR'];
   const [current, setCurrent] = useState(0);
 
   const finish = () => {
@@ -93,15 +104,13 @@ const OnboardingWizard: React.FC<Props> = ({ rol, userId, onDismiss }) => {
         {/* Header */}
         <div className="bg-[#1B5E3C] px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-              <Leaf size={16} className="text-white" />
-            </div>
+            <SitrepMark size={32} />
             <span className="text-white font-semibold text-sm">SITREP</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full text-white ${ROL_COLORS[rol] || 'bg-neutral-500'} ml-1`}>
-              {ROL_LABELS[rol] || rol}
+            <span className={`text-xs px-2 py-0.5 rounded-full text-white ${ROL_COLORS[presentationRole] || 'bg-neutral-500'} ml-1`}>
+              {ROL_LABELS[presentationRole] || presentationRole}
             </span>
           </div>
-          <button onClick={finish} className="text-white/70 hover:text-white transition-colors">
+          <button aria-label="Cerrar introducción" onClick={finish} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-white hover:bg-white/10">
             <X size={18} />
           </button>
         </div>
@@ -118,7 +127,7 @@ const OnboardingWizard: React.FC<Props> = ({ rol, userId, onDismiss }) => {
           {/* Dots */}
           <div className="flex gap-1.5">
             {steps.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)} className={`rounded-full transition-all ${i === current ? 'w-5 h-2 bg-[#1B5E3C]' : 'w-2 h-2 bg-neutral-200 hover:bg-neutral-300'}`} />
+              <span key={i} aria-hidden="true" className={`rounded-full ${i === current ? 'w-5 h-2 bg-[#1B5E3C]' : 'w-2 h-2 bg-neutral-300'}`} />
             ))}
           </div>
 
@@ -143,7 +152,7 @@ const OnboardingWizard: React.FC<Props> = ({ rol, userId, onDismiss }) => {
 
         {/* Skip */}
         <div className="px-6 pb-4 text-center">
-          <button onClick={finish} className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors">
+          <button onClick={finish} className="min-h-11 rounded-lg px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-100">
             Saltar introducción
           </button>
         </div>

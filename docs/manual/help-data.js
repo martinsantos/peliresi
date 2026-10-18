@@ -2,6 +2,8 @@
   'use strict';
 
   var S = 'screenshots/';
+  var QA_TRAINING = 'QA · 12/10/2026 · Datos sintéticos · Captura reutilizada de escritorio o app';
+  var QA_ALERTS = 'Captura de QA del 04/10/2026 · Datos sintéticos · No acredita el estado actual de esta instalación';
 
   window.SITREP_HELP = {
     profiles: [
@@ -10,21 +12,112 @@
       { id: 'transportista', label: 'Transportista', icon: 'local_shipping', description: 'Retiros, GPS, incidentes y entregas.' },
       { id: 'operador', label: 'Operador', icon: 'science', description: 'Recepción, pesaje, tratamiento y cierre.' },
       { id: 'inspector', label: 'Inspector', icon: 'fact_check', description: 'Visita, controles, fotos, acta e informe técnico.' },
-      { id: 'auditor', label: 'Auditor', icon: 'policy', description: 'Consulta de actividad, evidencia y trazabilidad.' }
+      { id: 'auditor', label: 'Consulta y auditoría', icon: 'policy', description: 'Recorrido para personal autorizado; no concede un rol adicional.' }
     ],
 
     guides: [
       {
+        id: 'capacitacion-por-rol', profile: 'administrador',
+        audiences: ['administrador', 'generador', 'transportista', 'operador', 'inspector', 'auditor'],
+        title: 'Capacitación: recorrido por rol', summary: 'Una jornada de 90 minutos con un resultado comprobable por equipo.',
+        duration: '90 min', icon: 'school', keywords: ['capacitación', 'taller', 'tour', 'recorrido', 'datos sintéticos', 'demo'],
+        safety: 'En Operación real, solo lectura durante la capacitación. Para practicar dentro de este mismo SITREP, el administrador entra a Ver como otro usuario → Capacitación y confirma la banda «Capacitación · sin validez oficial». Si no está habilitada, no usar registros reales. No se envían correos ni se emiten documentos oficiales.',
+        steps: [
+          { title: 'Preparación · 10 min', body: ['El instructor ingresa con su cuenta administradora, abre Ver como otro usuario y selecciona Capacitación. Hay hasta cinco cuentas visibles por categoría; cada grupo puede cerrarse y tiene su propia paginación y búsqueda.', 'Elegí una cuenta CAP y comprobá la banda de capacitación antes de actuar. Los participantes del mismo relevo usan el mismo número de equipo: Generador 1, Transporte 1 y Operador 1. Las cuentas escuela se usan por impersonación; no se reparten contraseñas compartidas.', 'Usá Volver a mi cuenta para cambiar de equipo. No hagas el ejercicio en un navegador con formularios de trabajo pendientes; usá otro perfil del navegador. No borres almacenamiento ni cierres el formulario para preparar la clase.'], image: S + 'desktop/training-selector-20261012.png', caption: QA_TRAINING, alt: 'Selector de capacitación con cinco cuentas por categoría', expected: 'Cada equipo confirma modo, rol, número y regreso al administrador antes del ejercicio.' },
+          { title: 'Alta y recuperación · 15 min', body: ['Desde Probar, completá un alta con datos ficticios, revisá una sugerencia OCR y corregila si hace falta.', 'Guardá el borrador de prueba y recuperalo en el mismo navegador. No envíes un trámite real; los archivos no se conservan en el borrador de prueba.'], image: S + 'desktop/registration-draft-20261012.png', caption: QA_TRAINING, alt: 'Formulario con campos recuperados y estado de guardado local', expected: 'Se recuperan los campos y el paso; se identifica qué documentos hay que volver a elegir.' },
+          { title: 'Generador → transportista → operador · 20 min', body: ['Con la banda de capacitación visible, elegí un manifiesto CAP del equipo: generador revisa y firma; transportista confirma retiro y entrega; operador recibe, pesa, registra tratamiento y cierra.', 'Cada equipo verifica el estado y la línea de tiempo antes de entregar el turno al siguiente. Las descargas oficiales están deshabilitadas en capacitación. En Operación real sólo se muestran registros existentes, sin accionarlos.'], image: S + 'desktop/training-manifest-20261012.png', caption: QA_TRAINING, alt: 'Manifiesto de capacitación tratado, sin emisión de documentos oficiales', expected: 'Las tres partes completan el relevo y comprueban el cierre sin alterar un manifiesto ni emitir un certificado real.' },
+          { title: 'Inspector y autoridad · 20 min', body: ['El inspector identifica Visita, Controles, Registro y Expediente; contrasta lo declarado, documenta un hallazgo y verifica el guardado de su evidencia.', 'La autoridad revisa el expediente; el actor localiza el requerimiento que le corresponde. En el entorno escuela, demostrar respuesta vinculada y decisión autorizada. Una respuesta no equivale a conformidad.'], image: S + 'mobile/training-inspection-20261012.png', caption: QA_TRAINING, alt: 'Inspector de capacitación: secciones numeradas, control revisado y guardado confirmado', expected: 'Se distinguen acta, informe, respuesta del actor y decisión de la autoridad.' },
+          { title: 'Administración y soporte · 15 min', body: ['Administración localiza una solicitud, sus documentos y correcciones; consulta el padrón, el CAA oficial y Monitor con el período del ejercicio.', 'El equipo de soporte muestra un ticket escuela: Asignarme, Derivar, nota interna y respuesta pública. El autor verifica el aviso y la respuesta en el mismo ticket.'], image: S + 'desktop/support-actions-20261012.png', caption: QA_TRAINING, alt: 'Acciones del equipo de soporte: responder, nota interna, derivar y cerrar', expected: 'Se identifica quién debe actuar y qué ve el usuario final; las notas internas quedan separadas.' },
+          { title: 'Comprobación final · 10 min', body: ['Cada participante encuentra su próxima tarea y explica cómo pedir ayuda. Registrar dudas con pantalla, rol y resultado esperado.', 'GPS, cámara QR y recuperación de conexión deben comprobarse en los teléfonos de la jornada; una prueba en navegador o emulador no certifica batería ni segundo plano. No borrar ni reiniciar datos productivos para repetir ejercicios.'], expected: 'El instructor registra resultados y pendientes reales, sin declarar un GO global por completar el tour.' }
+        ]
+      },
+      {
+        id: 'alta-borradores-ocr', profile: 'generador', audiences: ['generador', 'transportista', 'operador', 'administrador'],
+        title: 'Alta: documentos, OCR y borradores', summary: 'Probá el formulario, recuperá lo guardado y distinguí una práctica de una solicitud real.',
+        duration: '6 min', icon: 'edit_document', keywords: ['alta', 'inscripción', 'OCR', 'licencia', 'choferes', 'recibos', 'borrador', 'precarga', 'TEF'],
+        safety: 'Probar (modo revisión) no crea trámites reales. El OCR propone datos: no valida pagos, identidad ni habilitación. La precarga del padrón requiere verificar el acceso; un CUIT público no autoriza consultar datos privados.',
+        steps: [
+          { title: 'Elegir el alta correcta', body: ['Entrá desde Probar en Generador, Transportista u Operador y comprobá el aviso de modo revisión.', 'Completá los datos de la actividad. El cálculo dinámico de TEF no se muestra al solicitante; su revisión corresponde a administración.'], image: S + 'mobile/registration-trial-20261012.png', caption: 'Modo prueba en la URL final · Datos sintéticos · 12/10/2026', alt: 'Alta de Generador en móvil con el aviso Prueba sin envío y el botón Guardar', expected: 'Sabés si estás practicando o completando una solicitud real.' },
+          { title: 'Cargar documentos y revisar OCR', body: ['Elegí el documento en su apartado y esperá el resultado de lectura. Compará cada sugerencia con el original antes de aceptarla.', 'En transportistas, cargá cada chofer con sus datos y licencia. Si la foto es borrosa o no se lee, completá los campos manualmente: no inventes lo ilegible. Una huella duplicada detecta el mismo archivo, no necesariamente otra foto del mismo recibo.'], image: S + 'mobile/registration-ocr-20261012.png', caption: 'Datos sintéticos · Licencia sin validez leída con OCR en modo prueba. La lectura no aprueba la licencia.', alt: 'Sugerencias OCR de una licencia ficticia: campos seleccionables y botón Usar datos seleccionados', expected: 'La información aceptada coincide con el documento; los errores de lectura no se confunden con una aprobación.' },
+          { title: 'Guardar y recuperar', body: ['En modo prueba, guardá el borrador y recuperalo en el mismo navegador y dispositivo. Los archivos no se guardan en ese borrador: hay que volver a seleccionarlos.', 'En un trámite real, esperá la confirmación de guardado del servidor. Un borrador local o un archivo pendiente no garantiza recuperación desde otro dispositivo.'], image: S + 'desktop/registration-draft-20261012.png', caption: QA_TRAINING, alt: 'Datos recuperados; se distingue guardado local de guardado en SITREP', expected: 'Campos y paso se recuperan; sabés qué está guardado y qué sigue pendiente.' },
+          { title: 'Revisar antes de presentar', body: ['Podés completar el formulario por partes; antes del envío real revisá los campos y documentos requeridos.', 'La solicitud presentada pasa a revisión administrativa. Si está observada, corregí lo solicitado en ese mismo trámite. Con los correos apagados no se entregan enlaces de verificación o recuperación.'], image: S + 'mobile/registration-observed-20261012.png', caption: QA_TRAINING, alt: 'Ejemplo posterior al envío: solicitud observada y campo de respuesta', expected: 'No confundís guardar, presentar y aprobar; en modo prueba no se crea una solicitud real.' }
+        ]
+      },
+      {
+        id: 'soporte-enviar-seguir', profile: 'generador', audiences: ['administrador', 'generador', 'transportista', 'operador', 'inspector', 'auditor'],
+        title: 'Enviar un ticket y leer la respuesta', summary: 'Pedí ayuda técnica desde la pantalla del problema y seguí el mismo ticket.',
+        duration: '3 min', icon: 'support_agent', keywords: ['ticket', 'soporte', 'ayuda', 'problema', 'respuesta', 'audio'],
+        safety: 'Un ticket no modifica ni reemplaza el trámite. No adjuntes contraseñas ni información de otras personas. Para practicar, usá una cuenta CAP con la banda de capacitación visible; en Operación real, consultá sin enviar pruebas.',
+        steps: [
+          { title: 'Reportar desde Ayuda', body: ['Abrí Ayuda → Reportar problema o Soporte. Describí qué intentabas hacer y qué pasó.', 'Las capturas y documentos son opcionales. Si continuás luego, el borrador queda en ese dispositivo y cuenta; no se envía automáticamente.'], image: S + 'mobile/support-report-20261012.png', caption: QA_TRAINING, alt: 'Reporte de problema con descripción y adjuntos opcionales', expected: 'El reporte explica el problema sin exigir un adjunto innecesario.' },
+          { title: 'Confirmar el envío', body: ['Enviá una sola vez y esperá el número de ticket. Si falla, conservá el texto y revisá el mensaje antes de reintentar.', 'Mis tickets permite volver al reporte desde web o app. No lo des por enviado si sólo ves un borrador.'], image: S + 'mobile/support-created-20261012.png', caption: QA_TRAINING, alt: 'Ticket creado con número y estado Abierto', expected: 'El ticket tiene número y puede abrirse desde Mis tickets.' },
+          { title: 'Seguir la respuesta', body: ['Consultá la campana de avisos o Mis tickets y abrí el mismo reporte. Los correos apagados no impiden consultar una respuesta guardada dentro del sistema.', 'Respondé con el dato solicitado; podés usar los adjuntos o audio cuando estén disponibles y autorices el micrófono. Cerrá con un motivo cuando esté resuelto o reabrí si persiste.'], image: S + 'desktop/support-answer-20261012.png', caption: QA_TRAINING, alt: 'Respuesta de soporte visible para el usuario autor del ticket', expected: 'El autor encuentra la respuesta pública y puede continuar la conversación.' }
+        ]
+      },
+      {
+        id: 'soporte-gestionar', profile: 'administrador',
+        title: 'Soporte: asignar, derivar y responder', summary: 'Separá la conversación con el usuario del trabajo interno del equipo.',
+        duration: '4 min', icon: 'assignment_ind', keywords: ['ticket', 'soporte', 'derivar', 'asignarme', 'clasificar', 'nota interna', 'impersonado'],
+        safety: 'Requiere acceso habilitado a Mesa de soporte. Estos permisos no conceden acceso adicional a trámites. Para practicar, usar tickets escuela en un entorno autorizado.',
+        steps: [
+          { title: 'Ubicar y tomar el ticket', body: ['Entrá en Mesa de soporte y filtrá por número, estado o clasificación. Asignarme toma un ticket disponible.', 'Comprobá el autor y, si se creó durante un acceso temporal, la identidad representada. La respuesta pública debe llegar al autor del ticket, no confundirse con una nota al administrador.'], image: S + 'desktop/support-assigned-20261012.png', caption: QA_TRAINING, alt: 'Ticket En atención con responsable identificado', expected: 'El ticket correcto tiene un responsable identificado.' },
+          { title: 'Clasificar o derivar', body: ['Clasificar define área, tipo y prioridad; no cierra el ticket.', 'Derivar permite elegir otro responsable activo. Si no aparece ningún destino, administración debe revisar Equipo de soporte. No compartas credenciales para resolver una derivación.'], image: S + 'desktop/support-triage-20261012.png', caption: QA_TRAINING, alt: 'Clasificación con área, tipo y prioridad; Derivar es otra acción', expected: 'El responsable y la clasificación quedan visibles; la derivación conserva su historial.' },
+          { title: 'Responder y cerrar', body: ['Elegí Responder para un mensaje visible al usuario; Nota interna sólo la ve soporte. Revisá esa distinción antes de enviar.', 'Pedí respuesta si faltan datos y cerrá con una resolución cuando corresponda. Verificá con el autor que puede abrir el aviso y leer la respuesta.'], image: S + 'desktop/support-actions-20261012.png', caption: QA_TRAINING, alt: 'Respuesta pública y acciones de soporte separadas de la nota interna', expected: 'El usuario ve la solución, no las notas internas; el estado refleja el trabajo pendiente.' }
+        ]
+      },
+      {
+        id: 'actor-mis-inspecciones', profile: 'transportista', audiences: ['generador', 'transportista', 'operador'],
+        title: 'Mis inspecciones: leer, responder y consultar el cierre',
+        summary: 'El actor consulta sus propios expedientes e intercambios, no las inspecciones generales.',
+        duration: '4 min', icon: 'forum', keywords: ['mis inspecciones', 'requerimiento', 'descargo', 'respuesta', 'cierre', 'transportista'],
+        safety: 'Una respuesta no aprueba ni cierra la inspección. Para practicar, usá únicamente expedientes CAP con la banda de capacitación; no se envían correos.',
+        steps: [
+          { title: 'Abrir el expediente propio', body: ['Desde el menú, entrá en Mis inspecciones y verificá el actor y el número del expediente.', 'El generador, transportista u operador sólo consulta los expedientes publicados que le corresponden. No ve los borradores de trabajo del inspector ni los de otros actores.'], image: S + 'mobile/actor-inspection-20261012.png', caption: QA_TRAINING, alt: 'App del transportista en su expediente, identificado como Vista: Inspeccionado', expected: 'La vista indica Inspeccionado y el expediente pertenece a tu organización.' },
+          { title: 'Responder al pedido correcto', body: ['En el registro cronológico, leé el requerimiento y su plazo; usá Responder en ese pedido para vincular la presentación.', 'Completá el contenido y adjuntá sólo lo necesario. Presentar en expediente debe confirmar el guardado; comprobá que la actuación aparezca al volver a abrir. No confundas un texto local con una presentación recibida.'], image: S + 'desktop/actor-inspection-closed-20261012.png', caption: QA_TRAINING + ' · Ejemplo de registro ya cerrado; las acciones disponibles dependen del estado', alt: 'Registro cronológico con requerimiento y descargo vinculados del mismo actor', expected: 'La respuesta queda en el pedido correspondiente; la decisión sigue a cargo de la autoridad.' },
+          { title: 'Consultar la decisión', body: ['Volvé al expediente para revisar la nueva actuación de la autoridad y su estado.', 'Cerrada conforme y Sin plazo abierto distinguen el cierre de un intercambio pendiente. Un expediente cerrado no habilita nuevas respuestas; consultá a la autoridad si necesitás otra actuación.'], image: S + 'desktop/actor-inspection-closed-20261012.png', caption: QA_TRAINING, alt: 'Transportista: expediente Cerrada conforme, sin plazo abierto y con historial conservado', expected: 'Podés distinguir respuesta presentada, requerimiento pendiente y cierre autorizado.' }
+        ]
+      },
+      {
+        id: 'cambio-dominio', profile: 'administrador', audiences: ['administrador', 'generador', 'transportista', 'operador', 'inspector', 'auditor'],
+        title: 'Acceder a SITREP y preparar el cambio de dominio', summary: 'Usá la instalación actual; el dominio final se habilitará mediante una migración anunciada.',
+        duration: '3 min', icon: 'language', keywords: ['dominio', 'migración', 'sesión', 'Mendoza', 'borradores', 'app', 'APK', 'PWA'],
+        safety: 'El destino previsto es sitrep.mendoza.gov.ar. Mencionarlo aquí no significa que ya esté habilitado. Este manual no cambia DNS, servidores, cuentas ni formularios abiertos.',
+        steps: [
+          { title: 'Usar la instalación actual', body: ['Los enlaces del manual a web, app y ayuda permanecen en el dominio donde abriste este manual.', 'Usá el enlace institucional confirmado para la jornada. No pruebes credenciales en un dominio distinto sólo porque aparece en una captura histórica.'], expected: 'Manual, web y app apuntan a la misma instalación autorizada.' },
+          { title: 'Conservar el trabajo antes de migrar', body: ['Las sesiones, borradores locales, colas sin sincronizar y permisos de cámara/GPS no se trasladan automáticamente entre dominios.', 'Antes del corte, confirmá los guardados del servidor y la sincronización. No borres datos del sitio anterior ni cierres un formulario pendiente. Un enlace recibido por correo tampoco transporta el borrador del otro navegador.'], expected: 'No queda trabajo sólo local que se dé por recuperable en el dominio nuevo.' },
+          { title: 'Validar el nuevo acceso', body: ['Tras el anuncio de la migración, ingresá por el enlace oficial y verificá cuenta, rol, trámites y documentos. La conservación de datos del servidor debe comprobarla el equipo de migración.', 'La PWA anterior puede seguir abriendo el dominio anterior y el APK necesita verificar su destino y versión. El equipo técnico debe validar TLS, enlaces de correo, autenticación, GPS, QR y offline antes de declarar el cambio completo.'], expected: 'Se confirma el acceso en web y app; no se presume que una redirección migra sesiones o instalaciones.' }
+        ]
+      },
+      {
+        id: 'administrador-alertas-proactivas',
+        profile: 'administrador',
+        title: 'Configurar alertas y seguir sus avisos',
+        summary: 'Simulá reglas con fuentes reales, elegí destinatarios y gestioná casos sin confundir lectura con resolución.',
+        duration: '6 min',
+        icon: 'notifications_active',
+        keywords: ['alertas', 'avisos', 'reglas', 'vencimientos', 'habilitación', 'licencia', 'inspección', 'requerimiento', 'respuesta', 'DDJJ', 'TEF', 'OCR'],
+        safety: 'Las capturas de QA usan datos sintéticos y no acreditan la configuración actual. Simular no envía ni crea casos; evaluar reglas activas sí genera casos y avisos internos. Durante la capacitación no activar reglas ni envíos. Consultá los permisos y la configuración de esta instalación.',
+        steps: [
+          { title: 'Abrir Reglas y simular sin enviar', body: ['En Alertas → Reglas → Nueva Regla, elegí una familia, su nombre y los destinatarios permitidos.', 'Usá Simular sin enviar: muestra la cantidad real y hasta 20 ejemplos. No crea la regla, casos ni avisos. Las reglas nuevas se crean inactivas.'], image: S + 'desktop/alerts_simulation_qa.png', caption: QA_ALERTS, alt: 'QA: simulación de manifiestos pendientes sin enviar avisos', expected: 'Podés revisar la fuente y el alcance antes de guardar o activar.' },
+          { title: 'Seguir manifiestos recibidos', body: ['Manifiesto pendiente de tratamiento o cierre usa estados Recibido o En tratamiento y la fecha de recepción registrada.', 'Los días son un umbral operativo, no un vencimiento legal. Cero incluye todos los recibidos o en tratamiento; una fecha ausente se identifica, no se inventa.'], image: S + 'desktop/alerts_simulation_qa.png', caption: QA_ALERTS, alt: 'QA: umbral operativo desde la recepción de un manifiesto', expected: 'La alerta identifica el manifiesto que necesita una acción permitida.' },
+          { title: 'Detectar requerimientos sin respuesta', body: ['Inspección · requerimiento sin respuesta usa el plazo real del requerimiento de la autoridad dirigido al inspeccionado.', 'Leer, responder a otro pedido o una actuación de la autoridad no lo contesta. Una respuesta, descargo o subsanación vinculada detiene el aviso de ausencia, aunque sea tardía; no significa aceptación legal ni conformidad.'], image: S + 'desktop/alerts_requirement_qa.png', caption: QA_ALERTS, alt: 'QA: plazos de requerimientos e inspecciones sin respuesta relacionada', expected: 'Se sigue cada pedido concreto y se conserva la evidencia original.' },
+          { title: 'Revisar habilitaciones y licencias', body: ['Elegí anticipación entre 0 y 365 días y las fuentes con fecha registrada: transportistas, operadores, vehículos y conductores. Sin fecha no se presume vencimiento.', 'Una fecha sin hora, por ejemplo 10/10, permanece vigente hasta finalizar el 10 en Mendoza y está vencida desde el 11. Con cero días se incluye hoy y las fechas pasadas.'], image: S + 'desktop/alerts_expiry_qa.png', caption: QA_ALERTS, alt: 'QA: fuentes y anticipación configurables de vigencia documental', expected: 'La fecha mostrada coincide con la registrada y no vence antes de terminar ese día.' },
+          { title: 'Activar y verificar la llegada del aviso', body: ['Revisá y activá la regla deliberadamente. Evaluar seguimiento ahora procesa reglas activas de manifiestos; Evaluar inspecciones y vencimientos procesa las otras dos familias. También hay evaluación diaria a las 08:00 y 08:05 de Mendoza, respectivamente.', 'El responsable abre su campana o Avisos en la app. Sólo reciben el actor involucrado, inspector asignado habilitado o administración competente, según la regla; nunca todo el padrón. El aviso abre el manifiesto, expediente o ficha propia. No se envía correo ni push desde este catálogo.'], image: S + 'mobile/alerts_owner_notice_qa.png', caption: QA_ALERTS, alt: 'QA app: aviso interno del operador con acceso al manifiesto propio', expected: 'El destinatario exacto puede abrir el origen; una regla inactiva no produce casos.' },
+          { title: 'Resolver el caso, no sólo leer el aviso', body: ['La autoridad habilitada usa Gestionar caso: Pendiente, En revisión, Resuelta o Descartada, con motivo obligatorio. Marcar leída cambia sólo la lectura del aviso.', 'La evaluación concilia fuentes que ya cambiaron, manteniendo la situación inicial. Resolver un caso no cierra un manifiesto ni aprueba una inspección. Se conserva la última decisión; no es un historial legal inmutable de todas las decisiones.'], image: S + 'mobile/alerts_resolved_case_qa.png', caption: QA_ALERTS, alt: 'QA app: caso resuelto con motivo y situación original preservados', expected: 'Estado y motivo persisten, sin cambiar la formalidad del objeto de origen.' },
+          { title: 'Comprobar el origen y los límites', body: ['El inspector abre el expediente asignado desde el aviso; el operador consulta su perfil, y el transportista su ficha y Flota y Conductores para avisos de vehículos o licencias.', 'Reglas distintas pueden generar casos distintos sobre el mismo objeto. Desactivar preserva los casos anteriores. DDJJ, TEF/TF, OCR de recibos y mensajes sin plazo requieren fuentes y criterios aprobados: todavía no son reglas operativas del catálogo.'], image: S + 'mobile/alerts_inspector_origin_qa.png', caption: QA_ALERTS, alt: 'QA app: inspector accede al expediente real del aviso, con datos sintéticos', expected: 'Cada aviso tiene una fuente comprobable y no acusa una infracción por suposición.' }
+        ]
+      },
+      {
         id: 'inspector-completar-inspeccion',
         profile: 'inspector',
         title: 'Completar una inspección en campo',
-        summary: 'Seguí los siete pasos, documentá cada hallazgo y verificá el guardado de fotos y comentarios.',
+        summary: 'Prepará la visita, contrastá en campo y verificá el guardado de cada foto y comentario.',
         duration: '8 min',
         icon: 'fact_check',
         keywords: ['inspección', 'inspector', 'checklist', 'acta', 'informe técnico', 'foto', 'evidencia', 'sin conexión', 'descargo'],
         safety: 'Avanzar entre pasos no guarda ni envía por sí solo. No cierres ni envíes el expediente hasta confirmar el texto y cada foto en el servidor.',
         steps: [
-          { title: 'Preparar el expediente', body: ['Abrí Inspecciones y verificá actor, ubicación, inspector asignado y número de acta.', 'Iniciá la etapa de campo cuando estés en el lugar. La ficha del actor se abre desde su nombre dentro del expediente.'], image: S + 'mobile/inspection_wizard_qa.png', alt: 'Simulación móvil del asistente de inspección con el paso actual visible', expected: 'El expediente correcto y el paso actual están identificados.' },
+          { title: 'Preparar el expediente', body: ['Abrí Inspecciones y verificá actor, ubicación, inspector asignado y número de acta. El número del legajo encabeza la ficha; Listado permite volver sin desplazar el título.', 'Las secciones son 1 Visita, 2 Controles, 3 Registro y 4 Expediente. El verde oscuro identifica la sección abierta; la fila inferior muestra sus apartados, no otra etapa. Los números orientan: no indican aprobación ni porcentaje completado.', 'Iniciá la etapa de campo cuando estés en el lugar. La ficha del actor se abre desde su nombre dentro del expediente. La ayuda técnica está en la cabecera durante el trabajo de campo; no tapa Guardar.'], image: S + 'mobile/training-inspection-20261012.png', caption: QA_TRAINING, alt: 'Secciones Visita, Controles, Registro y Expediente en app', expected: 'El expediente correcto, la sección abierta y las acciones de guardado están identificados.' },
           { title: 'Contrastar lo declarado', body: ['En Declarado vs. verificado, revisá cada dato y marcá Coincide, Difiere o No verificado.', 'Si difiere, describí qué constataste y qué debe corregirse; evitá marcar en bloque sin revisar.'], image: S + 'desktop/inspection_comparison_qa.png', alt: 'Simulación de datos declarados frente a la verificación en campo', expected: 'Cada dato tiene un resultado explícito y los desacuerdos están documentados.' },
           { title: 'Completar el checklist', body: ['Abrí cada control y elegí Cumple, No cumple o No aplica.', 'Ante un incumplimiento, escribí el hallazgo y la acción requerida dentro de ese control.'], image: S + 'desktop/inspection_checklist_qa.png', alt: 'Simulación de checklist con resultado, observación y guardado', expected: 'El índice distingue controles pendientes y revisados; cada resultado adverso conserva su observación.' },
           { title: 'Adjuntar la foto al hallazgo', body: ['Dentro del mismo control, usá Tomar foto o Elegir imagen; no confundas esa foto con un archivo general del expediente.', 'Comprobá que aparezca la miniatura vinculada. Guardá y esperá la confirmación del servidor.'], image: S + 'mobile/inspection_evidence_qa.png', alt: 'Simulación móvil de evidencia fotográfica vinculada a un control', expected: 'La miniatura sigue asociada al control incluso después de recargar.' },
@@ -144,7 +237,7 @@
         steps: [
           { title: 'Preparar el contexto de origen', body: ['Abrí la pantalla desde la que necesitás asistir al usuario.', 'Aplicá los filtros necesarios y anotá el resultado esperado.'], image: S + 'desktop/23_admin_usuarios.png', alt: 'Gestión de usuarios del administrador', expected: 'La pantalla de origen queda lista para comprobar el regreso.' },
           { title: 'Elegir el usuario', body: ['Abrí Usuarios y buscá por nombre, correo o rol.', 'Verificá identidad y organización antes de continuar.'], image: S + 'desktop/23_admin_usuarios.png', alt: 'Listado de usuarios con acceso temporal', expected: 'El usuario correcto está identificado.' },
-          { title: 'Iniciar el acceso temporal', body: ['Seleccioná el ícono de acceso temporal.', 'Confirmá que el encabezado muestre el usuario y rol esperados.'], image: S + 'desktop/03_user_switcher.png', alt: 'Selector de usuario para acceso temporal', expected: 'La sesión temporal está activa y claramente señalizada.' },
+          { title: 'Iniciar el acceso temporal', body: ['En Ver como otro usuario, elegí Capacitación para el ejercicio y seleccioná una cuenta CAP. Cada categoría muestra hasta cinco cuentas.', 'Confirmá la banda Capacitación · sin validez oficial y el rol. La captura muestra el selector de práctica; no autoriza acciones sobre usuarios reales.'], image: S + 'desktop/training-selector-20261012.png', caption: QA_TRAINING, alt: 'Selector de capacitación con grupos de cinco usuarios', expected: 'La sesión temporal está activa y claramente señalizada.' },
           { title: 'Realizar la consulta', body: ['Navegá únicamente por las pantallas necesarias.', 'Evitá crear, aprobar, cancelar o modificar registros si no existe autorización expresa.'], image: S + 'desktop/47_dashboard_generador.png', alt: 'Vista de un usuario durante acceso temporal', expected: 'La consulta se completa sin afectar datos ajenos.' },
           { title: 'Volver a mi cuenta', body: ['Usá Volver a mi cuenta desde el indicador de acceso temporal.', 'Comprobá que regresaste a la página, filtros y posición originales.'], image: S + 'desktop/23_admin_usuarios.png', alt: 'Regreso a la cuenta administrativa', expected: 'La identidad administrativa y el contexto de navegación quedan restaurados.' }
         ]
@@ -226,4 +319,78 @@
       }
     ]
   };
+
+  // Classroom links identify existing synthetic records; they never switch
+  // identity, enable training, create records or bypass the application's ACL.
+  var workshop = window.SITREP_HELP.guides[0];
+  workshop.summary = '90 minutos · Un caso completo, cinco equipos y accesos directos para web y app.';
+  workshop.keywords.push('golden path', 'guion', 'CAP', 'equipos');
+  workshop.steps[0].body = [
+    'Antes del taller: comprobá tu ingreso y usá un perfil de navegador separado de los formularios reales. Con correos apagados, no dependas de recuperar la contraseña durante la clase. Conservá el APK instalado; no borres sus datos.',
+    'Administrador → Ver como otro usuario → Capacitación. Elegí CAP · GENERADOR 1 y comprobá «Capacitación · sin validez oficial». Practicá Volver a mi cuenta antes de continuar. Estos enlaces no inician sesión ni cambian el rol: elegilo primero en el selector.',
+    'Equipo 1: demostración. Equipos 2–4: práctica. Equipo 5: reserva con respuestas de QA ya cargadas. Mantené el mismo número al cambiar de rol y un solo responsable por registro. No compartas contraseñas.',
+    'Las cuentas se llaman CAP · ADMIN N, INSPECTOR N, GENERADOR N, TRANSPORTISTA N y OPERADOR N. También hay ADMIN_GENERADOR N, ADMIN_TRANSPORTISTA N y ADMIN_OPERADOR N para consulta sectorial. Reemplazá N por tu equipo, del 1 al 5.',
+    'Los enlaces App abren la web móvil. Dentro del APK, seguí estos mismos números desde su menú si el manual se abrió en otro navegador. No instales ni actualices el APK para hacer este recorrido.'
+  ];
+  workshop.steps[0].resources = [{ label: 'Elegir cuenta CAP · requiere administrador', path: '/switch-user' }];
+  workshop.steps[1].body = [
+    'Abrí un alta en modo revisión. Para la demostración, usá Transportista: completá datos ficticios y agregá un chofer en Flota y choferes. No uses documentos personales.',
+    'Descargá la licencia sintética de abajo y elegila en el campo de licencia. Compará las propuestas OCR con el original antes de usar los datos seleccionados. OCR no aprueba identidad, pagos ni habilitación.',
+    'Guardá, salí del alta de práctica y recuperá el borrador en ese mismo navegador. Comprobá campos y paso; los archivos deben volver a elegirse. No presentes un trámite real. El TEF dinámico no se muestra al solicitante.'
+  ];
+  workshop.steps[1].resources = ['generador', 'transportista', 'operador'].map(function (role) {
+    return { label: 'Probar alta · ' + role, path: '/inscripcion/' + role + '?modo=revision' };
+  }).concat([{ label: 'Licencia sintética · sin validez', href: '/manual/fixtures/licencia-capacitacion.png', action: 'Descargar PNG', download: true }]);
+  workshop.steps[2].body = [
+    'Generador N: abrí CAP-N-BORRADOR, revisá actores y residuo y firmá. Verificá APROBADO. El número conserva «BORRADOR» aunque cambie el estado.',
+    'Volvé al administrador y elegí TRANSPORTISTA N. Abrí el mismo manifiesto: confirmá retiro y entrega. Verificá EN_TRANSITO y ENTREGADO antes de pasar el turno.',
+    'Elegí OPERADOR N: recibí, revisá pesaje, registrá tratamiento y cerrá. Verificá TRATADO y la cronología. Las descargas oficiales están deshabilitadas en capacitación.',
+    'Si falta tiempo, CAP-N-APROBADO es otro caso para empezar desde retiro. CAP-N-TRATADO sirve de consulta. No finjas continuidad entre ellos ni reinicies un caso ya utilizado.'
+  ];
+  workshop.steps[3].body = [
+    'Campo: INSPECTOR N abre CAP-I-N-GENERADOR → Visita → Iniciar visita → Controles. Marcá un control, guardá y reabrí. Es trabajo de campo, todavía no el expediente publicado que verá el actor.',
+    'Intercambio: GENERADOR, TRANSPORTISTA u OPERADOR N abre su CAP-P-N-ROL-A en Mis inspecciones. Leé el último requerimiento → Responder esta actuación → Presentar en expediente. Reabrí para verificar el guardado.',
+    'Autoridad: ADMIN N abre ese mismo CAP-P en Expediente → Comunicaciones, revisa y registra una decisión con fundamento. Volvé al actor para comprobarla. Responder no significa aprobar.',
+    'Son dos ejercicios distintos: visita de campo e intercambio preparado. El actor no ve inspecciones generales ni borradores del inspector. Si el caso ya cambió de estado, seguí su historial; no lo restablezcas.'
+  ];
+  workshop.steps[4].body = [
+    'Actor CAP: Ayuda → Reportar problema. Describí el problema; adjunto opcional. Esperá la confirmación y anotá el número. Los tickets de abajo son reservas ya creadas, no el ticket nuevo.',
+    'Volvé como ADMIN N de Capacitación, no como administrador operativo. Abrí el ticket del autor → Asignarme → Derivar a otro ADMIN CAP habilitado → Nota interna → Responder. Los tickets de reserva ya tienen responsable; no des por demostrado Asignarme con uno que ya era tuyo.',
+    'Volvé al autor: abrí el mismo número, leé la respuesta pública y cerrá sólo después de comprobarla. Las notas internas quedan reservadas a soporte. No esperes un correo.'
+  ];
+  workshop.steps[4].resources = [{ label: 'Mis tickets / Mesa de soporte · según cuenta CAP', path: '/soporte' }];
+  workshop.steps[5].body = [
+    'ADMIN CAP: consultá Centro de Control y Monitor con un rango que incluya el 12/10/2026. Los puntos preparados no necesariamente aparecen en «Hoy». Son ubicaciones sintéticas, no un viaje físico en vivo.',
+    'Cada participante encuentra su próxima tarea y sabe volver al manual o pedir ayuda. En los teléfonos, comprobar cámara QR, permisos GPS y recuperación de red. Navegador y emulador no certifican batería ni segundo plano.',
+    'Si falta confirmación, conservá el formulario y consultá estado/historial antes de reintentar. Si desaparece la banda CAP, detené las modificaciones. No borres almacenamiento ni reinicies registros.',
+    'Anotá cualquier pendiente con rol, pantalla, número CAP, hora y resultado esperado. No activar correos, push, reglas masivas ni documentos oficiales durante el taller.'
+  ];
+  workshop.steps[5].resources = [{ label: 'Centro de Control · consulta CAP', path: '/centro-control' }, { label: 'Monitor · consulta CAP', path: '/monitor' }];
+
+  function teams(records) {
+    return [1, 2, 3, 4, 5].map(function (n) {
+      return { label: 'Equipo ' + n, note: n === 1 ? 'Demostración' : n === 5 ? 'Reserva · contiene pruebas previas' : 'Práctica', records: records(n) };
+    });
+  }
+  workshop.steps[2].teams = teams(function (n) {
+    return [
+      { label: 'CAP-' + n + '-BORRADOR', role: 'Generador → Transportista → Operador · mismo número', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-BORRADOR' },
+      { label: 'CAP-' + n + '-APROBADO', role: 'Alternativa desde retiro · otro caso', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-APROBADO' },
+      { label: 'CAP-' + n + '-TRATADO', role: 'Cierre preparado · sólo consulta', path: '/manifiestos/cap-20261012-manifiesto-' + n + '-TRATADO' }
+    ];
+  });
+  workshop.steps[3].teams = teams(function (n) {
+    var records = [{ label: 'CAP-I-' + n + '-GENERADOR', role: 'Inspector · trabajo de campo', path: '/inspecciones/cap-20261012-inspeccion-' + n + '-GENERADOR' }];
+    ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].forEach(function (role) {
+      var id = 'cap-20261012-participacion-' + n + '-' + role + '-abierta';
+      records.push({ label: 'CAP-P-' + n + '-' + role + '-A', role: role + ' · Mis inspecciones', path: '/mis-inspecciones/' + id });
+      records.push({ label: 'CAP-P-' + n + '-' + role + '-A', role: 'ADMIN · revisar respuesta de ' + role, path: '/inspecciones/' + id });
+    });
+    return records;
+  });
+  workshop.steps[4].teams = teams(function (n) {
+    return ['generador', 'transportista', 'operador'].map(function (role) {
+      return { label: 'CAP · Consulta de ' + role + ' ' + n, role: 'Reserva · autor ' + role + ' ' + n + ' / ADMIN ' + n, path: '/soporte/cap-20261012-ticket-' + role + '-' + n };
+    });
+  });
 })();

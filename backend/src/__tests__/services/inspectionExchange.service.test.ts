@@ -22,6 +22,7 @@ const baseDigest = {
   respondeAId: null,
   tipo: 'REQUERIMIENTO' as const,
   parte: 'AUTORIDAD' as const,
+  destinatario: 'INSPECCIONADO' as const,
   asunto: 'Documentación pendiente',
   cuerpo: 'Presente la constancia vigente y el plan de adecuación.',
   plazoRespuestaAt: '2026-09-30T18:00:00.000Z',
@@ -95,6 +96,12 @@ describe('inspection exchange evidence chain', () => {
       ...baseDigest,
       adjuntos: baseDigest.adjuntos.map((file, index) => index === 0 ? { ...file, sha256: 'c'.repeat(64) } : file),
     }, null)).not.toEqual(original);
+  });
+
+  it('binds the intended recipient into the signed content', () => {
+    const original = buildInspectionExchangeDigests(baseDigest, null);
+    const redirected = buildInspectionExchangeDigests({ ...baseDigest, destinatario: 'AUTORIDAD' }, null);
+    expect(redirected).not.toEqual(original);
   });
 
   it('chains every later presentation to the preceding hash', () => {

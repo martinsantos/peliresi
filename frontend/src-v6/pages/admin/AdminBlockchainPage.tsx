@@ -86,7 +86,7 @@ export default function AdminBlockchainPage() {
           <button
             onClick={() => verificarMutation.mutate()}
             disabled={verificarMutation.isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-2 px-4 py-2 bg-emerald-700 text-white rounded-xl text-sm font-medium hover:bg-emerald-800 active:bg-emerald-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 focus-visible:outline-offset-2 transition-colors disabled:opacity-50"
           >
             {verificarMutation.isPending ? (
               <Loader2 size={16} className="animate-spin" />
@@ -117,9 +117,10 @@ export default function AdminBlockchainPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-neutral-900">Verificacion de Integridad</h3>
               <span className="text-xs text-neutral-400">
-                {verificarMutation.data.totalVerificados} manifiestos verificados
+                {verificarMutation.data.totalVerificados} manifiestos examinados
               </span>
             </div>
+            <p className="mb-4 text-sm text-neutral-700">Se comparan los sellos disponibles. La cadena histórica de eventos no se reconstruye completa; una coincidencia de sellos no certifica toda la trazabilidad.</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="bg-emerald-50 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-emerald-700">{verificarMutation.data.integridadCompleta}</p>
@@ -160,7 +161,7 @@ export default function AdminBlockchainPage() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         {[
           { value: '', label: 'Todos' },
           { value: 'CONFIRMADO', label: 'Confirmados' },
@@ -169,10 +170,11 @@ export default function AdminBlockchainPage() {
         ].map(f => (
           <button
             key={f.value}
+            aria-pressed={filter === f.value}
             onClick={() => { setFilter(f.value); setPage(1); }}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`min-h-11 px-3 py-1.5 rounded-lg text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 focus-visible:outline-offset-2 transition-colors ${
               filter === f.value
-                ? 'bg-emerald-600 text-white'
+                ? 'bg-emerald-700 text-white'
                 : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
             }`}
           >

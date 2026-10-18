@@ -14,8 +14,8 @@ import {
 import api from './api';
 
 const DB_NAME = 'sitrep_offline_db';
-const DB_VERSION = 4;
-const STORES = ['manifiestos', 'catalogos', 'sync_queue', 'inspection_evidence_queue', 'inspection_cases', 'inspection_exchange_drafts'] as const;
+const DB_VERSION = 5;
+const STORES = ['manifiestos', 'catalogos', 'sync_queue', 'inspection_evidence_queue', 'inspection_cases', 'inspection_exchange_drafts', 'inspection_spontaneous_drafts'] as const;
 
 export type StoreName = (typeof STORES)[number];
 
@@ -26,6 +26,34 @@ export interface SyncAction {
   data: unknown;
   createdAt: string;
   userId: string | number;
+  attempts?: number;
+  lastError?: string;
+  failureKind?: 'retryable' | 'terminal' | 'auth';
+  nextRetryAt?: string;
+}
+
+export interface SyncQueueResult {
+  processed: number;
+  pending: number;
+  retryable: number;
+  terminal: number;
+  auth: number;
+  skipped: number;
+  lastError?: string;
+}
+
+export function classifySyncFailure(error: unknown): { failureKind: NonNullable<SyncAction['failureKind']>; lastError: string } {
+  const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
+  const status = response?.status;
+  const failureKind: NonNullable<SyncAction['failureKind']> = status === 401 || status === 403
+    ? 'auth'
+    : status !== undefined && status >= 400 && status < 500 && ![408, 425, 429].includes(status)
+      ? 'terminal'
+      : 'retryable';
+  return {
+    failureKind,
+    lastError: response?.data?.message || (error instanceof Error ? error.message : 'No se pudo sincronizar este cambio.'),
+  };
 }
 
 const MAX_SYNC_QUEUE_SIZE = 500;
@@ -35,12 +63,27 @@ const MAX_SYNC_QUEUE_SIZE = 500;
 // ========================================
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+const DB_OPEN_TIMEOUT_MS = 12_000;
 
 function getDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
 
-  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+  let pending: Promise<IDBDatabase>;
+  pending = new Promise<IDBDatabase>((resolve, reject) => {
+    let settled = false;
+    let blocked = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    };
+    const timeout = setTimeout(() => fail(new Error(blocked
+      ? 'La copia local está esperando a que se cierre otra pestaña de SITREP.'
+      : 'La copia local no respondió a tiempo.')), DB_OPEN_TIMEOUT_MS);
+    let request: IDBOpenDBRequest;
+    try { request = indexedDB.open(DB_NAME, DB_VERSION); }
+    catch (error) { fail(error instanceof Error ? error : new Error('No se pudo abrir la copia local.')); return; }
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -55,14 +98,24 @@ function getDB(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => {
-      dbPromise = null;
-      reject(request.error);
+    request.onblocked = () => { blocked = true; };
+    request.onsuccess = () => {
+      const db = request.result;
+      if (settled) { db.close(); return; }
+      settled = true;
+      clearTimeout(timeout);
+      db.onversionchange = () => {
+        db.close();
+        if (dbPromise === pending) dbPromise = null;
+      };
+      resolve(db);
     };
+    request.onerror = () => fail(request.error || new Error('No se pudo abrir la copia local.'));
   });
 
-  return dbPromise;
+  dbPromise = pending;
+  void pending.catch(() => { if (dbPromise === pending) dbPromise = null; });
+  return pending;
 }
 
 // ========================================
@@ -144,22 +197,29 @@ export async function replaceOffline(store: StoreName, previousKey: string, repl
 
 /**
  * Agrega una acción pendiente a la cola de sincronización.
- * Enforces MAX_SYNC_QUEUE_SIZE to prevent unbounded growth.
+ * Enforces MAX_SYNC_QUEUE_SIZE without deleting earlier unsent actions.
  */
 export async function addToSyncQueue(action: Omit<SyncAction, 'id' | 'createdAt'>): Promise<void> {
   if (action.userId == null) throw new Error('Offline actions require an owning user');
-  // Check queue size before adding
-  const queue = await getSyncQueue();
-  if (queue.length >= MAX_SYNC_QUEUE_SIZE) {
-    // Drop oldest items to make room
-    const toRemove = queue.slice(0, queue.length - MAX_SYNC_QUEUE_SIZE + 1);
-    for (const item of toRemove) {
-      if (item.id != null) await removeOffline('sync_queue', item.id);
-    }
-  }
-  await saveOffline('sync_queue', {
-    ...action,
-    createdAt: new Date().toISOString(),
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite');
+    const records = tx.objectStore('sync_queue');
+    let full = false;
+    const count = records.count();
+    count.onsuccess = () => {
+      if (count.result >= MAX_SYNC_QUEUE_SIZE) {
+        full = true;
+        tx.abort();
+        return;
+      }
+      records.add({ ...action, createdAt: new Date().toISOString(), attempts: action.attempts ?? 0 });
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('No se confirmó el guardado local.'));
+    tx.onabort = () => reject(full
+      ? new Error('La cola local está llena. Los cambios pendientes se conservaron; sincronizá antes de agregar otro.')
+      : tx.error || new Error('No se confirmó el guardado local.'));
   });
 }
 
@@ -192,19 +252,43 @@ export async function clearSyncQueue(): Promise<void> {
  * If currentUserId is provided, skips actions from other users.
  * Retorna la cantidad de acciones procesadas con éxito.
  */
-export async function processSyncQueue(currentUserId: string | number): Promise<number> {
+export async function processSyncQueue(currentUserId: string | number, manual = false): Promise<SyncQueueResult> {
   const queue = await getSyncQueue();
-  if (queue.length === 0) return 0;
+  const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId));
+  const result: SyncQueueResult = { processed: 0, pending: owned.length, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
+  if (owned.length === 0) return result;
 
-  let processed = 0;
-
-  for (const action of queue) {
+  for (const action of owned) {
     // Skip actions from other users (prevents cross-user data leakage)
     if (!isSyncActionOwnedBy(action.userId, currentUserId)) {
       continue;
     }
 
-    if (!isSupportedSyncMethod(action.type)) continue;
+    if (!isSupportedSyncMethod(action.type)) {
+      result.terminal += 1;
+      result.skipped += 1;
+      result.lastError = 'La acción guardada usa un método no compatible.';
+      if (action.id != null) await saveOffline('sync_queue', { ...action, failureKind: 'terminal', lastError: result.lastError });
+      continue;
+    }
+    if (!manual && action.failureKind === 'terminal') {
+      result.terminal += 1;
+      result.skipped += 1;
+      result.lastError = action.lastError || result.lastError;
+      continue;
+    }
+    if (!manual && action.failureKind === 'auth') {
+      result.auth += 1;
+      result.skipped += 1;
+      result.lastError = action.lastError || result.lastError;
+      continue;
+    }
+    if (!manual && action.nextRetryAt && Date.parse(action.nextRetryAt) > Date.now()) {
+      result.retryable += 1;
+      result.skipped += 1;
+      result.lastError = action.lastError || result.lastError;
+      continue;
+    }
 
     try {
       switch (action.type) {
@@ -233,14 +317,31 @@ export async function processSyncQueue(currentUserId: string | number): Promise<
         await removeOffline('sync_queue', action.id);
       }
       cleanupAfterSuccessfulSync(action.endpoint);
-      processed++;
-    } catch {
-      // Detenerse en el primer error para mantener el orden
-      break;
+      result.processed += 1;
+      result.pending -= 1;
+    } catch (error) {
+      const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
+      const { failureKind, lastError } = classifySyncFailure(error);
+      const attempts = (action.attempts || 0) + 1;
+      if (action.id != null) {
+        await saveOffline('sync_queue', {
+          ...action,
+          attempts,
+          failureKind,
+          lastError,
+          nextRetryAt: failureKind === 'retryable' ? new Date(Date.now() + 30_000 * 2 ** Math.min(attempts, 6)).toISOString() : undefined,
+        });
+      }
+      result[failureKind] += 1;
+      result.lastError = lastError;
+      // A lost connection or expired authorization affects every following
+      // request. Data/validation failures stay attached to their own action so
+      // unrelated queued work can continue.
+      if (failureKind === 'auth' || response === undefined || !navigator.onLine) break;
     }
   }
 
-  return processed;
+  return result;
 }
 
 type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown> };

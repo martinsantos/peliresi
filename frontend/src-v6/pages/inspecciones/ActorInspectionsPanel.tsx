@@ -4,6 +4,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Card } from '../../components/ui/CardV2';
 import { useInspections } from '../../hooks/useInspecciones';
+import { useAuth } from '../../contexts/AuthContext';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { actorInspectionAccess } from '../../utils/actorReadAccess';
 import type { InspectionActorType } from '../../types/inspection';
 import {
   INSPECTION_STATE_COLORS,
@@ -14,15 +17,28 @@ import {
 
 const CLOSED_STATES = new Set(['CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA']);
 
-export function ActorInspectionsPanel({
+type Props = { actorType: InspectionActorType; actorId: string; actorName: string };
+
+export function ActorInspectionsPanel(props: Props) {
+  const { currentUser } = useAuth();
+  const mp = useMobilePrefix();
+  const access = actorInspectionAccess(currentUser, props.actorType, props.actorId);
+  if (access === 'staff') return <StaffActorInspectionsPanel {...props} />;
+  if (access !== 'participation') return null;
+  // Do not fetch the staff-only list for an actor or disguise its403 as zero.
+  return <div className="space-y-3">
+    <p className="text-sm text-neutral-700">Consultá las inspecciones notificadas y tus respuestas en el portal de participación.</p>
+    <Link to={mp('/mis-inspecciones')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 font-semibold text-primary-700 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+      <ClipboardCheck size={18} aria-hidden="true" />Ver mis inspecciones
+    </Link>
+  </div>;
+}
+
+function StaffActorInspectionsPanel({
   actorType,
   actorId,
   actorName,
-}: {
-  actorType: InspectionActorType;
-  actorId: string;
-  actorName: string;
-}) {
+}: Props) {
   const location = useLocation();
   const mobile = location.pathname.startsWith('/mobile');
   const query = useInspections({ tipoActor: actorType, actorId, limit: 100 });

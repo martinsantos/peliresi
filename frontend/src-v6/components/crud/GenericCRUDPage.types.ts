@@ -39,7 +39,9 @@ export interface CRUDFilter {
 // ========================================
 export interface CRUDExportConfig {
   /** Map each item to a flat row for CSV export */
-  mapRow: (item: any) => Record<string, unknown>;
+  mapRow?: (item: any) => Record<string, unknown>;
+  /** Override the local-page export with a complete server-backed export. */
+  onExport?: () => void | Promise<void>;
   filename: string;
   metadata: {
     titulo: string;
@@ -53,6 +55,8 @@ export interface CRUDExportConfig {
 // PDF EXPORT CONFIG
 // ========================================
 export interface CRUDPdfExportConfig {
+  /** Override the local-page export with a complete server-backed export. */
+  onExport?: () => void | Promise<void>;
   titulo: string;
   subtitulo: string;
   periodo: string;
@@ -80,6 +84,12 @@ export interface CRUDDeleteConfig {
 // ========================================
 export interface CRUDSortConfig {
   onSort: (key: string, direction: 'asc' | 'desc') => void;
+}
+
+export interface CRUDSelectionConfig {
+  selectedKeys: string[];
+  onSelectionChange: (keys: string[]) => void;
+  ariaLabel?: string;
 }
 
 // ========================================
@@ -112,6 +122,8 @@ export interface GenericCRUDConfig<T> {
 
   // Table
   columns: Column<T>[];
+  /** Bounded table sizing for pages with many responsive columns. */
+  tableClassName?: string;
   getRowKey: (item: T) => string;
   onRowClick?: (item: T) => void;
   emptyMessage?: string;
@@ -120,6 +132,7 @@ export interface GenericCRUDConfig<T> {
   searchValue: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
+  searchDebounce?: number;
 
   // Filters
   filters?: CRUDFilter[];
@@ -130,12 +143,16 @@ export interface GenericCRUDConfig<T> {
   // Sort
   sort?: CRUDSortConfig;
 
+  // Optional page-aware row selection for bulk workflows.
+  selection?: CRUDSelectionConfig;
+
   // Pagination
   pagination: CRUDPaginationConfig;
 
   // Actions — header buttons
   onNew?: () => void;
   newLabel?: string;     // e.g. "Nuevo Generador"
+  mobileNewLabel?: string;
 
   // Export
   csvExport?: CRUDExportConfig;

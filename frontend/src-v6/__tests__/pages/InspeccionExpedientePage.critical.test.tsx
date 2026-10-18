@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('../../hooks/useCatalogos', () => ({ useCatalogoGeneradores: () => ({ data: [] }), useCatalogoOperadores: () => ({ data: [] }), useCatalogoTransportistas: () => ({ data: [] }) }));
 import type { Inspection, InspectionTechnicalReport } from '../../types/inspection';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
 
 const useInspectionMock = vi.hoisted(() => vi.fn());
+vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined), writeInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined) }));
 const listPendingEvidenceMock = vi.hoisted(() => vi.fn());
 const transitionMock = vi.hoisted(() => vi.fn());
 const draftOwnershipMock = vi.hoisted(() => vi.fn());
@@ -151,15 +153,61 @@ describe('InspeccionExpedientePage critical review UX', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
+  it('keeps the dossier identity first and back navigation in a separate action row', async () => {
+    renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#checklist');
+    const heading = await screen.findByRole('heading', { name: 'I-2026-000001', exact: true });
+    const header = heading.closest('header')!;
+    expect(header.firstElementChild).toContainElement(heading);
+    expect(header.firstElementChild).not.toContainElement(screen.getByRole('button', { name: 'Volver al listado', exact: true }));
+    expect(screen.getByRole('button', { name: 'Volver al listado', exact: true })).toHaveTextContent('Listado');
+    expect(header.firstElementChild).toContainElement(screen.getByRole('link', { name: 'Abrir actor inspeccionado: Planta Auditada SA', exact: true }));
+  });
+
+  it.each(['touch', 'mouse'])('retains the active editor only for touch save without submitting on pointerdown (%s)', async (pointerType) => {
+    const { inspeccionService } = await import('../../services/inspeccion.service');
+    const { toast } = await import('../../components/ui/Toast');
+    const rendered = renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#acta');
+    const editor = await waitFor(() => { const field = rendered.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(field).toBeEnabled(); return field!; });
+    fireEvent.change(editor, { target: { value: 'Comentario de campo confirmado por una acción explícita.' } });
+    editor.focus();
+    const button = screen.getByRole('button', { name: 'Guardar cambios', exact: true });
+    await waitFor(() => expect(button).toBeEnabled());
+    const down = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+    Object.defineProperty(down, 'pointerType', { value: pointerType });
+    fireEvent(button, down);
+    expect(down.defaultPrevented).toBe(pointerType === 'touch');
+    expect(editor).toHaveFocus();
+    expect(inspeccionService.saveDraft).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
+    expect(inspeccionService.saveDraft).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ observaciones: 'Comentario de campo confirmado por una acción explícita.' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+  });
+
+  it('retains ordinary keyboard activation of save', async () => {
+    const { inspeccionService } = await import('../../services/inspeccion.service');
+    const { toast } = await import('../../components/ui/Toast');
+    const rendered = renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#acta');
+    const editor = await waitFor(() => { const field = rendered.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(field).toBeEnabled(); return field!; });
+    fireEvent.change(editor, { target: { value: 'Observación guardada desde el botón enfocado.' } });
+    const button = screen.getByRole('button', { name: 'Guardar cambios', exact: true });
+    await waitFor(() => expect(button).toBeEnabled());
+    button.focus();
+    expect(button).toHaveFocus();
+    fireEvent.click(button, { detail: 0 });
+    await waitFor(() => expect(inspeccionService.saveDraft).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Cambios confirmados en el servidor', expect.any(String)));
+  });
+
   it('prioritizes the editable technical report in its own step during review', async () => {
     renderPage(inspectionFixture());
 
-    const editor = await screen.findByRole('heading', { name: /informe técnico para legales/i });
+    const editor = await screen.findByRole('region', { name: /informe técnico para legales/i });
     expect(editor).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /vista consolidada del expediente/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('link', { name: /Revisar y enviar/ }));
+    fireEvent.click(screen.getByRole('link', { name: 'Resumen y cierre', exact: true }));
     expect(await screen.findByRole('heading', { name: /vista consolidada del expediente/i })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /informe técnico para legales/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /informe técnico para legales/i })).not.toBeInTheDocument();
   });
 
   it('lists approval blockers and disables approval while the dossier is incomplete', async () => {
@@ -195,6 +243,19 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(transitionMock).not.toHaveBeenCalled();
   });
 
+  it('keeps a reviewed finding without a responsible actor editable as a report but never offers an impossible notification', async () => {
+    renderPage(inspectionFixture({
+      tipoActor: null,
+      generador: null,
+      comparaciones: [],
+    }), false, '#revision');
+
+    expect(await screen.findByText(/no hay destinatario para notificar/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /aprobar expediente/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Plazo de respuesta')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /devolver a campo/i })).toBeInTheDocument();
+  });
+
   it('shows a clear read-only state and hides save and transition actions when another tab owns the draft', async () => {
     draftOwnershipMock.mockReturnValue({ status: 'blocked', canWrite: () => false, retry: vi.fn() });
     renderPage(inspectionFixture());
@@ -224,15 +285,38 @@ describe('InspeccionExpedientePage critical review UX', () => {
 
     renderPage(inspection);
 
-    const recover = await screen.findByRole('button', { name: /recuperar borrador anterior/i });
+    const objectiveConflict = await screen.findByRole('checkbox', { name: /Informe · objetivo/i });
     expect(screen.getByRole('button', { name: /descartar borrador anterior/i })).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({
       version: inspection.version - 1,
       informeTecnico: { objetivo: 'Objetivo conservado en el borrador anterior.' },
     });
 
-    fireEvent.click(recover);
+    fireEvent.click(objectiveConflict);
+    fireEvent.click(screen.getByRole('button', { name: /aplicar selección \(1\)/i }));
     expect(await screen.findByDisplayValue('Objetivo conservado en el borrador anterior.')).toBeInTheDocument();
+  });
+
+  it.each([false, true])('does not block a saved case before local acknowledgment (JSON key reorder: %s)', async (reorderKeys) => {
+    const inspection = inspectionFixture({ estado: 'EN_CAMPO', plazoRespuestaAt: null });
+    const key = `sitrep_inspection_draft_admin-1_${inspection.id}`;
+    localStorage.setItem(key, JSON.stringify({
+      version: inspection.version - 1, observaciones: inspection.observaciones,
+      numeroActa: inspection.numeroActa, ubicacion: inspection.ubicacion, plazoRespuestaAt: '',
+      datosActa: reorderKeys ? Object.fromEntries(Object.entries(inspection.datosActa!).reverse()) : inspection.datosActa,
+      informeTecnico: reorderKeys ? Object.fromEntries(Object.entries(inspection.informeTecnico!).reverse()) : inspection.informeTecnico,
+      items: inspection.items, comparaciones: inspection.comparaciones,
+    }));
+    renderPage(inspection, false, '#acta');
+    const field = await screen.findByLabelText('Registro de lo observado');
+    expect(field).toHaveValue(inspection.observaciones);
+    expect(screen.queryByText('Hay un borrador anterior sin conciliar')).not.toBeInTheDocument();
+    fireEvent.change(field, { target: { value: 'Nuevo hallazgo después de recargar' } });
+    expect(screen.getByRole('button', { name: 'Guardar cambios', exact: true })).toBeEnabled();
+    fireEvent(window, new Event('pagehide'));
+    expect(JSON.parse(localStorage.getItem(key) || '{}')).toMatchObject({
+      version: inspection.version, observaciones: 'Nuevo hallazgo después de recargar',
+    });
   });
 
   it('removes an older local draft only after an explicit discard action', async () => {
@@ -259,23 +343,79 @@ describe('InspeccionExpedientePage critical review UX', () => {
   it('keeps mobile actions in normal flow without covering the active wizard step', async () => {
     renderPage(inspectionFixture(), true);
 
-    const actionBar = await screen.findByTestId('inspection-action-bar');
+    const content = await screen.findByTestId('inspection-step-content');
+    expect(content).toBeVisible();
+    const actionBar = screen.queryByTestId('inspection-action-bar');
+    if (!actionBar) { expect(screen.queryByRole('progressbar', { name: 'Paso actual del recorrido' })).toBeNull(); return; }
     const positioningContract = `${actionBar.className} ${actionBar.getAttribute('style') || ''}`;
     expect(positioningContract).not.toMatch(/\b(?:sticky|fixed|absolute)\b/);
-    const content = screen.getByTestId('inspection-step-content');
     expect(content.compareDocumentPosition(actionBar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole('progressbar', { name: 'Paso actual del recorrido' })).toHaveAttribute('aria-valuemax', '7');
+    expect(screen.queryByRole('progressbar', { name: 'Paso actual del recorrido' })).toBeNull();
+  });
+
+  it('opens the checklist index without editable focus and searches only on explicit entry', async () => {
+    renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#checklist');
+    const trigger = await screen.findByRole('button', { name: /^Ir a un control:/ });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const search = screen.getByRole('searchbox', { name: 'Buscar control' });
+    expect(search).not.toHaveFocus();
+    expect(screen.getByRole('navigation', { name: 'Índice de controles' })).toBeVisible();
+    search.focus();
+    fireEvent.change(search, { target: { value: 'obligatoria' } });
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Índice de controles' })).getByRole('button', { name: /Documentación obligatoria/ }));
+    expect(screen.queryByRole('searchbox', { name: 'Buscar control' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Observación: Documentación obligatoria' })).toBeVisible();
+  });
+
+  it('closes the current mobile control in focused mode and preserves the observation when reopened', async () => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 });
+    try {
+      const base = inspectionFixture({ estado: 'EN_CAMPO' });
+      renderPage({ ...base, items: [...base.items, { ...base.items[0], id: 'item-2', codigo: 'DOC-02', etiqueta: 'Otro control', resultado: 'PENDIENTE' }] }, true, '#checklist/DOC-01');
+      const observation = await screen.findByRole('textbox', { name: 'Observación: Documentación obligatoria' });
+      fireEvent.change(observation, { target: { value: 'Nota en campo que no debe perderse' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Volver al control actual' }));
+      const header = within(document.getElementById('control-item-1')!).getByRole('button', { name: /Documentación obligatoria/ });
+      fireEvent.click(header);
+      expect(header).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('textbox', { name: 'Observación: Documentación obligatoria' })).toBeNull();
+      expect(within(document.getElementById('control-item-2')!).getByRole('button', { name: /Otro control/ })).toBeVisible();
+      fireEvent.click(header);
+      expect(screen.getByRole('textbox', { name: 'Observación: Documentación obligatoria' })).toHaveValue('Nota en campo que no debe perderse');
+      expect(header).toHaveAttribute('aria-expanded', 'true');
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    }
   });
 
   it('flushes the field draft before step navigation and restores it when returning', async () => {
     const inspection = inspectionFixture({ estado: 'EN_CAMPO' });
     renderPage(inspection);
+    fireEvent.click(await screen.findByRole('link', { name: 'Visita', exact: true }));
     fireEvent.change(await screen.findByLabelText('Ubicación', { exact: true }), { target: { value: 'Ubicación validada en campo' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Datos declarados', exact: true }));
     expect(await screen.findByTestId('comparison-editor')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('sitrep_inspection_draft_admin-1_inspection-1') || '{}')).toMatchObject({ ubicacion: 'Ubicación validada en campo' });
-    fireEvent.click(screen.getByRole('button', { name: 'Anterior', exact: true }));
+    fireEvent.click(screen.getByRole('link', { name: 'Visita', exact: true }));
     expect(await screen.findByLabelText('Ubicación', { exact: true })).toHaveValue('Ubicación validada en campo');
     expect(screen.getByTestId('comparison-editor')).not.toBeVisible();
+  });
+
+  it('offers the frozen declared location rather than a newer actor address and protects the explicit choice', async () => {
+    const base = inspectionFixture({ estado: 'EN_CAMPO' });
+    const inspection = { ...base, generador: { ...base.generador!, domicilio: 'Registro actualizado 999' },
+      comparaciones: [{ ...base.comparaciones[0], codigo: 'CON-DOMICILIO', valorDeclarado: 'Registro fotografiado 100' }] };
+    renderPage(inspection);
+    fireEvent.click(await screen.findByRole('link', { name: 'Visita', exact: true }));
+    const location = await screen.findByLabelText('Ubicación', { exact: true });
+    expect(location).toHaveValue('Parque Industrial, Mendoza');
+    expect(screen.queryByRole('button', { name: /Registro actualizado 999/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Usar domicilio declarado: Registro fotografiado 100' }));
+    expect(location).toHaveValue('Registro fotografiado 100');
+    fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
+    expect(JSON.parse(localStorage.getItem('sitrep_inspection_draft_admin-1_inspection-1') || '{}')).toMatchObject({ ubicacion: 'Registro fotografiado 100' });
   });
 });

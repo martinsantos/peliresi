@@ -14,20 +14,28 @@ export const CANONICAL_QR_HOSTS = [
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const INSPECTION_PATH = /^\/verificar\/inspecciones\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/;
+const MANIFEST_VERIFICATION_PATH = /^\/(?:(?:app|v6)\/)?manifiestos\/verificar\/([^/]+)$/;
+const MANIFEST_DETAIL_PATH = /^\/(?:app\/)?manifiestos\/([^/]+)$/;
 
 export type ParsedQrPayload =
   | { kind: 'inspection'; token: string; url: string }
   | { kind: 'manifiesto'; id: string };
 
-export const isValidManifiestoId = (data: string): boolean =>
-  /^M-\d{4}-\d{4,}$/i.test(data.trim());
+export const isManifiestoNumber = (data: string): boolean =>
+  /^(?:\d{4}-\d{6,}|M-\d{4}-\d{4,})$/i.test(data.trim());
 
-function isAllowedInspectionHost(url: URL): boolean {
+const isDatabaseId = (data: string): boolean => /^c[a-z0-9]{24}$/.test(data);
+
+export const isValidManifiestoId = (data: string): boolean =>
+  isManifiestoNumber(data) || isDatabaseId(data.trim());
+
+function isAllowedQrHost(url: URL): boolean {
+  if (url.username || url.password) return false;
   const host = url.hostname.toLowerCase();
   if ((import.meta.env?.DEV ?? false) && LOCAL_HOSTS.has(host)) {
     return url.protocol === 'http:';
   }
-  return CANONICAL_QR_HOSTS.includes(host as (typeof CANONICAL_QR_HOSTS)[number]) && url.protocol === 'https:';
+  return CANONICAL_QR_HOSTS.includes(host as (typeof CANONICAL_QR_HOSTS)[number]) && url.protocol === 'https:' && !url.port;
 }
 
 /** Returns the token only for a canonical, same-service inspection URL. */
@@ -37,7 +45,7 @@ export function parseInspectionTraceUrl(raw: string): { token: string; url: stri
 
   try {
     const url = new URL(trimmed);
-    if (!isAllowedInspectionHost(url) || url.search || url.hash) return null;
+    if (!isAllowedQrHost(url) || url.search || url.hash) return null;
     const match = url.pathname.match(INSPECTION_PATH);
     if (!match) return null;
     return { token: match[1], url: url.toString() };
@@ -59,10 +67,15 @@ export function parseQrPayload(raw: string): ParsedQrPayload | null {
 
   try {
     const url = new URL(trimmed);
-    const segments = url.pathname.split('/').filter(Boolean);
-    const last = segments[segments.length - 1];
-    if (last && isValidManifiestoId(decodeURIComponent(last))) {
-      return { kind: 'manifiesto', id: decodeURIComponent(last) };
+    if (!isAllowedQrHost(url) || url.search || url.hash) return null;
+    const verification = url.pathname.match(MANIFEST_VERIFICATION_PATH);
+    const detail = url.pathname.match(MANIFEST_DETAIL_PATH);
+    const candidate = verification?.[1] || detail?.[1];
+    if (candidate) {
+      const value = decodeURIComponent(candidate);
+      if (verification ? isManifiestoNumber(value) : isDatabaseId(value)) {
+        return { kind: 'manifiesto', id: value };
+      }
     }
   } catch {
     // Not a URL; JSON payload compatibility is checked below.
@@ -70,9 +83,9 @@ export function parseQrPayload(raw: string): ParsedQrPayload | null {
 
   try {
     const json = JSON.parse(trimmed) as Record<string, unknown>;
-    const candidate = json.id ?? json.manifiestoId ?? json.manifiesto_id;
-    if (candidate && isValidManifiestoId(String(candidate))) {
-      return { kind: 'manifiesto', id: String(candidate) };
+    const candidate = json.id ?? json.manifiestoId ?? json.manifiesto_id ?? json.numero;
+    if (typeof candidate === 'string' && isValidManifiestoId(candidate)) {
+      return { kind: 'manifiesto', id: candidate.trim() };
     }
   } catch {
     // Invalid/non-JSON QR content.

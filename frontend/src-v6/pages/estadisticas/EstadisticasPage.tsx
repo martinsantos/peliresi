@@ -87,7 +87,7 @@ const EstadisticasPage: React.FC = () => {
             </button>
           )}
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Estadísticas</h2>
+            <h2 className="sr-only">Estadísticas</h2>
             <p className="text-neutral-600 mt-1">
               {isLoading ? (
                 <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Cargando métricas...</span>

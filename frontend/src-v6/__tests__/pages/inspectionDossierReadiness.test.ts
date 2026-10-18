@@ -82,4 +82,13 @@ describe('inspection dossier readiness', () => {
       'Notificación y domicilio legal',
     ]));
   });
+
+  it('does not enable approval when declared comparisons are absent', () => {
+    const readiness = getInspectionDossierReadiness(inspection, {
+      ...baseDraft,
+      comparaciones: [],
+    });
+    expect(readiness.ready).toBe(false);
+    expect(readiness.missing).toContain('Comparativa declarado/verificado completa');
+  });
 });

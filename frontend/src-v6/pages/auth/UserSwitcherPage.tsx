@@ -5,20 +5,21 @@
  * Carga usuarios reales del backend, no credenciales hardcodeadas.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Shield, Factory, Truck, FlaskConical, User, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, Shield, Factory, Truck, FlaskConical, ClipboardCheck, User, ChevronRight, ChevronDown, Loader2, Search, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { ROLE_GROUP_LABELS } from '../../utils/roleGroupLabels';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
+type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'INSPECTOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 interface ApiUsuario {
-  id: number;
+  id: string;
   nombre: string;
   apellido?: string;
   email: string;
@@ -37,13 +38,13 @@ const ROL_CONFIG: Record<string, { label: string; icon: React.ElementType; color
   GENERADOR:          { label: 'Generador',          icon: Factory,      color: 'text-purple-700',  bg: 'bg-purple-50',   border: 'border-purple-200' },
   TRANSPORTISTA:      { label: 'Transportista',      icon: Truck,        color: 'text-orange-700',  bg: 'bg-orange-50',   border: 'border-orange-200' },
   OPERADOR:           { label: 'Operador',           icon: FlaskConical, color: 'text-blue-700',    bg: 'bg-blue-50',     border: 'border-blue-200' },
-  AUDITOR:            { label: 'Auditor',            icon: User,         color: 'text-slate-700',   bg: 'bg-slate-50',    border: 'border-slate-200' },
+  INSPECTOR:          { label: 'Inspector',          icon: ClipboardCheck, color: 'text-teal-700', bg: 'bg-teal-50', border: 'border-teal-200' },
   ADMIN_TRANSPORTISTA:{ label: 'Adm. Transportistas',icon: User,         color: 'text-amber-700',   bg: 'bg-amber-50',    border: 'border-amber-200' },
   ADMIN_GENERADOR:    { label: 'Adm. Generadores',  icon: User,         color: 'text-lime-700',    bg: 'bg-lime-50',     border: 'border-lime-200' },
   ADMIN_OPERADOR:     { label: 'Adm. Operadores',   icon: User,         color: 'text-teal-700',    bg: 'bg-teal-50',     border: 'border-teal-200' },
 };
 
-const ROL_ORDER: UserRole[] = ['ADMIN', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'AUDITOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'];
+const ROL_ORDER: UserRole[] = ['ADMIN', 'INSPECTOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,43 +59,94 @@ function getInitials(u: ApiUsuario): string {
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
+interface UserPage { usuarios: ApiUsuario[]; pagination: { total: number; pages: number } }
+
+/** Each role has its own server page: a large generator roster cannot starve operators. */
+function RoleUsers({ rol, search, adminId, training, onSelect }: { rol: UserRole; search: string; adminId: string; training: boolean; onSelect: (user: ApiUsuario) => void }) {
+  const [page, setPage] = useState(1);
+  const [open, setOpen] = useState(true);
+  const cfg = ROL_CONFIG[rol];
+  const Icon = cfg.icon;
+  const label = rol === 'INSPECTOR' ? 'Inspectores' : ROLE_GROUP_LABELS[rol];
+  const { data, isLoading, isError, refetch } = useQuery<UserPage>({
+    queryKey: ['admin-usuarios-switcher', adminId, rol, search, page, training],
+    queryFn: async () => (await api.get(training ? '/admin/training/usuarios' : '/admin/usuarios', { params: {
+      limit: 5, page, activo: 'true', excludeSelf: 'true', sortBy: 'nombre', sortOrder: 'asc',
+      esInspector: rol === 'INSPECTOR' ? 'true' : 'false',
+      ...(rol === 'INSPECTOR' ? {} : { rol }), ...(search ? { search } : {}),
+    } })).data.data,
+    staleTime: 2 * 60_000,
+  });
+  const users = data?.usuarios || [];
+  const total = data?.pagination.total || 0;
+  return <section aria-label={label} className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+    <button type="button" aria-expanded={open} aria-controls={`users-${rol}`} onClick={() => setOpen(value => !value)}
+      className={`flex min-h-12 w-full items-center gap-2 px-4 py-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${cfg.bg} ${cfg.color}`}>
+      <Icon size={18} aria-hidden="true" className="shrink-0" /><span className="flex-1 font-semibold">{label}</span>
+      {!isLoading && !isError && <span className="text-sm tabular-nums">{total}</span>}
+      <ChevronDown size={18} aria-hidden="true" className={`shrink-0 transition-transform ${open ? '' : '-rotate-90'}`} />
+    </button>
+    {open && <div id={`users-${rol}`}>
+      {isLoading && <p role="status" className="flex items-center gap-2 p-4"><Loader2 size={18} className="animate-spin" /> Cargando…</p>}
+      {isError && <div role="alert" className="p-4 text-red-800">No se pudo cargar esta categoría.
+        <button type="button" onClick={() => void refetch()} className="mt-2 flex min-h-11 items-center gap-2 font-semibold"><RefreshCw size={16} /> Reintentar {label.toLowerCase()}</button>
+      </div>}
+      {!isLoading && !isError && <>
+        {users.length === 0 && <p className="px-4 py-3 text-sm text-neutral-600">{search ? 'Sin coincidencias en esta categoría.' : 'No hay otros usuarios activos en esta categoría.'}</p>}
+        <div className="divide-y divide-neutral-100">{users.slice(0, 5).map(u => <button type="button" key={u.id} onClick={() => onSelect(u)}
+          aria-label={`Ver como ${[u.nombre, u.apellido].filter(Boolean).join(' ') || u.email}, ${getSector(u)}`}
+          className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${cfg.bg} ${cfg.color}`} aria-hidden="true">{getInitials(u)}</span>
+          <span className="min-w-0 flex-1"><span className="block truncate font-medium text-neutral-900">{[u.nombre, u.apellido].filter(Boolean).join(' ') || u.email}</span>
+            <span className="block truncate text-sm text-neutral-600">{getSector(u)}</span></span>
+          <ChevronRight size={16} aria-hidden="true" className="shrink-0 text-neutral-500" />
+        </button>)}</div>
+        {(total > 5 || page > 1) && <nav aria-label={`Páginas de ${label.toLowerCase()}`} className="flex items-center justify-between gap-2 border-t px-3 py-1 text-sm">
+          <button type="button" disabled={page === 1} onClick={() => setPage(value => value - 1)} className="min-h-11 px-2 font-semibold disabled:opacity-40">Anterior</button>
+          <span className="text-neutral-600 tabular-nums">{page} / {Math.max(page, data?.pagination.pages || 1)}</span>
+          <button type="button" disabled={page >= (data?.pagination.pages || 1)} onClick={() => setPage(value => value + 1)} className="min-h-11 px-2 font-semibold disabled:opacity-40">Siguiente</button>
+        </nav>}
+      </>}
+    </div>}
+  </section>;
+}
+
 export const UserSwitcherPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { impersonateUser, impersonationData } = useImpersonation();
-  const [loadingId, setLoadingId] = useState<number | null>(null);
-
-  const { data, isLoading, isError } = useQuery<ApiUsuario[]>({
-    queryKey: ['admin-usuarios-switcher'],
-    queryFn: () => api.get('/admin/usuarios', { params: { limit: 200 } }).then(r => r.data?.data?.usuarios || []),
-    staleTime: 2 * 60_000,
-  });
-
-  const usuarios: ApiUsuario[] = useMemo(() => {
-    const list = data || [];
-    // Exclude current user and already-impersonated user
-    return list.filter(u => u.id !== currentUser?.id && u.activo);
-  }, [data, currentUser]);
-
-  const byRole = useMemo(() => {
-    const map: Record<string, ApiUsuario[]> = {};
-    for (const u of usuarios) {
-      if (!map[u.rol]) map[u.rol] = [];
-      map[u.rol].push(u);
-    }
-    return map;
-  }, [usuarios]);
+  const { impersonateUser } = useImpersonation();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [training, setTraining] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   const handleImpersonate = async (u: ApiUsuario) => {
-    setLoadingId(u.id);
+    setActionError(null);
+    setLoadingId(String(u.id));
     try {
       await impersonateUser(String(u.id));
       // impersonateUser does window.location.href = '/dashboard', so this won't run
     } catch (err) {
       console.error('Impersonation failed:', err);
+      setActionError('No se pudo abrir la vista temporal. Tu sesión no cambió. Intentá nuevamente.');
       setLoadingId(null);
     }
   };
+
+  if (currentUser?.rol !== 'ADMIN') {
+    return (
+      <div className="mx-auto max-w-md px-4 py-8">
+        <h1 className="text-xl font-bold text-neutral-900">Cambio de usuario no disponible</h1>
+        <p className="mt-2 text-base text-neutral-700">Esta función pertenece a una cuenta administradora. Tu sesión actual no cambió.</p>
+        <button type="button" onClick={() => navigate('/dashboard')} className="mt-5 min-h-11 rounded-lg bg-primary-800 px-4 font-semibold text-white">Volver al inicio</button>
+      </div>
+    );
+  }
 
   // Loading overlay
   if (loadingId !== null) {
@@ -109,103 +161,41 @@ export const UserSwitcherPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="mx-auto max-w-3xl px-1 pb-8 pt-2 sm:px-4" data-testid="user-switcher-page">
+      <div className="space-y-5">
 
         {/* Header */}
-        <div className="flex items-center gap-4">
+        <div>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 text-sm font-medium text-neutral-700 transition-colors"
+            className="mb-4 flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={18} aria-hidden="true" />
             Volver
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900">Cambiar Usuario</h1>
-            <p className="text-neutral-500 text-sm">Selecciona un usuario para impersonarlo</p>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-950">Ver como otro usuario</h1>
+          <p className="mt-1 text-base text-neutral-700">Vista temporal para comprobar su experiencia. Podés volver a tu cuenta en cualquier momento.</p>
         </div>
 
-        {/* Banner informativo */}
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-xl p-4 text-white">
-          <p className="font-semibold">Acceso Comodín — Impersonación de Usuarios</p>
-          <p className="text-emerald-100 text-sm mt-1">
-            Tomarás el control total de la sesión del usuario seleccionado. Aparecerá
-            una barra naranja para recordarte que estás en modo impersonación.
-            {impersonationData && (
-              <span className="font-bold"> Ya estás impersonando a {impersonationData.impersonatedUser.nombre}.</span>
-            )}
-          </p>
+        <div role="group" aria-label="Ámbito de usuarios" className="flex flex-wrap gap-2">
+          {[false, true].map(value => <button type="button" key={String(value)} aria-pressed={training === value} onClick={() => setTraining(value)}
+            className={`min-h-11 rounded-lg border px-4 font-semibold ${training === value ? 'border-primary-800 bg-primary-800 text-white' : 'border-neutral-300 bg-white text-neutral-800'}`}>
+            {value ? 'Capacitación' : 'Operación real'}
+          </button>)}
         </div>
+        {training && <p role="status" className="text-sm font-medium text-amber-900">Sólo datos de práctica. Sin envíos ni documentos oficiales.</p>}
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-neutral-800">Buscar usuario</span>
+          <span className="flex min-h-12 items-center gap-3 rounded-xl border border-neutral-300 bg-white px-3 focus-within:border-primary-700 focus-within:ring-2 focus-within:ring-primary-100">
+            <Search size={19} className="shrink-0 text-neutral-600" aria-hidden="true" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre, correo o entidad" className="w-full bg-transparent text-base text-neutral-950 outline-none placeholder:text-neutral-500" />
+          </span>
+        </label>
 
-        {/* Estado de carga / error */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 size={32} className="text-emerald-500 animate-spin" />
-          </div>
-        )}
-
-        {isError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
-            Error al cargar usuarios. Verificá que tenés rol ADMIN.
-          </div>
-        )}
-
-        {/* Lista por rol */}
-        {!isLoading && !isError && ROL_ORDER.map(rol => {
-          const group = byRole[rol];
-          if (!group || group.length === 0) return null;
-          const cfg = ROL_CONFIG[rol] || ROL_CONFIG.AUDITOR;
-          const Icon = cfg.icon;
-
-          return (
-            <div key={rol} className="bg-white rounded-xl border border-neutral-200 overflow-hidden shadow-sm">
-              {/* Cabecera del grupo */}
-              <div className={`flex items-center gap-2 px-4 py-3 ${cfg.bg} border-b ${cfg.border}`}>
-                <Icon size={16} className={cfg.color} />
-                <span className={`font-semibold text-sm ${cfg.color}`}>{cfg.label}s</span>
-                <span className="ml-auto text-xs font-medium text-neutral-500 bg-white/70 px-2 py-0.5 rounded-full">
-                  {group.length}
-                </span>
-              </div>
-
-              {/* Usuarios */}
-              <div className="divide-y divide-neutral-100">
-                {group.map(u => (
-                  <button
-                    key={u.id}
-                    onClick={() => handleImpersonate(u)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors text-left"
-                  >
-                    {/* Avatar */}
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 ${cfg.bg} ${cfg.color}`}>
-                      {getInitials(u)}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-neutral-900 truncate">
-                        {[u.nombre, u.apellido].filter(Boolean).join(' ') || u.email}
-                      </p>
-                      <p className="text-xs text-neutral-500 truncate">{getSector(u)}</p>
-                    </div>
-
-                    <ChevronRight size={16} className="text-neutral-400 flex-shrink-0" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Sin usuarios */}
-        {!isLoading && !isError && usuarios.length === 0 && (
-          <div className="text-center py-12 text-neutral-400">
-            <User size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No hay otros usuarios activos</p>
-          </div>
-        )}
+        {actionError && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 font-medium text-red-900">{actionError}</p>}
+        <p className="text-sm text-neutral-600">Hasta cinco por categoría. Buscá en todo el padrón o usá las páginas de cada grupo.</p>
+        {ROL_ORDER.map(rol => <RoleUsers key={rol + ':' + debouncedSearch + ':' + training} rol={rol} search={debouncedSearch} training={training}
+          adminId={String(currentUser.id)} onSelect={handleImpersonate} />)}
 
       </div>
     </div>

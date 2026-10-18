@@ -1,4 +1,5 @@
 import { AppError } from '../middlewares/errorHandler';
+import { canReadEnterpriseManifest, type EnterpriseContext } from '../domain/empresa';
 
 type ActorScopedUser = {
   rol: string;
@@ -6,9 +7,11 @@ type ActorScopedUser = {
   transportista?: { id: string } | null;
   operador?: { id: string } | null;
   esInspector?: boolean;
+  empresaContexto?: EnterpriseContext;
 };
 
 type ManifiestoActorScope = {
+  contextoEmpresa?: unknown;
   generadorId?: string | null;
   transportistaId?: string | null;
   operadorId?: string | null;
@@ -26,6 +29,11 @@ export function applyRoleFilter(
   user: ActorScopedUser
 ): void {
   if (isFullAccess(user)) return;
+  if(user.empresaContexto&&!user.empresaContexto.todasSedes) {
+    const scope={contextoEmpresa:{path:['establecimientoId'],equals:user.empresaContexto.establecimientoId}};
+    const prior=where.AND;where.AND=[...(Array.isArray(prior)?prior:prior?[prior]:[]),scope,
+      {contextoEmpresa:{path:['empresaId'],equals:user.empresaContexto.empresaId}}];
+  }
 
   if (user.rol === 'GENERADOR' && user.generador) {
     where.generadorId = user.generador.id;
@@ -33,11 +41,16 @@ export function applyRoleFilter(
     where.transportistaId = user.transportista.id;
   } else if (user.rol === 'OPERADOR' && user.operador) {
     where.operadorId = user.operador.id;
+  } else {
+    // A missing actor association is not permission to list every actor's data.
+    // Keep the same deny-by-default policy as canAccessManifiesto().
+    where.id = { in: [] };
   }
 }
 
 export function canAccessManifiesto(user: ActorScopedUser, manifiesto: ManifiestoActorScope): boolean {
   if (!user || !manifiesto) return false;
+  if(!canReadEnterpriseManifest(user.empresaContexto,manifiesto))return false;
   if (isFullAccess(user)) return true;
 
   if (user.rol === 'GENERADOR' && user.generador) {
@@ -58,7 +71,7 @@ export async function assertCanAccessManifiesto(
     manifiesto: {
       findUnique: (args: {
         where: { id: string };
-        select: { id: true; generadorId: true; transportistaId: true; operadorId: true };
+        select: { id: true; generadorId: true; transportistaId: true; operadorId: true; contextoEmpresa?:true };
       }) => Promise<ManifiestoActorScope | null>;
     };
   },
@@ -67,7 +80,7 @@ export async function assertCanAccessManifiesto(
 ): Promise<void> {
   const manifiesto = await prismaClient.manifiesto.findUnique({
     where: { id: manifiestoId },
-    select: { id: true, generadorId: true, transportistaId: true, operadorId: true },
+    select: { id: true, generadorId: true, transportistaId: true, operadorId: true, ...(user.empresaContexto?{contextoEmpresa:true as const}:{}) },
   });
 
   if (!manifiesto || !canAccessManifiesto(user, manifiesto)) {

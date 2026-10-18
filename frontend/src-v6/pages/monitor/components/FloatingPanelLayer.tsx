@@ -5,7 +5,7 @@
  * Pure mousedown/mousemove drag — no external libraries.
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   GripVertical, X, Minus, Maximize2,
   ArrowRight, Package, MapPin, Truck, CheckCircle,
@@ -14,6 +14,7 @@ import {
 import { EVENT_COLORS, RESIDUO_PALETTE } from '../utils/war-room-icons';
 import { formatTimeShort } from '../utils/formatters';
 import type { EnTransitoItem } from '../api/monitor-api';
+import { MonitorActorRow } from './MonitorActorRow';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,13 +47,13 @@ export interface FloatingPanel {
 // ─── Workflow dots ────────────────────────────────────────────────────────────
 
 const WORKFLOW = [
-  { key: 'borrador',      label: 'BOR', Icon: FileText },
-  { key: 'aprobado',      label: 'APR', Icon: CheckCircle },
-  { key: 'enTransito',    label: 'TRA', Icon: Truck },
-  { key: 'entregado',     label: 'ENT', Icon: Box },
-  { key: 'recibido',      label: 'REC', Icon: Package },
-  { key: 'enTratamiento', label: 'TRT', Icon: FlaskConical },
-  { key: 'tratado',       label: 'FIN', Icon: Zap },
+  { key: 'borrador',      label: 'BOR', name: 'Borrador', Icon: FileText },
+  { key: 'aprobado',      label: 'APR', name: 'Aprobado', Icon: CheckCircle },
+  { key: 'enTransito',    label: 'TRA', name: 'En tránsito', Icon: Truck },
+  { key: 'entregado',     label: 'ENT', name: 'Entregado', Icon: Box },
+  { key: 'recibido',      label: 'REC', name: 'Recibido', Icon: Package },
+  { key: 'enTratamiento', label: 'TRT', name: 'En tratamiento', Icon: FlaskConical },
+  { key: 'tratado',       label: 'FIN', name: 'Tratado', Icon: Zap },
 ] as const;
 
 const TIPO_TO_PROGRESS: Record<string, number> = {
@@ -75,8 +76,8 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       {/* Type badge + time */}
       <div className="flex items-center justify-between gap-2">
         <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
-          style={{ backgroundColor: color + '20', color }}
+          className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
+          style={{ backgroundColor: color + '20' }}
         >
           {tipo || 'EVENTO'}
         </span>
@@ -94,26 +95,11 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       </p>
 
       {/* Actors */}
-      <div className="space-y-1">
-        {data.generador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 shrink-0">GEN</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{data.generador.razonSocial}</span>
-          </div>
-        )}
-        {transNombre && (
-          <div className="flex items-center gap-1.5 pl-1">
-            <ArrowRight size={9} className="text-neutral-400 shrink-0" />
-            <span className="text-[11px] text-orange-600 truncate font-semibold">{transNombre}</span>
-          </div>
-        )}
-        {data.operador && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 shrink-0">OPE</span>
-            <span className="text-[11px] text-neutral-700 truncate font-medium">{data.operador.razonSocial}</span>
-          </div>
-        )}
-      </div>
+      <ul className="space-y-1" aria-label="Actores del evento">
+        {data.generador && <MonitorActorRow category="generador" name={data.generador.razonSocial} />}
+        {transNombre && <MonitorActorRow category="transportista" name={transNombre} />}
+        {data.operador && <MonitorActorRow category="operador" name={data.operador.razonSocial} />}
+      </ul>
 
       {/* Residuos pills */}
       {data.residuos && data.residuos.length > 0 && (
@@ -121,10 +107,9 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
           {data.residuos.slice(0, 6).map((r, i) => (
             <span
               key={i}
-              className="text-[9px] font-mono px-1.5 py-0.5 rounded-full border"
+              className="text-[10px] text-neutral-800 font-mono px-1.5 py-0.5 rounded-full border"
               style={{
                 background: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18',
-                color: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length],
                 borderColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '40',
               }}
             >
@@ -137,29 +122,30 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       {/* Workflow progress dots */}
       {progressIdx >= 0 && (
         <div className="pt-1 border-t border-black/5">
-          <div className="flex items-center justify-between mb-1.5">
-            {WORKFLOW.map(({ label, Icon }, i) => {
+          <p className="mb-2 text-xs text-neutral-700">Etapa del evento: {WORKFLOW[progressIdx].name}</p>
+          <ul className="flex items-center justify-between mb-1.5" aria-label="Etapas hasta este evento">
+            {WORKFLOW.map(({ label, name, Icon }, i) => {
               const filled = i <= progressIdx;
               const active = i === progressIdx;
               return (
-                <div key={label} className="flex flex-col items-center gap-0.5">
+                <li key={label} title={name} aria-label={name} aria-current={active ? 'step' : undefined} className="flex flex-col items-center gap-0.5">
                   <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${active ? 'scale-110' : ''} transition-all`}
+                    className="w-5 h-5 rounded-full border flex items-center justify-center"
                     style={{
                       backgroundColor: filled ? color : 'transparent',
                       borderColor: filled ? color : '#e5e7eb',
-                      boxShadow: active ? `0 0 8px ${color}60` : 'none',
+                      boxShadow: active ? '0 0 0 2px #525252' : 'none',
                     }}
                   >
-                    <Icon size={9} color={filled ? '#fff' : '#d1d5db'} />
+                    <Icon size={11} aria-hidden="true" color={filled ? '#262626' : '#525252'} />
                   </div>
-                  <span className={`text-[7px] font-mono ${filled ? 'text-neutral-500' : 'text-neutral-300'}`}>
+                  <span className="text-[10px] font-mono text-neutral-600">
                     {label}
                   </span>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
           <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"
@@ -202,6 +188,7 @@ const ViajeContent: React.FC<{ data: ViajeFPData }> = ({ data }) => {
       {/* Vehiculo + Chofer */}
       {(data.vehiculo || data.chofer) && (
         <div className="space-y-0.5">
+          <p className="text-xs text-neutral-700">Flota declarada · asignación del viaje no verificada</p>
           {data.vehiculo && (
             <p className="text-[10px] text-neutral-500">
               <span className="font-mono font-bold text-neutral-700">{data.vehiculo.patente}</span>
@@ -252,10 +239,9 @@ const ViajeContent: React.FC<{ data: ViajeFPData }> = ({ data }) => {
             {data.residuos.slice(0, 4).map((r, i) => (
               <span
                 key={i}
-                className="text-[9px] font-mono px-1.5 py-0.5 rounded-full border"
+                className="text-[10px] text-neutral-800 font-mono px-1.5 py-0.5 rounded-full border"
                 style={{
                   background: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '18',
-                  color: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length],
                   borderColor: RESIDUO_PALETTE[i % RESIDUO_PALETTE.length] + '40',
                 }}
               >
@@ -283,6 +269,8 @@ const FloatingPanelWindow: React.FC<{
   onMove: (pos: { x: number; y: number }) => void;
   onMinimize: () => void;
 }> = ({ panel, onClose, onBringToFront, onMove, onMinimize }) => {
+  const dragCleanup=useRef<(()=>void)|null>(null);
+  useEffect(()=>()=>dragCleanup.current?.(),[]);
 
   const onHeaderMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     // Ignore clicks on buttons inside header
@@ -292,16 +280,20 @@ const FloatingPanelWindow: React.FC<{
 
     const startX = e.clientX - panel.pos.x;
     const startY = e.clientY - panel.pos.y;
+    const layer=e.currentTarget.closest('.fp-layer');
 
     const onMouseMove = (ev: MouseEvent) => {
-      const x = Math.max(0, Math.min(window.innerWidth - 280, ev.clientX - startX));
-      const y = Math.max(0, Math.min(window.innerHeight - 40, ev.clientY - startY));
+      const rect=layer?.getBoundingClientRect();
+      const x = Math.max(0, Math.min((rect?.width ?? window.innerWidth) - 280, ev.clientX - startX));
+      const y = Math.max(0, Math.min((rect?.height ?? window.innerHeight) - 52, ev.clientY - startY));
       onMove({ x, y });
     };
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      dragCleanup.current=null;
     };
+    dragCleanup.current?.();dragCleanup.current=onMouseUp;
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   }, [panel.pos, onBringToFront, onMove]);
@@ -310,7 +302,8 @@ const FloatingPanelWindow: React.FC<{
     <div
       className="fp-window"
       style={{
-        transform: `translate(${panel.pos.x}px, ${panel.pos.y}px)`,
+        left: `${panel.pos.x}px`, top: `${panel.pos.y}px`,
+        maxHeight: `calc(100% - ${panel.pos.y + 8}px)`,
         zIndex: panel.zIndex,
       }}
       onMouseDown={onBringToFront}
@@ -329,10 +322,10 @@ const FloatingPanelWindow: React.FC<{
             {(panel.data as ViajeFPData).numero}
           </span>
         )}
-        <button onClick={onMinimize} className="fp-btn" title={panel.minimized ? 'Expandir' : 'Minimizar'}>
+        <button onClick={onMinimize} className="fp-btn" aria-expanded={!panel.minimized} title={panel.minimized ? 'Expandir detalle' : 'Minimizar detalle'}>
           {panel.minimized ? <Maximize2 size={11} /> : <Minus size={11} />}
         </button>
-        <button onClick={onClose} className="fp-btn fp-btn-close" title="Cerrar">
+        <button onClick={onClose} className="fp-btn fp-btn-close" title="Cerrar detalle">
           <X size={11} />
         </button>
       </div>
@@ -395,7 +388,7 @@ export function useFloatingPanels() {
       topZRef.current++;
       return [...prev, {
         id, type, data,
-        pos: { x: 340 + offset, y: 72 + offset },
+        pos: { x: Math.max(8, Math.min(12 + offset, window.innerWidth - 288)), y: 12 + offset },
         zIndex: topZRef.current,
         minimized: false,
       }];

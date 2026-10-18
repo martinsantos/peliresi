@@ -13,6 +13,8 @@ import { Card, CardContent } from '../../components/ui/CardV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Select } from '../../components/ui/Select';
 import { useSolicitudes } from '../../hooks/useSolicitudes';
+import { useAttentionCounts } from '../../hooks/useAttentionCounts';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import type { EstadoSolicitud, SolicitudInscripcion } from '../../types/api';
 
 // ── Status config ──
@@ -32,10 +34,12 @@ const ESTADO_CONFIG: Record<EstadoSolicitud, {
 
 const AdminSolicitudesPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const [estado, setEstado] = useState<string>('');
   const [tipoActor, setTipoActor] = useState<string>('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const { applications } = useAttentionCounts();
 
   const { data, isLoading } = useSolicitudes({
     estado: (estado || undefined) as EstadoSolicitud | undefined,
@@ -49,13 +53,12 @@ const AdminSolicitudesPage: React.FC = () => {
   const totalPages = data?.totalPages || 1;
   const total = data?.total || 0;
 
-  // KPIs from current page data - for a production app these would come from a dedicated stats endpoint.
-  // We compute from all loaded items as a reasonable approximation.
+  // Server totals across all pages, independent of the visible list filters.
   const kpis = {
-    pendientes: solicitudes.filter(s => s.estado === 'ENVIADA').length,
-    enRevision: solicitudes.filter(s => s.estado === 'EN_REVISION').length,
-    observadas: solicitudes.filter(s => s.estado === 'OBSERVADA').length,
-    aprobadas: solicitudes.filter(s => s.estado === 'APROBADA').length,
+    pendientes: applications?.ENVIADA ?? '—',
+    enRevision: applications?.EN_REVISION ?? '—',
+    observadas: applications?.OBSERVADA ?? '—',
+    aprobadas: applications?.APROBADA ?? '—',
   };
 
   return (
@@ -117,6 +120,7 @@ const AdminSolicitudesPage: React.FC = () => {
             { value: '', label: 'Todos los tipos' },
             { value: 'GENERADOR', label: 'Generadores' },
             { value: 'OPERADOR', label: 'Operadores' },
+            { value: 'TRANSPORTISTA', label: 'Transportistas' },
           ]}
           size="sm"
           isFullWidth={false}
@@ -155,7 +159,7 @@ const AdminSolicitudesPage: React.FC = () => {
               <Card
                 key={s.id}
                 className="active:scale-[0.98] transition-transform cursor-pointer"
-                onClick={() => navigate(`/admin/solicitudes/${s.id}`)}
+                onClick={() => navigate(mp(`/admin/solicitudes/${s.id}`))}
               >
                 <div className="p-3">
                   <div className="flex items-center justify-between mb-1.5">
@@ -187,7 +191,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       </span>
                     </div>
                     <button
-                      onClick={e => { e.stopPropagation(); navigate(`/admin/solicitudes/${s.id}`); }}
+                      onClick={e => { e.stopPropagation(); navigate(mp(`/admin/solicitudes/${s.id}`)); }}
                       className="p-1.5 rounded-lg hover:bg-neutral-100"
                       title="Ver detalle"
                     >
@@ -223,7 +227,7 @@ const AdminSolicitudesPage: React.FC = () => {
                     <tr
                       key={s.id}
                       className="border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer"
-                      onClick={() => navigate(`/admin/solicitudes/${s.id}`)}
+                      onClick={() => navigate(mp(`/admin/solicitudes/${s.id}`))}
                     >
                       <td className="py-3 px-4">
                         <p className="font-medium text-neutral-900">{s.usuario?.nombre || '-'}</p>
@@ -254,7 +258,7 @@ const AdminSolicitudesPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <button
-                          onClick={e => { e.stopPropagation(); navigate(`/admin/solicitudes/${s.id}`); }}
+                          onClick={e => { e.stopPropagation(); navigate(mp(`/admin/solicitudes/${s.id}`)); }}
                           className="p-1.5 rounded-lg hover:bg-neutral-100"
                           title="Ver detalle"
                         >

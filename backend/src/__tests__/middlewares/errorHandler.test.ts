@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { MulterError } from 'multer';
+import { z } from 'zod';
 
 // Mock the logger to avoid pino output during tests
 vi.mock('../../utils/logger', () => ({
@@ -73,6 +74,18 @@ describe('errorHandler middleware', () => {
     errorHandler(err, req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(500);
+  });
+
+  it.each(['test', 'production'])('returns a safe 400 for schema validation in %s', (environment) => {
+    process.env.NODE_ENV = environment;
+    const { req, res, next } = createMocks();
+    const result = z.object({ version: z.number().int().positive('La versión debe ser positiva') }).safeParse({ version: -1 });
+    if (result.success) throw new Error('Expected invalid fixture');
+    errorHandler(result.error as unknown as AppError, req, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'La versión debe ser positiva', status: 400, details: undefined,
+    }));
   });
 
   it('handles Prisma P2002 (unique constraint) as 409', () => {

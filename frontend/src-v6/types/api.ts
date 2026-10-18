@@ -4,7 +4,7 @@
  */
 
 import type {
-  Usuario, Manifiesto, TipoResiduo, Rol, EstadoManifiesto,
+  Usuario, Manifiesto, TipoResiduo, Rol, EstadoManifiesto, Generador, Vehiculo, Chofer,
 } from './models';
 
 // ========================================
@@ -73,6 +73,8 @@ export interface ChangePasswordRequest {
 export interface CreateManifiestoRequest {
   generadorId: string;
   transportistaId?: string;
+  vehiculoId?: string;
+  choferId?: string;
   operadorId: string;
   modalidad?: 'FIJO' | 'IN_SITU';
   fechaEstimadaRetiro?: string;
@@ -250,7 +252,7 @@ export interface CreateOperadorRequest {
 export interface Renovacion {
   id: string;
   anio: number;
-  tipoActor: 'GENERADOR' | 'OPERADOR';
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
   generadorId?: string;
   operadorId?: string;
   modalidad: 'SIN_CAMBIOS' | 'CON_CAMBIOS';
@@ -299,7 +301,7 @@ export type EstadoSolicitud = 'BORRADOR' | 'ENVIADA' | 'EN_REVISION' | 'OBSERVAD
 export interface SolicitudInscripcion {
   id: string;
   usuarioId: string;
-  tipoActor: 'GENERADOR' | 'OPERADOR';
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
   estado: EstadoSolicitud;
   datosActor: string;
   datosResiduos?: string;
@@ -312,6 +314,7 @@ export interface SolicitudInscripcion {
   observaciones?: string;
   generadorId?: string;
   operadorId?: string;
+  transportistaId?: string;
   createdAt: string;
   updatedAt: string;
   usuario?: { id: string; email: string; nombre: string; rol: string };
@@ -328,11 +331,20 @@ export interface DocumentoSolicitud {
   path: string;
   mimeType: string;
   size: number;
+  sha256?: string | null;
+  analisis?: import('./documentAnalysis').ReceiptAnalysis | null;
   estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
   observaciones?: string;
   revisadoPor?: string;
   revisadoAt?: string;
   createdAt: string;
+}
+
+export interface SolicitudRequirements {
+  tipoActor: 'GENERADOR' | 'OPERADOR' | 'TRANSPORTISTA';
+  documentos: Array<{ tipo: string; nombre: string; required: boolean }>;
+  acceptedMimeTypes: string[];
+  maxBytes: number;
 }
 
 export interface MensajeSolicitud {
@@ -386,10 +398,27 @@ export interface AuditoriaEntry {
 export interface ActorFilters {
   search?: string;
   activo?: boolean;
+  categoria?: string;
+  rubro?: string;
+  fiscalStatus?: 'AL_DIA' | 'TEF_SIN_PAGO' | 'TEF_SIN_REGISTRO' | 'DDJJ_PENDIENTE' | 'DDJJ_SIN_REGISTRO' | 'NO_HABILITADO' | 'SIN_DATOS';
+  fiscalYear?: number;
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+}
+
+export interface GeneradorListData extends PaginatedData<Generador> {
+  fiscalYear: number;
+  stats: {
+    total: number;
+    activos: number;
+    alDia: number;
+    requierenRevision: number;
+    tefSinPago: number;
+    ddjjPendiente: number;
+    sinDatos: number;
+  };
 }
 
 // ========================================
@@ -426,6 +455,7 @@ export interface CreateReglaAlertaRequest {
   evento: string;
   condicion: string;
   destinatarios: string;
+  activa?: boolean;
 }
 
 export interface AlertaFilters {
@@ -433,6 +463,8 @@ export interface AlertaFilters {
   reglaId?: string;
   page?: number;
   limit?: number;
+  evento?: string;
+  fechaDesde?: string;
 }
 
 // ========================================
@@ -440,6 +472,8 @@ export interface AlertaFilters {
 // ========================================
 
 export interface ReporteFilters {
+  page?: number;
+  limit?: number;
   fechaDesde?: string;
   fechaHasta?: string;
   generadorId?: string;
@@ -477,7 +511,9 @@ export interface UpdateUsuarioRequest {
 
 export interface UsuarioFilters {
   rol?: Rol;
+  roles?: Array<Rol | 'ADMIN_GENERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_OPERADOR'>;
   activo?: boolean;
+  emailVerified?: boolean;
   search?: string;
   page?: number;
   limit?: number;
@@ -497,7 +533,10 @@ export interface DashboardStats {
     enTransito: number;
     entregados: number;
     recibidos: number;
+    enTratamiento?: number;
     tratados: number;
+    rechazados?: number;
+    cancelados?: number;
     total: number;
   };
   recientes?: Manifiesto[];
@@ -551,6 +590,8 @@ export interface CatalogoItem {
   licencia?: string;      // Chofer
   metodo?: string;        // TratamientoAutorizado
   usuario?: { email: string; nombre?: string };
+  vehiculos?: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'activo'>[];
+  choferes?: Pick<Chofer, 'id' | 'nombre' | 'apellido' | 'dni' | 'activo'>[];
   [key: string]: unknown;
 }
 

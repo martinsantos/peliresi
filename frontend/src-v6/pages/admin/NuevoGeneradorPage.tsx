@@ -19,6 +19,9 @@ import {
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { MobileFormSteps } from '../../components/MobileFormSteps';
+import { actorEmailError, initialPasswordError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
+import { useRegistrationValidationFocus } from '../../hooks/useRegistrationValidationFocus';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
@@ -30,6 +33,12 @@ import { CORRIENTES_Y, CORRIENTES_Y_CODES, parseCorrientes } from '../../data/co
 import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { C_CORRIENTES } from '../../utils/calculoTEF';
 import CalculadoraTEF, { type TEFInputs } from '../../components/CalculadoraTEF';
+import { useActorRegistrationDraft } from '../../hooks/useActorRegistrationDraft';
+import { ActorRegistrationDraftBar } from '../../components/ActorRegistrationDraftBar';
+import { ActorContactFields, ActorAddressFields } from '../../components/registration/ActorFields';
+import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
+import { restoreRegistrationForm } from '../../services/registrationDraft';
+import { tefDeclaredInputs } from '../../utils/tefDeclaredInputs';
 
 const STEPS = [
   { id: 1, label: 'Identificacion', icon: Factory },
@@ -48,6 +57,7 @@ const DOCUMENTOS_REQUERIDOS = [
   { tipo: 'CONSTANCIA_AFIP', nombre: 'Constancia AFIP', obligatorio: true, categoria: 'Doc. Fiscal' },
   { tipo: 'CONTRATO_ALQUILER', nombre: 'Contrato de Alquiler (si corresponde)', obligatorio: false, categoria: 'Doc. Legal' },
   { tipo: 'CERTIFICADO_ISO', nombre: 'Certificacion ISO 14000 o similar', obligatorio: false, categoria: 'Doc. Tecnica' },
+  { tipo: 'COMPROBANTE_PAGO', nombre: 'Recibo o comprobante de pago', obligatorio: false, categoria: 'Doc. Fiscal' },
 ];
 
 const CATEGORIAS = ['Grandes Generadores', 'Medianos Generadores', 'Pequenos Generadores'];
@@ -94,12 +104,30 @@ const NuevoGeneradorPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(INITIAL_FORM);
   const [selectedY, setSelectedY] = useState<Set<string>>(new Set());
-  const [attempted, setAttempted] = useState<Set<number>>(new Set()); // steps where user tried to advance
+  const [attempted, setAttempted] = useState<Set<number>>(new Set());
+  const validationRef = useRegistrationValidationFocus(attempted);
   const [adjuntos, setAdjuntos] = useState<Record<string, File>>({}); // tipo -> File
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [savedActorId, setSavedActorId] = useState<string | null>(null);
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const submissionInFlight = useRef(false);
   const [tefInputs, setTefInputs] = useState<TEFInputs | null>(null);
+  const [missingFiles, setMissingFiles] = useState<string[]>([]);
+  const draftData = { form, step, selectedY: [...selectedY], tefInputs, savedActorId, uploadedDocs, files: [...missingFiles, ...Object.values(adjuntos).map(file => file.name)] };
+  const draft = useActorRegistrationDraft('GENERADOR', id, draftData, data => {
+    setAdjuntos({}); setSubmitError(null);
+    setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
+    setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
+    setTefInputs(data.tefInputs ? tefDeclaredInputs({ tefInputs: data.tefInputs }).inputs : null);
+    setSavedActorId(typeof data.savedActorId === 'string' ? data.savedActorId : null);
+    setUploadedDocs(data.uploadedDocs && typeof data.uploadedDocs === 'object' ? data.uploadedDocs as Record<string, string> : {});
+    setStep(data.savedActorId ? TOTAL_STEPS : Math.min(TOTAL_STEPS, Math.max(1, Number(data.step) || 1)));
+    setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
+  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || Boolean(savedActorId));
 
-  const { data: existing, isLoading: loadingExisting } = useGenerador(id || '');
+  const { data: existing, isLoading: loadingExisting, refetch: reloadExisting } = useGenerador(id || '');
+  const initializedActor = useRef<string | null>(null);
   const createMutation = useCreateGenerador();
   const updateMutation = useUpdateGenerador();
   const uploadDocMutation = useUploadDocumento();
@@ -107,7 +135,13 @@ const NuevoGeneradorPage: React.FC = () => {
   const backPath = '/admin/actores/generadores';
 
   useEffect(() => {
-    if (!isEdit || !existing) return;
+    initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setSelectedY(new Set());
+    setAdjuntos({}); setSavedActorId(null); setUploadedDocs({}); setTefInputs(null); setMissingFiles([]);
+  }, [id, draft.owner]);
+
+  useEffect(() => {
+    if (!isEdit || !existing || existing.id !== id || initializedActor.current === id) return;
+    initializedActor.current = id!;
     const g = existing;
     // CSV enrichment fallback for fields not yet persisted in DB
     const csv = g.cuit ? (GENERADORES_DATA[g.cuit] || GENERADORES_DATA[g.cuit?.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
@@ -136,7 +170,7 @@ const NuevoGeneradorPage: React.FC = () => {
       categoriaIndividual: g.categoriaIndividual || '',
       montoMxR: g.montoMxR != null ? String(g.montoMxR) : '',
       libroOperatoria: g.libroOperatoria ?? false,
-      coordenadas: g.latitud ? `${g.latitud}, ${g.longitud}` : '',
+      coordenadas: g.latitud != null && g.longitud != null ? `${g.latitud}, ${g.longitud}` : '',
     });
 
     const corrientesStr = g.corrientesControl || (csv?.categoriasControl ? csv.categoriasControl.join(', ') : '');
@@ -147,7 +181,7 @@ const NuevoGeneradorPage: React.FC = () => {
     if (g.tefInputs) {
       setTefInputs(g.tefInputs as unknown as TEFInputs);
     }
-  }, [existing, isEdit]);
+  }, [existing, isEdit, id, draft.owner]);
 
   const up = (field: string, value: string | boolean) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -165,10 +199,13 @@ const NuevoGeneradorPage: React.FC = () => {
     if (s === 1) {
       if (!form.razonSocial.trim()) errs.push('Razon Social es obligatoria');
       if (!form.cuit.trim()) errs.push('CUIT es obligatorio');
-      if (!form.email.trim()) errs.push('Email es obligatorio');
+      const emailError = actorEmailError(form.email, true);
+      if (emailError) errs.push(emailError);
     }
+    if (s === 2 && parseActorCoordinates(form.coordenadas) === null) errs.push(COORDINATE_ERROR);
     if (s === 5 && !isEdit) {
-      if (!form.password.trim()) errs.push('Password inicial es obligatorio');
+      const error = initialPasswordError(form.password, form.cuit);
+      if (error) errs.push(error);
     }
     return errs;
   };
@@ -179,7 +216,7 @@ const NuevoGeneradorPage: React.FC = () => {
     if (field === 'razonSocial') return attempted.has(1) && !form.razonSocial.trim();
     if (field === 'cuit') return attempted.has(1) && !form.cuit.trim();
     if (field === 'email') return attempted.has(1) && !form.email.trim();
-    if (field === 'password') return attempted.has(5) && !isEdit && !form.password.trim();
+    if (field === 'password') return attempted.has(5) && !isEdit && !!initialPasswordError(form.password, form.cuit);
     return false;
   };
 
@@ -187,7 +224,6 @@ const NuevoGeneradorPage: React.FC = () => {
     setAttempted(prev => new Set(prev).add(step));
     const errs = getStepErrors(step);
     if (errs.length > 0) {
-      toast.error('Campos obligatorios', errs.join('. '));
       return;
     }
     if (step < TOTAL_STEPS) setStep(step + 1);
@@ -198,13 +234,15 @@ const NuevoGeneradorPage: React.FC = () => {
     if (s < step) { setStep(s); return; }
     setAttempted(prev => new Set(prev).add(step));
     const errs = getStepErrors(step);
-    if (errs.length > 0) { toast.error('Campos obligatorios', errs.join('. ')); return; }
+    if (errs.length > 0) return;
     setStep(s);
   };
 
   // File attach handler
   const attachFile = (tipo: string, file: File) => {
+    if (!file.size || file.size > 10 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) { setSubmitError('Elegí un PDF, JPG o PNG con contenido de hasta 10 MB. No se modificó ningún documento guardado.'); return; }
     setAdjuntos(prev => ({ ...prev, [tipo]: file }));
+    setMissingFiles(previous => previous.filter(name => name !== file.name));
     toast.success('Archivo adjuntado', `${file.name}`);
   };
 
@@ -213,21 +251,19 @@ const NuevoGeneradorPage: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (submissionInFlight.current) return;
     // Validate all steps
-    for (const s of [1, 5]) {
+    for (const s of savedActorId ? [] : [1, 2, 5]) {
       const errs = getStepErrors(s);
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
-        toast.error('Campos obligatorios', errs.join('. '));
         setStep(s);
         return;
       }
     }
 
     // Parse coordenadas "lat, long" back to separate fields for backend
-    const coordParts = form.coordenadas?.split(',').map(s => s.trim()).filter(Boolean);
-    const latitud = coordParts?.[0] ? Number(coordParts[0]) : undefined;
-    const longitud = coordParts?.[1] ? Number(coordParts[1]) : undefined;
+    const coordinates = parseActorCoordinates(form.coordenadas) || {};
 
     const regulatory: Record<string, any> = {
       expedienteInscripcion: form.expedienteInscripcion || undefined,
@@ -245,28 +281,31 @@ const NuevoGeneradorPage: React.FC = () => {
       domicilioRealDepto: form.domicilioRealIgual ? form.domicilioLegalDepto || undefined : form.domicilioRealDepto || undefined,
     };
 
+    submissionInFlight.current = true;
+    setSubmitting(true);
     setSubmitError(null);
     try {
-      let generadorId: string | undefined;
+      draft.assertSession();
+      let generadorId: string | undefined = savedActorId || undefined;
 
-      if (isEdit && id) {
+      if (!generadorId && isEdit && id) {
         await updateMutation.mutateAsync({
           id,
           data: {
             razonSocial: form.razonSocial, cuit: form.cuit,
-            domicilio: form.domicilio || form.domicilioLegalCalle,
+            domicilio: [form.domicilioLegalCalle, form.domicilioLegalLocalidad, form.domicilioLegalDepto].filter(Boolean).join(', ') || form.domicilio,
             telefono: form.telefono, email: form.email,
             numeroInscripcion: form.numeroInscripcion, categoria: form.categoria,
             actividad: form.actividad, rubro: form.rubro,
             corrientesControl: corrientesCodes.join(', '),
             ...regulatory,
-            ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
+            ...coordinates,
             ...(tefInputs && { tefInputs }),
           } as Partial<CreateGeneradorRequest>,
         });
         generadorId = id;
         toast.success('Guardado', `Generador ${form.razonSocial} actualizado`);
-      } else {
+      } else if (!generadorId) {
         const result = await createMutation.mutateAsync({
           email: form.email, password: form.password,
           nombre: form.nombre || form.razonSocial,
@@ -276,7 +315,7 @@ const NuevoGeneradorPage: React.FC = () => {
           categoria: form.categoria, actividad: form.actividad,
           rubro: form.rubro, corrientesControl: corrientesCodes.join(', '),
           ...regulatory,
-          ...(latitud && longitud && !isNaN(latitud) && !isNaN(longitud) ? { latitud, longitud } : {}),
+          ...coordinates,
           ...(tefInputs && { tefInputs }),
         } as CreateGeneradorRequest);
         // result is data.data from service — could be Generador or { generador: { id, ... } }
@@ -285,15 +324,29 @@ const NuevoGeneradorPage: React.FC = () => {
         toast.success('Generador creado', `${form.razonSocial} registrado exitosamente`);
       }
 
-      // Upload attached files after generador is created
+      if (!generadorId) throw new Error('El servidor no devolvió el identificador del generador.');
+      draft.assertSession();
+      setSavedActorId(generadorId);
+      draft.checkpoint({ ...draftData, savedActorId: generadorId });
+      // A retry keeps the saved actor and sends only unconfirmed files.
       const filesToUpload = Object.entries(adjuntos);
+      const failed: string[] = [];
       if (generadorId && filesToUpload.length > 0) {
         let uploaded = 0;
         for (const [tipo, file] of filesToUpload) {
           try {
-            await uploadDocMutation.mutateAsync({ generadorId, file, tipo });
+            draft.assertSession();
+            const document = await uploadDocMutation.mutateAsync({ generadorId, file, tipo });
+            draft.assertSession();
+            if (document.analisis?.duplicado) toast.warning('Comprobante repetido', 'La huella coincide con un recibo ya cargado. No acredita un pago nuevo.');
             uploaded++;
+            setUploadedDocs(prev => ({ ...prev, [tipo]: file.name }));
+            setAdjuntos(prev => {
+              if (prev[tipo] !== file) return prev;
+              const remaining = { ...prev }; delete remaining[tipo]; return remaining;
+            });
           } catch (uploadErr: any) {
+            failed.push(file.name);
             console.error('Upload error:', uploadErr);
             toast.error('Error subiendo', `No se pudo subir ${file.name}: ${uploadErr?.response?.data?.message || 'Error'}`);
           }
@@ -302,17 +355,20 @@ const NuevoGeneradorPage: React.FC = () => {
           toast.success('Documentos adjuntados', `${uploaded} archivo(s) subido(s)`);
         }
       }
-
-      navigate(backPath);
+      if (failed.length) {
+        setSubmitError(`Generador guardado. No se subieron: ${failed.join(', ')}. Reintentá los adjuntos pendientes; no se repetirá el alta.`);
+        return;
+      }
+      draft.clear(); navigate(backPath);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Error desconocido al guardar';
       console.error('Submit error:', err);
       setSubmitError(msg);
       toast.add({ type: 'error', title: 'Error al guardar', message: msg, duration: 15000 });
-    }
+    } finally { submissionInFlight.current = false; setSubmitting(false); }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending || uploadDocMutation.isPending;
+  const isPending = submitting || createMutation.isPending || updateMutation.isPending || uploadDocMutation.isPending;
 
   if (isEdit && loadingExisting) {
     return (
@@ -326,24 +382,29 @@ const NuevoGeneradorPage: React.FC = () => {
       </div>
     );
   }
+  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del generador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div className="space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
+    <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 rounded-xl"><Factory size={22} className="text-purple-600" /></div>
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">{isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'}</h2>
-            <p className="text-sm text-neutral-500">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <Button variant="outline" size="sm" className="shrink-0" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="shrink-0 p-2 bg-purple-100 rounded-xl"><Factory size={22} className="text-purple-600" /></div>
+          <div className="min-w-0">
+            <h2 aria-label={isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'} className="text-xl sm:text-2xl font-bold text-neutral-900"><span className="sm:hidden">{isEdit ? 'Editar generador' : 'Alta de generador'}</span><span className="hidden sm:inline">{isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'}</span></h2>
+            <p className="text-xs leading-5 text-neutral-600 sm:text-sm">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
           </div>
         </div>
       </div>
 
+      <ActorRegistrationDraftBar draft={draft} />
+      {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos que estaban pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
+
       {/* Stepper */}
-      <div className="bg-white rounded-2xl border border-neutral-200 p-4 shadow-sm">
-        <div className="flex items-center justify-between">
+      <fieldset disabled={isPending || Boolean(savedActorId)} className="min-w-0 md:bg-white md:rounded-2xl md:border md:border-neutral-200 md:p-4 md:shadow-sm">
+        <MobileFormSteps compact steps={STEPS} currentStep={step} onSelect={goStep} />
+        <div className="hidden items-center justify-between md:flex">
           {STEPS.map((s, i) => {
             const Icon = s.icon;
             const isActive = step === s.id;
@@ -351,7 +412,7 @@ const NuevoGeneradorPage: React.FC = () => {
             const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
             return (
               <React.Fragment key={s.id}>
-                <button onClick={() => goStep(s.id)} className={`flex flex-col items-center gap-1.5 group transition-all ${isActive ? 'scale-105' : ''}`}>
+                <button type="button" aria-label={`${s.id}. ${s.label}`} aria-current={isActive ? 'step' : undefined} onClick={() => goStep(s.id)} className="flex flex-col items-center gap-1.5 group transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 rounded-lg">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                     hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
                     isActive ? 'bg-primary-600 text-white shadow-lg shadow-primary-200' :
@@ -371,27 +432,16 @@ const NuevoGeneradorPage: React.FC = () => {
             );
           })}
         </div>
-      </div>
+      </fieldset>
 
       {/* Step Content */}
-      <div className="min-h-[400px]">
+      <fieldset disabled={isPending || Boolean(draft.available) || (Boolean(savedActorId) && step !== TOTAL_STEPS)} className="min-w-0 min-h-[400px]">
         {/* ===== PASO 1 ===== */}
         {step === 1 && (
           <Card>
             <CardHeader><div className="flex items-center gap-2"><Factory size={20} className="text-purple-600" /><h3 className="text-lg font-bold text-neutral-900">Identificacion y Contacto</h3></div></CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Input label="Razon Social *" value={form.razonSocial} onChange={e => up('razonSocial', e.target.value)} placeholder="Empresa S.A."
-                    className={showError('razonSocial') ? 'border-error-400 bg-error-50' : ''} />
-                  <FieldError show={showError('razonSocial')} msg="La razon social es obligatoria" />
-                </div>
-                <div>
-                  <Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9"
-                    className={showError('cuit') ? 'border-error-400 bg-error-50' : ''} />
-                  <FieldError show={showError('cuit')} msg="El CUIT es obligatorio" />
-                </div>
-              </div>
+              <ActorContactFields form={form} up={up} administrative domicile={false} attempted={attempted.has(1)} placeholder="Empresa S.A." identitySlot={<div><Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9" errorMessage={showError('cuit') ? 'El CUIT es obligatorio' : undefined} />{!isEdit && !savedActorId && <ActorRegistryLookup type="GENERADOR" cuit={form.cuit} />}</div>} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
                   label="Categoria"
@@ -405,14 +455,7 @@ const NuevoGeneradorPage: React.FC = () => {
                 />
                 <Input label="N Inscripcion DGFA" value={form.numeroInscripcion} onChange={e => up('numeroInscripcion', e.target.value)} placeholder="G-000XXX" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Input label="Email *" type="email" value={form.email} onChange={e => up('email', e.target.value)} placeholder="contacto@empresa.com"
-                    className={showError('email') ? 'border-error-400 bg-error-50' : ''} />
-                  <FieldError show={showError('email')} msg="El email es obligatorio" />
-                </div>
-                <Input label="Telefono" value={form.telefono} onChange={e => up('telefono', e.target.value)} placeholder="+54 261 4XX-XXXX" />
-              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Rubro de la Empresa" value={form.rubro} onChange={e => up('rubro', e.target.value)} placeholder="INDUSTRIA QUIMICA" />
                 <Input label="Actividad Principal" value={form.actividad} onChange={e => up('actividad', e.target.value)} placeholder="Generacion de energia electrica" />
@@ -422,59 +465,7 @@ const NuevoGeneradorPage: React.FC = () => {
         )}
 
         {/* ===== PASO 2 ===== */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader><div className="flex items-center gap-2"><Building2 size={20} className="text-info-600" /><h3 className="text-lg font-bold text-neutral-900">Direccion Fiscal</h3></div></CardHeader>
-              <CardContent className="space-y-4">
-                <Input label="Calle / Ruta" value={form.domicilioLegalCalle} onChange={e => up('domicilioLegalCalle', e.target.value)} placeholder="Av. San Martin 1234" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Localidad" value={form.domicilioLegalLocalidad} onChange={e => up('domicilioLegalLocalidad', e.target.value)} placeholder="Ciudad de Mendoza" />
-                  <Select
-                    label="Departamento"
-                    value={form.domicilioLegalDepto}
-                    onChange={(val) => up('domicilioLegalDepto', val)}
-                    options={[
-                      { value: '', label: 'Seleccionar...' },
-                      ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
-                    ]}
-                    size="base"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2"><MapPin size={20} className="text-warning-600" /><h3 className="text-lg font-bold text-neutral-900">Direccion Real</h3></div>
-                  <label className="flex items-center gap-2 text-sm text-neutral-500 cursor-pointer">
-                    <input type="checkbox" checked={form.domicilioRealIgual} onChange={e => up('domicilioRealIgual', e.target.checked)} className="rounded border-neutral-300 text-primary-600" />
-                    Igual a la fiscal
-                  </label>
-                </div>
-              </CardHeader>
-              {!form.domicilioRealIgual && (
-                <CardContent className="space-y-4">
-                  <Input label="Calle / Ruta" value={form.domicilioRealCalle} onChange={e => up('domicilioRealCalle', e.target.value)} placeholder="Ruta 40 km 3200" />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Localidad" value={form.domicilioRealLocalidad} onChange={e => up('domicilioRealLocalidad', e.target.value)} placeholder="Lujan de Cuyo" />
-                    <Select
-                      label="Departamento"
-                      value={form.domicilioRealDepto}
-                      onChange={(val) => up('domicilioRealDepto', val)}
-                      options={[
-                        { value: '', label: 'Seleccionar...' },
-                        ...DEPARTAMENTOS_MENDOZA.map(d => ({ value: d, label: d })),
-                      ]}
-                      size="base"
-                    />
-                  </div>
-                  <Input label="Coordenadas Geograficas" value={form.coordenadas} onChange={e => up('coordenadas', e.target.value)} placeholder="lat -32.89, long -68.83" />
-                </CardContent>
-              )}
-            </Card>
-          </div>
-        )}
+        {step === 2 && <Card><CardContent className="py-5"><ActorAddressFields form={form} up={up} administrative same={form.domicilioRealIgual} onSame={same => up('domicilioRealIgual', same)} attempted={attempted.has(2)} /></CardContent></Card>}
 
         {/* ===== PASO 3 ===== */}
         {step === 3 && (
@@ -586,9 +577,9 @@ const NuevoGeneradorPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input label="Nombre del Responsable" value={form.nombre} onChange={e => up('nombre', e.target.value)} placeholder="Juan Perez" />
                     <div>
-                      <Input label="Password Inicial *" type="password" value={form.password} onChange={e => up('password', e.target.value)} placeholder="Minimo 8 caracteres"
-                        className={showError('password') ? 'border-error-400 bg-error-50' : ''} />
-                      <FieldError show={showError('password')} msg="El password es obligatorio para crear el generador" />
+                      <Input label="Password Inicial *" type="password" autoComplete="new-password" value={form.password} onChange={e => up('password', e.target.value)} placeholder="Minimo 8 caracteres"
+                        helperText="Al menos 8 caracteres. No uses el CUIT."
+                        errorMessage={showError('password') ? initialPasswordError(form.password, form.cuit) : undefined} />
                     </div>
                   </div>
                   <p className="text-xs text-neutral-500">El responsable podra cambiar su contrasena desde su perfil al ingresar.</p>
@@ -612,7 +603,7 @@ const NuevoGeneradorPage: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="border border-neutral-200 rounded-xl overflow-hidden">
+                <div className="border border-neutral-200 rounded-xl overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-neutral-50">
                       <tr>
@@ -640,16 +631,19 @@ const NuevoGeneradorPage: React.FC = () => {
                             <td className="px-4 py-3 text-[10px] text-neutral-500 hidden md:table-cell uppercase">{doc.categoria}</td>
                             <td className="px-4 py-3 text-center">
                               {file ? (
-                                <div className="inline-flex items-center gap-2 px-2 py-1 bg-success-50 border border-success-200 rounded-lg">
-                                  <Paperclip size={12} className="text-success-600" />
-                                  <span className="text-xs text-success-700 truncate max-w-[100px]">{file.name}</span>
-                                  <button onClick={() => removeFile(doc.tipo)} className="text-neutral-400 hover:text-error-600"><X size={14} /></button>
+                                <div className="inline-flex flex-wrap items-center justify-center gap-2 px-2 py-1 bg-neutral-50 border border-neutral-300 rounded-lg">
+                                  <Paperclip size={12} className="text-neutral-600" />
+                                  <span className="text-xs text-neutral-700 truncate max-w-[100px]">{file.name}</span>
+                                  <span className="text-xs text-neutral-600">Pendiente</span>
+                                  <button type="button" aria-label={`Quitar ${doc.nombre}`} onClick={() => removeFile(doc.tipo)} className="min-h-11 min-w-11 text-neutral-500 hover:text-error-600"><X size={14} /></button>
                                 </div>
+                              ) : uploadedDocs[doc.tipo] ? (
+                                <span className="inline-flex flex-wrap items-center justify-center gap-1 text-xs text-success-700"><Check size={14} /><span className="max-w-[120px] truncate">{uploadedDocs[doc.tipo]}</span><span>Guardado</span></span>
                               ) : (
-                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-primary-50 border border-neutral-200 hover:border-primary-300 rounded-lg cursor-pointer transition-colors text-xs font-medium text-neutral-700 hover:text-primary-700">
+                                <label className="inline-flex min-h-11 min-w-11 items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-primary-50 border border-neutral-200 hover:border-primary-300 rounded-lg cursor-pointer transition-colors text-sm font-medium text-neutral-700 hover:text-primary-700">
                                   <Upload size={14} />
                                   Subir
-                                  <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                                  <input type="file" aria-label={`Adjuntar ${doc.nombre}`} className="hidden" accept=".pdf,.jpg,.jpeg,.png"
                                     onChange={e => { const f = e.target.files?.[0]; if (f) attachFile(doc.tipo, f); e.target.value = ''; }}
                                   />
                                 </label>
@@ -685,14 +679,14 @@ const NuevoGeneradorPage: React.FC = () => {
             </Card>
           </div>
         )}
-      </div>
+      </fieldset>
 
       {/* Error banner */}
       {submitError && (
-        <div className="bg-error-50 border-2 border-error-300 rounded-xl p-4 flex items-start gap-3">
+        <div role="alert" aria-label={savedActorId ? 'Adjuntos pendientes' : 'Error al guardar'} className="bg-error-50 border-2 border-error-300 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle size={20} className="text-error-600 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-bold text-error-800">No se pudo guardar el generador</p>
+            <p className="font-bold text-error-800">{savedActorId ? 'Generador guardado · adjuntos pendientes' : 'No se pudo guardar el generador'}</p>
             <p className="text-sm text-error-700 mt-1">{submitError}</p>
           </div>
           <button onClick={() => setSubmitError(null)} className="text-error-400 hover:text-error-600"><X size={18} /></button>
@@ -700,9 +694,9 @@ const NuevoGeneradorPage: React.FC = () => {
       )}
 
       {/* Navigation */}
-      <div className="flex items-center justify-between pt-2">
-        <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={step === 1 ? () => navigate(backPath) : goPrev}>
-          {step === 1 ? 'Cancelar' : 'Volver'}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <Button variant="outline" disabled={isPending} leftIcon={<ArrowLeft size={16} />} onClick={savedActorId || step === 1 ? () => navigate(backPath) : goPrev}>
+          {savedActorId ? 'Salir sin adjuntos pendientes' : step === 1 ? 'Cancelar' : 'Volver'}
         </Button>
         <div className="flex items-center gap-2">
           <span className="text-sm text-neutral-400">Paso {step} de {TOTAL_STEPS}</span>
@@ -710,7 +704,7 @@ const NuevoGeneradorPage: React.FC = () => {
             <Button rightIcon={<ArrowRight size={16} />} onClick={goNext}>Continuar</Button>
           ) : (
             <Button leftIcon={isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} onClick={handleSubmit} disabled={isPending}>
-              {isPending ? 'Guardando...' : isEdit ? 'Guardar Cambios' : 'Confirmar Registro'}
+              {isPending ? 'Guardando...' : savedActorId ? 'Reintentar adjuntos' : isEdit ? 'Guardar Cambios' : 'Confirmar Registro'}
             </Button>
           )}
         </div>

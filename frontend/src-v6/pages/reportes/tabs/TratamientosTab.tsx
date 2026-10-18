@@ -17,6 +17,7 @@ import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
 import { KpiCard } from '../../../components/charts/KpiCard';
+import { CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
 import { downloadCsv } from '../../../utils/exportCsv';
 import { exportReportePDF } from '../../../utils/exportPdf';
@@ -191,10 +192,10 @@ export default function TratamientosTab({
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={FlaskConical} label="Métodos de Tratamiento" value={STATS_TRATAMIENTOS.totalMetodos} color="from-emerald-600 to-emerald-700" />
-        <KpiCard icon={Layers} label="Categorías" value={STATS_TRATAMIENTOS.totalCategorias} color="from-blue-600 to-blue-700" />
-        <KpiCard icon={FlaskConical} label="Operadores" value={STATS_TRATAMIENTOS.totalOperadores} color="from-blue-600 to-blue-700" sub="habilitados" />
-        <KpiCard icon={AlertTriangle} label="Riesgo Crítico" value={STATS_TRATAMIENTOS.metodosCriticos} color="from-red-600 to-red-700" sub="solo 1 operador" />
+        <KpiCard icon={FlaskConical} label="Métodos de Tratamiento" value={STATS_TRATAMIENTOS.totalMetodos} color="from-emerald-700 to-emerald-800" />
+        <KpiCard icon={Layers} label="Categorías" value={STATS_TRATAMIENTOS.totalCategorias} color="from-blue-700 to-blue-800" />
+        <KpiCard icon={FlaskConical} label="Operadores" value={STATS_TRATAMIENTOS.totalOperadores} color="from-blue-700 to-blue-800" sub="habilitados" />
+        <KpiCard icon={AlertTriangle} label="Riesgo Crítico" value={STATS_TRATAMIENTOS.metodosCriticos} color="from-red-700 to-red-800" sub="solo 1 operador" />
       </div>
 
       {/* Charts: 2 columns */}
@@ -220,8 +221,8 @@ export default function TratamientosTab({
                 margin={{ left: 10, right: 20, top: 5, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={120} stroke="#94a3b8" />
+                <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={120} stroke="#94a3b8" />
                 <Tooltip />
                 <Bar dataKey="value" name="Métodos" radius={[0, 8, 8, 0]} barSize={28}>
                   {byRisk.map((entry, i) => (
@@ -241,8 +242,8 @@ export default function TratamientosTab({
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={corrienteCoverage} margin={{ left: 5, right: 20, top: 5, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+              <YAxis tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
               <Tooltip />
               <Bar dataKey="value" name="Métodos" fill="#0D8A4F" radius={[6, 6, 0, 0]} barSize={24} />
             </BarChart>
@@ -309,8 +310,8 @@ export default function TratamientosTab({
                       <td className="px-4 py-3">
                         {cat && (
                           <span
-                            className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded"
-                            style={{ backgroundColor: `${CAT_CHART_COLORS[cat.id]}15`, color: CAT_CHART_COLORS[cat.id] }}
+                            className="inline-block px-2 py-0.5 text-xs font-semibold rounded text-neutral-700"
+                            style={{ backgroundColor: `${CAT_CHART_COLORS[cat.id]}15` }}
                           >
                             {cat.nombre}
                           </span>

@@ -2,8 +2,12 @@ import { EventoAlerta, TipoNotificacion, PrioridadNotificacion } from '@prisma/c
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { emailService } from '../services/email.service';
+import { externalAlertRecipientAllowed } from '../services/email-policy';
 import { notificationService } from '../controllers/notification.controller';
 import { DomainEvent } from '../services/domainEvent.service';
+import { matchesAlertCondition } from '../services/alertRuleCondition.service';
+import { followupDays } from '../services/alertFollowupPolicy.service';
+import { catalogueCondition } from '../services/alertCataloguePolicy.service';
 
 /** Mapeo DomainEvent.type → EventoAlerta (para búsqueda de ReglaAlerta) */
 const EVENTO_ALERTA_MAP: Partial<Record<DomainEvent['type'], EventoAlerta>> = {
@@ -30,7 +34,13 @@ async function notificarAdmins(
     select: { id: true },
   });
   const ids = admins.map(a => a.id).filter(id => id !== excluirId);
+  const existing = ids.length ? await prisma.notificacion.findMany({
+    where: { usuarioId: { in: ids }, tipo, titulo, manifiestoId: manifiestoId ?? null, createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) } },
+    select: { usuarioId: true },
+  }) : [];
+  const alreadyNotified = new Set(existing.map((notification) => notification.usuarioId));
   for (const usuarioId of ids) {
+    if (alreadyNotified.has(usuarioId)) continue;
     await notificationService.crearNotificacion({ usuarioId, tipo, titulo, mensaje, manifiestoId, prioridad });
   }
 }
@@ -45,6 +55,32 @@ async function dispararReglasAlerta(
   });
 
   for (const regla of reglas) {
+    let matches = false;
+    try {
+      if (followupDays(regla.condicion) !== null) continue;
+      if (catalogueCondition(regla.condicion) !== null) continue;
+      matches = matchesAlertCondition(regla.condicion, datos);
+    }
+    catch (error) {
+      logger.error({ reglaId: regla.id, error: error instanceof Error ? error.message : String(error) }, 'Invalid alert rule condition');
+      continue;
+    }
+    if (!matches) continue;
+
+    const duplicateSince = new Date(Date.now() - 30 * 60 * 1000);
+    // Expirations have no manifest. Rule/null alone collapses different subjects.
+    // Existing event snapshots are JSON.stringify output: include the complete
+    // escaped key/value tokens, not an ID substring, and preserve the old window.
+    const expiryIdentity = eventoAlerta === 'VENCIMIENTO' && !manifiestoId
+      ? ['entidad', 'entidadId', 'vencimiento'].map(key => ({ datos: { contains: JSON.stringify({ [key]: datos[key] }).slice(1, -1) } }))
+      : [];
+    const duplicate = await prisma.alertaGenerada.findFirst({
+      where: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, createdAt: { gte: duplicateSince },
+        ...(expiryIdentity.length ? { AND: expiryIdentity } : {}) },
+      select: { id: true },
+    });
+    if (duplicate) continue;
+
     await prisma.alertaGenerada.create({
       data: {
         reglaId: regla.id,
@@ -66,18 +102,46 @@ async function dispararReglasAlerta(
       .filter((d: string) => d.startsWith('email:'))
       .map((d: string) => d.replace('email:', ''));
 
-    for (const rol of roles) {
-      await notificationService.notificarPorRol(rol, {
+    const recipientIds = new Set<string>();
+    const eventUserId = typeof datos.userId === 'string' ? datos.userId : undefined;
+    if (manifiestoId && roles.some((role) => ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(role))) {
+      const manifiesto = await prisma.manifiesto.findUnique({
+        where: { id: manifiestoId },
+        select: {
+          generador: { select: { usuario: { select: { id: true } } } },
+          transportista: { select: { usuario: { select: { id: true } } } },
+          operador: { select: { usuario: { select: { id: true } } } },
+        },
+      });
+      const participantByRole: Record<string, string | undefined> = {
+        GENERADOR: manifiesto?.generador?.usuario?.id,
+        TRANSPORTISTA: manifiesto?.transportista?.usuario?.id,
+        OPERADOR: manifiesto?.operador?.usuario?.id,
+      };
+      roles.forEach((role) => { const id = participantByRole[role]; if (id && id !== eventUserId) recipientIds.add(id); });
+    }
+    const administrativeRoles = roles.filter((role) => role === 'ADMIN' || role.startsWith('ADMIN_'));
+    if (administrativeRoles.length > 0) {
+      const users = await prisma.usuario.findMany({ where: { rol: { in: administrativeRoles as any }, activo: true }, select: { id: true } });
+      users.forEach((user) => { if (user.id !== eventUserId) recipientIds.add(user.id); });
+    }
+    for (const usuarioId of recipientIds) {
+      await notificationService.crearNotificacion({
+        usuarioId,
         tipo: 'ALERTA_SISTEMA' as TipoNotificacion,
         titulo: regla.nombre,
         mensaje: `Regla activada: ${regla.nombre}`,
         manifiestoId,
         prioridad: 'ALTA' as PrioridadNotificacion,
+        datos: { evento: eventoAlerta, reglaId: regla.id, ...datos },
       });
     }
 
-    if (emails.length > 0) {
-      await emailService.sendAlertEmail(emails, regla, manifiestoId ?? '', datos);
+    // Explicit legacy addresses are a distinct channel, not registered-user
+    // subscriptions. Never activate it as a side effect of enabling other mail.
+    const authorizedEmails = [...new Set(emails.map(email => email.trim().toLowerCase()))].filter(email => externalAlertRecipientAllowed(email));
+    if (authorizedEmails.length > 0) {
+      await emailService.sendAlertEmail(authorizedEmails, regla, manifiestoId ?? '', datos);
     }
   }
 }

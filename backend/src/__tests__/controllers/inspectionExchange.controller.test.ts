@@ -16,11 +16,12 @@ const mocks = vi.hoisted(() => ({
   updateInspection: vi.fn(),
   createEvent: vi.fn(),
   finalExchange: vi.fn(),
+  markViewed: vi.fn(),
 }));
 
 vi.mock('../../lib/prisma', () => ({ default: {
   inspeccion: { findUnique: mocks.inspection, findMany: mocks.inspections },
-  intercambioInspeccion: { findMany: mocks.exchanges, findFirst: mocks.existingExchange, findUniqueOrThrow: mocks.finalExchange },
+  intercambioInspeccion: { findMany: mocks.exchanges, findFirst: mocks.existingExchange, findUniqueOrThrow: mocks.finalExchange, updateMany: mocks.markViewed },
   $transaction: mocks.transaction,
 } }));
 vi.mock('../../services/inspectionEvidence.service', () => ({
@@ -66,6 +67,7 @@ describe('inspection participant exchange controller', () => {
     vi.clearAllMocks();
     mocks.inspection.mockResolvedValue(actorInspection);
     mocks.exchanges.mockResolvedValue([]);
+    mocks.markViewed.mockResolvedValue({ count: 1 });
     mocks.inspections.mockResolvedValue([{ ...actorInspection, _count: { intercambios: 2 } }]);
     mocks.existingExchange.mockResolvedValue(null);
     mocks.persist.mockResolvedValue({
@@ -97,12 +99,33 @@ describe('inspection participant exchange controller', () => {
     }));
   });
 
+  it.each([['TRANSPORTISTA', 'transportista', 'transportistaId'], ['OPERADOR', 'operador', 'operadorId'], ['GENERADOR', 'generador', 'generadorId']])('scopes %s independently of requested filters and hides internal drafts', async (rol, relation, field) => {
+    const next = vi.fn();
+    await listarParticipacionInspeccionado({ user: { id: 'owner', rol, [relation]: { id: 'own' } },
+      query: { actorId: 'other', estado: 'BORRADOR' } } as any, response() as any, next);
+    expect(next).not.toHaveBeenCalled();
+    const where = mocks.inspections.mock.calls[0][0].where;
+    expect(where[field]).toBe('own');
+    expect(where.estado.in).toContain('NOTIFICADA');
+    expect(where.estado.in).not.toContain('BORRADOR');
+    for (const state of ['BORRADOR', 'EN_CAMPO', 'EN_REVISION']) {
+      mocks.inspection.mockResolvedValue({ ...actorInspection, tipoActor: rol, [field]: 'own', estado: state });
+      await obtenerIntercambiosInspeccion({ params: { id: 'inspection-1' }, user: { rol, [relation]: { id: 'own' } } } as any, response() as any, next);
+      expect(next).toHaveBeenLastCalledWith(expect.objectContaining({ statusCode: 403 }));
+    }
+    expect(mocks.markViewed).not.toHaveBeenCalled();
+    expect(mocks.exchanges).not.toHaveBeenCalled();
+  });
+
   it('shows the formal timeline to the inspected actor linked to the case', async () => {
     const res = response();
     const next = vi.fn();
     await obtenerIntercambiosInspeccion({ params: { id: 'inspection-1' }, user: actorUser() } as any, res as any, next);
     expect(next).not.toHaveBeenCalled();
     expect(mocks.exchanges).toHaveBeenCalledWith(expect.objectContaining({ where: { inspeccionId: 'inspection-1' } }));
+    expect(mocks.markViewed).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ destinatario: 'INSPECCIONADO', vistaPorDestinatarioAt: null }),
+    }));
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ parteActual: 'INSPECCIONADO', comunicacionExterna: false }),
     }));

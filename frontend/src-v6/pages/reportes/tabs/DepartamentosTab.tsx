@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  MapPin, Truck, Factory, Package, Calendar, Filter, ChevronRight,
+  MapPin, Truck, Factory, FlaskConical, Calendar, Filter, ChevronRight,
   Search, X, Download, Printer, FileDown,
 } from 'lucide-react';
 import {
@@ -13,6 +13,8 @@ import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { Select } from '../../../components/ui/Select';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
+import { CHART_TEXT_COLOR } from '../../../utils/chart-colors';
+import { ChartLegendLabel } from '../../../components/charts/ChartLegendLabel';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { ACTOR_COLORS } from '../../../utils/map-icons';
 import { agruparPorDepartamento } from '../../../utils/mendoza-departamentos';
@@ -103,13 +105,13 @@ export function DepartamentoDetalleModal({
   }, [allActors, tipoFilter, searchQuery, categoriaFilter]);
 
   const tipoColor: Record<string, string> = {
-    generador: 'text-green-700 bg-green-50',
+    generador: 'text-purple-700 bg-purple-50',
     transportista: 'text-orange-700 bg-orange-50',
     operador: 'text-blue-700 bg-blue-50',
   };
 
   const tipoDot: Record<string, string> = {
-    generador: 'bg-green-500',
+    generador: 'bg-purple-500',
     transportista: 'bg-orange-500',
     operador: 'bg-blue-500',
   };
@@ -198,17 +200,17 @@ export function DepartamentoDetalleModal({
         {/* Stats row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 sm:px-6 py-4 bg-neutral-50/50">
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-neutral-100">
-            <span className="w-3 h-3 rounded-full bg-green-500" />
+            <span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ backgroundColor: ACTOR_COLORS.generador }} />
             <span className="text-sm font-semibold text-neutral-900">{generadores.length}</span>
             <span className="text-xs text-neutral-500">Generadores</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-neutral-100">
-            <span className="w-3 h-3 rounded-full bg-orange-500" />
+            <span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ backgroundColor: ACTOR_COLORS.transportista }} />
             <span className="text-sm font-semibold text-neutral-900">{transportistas.length}</span>
             <span className="text-xs text-neutral-500">Transportistas</span>
           </div>
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-neutral-100">
-            <span className="w-3 h-3 rounded-full bg-blue-500" />
+            <span aria-hidden="true" className="w-3 h-3 rounded-full" style={{ backgroundColor: ACTOR_COLORS.operador }} />
             <span className="text-sm font-semibold text-neutral-900">{operadores.length}</span>
             <span className="text-xs text-neutral-500">Operadores</span>
           </div>
@@ -392,10 +394,10 @@ export default function DepartamentosTab({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={MapPin} label="Departamentos" value={depStats.length} color="from-violet-600 to-violet-700" sub="con actividad" />
-        <KpiCard icon={Factory} label="Generadores" value={totalGen} color="from-green-600 to-green-700" />
-        <KpiCard icon={Truck} label="Transportistas" value={totalTrans} color="from-orange-600 to-orange-700" />
-        <KpiCard icon={Package} label="Operadores" value={totalOper} color="from-blue-600 to-blue-700" />
+        <KpiCard icon={MapPin} label="Departamentos" value={depStats.length} color="from-violet-700 to-violet-800" sub="con actividad" />
+        <KpiCard icon={Factory} label="Generadores" value={totalGen} color="from-purple-700 to-purple-800" />
+        <KpiCard icon={Truck} label="Transportistas" value={totalTrans} color="from-orange-700 to-orange-800" />
+        <KpiCard icon={FlaskConical} label="Operadores" value={totalOper} color="from-blue-700 to-blue-800" />
       </div>
 
       {/* Department filter */}
@@ -435,10 +437,10 @@ export default function DepartamentosTab({
             <ResponsiveContainer width="100%" height={Math.max(320, chartData.length * 40)}>
               <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} stroke="#94a3b8" />
+                <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={110} stroke="#94a3b8" />
                 <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} formatter={ChartLegendLabel} />
                 <Bar
                   dataKey="generadores"
                   name="Generadores"
@@ -494,13 +496,13 @@ export default function DepartamentosTab({
                   <tr>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">Departamento</th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">
-                      <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Gen.</span>
+                      <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ backgroundColor: ACTOR_COLORS.generador }} /> Gen.</span>
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center hidden md:table-cell">
-                      <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /> Trans.</span>
+                      <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ backgroundColor: ACTOR_COLORS.transportista }} /> Trans.</span>
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center hidden md:table-cell">
-                      <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Oper.</span>
+                      <span className="inline-flex items-center gap-1"><span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ backgroundColor: ACTOR_COLORS.operador }} /> Oper.</span>
                     </th>
                     <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center">Total</th>
                     <th className="px-4 py-3 w-8"></th>
@@ -514,8 +516,8 @@ export default function DepartamentosTab({
                       onClick={() => onSelectDep(d.departamento)}
                     >
                       <td className="px-4 py-3 text-sm font-medium text-neutral-900">{d.departamento}</td>
-                      <td className="px-4 py-3 text-sm text-green-600 font-semibold text-center">{d.generadores}</td>
-                      <td className="px-4 py-3 text-sm text-orange-600 font-semibold text-center hidden md:table-cell">{d.transportistas}</td>
+                      <td className="px-4 py-3 text-sm text-purple-700 font-semibold text-center">{d.generadores}</td>
+                      <td className="px-4 py-3 text-sm text-orange-700 font-semibold text-center hidden md:table-cell">{d.transportistas}</td>
                       <td className="px-4 py-3 text-sm text-blue-600 font-semibold text-center hidden md:table-cell">{d.operadores}</td>
                       <td className="px-4 py-3 text-sm font-bold text-neutral-900 text-center">{d.total}</td>
                       <td className="px-4 py-3">

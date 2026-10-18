@@ -6,19 +6,22 @@
  */
 
 import React, { Suspense } from 'react';
+import { PageLoader } from './components/ui/LoadingState';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
+import { AuthLayout } from './layouts/AuthLayout';
 import { canAccessMobilePath } from './utils/mobileAccess';
 import { postLoginDestination } from './utils/authRedirect';
 
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
-  LoginPage, ReclamarCuentaPage, RegistroPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
-  MobileDashboardPage, CentroControlPage,
+  LoginPage, ReclamarCuentaPage, RegistroPage, VerificarEmailPage, ForgotPasswordPage, ResetPasswordPage, UserSwitcherPage,
+  MobileDashboardPage, CentroControlPage, WarRoomPage,
   InspeccionesPage, InspeccionDetallePage,
   InspeccionadoParticipacionPage,
-  ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  ManifiestosPage, BajaIntensidadPage, AdendasManifiestoPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   VerificarInspeccionPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
@@ -27,19 +30,11 @@ import {
   AdminOperadoresPage, NuevoOperadorPage, NuevoTransportistaPage,
   AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
   AdminRenovacionesPage, AdminSolicitudesPage, SolicitudDetallePage,
-  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
-  AyudaPage, EscanerQRPage, EstadisticasPage,
+  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage, EmpresasPage, EmpresaInvitacionPage,
+  AyudaPage, SoportePage, EscanerQRPage, EstadisticasPage,
   InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
 } from './routes/pages';
 
-const PageLoader: React.FC = () => (
-  <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-    <div className="flex flex-col items-center gap-4">
-      <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
-      <p className="text-neutral-600 font-medium">Cargando SITREP...</p>
-    </div>
-  </div>
-);
 
 const TrackingRedirectMobile: React.FC = () => {
   const { id } = useParams();
@@ -82,7 +77,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/inscripcion', '/registro', '/recuperar', '/reset-password'];
+  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
@@ -92,7 +87,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   // Logged-in user on /login → resume a safe local deep link when available
   if (currentUser && location.pathname === '/login') {
     const requestedPath = (location.state as { from?: unknown } | null)?.from;
-    return <Navigate to={postLoginDestination(requestedPath, currentUser.rol)} replace />;
+    return <Navigate to={postLoginDestination(requestedPath, currentUser.rol, currentUser.esInspector)} replace />;
   }
 
   // Public route → render
@@ -118,6 +113,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
 function AppMobile() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
         <AuthGate>
@@ -127,16 +123,26 @@ function AppMobile() {
           <Route path="/l/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/reclamar" element={<ReclamarCuentaPage />} />
-          <Route path="/registro" element={<RegistroPage />} />
-          <Route path="/recuperar" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route element={<AuthLayout />}>
+            <Route path="/registro" element={<RegistroPage />} />
+            <Route path="/empresa-invitacion/:token" element={<EmpresaInvitacionPage />} />
+            <Route path="/verificar-email" element={<VerificarEmailPage />} />
+            <Route path="/recuperar" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+          </Route>
+
+          {/* Same authenticated, full-screen Monitor as the web, without a second mobile shell. */}
+          <Route path="/monitor" element={<WarRoomPage />} />
 
           {/* Mobile Routes - MobileLayout (auth handled by AuthGate above) */}
           <Route element={<MobileLayout />}>
             <Route path="/dashboard" element={<MobileDashboardPage />} />
+            <Route path="/empresas" element={<EmpresasPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
             <Route path="/centro-control/viaje/:id" element={<ViajeRedirectMobile />} />
             <Route path="/manifiestos" element={<ManifiestosPage />} />
+            <Route path="/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
+            <Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
@@ -181,6 +187,8 @@ function AppMobile() {
             <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />
             <Route path="/mi-solicitud" element={<MiSolicitudPage />} />
             <Route path="/ayuda" element={<AyudaPage />} />
+            <Route path="/soporte" element={<SoportePage />} />
+            <Route path="/soporte/:id" element={<SoportePage />} />
             <Route path="/switch-user" element={<UserSwitcherPage />} />
 
             {/* Admin */}
@@ -225,6 +233,7 @@ function AppMobile() {
         </AuthGate>
       </Suspense>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ReportRow, ReportSortHeader } from './ReportTableControls';
 import {
-  Factory, Package, MapPin, FileText, Calendar, Search, ChevronUp, ChevronDown, Download, FileDown, Printer, Filter,
+  Factory, Package, MapPin, FileText, Calendar, Search, Download, FileDown, Printer, Filter,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { Badge } from '../../../components/ui/BadgeV2';
-import { CHART_COLORS } from '../../../utils/chart-colors';
+import { CHART_COLORS, CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { CategoryBarChart } from '../../../components/charts/CategoryBarChart';
@@ -28,7 +28,6 @@ export default function GeneradoresTab({
   periodoLabel: string;
   incluirTodos?: boolean;
 }) {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
@@ -36,10 +35,6 @@ export default function GeneradoresTab({
   const toggleSort = (key: string) => setSortConfig(prev =>
     prev?.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }
   );
-  const SortIcon = ({ col }: { col: string }) => {
-    if (sortConfig?.key !== col) return <ChevronUp size={12} className="ml-1 opacity-30 inline" />;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
-  };
 
   // Fetch ALL generadores (used in "Ver Todos" mode)
   const { data: paginatedData, isLoading } = useGeneradores({ limit: 5000 });
@@ -60,7 +55,7 @@ export default function GeneradoresTab({
   }, [ccData]);
 
   // Choose data source: ccData when date-filtered, full API when "Ver Todos"
-  const isDateFiltered = !incluirTodos && ccGeneradores.length > 0;
+  const isDateFiltered = !incluirTodos;
   const generadores = isDateFiltered ? ccGeneradores : allGeneradores;
 
   const filtered = useMemo(() => {
@@ -182,10 +177,10 @@ export default function GeneradoresTab({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-600 to-purple-700" />
-        <KpiCard icon={Package} label="Categorias" value={uniqueCategories} color="from-indigo-600 to-indigo-700" sub="tipos" />
-        <KpiCard icon={MapPin} label="Departamentos" value={byDep.filter(d => d.name !== 'Sin departamento').length} color="from-violet-600 to-violet-700" sub="con presencia" />
-        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s: number, g: any) => s + g.cantManifiestos, 0)} color="from-emerald-600 to-emerald-700" sub={isDateFiltered ? 'en periodo' : 'generados'} />
+        <KpiCard icon={Factory} label="Total Generadores" value={generadores.length} color="from-purple-700 to-purple-800" />
+        <KpiCard icon={Package} label="Categorias" value={uniqueCategories} color="from-indigo-700 to-indigo-800" sub="tipos" />
+        <KpiCard icon={MapPin} label="Departamentos" value={byDep.filter(d => d.name !== 'Sin departamento').length} color="from-violet-700 to-violet-800" sub="con presencia" />
+        <KpiCard icon={FileText} label="Manifiestos" value={generadores.reduce((s: number, g: any) => s + g.cantManifiestos, 0)} color="from-emerald-700 to-emerald-800" sub={isDateFiltered ? 'en periodo' : 'generados'} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -205,8 +200,8 @@ export default function GeneradoresTab({
               <ResponsiveContainer width="100%" height={320}>
                 <BarChart data={byDep} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} stroke="#94a3b8" />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: CHART_TEXT_COLOR }} stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: CHART_TEXT_COLOR }} width={110} stroke="#94a3b8" />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="value" name="Generadores" fill="#7C3AED" radius={[0, 8, 8, 0]} barSize={22} />
                 </BarChart>
@@ -222,6 +217,7 @@ export default function GeneradoresTab({
 
       <Card className="border-0 shadow-sm">
         <CardHeader
+          className="flex-col sm:flex-row"
           title={`Listado de Generadores (${filtered.length})`}
           subtitle={isDateFiltered ? `Generadores con actividad en ${periodoLabel}` : 'Generadores registrados en el sistema'}
           action={
@@ -293,18 +289,18 @@ export default function GeneradoresTab({
             <table className="w-full text-left">
               <thead className="bg-neutral-50/80 border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('razonSocial')}>Razon Social<SortIcon col="razonSocial" /></th>
+                  <ReportSortHeader column="razonSocial" label="Razon Social" sort={sortConfig} onSort={toggleSort} />
                   <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider">CUIT</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('categoria')}>Categoria<SortIcon col="categoria" /></th>
+                  <ReportSortHeader column="categoria" label="Categoria" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
                   {!isDateFiltered && (
-                    <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider hidden md:table-cell cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('departamento')}>Departamento<SortIcon col="departamento" /></th>
+                    <ReportSortHeader column="departamento" label="Departamento" sort={sortConfig} onSort={toggleSort} className="hidden md:table-cell" />
                   )}
-                  <th className="px-4 py-3 text-xs font-semibold text-neutral-500 uppercase tracking-wider text-center cursor-pointer select-none hover:text-primary-600" onClick={() => toggleSort('manifiestos')}>Manifiestos<SortIcon col="manifiestos" /></th>
+                  <ReportSortHeader column="manifiestos" label="Manifiestos" sort={sortConfig} onSort={toggleSort} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {filtered.slice(0, 100).map((g, i) => (
-                  <tr key={`${g.id}-${i}`} className="hover:bg-primary-50/30 transition-colors cursor-pointer" onClick={() => g.id && navigate(`/admin/actores/generadores/${g.id}`)}>
+                  <ReportRow key={`${g.id}-${i}`} to={g.id ? `/admin/actores/generadores/${g.id}` : undefined}>
                     <td className="px-4 py-3 text-sm font-medium text-neutral-900 max-w-[200px] truncate">{g.razonSocial}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 font-mono text-xs">{g.cuit}</td>
                     <td className="px-4 py-3 text-sm text-neutral-600 hidden md:table-cell max-w-[150px] truncate" title={g.categoria}>{g.categoria || '-'}</td>
@@ -314,7 +310,7 @@ export default function GeneradoresTab({
                     <td className="px-4 py-3 text-center">
                       <Badge variant="soft" color="primary">{g.cantManifiestos}</Badge>
                     </td>
-                  </tr>
+                  </ReportRow>
                 ))}
                 {filtered.length === 0 && (
                   <tr>

@@ -1,0 +1,65 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RegisteredAccount } from '../../pages/public/inscripcion/RegisteredAccount';
+import SolicitarCambiosPage from '../../pages/perfil/SolicitarCambiosPage';
+import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
+const mock = vi.hoisted(() => ({ get: vi.fn(), token: '', role: 'GENERADOR', submit: vi.fn() }));
+vi.mock('../../services/api', () => ({ default: { get: mock.get }, getAccessToken: () => mock.token }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', actorId: 'actor' }, isGenerador: mock.role === 'GENERADOR', isOperador: mock.role === 'OPERADOR' }) }));
+vi.mock('../../services/renovacion.service', () => ({ renovacionService: { create: mock.submit } }));
+vi.mock('../../components/ui/Toast', () => ({ toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
+beforeEach(() => { vi.clearAllMocks(); mock.role = 'GENERADOR'; mock.token = `qa.${btoa(JSON.stringify({ id: 'owner' }))}.qa`; });
+describe('existing registry is available only through the verified owner and actual API shape', () => {
+  it('finds the exact imported CUIT without separators, without rewriting it or matching another actor', async () => {
+    mock.get.mockResolvedValueOnce({ data: { data: { generadores: [] } } })
+      .mockResolvedValueOnce({ data: { data: { generadores: [{ id: 'exact', razonSocial: 'QA importado', cuit: '30123456789' }, { id: 'other', razonSocial: 'Otra ficha', cuit: '30999999999' }] } } });
+    render(<MemoryRouter><ActorRegistryLookup type="GENERADOR" cuit="30-12345678-9" /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar en padrón' }));
+    await waitFor(() => expect(screen.getByText('QA importado · 30123456789')).toBeVisible());
+    expect(screen.queryByText(/Otra ficha/)).toBeNull();
+    expect(mock.get.mock.calls.map(call => call[1].params.search)).toEqual(['30-12345678-9', '30123456789']);
+  });
+  it('does not query or disclose the padrón without an actual session', async () => {
+    mock.token = ''; render(<MemoryRouter><ActorRegistryLookup type="OPERADOR" cuit="30-12345678-9" /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar en padrón' }));
+    await waitFor(() => expect(screen.getByText('Iniciá sesión para consultar el padrón.')).toBeVisible()); expect(mock.get).not.toHaveBeenCalled();
+  });
+  it.each(['GENERADOR', 'OPERADOR'] as const)('%s precarga uses the wrapped actor API and retains the current address', async role => {
+    mock.role = role; mock.get.mockResolvedValue({ data: { data: { [role.toLowerCase()]: { id: 'actor', razonSocial: 'QA padrón', domicilio: 'QA domicilio anterior', telefono: '0261-QA' } } } });
+    await act(async () => render(<MemoryRouter><SolicitarCambiosPage /></MemoryRouter>));
+    expect(screen.getByLabelText('Razon Social')).toHaveValue('QA padrón'); expect(screen.getByLabelText('Domicilio')).toHaveValue('QA domicilio anterior');
+    expect(mock.submit).not.toHaveBeenCalled();
+  });
+  it('never renders an editable empty registry after a failed preload', async () => {
+    mock.get.mockRejectedValue(new Error('QA offline')); await act(async () => render(<MemoryRouter><SolicitarCambiosPage /></MemoryRouter>));
+    expect(screen.queryByRole('textbox')).toBeNull(); expect(screen.getByRole('button', { name: 'Reintentar precarga' })).toBeVisible(); expect(mock.submit).not.toHaveBeenCalled();
+  });
+  it('does not display another account profile even if its response finishes late', async () => {
+    let finish!: (value: unknown) => void; mock.get.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    render(<MemoryRouter><RegisteredAccount type="GENERADOR"><p>Nueva cuenta</p></RegisteredAccount></MemoryRouter>);
+    mock.token = `qa.${btoa(JSON.stringify({ id: 'other' }))}.qa`;
+    await act(async () => finish({ data: { data: { user: { id: 'owner', activo: true, rol: 'GENERADOR', generador: { razonSocial: 'PRIVATE-QA', cuit: 'QA', domicilio: 'QA' } } } } }));
+    expect(screen.queryByText('PRIVATE-QA')).toBeNull(); expect(screen.getByText('Nueva cuenta')).toBeVisible();
+  });
+  it('offers the existing review circuit instead of creating a duplicate account', async () => {
+    mock.get.mockResolvedValue({ data: { data: { user: { id: 'owner', activo: true, rol: 'GENERADOR', generador: { razonSocial: 'QA padrón', cuit: 'QA', domicilio: 'QA' } } } } });
+    await act(async () => render(<MemoryRouter><Routes><Route path="/" element={<RegisteredAccount type="GENERADOR"><p>Nueva cuenta</p></RegisteredAccount>} /><Route path="/mi-perfil/solicitar-cambios" element={<p>Revisión precargada</p>} /></Routes></MemoryRouter>));
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar mis datos precargados' }));
+    await waitFor(() => expect(screen.getByText('Revisión precargada')).toBeVisible()); expect(mock.submit).not.toHaveBeenCalled();
+  });
+});
+
+import { toast as mockedToast } from '../../components/ui/Toast';
+describe('change requests explain a server rejection instead of inviting a pointless retry', () => {
+  it('shows the server reason and keeps the edited values', async () => {
+    mock.role = 'GENERADOR';
+    mock.get.mockResolvedValue({ data: { data: { generador: { id: 'actor', razonSocial: 'QA padrón', domicilio: 'QA domicilio anterior', telefono: '0261-QA' } } } });
+    mock.submit.mockRejectedValue({ isAxiosError: true, response: { status: 400, data: { message: 'Ya existe una renovacion para este actor en ese ano' } } });
+    await act(async () => render(<MemoryRouter><SolicitarCambiosPage /></MemoryRouter>));
+    fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA domicilio nuevo' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Enviar Solicitud/ })); });
+    expect(mockedToast.error).toHaveBeenCalledWith('No se envió la solicitud', 'Ya existe una renovacion para este actor en ese ano');
+    expect(screen.getByLabelText('Domicilio')).toHaveValue('QA domicilio nuevo');
+  });
+});

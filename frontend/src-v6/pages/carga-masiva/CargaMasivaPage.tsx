@@ -22,7 +22,9 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { toast } from '../../components/ui/Toast';
 import { Select } from '../../components/ui/Select';
+import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 import api from '../../services/api';
+import { bulkUploadFailureMessage, summarizeBulkUpload, type BulkUploadRowError } from '../../utils/bulkUploadResult';
 
 // Type for upload results
 interface CargaResultado {
@@ -33,16 +35,17 @@ interface CargaResultado {
   exitosos: number;
   fallidos: number;
   estado: string;
+  errores: BulkUploadRowError[];
 }
 
 // Historial starts empty - populated by actual uploads
 
 // Template types for download — match backend routes in notification.routes.ts
 const TEMPLATE_TYPES = [
-  { tipo: 'generadores', label: 'Generadores', version: 'v2.0', color: 'primary', bgColor: 'bg-primary-100', textColor: 'text-primary-600' },
-  { tipo: 'transportistas', label: 'Transportistas', version: 'v1.5', color: 'purple', bgColor: 'bg-purple-100', textColor: 'text-purple-600' },
-  { tipo: 'operadores', label: 'Operadores', version: 'v1.0', color: 'orange', bgColor: 'bg-orange-100', textColor: 'text-orange-600' },
-];
+  { tipo: 'generadores', label: 'Generadores', version: 'v2.0', category: 'generador' },
+  { tipo: 'transportistas', label: 'Transportistas', version: 'v1.5', category: 'transportista' },
+  { tipo: 'operadores', label: 'Operadores', version: 'v1.0', category: 'operador' },
+] as const;
 
 const CargaMasivaPage: React.FC = () => {
   const [dragActive, setDragActive] = useState(false);
@@ -125,12 +128,12 @@ const CargaMasivaPage: React.FC = () => {
               resolve({ data: null });
             }
           } else {
-            reject(new Error(`Upload failed: ${xhr.status}`));
+            reject(new Error(bulkUploadFailureMessage(xhr.status, xhr.responseText)));
           }
         });
 
-        xhr.addEventListener('error', () => reject(new Error('Network error')));
-        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
+        xhr.addEventListener('error', () => reject(new Error(bulkUploadFailureMessage(0, ''))));
+        xhr.addEventListener('abort', () => reject(new Error('Carga cancelada. El archivo sigue seleccionado.')));
 
         // Add auth token
         const token = localStorage.getItem('sitrep_access_token');
@@ -143,24 +146,27 @@ const CargaMasivaPage: React.FC = () => {
       });
 
       // Process response
-      const resultData = result?.data;
+      const summary = summarizeBulkUpload(result?.data);
       const nuevoRegistro: CargaResultado = {
         id: historial.length + 1,
         archivo: archivo.name,
         fecha: new Date().toLocaleString('es-AR'),
-        registros: resultData?.total || 0,
-        exitosos: resultData?.exitosos || resultData?.total || 0,
-        fallidos: resultData?.fallidos || 0,
-        estado: resultData?.fallidos > 0 ? 'parcial' : 'completado',
+        ...summary,
       };
 
       setHistorial(prev => [nuevoRegistro, ...prev]);
-      toast.success('Carga completada', `Se procesaron ${nuevoRegistro.registros} registros de ${archivo.name}`);
-    } catch {
-      toast.error('Error de carga', `No se pudo procesar el archivo ${archivo.name}. Verifica el formato e intenta nuevamente.`);
+      setArchivo(null);
+      if (summary.estado === 'completado') {
+        toast.success('Carga completada', `${summary.exitosos} de ${summary.registros} registros de ${archivo.name} se cargaron.`);
+      } else if (summary.estado === 'parcial') {
+        toast.warning('Carga parcial', `${summary.exitosos} de ${summary.registros} registros se cargaron; ${summary.fallidos} tienen errores. Revisalos en el historial.`);
+      } else {
+        toast.error('No se cargó ningún registro', `${archivo.name}: revisá las filas con error en el historial.`);
+      }
+    } catch (error) {
+      toast.error('Error de carga', error instanceof Error && error.message ? error.message : bulkUploadFailureMessage(-1, ''));
     } finally {
       setProcesando(false);
-      setArchivo(null);
       setProgreso(0);
     }
   };
@@ -182,23 +188,18 @@ const CargaMasivaPage: React.FC = () => {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-neutral-900">Carga Masiva</h2>
-        <p className="text-neutral-600 mt-1">
-          Importa datos masivamente mediante archivos Excel o CSV
-        </p>
+        <h2 className="sr-only">Carga Masiva</h2>
       </div>
 
       {/* Plantillas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {TEMPLATE_TYPES.map(tmpl => (
-          <Card key={tmpl.tipo} className="hover:shadow-md transition-shadow cursor-pointer">
-            <CardContent className="p-4">
+          <Card key={tmpl.tipo} padding="none">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className={`p-2 ${tmpl.bgColor} rounded-lg`}>
-                  <FileSpreadsheet size={20} className={tmpl.textColor} />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-neutral-900">{tmpl.label}</h4>
+                <MapCategorySymbol category={tmpl.category} />
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-neutral-900 break-words">{tmpl.label}</h4>
                   <p className="text-xs text-neutral-500">Template {tmpl.version}</p>
                 </div>
               </div>
@@ -353,6 +354,14 @@ const CargaMasivaPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          {historial.filter(carga => carga.errores.length > 0).slice(0, 1).map(carga => (
+            <details key={carga.id} open className="border-t border-neutral-200 px-3 py-3">
+              <summary className="min-h-11 cursor-pointer text-sm font-semibold text-error-700">Filas con error en {carga.archivo} ({carga.errores.length})</summary>
+              <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto text-sm text-neutral-800">
+                {carga.errores.map((row, index) => <li key={`${row.linea}-${index}`}><span className="font-mono">Línea {row.linea}</span>: {row.error}</li>)}
+              </ul>
+            </details>
+          ))}
         </CardContent>
       </Card>
     </div>

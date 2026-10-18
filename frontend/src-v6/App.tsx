@@ -5,6 +5,7 @@
  */
 
 import React, { Suspense } from 'react';
+import { PageLoader } from './components/ui/LoadingState';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 
 // ========================================
@@ -31,7 +32,7 @@ import {
   InspeccionesPage, InspeccionDetallePage,
   VerificarInspeccionPage,
   InspeccionadoParticipacionPage,
-  ManifiestosPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
+  ManifiestosPage, BajaIntensidadPage, AdendasManifiestoPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   TransportePerfilPage, ViajeEnCursoTransportista,
   ActoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, ConfiguracionPage,
@@ -39,22 +40,14 @@ import {
   AdminOperadoresPage, NuevoOperadorPage, NuevoTransportistaPage,
   AdminRenovacionesPage, AdminVehiculosPage, AdminResiduosPage, AdminTratamientosPage, AdminBlockchainPage,
   AdminSolicitudesPage, SolicitudDetallePage,
-  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage,
-  MobileDashboardPage, NotificacionesPage, AyudaPage, EscanerQRPage, EstadisticasPage,
+  AuditoriaPage, CargaMasivaPage, PerfilPage, SolicitarCambiosPage, EmpresasPage, EmpresaInvitacionPage,
+  MobileDashboardPage, NotificacionesPage, AyudaPage, SoportePage, EscanerQRPage, EstadisticasPage,
   InscripcionWizardPage, MiSolicitudPage, NotFoundPage,
 } from './routes/pages';
 
 // ========================================
 // COMPONENTE DE CARGA
 // ========================================
-const PageLoader: React.FC = () => (
-  <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-    <div className="flex flex-col items-center gap-4">
-      <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin" />
-      <p className="text-neutral-600 font-medium">Cargando SITREP v6...</p>
-    </div>
-  </div>
-);
 
 // ========================================
 // TRACKING REDIRECT (legacy routes → centro-control)
@@ -95,6 +88,7 @@ function App() {
           <Route path="/l/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/registro" element={<RegistroPage />} />
+          <Route path="/empresa-invitacion/:token" element={<EmpresaInvitacionPage />} />
           <Route path="/verificar-email" element={<VerificarEmailPage />} />
           <Route path="/recuperar" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -107,9 +101,12 @@ function App() {
           <Route element={<MobileLayout />}>
             <Route path="/mobile" element={<MobileDashboardPage />} />
             <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
+            <Route path="/mobile/empresas" element={<EmpresasPage />} />
             <Route path="/mobile/centro-control" element={<CentroControlPage />} />
             <Route path="/mobile/centro-control/viaje/:id" element={<ViajeRedirect />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
+            <Route path="/mobile/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
+            <Route path="/mobile/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} />
             <Route path="/mobile/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/mobile/manifiestos/:id" element={<ManifiestoDetallePage />} />
@@ -126,6 +123,8 @@ function App() {
             <Route path="/mobile/configuracion" element={<ConfiguracionPage />} />
             <Route path="/mobile/mi-perfil" element={<PerfilPage />} />
             <Route path="/mobile/ayuda" element={<AyudaPage />} />
+            <Route path="/mobile/soporte" element={<SoportePage />} />
+            <Route path="/mobile/soporte/:id" element={<SoportePage />} />
             <Route path="/mobile/switch-user" element={<UserSwitcherPage />} />
 
             {/* Mobile Special Routes */}
@@ -135,6 +134,12 @@ function App() {
         </Route>
 
         {/* Admin Mobile Routes - ADMIN only */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/solicitudes" element={<AdminSolicitudesPage />} />
+            <Route path="/mobile/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
+          </Route>
+        </Route>
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores" element={<ActoresPage />} />
@@ -152,7 +157,7 @@ function App() {
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+        <Route element={<ProtectedRoute actorRead="TRANSPORTISTA" />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>
@@ -171,7 +176,7 @@ function App() {
             <Route path="/mobile/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
             <Route path="/mobile/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
             <Route path="/mobile/admin/actores/generadores/:id/renovar" element={<NuevoGeneradorPage />} />
-            <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+
             <Route path="/mobile/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
         </Route>
@@ -183,8 +188,36 @@ function App() {
             <Route path="/mobile/admin/actores/operadores/nuevo" element={<NuevoOperadorPage />} />
             <Route path="/mobile/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
             <Route path="/mobile/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
-            <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+
             <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute actorRead="GENERADOR" />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute actorRead="OPERADOR" />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute actorRead="GENERADOR" />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+          </Route>
+        </Route>
+
+        {/* Inspector consultation only; creation/editing remain in admin guards. */}
+        <Route element={<ProtectedRoute actorRead="OPERADOR" />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
           </Route>
         </Route>
 
@@ -203,6 +236,8 @@ function App() {
 
             {/* Manifiestos */}
             <Route path="/manifiestos" element={<ManifiestosPage />} />
+            <Route path="/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
+            <Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} />
             <Route path="/manifiestos/nuevo" element={<NuevoManifiestoPage />} />
             <Route path="/manifiestos/:id/editar" element={<EditarManifiestoPage />} />
             <Route path="/manifiestos/:id" element={<ManifiestoDetallePage />} />
@@ -220,15 +255,19 @@ function App() {
 
             {/* Alertas */}
             <Route path="/alertas" element={<AlertasPage />} />
+            <Route path="/notificaciones" element={<NotificacionesPage />} />
 
             {/* Configuración */}
             <Route path="/configuracion" element={<ConfiguracionPage />} />
 
             {/* Perfil */}
             <Route path="/mi-perfil" element={<PerfilPage />} />
+            <Route path="/empresas" element={<EmpresasPage />} />
 
             {/* Ayuda */}
             <Route path="/ayuda" element={<AyudaPage />} />
+            <Route path="/soporte" element={<SoportePage />} />
+            <Route path="/soporte/:id" element={<SoportePage />} />
 
             {/* Solicitudes */}
             <Route path="/mi-solicitud" element={<MiSolicitudPage />} />
@@ -238,7 +277,7 @@ function App() {
         </Route>
 
         {/* Admin Solicitudes - ADMIN + sub-admins */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/solicitudes" element={<AdminSolicitudesPage />} />
             <Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
@@ -271,7 +310,7 @@ function App() {
           </Route>
         </Route>
         {/* Transportista detail: ADMIN + ADMIN_TRANSPORTISTA + TRANSPORTISTA (own profile) */}
-        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_TRANSPORTISTA', 'TRANSPORTISTA']} />}>
+        <Route element={<ProtectedRoute actorRead="TRANSPORTISTA" />}>
           <Route element={<MainLayout />}>
             <Route path="/admin/actores/transportistas/:id" element={<TransportistaDetallePage />} />
           </Route>
@@ -290,7 +329,7 @@ function App() {
             <Route path="/admin/actores/generadores/nuevo" element={<NuevoGeneradorPage />} />
             <Route path="/admin/actores/generadores/:id/editar" element={<NuevoGeneradorPage />} />
             <Route path="/admin/actores/generadores/:id/renovar" element={<NuevoGeneradorPage />} />
-            <Route path="/admin/actores/generadores/:id" element={<GeneradorDetallePage />} />
+
             <Route path="/admin/residuos" element={<AdminResiduosPage />} />
           </Route>
         </Route>
@@ -302,7 +341,7 @@ function App() {
             <Route path="/admin/actores/operadores/nuevo" element={<NuevoOperadorPage />} />
             <Route path="/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
             <Route path="/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
-            <Route path="/admin/actores/operadores/:id" element={<OperadorDetallePage />} />
+
             <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
             <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
@@ -316,7 +355,11 @@ function App() {
         <Route path="/v6/manifiestos/verificar/:numero" element={<V6VerificarRedirect />} />
 
         {/* User Switcher */}
-        <Route path="/switch-user" element={<UserSwitcherPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="/switch-user" element={<UserSwitcherPage />} />
+          </Route>
+        </Route>
 
         {/* Redirects */}
         <Route path="/" element={<LandingPage />} />

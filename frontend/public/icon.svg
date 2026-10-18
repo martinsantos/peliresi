@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect fill="#0f172a" width="512" height="512" rx="64"/>
-  <rect fill="#10b981" x="64" y="64" width="384" height="384" rx="48"/>
-  <text x="256" y="300" font-size="256" font-family="Arial,sans-serif" font-weight="bold" fill="white" text-anchor="middle">T</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="SITREP: reciclaje y circulación"><rect width="100" height="100" fill="#1B5E3C"/><g fill="#fff"><path d="M36.319 12.412A40 40 0 0 1 80.642 24.288L86.77 19.146L83.483 44.096L65.321 37.144L71.449 32.002A28 28 0 0 0 40.423 23.689Z"/><path transform="rotate(120 50 50)" d="M36.319 12.412A40 40 0 0 1 80.642 24.288L86.77 19.146L83.483 44.096L65.321 37.144L71.449 32.002A28 28 0 0 0 40.423 23.689Z"/><path transform="rotate(240 50 50)" d="M36.319 12.412A40 40 0 0 1 80.642 24.288L86.77 19.146L83.483 44.096L65.321 37.144L71.449 32.002A28 28 0 0 0 40.423 23.689Z"/></g></svg>

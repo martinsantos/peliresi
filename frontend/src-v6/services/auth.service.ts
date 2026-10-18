@@ -2,29 +2,58 @@
  * SITREP v6 - Auth Service
  */
 
-import api, { setTokens, clearTokens } from './api';
+import axios from 'axios';
+import api, { setTokensDurably, clearTokensDurably, getAccessToken } from './api';
 import type { LoginRequest, LoginResponse, ChangePasswordRequest } from '../types/api';
 import type { Usuario } from '../types/models';
+import { readCompanyContext,saveCompanyContext } from './companyContext';
+import { activityOwner } from './actorActivity';
+import { releasePushSubscription } from './pushRelease';
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const { data } = await api.post<{ success: true; data: { user: any; tokens: { accessToken: string; refreshToken: string } } }>('/auth/login', credentials);
-    const { tokens, user } = data.data;
-    setTokens(tokens.accessToken, tokens.refreshToken);
-    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user };
+    const { data } = await api.post<{ success: true; data: { user: Usuario; tokens: { accessToken: string; refreshToken: string }; restricted?: boolean; solicitudId?: string | null } }>('/auth/login', credentials);
+    const { tokens, user, restricted, solicitudId } = data.data;
+    await setTokensDurably(tokens.accessToken, tokens.refreshToken);
+    const profile = (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true'||import.meta.env.VITE_ENTERPRISE_ENABLED==='true') && user.activo && !restricted
+      ? await this.getMe() : user;
+    return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: profile, restricted, solicitudId };
   },
 
   async logout(): Promise<void> {
-    try {
-      await api.post('/auth/logout');
-    } finally {
-      clearTokens();
-    }
+    const endingToken = getAccessToken();
+    const durableLogout = clearTokensDurably();
+    // Logout must work locally even without a network. Use the captured ending
+    // credential, never an interceptor that could pick up a subsequent login.
+    const confirmation = endingToken ? axios.post('/auth/logout', undefined, {
+      baseURL: api.defaults.baseURL,
+      timeout: api.defaults.timeout,
+      headers: { Authorization: `Bearer ${endingToken}` },
+    }) : Promise.resolve();
+    const pushRelease = endingToken ? releasePushSubscription(endingToken, api.defaults.baseURL) : Promise.resolve();
+    await Promise.all([durableLogout, confirmation, pushRelease]);
   },
 
   async getMe(): Promise<Usuario> {
-    const { data } = await api.get<{ success: true; data: { user: Usuario } }>('/auth/profile');
-    return data.data.user;
+    try {
+      const { data } = await api.get<{ success: true; data: { user: Usuario } }>('/auth/profile');
+      return data.data.user;
+    }catch(error) {
+      // Profile recovery only. Never replay a denied business action in another company.
+      if(axios.isAxiosError(error)&&error.response?.status===403&&readCompanyContext(getAccessToken())) {
+        const selection=readCompanyContext(getAccessToken());
+        const owner=activityOwner(getAccessToken());
+        if(owner)saveCompanyContext(owner,null);
+        const {data}=await api.get<{data:{user:Usuario}}>('/auth/profile');
+        return {...data.data.user,empresaContextoError:selection?'Tu autorización cambió. Elegí nuevamente la empresa.':undefined};
+      }
+      throw error;
+    }
+  },
+
+  /** Own name and phone only (PUT /auth/profile); other account fields stay with administrators. */
+  async updateOwnProfile(changes: { nombre?: string; telefono?: string }): Promise<void> {
+    await api.put('/auth/profile', changes);
   },
 
   async changePassword(req: ChangePasswordRequest): Promise<void> {
@@ -36,9 +65,12 @@ export const authService = {
     return { message: data.message };
   },
 
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    const { data } = await api.get<{ success: true; message: string }>(`/auth/verify-email?token=${token}`);
-    return { message: data.message };
+  async verifyEmail(token: string): Promise<{ message: string; verifiedUserId?: string; nextPath?: string }> {
+    // Public one-time link: do not attach/refresh/clear an unrelated active session.
+    const { data } = await axios.get<{ success: true; message: string; verifiedUserId?: string; nextPath?: string }>('/auth/verify-email', {
+      baseURL: api.defaults.baseURL, timeout: api.defaults.timeout, params: { token },
+    });
+    return { message: data.message, verifiedUserId: data.verifiedUserId, nextPath: data.nextPath };
   },
 
   async forgotPassword(payload: { email?: string; cuit?: string }): Promise<void> {
@@ -50,7 +82,7 @@ export const authService = {
     localStorage.setItem('sitrep_post_reset', '1');
   },
 
-  async claimAccount(data: { cuit: string; razonSocial: string; nuevoEmail: string; password: string }): Promise<{ message: string }> {
+  async claimAccount(data: { cuit: string; razonSocial: string }): Promise<{ message: string }> {
     const { data: resp } = await api.post<{ success: true; message: string }>('/auth/claim-account', data);
     return { message: resp.message };
   },
