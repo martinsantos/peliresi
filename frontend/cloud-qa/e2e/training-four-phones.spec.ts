@@ -1,7 +1,7 @@
 import {test, expect, devices, type Page, type TestInfo, type BrowserContext, type Locator} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {trainingLogin, publishedTraining} from '../training-login';
-import {directTrainingLogin} from '../direct-training-login';
+import {directTrainingLogin,observedNotificationBody} from '../direct-training-login';
 import {prefix, readablePageHeading} from './helpers';
 
 // Four isolated browser contexts, one worker. GPS is browser-emulated; API,
@@ -115,7 +115,7 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     }
     evidence.steps.push(direct?'four direct role logins without instructor credentials':'four role sessions selected through instructor UI');console.log('All four roles ready');
     const seenNotices:Record<string,Set<string>>={};
-    for(const [role,page] of Object.entries(pages)){seenNotices[role]=new Set();page.on('response',async r=>{if(new URL(r.url()).pathname==='/api/notificaciones' && r.status()===200){for(const n of (await r.json()).data.notificaciones||[])if(n.manifiestoId)seenNotices[role].add(n.manifiestoId);}});}
+    for(const [role,page] of Object.entries(pages)){seenNotices[role]=new Set();page.on('response',async r=>{if(new URL(r.url()).pathname==='/api/notificaciones' && r.status()===200){for(const n of (await observedNotificationBody(r))?.data?.notificaciones||[])if(n.manifiestoId)seenNotices[role].add(n.manifiestoId);}});}
     const {admin,generador,transportista,operador}=pages;
     async function api(role:string,id:string,action:string,body:any,status:number){
       if(status>=400)expectedHttp.add(role+': '+status+' /api/manifiestos/'+id+'/'+action);

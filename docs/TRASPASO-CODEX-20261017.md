@@ -1,6 +1,22 @@
 # SITREP — traspaso vigente para la capacitación del lunes 19/10/2026
 
-## Estado vigente — cuatro accesos directos, 18/10 a las 11:43:39
+## Estado vigente — circuito completo publicado, 18/10 a las 19:49:28 Mendoza
+
+**Backend, web, app y manual publicados sobre `930d3e6ae7c363789d5474d4aa40b4242b860825`.** Leer primero [circuito completo, resultados y rollback vigente](CIRCUITO-CAPACITACION-20261018.md). Fuente única: `sitrep-production-source-20261001`; rama `codex/sitrep-training-20261018`. Main permanece en `c840219`, sin integración. Commits `[skip ci]`, sin workflows.
+
+El operador, generador, transporte o administrador CAP pueden iniciar. Generador firma; transporte y operador aprueban por separado. Hay avisos internos y agenda de retiros futuros. El retiro requiere las tres decisiones. Después del viaje/GPS/C3, recepción/pesaje/tratamiento, el operador libera parciales y final con firma; la adenda conserva el original, requiere revisión independiente y debe resolverse antes del final. Sólo sesiones CAP autenticadas; permisos operativos y flags siguen sin activarse.
+
+Prueba publicada: web completa aprobada y repetición app completa aprobada; eventual 2/2, manual 3/3 y smoke público 44/44. Los intentos fallidos de QA se conservan y explican en el cierre. A las 20:03:12: 40 cuentas CAP y 35 casos preparados intactos; 000015/000025 Tratados con dos posiciones GPS y certificados; 000020 quedó pendiente por una interrupción del test, sin viaje activo. Para mañana crear otro caso y compartir su número. El GPS fue emulado: comprobar el teléfono físico con la hoja.
+
+Los cuatro accesos y sus claves simples no cambiaron; no se usa administrador personal. Vencen al finalizar el lunes 19/10 en Mendoza (`2026-10-20T03:00:00Z`). Dos hojas A4 privadas con QR y pasos están en `test-results-circuito-20261018/output/pdf/`. Manual conserva diseño. SW raíz v120, app 20261018224742; recargar web/app o usar el aviso de nueva versión antes del ensayo.
+
+`.env` SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`, sin cambios. UPLOADS_DIR, flags false, correos apagados y VAPID vacío conservados. Sin migraciones, semillas ni restauraciones. Auditoría privada `/var/backups/sitrep/20261018-circuito/`.
+
+Rollback vigente: backend y frontend activos `20261018-circuito-930d3e6`; volver ambos enlaces a sus releases `20261018-direct-97c77be`, recargar sólo backend y conservar la variable de vencimiento y las claves. No restaurar base ni borrar prácticas. Gemelo propio detenido, relay cerrado, imagen y evidencias conservadas, sin OOM. Procedimiento y evidencias completos en el cierre enlazado.
+
+## Instantánea histórica — accesos directos, 18/10 a las 11:43:39
+
+**Lo que sigue conserva el cierre anterior. No sustituye el circuito, versión, resultados ni rollback vigente de arriba.**
 
 **Backend, web, app y manual publicados sobre `97c77beecce5a349e53d47d89ad35881a599253a` en `sitrep.ultimamilla.com.ar`.** Leer primero [accesos directos, resultados y rollback vigente](ACCESOS-DIRECTOS-CAPACITACION-20261018.md). El dueño pidió cuatro usuarios/contraseñas para la pizarra, sin su administrador personal en los teléfonos. Los alias `admin@capacitacion.invalid`, `generador@capacitacion.invalid`, `transporte@capacitacion.invalid` y `operador@capacitacion.invalid` autentican exclusivamente las cuatro cuentas CAP del equipo 1. Contraseñas privadas fuera de Git y del manual. Vencen al terminar el lunes 19/10 en Mendoza.
 

@@ -1,5 +1,7 @@
 # Cuatro accesos directos para la capacitación del 19/10/2026
 
+**Actualización vigente: [circuito completo publicado y rollback](CIRCUITO-CAPACITACION-20261018.md), release `930d3e6`. Los cuatro accesos y claves simples siguen iguales. Las cifras, releases y rollback de la sección de evidencia de este documento corresponden al despliegue histórico de la mañana.**
+
 El dueño pidió cuatro accesos que puedan anotarse en una pizarra, sin ingresar con su administrador personal en cada teléfono. Se mantienen el aula artificial, los roles y las reglas del circuito. Las contraseñas se entregan al dueño por separado; no se publican en el manual ni se versionan.
 
 ## Entrada para los participantes
@@ -19,12 +21,12 @@ Los cuatro accesos directos se habilitan con `TRAINING_DIRECT_LOGIN_UNTIL=2026-1
 
 ## Machete del relevo
 
-1. Generador: crear y firmar un manifiesto nuevo con Y-CAP, 10 kg, Transporte 1, CAP001, Chofer ficticio 1 y Operador 1. Avisar «Firmé» y compartir el número nuevo CAP-2026-….
-2. Transporte: abrir ese número, confirmar retiro y permitir ubicación. Esperar «GPS activo» y «Sync» con hora. Avisar «Retiré» y dejar la pantalla de viaje abierta, desbloqueada y con Internet.
-3. Administrador: Control → Hoy → Viajes Activos → el mismo número. Ver llegar la ubicación, realizar un desplazamiento corto y seguro del teléfono del transporte y esperar aproximadamente un minuto. Avisar «Lo veo en C3» sólo si llegó la ubicación del teléfono. El origen del viaje o un ejemplo preparado no prueban GPS.
-4. Transporte: confirmar entrega y avisar «Entregué».
-5. Operador: confirmar recepción, registrar 10 kg, tratamiento y cierre. Avisar «Recibí» y luego «Cerré».
-6. Todos: comprobar el mismo número en estado Tratado. Para repetir, crear un caso nuevo.
+1. Operador (también puede iniciar generador, transporte o administrador): crear un manifiesto nuevo con Generador 1, Y-CAP, 10 kg, Transporte 1, CAP001, Chofer ficticio 1, Operador 1 y fecha de hoy. Compartir su número CAP-2026-….
+2. Generador, transporte y operador: abrir el aviso del mismo número; generador firma y las otras dos partes aprueban desde su cuenta. Sin las tres aprobaciones no hay retiro. Los casos futuros aprobados aparecen en Próximos retiros.
+3. Transporte: confirmar retiro y permitir ubicación. Esperar GPS activo y Sync con hora; dejar el viaje abierto, pantalla desbloqueada e Internet.
+4. Administrador: Control → Hoy → Viajes Activos → mismo número. Transporte se desplaza unos metros con seguridad; comprobar el cambio de posición en C3 antes de entregar. Un ejemplo preparado no prueba el GPS de ese teléfono.
+5. Transporte entrega; operador recibe, pesa 10 kg y registra tratamiento. Puede liberar un parcial de 4 kg con método, observación y firma.
+6. Practicar y resolver la adenda antes del final. Operador cierra y decide liberar la disposición final firmada de 10 kg, que incluye los parciales. Los cuatro pueden descargar ambos documentos CAP. Para repetir, crear otro caso.
 
 Guía publicada: `/manual/tutorial.html?guide=capacitacion-cuatro-telefonos`. Eventuales y adendas conservan su guía de novedades y la revisión por la parte correspondiente, ahora también coordinada entre teléfonos.
 

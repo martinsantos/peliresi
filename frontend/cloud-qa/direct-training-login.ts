@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Page, type TestInfo, type Response } from '@playwright/test';
 import { isolatedMapTiles, prefix } from './e2e/helpers';
 import type { TrainingRehearsalRecords } from './training-login';
+
+/** Background polling can finish as a full navigation discards its CDP body.
+ * This observer never supplies UI data: screen and next-poll assertions remain mandatory.
+ */
+export async function observedNotificationBody(response:Response) {
+  try{return await response.json();}
+  catch(error){
+    if(/Protocol error \(Network\.getResponseBody\): (?:No resource with given identifier found|No data found for resource with given identifier)|Target page, context or browser has been closed/.test(String(error)))return null;
+    throw error;
+  }
+}
 
 export async function directTrainingLogin(page: Page, info: TestInfo, role: string, records: TrainingRehearsalRecords) {
   const published = process.env.QA_TRAINING_PUBLISHED === 'true';
@@ -16,7 +27,7 @@ export async function directTrainingLogin(page: Page, info: TestInfo, role: stri
   const ownNotices=new Set<string>();
   await page.on('response', async response => {
     if (response.request().method()==='GET' && new URL(response.url()).pathname==='/api/notificaciones' && response.status()===200) {
-      for(const notice of (await response.json()).data.notificaciones||[]) if(records.manifests.has(notice.manifiestoId))ownNotices.add(notice.id);
+      for(const notice of (await observedNotificationBody(response))?.data?.notificaciones||[]) if(records.manifests.has(notice.manifiestoId))ownNotices.add(notice.id);
     }
     if (response.request().method() === 'POST' && response.status() === 201 && response.url() === origin + '/api/manifiestos') {
       const value = (await response.json()).data.manifiesto; if (typeof value.id === 'string') records.manifests.add(value.id);

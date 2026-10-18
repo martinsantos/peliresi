@@ -1,16 +1,17 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Punto de entrada vigente — capacitación 19/10/2026 (leer primero)
+## Punto de entrada vigente — circuito completo de capacitación, 19/10/2026
 
-- **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [cuatro accesos directos, resultados y rollback](docs/ACCESOS-DIRECTOS-CAPACITACION-20261018.md).** Backend/web/app/manual `97c77be` publicados en `sitrep.ultimamilla.com.ar`. CAP artificial; flags operativos, correos y push apagados.
-- Único checkout: `sitrep-production-source-20261001` indicado en el traspaso. Rama `codex/sitrep-training-20261018`; main sigue en `c840219`. El cierre documental posterior no cambia el producto publicado.
-- Cuatro alias directos del equipo 1 para la pizarra; no requieren credenciales personales ni selector de instructor. Contraseñas privadas, fuera de Git/manual. Vencen al finalizar el lunes 19/10 en Mendoza: `TRAINING_DIRECT_LOGIN_UNTIL=2026-10-20T03:00:00Z`. Sesiones y refresh también vencen. No crear usuarios operativos.
-- Conservar 40 cuentas CAP y 35 casos preparados. Para cada práctica crear un caso nuevo, compartir su número y conservar cada rol. Las ubicaciones de QA son emuladas: no certificar GPS físico, Android, segundo plano ni concurrencia masiva. Instructor QA anterior suspendido; no reactivarlo.
-- Backend completo 1.112/1.112; frontend completo 1.568/1.568. Guía de cuatro teléfonos actualizada sin cambiar diseño; ingreso directo, relevos verbales, GPS/C3 y cierre. Resultados posteriores y evidencias en el cierre enlazado.
-- Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads`, todas las variables previas y releases anteriores. No repetir migraciones ni ejecutar seeds. Rollback vigente: backend `20261018-training-c819ecf` y frontend `20261018-four-phones-f19d024`; recargar sólo backend y retirar la variable nueva de PM2. No restaurar base ni borrar prácticas.
-- QA pesada sólo remota, serial, un worker, 1 CPU/2 GiB/swap cero. Contenedor propio `sitrep-qa-training-20261018`; no tocar los ajenos ni reutilizar túneles antiguos. Estado final en el cierre de accesos directos.
+- **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [circuito, pruebas publicadas y rollback](docs/CIRCUITO-CAPACITACION-20261018.md).** Backend/web/app/manual `930d3e6` publicados el 18/10 a las 19:49:28 Mendoza. El operador ya puede iniciar; cada una de las tres partes aprueba, y el operador libera parciales y final firmados. Sólo CAP artificial; flags operativos, correos y push apagados.
+- Único checkout: `sitrep-production-source-20261001` indicado en el traspaso. Rama `codex/sitrep-training-20261018`; main sigue en `c840219`, sin integrar. El cierre posterior contiene documentación y una corrección del observador de QA; no cambia el producto publicado.
+- Cuatro accesos directos del equipo 1, sin administrador personal ni cambio de usuario. Contraseñas privadas simples, fuera de Git/manual. `TRAINING_DIRECT_LOGIN_UNTIL=2026-10-20T03:00:00Z`: sesiones, ingreso y refresh vencen al finalizar el lunes 19 en Mendoza. No crear usuarios operativos ni reactivar el instructor QA suspendido.
+- Prueba publicada: web completa aprobada y app completa aprobada en repetición, eventual 2/2 y manual 3/3; smoke 44/44. Los intentos fallidos y sus correcciones están documentados. Backend completo baseline 1.130/1.130 y frontend 1.568/1.568; después 35 controles backend y 56 frontend, sin afirmar suites completas finales. GPS emulado; no certificar hardware/Android/segundo plano ni carga masiva.
+- A las 20:03:12: 40 cuentas CAP activas, 35 casos preparados intactos; casos nuevos 000015/000025 Tratados con GPS y certificados. 000020 conserva la propuesta pendiente del ensayo interrumpido, sin viaje activo. Para cada práctica crear otro caso, compartir su número y conservar cada rol; no borrar ni resetear el historial.
+- Preservar `.env`, `UPLOADS_DIR=/var/lib/sitrep-uploads`, flags y credenciales. Sin migraciones ni seeds. Rollback de esta entrega: ambos releases `20261018-direct-97c77be`, recargando sólo backend y conservando la variable de vencimiento. No restaurar base ni hashes de contraseña.
+- SW raíz v120 y app 20261018224742. Manual actualizado sin rediseño; hojas privadas en el directorio ignorado `test-results-circuito-20261018/output/pdf/`.
+- QA pesada sólo remota y serial, un worker, 1 CPU/2 GiB/swap cero. Contenedor propio `sitrep-qa-training-20261018`; no tocar los ajenos ni reutilizar túneles antiguos. Al cierre el gemelo está detenido y el relay cerrado; imagen/evidencias conservadas, sin OOM. Detalle en el documento del circuito.
 - Commits `[skip ci]`, sin workflows. El dueño autorizó preparar/probar/publicar esta capacitación autónoma con datos artificiales; una ampliación a operación real requiere decisión específica.
-- Los apartados siguientes son históricos; sus ramas, despliegues, credenciales, seeds y estados de preview no acreditan la situación vigente ni autorizan operaciones.
+- Los apartados siguientes son históricos y no autorizan despliegues, seeds, consultas a datos reales ni cambios de permisos.
 
 ## Contexto histórico — cierre parcial 16/10/2026
 
