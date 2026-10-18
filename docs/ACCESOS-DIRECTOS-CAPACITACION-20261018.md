@@ -81,3 +81,11 @@ No equivale a certificación de GPS físico, segundo plano, Android ni concurren
 Contenedor propio `sitrep-qa-training-20261018` detenido al finalizar; relay de publicación cerrado y puerto 41443 sin escucha. Imagen y evidencias conservadas, sin tocar contenedores ajenos. Preview: `/opt/sitrep-qa-enterprise-20261016/source/.qa-direct-login-20261018`, `.qa-release-direct-login-20261018` y `.qa-direct-published-20261018`. Evidencia local ignorada: `test-results-direct-login-20261018/`; reportes publicados, capturas C3/GPS, comprobación posterior y auditoría de despliegue. Sin suite activa, sin OOM.
 
 El instructor QA anterior sigue suspendido; no se lo reactivó. Los participantes usan exclusivamente su acceso directo y el equipo 1. Los 35 ejemplos preparados no se reemplazan con los casos nuevos del ensayo.
+
+## Claves simplificadas y hoja para imprimir — 18/10, 12:13 Mendoza
+
+Por pedido explícito del dueño, se simplificaron las cuatro contraseñas CAP para la pizarra. Se conservan usuarios, roles, aislamiento y vencimiento al finalizar el lunes. Las claves anteriores ya no sirven para un nuevo ingreso. No hubo cambios de producto, despliegues ni reinicios.
+
+Antes del cambio se verificó el respaldo privado `passwords-before-simple.private.json` (SHA-256 `43c8476b76a9d583aa1b1e9feb6b29263cb7e9059c11300e19c40a19ae7b0cf6`); sólo se actualizaron los cuatro hashes del equipo 1 con el principal escolar. `provision-simple.json` registra la operación y `http-check-simple.json` confirma los cuatro logins, perfiles, refresh y bloqueo de capacidades externas. Contraseña incorrecta rechazada.
+
+La hoja A4 de una página contiene los accesos vigentes, QR a `/app/`, recorrido por rol y comprobación GPS/C3. Se entrega de forma privada desde `test-results-direct-login-20261018/output/pdf/`; no se publica en el manual ni se versionan contraseñas o PDF.
