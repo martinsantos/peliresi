@@ -10,7 +10,7 @@ Abrir `https://sitrep.ultimamilla.com.ar/app/` (o la web raíz) y usar el acceso
 | --- | --- | --- |
 | Administrador / C3 | admin@capacitacion.invalid | CAP · ADMIN 1 |
 | Generador | generador@capacitacion.invalid | CAP · GENERADOR 1 |
-| Transporte | transporte@capacitacion.invalid | CAP · TRANSPORTE 1 |
+| Transporte | transporte@capacitacion.invalid | CAP · TRANSPORTISTA 1 |
 | Operador | operador@capacitacion.invalid | CAP · OPERADOR 1 |
 
 La contraseña se distingue por mayúsculas. No son buzones de correo. Cada participante debe ver «Capacitación · sin validez oficial». No hay una sesión administradora personal guardada ni un botón para volver a ella. Al terminar, cada uno cierra su sesión.
