@@ -1,11 +1,14 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Punto de entrada vigente — traspaso 17/10/2026 (leer primero)
+## Punto de entrada vigente — cierre de producción 18/10/2026 (leer primero)
 
-- **Retomar desde [docs/TRASPASO-CODEX-20261017.md](docs/TRASPASO-CODEX-20261017.md).** Ahí está el estado de la rama `codex/sitrep-uiux-review-20261016` (subida a origin, 57 commits sobre el candidato, nada desplegado), la validación hecha en el preview (E2E 45/45), los pasos ordenados para producción y las decisiones abiertas.
-- Lo que sigue de este apartado es el cierre del 16/10, que conserva su contexto. Para el estado actual vale el traspaso.
+- **Retomar desde [docs/TRASPASO-CODEX-20261017.md](docs/TRASPASO-CODEX-20261017.md).** Producto `1ab057a` desplegado en `sitrep.ultimamilla.com.ar` (backend, web y `/app`), integración a `main` completada. Smoke final 39/39 y externo 4/4; [resultados, límites y rollback](docs/CIERRE-PRODUCCION-20261018.md).
+- Flags aprobados, correos y push apagados. Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads` y los releases anteriores. No repetir migraciones ni despliegue por seguir instrucciones históricas.
+- Gemelo `sitrep-qa-live-20261017` y su imagen eliminados del preview; original detenido, fuente/artefactos y otros recursos preservados. El antiguo túnel al gemelo ya no funciona.
+- El cierre documental avanza `main` sin cambiar el producto desplegado. Commits con `[skip ci]`, sin workflows. Cualquier nueva operación productiva requiere autorización específica.
+- El apartado siguiente conserva el contexto histórico del 16–17/10; sus estados de candidato no publicado y preview vivo fueron superados por el traspaso vigente.
 
-## Punto de entrada vigente — cierre parcial 16/10/2026
+## Contexto histórico — cierre parcial 16/10/2026
 
 - Desarrollo funcional actual: `codex/sitrep-manifiestos-v2-20261014`. Revisión UI/UX independiente: `codex/sitrep-uiux-review-20261016`, desde el tag `sitrep-uiux-baseline-20261016`. Leer [cierre y estado](docs/CIERRE-PARCIAL-20261016.md) y [guía para la otra IA](docs/REVISION-UIUX-20261016.md) antes de trabajar.
 - Este candidato **no está publicado**. No confundir `main`, ramas antiguas, archivos de demo ni Precrimen con la fuente actual. Los apartados de arquitectura, estados, CI/CD y cifras de febrero que siguen son históricos; no acreditan la configuración ni autorización actuales. Las reglas de ingeniería y estilo siguen vigentes.

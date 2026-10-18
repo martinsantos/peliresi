@@ -1,5 +1,7 @@
 # SITREP — decisiones pendientes de backend y scripts antes del release
 
+> **Estado al 18/10/2026:** producto `1ab057a` desplegado. El dueño eligió los cuatro flags frontend en false, demo false, y las contrapartes backend apagadas; correos y push siguen apagados. `UPLOADS_DIR` efectivo conservado: `/var/lib/sitrep-uploads`. El [traspaso vigente](TRASPASO-CODEX-20261017.md) registra la configuración exacta, la validación y el rollback. Las decisiones y diagnósticos siguientes conservan su fecha original.
+
 17/10/2026. Rama `codex/sitrep-uiux-review-20261016`. **Actualización:** el dueño decidió S1 sí (sin migrar archivos), S2/S3 sí, S6 todavía no (correos apagados), F1 opción A y F2 sí. Esas cuatro decisiones ya están aplicadas y validadas (ver la sexta tanda en hallazgos). Siguen abiertos S6, S5 en el backend y la higiene de repositorio. Cada punto trae evidencia, propuesta concreta, riesgo y lo que hace falta del dueño. Detalle de los hallazgos en [HALLAZGOS-UIUX-20261016.md](HALLAZGOS-UIUX-20261016.md) (sección «Cuarta pasada»).
 
 ## Bloqueantes de release (decidir antes del lunes)

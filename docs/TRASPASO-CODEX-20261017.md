@@ -1,119 +1,124 @@
-# SITREP — traspaso a Codex para llevar a producción
+# SITREP — traspaso vigente después del despliegue
 
-17/10/2026. Cierre de la sesión de revisión UI/UX y arreglos. **Nada está desplegado. Nada se integró a `main`.** Este documento es el punto de entrada; los detalles están en los enlaces.
+**Actualizado el 18/10/2026. Producto desplegado: `1ab057a57e07237625b3f9fb34d5e80623ecd4bf` en `sitrep.ultimamilla.com.ar`, backend, web y `/app`, a las 08:01:26 de Mendoza.** Integración a `main` completada. Este documento reemplaza el estado de candidato del 17/10; el cierre documental posterior no cambia el producto publicado.
 
-## 1. Fuente exacta
+Última comprobación productiva: 18/10, 08:03:04 de Mendoza, dos instancias online sin reinicios imprevistos. Este cierre se elaboró desde la evidencia guardada: **no volvió a contactar producción**. Detalle, hashes, incidencias y rollback: [CIERRE-PRODUCCION-20261018.md](CIERRE-PRODUCCION-20261018.md).
 
-| | |
+## 1. Fuente exacta y continuidad
+
+| Referencia | Estado |
 | --- | --- |
 | Repositorio | `https://github.com/martinsantos/peliresi.git` |
-| Checkout local | `/Users/santosma/.codex/visualizations/2026/09/24/01a0d460-1c47-70f1-b7bf-4ea3463f0746/sitrep-production-source-20261001`. **No** usar el checkout de SDTERA, carpetas tmp ni Precrimen |
-| Rama de trabajo | `codex/sitrep-uiux-review-20261016`, subida a origin. El último commit de producto y pruebas es `6b5b2a2`; los commits siguientes, si los hay, son sólo de documentación de cierre |
-| Partida | Tag `sitrep-uiux-baseline-20261016` (`9d701e3`) |
-| Contra el candidato `codex/sitrep-manifiestos-v2-20261014` | 57 commits adelante y 0 atrás: se puede avanzar sin merge |
-| Contra `main` | 457 commits adelante y **1 atrás**: `7e1460b` «Unify SITREP help and directory manual experience (#39)», que toca sólo `docs/manual/*`. Comprobar si su contenido ya está en la rama antes de integrar |
-| Commits | Todos con `[skip ci]`. **GitHub Actions no tiene crédito: no disparar workflows** |
+| Único checkout autorizado | `/Users/santosma/.codex/visualizations/2026/09/24/01a0d460-1c47-70f1-b7bf-4ea3463f0746/sitrep-production-source-20261001`; no usar SDTERA, tmp ni Precrimen |
+| Rama del checkout | `main`; el cierre documental avanza desde `1ab057a`, sin nuevo build ni despliegue |
+| Producto publicado | `1ab057a57e07237625b3f9fb34d5e80623ecd4bf` |
+| Revisión UI/UX y candidato | `codex/sitrep-uiux-review-20261016` y `codex/sitrep-manifiestos-v2-20261014`, ambos publicados en `222ccbb` |
+| Integración | `96f333e`, árbol idéntico a `222ccbb`; `1ab057a` añade únicamente la versión del service worker |
+| Manual de `main` | `7e1460b` y `3b67c24` tienen el mismo patch-id y árbol de manual. Se preservaron las mejoras posteriores del candidato al resolver seis conflictos; ambos commits quedan en la historia |
+| CI | Commits con `[skip ci]`; sin workflows ni despliegues automáticos. Actions no tiene crédito |
 
-## 2. Qué contiene la rama (además del candidato)
+No repetir integración, migraciones ni despliegue por encontrar instrucciones históricas en otros documentos. Cada nueva operación productiva necesita autorización específica del dueño.
 
-- **Interfaz:**
-  - errores en español;
-  - formularios que conservan lo cargado;
-  - listado de manifiestos compacto en teléfono;
-  - un solo título por página;
-  - menú de cuenta sin selector demo;
-  - WhatsApp y Telegram no se ofrecen;
-  - carga masiva, contraseña y vehículos corregidos;
-  - `/app` con ErrorBoundary y zoom.
-- **Backend:**
-  - `PUT /auth/profile` (nombre y teléfono propios, con auditoría);
-  - las notificaciones push siguen a la persona y no al dispositivo;
-  - los scripts de seed y demo exigen `ALLOW_DEMO_SEED=1` y rechazan producción.
-- **Despliegue:** `sitrep-deploy-fase3.sh` guarda los archivos subidos en `UPLOADS_DIR=/var/www/sitrep-uploads`, fuera del directorio que se reemplaza.
-- **Eventuales nuevos** (aprobados por el dueño, [especificación v2](ESPEC-EVENTUALES-20261017.md)):
-  - pueden iniciarlos generador, transportista, operador o ADMIN;
-  - los participantes con cuenta aprueban antes de avanzar;
-  - el operador puede ser externo;
-  - migración aditiva `20261017140000_exceptional_any_party`.
-- **Detalle de cada cambio:** [HALLAZGOS-UIUX-20261016.md](HALLAZGOS-UIUX-20261016.md), tandas 1 a 7.
+## 2. Qué se publicó y qué permanece apagado
 
-## 3. Validación existente (preview aislado, no producción)
+- Interfaz: errores en español, formularios que conservan lo cargado, listado compacto de manifiestos, un título por página, menú sin selector demo, `/app` con zoom y ErrorBoundary; correcciones de carga masiva, contraseña y vehículos.
+- Backend: actualización del perfil propio con auditoría; suscripciones push ligadas a la persona; scripts de seed/demo protegidos contra producción.
+- Eventuales v2: creación por cualquier parte o ADMIN, aprobación de participantes con cuenta y operador externo. Código y migración publicados, **funcionalidad apagada por decisión del dueño**, igual que empresa, adendas y multirol.
+- Detalle funcional: [hallazgos](HALLAZGOS-UIUX-20261016.md), [decisiones](DECISIONES-RELEASE-20261017.md) y [especificación aprobada de Eventuales](ESPEC-EVENTUALES-20261017.md).
 
-Última corrida completa, sobre la fuente `9b3b71c`, hecha por la sesión de eventuales:
-- **E2E 45/45** en escritorio 1440, web móvil 360 y `/app` 390, sin omitidas ni inestables;
-- **HTTP 7/7**, más `own-profile-push-http` 4/4;
-- **pantallas 20/20**, más 1 omitida a propósito;
-- migración probada con una fila del contrato anterior, que quedó intacta;
-- sin OOM.
+Configuración aprobada y verificada en `.env` y en ambas instancias PM2:
 
-La corrida anterior de títulos (`c0aee8b`) dio E2E 39/39 y pantallas 20/20.
+```text
+UPLOADS_DIR=/var/lib/sitrep-uploads
+ENTERPRISE_ENABLED=false
+MANIFEST_EXCEPTIONAL_ENABLED=false
+MANIFEST_ADDENDA_ENABLED=false
+MANIFEST_PARTY_REVIEW_ENABLED=false
+ACTOR_MULTIROLE_ENABLED=false
+MANIFEST_EXCEPTIONAL_REVIEWERS=
+DISABLE_EMAILS=true
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+```
 
-**Unitarias:** se corrieron las afectadas en cada cambio, todas en verde. **No** se corrieron las suites completas de frontend y backend sobre el commit final. Las pruebas del backend sólo corren dentro del contenedor, porque la Mac no tiene sus dependencias de desarrollo.
+Frontend compilado con `VITE_API_URL=https://sitrep.ultimamilla.com.ar/api`; `VITE_ENTERPRISE_ENABLED`, `VITE_MANIFEST_EXCEPTIONAL_ENABLED`, `VITE_MANIFEST_ADDENDA_ENABLED`, `VITE_ACTOR_MULTIROLE_ENABLED` y `VITE_DEMO_MODE`, todos `false`. Cambiarlos requiere otro build autorizado. Las demás variables del servidor conservaron sus valores anteriores.
 
-**No verificado:**
-- APK y Android físico;
-- `inbox.spec`: falla por falta de un dato de prueba, no del producto;
-- texto real de los correos (siguen apagados);
-- el `.env` real del servidor.
+**Conservar `/var/lib/sitrep-uploads`**, fuera de releases. No sustituirlo por el default documental `/var/www/sitrep-uploads`. No se movieron archivos históricos; se preservó también el enlace fallback `uploads` del backend.
 
-## 4. Pasos para producción (en orden, cada uno con OK del dueño)
+## 3. Validación y límites
 
-1. **Definir el destino.** Hay dos hosts en juego: `sitrep.ultimamilla.com.ar` (según `CLAUDE.md`) y `rptrazar.mendoza.gov.ar` (según `sitrep-deploy-fase3.sh` y `qrParser.ts`). Hay que confirmar cuál es el del lunes y qué commit corre hoy ahí, con una lectura del servidor que no lo modifique.
-2. **Suites completas** sobre el commit final, en el preview aislado: unitarias de frontend y backend, build, HTTP y E2E. Corrida única, con 1 CPU y 2 GiB.
-3. **Integración.**
-   - Avanzar `codex/sitrep-manifiestos-v2-20261014` hasta esta rama, sin merge.
-   - Resolver `7e1460b` contra `main`.
-   - Integrar en la rama que se despliega. Ojo: el workflow productivo se dispara con `main`/`master`.
-4. **Service worker:** subir `CACHE_NAME` en `frontend/public/sw.js` (hoy `trazabilidad-rrpp-v115`). `sw-app.js` se versiona solo en el build.
-5. **Build de frontend** con `VITE_API_URL=https://<dominio>/api` para web y `/app` (ver `CLAUDE.md`). No usar el `frontend/dist` local, que está viejo.
-6. **Backend:** `npm run build`, `npx prisma generate` en el servidor, y `npx prisma migrate deploy`. Hay **12 migraciones que `main` no tiene**: desde `20260924190000_inspection_operations` hasta `20261017140000_exceptional_any_party`. Hacer backup de la base antes.
-7. **`.env` del servidor:**
-   - `UPLOADS_DIR` (fase3 lo agrega si falta);
-   - correos apagados (`DISABLE_EMAILS=true`), decisión del dueño: «todavía no»;
-   - flags del backend: `ENTERPRISE_ENABLED`, `MANIFEST_EXCEPTIONAL_ENABLED`, `MANIFEST_EXCEPTIONAL_REVIEWERS`, `MANIFEST_ADDENDA_ENABLED`, `MANIFEST_PARTY_REVIEW_ENABLED`, `ACTOR_MULTIROLE_ENABLED`;
-   - flags del frontend al compilar: `VITE_ENTERPRISE_ENABLED`, `VITE_MANIFEST_EXCEPTIONAL_ENABLED`, `VITE_MANIFEST_ADDENDA_ENABLED`, `VITE_ACTOR_MULTIROLE_ENABLED`, `VITE_DEMO_MODE=false`.
-   - **El dueño decide qué se enciende.**
-8. **Despliegue** con fase3 o el procedimiento de `CLAUDE.md` según el destino. Después: health check, ingreso por rol y smoke no mutante.
-9. **Documentación desactualizada:** `DEPLOY-NUEVO-SERVIDOR.md:994` y `SETUP.html:266` mandan correr `seed-admin-data.ts`, que ahora aborta a propósito.
+| Validación | Fuente y resultado |
+| --- | --- |
+| Unitarias completas backend | `21d9753`: **1.064/1.064**, 100 archivos |
+| Unitarias completas frontend | `21d9753`: **1.558/1.558**, 216 archivos, con flags de funcionalidad false |
+| Integraciones HTTP y perfil/push | `21d9753`: **7/7 + 4/4**, sin entrega externa |
+| E2E del candidato | `21d9753`: **45/45**, sin omisiones, inestables ni reintentos |
+| Pantallas | `222ccbb`: **20 aprobadas + 1 omisión prevista**, cero fallos/inestables/reintentos |
+| Builds finales web y `/app` | `1ab057a`: aprobados, API final y flags false; 243 y 186 archivos |
+| Backend final | `1ab057a`: compilado en preview en 26,44 s; 335 archivos verificados al preparar el release |
+| Smoke productivo final | **39/39**, sólo GET públicos y health (`SELECT 1`); sin login ni consultas de negocio |
+| Comprobación HTTPS externa | **4/4**: web, `/app`, identificación de commit y health |
+| Estabilidad posterior | Dos instancias online, mismos PID y contadores desde la activación final, comprobado a las 08:03:04 de Mendoza |
 
-## 5. Decisiones y pendientes abiertos
+La primera corrida de unitarias frontend tuvo una falla por heredar un flag encendido del preview: se repitió completa con flags false y pasó sin cambiar producto ni expectativas. La primera corrida de pantallas dio 19 aprobadas, 1 fallida y 1 omitida por leer «Cargando SITREP…» antes del render. `222ccbb` corrigió únicamente la espera del test mediante `expect.poll`, manteniendo el umbral `rootText > 30`; la repetición completa pasó. No se ocultan esas fallas iniciales.
 
-- **Del dueño:**
-  - flags del lunes;
-  - correos (S6, hoy apagados);
-  - log de teléfono y chat de WhatsApp/Telegram en `notification-dispatcher.service.ts` (S5 backend);
-  - rotar las credenciales que aparecen en `frontend/scripts/capture-*` (S8).
-- **Interfaz, no bloqueante:**
-  - patrón compacto en los otros listados;
-  - «Editar» visible en manifiestos tratados;
-  - Seguridad muestra «Guardar cambios» del perfil (O3);
-  - textos de maqueta en carga masiva y perfil (O4, O5);
-  - H03, H04, H13, H17, H19 en hallazgos.
-- **Higiene de repositorio:** S7, S9–S12 en [DECISIONES-RELEASE-20261017.md](DECISIONES-RELEASE-20261017.md).
+Las suites completas no se repitieron bajo el SHA final `1ab057a`: desde `21d9753` sólo cambió la espera del test, el merge conservó el árbol del candidato y se versionó el service worker. Sí se compilaron y verificaron los artefactos finales de `1ab057a`. Las pruebas pesadas fueron seriales, un worker, 1 CPU/2 GiB/swap cero en el preview; no hubo OOM. Antes del último build se corrigió una divergencia del límite efectivo de swap del gemelo, detectada por el guard antes de compilar.
 
-## 6. Preview aislado (sintético)
+No certificados: Android físico/APK, login y flujos por rol en producción, entrega de correos/push. `inbox.spec` y su fixture pendiente siguen fuera de la configuración E2E ejecutada. La asociación Android disponible no certifica el APK. No es un GO global.
 
-- **Servidor:** `76.13.234.213`.
-- **Contenedor vivo:** `sitrep-qa-live-20261017`.
-  - Imagen `sitrep-qa-enterprise-20261016:live-20261017`, de 2,2 GB.
-  - Límites: 1 CPU, 2 GiB, sin swap, red interna sin gateway, sin puertos publicados.
-  - **Se apaga solo el 18/10 cerca de las 15:32 UTC.**
-- **Contenedor original:** `sitrep-qa-enterprise-20261016`, detenido e intacto.
-- **Fuente:** `/opt/sitrep-qa-enterprise-20261016/source`, montada en `/work/sitrep`. Las fases corren con `preview-run.ts`, usando un env derivado de `preview.env` con `GITHUB_REF=refs/heads/codex/sitrep-uiux-review-20261016` y `QA_ARTIFACTS`, `RUNNER_TEMP` y `UPLOADS_DIR` propios.
-- **Una corrida a la vez:** respetar el lock.
-- **Acceso desde la Mac:**
-  ```
-  ssh -L 127.0.0.1:4177:127.0.0.1:14177 root@76.13.234.213 'python3 -u - sitrep-qa-live-20261017' < frontend/cloud-qa/live-bridge.py
-  ```
-  Después abrir `http://127.0.0.1:4177/app/login`. El puente vive mientras dure la sesión SSH.
-- **Cuentas fáciles,** sólo en el preview vivo: `admin|generador|transportista|operador|inspector@sitrep.test` con `Sitrep2026`. Se aplican con `frontend/cloud-qa/live-easy-accounts.ts`, sólo después de restaurar la base viva.
-- **Limpieza** cuando ya no se use: borrar el contenedor gemelo y la imagen `:live-20261017`.
+## 4. Pasos autorizados: completados
 
-## 7. Reglas que siguen vigentes
+1. **Destino:** confirmado por el dueño `sitrep.ultimamilla.com.ar`; inspección inicial de sólo lectura. No se desplegó en `rptrazar.mendoza.gov.ar`.
+2. **Suites completas:** resultados y corrección aislada de pantallas en la sección 3.
+3. **Integración:** candidato avanzado a `222ccbb`; merge `96f333e` publicado en `main`; manual faltante reconciliado sin perder sus cambios posteriores.
+4. **Service worker:** commit `1ab057a`; cachés raíz `trazabilidad-rrpp-v116` y `runtime-cache-v116`. App versionada por build: `20261018001836`.
+5. **Build frontend:** web y `/app` de `1ab057a`, API final y cinco flags false, seriales en preview. Esos mismos paquetes fueron publicados.
+6. **Backup y migraciones:** backup verificado antes de cambios. De las 12 del lote, 2 ya estaban registradas; 4 ya existían físicamente y se reconciliaron con `migrate resolve --applied` tras comparar el esquema; 6 se aplicaron con `prisma migrate deploy`. Las 23 de la fuente tienen checksum exacto y estado aplicado; `Database schema is up to date!`. Se conservaron 16 registros históricos cuyos SQL no están en el checkout. No reejecutar las 12 como si estuvieran pendientes.
+7. **Entorno:** valores de la sección 2, `.env` conservado exactamente al desplegar. Correos y push apagados; archivos subidos intactos.
+8. **Preparación y despliegue:** backend compilado en preview; dependencias de runtime coincidentes con el lockfile copiadas a un release independiente; Prisma 5.22.0 generado para el servidor sin alterar el cliente anterior. Activación mediante enlaces atómicos y reload exclusivo de `sitrep-backend`. Manual incluido; Nginx sin cambios. Smoke final 39/39 y externo 4/4. Hubo dos rollbacks preventivos detallados abajo; el tercer intento quedó publicado.
 
-- Sin datos reales, correos, push productivo ni formulario humano.
-- No cambiar reglas regulatorias, permisos, numeración ni históricos para facilitar la interfaz.
-- En la Mac, sólo verificaciones livianas: no instalar dependencias ni levantar Docker, base de datos o emuladores.
-- **No desplegar ni integrar a `main` sin OK explícito del dueño.**
-- No afirmar «100 %» ni GO global.
-- **Android y APK no se certifican desde un viewport.**
+## 5. Rollback y respaldos
+
+| Componente | Activo tras el despliegue | Anterior conservado |
+| --- | --- | --- |
+| Backend (`/var/www/sitrep-backend`) | `/var/www/sitrep-backend-releases/20261018-1ab057a` | `/var/www/sitrep-backend-releases/20261012-training-r1` |
+| Web + app (`/var/www/sitrep`) | `/var/www/sitrep-releases/20261018-1ab057a` | `/var/www/sitrep-releases/20261013-attention-r1` |
+
+Los dos primeros intentos restauraron esos destinos anteriores automáticamente:
+
+1. El smoke esperaba JavaScript para un SVG del precache. Se corrigió el MIME del verificador, sin relajar el hash esperado.
+2. Readiness se comprobó cuando la segunda instancia aún tenía unos nueve segundos. Se agregó espera tras el reload de ambas; el contrato `uptime > 10s` y el producto no cambiaron.
+
+**Procedimiento para un rollback futuro, sólo con nueva autorización:** verificar primero los destinos actuales y los releases conservados; reemplazar atómicamente ambos enlaces por los destinos anteriores exactos; recargar únicamente `sitrep-backend` conservando los flags y `UPLOADS_DIR` aprobados; esperar que ambas instancias superen diez segundos y comprobar health/readiness y archivos públicos. No deducir el release anterior por orden de directorios ni borrar releases. **Rollback de aplicación no significa deshacer migraciones ni restaurar la base.**
+
+- Backup de base: `/var/backups/sitrep/20261018-step6-1ab057a/trazabilidad_rrpp-before-1ab057a.dump`, 23.033.797 bytes, SHA-256 `75ac31216e042b96f4bed5a17ad5307e711f9999228675d9651c3477556a53f1`. Se verificaron índice y descompresión completa; no se ensayó restauración en otra base. Hash vuelto a verificar antes del deploy.
+- Respaldo previo del entorno: `/var/backups/sitrep/20261018-step7-env-1ab057a/.env.before`. Contiene el estado **anterior** a explicitar los cinco flags; no usarlo para rollback sin conservar la configuración aprobada.
+- `.env` desplegado: SHA-256 `d34cc69b6c61d60059206ec58ba4a63eee2e3f50b5abddeb8aff17fc071d5815`, permisos 0600. Mismo contenido que el paso 7.
+- Auditoría productiva guardada durante el despliegue: `/var/backups/sitrep/20261018-step8-1ab057a/`.
+
+Los respaldos con secretos y datos permanecen sólo en producción. Este cierre no los leyó ni modificó.
+
+## 6. Preview: gemelo retirado
+
+Limpieza autorizada y completada el **18/10/2026, 08:09:39 de Mendoza**, únicamente en `76.13.234.213`:
+
+- Eliminado `sitrep-qa-live-20261017`, ID `cc9c132b55efa02a7ea9683b5db2c014b77a1c944896d42da92ec84b4d615cb5`, después de cerrar QA y detenerlo.
+- Eliminada su imagen `sitrep-qa-enterprise-20261016:live-20261017`, ID `sha256:904b70752338dc0cc43a682f2c96d06352c348178798825e4983f207994fa5ca`.
+- Conservado el original `sitrep-qa-enterprise-20261016`, detenido, y su imagen. Los otros 74 contenedores mantuvieron identidad, imagen y estado; demás imágenes, redes y volúmenes sin cambios. Sin prune global, force ni eliminación de volúmenes.
+- Conservados la fuente y artefactos montados en `/opt/sitrep-qa-enterprise-20261016/source`; también los archivos de entorno del preview. El estado efímero dentro de la capa escribible del gemelo desapareció al eliminarlo; no afirmar que esa base viva sigue disponible.
+- **El antiguo túnel y las instrucciones de acceso al gemelo ya no sirven.** Para nueva QA hace falta preparar un entorno autorizado; no reiniciar el original ni recrear el gemelo automáticamente.
+- Evidencia local: `test-results-close-20261018/preview-cleanup.json`. No se contactó producción en esta limpieza ni se tocaron otros proyectos.
+
+## 7. Evidencia y pendientes
+
+El [cierre de producción](CIERRE-PRODUCCION-20261018.md) versiona el resumen operativo. Los artefactos completos se conservan en directorios ignorados del checkout: `test-results-step2-21d9753`, `test-results-screen-wait-222ccbb`, `test-results-integration-96f333e`, `test-results-sw-v116-1ab057a`, `test-results-build-1ab057a`, `test-results-migrations-1ab057a`, `test-results-env-1ab057a`, `test-results-deploy-1ab057a` y `test-results-close-20261018`. No son archivos publicados en Git; cada carpeta incluye resultados o evidencia JSON.
+
+Pendientes que este despliegue no resuelve:
+
+- Decisión futura del dueño para activar funcionalidades, correos o push; actualmente apagados según la sección 2.
+- Log de teléfono y chat de canales no implementados en `notification-dispatcher.service.ts` (S5), rotación de credenciales de scripts `capture-*` (S8), higiene S7/S9–S12 y 16 migraciones históricas sin SQL en este checkout.
+- Patrón compacto en otros listados, «Editar» en tratados, O3/O4/O5 y H03/H04/H13/H17/H19 según los hallazgos.
+- Instrucciones antiguas de seed en `DEPLOY-NUEVO-SERVIDOR.md` y `SETUP.html`: no ejecutarlas. Scripts de seed no son parte de un redeploy.
+- Android/APK, `inbox.spec`, correos y pruebas productivas por rol conservan los límites de la sección 3.
+
+Reglas vigentes: sin datos reales en QA, proveedores externos apagados, sin alterar reglas regulatorias/permisos/históricos para UI, Mac sólo verificaciones livianas, QA pesada remota serial con 1 CPU/2 GiB/swap cero. Cualquier nueva operación productiva o cambio de alcance requiere OK del dueño. No afirmar GO global ni certificar Android desde un viewport.

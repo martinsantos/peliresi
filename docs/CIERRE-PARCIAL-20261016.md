@@ -2,7 +2,7 @@
 
 16/10/2026. Es un punto de traspaso de desarrollo, **no una publicación ni un GO global**. No mezclar SITREP con Precrimen u otros proyectos.
 
-> **Actualización 17/10/2026, cierre de sesión:** el punto de entrada para seguir hacia producción es [TRASPASO-CODEX-20261017.md](TRASPASO-CODEX-20261017.md). El resumen de abajo quedó superado: no incluye los eventuales nuevos ni las últimas tandas.
+> **Actualización 18/10/2026:** `1ab057a` ya está integrado y desplegado en `sitrep.ultimamilla.com.ar`. Smoke final 39/39 y externo 4/4; flags aprobados, correos y push apagados. Gemelo e imagen del preview retirados; original y artefactos preservados. Retomar desde [TRASPASO-CODEX-20261017.md](TRASPASO-CODEX-20261017.md) y [CIERRE-PRODUCCION-20261018.md](CIERRE-PRODUCCION-20261018.md), que incluyen resultados y rollback. **Todo lo que sigue conserva el estado histórico de la revisión y no debe usarse como instrucciones operativas actuales.**
 
 ## Retomar la revisión UI/UX — estado al 17/10/2026 (leer primero)
 
