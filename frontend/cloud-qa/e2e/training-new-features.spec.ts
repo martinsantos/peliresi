@@ -172,12 +172,16 @@ test('school Centro de Control and Monitor show synthetic trips; new manual guid
   expect((await liveResponse.json()).data.enTransito.some((row: any) => row.numero === 'CAP-1-EN_TRANSITO')).toBe(true);
   const timeline = page.waitForResponse(r => r.url().includes('/api/centro-control/timeline?'));
   await page.getByRole('button', { name: 'Historial', exact: true }).click();
-  const history = await timeline; expect(history.status()).toBe(200); expect((await history.json()).data.eventos.length).toBeGreaterThan(0);
-  // Wait for the automatic start, then exercise pause, manual seeking and resume.
+  const history = await timeline; expect(history.status()).toBe(200); expect((await history.json()).data.eventos.some((event: any) => event.type === 'EVENTO')).toBe(true);
+  // The preceding manifest journey supplies actual events; GPS alone is not a movie.
+  const toggle = page.getByRole('button', { name: /^(Pausar|Reproducir) historial$/ });
+  await expect(toggle).toBeEnabled();
+  if (await toggle.getAttribute('aria-label') === 'Reproducir historial') await toggle.click();
   const pause = page.getByRole('button', { name: 'Pausar historial', exact: true });
   await pause.click();
-  await page.getByRole('slider', { name: 'Recorrer historial', exact: true }).fill('500');
-  expect(Number(await page.getByRole('slider', { name: 'Recorrer historial', exact: true }).inputValue())).toBeGreaterThan(0);
+  const scrubber = page.getByRole('slider', { name: 'Recorrer historial', exact: true });
+  await scrubber.focus(); await scrubber.press('End'); await expect(scrubber).toHaveValue('1000');
+  await scrubber.press('Home'); await expect(scrubber).toHaveValue('0');
   await page.getByRole('button', { name: 'Reproducir historial', exact: true }).click();
   await pause.click(); await proof(page, info, 'training-monitor');
   const forecast = page.waitForResponse(r => r.url().includes('/api/centro-control/forecast'));
