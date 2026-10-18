@@ -13,7 +13,7 @@ type Waste = { corriente: string; cantidad: number; unidad: string };
 type Adenda = { id: string; motivo: string; rectificaId: string | null; version: number; estadoRevision: string; puedeResolver: boolean;
   creadoPorId: string; createdAt: string; residuos: Waste[]; declaracion: { numero: string; residuos: Waste[] };
   revisiones: { id: string; autorId: string; fecha: string; decision: string; nota: string }[] };
-type Data = { adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: string };
+type Data = { finalLiberado?: boolean; adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: string };
   documental?: { pendientes: number; observadas: number; rechazadas: number; estado: string; cierreAcreditado: boolean } };
 const labels: Record<string, string> = { PENDIENTE: 'Pendiente de revisión', APROBADA: 'Aprobada post facto', OBSERVADA: 'Observada', RECHAZADA: 'Conformidad rechazada' };
 const emptyWaste = (): Waste => ({ corriente: '', cantidad: 0, unidad: 'kg' });
@@ -70,6 +70,7 @@ export default function AdendasManifiestoPage() {
       {data?.puedeRegistrar && !creating && <Button onClick={() => { setCreating(true); setSaved(''); }}>Registrar diferencia</Button>}
     </div>
     {data && <p className="text-sm text-neutral-600">Operación: {data.manifiesto.estado}. La revisión de adendas no detiene el circuito.</p>}
+    {data?.finalLiberado && <p role="status" className="rounded border border-neutral-200 p-3">El operador ya liberó la disposición final CAP. Se conservan el certificado y las adendas revisadas; este expediente queda en consulta.</p>}
     {data?.documental && <Card className="p-4 space-y-1" role="region" aria-label="Control documental">
       <h2 className="font-semibold">Control documental</h2>
       <p>{data.documental.pendientes} {data.documental.pendientes === 1 ? 'pendiente' : 'pendientes'} · {data.documental.observadas} {data.documental.observadas === 1 ? 'observada' : 'observadas'} · {data.documental.rechazadas} {data.documental.rechazadas === 1 ? 'rechazada' : 'rechazadas'}</p>

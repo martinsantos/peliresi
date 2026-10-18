@@ -1,3 +1,4 @@
+import { TrainingCertificates } from './components/TrainingCertificates';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Manifiesto Detail Page
@@ -6,7 +7,7 @@ import { manifestFeatureVisible } from '../../utils/manifestFeatures';
  */
 
 import React, { useState, useMemo } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
   ArrowLeft,
   FileText,
@@ -323,8 +324,7 @@ const ManifiestoDetailPage: React.FC = () => {
   const transportistaStates = [EstadoManifiesto.APROBADO, EstadoManifiesto.EN_TRANSITO, EstadoManifiesto.ENTREGADO];
   if (!isLoading && manifiesto && isTransportista && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
     const prefix = isApp ? '/app' : '';
-    navigate(`${prefix}/transporte/viaje/${id}`, { replace: true });
-    return null;
+    return <Navigate to={`${prefix}/transporte/viaje/${id}`} replace />;
   }
 
   if (isLoading) {
@@ -432,6 +432,8 @@ const ManifiestoDetailPage: React.FC = () => {
       />
 
       {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
+
+      {currentUser?.training && <TrainingCertificates manifest={m} />}
 
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

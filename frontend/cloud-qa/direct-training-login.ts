@@ -13,7 +13,11 @@ export async function directTrainingLogin(page: Page, info: TestInfo, role: stri
   assert.ok(account && account.email.endsWith('@capacitacion.invalid'));
   const origin = published ? 'https://sitrep.ultimamilla.com.ar' : 'http://127.0.0.1:4177';
   await isolatedMapTiles(page, info);
+  const ownNotices=new Set<string>();
   await page.on('response', async response => {
+    if (response.request().method()==='GET' && new URL(response.url()).pathname==='/api/notificaciones' && response.status()===200) {
+      for(const notice of (await response.json()).data.notificaciones||[]) if(records.manifests.has(notice.manifiestoId))ownNotices.add(notice.id);
+    }
     if (response.request().method() === 'POST' && response.status() === 201 && response.url() === origin + '/api/manifiestos') {
       const value = (await response.json()).data.manifiesto; if (typeof value.id === 'string') records.manifests.add(value.id);
     }
@@ -29,9 +33,15 @@ export async function directTrainingLogin(page: Page, info: TestInfo, role: stri
     }
     if(claim.realm==='sitrep-capacitacion-v1'&&claim.trainingDirect===true&&!claim.impersonatedBy&&claim.id===account.id){
       allowed ||= read&&/^\/api\/(auth\/profile|manifiestos|catalogos|actores|reportes|analytics|centro-control|inspecciones|soporte|notificaciones|search|admin\/usuarios|solicitudes|renovaciones|alertas|anomalias)(\/|$)/.test(p);
-      if(method==='POST'&&p==='/api/manifiestos')allowed=role==='generador'&&body?.generadorId===credentials.generadorId&&body?.transportistaId===credentials.transportistaId&&body?.operadorId===credentials.operadorId;
-      if(method==='POST')allowed ||= [...records.manifests].some(id=>new RegExp('^/api/manifiestos/'+id+'/(firmar|confirmar-retiro|confirmar-entrega|confirmar-recepcion|pesaje|tratamiento|cerrar|ubicacion)$').test(p))||p==='/api/auth/logout';
+      if(method==='POST'&&p==='/api/manifiestos')allowed=['generador','transportista','operador','admin'].includes(role)&&body?.generadorId===credentials.generadorId&&body?.transportistaId===credentials.transportistaId&&body?.operadorId===credentials.operadorId;
+      if(method==='POST' && p==='/api/manifiestos/baja-intensidad') {
+        allowed=role==='generador' && body?.operador?.padronId===credentials.operadorId && !body?.transportista?.padronId && typeof body?.id==='string';
+        if(allowed)records.eventuals.add(body.id);
+      }
+      if(method==='POST' && [...records.eventuals].some(id=>p==='/api/manifiestos/baja-intensidad/'+id+'/eventos'))allowed=true;
+      if(method==='POST')allowed ||= [...records.manifests].some(id=>new RegExp('^/api/manifiestos/'+id+'/(adendas(?:/[0-9a-f-]+/revisiones)?|aprobar-parte|documentos-cap|firmar|confirmar-retiro|confirmar-entrega|confirmar-recepcion|pesaje|tratamiento|cerrar|ubicacion)$').test(p))||p==='/api/auth/logout';
     }
+    if(method==='PUT' && claim.realm==='sitrep-capacitacion-v1' && claim.id===account.id && [...ownNotices].some(id=>p==='/api/notificaciones/'+id+'/leida'))allowed=true;
     if(!allowed){info.annotations.push({type:'blocked-non-classroom-request',description:method+' '+p});return route.abort('blockedbyclient');}
     return route.continue();
   });

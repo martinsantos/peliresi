@@ -1,0 +1,76 @@
+import {beforeEach,describe,expect,it,vi} from 'vitest';
+const mock=vi.hoisted(()=>({tx:{} as any,manifest:{} as any,events:[] as any[]}));
+vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transaction'?async(fn:any)=>fn(mock.tx):mock.tx[key]})}));
+vi.mock('qrcode',()=>({default:{toDataURL:vi.fn().mockResolvedValue('data:qr')}}));
+import {inTrainingSession,inOperationalSession} from '../lib/trainingScope';
+import {canCreateManifestProposal,MANIFEST_PROPOSAL,proposalRole,parseProposal} from '../domain/manifestProposal';
+import {approveManifestProposal,assertManifestProposalApproved} from '../controllers/manifest-proposal.controller';
+const p={version:1 as const,generadorId:'g',transportistaId:'t',operadorId:'o',creadoPorId:'uo',autorRol:'OPERADOR'};
+const users={GENERADOR:{id:'ug',rol:'GENERADOR',generador:{id:'g'}},TRANSPORTISTA:{id:'ut',rol:'TRANSPORTISTA',transportista:{id:'t'}},OPERADOR:{id:'uo',rol:'OPERADOR',operador:{id:'o'}},ADMIN:{id:'ua',rol:'ADMIN'}};
+const req=(rol:keyof typeof users,body={})=>({params:{id:'m'},user:users[rol],body} as any);
+const signature={imagen:'signed-image',sha256:'signed-hash'};
+beforeEach(()=>{
+ mock.manifest={id:'m',numero:'CAP-TEST',estado:'PENDIENTE_APROBACION',...p,fechaEstimadaRetiro:new Date('2026-10-19T15:00:00Z')};
+ mock.events=[{id:'marker',tipo:MANIFEST_PROPOSAL,descripcion:JSON.stringify(p)}];
+ mock.tx={$queryRaw:vi.fn(),manifiesto:{findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{
+ findFirst:vi.fn(async()=>mock.events.find(e=>e.tipo===MANIFEST_PROPOSAL)),findMany:vi.fn(async()=>mock.events.filter(e=>e.tipo!==MANIFEST_PROPOSAL)),create:vi.fn(async({data}:any)=>{const e={...data,id:String(mock.events.length),createdAt:new Date()};mock.events.push(e);return e;})},
+ generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn()}};
+});
+describe('three independently authenticated parties',()=>{
+ it.each(Object.keys(users) as (keyof typeof users)[])('allows %s creation only in the signed school scope',rol=>{
+  expect(inOperationalSession(()=>canCreateManifestProposal(users[rol]))).toBe(false);
+  expect(inTrainingSession(()=>canCreateManifestProposal(users[rol]))).toBe(true);
+ });
+ it('denies missing actor and restricted identities',()=>{
+  expect(inTrainingSession(()=>canCreateManifestProposal({id:'x',rol:'OPERADOR'}))).toBe(false);
+  expect(inTrainingSession(()=>canCreateManifestProposal({...users.OPERADOR,restricted:true}))).toBe(false);
+ });
+ it('does not let admin or another company approve a place',async()=>{
+  expect(proposalRole({...users.OPERADOR,operador:{id:'other'}},p)).toBeNull();
+  await expect(inTrainingSession(()=>approveManifestProposal(req('ADMIN')))).rejects.toMatchObject({statusCode:403});
+  expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();
+ });
+ it('cannot reach a database for an operational approval',async()=>{
+  await expect(inOperationalSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:404});
+  expect(mock.tx.manifiesto.findUnique).not.toHaveBeenCalled();
+ });
+ it('requires generator signature even if operator and transport have accepted',async()=>{
+  await inTrainingSession(()=>approveManifestProposal(req('OPERADOR')));
+  await inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
+  await expect(inTrainingSession(()=>approveManifestProposal(req('GENERADOR')))).rejects.toMatchObject({statusCode:400});
+  expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');
+ });
+ it('keeps pickup locked until all three approve, records each actor and signature, then notifies once',async()=>{
+  await inTrainingSession(()=>approveManifestProposal(req('OPERADOR')));
+  await inTrainingSession(()=>approveManifestProposal(req('GENERADOR'),signature));
+  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+  expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');
+  await inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
+  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+  expect(mock.manifest.estado).toBe('APROBADO');
+  expect(mock.events.filter(e=>e.tipo!==MANIFEST_PROPOSAL).map(e=>e.usuarioId)).toEqual(['uo','ug','ut']);
+  expect(mock.events.find(e=>e.tipo==='FIRMA')).toMatchObject({firmaImagen:'signed-image',firmaSha256:'signed-hash'});
+  await inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
+  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(3);expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(1);
+ });
+ it('preserves a reasoned rejection and refuses subsequent approvals and pickup',async()=>{
+  await inTrainingSession(()=>approveManifestProposal(req('GENERADOR',{decision:'RECHAZADA',motivo:'Fecha incorrecta'})));
+  expect(mock.manifest.estado).toBe('RECHAZADO');
+  expect(JSON.parse(mock.events.at(-1).descripcion)).toMatchObject({rol:'GENERADOR',motivo:'Fecha incorrecta',decision:'RECHAZADA'});
+  await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:409});
+  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+ });
+ it('rejects corrupted or changed participant snapshots',async()=>{
+  expect(()=>parseProposal('{}')).toThrow();expect(()=>parseProposal('null')).toThrow();mock.manifest.operadorId='other';
+  await expect(inTrainingSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:404});
+  await expect(inTrainingSession(()=>approveManifestProposal(req('GENERADOR'),signature))).rejects.toMatchObject({statusCode:409});
+ });
+ it('refuses pickup if a rejected history is manually changed to approved',async()=>{
+  for(const rol of ['OPERADOR','TRANSPORTISTA','GENERADOR'] as const) await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  mock.events.push({tipo:'RECHAZO_PARTE'});
+  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+ });
+ it('does not attach new approval requirements to old records',async()=>{
+  mock.events=[];await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+ });
+});

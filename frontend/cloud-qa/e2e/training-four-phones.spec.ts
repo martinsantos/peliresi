@@ -1,4 +1,4 @@
-import {test, expect, devices, type Page, type TestInfo, type BrowserContext} from '@playwright/test';
+import {test, expect, devices, type Page, type TestInfo, type BrowserContext, type Locator} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {trainingLogin, publishedTraining} from '../training-login';
 import {directTrainingLogin} from '../direct-training-login';
@@ -34,10 +34,58 @@ async function proof(page:Page,info:TestInfo,name:string){
 async function post(page:Page,suffix:string,action:()=>Promise<unknown>,status=200){
   const result=page.waitForResponse(r=>r.url().endsWith(suffix)&&r.request().method()==='POST');
   await action();const response=await result;expect(response.status(),suffix).toBe(status);
-  expect(response.headers()['x-sitrep-training']).toBe('true');return response.json();
+  expect(response.headers()['x-sitrep-training']).toBe('true');return {...await response.json(),__command:response.request().postDataJSON()};
+}
+
+async function draw(page:Page,area:Locator){
+ const canvas=area.locator('canvas');await canvas.scrollIntoViewIfNeeded();const b=(await canvas.boundingBox())!;
+ await page.mouse.move(b.x+b.width*.1,b.y+b.height*.5);await page.mouse.down();
+ for(const [x,y]of [[.2,.2],[.4,.6],[.6,.2],[.8,.7]])await page.mouse.move(b.x+b.width*x,b.y+b.height*y,{steps:5});
+ await page.mouse.up();await area.getByRole('button',{name:'Usar firma',exact:true}).click();
+}
+async function createProposal(page:Page,info:TestInfo,role:string,team:number,futureDays=1){
+ await navigation(page,info,'/manifiestos');
+ await page.getByRole('button',{name:'Nuevo Manifiesto',exact:true}).click();
+ if(role!=='generador')await choose(page,'Generador *',new RegExp('^CAP · Generador '+team));
+ await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+ await choose(page,'Tipo de Residuo *',/^Y-CAP/);
+ await page.getByLabel('Cantidad *',{exact:true}).fill('10');
+ await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+ if(role!=='transportista')await choose(page,'Transportista *',new RegExp('^CAP · Transporte '+team));
+ await choose(page,'Vehículo (opcional)',new RegExp('^CAP00'+team));
+ await choose(page,'Chofer (opcional)',new RegExp('^Chofer ficticio '+team));
+ if(role!=='operador')await choose(page,'Operador / Destino *',new RegExp('^CAP · Operador '+team));
+ const future=new Date(Date.now()+futureDays*86400000).toLocaleDateString('sv-SE',{timeZone:'America/Argentina/Mendoza'});
+ await page.getByLabel('Fecha estimada de retiro',{exact:true}).fill(future);
+ await proof(page,info,'creation-'+role);
+ const created=await post(page,'/api/manifiestos',()=>page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201);
+ expect(created.data.manifiesto.estado).toBe('PENDIENTE_APROBACION');
+ return created.data.manifiesto;
+}
+async function approve(page:Page,info:TestInfo,role:string,m:any){
+ await openManifest(page,info,m.numero);
+ const region=page.getByRole('region',{name:'Aprobaciones de las partes'});
+ if(role==='generador'){
+  await region.getByRole('button',{name:'Firmar Manifiesto',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Firma del manifiesto',exact:true});await draw(page,dialog);
+  await post(page,'/'+m.id+'/firmar',()=>dialog.getByRole('button',{name:'Confirmar y Firmar',exact:true}).click());
+ }else await post(page,'/'+m.id+'/aprobar-parte',()=>region.getByRole('button',{name:role==='operador'?'Aprobar como operador':'Aprobar como transporte',exact:true}).click());
+}
+async function release(page:Page,info:TestInfo,m:any,kind:'parcial'|'final'){
+ const area=page.getByRole('region',{name:'Certificados de capacitación'});
+ await area.getByRole('button',{name:kind==='parcial'?'Liberar certificado parcial':'Liberar disposición final',exact:true}).click();
+ if(kind==='parcial')await area.getByLabel(/^Cantidad a certificar/).fill('4');
+ await area.getByLabel('Método de tratamiento certificado',{exact:true}).fill('Tratamiento ficticio CAP');
+ await area.getByLabel('Observaciones del certificado',{exact:true}).fill('Práctica con material artificial.');
+ await draw(page,area);
+ const result=await post(page,'/'+m.id+'/documentos-cap',()=>area.getByRole('button',{name:'Firmar y liberar documento CAP',exact:true}).click(),201);
+ const download=page.waitForEvent('download');await area.getByRole('button',{name:kind==='parcial'?'Descargar parcial 1 CAP':'Descargar final CAP',exact:true}).click();
+ await (await download).saveAs(info.outputPath('certificado-'+kind+'.pdf'));
+ await proof(page,info,'documento-'+kind);return result.__command;
 }
 
 test('four independent phones hand off one new manifest and observe actual GPS submissions in C3',async({browser},info)=>{
+  const expectedHttp=new Set<string>();
   const contexts:BrowserContext[]=[], pages:Record<string,Page>={},errors:string[]=[],consoleErrors:string[]=[],serverErrors:string[]=[],httpErrors:string[]=[];
   const direct=process.env.QA_TRAINING_DIRECT==='true', team=direct?1:5;
   const scope={manifests:new Set<string>(),eventuals:new Set<string>()};
@@ -66,33 +114,58 @@ test('four independent phones hand off one new manifest and observe actual GPS s
       page.on('response',r=>{if(r.status()>=400)httpErrors.push(role+': '+r.status()+' '+new URL(r.url()).pathname);if(r.status()>=500)serverErrors.push(role+': '+r.status()+' '+new URL(r.url()).pathname);});
     }
     evidence.steps.push(direct?'four direct role logins without instructor credentials':'four role sessions selected through instructor UI');console.log('All four roles ready');
+    const seenNotices:Record<string,Set<string>>={};
+    for(const [role,page] of Object.entries(pages)){seenNotices[role]=new Set();page.on('response',async r=>{if(new URL(r.url()).pathname==='/api/notificaciones' && r.status()===200){for(const n of (await r.json()).data.notificaciones||[])if(n.manifiestoId)seenNotices[role].add(n.manifiestoId);}});}
     const {admin,generador,transportista,operador}=pages;
+    async function api(role:string,id:string,action:string,body:any,status:number){
+      if(status>=400)expectedHttp.add(role+': '+status+' /api/manifiestos/'+id+'/'+action);
+      const result=await pages[role].evaluate(async({url,body})=>{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('sitrep_access_token')},body:JSON.stringify(body)});return {status:r.status,data:await r.json()};},{url:'/api/manifiestos/'+id+'/'+action,body});
+      expect(result.status,JSON.stringify(result.data)).toBe(status);return result.data;
+    }
+
     let activity:any=null;
     admin.on('response',async r=>{if(r.url().includes('/api/centro-control/actividad')&&r.status()===200)activity=(await r.json()).data;});
     await navigation(admin,info,'/centro-control');
     await admin.getByRole('button',{name:'Hoy',exact:true}).click();
-    await navigation(generador,info,'/manifiestos');
-    await generador.getByRole('button',{name:'Nuevo Manifiesto',exact:true}).click();
-    await generador.getByRole('button',{name:'Siguiente',exact:true}).click();
-    await choose(generador,'Tipo de Residuo *',/^Y-CAP/);
-    await generador.getByLabel('Cantidad *',{exact:true}).fill('10');
-    await generador.getByRole('button',{name:'Siguiente',exact:true}).click();
-    await choose(generador,'Transportista *',new RegExp('^CAP · Transporte '+team));
-    await choose(generador,'Vehículo (opcional)',new RegExp('^CAP00'+team));
-    await choose(generador,'Chofer (opcional)',new RegExp('^Chofer ficticio '+team));
-    await choose(generador,'Operador / Destino *',new RegExp('^CAP · Operador '+team));
-    await proof(generador,info,'01-generador-flota');
-    const created=await post(generador,'/api/manifiestos',()=>generador.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201);
-    const manifest=created.data.manifiesto;evidence.manifest={id:manifest.id,numero:manifest.numero};
-    await expect(generador).toHaveURL(new RegExp('/manifiestos/'+manifest.id+'$'));
-    await generador.getByRole('button',{name:'Firmar Manifiesto',exact:true}).click();
-    const signature=generador.getByRole('dialog',{name:'Firma del manifiesto',exact:true});
-    const canvas=signature.locator('canvas');await canvas.scrollIntoViewIfNeeded();const b=(await canvas.boundingBox())!;
-    await generador.mouse.move(b.x+b.width*.1,b.y+b.height*.5);await generador.mouse.down();
-    for(const [x,y]of [[.2,.2],[.4,.6],[.6,.2],[.8,.7]])await generador.mouse.move(b.x+b.width*x,b.y+b.height*y,{steps:5});
-    await generador.mouse.up();await signature.getByRole('button',{name:'Usar firma',exact:true}).click();
-    await post(generador,'/'+manifest.id+'/firmar',()=>signature.getByRole('button',{name:'Confirmar y Firmar',exact:true}).click());
-    evidence.steps.push('generator creates and signs with registered vehicle and driver');
+    // Every origin is exercised through the real form. The other three proposals
+    // remain future approved appointments; the operator-created case completes the trip.
+    for(const origin of ['admin','generador','transportista']){
+      const m=await createProposal(pages[origin],info,origin,team);
+      evidence.steps.push('created by '+origin+': '+m.numero);
+      for(const role of ['generador','operador','transportista'])await approve(pages[role],info,role,m);
+      // A phone already on this list refreshes its agenda every 15 seconds.
+      for(const role of ['generador','operador','transportista','admin']){
+        await navigation(pages[role],info,'/manifiestos');
+        await expect(pages[role].getByRole('region',{name:'Próximos retiros'}).getByRole('link').filter({hasText:m.numero})).toBeVisible({timeout:20000});
+      }
+    }
+    const rejected=await createProposal(operador,info,'operador',team);
+    await openManifest(generador,info,rejected.numero);
+    await generador.getByLabel('Motivo del rechazo',{exact:true}).fill('Fecha no acordada en la práctica');
+    await post(generador,'/'+rejected.id+'/aprobar-parte',()=>generador.getByRole('button',{name:'Rechazar mi participación',exact:true}).click());
+    await openManifest(operador,info,rejected.numero);
+    await expect(operador.getByText(/Propuesta rechazada: Fecha no acordada/)).toBeVisible();
+    await expect(operador.getByRole('button',{name:'Aprobar como operador',exact:true})).toHaveCount(0);
+    evidence.steps.push('independent rejection preserves reason and blocks further approvals');
+    const manifest=await createProposal(operador,info,'operador',team,0);evidence.manifest={id:manifest.id,numero:manifest.numero};
+    for(const role of ['generador','transportista']){
+      await expect.poll(()=>seenNotices[role].has(manifest.id),{timeout:45000}).toBe(true);
+      await pages[role].goto(prefix(info)+'/notificaciones');
+      const notice=pages[role].getByRole('button',{name:'Abrir aviso: Manifiesto pendiente de tu aprobación',exact:true}).filter({hasText:manifest.numero});
+      await expect(notice).toBeVisible();await notice.click();
+      await expect(pages[role]).toHaveURL(new RegExp('/manifiestos/'+manifest.id+'$'));
+      await proof(pages[role],info,'aviso-'+role);
+    }
+    await approve(generador,info,'generador',manifest);
+    await approve(operador,info,'operador',manifest);
+    await openManifest(transportista,info,manifest.numero);
+    await expect(transportista.getByText('Pendiente de aprobación: todavía no se puede retirar.',{exact:true})).toBeVisible();
+    await expect(transportista.getByRole('button',{name:'Confirmar retiro',exact:true})).toHaveCount(0);
+    await api('transportista',manifest.id,'confirmar-retiro',{},409);
+    await api('admin',manifest.id,'aprobar-parte',{},403);
+    await approve(transportista,info,'transportista',manifest);
+    evidence.steps.push('operator creates; related accounts receive actionable notices; three independent approvals before pickup');
+    await navigation(admin,info,'/centro-control');await admin.getByRole('button',{name:'Hoy',exact:true}).click();
     await openManifest(transportista,info,manifest.numero);
     await expect(transportista).toHaveURL(new RegExp('/transporte/viaje/'+manifest.id+'$'));
     await proof(transportista,info,'02-transporte-retiro');
@@ -131,12 +204,44 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     const treatment=operador.getByRole('dialog',{name:'Registrar Tratamiento',exact:true});
     await treatment.getByPlaceholder('Observaciones del tratamiento...').fill('CAP: cuatro teléfonos, tratamiento ficticio');
     await post(operador,'/'+manifest.id+'/tratamiento',()=>treatment.getByRole('button',{name:'Confirmar Tratamiento',exact:true}).click());
+    await expect(operador.getByRole('button',{name:'Liberar disposición final',exact:true})).toBeDisabled();
+    const partial=await release(operador,info,manifest,'parcial');
+    await api('operador',manifest.id,'documentos-cap',partial,201);
+    await api('operador',manifest.id,'documentos-cap',{...partial,id:crypto.randomUUID(),cantidades:partial.cantidades.map((r:any)=>({...r,cantidad:7}))},409);
+    const finalBody={...partial,id:crypto.randomUUID(),tipo:'FINAL',cantidades:partial.cantidades.map((r:any)=>({...r,cantidad:10}))};
+    await api('operador',manifest.id,'documentos-cap',finalBody,409);
+    await api('generador',manifest.id,'documentos-cap',finalBody,403);
+    await operador.goto(prefix(info)+'/manifiestos/'+manifest.id+'/adendas');
+    await operador.getByRole('button',{name:'Registrar diferencia',exact:true}).click();
+    await operador.getByLabel('Corriente observada 1',{exact:true}).fill('Y1');
+    await operador.getByLabel('Cantidad observada 1',{exact:true}).fill('12');
+    await operador.getByLabel('Motivo de la adenda',{exact:true}).fill('CAP: diferencia documental; conservar 10 kg declarados y recibidos.');
+    const added=await post(operador,'/'+manifest.id+'/adendas',()=>operador.getByRole('button',{name:'Guardar y solicitar revisión',exact:true}).click(),201);
+    const adenda=added.data.adenda;
+    await expect(operador.getByRole('button',{name:'Aprobar post facto',exact:true})).toHaveCount(0);
+    await openManifest(operador,info,manifest.numero);
+
     await post(operador,'/'+manifest.id+'/cerrar',()=>operador.getByRole('button',{name:'Cerrar Manifiesto',exact:true}).click());
+    await api('operador',manifest.id,'documentos-cap',finalBody,409);
+    await generador.goto(prefix(info)+'/manifiestos/'+manifest.id+'/adendas');
+    await generador.getByLabel('Motivo de resolución',{exact:true}).fill('CAP: diferencia revisada; original y pesaje conservados.');
+    await post(generador,'/'+adenda.id+'/revisiones',()=>generador.getByRole('button',{name:'Aprobar post facto',exact:true}).click());
+    await expect(generador.getByText('Y-CAP · 10 kg',{exact:true})).toBeVisible();
+    await expect(generador.getByText('Y1 · 12 kg',{exact:true})).toBeVisible();
+    await proof(generador,info,'adenda-resuelta');
+    await release(operador,info,manifest,'final');
+    await api('operador',manifest.id,'documentos-cap',{...partial,id:crypto.randomUUID()},409);
+    await api('operador',manifest.id,'adendas',{...added.__command,id:crypto.randomUUID()},409);
+    evidence.steps.push('partial 4 kg signed; retry idempotent; excess, premature final, non-operator and pending addenda denied; counterpart resolves without changing original; operator releases final 10 kg');
+
     await expect(admin.getByText('Tratado',{exact:true}).first()).toBeVisible({timeout:35000});
     for(const role of ['generador','transportista','operador','admin']){
       await openManifest(pages[role],info,manifest.numero);
       await expect(pages[role].getByRole('button',{name:'Descargar Certificado',exact:true})).toBeDisabled();
       await expect(pages[role].getByText('Tratado',{exact:true}).first()).toBeVisible();
+      await expect(pages[role].getByRole('button',{name:'Descargar final CAP',exact:true})).toBeVisible();
+      await expect(pages[role].getByRole('button',{name:'Descargar parcial 1 CAP',exact:true})).toBeVisible();
+      if(role==='admin')await expect(pages[role].getByRole('button',{name:'Revertir Estado',exact:true})).toHaveCount(0);
       await proof(pages[role],info,'06-cierre-'+role);
     }
     await navigation(admin,info,'/centro-control');
@@ -147,11 +252,12 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     }
     evidence.steps.push('delivery, reception, weighing, treatment and closure; four parties see treated; trip leaves active C3');
     expect(errors).toEqual([]);expect(serverErrors).toEqual([]);
-    expect(httpErrors.filter(error => !/403 \/api\/(?:push\/vapid-key$|blockchain\/manifiesto\/)/.test(error))).toEqual([]);
+    expect(consoleErrors.filter(e=>/Cannot update a component|Rendered (?:more|fewer) hooks/.test(e))).toEqual([]);
+    expect(httpErrors.filter(error => !expectedHttp.has(error) && !/403 \/api\/(?:push\/vapid-key$|blockchain\/manifiesto\/)/.test(error))).toEqual([]);
     evidence.status='passed';
   }finally{
     for(const [role,page]of Object.entries(pages)){if(!page.isClosed()){await page.screenshot({path:info.outputPath('last-'+role+'.png'),fullPage:true,animations:'disabled'}).catch(()=>{});writeFileSync(info.outputPath('last-'+role+'.txt'),await page.locator('body').innerText().catch(()=>''));}}
-    evidence.errors=errors;evidence.consoleErrors=consoleErrors;evidence.serverErrors=serverErrors;evidence.httpErrors=httpErrors;
+    evidence.createdManifestIds=[...scope.manifests];evidence.errors=errors;evidence.consoleErrors=consoleErrors;evidence.serverErrors=serverErrors;evidence.httpErrors=httpErrors;
     writeFileSync(info.outputPath('four-phones-evidence.json'),JSON.stringify(evidence,null,2));
     for(const context of contexts)await context.close().catch(()=>{});
   }

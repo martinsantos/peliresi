@@ -17,6 +17,17 @@ type TimelineEntry = {
   description: string;
 };
 
+function describeEvent(ev: EventoManifiesto) {
+  try {
+    const value = JSON.parse(ev.descripcion || '');
+    const roles: Record<string,string> = { ADMIN:'administrador', GENERADOR:'generador', TRANSPORTISTA:'transporte', OPERADOR:'operador' };
+    if (ev.tipo === 'PROPUESTA_PARTES_V1') return `Propuesta creada por ${roles[value.autorRol] || 'una parte'}. Requiere la aprobación de generador, transporte y operador.`;
+    if (ev.tipo === 'CERTIFICADO_CAP_V1') return `${value.tipo === 'FINAL' ? 'Disposición final' : 'Certificado parcial'} liberado por el operador. Sin validez oficial. ${value.cantidades.map((r: any) => `${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}`;
+    if (value.version === 1 && roles[value.rol] && ['FIRMA','APROBACION_TRANSPORTISTA','APROBACION_OPERADOR','RECHAZO_PARTE'].includes(ev.tipo)) return value.decision === 'RECHAZADA' ? `${roles[value.rol]} rechazó: ${value.motivo}` : `${roles[value.rol]} aprobó su participación.`;
+  } catch { /* Historical events are plain text. */ }
+  return String(ev.descripcion || '');
+}
+
 function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
   if (!manifiesto.eventos || !Array.isArray(manifiesto.eventos) || manifiesto.eventos.length === 0) return [];
 
@@ -25,8 +36,8 @@ function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
   return manifiesto.eventos.map(ev => ({
     id: ev.id,
     date: formatDateTime(ev.createdAt),
-    title: String(ev.tipo || '').replace(/_/g, ' '),
-    description: String(ev.descripcion || '') + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
+    title: ({PROPUESTA_PARTES_V1:'Propuesta a las tres partes',CERTIFICADO_CAP_V1:'Documento de capacitación liberado',APROBACION_TRANSPORTISTA:'Aprobación del transporte',APROBACION_OPERADOR:'Aprobación del operador',RECHAZO_PARTE:'Participación rechazada'} as Record<string,string>)[ev.tipo] || String(ev.tipo || '').replace(/_/g, ' '),
+    description: describeEvent(ev) + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
   }));
 }
 
@@ -62,7 +73,7 @@ const ManifiestoTimeline: React.FC<ManifiestoTimelineProps> = ({ manifiesto }) =
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 pb-6">
+                  <div className="min-w-0 flex-1 pb-6">
                     <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                       <div className="min-w-0">
                         <p className="font-semibold text-neutral-900">

@@ -1,3 +1,4 @@
+import { lockTrainingDocuments, assertNoFinalTrainingCertificate, hasFinalTrainingCertificate } from '../services/trainingCertificate.service';
 import { manifestFeatureEnabled, manifestPracticeIdentity } from '../lib/manifestTraining';
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
@@ -47,10 +48,11 @@ export async function listAddenda(req: AuthRequest, res: Response, next: NextFun
         FROM adendas_manifiesto WHERE "manifiestoId" = ${manifest.id}`),
     ]);
     const summary = counts[0];
-    res.json({ success: true, data: { adendas: items.map(r => present(r, req)), total: summary.total,
+    const finalLiberado = await hasFinalTrainingCertificate(prisma, manifest.id);
+    res.json({ success: true, data: { adendas: items.map(r => ({...present(r, req), ...(finalLiberado ? {puedeResolver:false} : {})})), total: summary.total, finalLiberado,
       documental: { ...summary, estado: documentaryStatus(summary), cierreAcreditado: false },
       manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado },
-      puedeRegistrar: canRecordAddendum(req.user, manifest) && addendumStageAllowed(manifest.estado) } });
+      puedeRegistrar: !finalLiberado && canRecordAddendum(req.user, manifest) && addendumStageAllowed(manifest.estado) } });
   } catch (error) { next(error); }
 }
 export async function downloadAddendum(req: AuthRequest, res: Response, next: NextFunction) {
@@ -95,7 +97,10 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
     if (command.rectificaId && !await prisma.adendaManifiesto.findFirst({ where: { id: command.rectificaId, manifiestoId: manifest.id } })) {
       throw new AppError('La rectificación debe referirse a una adenda de este manifiesto', 400);
     }
-    const record = await prisma.adendaManifiesto.upsert({ where: { id: command.id }, update: {}, create: {
+    const record = await prisma.$transaction(async tx => {
+      await lockTrainingDocuments(tx,manifest.id);
+      await assertNoFinalTrainingCertificate(tx,manifest.id);
+      return tx.adendaManifiesto.upsert({ where: { id: command.id }, update: {}, create: {
       id: command.id, manifiestoId: manifest.id, creadoPorId: req.user.id,
       impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud: hash,
       motivo: command.motivo, rectificaId: command.rectificaId || null, residuos: command.residuos,
@@ -106,7 +111,8 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
         residuos: manifest.residuos.map(r => ({ id: r.id, tipoResiduoId: r.tipoResiduoId,
           corriente: r.tipoResiduo.codigo, cantidad: r.cantidad, unidad: r.unidad, descripcion: r.descripcion })) },
       revisiones: [],
-    } }).catch(async (error: unknown) => {
+    } });
+    }).catch(async (error: unknown) => {
       // Prisma can race its client-side upsert on simultaneous first requests.
       // Only recover a primary-key conflict, then verify the original request below.
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
@@ -123,6 +129,8 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const command = parsed.data;
     const record = await prisma.$transaction(async tx => {
+      await lockTrainingDocuments(tx,req.params.id);
+      await assertNoFinalTrainingCertificate(tx,req.params.id);
       const current = await tx.adendaManifiesto.findFirst({ where: { id: req.params.adendaId, manifiestoId: req.params.id } });
       if (!current) throw new AppError('Adenda no encontrada', 404);
       if (!canReview(req, current)) throw new AppError('Se requiere contraparte vinculada o revisor designado, sin autoaprobación ni impersonación', 403);

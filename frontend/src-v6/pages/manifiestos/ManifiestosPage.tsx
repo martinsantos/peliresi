@@ -1,3 +1,4 @@
+import { ManifestAgenda } from './components/ManifestAgenda';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Manifiestos Page
@@ -315,6 +316,8 @@ const ManifiestosPage: React.FC = () => {
           <Button size="sm" aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>
         </div>
       </div>
+
+      {currentUser?.training && <ManifestAgenda />}
 
       {/* Filters — sticky. Phones: search + Filtros in one row; state joins the other filters. */}
       <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-1 pb-2 md:pt-2">

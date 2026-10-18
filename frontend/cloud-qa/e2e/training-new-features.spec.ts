@@ -62,7 +62,12 @@ test('school creates a manifest with registered fleet; an addendum preserves its
   await page.mouse.up(); await signature.getByRole('button', { name: 'Usar firma', exact: true }).click();
   const signing = page.waitForResponse(r => r.url().endsWith('/' + manifest.id + '/firmar') && r.request().method() === 'POST');
   await signature.getByRole('button', { name: 'Confirmar y Firmar', exact: true }).click(); expect((await signing).status()).toBe(200);
+  await role(page, info, 'Operadores', n); await page.goto(prefix(info) + '/manifiestos/' + manifest.id);
+  const operatorApproval=page.waitForResponse(r=>r.url().endsWith('/aprobar-parte')&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'Aprobar como operador',exact:true}).click();expect((await operatorApproval).status()).toBe(200);
   await role(page, info, 'Transportistas', n); await page.goto(prefix(info) + '/manifiestos/' + manifest.id);
+  const carrierApproval=page.waitForResponse(r=>r.url().endsWith('/aprobar-parte')&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'Aprobar como transporte',exact:true}).click();expect((await carrierApproval).status()).toBe(200);
   await page.getByRole('link', { name: 'Adendas y revisión posterior', exact: true }).click();
   await page.getByRole('button', { name: 'Registrar diferencia', exact: true }).click();
   await page.getByLabel('Corriente observada 1', { exact: true }).fill('Y1');

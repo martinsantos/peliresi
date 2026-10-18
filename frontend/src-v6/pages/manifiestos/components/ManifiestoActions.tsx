@@ -1,3 +1,4 @@
+import { ManifestProposalApprovals } from './ManifestProposalApprovals';
 /**
  * SITREP v6 - Manifiesto Actions
  * ===============================
@@ -93,6 +94,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
       <Card>
         <CardHeader title="Acciones" />
         <CardContent>
+          {training && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           <ActionButtons
             estado={m.estado}
             isAdmin={isAdmin}
@@ -123,6 +125,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             onOpenReversionModal={() => setShowReversionModal(true)}
             onDescargarPDF={onDescargarPDF}
             training={training}
+            immutableProposal={!!training && m.eventos?.some(e => e.tipo === 'PROPUESTA_PARTES_V1')}
             onDescargarCertificado={onDescargarCertificado}
           />
         </CardContent>

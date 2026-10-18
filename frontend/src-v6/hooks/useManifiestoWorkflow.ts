@@ -42,6 +42,7 @@ export function useUpdateManifiesto() {
       manifiestoService.update(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -55,6 +56,7 @@ export function useFirmarManifiesto() {
       manifiestoService.firmar(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -68,6 +70,7 @@ export function useConfirmarRetiro() {
       manifiestoService.confirmarRetiro(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -81,6 +84,7 @@ export function useConfirmarEntrega() {
       manifiestoService.confirmarEntrega(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -94,6 +98,7 @@ export function usePesaje() {
       manifiestoService.pesaje(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
     },
   });
 }
@@ -106,6 +111,7 @@ export function useConfirmarRecepcion() {
       manifiestoService.confirmarRecepcion(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -119,6 +125,7 @@ export function useConfirmarRecepcionInSitu() {
       manifiestoService.confirmarRecepcionInSitu(id),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -132,6 +139,7 @@ export function useRegistrarTratamiento() {
       manifiestoService.registrarTratamiento(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -145,6 +153,7 @@ export function useRechazarManifiesto() {
       manifiestoService.rechazar(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -158,6 +167,7 @@ export function useRegistrarIncidente() {
       manifiestoService.registrarIncidente(id, req),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -170,6 +180,7 @@ export function useCerrarManifiesto() {
     mutationFn: (id: string) => manifiestoService.cerrar(id),
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -183,6 +194,7 @@ export function useCancelarManifiesto() {
       manifiestoService.cancelar(id, motivo),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -196,6 +208,7 @@ export function useRevertirEstado() {
       manifiestoService.revertirEstado(id, estadoNuevo, motivo),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
+      qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });

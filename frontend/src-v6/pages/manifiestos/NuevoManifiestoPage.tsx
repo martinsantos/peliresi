@@ -62,6 +62,11 @@ export const NuevoManifiestoPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser, isAdmin, isGenerador } = useAuth();
+  const partyProposal = currentUser?.training === true && ['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'].includes(currentUser.rol);
+  const carrierProposal = partyProposal && currentUser?.rol === 'TRANSPORTISTA';
+  const ownCarrierId = carrierProposal ? currentUser?.actorId || '' : '';
+  const operatorProposal = currentUser?.training === true && currentUser.rol === 'OPERADOR';
+  const ownOperatorId = operatorProposal ? currentUser?.actorId || '' : '';
   const [step, setStep] = useState(1);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLDivElement>(null);
@@ -94,11 +99,11 @@ export const NuevoManifiestoPage: React.FC = () => {
     generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
     generadorId: currentUser?.rol === 'GENERADOR' ? currentUser?.actorId || '' : '',
     modalidad: 'FIJO' as 'FIJO' | 'IN_SITU',
-    transportista: '',
+    transportista: ownCarrierId,
     vehiculoId: '',
     choferId: '',
-    operador: '',
-    fechaRetiro: new Date().toISOString().split('T')[0],
+    operador: ownOperatorId,
+    fechaRetiro: new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Mendoza'}).format(new Date()),
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
   });
@@ -116,7 +121,7 @@ export const NuevoManifiestoPage: React.FC = () => {
     [formData.residuos]
   );
   const operadoresFiltrados = useMemo(() => {
-    let filtered = operadoresList;
+    let filtered = operatorProposal ? operadoresList.filter(o => o.id === ownOperatorId) : operadoresList;
 
     // Filter by modalidad: check modalidades array, tipoOperador, or categoria
     filtered = filtered.filter((op: any) => {
@@ -142,7 +147,7 @@ export const NuevoManifiestoPage: React.FC = () => {
     }
 
     return filtered;
-  }, [operadoresList, selectedResiduoIds, formData.modalidad]);
+  }, [operadoresList, selectedResiduoIds, formData.modalidad, operatorProposal, ownOperatorId]);
 
   // Cross-filter: residuos by generador's corrientesControl
   const genCorrientes = useMemo(() => {
@@ -257,8 +262,8 @@ export const NuevoManifiestoPage: React.FC = () => {
 
   // Removed isMobile — React Router handles /app/ basename
 
-  // Only GENERADOR and ADMIN can create manifiestos
-  const canCreate = isAdmin || isGenerador;
+  // Operational permissions are unchanged; signed CAP actors can propose their own participation.
+  const canCreate = isAdmin || isGenerador || (operatorProposal && !!ownOperatorId) || (carrierProposal && !!ownCarrierId);
 
   if (!canCreate) {
     return (
@@ -319,6 +324,7 @@ export const NuevoManifiestoPage: React.FC = () => {
         </div>
       </header>
 
+      {partyProposal && <p className="mb-3 rounded-lg bg-primary-50 p-3 text-sm">Cualquiera de las partes puede iniciar. Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro. Tu empresa queda vinculada a tu rol.</p>}
       <ol aria-label="Etapas del formulario" className="flex gap-4 py-3 text-sm text-neutral-600">
         {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={step === index + 1 ? 'font-semibold text-primary-800' : ''}>{index + 1}. {label}</li>)}
       </ol>
@@ -338,7 +344,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                   onChange={(val) => {
                     if (val === formData.generadorId) return;
                     const gen = generadoresList.find((g: any) => g.id === val);
-                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], transportista: '', operador: '' });
+                    setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], transportista: ownCarrierId, operador: ownOperatorId });
                   }}
                   options={[...generadoresList]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
@@ -503,7 +509,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                     setValidationErrors(prev => { const n = {...prev}; delete n.residuos; return n; });
                     // A previously selected transport must still support the updated residues.
                     if (formData.transportista && !transportistasFiltrados.some((t) => t.id === formData.transportista)) {
-                      setFormData(prev => ({ ...prev, transportista: '', vehiculoId: '', choferId: '' }));
+                      setFormData(prev => ({ ...prev, transportista: ownCarrierId, vehiculoId: '', choferId: '' }));
                     }
                     // Clear operador if no longer valid for the selected residuos
                     if (formData.operador) {
@@ -517,8 +523,8 @@ export const NuevoManifiestoPage: React.FC = () => {
                               .map((t: any) => t.tipoResiduoId)
                           );
                           const stillValid = curResiduoIds.every(id => opResiduoIds.has(id));
-                          if (!stillValid) {
-                            setFormData(prev => ({ ...prev, operador: '' }));
+                          if (!stillValid && !operatorProposal) {
+                            setFormData(prev => ({ ...prev, operador: ownOperatorId }));
                           }
                         }
                       }
@@ -551,7 +557,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                     aria-pressed={formData.modalidad === 'FIJO'}
                     onClick={() => {
                       if (formData.modalidad === 'FIJO') return;
-                      setFormData(prev => ({ ...prev, modalidad: 'FIJO', operador: '' }));
+                      setFormData(prev => ({ ...prev, modalidad: 'FIJO', operador: ownOperatorId }));
                       setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
@@ -569,9 +575,11 @@ export const NuevoManifiestoPage: React.FC = () => {
                   <button
                     type="button"
                     aria-pressed={formData.modalidad === 'IN_SITU'}
+                    disabled={partyProposal}
+                    title={partyProposal ? 'Este ensayo de tres partes usa destino fijo y transporte' : undefined}
                     onClick={() => {
                       if (formData.modalidad === 'IN_SITU') return;
-                      setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', vehiculoId: '', choferId: '', operador: '' }));
+                      setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: ownCarrierId, vehiculoId: '', choferId: '', operador: ownOperatorId }));
                       setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
@@ -610,8 +618,9 @@ export const NuevoManifiestoPage: React.FC = () => {
                     <Select
                       label="Transportista *"
                       value={formData.transportista}
+                      disabled={carrierProposal}
                       onChange={(val) => setFormData(prev => val === prev.transportista ? prev : ({ ...prev, transportista: val, vehiculoId: '', choferId: '' }))}
-                      options={[...transportistasFiltrados]
+                      options={[...(carrierProposal ? transportistasFiltrados.filter(t => t.id === ownCarrierId) : transportistasFiltrados)]
                         .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                         .map((t: any) => ({
                           value: t.id,
@@ -651,6 +660,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                 <Select
                   label="Operador / Destino *"
                   value={formData.operador}
+                  disabled={operatorProposal}
                   onChange={(val) => setFormData({ ...formData, operador: val })}
                   options={[...operadoresFiltrados]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))

@@ -1,3 +1,6 @@
+import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
+import { canCreateManifestProposal } from '../domain/manifestProposal';
+import { getManifestProposal, approveManifestParty, getProposalAgenda } from '../controllers/manifest-proposal.controller';
 import { Router } from 'express';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import {
@@ -244,6 +247,7 @@ router.get('/', getManifiestos);
  *       404:
  *         description: Manifiesto no encontrado
  */
+router.get('/agenda-partes', getProposalAgenda);
 router.get('/:id', getManifiestoById);
 
 /**
@@ -280,7 +284,12 @@ router.get('/:id', getManifiestoById);
  *       403:
  *         description: Rol no autorizado
  */
-router.post('/', hasRole('GENERADOR', 'ADMIN'), createManifiesto);
+router.post('/', (req: any, res, next) => canCreateManifestProposal(req.user) ? next() : hasRole('GENERADOR', 'ADMIN')(req, res, next), createManifiesto);
+router.get('/:id/documentos-cap', listTrainingCertificates);
+router.post('/:id/documentos-cap', releaseTrainingCertificate);
+router.get('/:id/documentos-cap/:documentId/archivo', downloadTrainingCertificate);
+router.get('/:id/aprobaciones', getManifestProposal);
+router.post('/:id/aprobar-parte', approveManifestParty);
 
 /**
  * @openapi

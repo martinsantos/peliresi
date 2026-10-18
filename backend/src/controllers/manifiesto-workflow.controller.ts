@@ -1,3 +1,6 @@
+import { approveManifestProposal, assertManifestProposalApproved } from './manifest-proposal.controller';
+import { MANIFEST_PROPOSAL } from '../domain/manifestProposal';
+import { isTrainingSession } from '../lib/trainingScope';
 import { Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
@@ -77,6 +80,11 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     await assertCanAccessManifiesto(prisma, req.user, id);
     const userId = req.user.id;
     const firma = await prepareManifiestoSignature(req.body?.firma);
+    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) {
+      const manifiesto = await approveManifestProposal(req, firma);
+      res.json({ success: true, data: { manifiesto } });
+      return;
+    }
 
     // Generate QR before transaction (async, no DB write)
     // We need manifiesto.numero first — fetch outside tx to avoid holding tx open during QR generation
@@ -193,6 +201,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
 
     // Atomic conditional update: prevents double-tap race condition
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+      await assertManifestProposalApproved(tx, id);
       let updated;
       try {
         updated = await tx.manifiesto.update({
@@ -847,6 +856,7 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
+    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta conserva las decisiones y el recorrido de las partes; creá un caso nuevo para repetir la práctica', 409);
     const parsed = revertirManifiestoSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const { estadoNuevo, motivo } = parsed.data;

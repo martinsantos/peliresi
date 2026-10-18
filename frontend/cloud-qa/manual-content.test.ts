@@ -194,3 +194,15 @@ test('four phones retain their roles and follow one new case through GPS and clo
   assert.match(guide.steps[5].body.join(' '), /Los cuatro deben ver Tratado/);
   assert.match(read('index.html'), /guide=capacitacion-cuatro-telefonos/);
 });
+
+
+test('classroom new proposals separate authorship, three decisions, agenda and signed releases', () => {
+  const guide=guides.find((g:any)=>g.id==='capacitacion-cuatro-telefonos');
+  const text=JSON.stringify(guide);
+  assert.match(text,/Puede iniciar cualquiera: operador, transporte, generador o administrador CAP/);
+  assert.match(text,/Sólo con las tres aprobaciones/);
+  assert.match(text,/Próximos retiros/);
+  assert.match(text,/Tratado no libera automáticamente/);
+  assert.match(text,/todas las adendas aprobadas/);
+  assert.match(text,/CAPACITACIÓN — SIN VALIDEZ OFICIAL/);
+});

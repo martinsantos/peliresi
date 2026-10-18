@@ -1,3 +1,6 @@
+import { validateProposalParties, notifyManifestParties } from '../services/manifestProposal.service';
+import { isTrainingSession } from '../lib/trainingScope';
+import { canCreateManifestProposal, MANIFEST_PROPOSAL } from '../domain/manifestProposal';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
@@ -112,18 +115,24 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
-    if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN') {
+    const partyProposal = canCreateManifestProposal(req.user);
+    if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN' && !partyProposal) {
       throw new AppError('Solo los generadores pueden crear manifiestos', 403);
     }
 
     // ADMIN can specify generadorId in body; GENERADOR uses their own
-    const generadorId = req.user.rol === 'ADMIN'
+    if (partyProposal && req.user.rol === 'OPERADOR' && operadorId !== req.user.operador.id) throw new AppError('El operador de destino debe ser tu propia empresa', 403);
+    if (partyProposal && req.user.rol === 'TRANSPORTISTA' && transportistaId !== req.user.transportista.id) throw new AppError('El transporte debe ser tu propia empresa', 403);
+    if (partyProposal && modalidad !== 'FIJO') throw new AppError('El circuito de tres partes requiere transporte y destino fijo', 400);
+    const generadorId = req.user.rol !== 'GENERADOR'
       ? (bodyGeneradorId || (req.user.generador && req.user.generador.id))
       : req.user.generador?.id;
 
     if (!generadorId) {
       throw new AppError('Se requiere un generador para crear el manifiesto', 400);
     }
+
+    if (partyProposal && (!fechaEstimadaRetiro || !/^\d{4}-\d{2}-\d{2}$/.test(fechaEstimadaRetiro) || !Number.isFinite(Date.parse(fechaEstimadaRetiro)) || new Date(fechaEstimadaRetiro).toISOString().slice(0,10) !== fechaEstimadaRetiro)) throw new AppError('Indicá la fecha prevista del retiro', 400);
 
     // Modalidad validation
     if (modalidad === 'FIJO' && !transportistaId) {
@@ -158,6 +167,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     // Reserve the number and insert record/event under one database lock.
     // A process-local mutex would not protect both production PM2 workers.
     const manifiesto = await prisma.$transaction(async (tx) => {
+      if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: transportistaId!, operadorId });
       const asignacionTransporte = await prepareTransportAssignment(tx, { modalidad, transportistaId, vehiculoId, choferId });
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(836272)::text AS "lock"`;
       const numero = await generarNumeroManifiesto(tx);
@@ -173,8 +183,8 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         operadorId,
         modalidad,
         observaciones,
-        fechaEstimadaRetiro: fechaEstimadaRetiro ? new Date(fechaEstimadaRetiro) : null,
-        estado: 'BORRADOR',
+        fechaEstimadaRetiro: fechaEstimadaRetiro ? new Date(partyProposal && /^\d{4}-\d{2}-\d{2}$/.test(fechaEstimadaRetiro) ? fechaEstimadaRetiro + 'T12:00:00-03:00' : fechaEstimadaRetiro) : null,
+        estado: partyProposal ? 'PENDIENTE_APROBACION' : 'BORRADOR',
         creadoPorId: userId,
         residuos: {
           create: residuos.map((r: any) => ({
@@ -213,6 +223,11 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       descripcion: `Asignación inicial. Vehículo: ${asignacionTransporte.vehiculo?.patente || 'sin asignar'}. Chofer: ${asignacionTransporte.chofer ? `${asignacionTransporte.chofer.nombre} ${asignacionTransporte.chofer.apellido}`.trim() : 'sin asignar'}.`,
     } });
 
+      if (partyProposal) await tx.eventoManifiesto.create({ data: {
+        manifiestoId: created.id, tipo: MANIFEST_PROPOSAL, usuarioId: userId,
+        descripcion: JSON.stringify({ version: 1, generadorId, transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
+      } });
+      if (partyProposal) await notifyManifestParties(tx, created, 'creada', userId);
       return created;
     });
 
@@ -234,6 +249,8 @@ export const updateManifiesto = async (req: AuthRequest, res: Response, next: Ne
     if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
+
+    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta conserva lo presentado a las partes; creá otra propuesta para corregirla', 409);
 
     if (manifiesto.estado !== 'BORRADOR') {
       throw new AppError('Solo se pueden editar manifiestos en estado BORRADOR', 400);
@@ -299,6 +316,8 @@ export const deleteManifiesto = async (req: AuthRequest, res: Response, next: Ne
     if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {
       throw new AppError('Manifiesto no encontrado', 404);
     }
+
+    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta y sus decisiones se conservan en el historial; no se pueden eliminar', 409);
 
     if (manifiesto.estado !== 'BORRADOR' && manifiesto.estado !== 'CANCELADO') {
       throw new AppError('Solo se pueden eliminar manifiestos en estado BORRADOR o CANCELADO', 400);

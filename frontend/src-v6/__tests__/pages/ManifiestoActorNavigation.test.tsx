@@ -5,12 +5,12 @@ import { beforeEach, afterEach, test, vi, expect } from 'vitest';
 import ManifiestoDetallePage from '../../pages/manifiestos/ManifiestoDetallePage';
 import { canAccessMobilePath } from '../../utils/mobileAccess';
 
-const state = vi.hoisted(() => ({ user: {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}, writes: vi.fn() }));
+const state = vi.hoisted(() => ({ user: {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}, writes: vi.fn(), status: 'TRATADO' }));
 vi.mock('../../contexts/AuthContext', () => ({useAuth: () => ({currentUser: state.user, isAdmin: state.user.rol === 'ADMIN'})}));
 vi.mock('../../hooks/useManifiestos', () => {
   const mutation = () => ({isPending: false, mutateAsync: state.writes});
   return {
-    useManifiesto: () => ({data: {id: 'm-1', numero: 'QA-1', estado: 'TRATADO', createdAt: '2026-10-02T12:00:00Z',
+    useManifiesto: () => ({data: {id: 'm-1', numero: 'QA-1', estado: state.status, createdAt: '2026-10-02T12:00:00Z',
       generadorId: 'g-1', transportistaId: 't-1', operadorId: 'o-1',
       generador: {razonSocial: 'QA Generador', cuit: '30123456789'}, transportista: {razonSocial: 'QA Transporte'}, operador: {razonSocial: 'QA Operador'}, residuos: [], eventos: []}}),
     useFirmarManifiesto: mutation, useConfirmarRetiro: mutation, useConfirmarEntrega: mutation,
@@ -24,7 +24,7 @@ vi.mock('../../pages/manifiestos/components/ManifiestoTimeline', () => ({default
 vi.mock('../../pages/manifiestos/components/ManifiestoActions', () => ({default: () => null}));
 vi.mock('../../services/manifiesto.service', () => ({manifiestoService: {}}));
 
-beforeEach(() => { state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}; state.writes.mockClear(); });
+beforeEach(() => { state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}; state.writes.mockClear(); state.status = 'TRATADO'; });
 afterEach(cleanup);
 const open = () => render(<MemoryRouter initialEntries={['/manifiestos/m-1']}><Routes><Route path="/manifiestos/:id" element={<ManifiestoDetallePage/>}/></Routes></MemoryRouter>);
 const actorLinks = () => screen.queryAllByRole('link').filter(link => (link.getAttribute('href') || '').includes('/admin/actores/'));
@@ -56,4 +56,14 @@ test('app sector administrator can read another category without entering its ed
 });
 test('app ordinary transportista cannot render another actor detail', () => {
   expect(canAccessMobilePath({...state.user,rol:'TRANSPORTISTA',actorId:'t-1'} as never,'/admin/actores/transportistas/t-2')).toBe(false);
+});
+
+for (const prefix of ['', '/app']) test(`carrier opens its ready trip without a blank page on ${prefix || 'web'}`, async () => {
+  state.user.rol = 'TRANSPORTISTA'; state.status = 'APROBADO';
+  render(<MemoryRouter initialEntries={[prefix+'/manifiestos/m-1']}><Routes>
+    <Route path={prefix+'/manifiestos/:id'} element={<ManifiestoDetallePage/>}/>
+    <Route path={prefix+'/transporte/viaje/:id'} element={<h1>Viaje listo para retirar</h1>}/>
+  </Routes></MemoryRouter>);
+  expect(await screen.findByRole('heading',{name:'Viaje listo para retirar'})).toBeVisible();
+  expect(state.writes).not.toHaveBeenCalled();
 });

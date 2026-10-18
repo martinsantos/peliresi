@@ -32,6 +32,7 @@ export interface ActionButtonsProps {
   isActionPending: boolean;
   isInSitu?: boolean;
   training?: boolean;
+  immutableProposal?: boolean;
   isCancelling: boolean;
   mutations: {
     firmar: MutationState;
@@ -65,6 +66,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   isActionPending,
   isInSitu,
   training,
+  immutableProposal,
   isCancelling,
   mutations,
   onOpenFirmaModal,
@@ -222,7 +224,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
         </Button>
       )}
 
-      {isAdmin && estado !== EstadoManifiesto.BORRADOR && (
+      {isAdmin && !immutableProposal && estado !== EstadoManifiesto.BORRADOR && (
         <Button
           variant="outline"
           fullWidth
