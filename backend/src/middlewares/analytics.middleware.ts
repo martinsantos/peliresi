@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { isTrainingSession } from '../lib/trainingScope';
+import { isTrainingLoginEmail } from '../lib/trainingDirectLogin';
 import { AuthRequest } from './auth.middleware';
 
 interface AnalyticsData {
@@ -62,8 +63,11 @@ const SKIP_ANALYTICS_PATHS = ['/ubicacion', '/gps'];
 
 // Middleware
 export const analyticsMiddleware = (req: Request, res: Response, next: NextFunction) => {
+    // Direct login establishes its school scope inside the controller. Exclude
+    // that reserved entry before attaching a listener to the operational buffer.
+    const directSchoolLogin = /^\/api\/auth\/login\/?$/i.test(req.path) && isTrainingLoginEmail(req.body?.email);
     // M2: Skip analytics for GPS routes to reduce DB write pressure
-    if (isTrainingSession() || SKIP_ANALYTICS_PATHS.some(p => req.path.includes(p))) {
+    if (directSchoolLogin || isTrainingSession() || SKIP_ANALYTICS_PATHS.some(p => req.path.includes(p))) {
         return next();
     }
 
