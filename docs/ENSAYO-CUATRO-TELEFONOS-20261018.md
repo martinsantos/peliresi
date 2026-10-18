@@ -1,5 +1,7 @@
 # Capacitación: un manifiesto, cuatro teléfonos — 18/10/2026
 
+> Cierre histórico de f19d024. La entrega posterior incorpora cuatro accesos directos sin administrador personal: [estado, resultados y rollback vigente](ACCESOS-DIRECTOS-CAPACITACION-20261018.md).
+
 **Publicado el 18/10/2026 a las 10:42:14 de Mendoza:** web, app y manual sobre `f19d024c534be146a4d7eb1a863410f556c2bf28`. Backend `c819ecf` conservado sin reinicio. Ensayo final CAP publicado aprobado en web y `/app`, con cuatro sesiones independientes por circuito.
 
 ## Para el lunes 19

@@ -2,13 +2,14 @@
 
 ## Punto de entrada vigente — capacitación 19/10/2026 (leer primero)
 
-- **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [ensayo de cuatro teléfonos](docs/ENSAYO-CUATRO-TELEFONOS-20261018.md).** Web/app/manual `f19d024` publicados en `sitrep.ultimamilla.com.ar`; backend `c819ecf` conservado. Novedades exclusivamente para CAP firmado; flags operativos, correos y push apagados.
+- **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [cuatro accesos directos, resultados y rollback](docs/ACCESOS-DIRECTOS-CAPACITACION-20261018.md).** Backend/web/app/manual `97c77be` publicados en `sitrep.ultimamilla.com.ar`. CAP artificial; flags operativos, correos y push apagados.
 - Único checkout: `sitrep-production-source-20261001` indicado en el traspaso. Rama `codex/sitrep-training-20261018`; main sigue en `c840219`. El cierre documental posterior no cambia el producto publicado.
-- Cuatro sesiones independientes ensayadas de punta a punta en web y app: 2/2 preview y 2/2 aula publicada, con dos ubicaciones enviadas por UI y observadas en C3. Se corrigió el detalle desactualizado entre teléfonos. Guía «Un manifiesto, cuatro teléfonos», siete pasos, diseño conservado.
-- Se conservaron 40 cuentas CAP y 35 casos preparados. Los seis casos nuevos de esta etapa, CAP-2026-000003 a 000008, quedaron TRATADO; las dos interrupciones se completaron por UI sin reset. Instructor QA suspendido y contraseña rotada. No proclamar GO global, GPS/Android físico ni carga masiva certificada.
-- Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads`, `.env` y releases anteriores. No repetir migraciones ni ejecutar seeds. Rollback de esta entrega: sólo frontend a `20261018-training-c819ecf`; no reiniciar backend ni restaurar base. Rollback histórico completo a `1ab057a` documentado en el cierre anterior.
-- Gemelo `sitrep-qa-training-20261018` detenido; imagen y evidencias conservadas. Sin suite, servidor QA ni relay activo. No se modificaron contenedores ajenos; no usar túneles antiguos.
-- Commits `[skip ci]`, sin workflows. QA pesada sólo remota, serial, un worker, 1 CPU/2 GiB/swap cero. El dueño autorizó esta capacitación autónoma con datos artificiales; cualquier ampliación a operación real requiere decisión específica.
+- Cuatro alias directos del equipo 1 para la pizarra; no requieren credenciales personales ni selector de instructor. Contraseñas privadas, fuera de Git/manual. Vencen al finalizar el lunes 19/10 en Mendoza: `TRAINING_DIRECT_LOGIN_UNTIL=2026-10-20T03:00:00Z`. Sesiones y refresh también vencen. No crear usuarios operativos.
+- Conservar 40 cuentas CAP y 35 casos preparados. Para cada práctica crear un caso nuevo, compartir su número y conservar cada rol. Las ubicaciones de QA son emuladas: no certificar GPS físico, Android, segundo plano ni concurrencia masiva. Instructor QA anterior suspendido; no reactivarlo.
+- Backend completo 1.112/1.112; frontend completo 1.568/1.568. Guía de cuatro teléfonos actualizada sin cambiar diseño; ingreso directo, relevos verbales, GPS/C3 y cierre. Resultados posteriores y evidencias en el cierre enlazado.
+- Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads`, todas las variables previas y releases anteriores. No repetir migraciones ni ejecutar seeds. Rollback vigente: backend `20261018-training-c819ecf` y frontend `20261018-four-phones-f19d024`; recargar sólo backend y retirar la variable nueva de PM2. No restaurar base ni borrar prácticas.
+- QA pesada sólo remota, serial, un worker, 1 CPU/2 GiB/swap cero. Contenedor propio `sitrep-qa-training-20261018`; no tocar los ajenos ni reutilizar túneles antiguos. Estado final en el cierre de accesos directos.
+- Commits `[skip ci]`, sin workflows. El dueño autorizó preparar/probar/publicar esta capacitación autónoma con datos artificiales; una ampliación a operación real requiere decisión específica.
 - Los apartados siguientes son históricos; sus ramas, despliegues, credenciales, seeds y estados de preview no acreditan la situación vigente ni autorizan operaciones.
 
 ## Contexto histórico — cierre parcial 16/10/2026

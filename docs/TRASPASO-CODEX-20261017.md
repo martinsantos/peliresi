@@ -1,5 +1,21 @@
 # SITREP — traspaso vigente para la capacitación del lunes 19/10/2026
 
+## Estado vigente — cuatro accesos directos, 18/10 a las 11:43:39
+
+**Backend, web, app y manual publicados sobre `97c77beecce5a349e53d47d89ad35881a599253a` en `sitrep.ultimamilla.com.ar`.** Leer primero [accesos directos, resultados y rollback vigente](ACCESOS-DIRECTOS-CAPACITACION-20261018.md). El dueño pidió cuatro usuarios/contraseñas para la pizarra, sin su administrador personal en los teléfonos. Los alias `admin@capacitacion.invalid`, `generador@capacitacion.invalid`, `transporte@capacitacion.invalid` y `operador@capacitacion.invalid` autentican exclusivamente las cuatro cuentas CAP del equipo 1. Contraseñas privadas fuera de Git y del manual. Vencen al terminar el lunes 19/10 en Mendoza.
+
+Abrir `/app/`, entrar directamente y comprobar la banda amarilla «Capacitación · sin validez oficial». Seguir el manual «Un manifiesto, cuatro teléfonos»: crear y firmar → retirar y enviar GPS → observar el mismo número en C3/Hoy → entregar → recibir/pesar/tratar/cerrar. Cada persona conserva su rol. Eventuales y adendas mantienen el ámbito escolar y sus revisiones; los flags operativos, correos y push siguen apagados.
+
+Fuente única y rama sin cambios: este checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; main `c840219`, sin integrar. SW raíz v119, app `20261018143836`. Backend completo 1.112/1.112; frontend completo 1.568/1.568. Recorridos publicados 2/2, manual publicado 3/3 y smoke 44/44. A las 11:50:18: 40 cuentas CAP, 35 casos preparados intactos, casos nuevos 000009/000010 tratados y workers sin reinicios posteriores. Gemelo propio detenido y relay cerrado, imagen/evidencias conservadas. Evidencia completa y límites en el cierre enlazado. GPS probado con coordenadas emuladas; falta comprobar ubicación física con los teléfonos de la clase.
+
+Única variable nueva: `TRAINING_DIRECT_LOGIN_UNTIL=2026-10-20T03:00:00Z`. `.env` actual SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`; se conservan todas las variables anteriores y `UPLOADS_DIR`. No hubo migraciones/seeds ni cambios de permisos. Se respaldaron y verificaron los cuatro hashes CAP antes de reemplazarlos. Auditoría privada: `/var/backups/sitrep/20261018-direct-login/`.
+
+Rollback vigente: ambos enlaces activos apuntan a sus releases `20261018-direct-97c77be`; volver backend a `20261018-training-c819ecf` y frontend a `20261018-four-phones-f19d024`, con recarga exclusiva del backend y retiro de la variable nueva del entorno PM2. No restaurar la base ni borrar prácticas. El procedimiento exacto está en el cierre enlazado.
+
+## Instantánea histórica anterior — f19d024 / c819ecf
+
+**Todo lo que sigue conserva el cierre previo; sus hashes, rollback, cifras y forma de acceso no sustituyen el estado vigente de arriba.**
+
 **Web/app/manual publicados: `f19d024c534be146a4d7eb1a863410f556c2bf28`, el 18/10 a las 10:42:14 de Mendoza. Backend conservado: `c819ecfa275afe58d4e2d6d93119adccef073ea8`.** Dominio `sitrep.ultimamilla.com.ar`. Capacitación artificial; Eventuales y adendas disponibles sólo en sesiones CAP firmadas. Flags operativos, correos y push apagados.
 
 Leer [ensayo de cuatro teléfonos, resultados y rollback actual](ENSAYO-CUATRO-TELEFONOS-20261018.md). Comprobación posterior a las 10:49:30: dos procesos backend sin reinicio, 40 cuentas CAP y 35 casos preparados conservados, seis casos nuevos propios tratados; instructor QA suspendido y contraseña rotada. No es certificación global, de GPS/Android físico ni de concurrencia masiva. El [cierre anterior](CIERRE-CAPACITACION-20261018.md) conserva la evidencia de Eventuales, adendas y el despliegue backend.
