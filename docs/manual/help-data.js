@@ -442,4 +442,52 @@
     ]
   });
 
+  // One shared case, four persistent sessions: no role switching during the relay.
+  window.SITREP_HELP.guides.push({
+    id: 'capacitacion-cuatro-telefonos', profile: 'administrador', audiences: ['generador', 'transportista', 'operador'],
+    title: 'Un manifiesto, cuatro teléfonos',
+    summary: 'Cada persona conserva su rol. Crean un caso, siguen su viaje en C3 y comprueban juntos el cierre.',
+    duration: '25 min', icon: 'devices', keywords: ['cuatro teléfonos', '4 celulares', 'capacitación', 'GPS', 'C3', 'generador', 'transportista', 'operador', 'administrador'],
+    safety: 'Sólo con «Capacitación · sin validez oficial» en los cuatro teléfonos. El instructor prepara y supervisa las sesiones CAP; no reparte su contraseña.',
+    steps: [
+      { title: 'Preparar los cuatro teléfonos · instructor', body: [
+        'Usen todos Web o todos App para la primera vuelta. En cada teléfono, el instructor ingresa con su cuenta administradora → Elegir cuenta CAP. Dejá uno como CAP · ADMIN 1, otro como CAP · GENERADOR 1, otro como CAP · TRANSPORTE 1 y otro como CAP · OPERADOR 1. Para otro equipo, cambien el 1 por el mismo número en los cuatro.',
+        'Cada participante conserva ese rol hasta terminar. No son cuatro pestañas del mismo navegador: deben ser teléfonos o perfiles de navegador independientes. Confirmá la banda de capacitación y el nombre de cada rol. Volver a mi cuenta lo usa únicamente el instructor; al terminar, vuelve y cierra su sesión en cada equipo.',
+        'Antes de la clase: conexión a Internet en los cuatro; ubicación del teléfono de transporte activada y permiso permitido para SITREP. Durante el seguimiento, mantener la pantalla de viaje abierta y el teléfono desbloqueado. Probar el permiso y un envío real en ese teléfono: una prueba de navegador no certifica GPS físico ni segundo plano.'
+      ], expected: 'Cuatro pantallas, cuatro roles del mismo equipo y conexión lista.', resources: [{label:'Elegir cuenta CAP · prepara el instructor',path:'/switch-user?modo=capacitacion'}] },
+      { title: 'Crear y firmar · teléfono del generador', body: [
+        'Manifiestos → Nuevo. Primer paso: confirmar el generador CAP. Segundo: elegir Y-CAP y cargar 10 kg. Tercero: Transporte CAP del equipo, vehículo CAP00N, Chofer ficticio N y Operador CAP del mismo equipo. Crear Manifiesto.',
+        'Revisar el detalle → Firmar Manifiesto → dibujar la firma → Usar firma → Confirmar y Firmar. Esperar la confirmación; no tocar dos veces.',
+        'Anotar el número nuevo CAP-2026-… y decirlo a los otros tres. Ése es el único caso de esta vuelta. No abrir los casos preparados CAP-1-EN_TRANSITO ni CAP-1-TRATADO para simular que éste avanzó.'
+      ], image: S + 'desktop/training-fleet-20261018.png', alt: 'Vehículo y chofer registrados del equipo CAP', caption: 'Datos sintéticos · preview aislado · 18/10/2026.', expected: 'El caso nuevo está aprobado, con vehículo y chofer asignados. Todos anotaron el mismo número.', resources: [{label:'Manifiestos · generador CAP',path:'/manifiestos'}] },
+      { title: 'Retirar e iniciar GPS · teléfono del transporte', body: [
+        'Abrir el menú → Manifiestos (Mis Viajes). Buscar el número que dijo el generador y abrirlo. Si todavía no aparece, tocar Actualizar listado. Comprobar número, origen, destino, vehículo y chofer antes de continuar.',
+        'Confirmar retiro. La pantalla pasa a Viaje en Curso. Permitir ubicación cuando el teléfono la solicite. Esperar GPS activo y después el aviso Sync con una hora: ese aviso confirma un envío al servidor.',
+        'Dejar esta pantalla abierta. GPS activo significa que el teléfono obtuvo posición; no demuestra por sí solo que C3 ya la recibió. Los envíos se hacen aproximadamente cada 30 segundos.'
+      ], expected: 'El manifiesto está en tránsito y el teléfono confirma al menos un envío de ubicación.', resources: [{label:'Buscar el número en Manifiestos · transporte CAP',path:'/manifiestos'}] },
+      { title: 'Ver el mismo viaje · teléfono del administrador', body: [
+        'Centro de Control (Control en la barra de App) → Hoy → Viajes Activos. Buscar el número nuevo y seleccionarlo. Abrir Ver detalle del viaje para comprobar que es el mismo manifiesto; después volver a Control.',
+        'Con transporte todavía en Viaje en Curso, hacer un desplazamiento corto y seguro, sin manejar mientras se usa el teléfono. Esperar el siguiente envío y la actualización de C3: entre ambos puede tardar alrededor de un minuto. Comparar el punto y el recorrido antes de confirmar la entrega.',
+        'Explicar: el generador declaró y firmó, el transporte retiró, el teléfono envió su ubicación y el administrador consulta ese mismo viaje. Si no hay posición recibida, decirlo; no presentar las coordenadas de origen o un caso preparado como GPS del teléfono.'
+      ], expected: 'El administrador identifica el número correcto y observa una ubicación recibida del transporte.', resources: [{label:'Centro de Control · ADMIN CAP',path:'/centro-control'}] },
+      { title: 'Entregar y recibir · transporte y operador', body: [
+        'Sólo después de mostrar el viaje en C3, transporte toca Confirmar entrega → Sí, Confirmar Entrega. Espera la confirmación. Entregado todavía no significa recibido.',
+        'Operador abre Manifiestos, busca el mismo número y lo abre. El detalle abierto se actualiza aproximadamente cada 30 segundos; al volver a abrirlo consulta el estado actual. Cuando figure Entregado, tocar Confirmar Recepcion.',
+        'Registrar Pesaje → Peso real: 10 → Confirmar Pesaje. Es el peso ficticio del ejercicio. Revisar que quedó guardado antes de pasar a tratamiento.'
+      ], expected: 'El operador confirmó recepción y pesaje sobre el mismo manifiesto.', resources: [{label:'Buscar el número en Manifiestos · operador CAP',path:'/manifiestos'}] },
+      { title: 'Tratar, cerrar y comprobar · los cuatro', body: [
+        'Operador: Registrar Tratamiento → observación «CAP: tratamiento ficticio» → Confirmar Tratamiento. Después, Cerrar Manifiesto y esperar la confirmación.',
+        'Generador, transportista, operador y administrador vuelven a Manifiestos y abren el mismo número. Los cuatro deben ver Tratado y su historial. En C3 deja de ser un viaje activo después de actualizarse; el historial permanece.',
+        'Las descargas oficiales están deshabilitadas en capacitación: no es un error ni hace falta habilitarlas para terminar. Para otra vuelta creen otro manifiesto; no reinicien uno cerrado.'
+      ], expected: 'Todos reconocen el mismo caso tratado. Ninguno necesitó cambiar de rol ni actuar por otra persona.' },
+      { title: 'Si algo no aparece · resolver sin trucos', body: [
+        'Caso que falta: comparar el número y el equipo CAP, volver al listado y tocar Actualizar listado. No crear otro por impaciencia ni cambiar un filtro sin mirar qué estado se busca.',
+        'Sin GPS: revisar el permiso del navegador y la ubicación del teléfono, volver a Viaje en Curso, esperar GPS activo y Sync. Mantener Internet y pantalla abierta. Si no llega un envío, registrar el problema y continuar explicando el flujo sin afirmar que se probó seguimiento físico.',
+        'Acción sin confirmación: conservar lo cargado y revisar estado/historial antes de reintentar. Si falta la banda CAP, detener las modificaciones y llamar al instructor. No borrar almacenamiento ni usar una cuenta real para destrabar la práctica.',
+        'Al terminar este circuito, practicar Eventuales y adendas con la guía de novedades. Son ejercicios adicionales; no mezclar un eventual con el número del manifiesto ordinario que acaban de cerrar.'
+      ], expected: 'Cada persona sabe qué esperar, cómo comprobarlo y cuándo pedir ayuda.', resources: [{label:'Después: Eventuales y adendas',href:'/manual/tutorial.html?guide=capacitacion-novedades'}] }
+    ]
+  });
+  workshop.steps[2].resources.unshift({label:'Hacer el relevo con cuatro teléfonos',href:'/manual/tutorial.html?guide=capacitacion-cuatro-telefonos'});
+
 })();

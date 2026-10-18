@@ -153,7 +153,8 @@ test('classroom records keep five teams and distinct actor/authority views', () 
 test('all classroom links remain on the current/future domain; trial stays trial', () => {
   const workshop = guides.find((g: any) => g.id === 'capacitacion-por-rol');
   const resources = workshop.steps.flatMap((s: any) => [...(s.resources || []), ...(s.teams || []).flatMap((t: any) => t.records)]);
-  assert.equal(resources.length, 75);
+  assert.equal(resources.length, 76);
+  assert.equal(resources.filter((r: any) => r.href === '/manual/tutorial.html?guide=capacitacion-cuatro-telefonos').length, 1);
   for (const r of resources) {
     const href = r.path || r.href;
     assert.match(href, /^\/(?!\/)[a-zA-Z0-9/?=&._-]+$/);
@@ -179,4 +180,17 @@ test('classroom new features explain incomplete identities, registered fleet and
   assert.match(JSON.stringify(guide), /no se reemplazan|elegilas otra vez/);
   assert.equal(guide.steps[0].resources[0].path, '/switch-user?modo=capacitacion');
   assert.match(read('index.html'), /guide=capacitacion-novedades/);
+});
+
+
+test('four phones retain their roles and follow one new case through GPS and closure', () => {
+  const guide = guides.find((g: any) => g.id === 'capacitacion-cuatro-telefonos');
+  assert.equal(guide.steps.length, 7);
+  assert.match(guide.safety, /no reparte su contraseña/);
+  assert.match(guide.steps[0].body.join(' '), /perfiles de navegador independientes/);
+  assert.match(guide.steps[0].body.join(' '), /no certifica GPS físico/);
+  assert.match(guide.steps[2].body.join(' '), /Sync/);
+  assert.match(guide.steps[3].body.join(' '), /Hoy → Viajes Activos/);
+  assert.match(guide.steps[5].body.join(' '), /Los cuatro deben ver Tratado/);
+  assert.match(read('index.html'), /guide=capacitacion-cuatro-telefonos/);
 });

@@ -84,6 +84,14 @@ export function useManifiesto(id: string) {
     queryKey: KEYS.detail(id),
     networkMode: 'always',
     refetchOnReconnect: 'always',
+    // Another actor can advance the same manifest from a different device.
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
+    refetchInterval: query => {
+      const data = query.state.data;
+      return navigator.onLine && data && !data.offline
+        && !['TRATADO', 'CANCELADO', 'RECHAZADO'].includes(data.estado) ? 30_000 : false;
+    },
     retry: (count, error) => navigator.onLine && error.message !== 'No hay una copia descargada de este manifiesto.' && count < 3,
     queryFn: async (): Promise<Manifiesto & { offline?: true }> => {
       const readOffline = async () => {

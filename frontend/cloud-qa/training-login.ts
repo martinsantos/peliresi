@@ -4,15 +4,17 @@ import path from 'node:path';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { login, isolatedMapTiles, prefix } from './e2e/helpers';
 export const publishedTraining = process.env.QA_TRAINING_PUBLISHED === 'true';
+export type TrainingRehearsalRecords = { manifests: Set<string>; eventuals: Set<string> };
 
 /** Real sign-in; the published rehearsal can only mutate new CAP 5 exercises. */
-export async function trainingLogin(page: Page, info: TestInfo) {
+export async function trainingLogin(page: Page, info: TestInfo, shared?: TrainingRehearsalRecords) {
   if (!publishedTraining) return login(page, info);
   assert.equal(process.env.QA_TRAINING_PRODUCTION_AUTHORIZED, 'true');
   const credentials = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'teacher-private.json'), 'utf8'));
   assert.equal(credentials.email, 'qa.training.20261018@qa.invalid');
   assert.ok(credentials.password.length >= 40);
-  const origin = 'https://sitrep.ultimamilla.com.ar', manifests = new Set<string>(), eventuals = new Set<string>();
+  const origin = 'https://sitrep.ultimamilla.com.ar';
+  const { manifests, eventuals } = shared ?? { manifests: new Set<string>(), eventuals: new Set<string>() };
   await isolatedMapTiles(page, info);
   await page.addInitScript(() => {
     for (const role of ['ADMIN','GENERADOR','TRANSPORTISTA','OPERADOR','INSPECTOR']) localStorage.setItem('sitrep_onboarding_' + role, 'true');
