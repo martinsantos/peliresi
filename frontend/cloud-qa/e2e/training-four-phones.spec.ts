@@ -143,7 +143,7 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     await expect.poll(()=>activity?.enTransito?.some((m:any)=>m.manifiestoId===manifest.id),{timeout:45000}).toBe(false);
     for(const [role]of roles){
       const id=await pages[role].evaluate(()=>JSON.parse(atob(localStorage.getItem('sitrep_access_token')!.split('.')[1])).id);
-      expect(id).toBe('cap-20261012-'+role+'-5');
+      expect(id).toBe('cap-20261012-'+role+'-'+team);
     }
     evidence.steps.push('delivery, reception, weighing, treatment and closure; four parties see treated; trip leaves active C3');
     expect(errors).toEqual([]);expect(serverErrors).toEqual([]);
