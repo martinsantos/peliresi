@@ -387,6 +387,9 @@ const WarRoomPage: React.FC = () => {
     <div className={`wr-layout ${cinemaMode ? 'wr-cinema' : ''}`}>
       {/* Header */}
       <div className="wr-layout-header">
+        {currentUser?.training && <div role="status" aria-label="Modo capacitación" className="border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-950">
+          Capacitación · sin validez oficial · {currentUser.nombre}
+        </div>}
         <WarRoomHeader
           mode={mode}
           cinemaMode={cinemaMode}

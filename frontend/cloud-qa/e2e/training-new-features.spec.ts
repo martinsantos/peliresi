@@ -169,19 +169,22 @@ test('school Centro de Control and Monitor show synthetic trips; new manual guid
   await proof(page, info, 'training-control');
   const live = page.waitForResponse(r => r.url().includes('/api/centro-control/monitor-live'));
   await page.goto(prefix(info) + '/monitor'); const liveResponse = await live; expect(liveResponse.status()).toBe(200);
+  await expect(page.getByRole('status', { name: 'Modo capacitación', exact: true })).toBeInViewport({ ratio: 1 });
   expect((await liveResponse.json()).data.enTransito.some((row: any) => row.numero === 'CAP-1-EN_TRANSITO')).toBe(true);
   const timeline = page.waitForResponse(r => r.url().includes('/api/centro-control/timeline?'));
   await page.getByRole('button', { name: 'Historial', exact: true }).click();
-  const history = await timeline; expect(history.status()).toBe(200); expect((await history.json()).data.eventos.some((event: any) => event.type === 'EVENTO')).toBe(true);
+  const history = await timeline; expect(history.status()).toBe(200);
+  const eventCount = (await history.json()).data.eventos.filter((event: any) => event.type === 'EVENTO').length; expect(eventCount).toBeGreaterThan(1);
   // The preceding manifest journey supplies actual events; GPS alone is not a movie.
-  const toggle = page.getByRole('button', { name: /^(Pausar|Reproducir) historial$/ });
-  await expect(toggle).toBeEnabled();
-  if (await toggle.getAttribute('aria-label') === 'Reproducir historial') await toggle.click();
+  // A named step action pauses playback without racing the automatic start
+  // against a button whose accessible name changes between Play and Pause.
+  await page.getByRole('button', { name: 'Siguiente evento', exact: true }).click();
   const pause = page.getByRole('button', { name: 'Pausar historial', exact: true });
-  await pause.click();
   const scrubber = page.getByRole('slider', { name: 'Recorrer historial', exact: true });
   await scrubber.focus(); await scrubber.press('End'); await expect(scrubber).toHaveValue('1000');
-  await scrubber.press('Home'); await expect(scrubber).toHaveValue('0');
+  await scrubber.press('Home');
+  await expect(scrubber).toHaveValue(String(Math.round(1000 / eventCount)));
+  await expect(page.getByText('1 / ' + eventCount, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Reproducir historial', exact: true }).click();
   await pause.click(); await proof(page, info, 'training-monitor');
   const forecast = page.waitForResponse(r => r.url().includes('/api/centro-control/forecast'));

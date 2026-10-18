@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const state=vi.hoisted(()=>({navigate:vi.fn(),refetch:vi.fn(),error:false,updated:1700000000000}));
+const state=vi.hoisted(()=>({navigate:vi.fn(),refetch:vi.fn(),error:false,training:false,updated:1700000000000}));
 vi.mock('react-router-dom',async()=>({...await vi.importActual('react-router-dom'),useNavigate:()=>state.navigate}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:null})}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:state.training?{training:true,nombre:'CAP · ADMIN 1',rol:'ADMIN'}:null})}));
 vi.mock('../../hooks/useInspectionOperations',()=>({useInspectionOperations:()=>({data:null,isError:false,isPending:false})}));
 vi.mock('../../pages/monitor/hooks/useWarRoomData',()=>({useWarRoomData:()=>({data:{actores:{generadores:[],transportistas:[],operadores:[]}},isError:state.error,isPending:false,isFetching:false,dataUpdatedAt:state.updated,refetch:state.refetch})}));
 vi.mock('../../pages/monitor/hooks/useForecast',()=>({useForecast:()=>({data:null,isError:false,isPending:false,refetch:vi.fn()})}));
@@ -17,7 +17,7 @@ vi.mock('../../pages/monitor/components/DepartureBoard',()=>({DepartureBoard:()=
 vi.mock('../../pages/monitor/components/TimelineControls',()=>({TimelineControls:()=>null}));
 import WarRoomPage from '../../pages/monitor/WarRoomPage';
 const mount=(path='/monitor',basename='/')=>render(<MemoryRouter basename={basename} initialEntries={[path]}><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><WarRoomPage/></QueryClientProvider></MemoryRouter>);
-beforeEach(()=>{state.error=false;state.updated=1700000000000;vi.clearAllMocks();});
+beforeEach(()=>{state.error=false;state.training=false;state.updated=1700000000000;vi.clearAllMocks();});
 afterEach(cleanup);
 it('no roba Espacio a los botones ni flechas a los controles de formulario',()=>{
   mount();
@@ -54,4 +54,15 @@ it('cerrar desde app no añade de nuevo el basename a la ruta del router',()=>{
 it('Escape conserva el destino mobile de la web',()=>{
   mount('/mobile/monitor');fireEvent.keyDown(document.body,{key:'Escape'});
   expect(state.navigate).toHaveBeenCalledWith('/mobile/centro-control');
+});
+
+it('mantiene identificada el aula en Monitor completo y en sus tres modos',()=>{
+  state.training=true;mount();
+  for(const mode of ['En vivo','Historial','Pendientes']){
+    fireEvent.click(screen.getByRole('button',{name:mode,exact:true}));
+    expect(screen.getByRole('status',{name:'Modo capacitación'})).toHaveTextContent('Capacitación · sin validez oficial · CAP · ADMIN 1');
+  }
+});
+it('no etiqueta como capacitación una sesión operativa',()=>{
+  mount();expect(screen.queryByRole('status',{name:'Modo capacitación'})).not.toBeInTheDocument();
 });
