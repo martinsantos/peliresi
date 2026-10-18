@@ -178,8 +178,12 @@ test('school Centro de Control and Monitor show synthetic trips; new manual guid
   // The preceding manifest journey supplies actual events; GPS alone is not a movie.
   // A named step action pauses playback without racing the automatic start
   // against a button whose accessible name changes between Play and Pause.
-  await page.getByRole('button', { name: 'Siguiente evento', exact: true }).click();
   const pause = page.getByRole('button', { name: 'Pausar historial', exact: true });
+  // The timeline starts after its initial render. Wait for that start before
+  // pausing, otherwise the scheduled autoplay can race a step/seek action.
+  await expect(pause).toBeVisible();
+  await page.getByRole('button', { name: 'Siguiente evento', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Reproducir historial', exact: true })).toBeVisible();
   const scrubber = page.getByRole('slider', { name: 'Recorrer historial', exact: true });
   await scrubber.focus(); await scrubber.press('End'); await expect(scrubber).toHaveValue('1000');
   await scrubber.press('Home');
