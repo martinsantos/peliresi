@@ -1,5 +1,7 @@
 # SITREP — capacitación del lunes 19/10/2026
 
+**Actualización posterior:** web/app/manual `f19d024` publicados a las 10:42:14, backend `c819ecf` conservado. Ver [ensayo de cuatro teléfonos, resultados y rollback actual](ENSAYO-CUATRO-TELEFONOS-20261018.md). Lo que sigue documenta la entrega anterior de las 09:43 y sus pruebas.
+
 **Publicado en `sitrep.ultimamilla.com.ar` el 18/10/2026 a las 09:43:22 de Mendoza:** `c819ecfa275afe58d4e2d6d93119adccef073ea8`, rama `codex/sitrep-training-20261018`. **Los seis recorridos publicados quedaron comprobados**: cuatro de manifiestos/eventuales y los dos de C3, con la repetición descrita abajo. `main` conserva `c840219`; los commits llevan `[skip ci]` y no se ejecutan workflows.
 
 ## Recorrido para el instructor

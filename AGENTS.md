@@ -2,11 +2,12 @@
 
 ## Punto de entrada vigente — capacitación 19/10/2026 (leer primero)
 
-- **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [cierre de capacitación](docs/CIERRE-CAPACITACION-20261018.md).** Producto `c819ecf` publicado en `sitrep.ultimamilla.com.ar`, backend/web/app; novedades habilitadas exclusivamente para CAP firmado. Flags operativos, correos y push apagados.
-- Único checkout: `sitrep-production-source-20261001` indicado en el traspaso. Rama `codex/sitrep-training-20261018`; main sigue en `c840219`. `420cdd3` y el cierre posterior sólo cambian test/documentación, no el producto desplegado.
-- Se conservaron 40 cuentas CAP y 35 casos preparados. El ensayo publicado creó sólo dos manifiestos, dos eventuales y dos adendas CAP 5. Acceso temporal QA suspendido, contraseña rotada. Resultados y límites por corrida en el cierre; no proclamar GO global, Android físico ni carga masiva certificada.
-- Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads`, `.env` y releases anteriores. No repetir migraciones ni ejecutar seeds. Rollback de aplicación a `1ab057a` sin restaurar la base por defecto.
-- Gemelo nuevo `sitrep-qa-training-20261018` detenido; imagen y evidencias conservadas. Original detenido y otros 74 contenedores intactos. El gemelo viejo `sitrep-qa-live-20261017` ya había sido eliminado. No usar túneles antiguos.
+- **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [ensayo de cuatro teléfonos](docs/ENSAYO-CUATRO-TELEFONOS-20261018.md).** Web/app/manual `f19d024` publicados en `sitrep.ultimamilla.com.ar`; backend `c819ecf` conservado. Novedades exclusivamente para CAP firmado; flags operativos, correos y push apagados.
+- Único checkout: `sitrep-production-source-20261001` indicado en el traspaso. Rama `codex/sitrep-training-20261018`; main sigue en `c840219`. El cierre documental posterior no cambia el producto publicado.
+- Cuatro sesiones independientes ensayadas de punta a punta en web y app: 2/2 preview y 2/2 aula publicada, con dos ubicaciones enviadas por UI y observadas en C3. Se corrigió el detalle desactualizado entre teléfonos. Guía «Un manifiesto, cuatro teléfonos», siete pasos, diseño conservado.
+- Se conservaron 40 cuentas CAP y 35 casos preparados. Los seis casos nuevos de esta etapa, CAP-2026-000003 a 000008, quedaron TRATADO; las dos interrupciones se completaron por UI sin reset. Instructor QA suspendido y contraseña rotada. No proclamar GO global, GPS/Android físico ni carga masiva certificada.
+- Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads`, `.env` y releases anteriores. No repetir migraciones ni ejecutar seeds. Rollback de esta entrega: sólo frontend a `20261018-training-c819ecf`; no reiniciar backend ni restaurar base. Rollback histórico completo a `1ab057a` documentado en el cierre anterior.
+- Gemelo `sitrep-qa-training-20261018` detenido; imagen y evidencias conservadas. Sin suite, servidor QA ni relay activo. No se modificaron contenedores ajenos; no usar túneles antiguos.
 - Commits `[skip ci]`, sin workflows. QA pesada sólo remota, serial, un worker, 1 CPU/2 GiB/swap cero. El dueño autorizó esta capacitación autónoma con datos artificiales; cualquier ampliación a operación real requiere decisión específica.
 - Los apartados siguientes son históricos; sus ramas, despliegues, credenciales, seeds y estados de preview no acreditan la situación vigente ni autorizan operaciones.
 
