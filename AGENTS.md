@@ -1,12 +1,14 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Punto de entrada vigente — cierre de producción 18/10/2026 (leer primero)
+## Punto de entrada vigente — capacitación 19/10/2026 (leer primero)
 
-- **Retomar desde [docs/TRASPASO-CODEX-20261017.md](docs/TRASPASO-CODEX-20261017.md).** Producto `1ab057a` desplegado en `sitrep.ultimamilla.com.ar` (backend, web y `/app`), integración a `main` completada. Smoke final 39/39 y externo 4/4; [resultados, límites y rollback](docs/CIERRE-PRODUCCION-20261018.md).
-- Flags aprobados, correos y push apagados. Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads` y los releases anteriores. No repetir migraciones ni despliegue por seguir instrucciones históricas.
-- Gemelo `sitrep-qa-live-20261017` y su imagen eliminados del preview; original detenido, fuente/artefactos y otros recursos preservados. El antiguo túnel al gemelo ya no funciona.
-- El cierre documental avanza `main` sin cambiar el producto desplegado. Commits con `[skip ci]`, sin workflows. Cualquier nueva operación productiva requiere autorización específica.
-- El apartado siguiente conserva el contexto histórico del 16–17/10; sus estados de candidato no publicado y preview vivo fueron superados por el traspaso vigente.
+- **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [cierre de capacitación](docs/CIERRE-CAPACITACION-20261018.md).** Producto `c819ecf` publicado en `sitrep.ultimamilla.com.ar`, backend/web/app; novedades habilitadas exclusivamente para CAP firmado. Flags operativos, correos y push apagados.
+- Único checkout: `sitrep-production-source-20261001` indicado en el traspaso. Rama `codex/sitrep-training-20261018`; main sigue en `c840219`. `420cdd3` y el cierre posterior sólo cambian test/documentación, no el producto desplegado.
+- Se conservaron 40 cuentas CAP y 35 casos preparados. El ensayo publicado creó sólo dos manifiestos, dos eventuales y dos adendas CAP 5. Acceso temporal QA suspendido, contraseña rotada. Resultados y límites por corrida en el cierre; no proclamar GO global, Android físico ni carga masiva certificada.
+- Conservar `UPLOADS_DIR=/var/lib/sitrep-uploads`, `.env` y releases anteriores. No repetir migraciones ni ejecutar seeds. Rollback de aplicación a `1ab057a` sin restaurar la base por defecto.
+- Gemelo nuevo `sitrep-qa-training-20261018` detenido; imagen y evidencias conservadas. Original detenido y otros 74 contenedores intactos. El gemelo viejo `sitrep-qa-live-20261017` ya había sido eliminado. No usar túneles antiguos.
+- Commits `[skip ci]`, sin workflows. QA pesada sólo remota, serial, un worker, 1 CPU/2 GiB/swap cero. El dueño autorizó esta capacitación autónoma con datos artificiales; cualquier ampliación a operación real requiere decisión específica.
+- Los apartados siguientes son históricos; sus ramas, despliegues, credenciales, seeds y estados de preview no acreditan la situación vigente ni autorizan operaciones.
 
 ## Contexto histórico — cierre parcial 16/10/2026
 

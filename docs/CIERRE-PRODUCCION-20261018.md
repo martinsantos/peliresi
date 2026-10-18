@@ -1,5 +1,8 @@
 # SITREP — cierre de producción 18/10/2026
 
+> **Cierre histórico de `1ab057a`.** Desde las 09:43 del 18/10 está publicado `c819ecf` para capacitación aislada. Consultar el [cierre de capacitación](CIERRE-CAPACITACION-20261018.md) y el [traspaso vigente](TRASPASO-CODEX-20261017.md); este documento conserva la evidencia del despliegue anterior.
+
+
 **Desplegado el 18/10/2026 a las 08:01:26 de Mendoza (11:01:26 UTC)** en https://sitrep.ultimamilla.com.ar.
 
 Fuente: `1ab057a57e07237625b3f9fb34d5e80623ecd4bf`, sin modificaciones de producto. Durante el despliegue, checkout autorizado en `main`, limpio; sin commits, pushes ni workflows. El cierre posterior sólo modifica documentación con `[skip ci]`.
