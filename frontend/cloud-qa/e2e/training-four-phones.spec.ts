@@ -141,7 +141,7 @@ test('four independent phones hand off one new manifest and observe actual GPS s
       // A phone already on this list refreshes its agenda every 15 seconds.
       for(const role of ['generador','operador','transportista','admin']){
         await navigation(pages[role],info,'/manifiestos');
-        const schedule=pages[role].locator('details[aria-label="Próximos retiros"]');await schedule.locator('summary').click();
+        const schedule=pages[role].locator('details[aria-label="Próximos retiros"]');if(await schedule.getAttribute('open')===null)await schedule.locator('summary').click();
         await expect(schedule.getByRole('link').filter({hasText:m.numero})).toBeVisible({timeout:20000});
       }
     }

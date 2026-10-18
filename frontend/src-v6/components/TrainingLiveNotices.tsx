@@ -1,5 +1,4 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {createPortal} from 'react-dom';
 import {useNavigate} from 'react-router-dom';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {BellRing,Volume2,VolumeX,X,ArrowRight} from 'lucide-react';
@@ -36,10 +35,10 @@ export function TrainingLiveNotices({userId}:{userId:string|number}){
  const notice=queue[0];
  function dismiss(){setQueue(q=>q.slice(1));}
  function open(){if(!notice)return;void notificacionService.marcarLeida(notice.id).then(()=>qc.invalidateQueries({queryKey:['notificaciones']})).catch(()=>{});dismiss();navigate(resolveNotificationPath(notice,mp('')));}
- return <>{createPortal(<aside aria-label="Avisos en vivo" className="fixed bottom-20 right-3 left-3 z-[60] mx-auto max-w-md sm:left-auto sm:w-96 pointer-events-none">
-  {notice&&<div role="status" aria-live="polite" className="mb-2 rounded-2xl border-2 border-primary-600 bg-white p-4 text-neutral-900 shadow-xl pointer-events-auto"><div className="flex items-start gap-3"><BellRing size={24} className="shrink-0 text-primary-700"/><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wide text-primary-800">Nuevo aviso{queue.length>1?` · ${queue.length} novedades`:''}</p><h2 className="mt-1 text-lg font-bold">{notice.titulo}</h2></div><button aria-label="Cerrar aviso en vivo" onClick={dismiss} className="min-h-11 min-w-11"><X size={20}/></button></div><p className="mt-2 text-sm leading-relaxed">{notice.mensaje}</p><button onClick={open} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-700 px-3 font-semibold text-white">Abrir manifiesto <ArrowRight size={18}/></button></div>}
- </aside>,document.body)}
+ return <div className="shrink-0 bg-white"><aside aria-label="Avisos en vivo" className="max-h-[28dvh] overflow-y-auto overscroll-contain">
+  {notice&&<div role="status" aria-live="polite" className="border-b-2 border-primary-600 bg-primary-50 px-3 py-2 text-neutral-900"><div className="flex items-start gap-3"><BellRing size={24} className="shrink-0 text-primary-700"/><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wide text-primary-800">Nuevo aviso{queue.length>1?` · ${queue.length} novedades`:''}</p><h2 className="mt-1 text-base font-bold">{notice.titulo}</h2></div><button aria-label="Cerrar aviso en vivo" onClick={dismiss} className="min-h-11 min-w-11"><X size={20}/></button></div><p className="mt-1 text-sm leading-snug">{notice.mensaje}</p><button onClick={open} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-700 px-3 font-semibold text-white">Abrir manifiesto <ArrowRight size={18}/></button></div>}
+ </aside>
  <div className="flex flex-wrap items-center justify-center gap-2 bg-white px-3 py-2 text-xs text-neutral-700 border-b border-neutral-200">
   <BellRing size={14}/><span>Avisos en vivo con la app abierta</span><button type="button" onClick={()=>sound?(setSound(false),void audio.current?.suspend()):void enable()} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 font-semibold text-primary-800">{sound?<Volume2 size={16}/>:<VolumeX size={16}/>} {sound?'Sonido activo':'Activar sonido'}</button>{soundError&&<p role="alert">{soundError}</p>}
- </div></>;
+ </div></div>;
 }
