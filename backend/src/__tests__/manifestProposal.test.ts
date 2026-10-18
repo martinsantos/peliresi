@@ -4,7 +4,7 @@ vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transa
 vi.mock('qrcode',()=>({default:{toDataURL:vi.fn().mockResolvedValue('data:qr')}}));
 import {inTrainingSession,inOperationalSession} from '../lib/trainingScope';
 import {canCreateManifestProposal,MANIFEST_PROPOSAL,proposalRole,parseProposal} from '../domain/manifestProposal';
-import {approveManifestProposal,assertManifestProposalApproved} from '../controllers/manifest-proposal.controller';
+import {approveManifestProposal,assertManifestProposalApproved,startManifestCoordination} from '../controllers/manifest-proposal.controller';
 const p={version:1 as const,generadorId:'g',transportistaId:'t',operadorId:'o',creadoPorId:'uo',autorRol:'OPERADOR'};
 const users={GENERADOR:{id:'ug',rol:'GENERADOR',generador:{id:'g'}},TRANSPORTISTA:{id:'ut',rol:'TRANSPORTISTA',transportista:{id:'t'}},OPERADOR:{id:'uo',rol:'OPERADOR',operador:{id:'o'}},ADMIN:{id:'ua',rol:'ADMIN'}};
 const req=(rol:keyof typeof users,body={})=>({params:{id:'m'},user:users[rol],body} as any);
@@ -46,12 +46,12 @@ describe('three independently authenticated parties',()=>{
   await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
   expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');
   await inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
-  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
   expect(mock.manifest.estado).toBe('APROBADO');
   expect(mock.events.filter(e=>e.tipo!==MANIFEST_PROPOSAL).map(e=>e.usuarioId)).toEqual(['uo','ug','ut']);
   expect(mock.events.find(e=>e.tipo==='FIRMA')).toMatchObject({firmaImagen:'signed-image',firmaSha256:'signed-hash'});
   await inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
-  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(3);expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(1);
+  expect(mock.tx.eventoManifiesto.create).toHaveBeenCalledTimes(3);expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(3);
  });
  it('preserves a reasoned rejection and refuses subsequent approvals and pickup',async()=>{
   await inTrainingSession(()=>approveManifestProposal(req('GENERADOR',{decision:'RECHAZADA',motivo:'Fecha incorrecta'})));
@@ -72,5 +72,22 @@ describe('three independently authenticated parties',()=>{
  });
  it('does not attach new approval requirements to old records',async()=>{
   mock.events=[];await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+ });
+});
+
+describe('explicit coordination start',()=>{
+ it('requires unanimity, preserves pickup state, and is idempotent across retries',async()=>{
+  const next=vi.fn(),json=vi.fn(),res={json} as any;
+  await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),res,next));expect(next).toHaveBeenLastCalledWith(expect.objectContaining({statusCode:409}));
+  for(const rol of ['OPERADOR','TRANSPORTISTA','GENERADOR'] as const)await inTrainingSession(()=>approveManifestProposal(req(rol),rol==='GENERADOR'?signature:undefined));
+  next.mockClear();await inTrainingSession(()=>startManifestCoordination(req('ADMIN'),res,next));expect(next).toHaveBeenLastCalledWith(expect.objectContaining({statusCode:403}));
+  for(const rol of ['OPERADOR','GENERADOR','TRANSPORTISTA'] as const){next.mockClear();await inTrainingSession(()=>startManifestCoordination(req(rol),res,next));expect(next).not.toHaveBeenCalled();}
+  expect(mock.events.filter(e=>e.tipo==='INICIO_COORDINACION_CAP')).toHaveLength(1);expect(mock.manifest.estado).toBe('APROBADO');expect(mock.manifest.fechaRetiro).toBeUndefined();
+  await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+ });
+ it('cannot start an operational or rejected proposal',async()=>{
+  const next=vi.fn();await inOperationalSession(()=>startManifestCoordination(req('OPERADOR'),{} as any,next));expect(next).toHaveBeenLastCalledWith(expect.objectContaining({statusCode:404}));
+  await inTrainingSession(()=>approveManifestProposal(req('GENERADOR',{decision:'RECHAZADA',motivo:'No acepto'})));
+  await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{} as any,next));expect(next).toHaveBeenLastCalledWith(expect.objectContaining({statusCode:409}));
  });
 });

@@ -1,3 +1,4 @@
+import { TrainingLiveNotices } from './TrainingLiveNotices';
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 // (complementa el push nativo — cubre el caso en que el push no llegó)
 export function NotificacionesPoller() {
   const { currentUser, isRestricted } = useAuth();
+  if(currentUser?.training && !isRestricted)return <TrainingLiveNotices key={currentUser.id} userId={currentUser.id}/>;
   return currentUser && !isRestricted ? <AuthorizedNotificationsPoller key={currentUser.id} userId={currentUser.id} /> : null;
 }
 

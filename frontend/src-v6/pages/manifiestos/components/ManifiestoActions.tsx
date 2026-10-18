@@ -100,6 +100,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             isAdmin={isAdmin}
             userRol={userRol}
             isActionPending={isActionPending}
+            pickupBlocked={!!(training && m.estado === 'APROBADO' && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && !m.eventos?.some(e=>e.tipo==='INICIO_COORDINACION_CAP'))}
             isInSitu={isInSitu}
             isCancelling={isCancelling}
             mutations={{

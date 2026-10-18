@@ -1,6 +1,6 @@
 import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
 import { canCreateManifestProposal } from '../domain/manifestProposal';
-import { getManifestProposal, approveManifestParty, getProposalAgenda } from '../controllers/manifest-proposal.controller';
+import { getManifestProposal, approveManifestParty, getProposalAgenda, startManifestCoordination, getTrainingTasks } from '../controllers/manifest-proposal.controller';
 import { Router } from 'express';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
 import {
@@ -248,6 +248,7 @@ router.get('/', getManifiestos);
  *         description: Manifiesto no encontrado
  */
 router.get('/agenda-partes', getProposalAgenda);
+router.get('/tareas-partes', getTrainingTasks);
 router.get('/:id', getManifiestoById);
 
 /**
@@ -290,6 +291,7 @@ router.post('/:id/documentos-cap', releaseTrainingCertificate);
 router.get('/:id/documentos-cap/:documentId/archivo', downloadTrainingCertificate);
 router.get('/:id/aprobaciones', getManifestProposal);
 router.post('/:id/aprobar-parte', approveManifestParty);
+router.post('/:id/iniciar-coordinacion', startManifestCoordination);
 
 /**
  * @openapi

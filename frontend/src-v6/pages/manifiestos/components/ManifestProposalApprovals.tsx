@@ -1,43 +1,49 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Clock, Factory, Truck, FlaskConical, Play, XCircle } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../contexts/AuthContext';
 import { api } from '../../../services/api';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/ButtonV2';
 
-type Approval = { autorRol: string; rechazo?: string; estado: string; partes: { rol: string; aprobada: boolean }[]; puedeAprobar: string | null };
+type Approval = { autorRol: string; rechazo?: string; estado: string; inicio: string|null; puedeIniciar: boolean; partes: { rol: string; aprobada: boolean }[]; puedeAprobar: string | null };
 const names: Record<string, string> = { OPERADOR: 'Operador', GENERADOR: 'Generador', TRANSPORTISTA: 'Transporte' };
+const icons = { OPERADOR: FlaskConical, GENERADOR: Factory, TRANSPORTISTA: Truck };
 export function ManifestProposalApprovals({ id, estado, onSign }: { id: string; estado?: string; onSign: () => void }) {
   const { currentUser } = useAuth(); const qc = useQueryClient();
-  const [motivo,setMotivo] = useState('');
-  const [busy,setBusy] = useState(false), [error,setError] = useState(''); const lock=useRef(false);
+  const [motivo,setMotivo] = useState(''),[rejecting,setRejecting]=useState(false);
+  const [busy,setBusy] = useState(false), [error,setError] = useState(''),[now,setNow]=useState(Date.now()); const lock=useRef(false);
   const key=['manifest-proposal',currentUser?.id,id];
   const query=useQuery({queryKey:key,enabled:!!currentUser?.training,
     queryFn:async()=> (await api.get(`/manifiestos/${id}/aprobaciones`)).data.data as Approval|null,
-    refetchInterval: q => q.state.data?.estado === 'PENDIENTE_APROBACION' ? 5000 : false,
-    refetchOnMount:'always', staleTime:0, retry:false});
+    refetchInterval:5000,refetchOnMount:'always', staleTime:0, retry:false});
   useEffect(()=>{if(query.data && query.data.estado!==estado)void qc.invalidateQueries({queryKey:['manifiestos','detail',id]});},[query.data,estado,id,qc]);
+  useEffect(()=>{if(!query.data?.inicio||query.data.estado!=='APROBADO')return;const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[query.data?.inicio,query.data?.estado]);
   if(!currentUser?.training)return null;
   if(query.isError)return <p role="alert">No pudimos comprobar las aprobaciones. <Button onClick={()=>void query.refetch()}>Actualizar aprobaciones</Button></p>;
   if(!query.data)return null;
-  const data=query.data;
-  async function approve(reject=false){
+  const data=query.data,approved=data.partes.filter(p=>p.aprobada).length,missing=data.partes.filter(p=>!p.aprobada).map(p=>names[p.rol]).join(', ');
+  async function act(action:'approve'|'reject'|'start'){
     if(lock.current)return;lock.current=true;setBusy(true);setError('');
-    try{await api.post(`/manifiestos/${id}/aprobar-parte`,reject?{decision:'RECHAZADA',motivo}:undefined);await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});}
-    catch(e:any){setError(e.response?.data?.message||'No se pudo aprobar. Reintentá.');}
+    try{await api.post(`/manifiestos/${id}/${action==='start'?'iniciar-coordinacion':'aprobar-parte'}`,action==='reject'?{decision:'RECHAZADA',motivo}:undefined);await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});await qc.invalidateQueries({queryKey:['training-tasks']});}
+    catch(e:any){setError(e.response?.data?.message||'No se pudo guardar. Reintentá.');}
     finally{lock.current=false;setBusy(false);}
   }
-  return <section aria-label="Aprobaciones de las partes" className="mb-4 space-y-3 border-b border-neutral-200 pb-4">
-    <h3 className="font-semibold">Propuesta iniciada por {names[data.autorRol] || 'Administrador'}</h3>
-    <p className="text-sm">Cada parte aprueba desde su cuenta. El retiro se habilita cuando aprueban las tres.</p>
-    <ul className="space-y-1 text-sm">{data.partes.map(p=><li key={p.rol}>{names[p.rol]}: <strong>{p.aprobada?'Aprobado':'Pendiente'}</strong></li>)}</ul>
-    {data.puedeAprobar==='GENERADOR'?<Button onClick={onSign}>Firmar Manifiesto</Button>:
-      data.puedeAprobar?<Button disabled={busy} onClick={()=>void approve()}>{busy?'Guardando...':`Aprobar como ${names[data.puedeAprobar].toLowerCase()}`}</Button>:null}
-    {data.estado==='PENDIENTE_APROBACION' && <p role="status" className="text-sm">Pendiente de aprobación: todavía no se puede retirar.</p>}
-    {data.estado==='APROBADO' && <p role="status" className="text-sm font-semibold">Las tres partes aprobaron. Transporte ya puede confirmar el retiro.</p>}
-    {data.puedeAprobar && <div className="space-y-2"><Input label="Motivo del rechazo" maxLength={500} value={motivo} onChange={e=>setMotivo(e.target.value)} /><Button variant="outline" disabled={busy||!motivo.trim()} onClick={()=>void approve(true)}>Rechazar mi participación</Button></div>}
-    {data.rechazo && <p role="status">Propuesta rechazada: {JSON.parse(data.rechazo).motivo}. No se puede retirar; creá otra propuesta si corresponde.</p>}
+  const minutes=data.inicio?Math.max(0,Math.floor((now-Date.parse(data.inicio))/1000)):0;
+  return <section aria-label="Aprobaciones de las partes" className="mb-4 space-y-4 border-b border-neutral-200 pb-4">
+    <div><p className="text-sm text-neutral-600">Propuesta iniciada por {names[data.autorRol] || 'Administrador'}</p><h3 className="text-lg font-bold text-neutral-900">{data.rechazo?'Propuesta detenida':approved===3?'¡Las tres partes aprobaron!':`${approved} de 3 aprobaciones`}</h3></div>
+    <ul className="grid grid-cols-3 gap-2">{data.partes.map(p=>{const Icon=icons[p.rol as keyof typeof icons];return <li key={p.rol} className={`rounded-xl p-2 text-center ${p.aprobada?'bg-emerald-50 text-emerald-900':'bg-neutral-100 text-neutral-700'}`}><Icon size={22} className="mx-auto mb-2" aria-hidden="true"/><span className="block text-sm font-semibold">{names[p.rol]}</span><span className="mt-1 flex items-center justify-center gap-1 text-xs">{p.aprobada?<CheckCircle2 size={14}/>:<Clock size={14}/>} {p.aprobada?'Aprobado':'Pendiente'}</span></li>;})}</ul>
+    {data.estado==='PENDIENTE_APROBACION' && <p role="status" className="text-sm"><strong>{data.puedeAprobar?'Te toca revisar y aprobar.':'Tu decisión está registrada.'}</strong> Falta aprobar: {missing}. Hasta entonces no se puede iniciar ni retirar.</p>}
+    {data.puedeAprobar==='GENERADOR'?<Button fullWidth onClick={onSign}>Firmar Manifiesto</Button>:data.puedeAprobar?<Button fullWidth disabled={busy} onClick={()=>void act('approve')}>{busy?'Guardando...':`Aprobar como ${names[data.puedeAprobar].toLowerCase()}`}</Button>:null}
+    {data.estado==='APROBADO' && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
+      <p className="font-semibold">{data.inicio?'Coordinación iniciada':'Listo para iniciar la coordinación'}</p>
+      <p className="text-sm">{data.inicio?'Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.':'Generador, transporte u operador pueden dar inicio. Las otras partes reciben el aviso automáticamente.'}</p>
+      {data.inicio?<p className="tabular-nums text-xl font-bold" aria-label="Tiempo de coordinación">{Math.floor(minutes/3600).toString().padStart(2,'0')}:{Math.floor(minutes/60)%60<10?'0':''}{Math.floor(minutes/60)%60}:{(minutes%60).toString().padStart(2,'0')}</p>:data.puedeIniciar?<Button fullWidth leftIcon={<Play size={18}/>} disabled={busy} onClick={()=>void act('start')}>Iniciar coordinación</Button>:null}
+      <p className="text-xs">El tiempo de viaje y el GPS empiezan al confirmar el retiro físico.</p>
+    </div>}
+    {data.puedeAprobar && <details open={rejecting} onToggle={e=>setRejecting(e.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-3 text-sm text-error-800">No puedo participar / rechazar</summary><Input label="Motivo del rechazo" maxLength={500} value={motivo} onChange={e=>setMotivo(e.target.value)} /><Button variant="outline" disabled={busy||!motivo.trim()} onClick={()=>void act('reject')}>Rechazar mi participación</Button></details>}
+    {data.rechazo && <p role="status" className="rounded-xl bg-error-50 p-3 text-error-800"><XCircle className="inline mr-2" size={20}/>Propuesta rechazada: {JSON.parse(data.rechazo).motivo}. No se puede iniciar ni retirar; hace falta otra propuesta.</p>}
     {error&&<p role="alert">{error}</p>}
-    <Button variant="outline" size="sm" onClick={()=>void query.refetch()}>Actualizar aprobaciones</Button>
+    <button type="button" className="min-h-11 text-sm text-neutral-600 underline" onClick={()=>void query.refetch()}>Actualizar aprobaciones</button>
   </section>;
 }

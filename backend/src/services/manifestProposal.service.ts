@@ -21,10 +21,12 @@ export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:stri
   const partyUsers=users.filter(u=>u?.activo).map(u=>u!.id);
   const recipients=[...new Set([...partyUsers,manifest.creadoPorId])];
   const date=manifest.fechaEstimadaRetiro?.toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza'})||'sin fecha';
-  const title=phase==='creada'?'Manifiesto pendiente de tu aprobación':phase==='aprobada'?'Las tres partes aprobaron':phase==='rechazada'?'Una parte rechazó el manifiesto':'Documento de capacitación liberado';
+  const approvedRole=phase.startsWith('aprobacion-')?({GENERADOR:'Generador',TRANSPORTISTA:'Transporte',OPERADOR:'Operador'} as Record<string,string>)[phase.slice(11)]:null;
+  const title=phase==='creada'?'Manifiesto pendiente de tu aprobación':phase==='aprobada'?'¡Tres aprobaciones! Listos para iniciar':phase==='iniciada'?'¡Coordinación iniciada! Preparar el retiro':phase==='rechazada'?'Manifiesto detenido: una parte rechazó':approvedRole?`${approvedRole} aprobó su participación`:'Certificación disponible para descargar';
+  const next=phase==='creada'?'Abrí el manifiesto para aprobar o rechazar.':phase==='aprobada'?'Una de las tres partes debe pulsar Iniciar coordinación.':phase==='iniciada'?'Generador: prepará la carga. Operador: coordiná la recepción. Transporte: confirmá el retiro cuando ocurra.':phase==='rechazada'?'No se puede iniciar ni retirar. Revisá el motivo.':approvedRole?'Revisá qué aprobaciones faltan.':'El operador la firmó. Abrí Certificaciones para descargarla.';
   await tx.notificacion.createMany({skipDuplicates:true,data:recipients.map(usuarioId=>({
     id:createHash('sha256').update(`${manifest.id}:${phase}:${usuarioId}`).digest('hex'),usuarioId,tipo:'INFO_GENERAL',
-    titulo:phase==='creada'&&!partyUsers.includes(usuarioId)?'Manifiesto enviado a las partes':title,mensaje:`${manifest.numero}. Retiro previsto: ${date}. ${phase==='creada'?(partyUsers.includes(usuarioId)?'Abrí el manifiesto para aprobar o rechazar.':'Esperá las tres aprobaciones.'):phase==='aprobada'?'Disponible en Próximos retiros.':phase==='rechazada'?'No se puede retirar. El motivo queda en el historial.':'Abrí el manifiesto para consultar el documento.'}`,
+    titulo:phase==='creada'&&!partyUsers.includes(usuarioId)?'Manifiesto enviado a las partes':title,mensaje:`${manifest.numero}. Fecha prevista: ${date}. ${next}`,
     manifiestoId:manifest.id,datos:JSON.stringify({tipo:'propuesta_partes',fase:phase,autorId:author,url:`/manifiestos/${manifest.id}`}),
   }))});
 }

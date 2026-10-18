@@ -36,7 +36,7 @@ function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
   return manifiesto.eventos.map(ev => ({
     id: ev.id,
     date: formatDateTime(ev.createdAt),
-    title: ({PROPUESTA_PARTES_V1:'Propuesta a las tres partes',CERTIFICADO_CAP_V1:'Documento de capacitación liberado',APROBACION_TRANSPORTISTA:'Aprobación del transporte',APROBACION_OPERADOR:'Aprobación del operador',RECHAZO_PARTE:'Participación rechazada'} as Record<string,string>)[ev.tipo] || String(ev.tipo || '').replace(/_/g, ' '),
+    title: ({INICIO_COORDINACION_CAP:'Coordinación iniciada',PROPUESTA_PARTES_V1:'Propuesta a las tres partes',CERTIFICADO_CAP_V1:'Documento de capacitación liberado',APROBACION_TRANSPORTISTA:'Aprobación del transporte',APROBACION_OPERADOR:'Aprobación del operador',RECHAZO_PARTE:'Participación rechazada'} as Record<string,string>)[ev.tipo] || String(ev.tipo || '').replace(/_/g, ' '),
     description: describeEvent(ev) + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
   }));
 }

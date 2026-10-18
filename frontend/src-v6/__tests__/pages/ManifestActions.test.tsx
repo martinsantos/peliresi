@@ -24,13 +24,12 @@ const workflows = [
   [EstadoManifiesto.TRATADO, 'OPERADOR', 'Descargar Certificado', 'onDescargarCertificado', false],
 ] as const;
 describe('manifest workflow actions', () => {
-  it('explains disabled official downloads in training without removing normal workflow actions', () => {
+  it('directs training to its actual certifications without dead official download controls', () => {
     const props = input(EstadoManifiesto.TRATADO, 'OPERADOR');
     render(<ActionButtons {...props} training />);
-    expect(screen.getByRole('button', { name: 'Descargar Certificado' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeDisabled();
-    expect(screen.getByText('Capacitación: no se emiten documentos oficiales.')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Descargar Certificado' }));
+    expect(screen.queryByRole('button', { name: 'Descargar Certificado' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Descargar PDF' })).not.toBeInTheDocument();
+    expect(screen.getByText('Las certificaciones se emiten y descargan más abajo, en Certificaciones.')).toBeVisible();
     expect(props.onDescargarCertificado).not.toHaveBeenCalled();
   });
   it.each(workflows)('%s / %s exposes and wires %s', (estado, role, name, handler, inSitu) => {

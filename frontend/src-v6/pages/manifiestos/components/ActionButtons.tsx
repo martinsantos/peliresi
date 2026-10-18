@@ -33,6 +33,7 @@ export interface ActionButtonsProps {
   isInSitu?: boolean;
   training?: boolean;
   immutableProposal?: boolean;
+  pickupBlocked?: boolean;
   isCancelling: boolean;
   mutations: {
     firmar: MutationState;
@@ -67,6 +68,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   isInSitu,
   training,
   immutableProposal,
+  pickupBlocked,
   isCancelling,
   mutations,
   onOpenFirmaModal,
@@ -104,7 +106,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           fullWidth
           leftIcon={mutations.confirmarRetiro.isPending ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
           onClick={onConfirmarRetiro}
-          disabled={isActionPending}
+          disabled={isActionPending || pickupBlocked}
         >
           Confirmar Retiro
         </Button>
@@ -206,17 +208,17 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
         </Button>
       )}
 
-      <Button variant="outline" fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Download size={16} />} onClick={onDescargarPDF}>
+      {!training && <Button variant="outline" fullWidth leftIcon={<Download size={16} />} onClick={onDescargarPDF}>
         Descargar PDF
-      </Button>
+      </Button>}
 
-      {estado === EstadoManifiesto.TRATADO && (
+      {!training && estado === EstadoManifiesto.TRATADO && (
         <Button fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="!bg-success-600 hover:!bg-success-700">
           Descargar Certificado
         </Button>
       )}
 
-      {training && <p id="training-document-limit" className="col-span-full text-sm text-neutral-600">Capacitación: no se emiten documentos oficiales.</p>}
+      {training && <p id="training-document-limit" className="col-span-full text-sm text-neutral-600">Las certificaciones se emiten y descargan más abajo, en Certificaciones.</p>}
 
       {estado !== EstadoManifiesto.CANCELADO && estado !== EstadoManifiesto.TRATADO && (isAdmin || userRol === 'GENERADOR') && (
         <Button variant="outline" fullWidth leftIcon={<XCircle size={16} />} onClick={onOpenCancelModal} disabled={isActionPending || isCancelling} className="!text-error-800 !border-error-300 hover:!bg-error-50">

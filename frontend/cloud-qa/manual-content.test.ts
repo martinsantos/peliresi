@@ -201,7 +201,9 @@ test('classroom new proposals separate authorship, three decisions, agenda and s
   const text=JSON.stringify(guide);
   assert.match(text,/Puede iniciar cualquiera: operador, transporte, generador o administrador CAP/);
   assert.match(text,/Sólo con las tres aprobaciones/);
-  assert.match(text,/Próximos retiros/);
+  assert.match(text,/Ver manifiestos programados/);
+  assert.match(text,/Iniciar coordinación/);
+  assert.match(text,/Activar sonido/);
   assert.match(text,/Tratado no libera automáticamente/);
   assert.match(text,/todas las adendas aprobadas/);
   assert.match(text,/CAPACITACIÓN — SIN VALIDEZ OFICIAL/);

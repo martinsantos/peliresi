@@ -1,3 +1,4 @@
+import { TrainingTaskQueue } from '../../components/TrainingTaskQueue';
 /**
  * SITREP v6 - Mobile Dashboard Page
  * ==================================
@@ -146,7 +147,8 @@ export const MobileDashboardPage: React.FC = () => {
 
       {!connectivity.isOnline && <p role="status" className="rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900">Sin conexión. Revisá abajo qué trabajo quedó guardado en este dispositivo.</p>}
 
-      {isTransportista && (
+      {currentUser?.training && <TrainingTaskQueue/>}
+      {isTransportista && !currentUser?.training && (
         <TransportistaTripQueue
           activeTrips={activeQueueTrips}
           pendingTrips={pendingTrips}
@@ -154,7 +156,7 @@ export const MobileDashboardPage: React.FC = () => {
         />
       )}
 
-      {isOperador && (
+      {isOperador && !currentUser?.training && (
         <OperatorActionQueue
           manifiestos={operatorQueue}
           onOpenManifiesto={(manifiestoId) => navigate(mp(`/manifiestos/${manifiestoId}`))}

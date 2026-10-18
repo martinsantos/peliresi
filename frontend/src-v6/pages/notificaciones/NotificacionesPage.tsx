@@ -79,7 +79,7 @@ const NotificacionesPage: React.FC = () => {
             className={'flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 hover:bg-neutral-100 md:hidden ' + focus}>
             <ArrowLeft size={20} aria-hidden="true" />
           </button>
-          <h2 className="sr-only">Notificaciones</h2>
+          <div><h2 className="text-xl font-bold">Tus avisos</h2><p className="mt-1 text-sm text-neutral-600">Novedades de tus manifiestos. Abrí uno para ver el estado actual y el próximo paso.</p></div>
         </div>
         {data && data.noLeidas > 0 && (
           <Button variant="outline" leftIcon={<CheckCheck size={18} />} isLoading={markAll.isPending}
@@ -122,7 +122,7 @@ const NotificacionesPage: React.FC = () => {
         </div>
       ) : items.length > 0 ? (
         <ul aria-label="Avisos" className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 bg-white">
-          {items.map(notice => {
+          {items.map((notice,index) => {
             const followup = notificationFollowup(notice);
             // A configurable rule has an identity. Do not replace its saved
             // name with a generic title; retain the fallback for legacy data.
@@ -130,14 +130,18 @@ const NotificacionesPage: React.FC = () => {
             const path = resolveNotificationPath(notice, mp(''));
             const linked = path !== mp('/notificaciones');
             const Content = linked ? 'button' : 'div';
-            const warning = /RECHAZ|INCIDENTE|ANOMALIA|VENCIMIENTO|ALERTA/.test(notice.tipo);
-            const success = /TRATADO|RECIBIDO/.test(notice.tipo);
+            const warning = /RECHAZ|INCIDENTE|ANOMALIA|VENCIMIENTO|ALERTA/.test(notice.tipo) || /rechaz|detenido/i.test(notice.titulo);
+            const success = /TRATADO|RECIBIDO/.test(notice.tipo) || /aprobaron|aprobó|iniciada|certificación/i.test(notice.titulo);
+            const day=(date:string)=>new Date(date).toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza',day:'numeric',month:'long'});
+            const dateLabel=day(notice.createdAt);
+            const groupStart=index===0||day(items[index-1].createdAt)!==dateLabel;
             const Icon = warning ? AlertTriangle : /\/soporte\//.test(path) ? LifeBuoy : /\/(?:mis-)?inspecciones\//.test(path) ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
             return (
-              <li key={notice.id} className={notice.leida ? '' : 'bg-primary-50/40'}>
+              <li key={notice.id} className={notice.leida ? 'border-l-4 border-l-transparent opacity-80' : 'border-l-4 border-l-primary-600 bg-primary-50/40'}>
+                {groupStart && <p className="border-b border-neutral-200 bg-neutral-100 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-600">{dateLabel}</p>}
                 <Content type={linked ? 'button' : undefined} aria-label={linked ? 'Abrir aviso: ' + title : undefined} onClick={linked ? () => open(notice) : undefined}
                   className={'flex w-full items-start gap-3 p-4 text-left text-neutral-900 ' + (linked ? 'transition-colors hover:bg-primary-50 active:bg-primary-100 focus-visible:outline-offset-[-2px] ' + focus : '')}>
-                  <Icon size={20} aria-hidden="true" className={'mt-1 shrink-0 ' + (warning ? 'text-warning-800' : 'text-primary-800')} />
+                  <Icon size={20} aria-hidden="true" className={'mt-1 shrink-0 rounded-lg p-1 box-content ' + (warning ? 'bg-warning-100 text-warning-800' : success ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800')} />
                   <span className="min-w-0 flex-1">
                     <span className={'block break-words text-base leading-snug ' + (notice.leida ? 'font-medium' : 'font-semibold')}>{title}</span>
                     {!notice.leida && <span className="mt-1 block text-xs font-semibold text-primary-800">Sin leer</span>}
@@ -146,6 +150,7 @@ const NotificacionesPage: React.FC = () => {
                     )}
                     <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
                     {followup && <span className="mt-2 block text-sm font-semibold text-primary-800">{followup}</span>}
+                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">Abrir manifiesto y ver qué sigue →</span>}
                     <time dateTime={notice.createdAt} className="mt-2 block text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
                   </span>
                   {linked && <ChevronRight size={18} aria-hidden="true" className="mt-1 shrink-0 text-neutral-600" />}

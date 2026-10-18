@@ -50,7 +50,7 @@ export async function directTrainingLogin(page: Page, info: TestInfo, role: stri
         if(allowed)records.eventuals.add(body.id);
       }
       if(method==='POST' && [...records.eventuals].some(id=>p==='/api/manifiestos/baja-intensidad/'+id+'/eventos'))allowed=true;
-      if(method==='POST')allowed ||= [...records.manifests].some(id=>new RegExp('^/api/manifiestos/'+id+'/(adendas(?:/[0-9a-f-]+/revisiones)?|aprobar-parte|documentos-cap|firmar|confirmar-retiro|confirmar-entrega|confirmar-recepcion|pesaje|tratamiento|cerrar|ubicacion)$').test(p))||p==='/api/auth/logout';
+      if(method==='POST')allowed ||= [...records.manifests].some(id=>new RegExp('^/api/manifiestos/'+id+'/(adendas(?:/[0-9a-f-]+/revisiones)?|iniciar-coordinacion|aprobar-parte|documentos-cap|firmar|confirmar-retiro|confirmar-entrega|confirmar-recepcion|pesaje|tratamiento|cerrar|ubicacion)$').test(p))||p==='/api/auth/logout';
     }
     if(method==='PUT' && claim.realm==='sitrep-capacitacion-v1' && claim.id===account.id && [...ownNotices].some(id=>p==='/api/notificaciones/'+id+'/leida'))allowed=true;
     if(!allowed){info.annotations.push({type:'blocked-non-classroom-request',description:method+' '+p});return route.abort('blockedbyclient');}

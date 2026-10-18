@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
 export const certificateCommand = z.object({
  id:z.string().uuid(),tipo:z.enum(['PARCIAL','FINAL']),firma:z.string().min(1),
- metodo:z.string().trim().min(1).max(200),nota:z.string().trim().min(1).max(500),
+ metodo:z.string().trim().max(200).default(''),nota:z.string().trim().max(500).default(''),
  cantidades:z.array(z.object({residuoId:z.string().min(1),cantidad:z.number().finite().positive()})).min(1).max(50),
 }).strict();
 export type CertificateRow={residuoId:string;corriente:string;cantidad:number;unidad:string};
