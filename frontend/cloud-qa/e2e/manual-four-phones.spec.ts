@@ -12,10 +12,10 @@ test('four-phone guide opens from home, preserves Web/App links and has a usable
   await expect(page.locator('#tutorialTitle')).toHaveText('Un manifiesto, cuatro teléfonos');
   await expect(page.locator('.guide-step')).toHaveCount(7);
   await expect(page.locator('vite-error-overlay')).toHaveCount(0);
-  await expect(page.locator('#safetyNote')).toContainText('no reparte su contraseña');
+  await expect(page.locator('#safetyNote')).toContainText('No se necesita la cuenta administradora personal');
   const preparation=page.locator('.guide-step').first();
-  await expect(preparation.locator('a[href="/switch-user?modo=capacitacion"]')).toHaveAttribute('target','_blank');
-  await expect(preparation.locator('a[href="/app/switch-user?modo=capacitacion"]')).toHaveAttribute('rel','noopener');
+  await expect(preparation.locator('a[href="/login"]')).toHaveAttribute('target','_blank');
+  await expect(preparation.locator('a[href="/app/login"]')).toHaveAttribute('rel','noopener');
   await page.screenshot({path:info.outputPath('four-phones-guide-first.png'),animations:'disabled'});
   if(info.project.name!=='web-desktop')await page.getByRole('button',{name:/Índice del tutorial/}).click();
   await page.getByRole('navigation',{name:'Pasos de la guía'}).getByRole('link',{name:/Ver el mismo viaje/}).click();

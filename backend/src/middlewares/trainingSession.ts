@@ -3,11 +3,14 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/config';
 import { inTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
 import { AppError } from './errorHandler';
+import { validateDirectTrainingClaim } from '../lib/trainingDirectLogin';
 
 // Training is opt-in and fail-closed. A missing configuration never routes a
 // signed school token into production. The JWT is verified again by auth.
 export function trainingSession(req: Request, res: Response, next: NextFunction) {
-  const token = req.path === '/api/auth/refresh-token' && typeof req.body?.refreshToken === 'string' ? req.body.refreshToken
+  let requestPath: string;
+  try { requestPath = decodeURIComponent(req.path); } catch { return next(new AppError('Ruta inválida', 400)); }
+  const token = requestPath.replace(/\/+$/, '').toLowerCase() === '/api/auth/refresh-token' && typeof req.body?.refreshToken === 'string' ? req.body.refreshToken
     : req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : undefined;
   if (!token) return next();
   let claim: jwt.JwtPayload;
@@ -16,16 +19,18 @@ export function trainingSession(req: Request, res: Response, next: NextFunction)
     if (typeof decoded === 'string') return next();
     claim = decoded;
   } catch { return next(); } // Existing route authentication handles invalid tokens.
+  if (claim.trainingDirect !== undefined) {
+    try { validateDirectTrainingClaim(claim); } catch (error) { return next(error); }
+  }
   if (claim.realm === undefined) return next();
   if (claim.realm !== TRAINING_REALM) return next(new AppError('Ámbito de sesión inválido', 401));
-  if (!process.env.TRAINING_DATABASE_URL || typeof claim.impersonatedBy !== 'string') {
+  if (!process.env.TRAINING_DATABASE_URL || (typeof claim.impersonatedBy !== 'string' && claim.trainingDirect !== true)) {
     return next(new AppError('Capacitación no habilitada. Volvé a tu cuenta administradora.', 403));
   }
   // No irreversible documents, delivery settings, job invocation or public
   // account creation through training. These capabilities need dedicated QA
   // before they can be enabled in school mode.
-  let path: string;
-  try { path = decodeURIComponent(req.path); } catch { return next(new AppError('Ruta inválida', 400)); }
+  const path = requestPath;
   const allowed = /^\/api\/(?:auth\/(?:profile|logout|refresh-token)|manifiestos|catalogos|actores|reportes|analytics|centro-control|inspecciones|soporte|notificaciones|search)(?:\/|$)/;
   // Navigation badges and read-only administrative lists use the same scoped
   // store. Do not grant account mutation, nested impersonation or job execution.

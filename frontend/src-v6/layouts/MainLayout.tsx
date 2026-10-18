@@ -1,3 +1,4 @@
+import { TrainingBanner } from '../components/TrainingBanner';
 /**
  * SITREP v6 - Main Layout
  * =======================
@@ -228,6 +229,7 @@ export const MainLayout: React.FC = () => {
     <div data-app-shell className="h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden">
       <NotificacionesPoller />
       {/* Impersonation banner — amber bar above everything */}
+      {currentUser?.training && !impersonationData && <TrainingBanner user={currentUser} />}
       {impersonationData && (
         <ImpersonationBanner
           user={impersonationData.impersonatedUser}
@@ -326,7 +328,7 @@ export const MainLayout: React.FC = () => {
           )}
           
           {/* Only ADMIN can request a temporary view of another user. */}
-          {isAdmin && <div className="mt-6 pt-6 border-t border-white/15">
+          {isAdmin && !currentUser?.training && <div className="mt-6 pt-6 border-t border-white/15">
             <p className="px-3 text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
               Acceso Rápido
             </p>
@@ -434,7 +436,7 @@ export const MainLayout: React.FC = () => {
                   <User size={16} />
                   Mi Perfil
                 </NavLink>
-                {isAdmin && <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-primary-800 hover:bg-primary-50">
+                {isAdmin && !currentUser?.training && <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-primary-800 hover:bg-primary-50">
                   <SwitchCamera size={16} />
                   Ver como otro usuario
                 </NavLink>}

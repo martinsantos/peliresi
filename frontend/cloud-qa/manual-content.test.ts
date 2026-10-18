@@ -186,7 +186,7 @@ test('classroom new features explain incomplete identities, registered fleet and
 test('four phones retain their roles and follow one new case through GPS and closure', () => {
   const guide = guides.find((g: any) => g.id === 'capacitacion-cuatro-telefonos');
   assert.equal(guide.steps.length, 7);
-  assert.match(guide.safety, /no reparte su contraseña/);
+  assert.match(guide.safety, /No se necesita la cuenta administradora personal/);
   assert.match(guide.steps[0].body.join(' '), /perfiles de navegador independientes/);
   assert.match(guide.steps[0].body.join(' '), /no certifica GPS físico/);
   assert.match(guide.steps[2].body.join(' '), /Sync/);

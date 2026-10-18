@@ -9,6 +9,8 @@ import { verifiedImpersonator } from '../services/impersonationIdentity.service'
 import { accountActivities } from '../services/actorActivities.service';
 import { isActorActivity } from '../domain/actorActivities';
 import { resolveCompanyContext } from '../services/empresa.service';
+import { TRAINING_LOGINS, validateDirectTrainingClaim } from '../lib/trainingDirectLogin';
+import { isTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
 
 /** Shape of req.user set by isAuthenticated middleware. */
 export interface AuthUser {
@@ -46,7 +48,12 @@ export const isAuthenticated = async (
     const token = authHeader.split(' ')[1];
     
     // Verificar el token
-    const decoded = jwt.verify(token, config.JWT_SECRET as string) as { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
+    const decoded = jwt.verify(token, config.JWT_SECRET as string) as jwt.JwtPayload & { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
+
+    if (decoded.trainingDirect !== undefined) validateDirectTrainingClaim(decoded);
+    if (decoded.realm !== undefined && (!isTrainingSession() || decoded.realm !== TRAINING_REALM)) {
+      throw new AppError('Ámbito de capacitación requerido', 401);
+    }
 
     // Before email verification this token may only operate on its own draft.
     // Do not grant access to another actor, inspection or admin endpoint.
@@ -77,6 +84,13 @@ export const isAuthenticated = async (
 
     if (!user) {
       throw new AppError('Usuario no autorizado', 401);
+    }
+
+    if (decoded.trainingDirect !== undefined) {
+      validateDirectTrainingClaim(decoded);
+      const account = TRAINING_LOGINS.find(item => item.id === user.id);
+      if (!isTrainingSession() || !account || user.email !== account.id + '@capacitacion.invalid'
+        || user.rol !== account.rol || !user.activo || !user.emailVerified) throw new AppError('Sesión de capacitación inválida', 401);
     }
 
     // Block inactive users UNLESS they have a restricted token

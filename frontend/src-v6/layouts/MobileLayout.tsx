@@ -1,3 +1,4 @@
+import { TrainingBanner } from '../components/TrainingBanner';
 /**
  * SITREP v6 - Mobile Layout
  * =========================
@@ -384,6 +385,7 @@ export const MobileLayout: React.FC = () => {
       {/* SW update banner - shown when new version available */}
       <SWUpdateBanner />
 
+      {currentUser?.training && !impersonationData && <TrainingBanner user={currentUser} />}
       {impersonationData && (
         <div data-testid="impersonation-banner" className="flex shrink-0 items-center gap-2 border-b border-amber-300 bg-amber-100 px-3 py-2 text-amber-950">
           <Eye size={18} className="shrink-0" aria-hidden="true" />
@@ -591,7 +593,7 @@ export const MobileLayout: React.FC = () => {
               )}
 
               {/* Switching is an ADMIN tool, never a role selector for an actor. */}
-              {isAdmin && <>
+              {isAdmin && !currentUser?.training && <>
                 <div className="border-t border-neutral-100 my-2" />
                 <div className="px-2">
                 <NavLink

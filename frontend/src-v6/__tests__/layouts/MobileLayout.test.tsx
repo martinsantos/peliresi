@@ -17,6 +17,7 @@ const authState = vi.hoisted(() => ({
     ubicacion: '',
     permisos: [],
     esInspector: false,
+    training: false,
   },
 }));
 const impersonationState = vi.hoisted(() => ({
@@ -123,12 +124,20 @@ describe('MobileLayout Android shell', () => {
     localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: String(authState.currentUser.id) })) + '.not-a-credential');
     authState.currentUser = { ...authState.currentUser, rol: 'TRANSPORTISTA', esInspector: false };
     impersonationState.data = null;
+    authState.currentUser.training = false;
     impersonationState.exit.mockClear();
     notices.unread = 0;
     support.create.mockReset(); support.create.mockResolvedValue({ id: 'ticket' });
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
+  it('labels a direct CAP login and offers no return to a personal administrator',()=>{
+    authState.currentUser.training=true;authState.currentUser.rol='ADMIN';renderMobileLayout();
+    expect(screen.getByRole('status',{name:'Modo capacitación'})).toHaveTextContent('Capacitación · sin validez oficial');
+    expect(screen.queryByText('Volver a mi cuenta')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:/abrir menu/i}));
+    expect(screen.queryByRole('link',{name:'Ver como otro usuario'})).not.toBeInTheDocument();
+  });
   it('closes the reporting drawer only after the server confirms the ticket', async () => {
     renderMobileLayout('/dashboard');
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));

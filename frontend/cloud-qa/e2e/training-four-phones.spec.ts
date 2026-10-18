@@ -1,6 +1,7 @@
 import {test, expect, devices, type Page, type TestInfo, type BrowserContext} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {trainingLogin, publishedTraining} from '../training-login';
+import {directTrainingLogin} from '../direct-training-login';
 import {prefix, readablePageHeading} from './helpers';
 
 // Four isolated browser contexts, one worker. GPS is browser-emulated; API,
@@ -38,9 +39,10 @@ async function post(page:Page,suffix:string,action:()=>Promise<unknown>,status=2
 
 test('four independent phones hand off one new manifest and observe actual GPS submissions in C3',async({browser},info)=>{
   const contexts:BrowserContext[]=[], pages:Record<string,Page>={},errors:string[]=[],consoleErrors:string[]=[],serverErrors:string[]=[],httpErrors:string[]=[];
+  const direct=process.env.QA_TRAINING_DIRECT==='true', team=direct?1:5;
   const scope={manifests:new Set<string>(),eventuals:new Set<string>()};
   const roles=[['admin','Administradores'],['generador','Generadores'],['transportista','Transportistas'],['operador','Operadores']];
-  const evidence:any={surface:info.project.name,viewport:'360x800',independentSessions:4,team:5,gps:'browser-emulated; real UI sends to server',steps:[]};
+  const evidence:any={surface:info.project.name,viewport:'360x800',independentSessions:4,team,gps:'browser-emulated; real UI sends to server',steps:[]};
   const baseURL=publishedTraining?'https://sitrep.ultimamilla.com.ar':'http://127.0.0.1:4177';
   try{
     for(const [role,category]of roles){
@@ -50,6 +52,7 @@ test('four independent phones hand off one new manifest and observe actual GPS s
       context.setDefaultTimeout(15000);context.setDefaultNavigationTimeout(30000);
       contexts.push(context);const page=await context.newPage();pages[role]=page;console.log('Preparing phone',role);
       page.on('pageerror',e=>errors.push(role+': '+e.message));
+      if(direct){await directTrainingLogin(page,info,role,scope);}else{
       await trainingLogin(page,info,scope);
       await page.goto(prefix(info)+'/switch-user?modo=capacitacion');
       const group=page.getByRole('region',{name:category,exact:true});
@@ -57,11 +60,12 @@ test('four independent phones hand off one new manifest and observe actual GPS s
       const selected=page.waitForResponse(r=>r.url().includes('/admin/training/impersonate/')&&r.request().method()==='POST');
       await group.getByRole('button',{name:/^Ver como CAP/}).nth(4).click();expect((await selected).status()).toBe(200);
       await expect(page.getByText('Capacitación · sin validez oficial',{exact:false}).first()).toBeVisible();
+      }
       console.log('Phone ready',role);
       page.on('console',m=>{if(m.type()==='error')consoleErrors.push(role+': '+m.text());});
       page.on('response',r=>{if(r.status()>=400)httpErrors.push(role+': '+r.status()+' '+new URL(r.url()).pathname);if(r.status()>=500)serverErrors.push(role+': '+r.status()+' '+new URL(r.url()).pathname);});
     }
-    evidence.steps.push('four role sessions selected through instructor UI');console.log('All four roles ready');
+    evidence.steps.push(direct?'four direct role logins without instructor credentials':'four role sessions selected through instructor UI');console.log('All four roles ready');
     const {admin,generador,transportista,operador}=pages;
     let activity:any=null;
     admin.on('response',async r=>{if(r.url().includes('/api/centro-control/actividad')&&r.status()===200)activity=(await r.json()).data;});
@@ -73,10 +77,10 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     await choose(generador,'Tipo de Residuo *',/^Y-CAP/);
     await generador.getByLabel('Cantidad *',{exact:true}).fill('10');
     await generador.getByRole('button',{name:'Siguiente',exact:true}).click();
-    await choose(generador,'Transportista *',/^CAP · Transporte 5/);
-    await choose(generador,'Vehículo (opcional)',/^CAP005/);
-    await choose(generador,'Chofer (opcional)',/^Chofer ficticio 5/);
-    await choose(generador,'Operador / Destino *',/^CAP · Operador 5/);
+    await choose(generador,'Transportista *',new RegExp('^CAP · Transporte '+team));
+    await choose(generador,'Vehículo (opcional)',new RegExp('^CAP00'+team));
+    await choose(generador,'Chofer (opcional)',new RegExp('^Chofer ficticio '+team));
+    await choose(generador,'Operador / Destino *',new RegExp('^CAP · Operador '+team));
     await proof(generador,info,'01-generador-flota');
     const created=await post(generador,'/api/manifiestos',()=>generador.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201);
     const manifest=created.data.manifiesto;evidence.manifest={id:manifest.id,numero:manifest.numero};

@@ -41,3 +41,30 @@ it.each(['/api/admin/usuarios', '/api/solicitudes', '/api/alertas'])('allows sco
   expect(run(path, token).next.mock.results[0].value).toBe(true);
   expect(run(path, token, {}, 'POST').next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
 });
+
+it.each([
+  {id:'cap-20261012-admin-1',trainingDirect:true},
+  {id:'cap-20261012-admin-2',realm:TRAINING_REALM,trainingDirect:true},
+  {id:'cap-20261012-admin-1',realm:TRAINING_REALM,trainingDirect:'true'},
+  {id:'cap-20261012-admin-1',realm:TRAINING_REALM,trainingDirect:true,impersonatedBy:'real-admin'},
+  {id:'cap-20261012-admin-1',realm:TRAINING_REALM,trainingDirect:true,restricted:true},
+])('rejects malformed direct claims without a public fallback: %j',claim=>{
+  vi.stubEnv('TRAINING_DIRECT_LOGIN_UNTIL','2099-01-01T00:00:00Z');
+  expect(run('/api/manifiestos',sign(claim)).next).toHaveBeenCalledWith(expect.objectContaining({statusCode:401}));
+});
+it.each(['/api/admin/impersonate/real-admin','/api/admin/training/impersonate/other','/api/pdf/manifiesto/one','/api/push/subscribe','/api/auth/change-password','/api/auth/register','/api/admin/jobs/mail'])('direct CAP cannot escape through %s',path=>{
+  vi.stubEnv('TRAINING_DIRECT_LOGIN_UNTIL','2099-01-01T00:00:00Z');
+  expect(run(path,sign({id:'cap-20261012-admin-1',realm:TRAINING_REALM,trainingDirect:true}),{},'POST').next)
+    .toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
+});
+it('revokes existing signed direct tokens when the classroom window ends',()=>{
+  vi.stubEnv('TRAINING_DIRECT_LOGIN_UNTIL','2000-01-01T00:00:00Z');
+  expect(run('/api/manifiestos',sign({id:'cap-20261012-admin-1',realm:TRAINING_REALM,trainingDirect:true})).next)
+    .toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
+});
+
+it.each(['/api/auth/refresh-token/','/api/auth/%72efresh-token'])('retains school scope for normalized refresh path %s',path=>{
+  vi.stubEnv('TRAINING_DIRECT_LOGIN_UNTIL','2099-01-01T00:00:00Z');
+  const refreshToken=sign({id:'cap-20261012-admin-1',realm:TRAINING_REALM,trainingDirect:true});
+  expect(run(path,undefined,{refreshToken},'POST').next.mock.results[0].value).toBe(true);
+});

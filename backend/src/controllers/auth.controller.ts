@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import { isTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
+import { inTrainingSession, isTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
 import { StringValue } from 'ms';
 import { z } from 'zod';
 import { config } from '../config/config';
@@ -13,6 +13,7 @@ import { verifiedImpersonator } from '../services/impersonationIdentity.service'
 import { recordAccountMail } from '../services/account-mail.service';
 import { accountActivities } from '../services/actorActivities.service';
 import { companyContexts } from '../services/empresa.service';
+import { generateDirectTrainingTokens, isTrainingLoginEmail, TRAINING_LOGINS, trainingLoginDeadline, validateDirectTrainingClaim } from '../lib/trainingDirectLogin';
 
 // CUIT normalization: accepts "30711235961" or "30-71123596-1" → "30-71123596-1"
 function normalizeCuit(raw: string): string | null {
@@ -239,6 +240,28 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
 
     const { email, cuit, password } = parsed.data;
+
+    // Reserved training aliases never query the operational identity store,
+    // even on a wrong password, unknown alias or missing school configuration.
+    if (isTrainingLoginEmail(email)) {
+      trainingLoginDeadline();
+      const account = TRAINING_LOGINS.find(item => item.email === email!.trim().toLowerCase());
+      if (!account || cuit) throw new AppError('Credenciales inválidas', 401);
+      return await inTrainingSession(async () => {
+        const user = await prisma.usuario.findUnique({ where: { id: account.id }, include: { generador: true, transportista: true, operador: true } });
+        if (!user || user.email !== account.id + '@capacitacion.invalid' || user.rol !== account.rol
+          || !user.activo || !user.emailVerified || !(await bcrypt.compare(password, user.password))) {
+          throw new AppError('Credenciales inválidas', 401);
+        }
+        await prisma.auditoria.create({ data: { usuarioId: user.id, accion: 'CAPACITACION_LOGIN', modulo: 'AUTH', ip: req.ip } });
+        const tokens = generateDirectTrainingTokens(user.id);
+        res.setHeader('X-SITREP-Training', 'true');
+        res.setHeader('Cache-Control', 'no-store');
+        return res.json({ success: true, data: { user: { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol,
+          activo: user.activo, esInspector: user.esInspector, generador: user.generador, transportista: user.transportista,
+          operador: user.operador, createdAt: user.createdAt, training: true }, tokens } });
+      });
+    }
 
     const normalizedCuit = cuit ? (normalizeCuit(cuit) || cuit) : undefined;
     const user = await prisma.usuario.findFirst({
@@ -537,11 +560,16 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     const { refreshToken: token } = req.body;
     if (!token) throw new AppError('Refresh token es requerido', 400);
 
-    let decoded: { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
+    let decoded: jwt.JwtPayload & { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
     try {
       decoded = jwt.verify(token, config.JWT_SECRET as string) as typeof decoded;
     } catch {
       throw new AppError('Refresh token inválido o expirado', 401);
+    }
+
+    if (decoded.trainingDirect !== undefined) validateDirectTrainingClaim(decoded);
+    if (decoded.realm !== undefined && (!isTrainingSession() || decoded.realm !== TRAINING_REALM)) {
+      throw new AppError('Ámbito de capacitación requerido', 401);
     }
 
     const user = await prisma.usuario.findUnique({ where: { id: decoded.id } });
@@ -550,6 +578,14 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
     // Allow refresh for restricted tokens (inactive users with pending solicitudes)
     if (!user.activo && (!decoded.restricted || user.motivoInactividad === 'SUSPENDIDA')) {
       throw new AppError('Usuario no encontrado o inactivo', 401);
+    }
+
+    if (decoded.trainingDirect !== undefined) {
+      validateDirectTrainingClaim(decoded);
+      const account = TRAINING_LOGINS.find(item => item.id === user.id);
+      if (!isTrainingSession() || !account || user.email !== account.id + '@capacitacion.invalid'
+        || user.rol !== account.rol || !user.activo || !user.emailVerified) throw new AppError('Sesión de capacitación inválida', 401);
+      return res.json({ success: true, data: generateDirectTrainingTokens(user.id) });
     }
 
     const impersonator = await verifiedImpersonator(decoded.impersonatedBy, user.id, decoded.restricted);
