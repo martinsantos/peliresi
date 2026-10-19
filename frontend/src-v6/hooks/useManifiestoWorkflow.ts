@@ -30,7 +30,11 @@ export function useCreateManifiesto() {
   return useMutation({
     ...WORKFLOW_OPTIONS,
     mutationFn: (req: CreateManifiestoRequest) => manifiestoService.create(req),
-    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.lists() }),
+    onSuccess: () => Promise.all([
+      qc.invalidateQueries({ queryKey: KEYS.lists() }),
+      qc.invalidateQueries({ queryKey: ['training-tasks'] }),
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] }),
+    ]),
   });
 }
 

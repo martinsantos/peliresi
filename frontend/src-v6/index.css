@@ -722,3 +722,12 @@
   background: #161B22;
   border-color: #30363D;
 }
+
+/* New keyed agenda rows enter once; polling retains existing DOM nodes. */
+@keyframes agenda-row-enter {
+  from { opacity: 0; transform: translateY(-6px); background-color: #d1fae5; }
+  to { opacity: 1; transform: translateY(0); background-color: transparent; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .agenda-row-enter { animation: agenda-row-enter 600ms ease-out; }
+}
