@@ -1,6 +1,10 @@
 # SITREP — traspaso vigente para la capacitación del lunes 19/10/2026
 
-## Estado vigente — agenda actualizada al crear, 19/10/2026
+## Estado vigente — aviso de acceso corregido, 19/10/2026
+
+Web/app **`75f3062`**, publicado 11:42:46 Mendoza: conserva el mensaje de error al volver al formulario después de un login fallido. Generador CAP confirmado por API y UI; los cuatro alias responden 200. Credenciales, límites y permisos sin cambios. Backend `8de58de` sin reinicio, manual `ea92004` conservado, SW v126. Unitarias dirigidas 33/33; navegador publicado 4/4 (401/429 inyectados, login real y recarga de sesión en web/app); build remoto serial y smoke 44/44. Rollback sólo frontend a `20261019-agenda-live-ea92004`. Sin datos reales, main ni workflows. Leer [incidente, pruebas y rollback](ACCESO-CAPACITACION-20261019.md).
+
+## Historial — agenda actualizada al crear, 19/10/2026
 
 Web/app/manual **`ea92004`** publicados a las 09:29:02 Mendoza. El recién creado aparece primero, actualiza agenda al crear y llega a otra sesión sin recargar; después de la aprobación propia queda **En espera**. Animación breve con movimiento reducido respetado. Aprobaciones y permisos conservados. Backend `8de58de` sin reinicio; SW v125, manual 2026.20.9. Preview: unitarias 22/22, manual 16/16, cuatro roles × web/app 8/8. Agenda publicada de sólo lectura 3/3, smoke 44/44. Gemelo detenido y relay cerrado. Rollback sólo frontend al release `20261019-icons-88b1a0e`. Sin datos reales, main ni workflows. Leer [pruebas y rollback](AGENDA-CAPACITACION-20261019.md).
 
