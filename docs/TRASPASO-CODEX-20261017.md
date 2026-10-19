@@ -1,6 +1,10 @@
 # SITREP — traspaso vigente para la capacitación del lunes 19/10/2026
 
-## Estado vigente — aviso de acceso corregido, 19/10/2026
+## Estado vigente — capacitación cerrada, 19/10/2026
+
+Al terminar la demo, se revocaron los cuatro accesos directos CAP de la pizarra. Los cuatro nuevos ingresos y los cuatro tokens emitidos antes del cierre devolvieron 403; backend listo, dos workers online. El vencimiento pasado está tanto en `.env` como en PM2 y su estado guardado. Los datos artificiales, manifiestos y credenciales históricas quedan preservados, sin poder usar el ingreso directo. `main` y el frontend no cambiaron. [Cierre y auditoría](ACCESO-CAPACITACION-20261019.md).
+
+## Historial — aviso de acceso corregido, 19/10/2026
 
 Web/app **`75f3062`**, publicado 11:42:46 Mendoza: conserva el mensaje de error al volver al formulario después de un login fallido. Generador CAP confirmado por API y UI; los cuatro alias responden 200. Credenciales, límites y permisos sin cambios. Backend `8de58de` sin reinicio, manual `ea92004` conservado, SW v126. Unitarias dirigidas 33/33; navegador publicado 4/4 (401/429 inyectados, login real y recarga de sesión en web/app); build remoto serial y smoke 44/44. Rollback sólo frontend a `20261019-agenda-live-ea92004`. Sin datos reales, main ni workflows. Leer [incidente, pruebas y rollback](ACCESO-CAPACITACION-20261019.md).
 

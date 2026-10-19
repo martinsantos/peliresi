@@ -1,5 +1,15 @@
 # Acceso de capacitación — incidente del 19/10/2026
 
+## Cierre de los cuatro accesos, 19/10/2026
+
+Por pedido del dueño al finalizar la demostración, se cerraron de inmediato los cuatro alias directos `admin`, `generador`, `transporte` y `operador` de `@capacitacion.invalid`. La fecha `TRAINING_DIRECT_LOGIN_UNTIL` pasó de `2026-10-20T03:00:00Z` a `2000-01-01T00:00:00Z`. La configuración se aplicó a `.env`, a ambos procesos PM2 y al estado guardado de PM2. El backend hizo una recarga controlada: dos workers online y `/api/health/ready` en 200. Ningún release de código cambió.
+
+Se verificó con las credenciales originales: **4/4 nuevos ingresos rechazados con 403**. Se guardaron tokens temporales antes del cierre y se verificó que **4/4 sesiones previas recibieran 403** después. La API no consultó datos operativos; sólo se probaron los alias CAP. El respaldo íntegro del `.env` se verificó antes del cambio en `/var/backups/sitrep/20261019-cierre-capacitacion/backend-env.before.private` (acceso root, modo 0600); auditoría de la operación en `revocation.json`. Hash anterior `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`; nuevo `fd6a9d72f42f3eb5cd6a7378ba90424dfe0e147629dcb1a1fe51e7b61752529f`. Sólo cambió la línea del vencimiento.
+
+Los 40 usuarios sintéticos preparados, sus manifiestos y certificados permanecen en el esquema escolar. Los otros 36 no recibieron estos cuatro alias de ingreso directo. No se modificaron cuentas ni datos operativos, permisos, contraseñas, frontend o `main`; no se dispararon workflows. Las hojas privadas de la clase conservan el registro de los accesos entregados, pero **esas cuatro credenciales ya no sirven**. No restaurar la fecha anterior ni reactivar alias sin una nueva indicación expresa del dueño.
+
+## Historial — incidente de ingreso durante la clase
+
 ## Problema y diagnóstico
 
 Durante la clase se informó que el generador no podía ingresar: «Demasiados intentos» y luego regreso al formulario sin aviso. Se probaron los cuatro alias CAP por HTTPS: los cuatro devolvieron 200, con `X-SITREP-Training: true`; el perfil del generador también devolvió 200. Ingreso adicional por la UI real de `/app/login`: cuenta CAP · GENERADOR 1, pantalla Mis trámites y agenda visibles. Contraseñas verificadas contra las entregadas, sin cambiarlas.
