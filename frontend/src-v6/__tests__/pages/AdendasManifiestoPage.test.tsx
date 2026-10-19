@@ -96,3 +96,13 @@ it('school session can practice with operational flag off, while both annex down
   expect(screen.getByText('Capacitación: sin anexos ni documentos oficiales.')).toBeVisible();
   expect(mock.post).not.toHaveBeenCalled();
 });
+it('allows letters in the current code and free text in the reason, preserving Y-code validation', async () => {
+ mock.get.mockResolvedValue({data:{data:{...data,puedeRegistrar:true}}});view();
+ fireEvent.click(await screen.findByRole('button',{name:'Registrar diferencia'}));
+ const current=screen.getByLabelText('Corriente observada 1');
+ expect(current).toHaveAttribute('type','text');expect(current).toHaveAttribute('inputmode','text');
+ fireEvent.change(current,{target:{value:'y21'}});expect(current).toHaveValue('Y21');expect(current).toBeValid();
+ fireEvent.change(current,{target:{value:'21'}});expect(current).toBeInvalid();
+ const reason=screen.getByLabelText('Motivo de la adenda');expect(reason).toHaveAttribute('inputmode','text');
+ fireEvent.change(reason,{target:{value:'Se observó una diferencia de carga'}});expect(reason).toHaveValue('Se observó una diferencia de carga');
+});

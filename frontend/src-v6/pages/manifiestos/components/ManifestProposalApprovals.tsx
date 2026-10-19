@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Clock, Factory, Truck, FlaskConical, Play, XCircle } from 'lucide-react';
+import { Play, XCircle } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../../contexts/AuthContext';
 import { api } from '../../../services/api';
@@ -8,7 +8,7 @@ import { Button } from '../../../components/ui/ButtonV2';
 
 type Approval = { autorRol: string; rechazo?: string; estado: string; inicio: string|null; puedeIniciar: boolean; partes: { rol: string; aprobada: boolean }[]; puedeAprobar: string | null };
 const names: Record<string, string> = { OPERADOR: 'Operador', GENERADOR: 'Generador', TRANSPORTISTA: 'Transporte' };
-const icons = { OPERADOR: FlaskConical, GENERADOR: Factory, TRANSPORTISTA: Truck };
+import { PartyApprovalStatus } from '../../../components/PartyApprovalStatus';
 export function ManifestProposalApprovals({ id, estado, onSign }: { id: string; estado?: string; onSign: () => void }) {
   const { currentUser } = useAuth(); const qc = useQueryClient();
   const [motivo,setMotivo] = useState(''),[rejecting,setRejecting]=useState(false);
@@ -30,20 +30,20 @@ export function ManifestProposalApprovals({ id, estado, onSign }: { id: string; 
     finally{lock.current=false;setBusy(false);}
   }
   const minutes=data.inicio?Math.max(0,Math.floor((now-Date.parse(data.inicio))/1000)):0;
-  return <section aria-label="Aprobaciones de las partes" className="mb-4 space-y-4 border-b border-neutral-200 pb-4">
-    <div><p className="text-sm text-neutral-600">Propuesta iniciada por {names[data.autorRol] || 'Administrador'}</p><h3 className="text-lg font-bold text-neutral-900">{data.rechazo?'Propuesta detenida':approved===3?'¡Las tres partes aprobaron!':`${approved} de 3 aprobaciones`}</h3></div>
-    <ul className="grid grid-cols-3 gap-2">{data.partes.map(p=>{const Icon=icons[p.rol as keyof typeof icons];return <li key={p.rol} className={`rounded-xl p-2 text-center ${p.aprobada?'bg-emerald-50 text-emerald-900':'bg-neutral-100 text-neutral-700'}`}><Icon size={22} className="mx-auto mb-2" aria-hidden="true"/><span className="block text-sm font-semibold">{names[p.rol]}</span><span className="mt-1 flex items-center justify-center gap-1 text-xs">{p.aprobada?<CheckCircle2 size={14}/>:<Clock size={14}/>} {p.aprobada?'Aprobado':'Pendiente'}</span></li>;})}</ul>
-    {data.estado==='PENDIENTE_APROBACION' && <p role="status" className="text-sm"><strong>{data.puedeAprobar?'Te toca revisar y aprobar.':'Tu decisión está registrada.'}</strong> Falta aprobar: {missing}. Hasta entonces no se puede iniciar ni retirar.</p>}
+  return <section aria-label="Aprobaciones de las partes" className="mb-4 space-y-3 border-b border-neutral-200 pb-4">
+    <div><p className="text-sm text-neutral-600">Creado por {names[data.autorRol] || 'Administrador'}</p><h3 className="text-lg font-bold text-neutral-900">{data.rechazo?'Propuesta detenida':approved===3?'3 de 3 · Aprobado':`${approved} de 3 aprobaciones`}</h3></div>
+    <PartyApprovalStatus partes={data.partes}/>
+    {data.estado==='PENDIENTE_APROBACION' && <p role="status" className="text-sm"><strong>{data.puedeAprobar?'Te toca revisar y aprobar.':data.partes.some(p=>p.rol===currentUser?.rol&&p.aprobada)?'Tu aprobación está registrada.':'Esperando a las partes.'}</strong> Falta aprobar: {missing}.</p>}
     {data.puedeAprobar==='GENERADOR'?<Button fullWidth onClick={onSign}>Firmar Manifiesto</Button>:data.puedeAprobar?<Button fullWidth disabled={busy} onClick={()=>void act('approve')}>{busy?'Guardando...':`Aprobar como ${names[data.puedeAprobar].toLowerCase()}`}</Button>:null}
     {data.estado==='APROBADO' && <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
-      <p className="font-semibold">{data.inicio?'Coordinación iniciada':'Listo para iniciar la coordinación'}</p>
-      <p className="text-sm">{data.inicio?'Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.':'Generador, transporte u operador pueden dar inicio. Las otras partes reciben el aviso automáticamente.'}</p>
+      <p className="font-semibold">{data.inicio?'Coordinación iniciada':'Todo aprobado'}</p>
+
       {data.inicio?<p className="tabular-nums text-xl font-bold" aria-label="Tiempo de coordinación">{Math.floor(minutes/3600).toString().padStart(2,'0')}:{Math.floor(minutes/60)%60<10?'0':''}{Math.floor(minutes/60)%60}:{(minutes%60).toString().padStart(2,'0')}</p>:data.puedeIniciar?<Button fullWidth leftIcon={<Play size={18}/>} disabled={busy} onClick={()=>void act('start')}>Iniciar coordinación</Button>:null}
-      <p className="text-xs">El tiempo de viaje y el GPS empiezan al confirmar el retiro físico.</p>
+      <p className="text-xs">Retiro físico → viaje y GPS.</p>
     </div>}
     {data.puedeAprobar && <details open={rejecting} onToggle={e=>setRejecting(e.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-3 text-sm text-error-800">No puedo participar / rechazar</summary><Input label="Motivo del rechazo" maxLength={500} value={motivo} onChange={e=>setMotivo(e.target.value)} /><Button variant="outline" disabled={busy||!motivo.trim()} onClick={()=>void act('reject')}>Rechazar mi participación</Button></details>}
     {data.rechazo && <p role="status" className="rounded-xl bg-error-50 p-3 text-error-800"><XCircle className="inline mr-2" size={20}/>Propuesta rechazada: {JSON.parse(data.rechazo).motivo}. No se puede iniciar ni retirar; hace falta otra propuesta.</p>}
     {error&&<p role="alert">{error}</p>}
-    <button type="button" className="min-h-11 text-sm text-neutral-600 underline" onClick={()=>void query.refetch()}>Actualizar aprobaciones</button>
+    <button type="button" className="min-h-11 text-xs text-neutral-600 underline" onClick={()=>void query.refetch()}>Actualizar aprobaciones</button>
   </section>;
 }

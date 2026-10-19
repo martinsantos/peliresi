@@ -1,3 +1,5 @@
+import { Award, FileCheck2, LockKeyhole, CheckCircle2, Download } from 'lucide-react';
+import { CardHeader } from '../../../components/ui/CardV2';
 import { Link } from 'react-router-dom';
 import { useMobilePrefix } from '../../../hooks/useMobilePrefix';
 import React,{useRef,useState} from 'react';
@@ -36,15 +38,20 @@ export function TrainingCertificates({manifest}:{manifest:Partial<Manifiesto>}){
   catch{setError('No se pudo descargar el documento.');}
  }
  return <section id="certificaciones" aria-label="Certificaciones" className="rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
-  <h2 className="text-xl font-bold">Certificaciones</h2><p className="text-sm">El operador firma y libera. Generador y transporte reciben un aviso y pueden descargar aquí el mismo documento.</p><p className="text-xs text-neutral-600">Práctica con datos artificiales · sin validez oficial.</p>
+  <CardHeader icon={<Award size={22}/>} title="Certificaciones" subtitle="El operador firma. Las tres partes reciben el documento."/>
   {query.isError?<p role="alert">No se pudieron cargar los certificados.</p>:query.isPending?<p>Cargando...</p>:<>
-   {!query.data?.length&&<p className="text-sm">El operador todavía no liberó documentos.</p>}
-   <ul className="space-y-2">{query.data?.map((d,i)=><li key={d.id} className="rounded border border-neutral-200 p-3"><p className="font-semibold">{d.documento.tipo==='FINAL'?'Certificación final total':'Certificación parcial '+(i+1)} · Liberado</p><p className="text-sm">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p><Button variant="outline" onClick={()=>void download(d)}>Descargar {d.documento.tipo==='FINAL'?'final':'parcial '+(i+1)} CAP</Button></li>)}</ul>
+   <div className="grid grid-cols-2 gap-2" aria-label="Estado de certificaciones">{(['PARCIAL','FINAL'] as const).map(type=>{
+    const issued=query.data?.filter(d=>d.documento.tipo===type).length||0;
+    const ready=canRelease&&!final&&(type==='PARCIAL'||manifest.estado==='TRATADO'&&unresolved===0);
+    const Icon=issued?CheckCircle2:ready?FileCheck2:LockKeyhole;
+    return <div key={type} className={`rounded-lg border p-3 ${issued?'border-emerald-200 bg-emerald-50 text-emerald-900':ready?'border-primary-200 bg-primary-50 text-primary-900':'border-neutral-200 bg-neutral-50 text-neutral-600'}`}><Icon size={22} aria-hidden="true"/><h3 className="mt-2 text-sm font-semibold">{type==='PARCIAL'?'Parcial':'Final total'}</h3><p className="mt-1 text-xs">{issued?`${issued} emitida${issued>1?'s':''}`:ready?'Lista para firmar':!operator?'Pendiente del operador':final?'No emitida':type==='PARCIAL'?'Requiere tratamiento':'Requiere cierre y adendas resueltas'}</p></div>;
+   })}</div>
+   <ul className="space-y-2">{query.data?.map((d,i)=><li key={d.id} className="rounded border border-neutral-200 p-3"><p className="font-semibold">{d.documento.tipo==='FINAL'?'Certificación final total':'Certificación parcial '+(i+1)} · Liberado</p><p className="text-sm">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p><Button variant="outline" leftIcon={<Download size={16}/>} onClick={()=>void download(d)}>Descargar {d.documento.tipo==='FINAL'?'final':'parcial '+(i+1)} CAP</Button></li>)}</ul>
   </>}
   {canRelease&&!final&&!kind&&<div className="flex flex-wrap gap-2"><Button onClick={()=>open('PARCIAL')}>Emitir certificación parcial</Button><Button disabled={manifest.estado!=='TRATADO'||unresolved!==0} onClick={()=>open('FINAL')}>Emitir certificación final total</Button></div>}
   {operator&&canRelease&&!final&&<p className="text-sm text-neutral-700">{manifest.estado!=='TRATADO'?'Para emitir la final total: cerrá el tratamiento cuando corresponda.':unresolved===null?'Comprobando revisiones antes de la certificación final…':unresolved>0?<>{unresolved} adenda(s) por resolver antes del final. <Link className="font-semibold text-primary-800 underline" to={mp(`/manifiestos/${id}/adendas`)}>Ver qué falta resolver</Link></>:'Todo listo para firmar la certificación final total.'}</p>}
   {checks.isError&&<p role="alert">No pudimos comprobar las adendas. <button onClick={()=>void checks.refetch()} className="underline">Reintentar</button></p>}
-  {operator&&!canRelease&&!final&&<p className="text-sm">Todavía falta recibir, pesar o registrar el tratamiento. Completá la acción que aparece arriba. La final se emite después del cierre y de resolver las adendas.</p>}
+  {operator&&!canRelease&&!final&&<p className="text-sm">Primero: recepción → pesaje → tratamiento.</p>}
   {kind&&<form onSubmit={release} className="space-y-3 border-t pt-3"><h3 className="font-semibold">{kind==='PARCIAL'?'Cantidad efectivamente tratada en este parcial':'Total tratado: incluye los parciales previos'}</h3>
    {(manifest.residuos||[]).map(r=><Input key={r.id} label={`Cantidad a certificar ${r.tipoResiduo?.codigo||r.id} (${r.unidad})`} type="number" min="0.001" step="any" required={kind==='FINAL'} disabled={kind==='FINAL'} value={amounts[r.id]||''} onChange={e=>setAmounts({...amounts,[r.id]:e.target.value})} helperText={`Pesaje recibido: ${r.cantidadRecibida??'pendiente'} ${r.unidad}. En un parcial, dejá vacío lo que no se certifica.`}/>)}
    <p className="text-sm">Datos del manifiesto y pesaje ya incorporados. Revisá el método registrado y firmá.</p><Input label="Método de tratamiento certificado" required maxLength={200} value={method} onChange={e=>setMethod(e.target.value)}/>
@@ -53,6 +60,6 @@ export function TrainingCertificates({manifest}:{manifest:Partial<Manifiesto>}){
    <div className="flex gap-2"><Button type="submit" disabled={busy||!signature}>{busy?'Guardando...':'Firmar y publicar certificación'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>setKind(null)}>Cancelar</Button></div>
   </form>}
   {error&&<p role="alert">{error}</p>}
-  <Button size="sm" variant="outline" onClick={()=>void query.refetch()}>Actualizar certificados</Button>
+  <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-neutral-600">Capacitación · sin validez oficial</span><Button size="sm" variant="ghost" onClick={()=>void query.refetch()}>Actualizar certificados</Button></div>
  </section>;
 }

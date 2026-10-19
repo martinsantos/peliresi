@@ -7,6 +7,7 @@ import { ManifestProposalApprovals } from './ManifestProposalApprovals';
  * UI delegated to ActionButtons and ActionModals.
  */
 
+import { ClipboardCheck } from 'lucide-react';
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import type { Manifiesto } from '../../../types/models';
@@ -92,7 +93,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   return (
     <>
       <Card>
-        <CardHeader title="Acciones" />
+        <CardHeader title="Acciones" icon={<ClipboardCheck size={22}/>} />
         <CardContent>
           {training && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           <ActionButtons

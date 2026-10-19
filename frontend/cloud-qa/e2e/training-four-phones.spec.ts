@@ -31,6 +31,12 @@ async function proof(page:Page,info:TestInfo,name:string){
   await expect(page.getByText('Capacitación · sin validez oficial',{exact:false}).first()).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   await readablePageHeading(page);
+  const contrasts=await page.locator('button[data-ui-button="primary"]:enabled:visible').evaluateAll(buttons=>{
+    const luminance=(color:string)=>{const v=(color.match(/[\d.]+/g)||[]).slice(0,3).map(Number).map(c=>{c/=255;return c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4);});return v[0]*.2126+v[1]*.7152+v[2]*.0722;};
+    return buttons.map(button=>{const bg=luminance(getComputedStyle(button).backgroundColor),fg=luminance(getComputedStyle(button.querySelector('span')||button).color);return {text:button.textContent,ratio:(Math.max(bg,fg)+.05)/(Math.min(bg,fg)+.05)};});
+  });
+  for(const item of contrasts)expect(item.ratio,'Button contrast: '+item.text).toBeGreaterThanOrEqual(4.5);
+
   await page.screenshot({path:info.outputPath(name+'.png'),fullPage:true,animations:'disabled'});
 }
 async function post(page:Page,suffix:string,action:()=>Promise<unknown>,status=200){
@@ -122,6 +128,13 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     const seenNotices:Record<string,Set<string>>={};
     for(const [role,page] of Object.entries(pages)){seenNotices[role]=new Set();page.on('response',async r=>{if(new URL(r.url()).pathname==='/api/notificaciones' && r.status()===200){for(const n of (await observedNotificationBody(r))?.data?.notificaciones||[])if(n.manifiestoId)seenNotices[role].add(n.manifiestoId);}});}
     const {admin,generador,transportista,operador}=pages;
+    for(const role of ['admin','operador','transportista']){
+      const page=pages[role],agenda=page.getByRole('region',{name:'Agenda de manifiestos',exact:true});
+      await expect(agenda).toBeVisible();await expect(agenda.getByRole('button',{name:'En curso',exact:true})).toBeVisible();
+      await agenda.getByRole('button',{name:'En curso',exact:true}).click();await expect(agenda.getByRole('button',{name:'En curso',exact:true})).toHaveAttribute('aria-pressed','true');
+      await agenda.getByRole('button',{name:'Todos',exact:true}).click();
+      await proof(page,info,'agenda-'+role);
+    }
     async function api(role:string,id:string,action:string,body:any,status:number){
       if(status>=400)expectedHttp.add(role+': '+status+' /api/manifiestos/'+id+'/'+action);
       const result=await pages[role].evaluate(async({url,body})=>{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('sitrep_access_token')},body:JSON.stringify(body)});return {status:r.status,data:await r.json()};},{url:'/api/manifiestos/'+id+'/'+action,body});
@@ -215,6 +228,7 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     await expect.poll(()=>gpsHeld,{timeout:45000}).toBe(true);
     transportista.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/'+manifest.id+'/confirmar-entrega'))deliveryRequests++;});
     await transportista.getByRole('button',{name:'Confirmar entrega',exact:true}).click();
+    await expect(transportista.getByRole('dialog',{name:'Confirmar Entrega?',exact:true})).toBeVisible();
     const delivered=post(transportista,'/'+manifest.id+'/confirmar-entrega',()=>transportista.getByRole('button',{name:'Sí, Confirmar Entrega',exact:true}).click());
     try{
       await expect(transportista.getByRole('button',{name:'Confirmando...',exact:true})).toBeDisabled();
@@ -243,6 +257,8 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     await api('generador',manifest.id,'documentos-cap',finalBody,403);
     await operador.goto(prefix(info)+'/manifiestos/'+manifest.id+'/adendas');
     await operador.getByRole('button',{name:'Registrar diferencia',exact:true}).click();
+    await expect(operador.getByLabel('Corriente observada 1',{exact:true})).toHaveAttribute('inputmode','text');
+    await expect(operador.getByLabel('Motivo de la adenda',{exact:true})).toHaveAttribute('inputmode','text');
     await operador.getByLabel('Corriente observada 1',{exact:true}).fill('Y1');
     await operador.getByLabel('Cantidad observada 1',{exact:true}).fill('12');
     await operador.getByLabel('Motivo de la adenda',{exact:true}).fill('CAP: diferencia documental; conservar 10 kg declarados y recibidos.');

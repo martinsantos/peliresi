@@ -84,7 +84,7 @@ export default function AdendasManifiestoPage() {
       <h2 className="font-semibold">{rectificaId ? 'Rectificar mediante una nueva adenda' : 'Carga observada completa'}</h2>
       <p className="text-sm text-neutral-600">No se suma automáticamente a lo declarado. Compatibilidad de corrientes pendiente de verificar.</p>
       {wastes.map((row, i) => <fieldset key={i} className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-0"><legend className="sr-only">Residuo {i + 1}</legend>
-        <Input label={`Corriente observada ${i + 1}`} required pattern="Y[0-9]{1,3}" maxLength={4} placeholder="Y1" value={row.corriente} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, corriente: e.target.value.toUpperCase() } : v))} />
+        <Input label={`Corriente observada ${i + 1}`} type="text" inputMode="text" autoCapitalize="characters" autoCorrect="off" helperText="Letra Y y número: Y1, Y21…" title="Ingresá la letra Y seguida del número, por ejemplo Y21" required pattern="Y[0-9]{1,3}" maxLength={4} placeholder="Y1" value={row.corriente} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, corriente: e.target.value.toUpperCase() } : v))} />
         <Input label={`Cantidad observada ${i + 1}`} required type="number" inputMode="decimal" min="0.001" max="1000000000000" step="any" value={row.cantidad || ''} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, cantidad: Number(e.target.value) } : v))} />
         <label className="text-sm font-medium">Unidad observada {i + 1}<select className="mt-1 block h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-base" value={row.unidad} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, unidad: e.target.value } : v))}>
           {['kg', 'l', 't', 'm3'].map(unit => <option key={unit}>{unit}</option>)}
@@ -92,7 +92,7 @@ export default function AdendasManifiestoPage() {
         {wastes.length > 1 && <Button type="button" variant="ghost" onClick={() => setWastes(wastes.filter((_, n) => n !== i))}>Quitar residuo {i + 1}</Button>}
       </fieldset>)}
       <Button type="button" variant="outline" disabled={wastes.length >= 50 || busy} onClick={() => setWastes([...wastes, emptyWaste()])}>Agregar corriente</Button>
-      <Input label="Motivo de la adenda" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
+      <Input label="Motivo de la adenda" type="text" inputMode="text" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
       <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy}>Guardar y solicitar revisión</Button><Button type="button" variant="outline" disabled={busy} onClick={() => setCreating(false)}>Cerrar formulario</Button></div>
     </form></Card>}
     {currentUser?.training && <p className="text-sm text-neutral-600">Capacitación: sin anexos ni documentos oficiales.</p>}

@@ -91,3 +91,20 @@ describe('explicit coordination start',()=>{
   await inTrainingSession(()=>startManifestCoordination(req('OPERADOR'),{} as any,next));expect(next).toHaveBeenLastCalledWith(expect.objectContaining({statusCode:409}));
  });
 });
+
+describe('training agenda metadata',()=>{
+ it('returns independent approvals without inventing decisions and keeps actor filtering',async()=>{
+  const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
+  mock.tx.manifiesto.findMany=vi.fn(async()=>[{...mock.manifest,eventos:mock.events,residuos:[]}]);
+  const json=vi.fn(),next=vi.fn();await inTrainingSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
+  expect(next).not.toHaveBeenCalled();const result=json.mock.calls[0][0].data.items[0];
+  expect(result.requiereMiAprobacion).toBe(true);expect(result.inicio).toBeNull();expect(result.partes).toHaveLength(3);expect(result.partes.every((p:any)=>p.aprobada===false)).toBe(true);
+  expect(mock.tx.manifiesto.findMany.mock.calls[0][0].where.operadorId).toBe('o');
+ });
+ it('includes ongoing reception and treatment for the CAP administrator, never in the operational scope',async()=>{
+  const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
+  mock.tx.manifiesto.findMany=vi.fn(async()=>['ENTREGADO','RECIBIDO','EN_TRATAMIENTO'].map(estado=>({...mock.manifest,estado,eventos:mock.events,residuos:[{cantidadRecibida:null}]})));
+  const json=vi.fn(),next=vi.fn();await inTrainingSession(()=>getTrainingTasks(req('ADMIN'),{json} as any,next));expect(json.mock.calls[0][0].data.items).toHaveLength(3);
+  mock.tx.manifiesto.findMany.mockClear();await inOperationalSession(()=>getTrainingTasks(req('ADMIN'),{json} as any,next));expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:404}));expect(mock.tx.manifiesto.findMany).not.toHaveBeenCalled();
+ });
+});

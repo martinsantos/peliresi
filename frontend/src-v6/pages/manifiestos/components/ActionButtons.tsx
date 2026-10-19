@@ -119,7 +119,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           leftIcon={mutations.confirmarRecepcionInSitu.isPending ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
           onClick={onConfirmarRecepcionInSitu}
           disabled={isActionPending}
-          className="!bg-emerald-600 hover:!bg-emerald-700"
+          className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900"
         >
           Confirmar Recepcion In Situ
         </Button>
@@ -202,7 +202,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           leftIcon={mutations.cerrar.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
           onClick={onCerrar}
           disabled={isActionPending}
-          className="!bg-success-600 hover:!bg-success-700"
+          className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900"
         >
           Cerrar Manifiesto
         </Button>
@@ -213,7 +213,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       </Button>}
 
       {!training && estado === EstadoManifiesto.TRATADO && (
-        <Button fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="!bg-success-600 hover:!bg-success-700">
+        <Button fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900">
           Descargar Certificado
         </Button>
       )}

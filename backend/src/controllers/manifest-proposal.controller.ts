@@ -136,7 +136,7 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
   const labels:Record<string,string>={GENERADOR:'generador',TRANSPORTISTA:'transporte',OPERADOR:'operador'};
   const items=rows.flatMap(m=>{
    const marker=m.eventos.find(e=>e.tipo===MANIFEST_PROPOSAL),proposal=marker?parseProposal(marker.descripcion):null;
-   const role=proposal?proposalRole(req.user,proposal):req.user.rol;
+   const role=proposal?(proposalRole(req.user,proposal)||(req.user.rol==='ADMIN'?'ADMIN':null)):req.user.rol;
    let action='',detail='';
    if(m.estado==='PENDIENTE_APROBACION'&&proposal){
     const missing=(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).filter(r=>!m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[r]));
@@ -146,11 +146,14 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
     action=!started?'Las tres partes aprobaron: iniciar coordinación':role==='TRANSPORTISTA'?'Confirmá el retiro cuando recibas la carga':'Coordinación iniciada: preparando el retiro';
     detail=!started?'Generador, transporte u operador pueden dar inicio.':'Generador prepara la carga; operador prepara la recepción. El viaje empieza con el retiro.';
    }else if(m.estado==='EN_TRANSITO'){action=role==='TRANSPORTISTA'?'Continuá el viaje y compartí GPS':'El transporte está en viaje';detail='La entrega se confirma al llegar al destino.';}
-   else if(role==='OPERADOR'&&m.estado==='ENTREGADO'){action='Confirmá la recepción de esta carga';detail='Después registrá el peso realmente recibido.';}
-   else if(role==='OPERADOR'&&m.estado==='RECIBIDO'){action=m.residuos.some(r=>!r.cantidadRecibida)?'Registrá el pesaje recibido':'Registrá el tratamiento';detail='El pesaje y el tratamiento permiten emitir la certificación parcial.';}
-   else if(role==='OPERADOR'&&m.estado==='EN_TRATAMIENTO'){action='Emití un parcial o cerrá el tratamiento';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
+   else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='ENTREGADO'){action='Confirmá la recepción de esta carga';detail='Después registrá el peso realmente recibido.';}
+   else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='RECIBIDO'){action=m.residuos.some(r=>!r.cantidadRecibida)?'Registrá el pesaje recibido':'Registrá el tratamiento';detail='El pesaje y el tratamiento permiten emitir la certificación parcial.';}
+   else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='EN_TRATAMIENTO'){action='Emití un parcial o cerrá el tratamiento';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
    else if(m.estado==='TRATADO'&&!m.eventos.some(e=>e.tipo==='CERTIFICADO_CAP_V1'&&JSON.parse(e.descripcion).tipo==='FINAL')){action=role==='OPERADOR'?'Revisá adendas y emití la certificación final total':'Tratamiento cerrado: esperando la certificación final';detail='El operador decide cuándo firmarla y liberarla.';}
-   return action?[{id:m.id,numero:m.numero,estado:m.estado,action,detail,fechaEstimadaRetiro:m.fechaEstimadaRetiro}]:[];
+   const partes=proposal?(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
+   const inicio=m.eventos.find(e=>e.tipo==='INICIO_COORDINACION_CAP')?.createdAt||null;
+   const requiereMiAprobacion=!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
+   return action?[{id:m.id,numero:m.numero,estado:m.estado,action,detail,fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida)}]:[];
   });
   res.json({success:true,data:{items,total:items.length,limited:rows.length===100}});
  }catch(e){next(e);}
