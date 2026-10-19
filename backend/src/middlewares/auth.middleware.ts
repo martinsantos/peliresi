@@ -49,6 +49,7 @@ export const isAuthenticated = async (
     
     // Verificar el token
     const decoded = jwt.verify(token, config.JWT_SECRET as string) as jwt.JwtPayload & { id: string; restricted?: boolean; registrationDraft?: string; impersonatedBy?: unknown };
+    if (decoded.purpose !== undefined || typeof decoded.id !== 'string') throw new AppError('Este acceso no permite iniciar una sesión de usuario', 401);
 
     if (decoded.trainingDirect !== undefined) validateDirectTrainingClaim(decoded);
     if (decoded.realm !== undefined && (!isTrainingSession() || decoded.realm !== TRAINING_REALM)) {

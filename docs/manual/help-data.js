@@ -442,6 +442,34 @@
     ]
   });
 
+  window.SITREP_HELP.guides.push({
+    id: 'transporte-relevo', profile: 'transportista', audiences: ['generador', 'operador', 'administrador'],
+    title: 'Relevar el transporte por una rotura', summary: 'La transportista de origen registra el cambio; el reemplazo comparte su GPS.',
+    duration: '5 min', icon: 'local_shipping', keywords: ['rotura', 'relevo', 'traspaso', 'externo', 'eventual', 'GPS', 'custodia'],
+    safety: 'Ensayá con datos artificiales cuando aparezca Registrar traspaso. Los datos de un externo son declarados y pueden estar incompletos; registrarlos no certifica su habilitación. Los accesos de una capacitación finalizada no se reactivan desde esta guía.',
+    steps: [
+      { title: 'La transportista original registra el cambio', body: [
+        'Abrí el manifiesto En tránsito → Tramos de transporte → Registrar traspaso. La decisión corresponde a la transportista del manifiesto original.',
+        'Si continúa un móvil de la misma empresa, elegí esa empresa y el móvil/chofer registrados. También podés elegir otra transportista registrada. Para alguien sin alta, seleccioná Empresa externa eventual y completá los datos que tengas: los faltantes quedan sin declarar.',
+        'Escribí el motivo, por ejemplo rotura del camión, y tocá Confirmar traspaso. La carga y las aprobaciones originales se conservan; el tramo anterior queda en el historial.'
+      ], image:S+'desktop/transport-handoff-20261019.png',alt:'Tramos original y eventual declarados por la transportista de origen',caption:'Datos sintéticos · preview aislado · 19/10/2026.',expected: 'Queda un nuevo tramo En curso, con el motivo y la declaración de la transportista de origen.', resources: [{label:'Mis viajes',path:'/transporte/perfil'}] },
+      { title: 'El reemplazo comparte ubicación', body: [
+        'Mostrale el QR al chofer o usá Copiar enlace. El chofer lo abre, toca Compartir ubicación y permite el GPS. No necesita una cuenta de SITREP para este acceso limitado.',
+        'Si el reemplazo tiene cuenta de transportista registrada, también encuentra el seguimiento en Mis viajes → Relevos a mi cargo → Compartir GPS.',
+        'Mantené la pantalla abierta. Ubicación recibida por SITREP confirma el envío; si falta señal o permiso se muestra el problema. El enlace dura como máximo 24 horas. La transportista original puede crear uno nuevo o revocarlo.'
+      ], image:S+'mobile/transport-handoff-gps-20261019.png',alt:'Acceso limitado del reemplazo con una posición recibida por SITREP',caption:'Datos sintéticos · preview aislado · GPS emulado · 19/10/2026.',expected: 'SITREP recibe posiciones asociadas al tramo del reemplazo; el teléfono anterior deja de enviarlas para ese manifiesto.' },
+      { title: 'Las otras partes y C3 comprueban el relevo', body: [
+        'Generador y operador abren el aviso Cambio de transporte en tránsito y revisan Tramos de transporte en el mismo manifiesto.',
+        'El administrador busca ese número en Centro de Control → Viajes Activos. Aparece el transporte del nuevo tramo y el historial anterior. Antes de recibir una nueva ubicación muestra Esperando GPS del reemplazo.',
+        'Comprobá GPS recibido y el punto del reemplazo. Un externo aparece como eventual declarado. El historial conserva cada tramo; no se dibuja una continuidad GPS entre teléfonos distintos.'
+      ], image:S+'mobile/transport-handoff-c3-20261019.png',alt:'Centro de Control muestra el reemplazo actual y conserva el tramo anterior',caption:'Datos sintéticos · preview aislado · mapa y GPS emulados · 19/10/2026.',expected: 'Todos reconocen el mismo manifiesto, el transporte vigente y la ubicación efectivamente recibida.' },
+      { title: 'La transportista original confirma la entrega', body: [
+        'Cuando se entregue la carga, la transportista de origen abre el mismo manifiesto y toca Confirmar Entrega. El operador continúa con recepción, pesaje y tratamiento.',
+        'El tramo se cierra y el enlace GPS deja de funcionar. Si hay otra rotura antes de entregar, la transportista original registra otro traspaso y comparte el nuevo enlace.'
+      ], expected: 'La entrega cierra el transporte; el expediente y sus tramos quedan conservados.' }
+    ]
+  });
+
   // One shared case, four persistent sessions: no role switching during the relay.
   window.SITREP_HELP.guides.push({
     id: 'capacitacion-cuatro-telefonos', profile: 'administrador', audiences: ['generador', 'transportista', 'operador'],

@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { isAuthenticated } from './middlewares/auth.middleware';
 import authRoutes from './routes/auth.routes';
 import manifiestoRoutes from './routes/manifiesto.routes';
+import transportHandoffRoutes from './routes/transport-handoff.routes';
 import catalogoRoutes from './routes/catalogo.routes';
 import pdfRoutes from './routes/pdf.routes';
 import reporteRoutes from './routes/reporte.routes';
@@ -227,6 +228,7 @@ app.get('/api/health/ready', async (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/empresas',empresaRoutes);
 app.use('/api/manifiestos', manifiestoRoutes);
+app.use('/api/seguimiento-relevo', transportHandoffRoutes);
 app.use('/api/catalogos', catalogoRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/reportes', reporteRoutes);

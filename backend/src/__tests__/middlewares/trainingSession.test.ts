@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 vi.mock('../../config/config', () => ({ config: { JWT_SECRET: 'qa-only-training-signature' } }));
 import { trainingSession } from '../../middlewares/trainingSession';
 import { isTrainingSession, TRAINING_REALM } from '../../lib/trainingScope';
+import { TRANSPORT_GPS_PURPOSE } from '../../domain/transportHandoff';
 const sign = (claims: object) => jwt.sign(claims, 'qa-only-training-signature');
 beforeEach(() => { vi.stubEnv('TRAINING_DATABASE_URL', 'postgresql://school@localhost/test?schema=sitrep_training'); });
 afterEach(() => vi.unstubAllEnvs());
@@ -67,4 +68,10 @@ it.each(['/api/auth/refresh-token/','/api/auth/%72efresh-token'])('retains schoo
   vi.stubEnv('TRAINING_DIRECT_LOGIN_UNTIL','2099-01-01T00:00:00Z');
   const refreshToken=sign({id:'cap-20261012-admin-1',realm:TRAINING_REALM,trainingDirect:true});
   expect(run(path,undefined,{refreshToken},'POST').next.mock.results[0].value).toBe(true);
+});
+it('scopes a dedicated school GPS capability only to its narrow endpoint',()=>{
+  const token=sign({realm:TRAINING_REALM,purpose:TRANSPORT_GPS_PURPOSE,aud:TRANSPORT_GPS_PURPOSE,sub:'af1388bc-43f7-4c73-8e9c-c14c46695881'});
+  expect(run('/api/seguimiento-relevo/af1388bc-43f7-4c73-8e9c-c14c46695881',token).next.mock.results[0].value).toBe(true);
+  expect(run('/api/seguimiento-relevo/af1388bc-43f7-4c73-8e9c-c14c46695881/ubicacion',token,{},'POST').next.mock.results[0].value).toBe(true);
+  for(const path of ['/api/manifiestos','/api/auth/profile','/api/seguimiento-relevo/af1388bc-43f7-4c73-8e9c-c14c46695881/entregar'])expect(run(path,token).next).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
 });

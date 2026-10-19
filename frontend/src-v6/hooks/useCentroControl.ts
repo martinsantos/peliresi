@@ -48,6 +48,9 @@ export interface EnTransitoItem {
   canViewDetail?: boolean;
   numero: string;
   transportista: string;
+  transportistaOriginal?:string;
+  tramoActual?:{id:string;orden:number;tipo:string;inicio:string;gpsRecibido:boolean}|null;
+  tramos?:Array<{id:string;orden:number;tipo:string;empresa:string;inicio:string;fin:string|null}>;
   origen: string;
   origenLatLng: [number, number] | null;
   destino: string;

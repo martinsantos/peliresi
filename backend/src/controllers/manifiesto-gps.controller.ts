@@ -115,7 +115,9 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
         invalidateGpsCache(id);
         throw new AppError('Manifiesto no encontrado o no esta en transito', 404);
       }
-      return tx.trackingGPS.create({ data: { manifiestoId: id, latitud, longitud, velocidad, direccion } });
+      const activeLeg = await tx.tramoTransporte.findFirst({ where:{manifiestoId:id,fin:null} });
+      if (activeLeg && activeLeg.tipo !== 'ORIGINAL') throw new AppError('El GPS de este manifiesto continúa desde el enlace del transporte de reemplazo',409);
+      return tx.trackingGPS.create({ data: { manifiestoId: id, latitud, longitud, velocidad, direccion, emisor:`usuario:${req.user.id}` } });
     });
 
     res.json({ success: true, data: { tracking } });

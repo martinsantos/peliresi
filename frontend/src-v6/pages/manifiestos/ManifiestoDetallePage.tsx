@@ -1,4 +1,6 @@
 import { TrainingCertificates } from './components/TrainingCertificates';
+import { TransportLegs } from './components/TransportLegs';
+import { transportTrackSegments } from '../../utils/transportTrackSegments';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Manifiesto Detail Page
@@ -152,6 +154,7 @@ const ManifiestoDetailPage: React.FC = () => {
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
     return {
+      segments:transportTrackSegments(sorted),
       points: sorted.map((t: any) => [t.latitud, t.longitud] as [number, number]),
       start: [sorted[0].latitud, sorted[0].longitud] as [number, number],
       end: [sorted[sorted.length - 1].latitud, sorted[sorted.length - 1].longitud] as [number, number],
@@ -434,6 +437,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
 
       {currentUser?.training && <TrainingCertificates manifest={m} />}
+      {m.transportistaId&&m.estado!==EstadoManifiesto.BORRADOR&&<TransportLegs id={id!}/>}
 
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -571,7 +575,7 @@ const ManifiestoDetailPage: React.FC = () => {
 
                   {/* Ruta GPS realizada */}
                   {trackingRoute && (
-                    <Polyline positions={trackingRoute.points} color="#0D8A4F" weight={4} opacity={0.8} />
+                    <>{trackingRoute.segments.map((segment,index)=><Polyline key={index} positions={segment} color="#0D8A4F" weight={4} opacity={0.8} />)}</>
                   )}
 
                   {/* Marcadores inicio/fin GPS */}

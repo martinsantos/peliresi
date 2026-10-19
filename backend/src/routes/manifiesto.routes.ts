@@ -1,5 +1,6 @@
 import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
 import { canCreateManifestProposal } from '../domain/manifestProposal';
+import { handoffEnabled, listTransportLegs, createTransportHandoff, rotateTransportAccess, assignedTransportHandoffs, assignedTransportAccess } from '../controllers/transport-handoff.controller';
 import { getManifestProposal, approveManifestParty, getProposalAgenda, startManifestCoordination, getTrainingTasks } from '../controllers/manifest-proposal.controller';
 import { Router } from 'express';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
@@ -73,6 +74,8 @@ router.get('/verificar/:numero', verificarManifiesto);
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+router.get('/relevos-asignados',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportHandoffs);
+router.post('/relevos-asignados/:tramoId/acceso',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportAccess);
 
 router.get('/baja-intensidad', exceptionalEnabled, listExceptional);
 router.get('/baja-intensidad/participantes', exceptionalEnabled, exceptionalParticipants);
@@ -290,6 +293,9 @@ router.get('/:id/documentos-cap', listTrainingCertificates);
 router.post('/:id/documentos-cap', releaseTrainingCertificate);
 router.get('/:id/documentos-cap/:documentId/archivo', downloadTrainingCertificate);
 router.get('/:id/aprobaciones', getManifestProposal);
+router.get('/:id/tramos', handoffEnabled, listTransportLegs);
+router.post('/:id/tramos', handoffEnabled, hasRole('TRANSPORTISTA'), createTransportHandoff);
+router.post('/:id/tramos/:tramoId/acceso', handoffEnabled, hasRole('TRANSPORTISTA'), rotateTransportAccess);
 router.post('/:id/aprobar-parte', approveManifestParty);
 router.post('/:id/iniciar-coordinacion', startManifestCoordination);
 

@@ -14,6 +14,7 @@ import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-do
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+const RelevoGpsPage=React.lazy(()=>import('./pages/transporte/RelevoGpsPage'));
 
 // ========================================
 // LAYOUTS
@@ -77,11 +78,15 @@ const ViajeRedirect: React.FC = () => {
 // APP COMPONENT
 // ========================================
 function App() {
+  const location=useLocation();
+  // A per-leg GPS capability never inherits, refreshes or switches a stored user session.
+  if(location.pathname.startsWith('/relevo/'))return <ErrorBoundary><Suspense fallback={<PageLoader/>}><Routes><Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/></Routes></Suspense></ErrorBoundary>;
   return (
     <ErrorBoundary>
     <AuthProvider>
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        <Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/>
         {/* Public Routes */}
         <Route element={<AuthLayout />}>
           <Route path="/l" element={<Navigate to="/login" replace />} />

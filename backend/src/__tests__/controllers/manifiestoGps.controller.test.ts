@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ find: vi.fn(), create: vi.fn(), list: vi.fn(), emit: vi.fn(), current: vi.fn(), transaction: vi.fn() }));
+const mocks = vi.hoisted(() => ({ find: vi.fn(), create: vi.fn(), list: vi.fn(), emit: vi.fn(), current: vi.fn(), transaction: vi.fn(),leg:vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   manifiesto: { findUnique: mocks.find }, trackingGPS: { create: mocks.create, findMany: mocks.list },
   $transaction: mocks.transaction,
@@ -29,7 +29,8 @@ describe('GPS concurrency and recovery guards', () => {
     mocks.create.mockResolvedValue({ id: 'point-1', ...point });
     mocks.list.mockResolvedValue([]);
     mocks.current.mockResolvedValue([trip]);
-    mocks.transaction.mockImplementation(async callback => callback({ $queryRaw: mocks.current, trackingGPS: { create: mocks.create } }));
+    mocks.leg.mockResolvedValue(null);
+    mocks.transaction.mockImplementation(async callback => callback({ $queryRaw: mocks.current, trackingGPS: { create: mocks.create },tramoTransporte:{findFirst:mocks.leg} }));
   });
   afterEach(() => { vi.restoreAllMocks(); invalidateGpsCache(trip.id); });
 
@@ -40,7 +41,7 @@ describe('GPS concurrency and recovery guards', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mocks.find).toHaveBeenCalledTimes(1);
     expect(mocks.create).toHaveBeenCalledTimes(2);
-    expect(mocks.create).toHaveBeenLastCalledWith({ data: { manifiestoId: trip.id, ...point } });
+    expect(mocks.create).toHaveBeenLastCalledWith({ data: { manifiestoId: trip.id, ...point,emisor:'usuario:user-carrier-1' } });
   });
 
   it.each([true, false])('rejects a foreign carrier with warm cache = %s', async (warm) => {
@@ -122,5 +123,11 @@ describe('GPS concurrency and recovery guards', () => {
     await getViajeActual(request(point, 'carrier-2'), response(), next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
     expect(mocks.list).not.toHaveBeenCalled();
+  });
+  it('stops the original phone after a handoff even with a warm owner cache',async()=>{
+    await actualizarUbicacion(request(),response(),vi.fn());mocks.create.mockClear();
+    mocks.leg.mockResolvedValue({id:'replacement',tipo:'EXTERNO'});
+    const next=vi.fn();await actualizarUbicacion(request(),response(),next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409}));expect(mocks.create).not.toHaveBeenCalled();
   });
 });

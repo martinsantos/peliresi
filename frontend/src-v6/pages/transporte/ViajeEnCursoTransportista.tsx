@@ -1,4 +1,6 @@
 import { ManifestProposalApprovals } from '../manifiestos/components/ManifestProposalApprovals';
+import { TransportLegs } from '../manifiestos/components/TransportLegs';
+import { useTransportLegs } from '../../services/transport-handoff.service';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Viaje en Curso (Transportista)
@@ -124,11 +126,13 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const [incidenteTipo, setIncidenteTipo] = useState('');
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
   const [vistaMapa, setVistaMapa] = useState(true);
+  const legs=useTransportLegs(id||'');
+  const hasHandoff=legs.data?.tramos.some(leg=>!leg.fin&&leg.tipo!=='ORIGINAL')||false;
 
   // GPS tracking via custom hook
   const gps = useGPSTracking({
     manifiestoId: id,
-    estado: m.estado,
+    estado: hasHandoff?undefined:m.estado,
     viajeStatus,
   });
 
@@ -404,7 +408,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
           {m.estado === EstadoManifiesto.EN_TRANSITO && (
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${viajeStatus === 'ACTIVO' ? 'bg-success-50 text-success-700 border border-success-200' : 'bg-warning-50 text-warning-700 border border-warning-200'}`}>
               <Radio size={14} className={viajeStatus === 'ACTIVO' ? 'animate-pulse' : ''} />
-              <span className="text-xs font-semibold">{viajeStatus === 'ACTIVO' ? 'Activo' : 'Pausado'}</span>
+              <span className="text-xs font-semibold">{hasHandoff?'Relevado':viajeStatus === 'ACTIVO' ? 'Activo' : 'Pausado'}</span>
             </div>
           )}
         </div>
@@ -412,6 +416,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
       <div className="p-4 space-y-4">
         <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800 underline"><Truck size={17} aria-hidden="true" />Ver todos mis viajes</Link>
+        <TransportLegs id={id!} beforeHandoff={gps.stopAndDrain} onHandoffError={gps.resumeGps}/>
+        {hasHandoff&&<p role="status" className="rounded-xl bg-primary-50 p-3 text-sm text-primary-900">El GPS continúa desde el enlace del reemplazo. Como transportista de origen, seguís registrando la entrega del manifiesto.</p>}
         {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
         {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
@@ -437,6 +443,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
             <TripActionBar
               estado={m.estado}
               viajeStatus={viajeStatus}
+              delegated={hasHandoff}
               isPending={isActionPending}
               hasPendingSync={gps.hasPending}
               onConfirmPickup={handleConfirmarRetiro}
@@ -451,14 +458,14 @@ const ViajeEnCursoTransportista: React.FC = () => {
         {m.estado === EstadoManifiesto.EN_TRANSITO && (
           <>
             {/* GPS Status Panel */}
-            <GpsStatusPanel
+            {!hasHandoff&&<GpsStatusPanel
               status={gpsStatus}
               sendStatus={gpsSendStatus}
               position={currentPosition}
               details={gpsDetails}
               pendingCount={gps.pendingCount}
               lastSyncAt={gps.lastSyncAt}
-            />
+            />}
 
             {/* Timer */}
             <Card variant="elevated" className="bg-gradient-to-br from-primary-600 to-primary-700 text-white border-none shadow-lg">
@@ -491,6 +498,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
             <TripActionBar
               estado={m.estado}
               viajeStatus={viajeStatus}
+              delegated={hasHandoff}
               isPending={isActionPending}
               hasPendingSync={gps.hasPending}
               onConfirmPickup={handleConfirmarRetiro}
@@ -500,17 +508,17 @@ const ViajeEnCursoTransportista: React.FC = () => {
             />
 
             {/* Toggle map/events */}
-            <div className="flex bg-neutral-100 rounded-xl p-1">
+            {!hasHandoff&&<div className="flex bg-neutral-100 rounded-xl p-1">
               <button onClick={() => setVistaMapa(false)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${!vistaMapa ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600'}`}>
                 <List size={16} /> Eventos
               </button>
               <button onClick={() => setVistaMapa(true)} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${vistaMapa ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600'}`}>
                 <MapIcon size={16} /> Mapa
               </button>
-            </div>
+            </div>}
 
             {/* Map or events */}
-            {vistaMapa ? (
+            {vistaMapa&&!hasHandoff ? (
               <div className="relative z-0">
                 <Card className="overflow-hidden p-0 border-2 border-neutral-200">
                   <div className="h-64 relative isolate">

@@ -324,6 +324,7 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
         }
       });
 
+      await tx.tramoTransporte.updateMany({where:{manifiestoId:id,fin:null},data:{fin:updated.fechaEntrega!,accesoVersion:null,accesoHasta:null}});
       await updateRollingHash(tx, id, 'ENTREGADO', updated.fechaEntrega!, updated.observaciones, evento.id);
 
       return updated;

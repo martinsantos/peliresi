@@ -9,6 +9,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { parseOperationalDateParam } from '../utils/dateRange';
 import { canAccessManifiesto } from '../utils/roleFilter';
+import { declaredTransportLabel } from '../domain/transportHandoff';
 
 /**
  * GET /api/centro-control/actividad
@@ -205,6 +206,7 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
           generadorId: true,
           transportistaId: true,
           operadorId: true,
+          tramosTransporte:{orderBy:{orden:'asc'},select:{id:true,orden:true,tipo:true,datos:true,inicio:true,fin:true}},
           transportista: {
             select: { razonSocial: true },
           },
@@ -223,31 +225,39 @@ export const getActividadCentroControl = async (req: AuthRequest, res: Response,
               velocidad: true,
               direccion: true,
               timestamp: true,
+              tramoId:true,
             },
           },
         },
       });
 
-      result.enTransito = enTransito.map(m => ({
+      result.enTransito = enTransito.map(m => {
+        const legs=m.tramosTransporte||[];
+        const active=legs.find(leg=>!leg.fin);
+        const points=active?m.tracking.filter(point=>point.tramoId===active.id):m.tracking;
+        return ({
         manifiestoId: m.id,
         numero: m.numero,
         // Global operation is not permission to open a private dossier.
         canViewDetail: !!req.user && canAccessManifiesto(req.user, m),
-        transportista: m.transportista?.razonSocial ?? null,
+        transportista: active?declaredTransportLabel(active.datos):m.transportista?.razonSocial??null,
+        transportistaOriginal:m.transportista?.razonSocial??null,
+        tramoActual:active?{id:active.id,orden:active.orden,tipo:active.tipo,inicio:active.inicio,gpsRecibido:points.length>0}:null,
+        tramos:legs.map(leg=>({id:leg.id,orden:leg.orden,tipo:leg.tipo,empresa:declaredTransportLabel(leg.datos),inicio:leg.inicio,fin:leg.fin})),
         origen: m.generador?.razonSocial ?? null,
         origenLatLng: m.generador?.latitud && m.generador?.longitud
           ? [m.generador.latitud, m.generador.longitud] : null,
         destino: m.operador?.razonSocial ?? null,
         destinoLatLng: m.operador?.latitud && m.operador?.longitud
           ? [m.operador.latitud, m.operador.longitud] : null,
-        ultimaPosicion: m.tracking[0] || null,
-        ruta: [...m.tracking].reverse().map(t => ({
+        ultimaPosicion: points[0] || null,
+        ruta: [...points].reverse().map(t => ({
           lat: t.latitud,
           lng: t.longitud,
           velocidad: t.velocidad,
           timestamp: t.timestamp,
         })),
-      }));
+      });});
     }
 
     // ── Estadísticas ──

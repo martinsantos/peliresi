@@ -19,6 +19,7 @@ import {
 import { Badge } from '../../components/ui/BadgeV2';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { TransportistaTripQueue } from '../../components/mobile/TransportistaTripQueue';
+import { AssignedHandoffs } from '../../components/mobile/AssignedHandoffs';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useAuth } from '../../contexts/AuthContext';
 import { useManifiestos } from '../../hooks/useManifiestos';
@@ -110,7 +111,8 @@ const TransportePerfilPage: React.FC = () => {
       <div className="space-y-4">
         {/* === TAB: VIAJES === */}
         {activeTab === 'viaje' && (
-          (loadingViaje || loadingAprobados)
+          <div className="space-y-4"><AssignedHandoffs/>
+          {(loadingViaje || loadingAprobados)
             ? <p role="status" className="rounded-xl bg-neutral-100 p-4 text-sm text-neutral-700">Cargando viajes…</p>
             : <TransportistaTripQueue
                 activeTrips={viajesEnCurso}
@@ -118,8 +120,8 @@ const TransportePerfilPage: React.FC = () => {
                 activeTotal={enTransitoData?.total}
                 pendingTotal={aprobadosData?.total}
                 onOpenTrip={(tripId) => navigate(mp(`/transporte/viaje/${tripId}`))}
-              />
-        )}
+              />}
+          </div>)}
 
         {/* === TAB: INFORMACIÓN === */}
         {activeTab === 'info' && (

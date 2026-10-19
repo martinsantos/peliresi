@@ -4,6 +4,7 @@ import { config } from '../config/config';
 import { inTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
 import { AppError } from './errorHandler';
 import { validateDirectTrainingClaim } from '../lib/trainingDirectLogin';
+import { TRANSPORT_GPS_PURPOSE } from '../domain/transportHandoff';
 
 // Training is opt-in and fail-closed. A missing configuration never routes a
 // signed school token into production. The JWT is verified again by auth.
@@ -24,6 +25,13 @@ export function trainingSession(req: Request, res: Response, next: NextFunction)
   }
   if (claim.realm === undefined) return next();
   if (claim.realm !== TRAINING_REALM) return next(new AppError('Ámbito de sesión inválido', 401));
+  if (claim.purpose === TRANSPORT_GPS_PURPOSE) {
+    const dedicatedPath = /^\/api\/seguimiento-relevo\/[a-f0-9-]{36}(?:\/ubicacion)?$/.test(requestPath);
+    const allowedMethod = (req.method === 'GET' && !requestPath.endsWith('/ubicacion')) || (req.method === 'POST' && requestPath.endsWith('/ubicacion'));
+    if (!process.env.TRAINING_DATABASE_URL || claim.aud !== TRANSPORT_GPS_PURPOSE || !dedicatedPath || !allowedMethod) return next(new AppError('Acceso limitado al seguimiento del relevo',403));
+    res.setHeader('X-SITREP-Training','true');res.setHeader('Cache-Control','no-store');
+    return inTrainingSession(next);
+  }
   if (!process.env.TRAINING_DATABASE_URL || (typeof claim.impersonatedBy !== 'string' && claim.trainingDirect !== true)) {
     return next(new AppError('Capacitación no habilitada. Volvé a tu cuenta administradora.', 403));
   }

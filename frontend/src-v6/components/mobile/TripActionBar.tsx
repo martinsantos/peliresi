@@ -9,6 +9,7 @@ interface TripActionBarProps {
   viajeStatus: 'ACTIVO' | 'PAUSADO';
   isPending: boolean;
   hasPendingSync: boolean;
+  delegated?: boolean;
   onConfirmPickup: () => void;
   onTogglePause: () => void;
   onReportIncident: () => void;
@@ -20,6 +21,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
   viajeStatus,
   isPending,
   hasPendingSync,
+  delegated = false,
   onConfirmPickup,
   onTogglePause,
   onReportIncident,
@@ -27,7 +29,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
 }) => {
   if (estado === EstadoManifiesto.APROBADO) {
     return (
-      <div className="sticky bottom-20 z-30 rounded-2xl border border-primary-100 bg-white/95 p-3 shadow-xl backdrop-blur">
+      <div className="rounded-2xl border border-primary-100 bg-white p-3 shadow-sm">
         <Button
           fullWidth
           size="lg"
@@ -44,12 +46,12 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
   if (estado !== EstadoManifiesto.EN_TRANSITO) return null;
 
   return (
-    <div className="sticky bottom-20 z-30 space-y-2 rounded-2xl border border-neutral-200 bg-white/95 p-3 shadow-xl backdrop-blur">
+    <div className="space-y-2 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-wide text-neutral-500">Acciones de campo</span>
+        <span className="text-xs font-bold uppercase tracking-wide text-neutral-500">{delegated?'Control del manifiesto':'Acciones de campo'}</span>
         {hasPendingSync && <Badge color="warning" variant="soft" size="sm" dot>Sync pendiente</Badge>}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      {!delegated&&<div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={onTogglePause}
@@ -68,7 +70,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
           <AlertTriangle size={18} />
           Incidente
         </button>
-      </div>
+      </div>}
       <Button
         fullWidth
         size="lg"

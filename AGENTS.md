@@ -4,6 +4,10 @@
 
 Los cuatro alias directos de la clase (admin, generador, transporte y operador) quedaron **revocados inmediatamente** al terminar la demo. Ingreso nuevo y sesiones previas: 403 para los cuatro. `TRAINING_DIRECT_LOGIN_UNTIL=2000-01-01T00:00:00Z` está aplicado al `.env`, a ambos procesos PM2 y a su estado guardado; API lista. Las 40 identidades artificiales y los manifiestos de práctica se conservan como historial, sin acceso directo de la pizarra. No reactivar estos alias sin una nueva indicación del dueño. [Evidencia y cierre](docs/ACCESO-CAPACITACION-20261019.md).
 
+## Desarrollo posterior a la demo — relevo de transporte
+
+Candidato sin publicar en esta misma rama: tramos de custodia, relevo declarado por el transporte original (externo con datos opcionales), GPS limitado por enlace/QR revocable, consulta propia del reemplazo registrado y C3 por tramo. No modifica la asignación ni aprobaciones originales; la entrega sigue a cargo de origen. Flag opt-in apagado por defecto y una migración aditiva pendiente en producción. Preview: backend 1165/1165, API 16 grupos, navegador web/app 2/2; frontend 1593/1594 con fallo de ruta de capturas corregido después y manual 8/8 + 14/14. GPS de varias cargas todavía en desarrollo. Leer [alcance, límites, incidencias y evidencia](docs/REVISION-OPERACION-MANIFIESTOS-20261019.md). Producción, main, accesos CAP y canales externos sin cambios.
+
 ## Historial — aviso de acceso corregido, 19/10/2026
 
 Web/app **`75f3062`**, publicado 11:42:46 Mendoza: conserva el mensaje de error al volver al formulario después de un login fallido. Generador CAP confirmado por API y UI; los cuatro alias responden 200. Credenciales, límites y permisos sin cambios. Backend `8de58de` sin reinicio, manual `ea92004` conservado, SW v126. Unitarias dirigidas 33/33; navegador publicado 4/4 (401/429 inyectados, login real y recarga de sesión en web/app); build remoto serial y smoke 44/44. Rollback sólo frontend a `20261019-agenda-live-ea92004`. Sin datos reales, main ni workflows. Leer [incidente, pruebas y rollback](docs/ACCESO-CAPACITACION-20261019.md).

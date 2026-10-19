@@ -10,6 +10,14 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('handoff guide uses original synthetic captures and distinguishes delegated GPS from user access',()=>{
+  const proof=JSON.parse(read('transport-handoff-capture-provenance.json'));
+  assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);assert.equal(proof.gpsEmulated,true);
+  const guide=guides.find((g:any)=>g.id==='transporte-relevo');assert.ok(guide);
+  assert.equal(guide.steps.filter((s:any)=>s.image).length,3);
+  assert.match(JSON.stringify(guide),/transportista del manifiesto original/);assert.match(JSON.stringify(guide),/No necesita una cuenta/);
+  for(const item of proof.files){const bytes=readFileSync(new URL('screenshots/'+item.file,root));assert.equal(createHash('sha256').update(bytes).digest('hex'),item.sha256);assert.equal(bytes.readUInt32BE(16),item.width);assert.equal(bytes.readUInt32BE(20),item.height);}
+});
 
 test('new operational guides include relevant reusable captures, not text-only walkthroughs', () => {
   const minimums: Record<string, number> = {

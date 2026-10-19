@@ -9,6 +9,7 @@ import React, { Suspense } from 'react';
 import { PageLoader } from './components/ui/LoadingState';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+const RelevoGpsPage=React.lazy(()=>import('./pages/transporte/RelevoGpsPage'));
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { MobileLayout } from './layouts/MobileLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -78,7 +79,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const location = useLocation();
 
   // Public routes that don't need auth
-  const publicPaths = ['/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
+  const publicPaths = ['/relevo/', '/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
   // While auth state is loading, show loader (even for public routes,
@@ -113,12 +114,15 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
 };
 
 function AppMobile() {
+  const location=useLocation();
+  if(location.pathname.startsWith('/relevo/'))return <ErrorBoundary><Suspense fallback={<PageLoader/>}><Routes><Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/></Routes></Suspense></ErrorBoundary>;
   return (
     <ErrorBoundary>
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
         <AuthGate>
         <Routes>
+          <Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/>
           {/* Auth — public, sin layout */}
           <Route path="/l" element={<Navigate to="/login" replace />} />
           <Route path="/l/" element={<Navigate to="/login" replace />} />

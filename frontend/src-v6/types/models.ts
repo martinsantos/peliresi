@@ -351,6 +351,8 @@ export interface TrackingGPS {
   velocidad: number | null;
   direccion: number | null;
   precision: number | null;
+  tramoId?:string|null;
+  emisor?:string|null;
   timestamp: string;
 }
 
