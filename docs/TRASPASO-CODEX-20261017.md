@@ -1,6 +1,12 @@
 # SITREP — traspaso vigente para la capacitación del lunes 19/10/2026
 
-## Estado vigente — avisos proactivos y entrega GPS corregida
+## Estado vigente — agenda de capacitación, 19/10/2026
+
+**Backend, web, app y manual publicados sobre `8de58de`, el 19/10/2026 07:23:27 Mendoza.** Leer [agenda, pruebas y rollback](AGENDA-CAPACITACION-20261019.md). Inicio compacto con filtros y tres aprobaciones visibles; certificados con íconos/estados; adenda con teclado de texto; contraste y diálogo de entrega corregidos. Circuito aprobado conservado.
+
+Publicado: circuito 2/2, eventual 2/2, manual 3/3, agenda 3/3, smoke 44/44. 83 manifiestos CAP anteriores intactos, mismos cuatro accesos simples. Sin datos reales, main, correos ni push productivo. SW v123; actualizar web/app y activar sonido. Rollback inmediato: ambos releases `20261018-proactivo-gps-312d6f2`; sin restaurar base. Gemelo detenido y relay cerrado. Los intentos fallidos y límites de QA se documentan en el cierre.
+
+## Historial — avisos proactivos y entrega GPS corregida
 
 **Backend, web, app y manual publicados sobre `312d6f239a015b0528218bf7d9a710fff4f36d04`, el 18/10/2026 a las 22:24:44 Mendoza.** Leer [afinamiento, pruebas, límites y rollback](AFINADO-CAPACITACION-20261018.md). Único checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; main permanece `c840219`, sin integración. Commits `[skip ci]`, sin workflows.
 

@@ -1,5 +1,7 @@
 # Capacitación — avisos, coordinación y certificaciones
 
+> Estado posterior: [agenda de capacitación publicada el 19/10](AGENDA-CAPACITACION-20261019.md). Este documento conserva el cierre anterior sobre 312d6f2.
+
 **Estado final: `312d6f2` publicado el 18/10/2026 a las 22:24:44 Mendoza. Circuito publicado 2/2, eventual 2/2, manual 3/3 y smoke 44/44.** Los apartados intermedios conservan los intentos y releases anteriores.
 
 ## Pedido y alcance

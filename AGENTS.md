@@ -1,6 +1,12 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Punto de entrada vigente — capacitación afinada, 19/10/2026
+## Estado vigente — agenda de capacitación, 19/10/2026
+
+**Backend, web, app y manual publicados sobre `8de58de`, el 19/10/2026 07:23:27 Mendoza.** Leer [agenda, pruebas y rollback](docs/AGENDA-CAPACITACION-20261019.md). Inicio compacto con filtros y tres aprobaciones visibles; certificados con íconos/estados; adenda con teclado de texto; contraste y diálogo de entrega corregidos. Circuito aprobado conservado.
+
+Publicado: circuito 2/2, eventual 2/2, manual 3/3, agenda 3/3, smoke 44/44. 83 manifiestos CAP anteriores intactos, mismos cuatro accesos simples. Sin datos reales, main, correos ni push productivo. SW v123; actualizar web/app y activar sonido. Rollback inmediato: ambos releases `20261018-proactivo-gps-312d6f2`; sin restaurar base. Gemelo detenido y relay cerrado. Los intentos fallidos y límites de QA se documentan en el cierre.
+
+## Historial — capacitación afinada, 19/10/2026
 
 - **Leer primero [traspaso vigente](docs/TRASPASO-CODEX-20261017.md) y [afinamiento, evidencias y rollback](docs/AFINADO-CAPACITACION-20261018.md).** Producto publicado `312d6f2`, backend/web/app/manual en `sitrep.ultimamilla.com.ar`; aviso proactivo, inicio por una parte después de unanimidad, certificaciones simples y cierre GPS sin carrera.
 - Único checkout `sitrep-production-source-20261001` del traspaso. Rama `codex/sitrep-training-20261018`, main `c840219` intacto. Cierre posterior sólo documental. Commits `[skip ci]`; sin workflows.
