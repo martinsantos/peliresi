@@ -1,5 +1,7 @@
 # Circuito de capacitación — cuatro roles, tres decisiones y certificados
 
+> Este documento conserva la entrega histórica `930d3e6`. El estado vigente, el inicio explícito, los avisos proactivos, las certificaciones y el cierre GPS corregido están en [AFINADO-CAPACITACION-20261018.md](AFINADO-CAPACITACION-20261018.md) sobre `312d6f2`.
+
 ## Alcance de la corrección
 
 El ensayo anterior verificó un caso iniciado por el generador, pero no la creación por el operador ni el circuito completo solicitado. La pantalla y la ruta de creación conservaban la restricción generador/administrador. El dueño solicitó corregirlo y demostrarlo con cuatro accesos CAP independientes.

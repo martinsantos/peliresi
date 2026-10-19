@@ -1,5 +1,7 @@
 # Capacitación — avisos, coordinación y certificaciones
 
+**Estado final: `312d6f2` publicado el 18/10/2026 a las 22:24:44 Mendoza. Circuito publicado 2/2, eventual 2/2, manual 3/3 y smoke 44/44.** Los apartados intermedios conservan los intentos y releases anteriores.
+
 ## Pedido y alcance
 
 El dueño probó operador, generador y transporte en teléfonos reales y encontró un circuito pasivo: debía buscar avisos, no distinguía aprobar de iniciar y encontraba descargas oficiales deshabilitadas junto a certificados escolares que volvían a pedir datos ya registrados. Autorizó corregir, probar y publicar en capacitación, sin main ni datos operativos.
@@ -67,3 +69,18 @@ La primera comprobación publicada de `0e5ad03` completó ambos recorridos, pero
 El cliente podía confirmar entrega mientras quedaba un envío GPS en vuelo. La corrección detiene nuevos envíos y espera los pendientes antes del POST de entrega; ante un fallo de entrega reanuda el seguimiento. Los puntos guardados no se reenvían si el caso ya está entregado. El servidor conserva sus verificaciones de pertenencia y EN_TRANSITO, incluido el bloqueo entre workers. No se permite GPS posterior a la entrega ni se modifica la regla para hacer pasar QA.
 
 Pruebas unitarias GPS: 15/15, incluyendo espera de un envío pendiente, ausencia de envíos posteriores y reanudación. Se añadió al recorrido real una retención temporal de un request GPS (sin falsear su respuesta): mientras está pendiente la entrega no puede salir; luego se deja llegar al servidor y se exige la entrega correcta, manteniendo cero errores HTTP inesperados. SW raíz se incrementa a v122 para el paquete corregido. Resultados de repetición y release final se agregan abajo.
+
+
+## Cierre final verificado
+
+`312d6f2` repitió 51/51 controles de GPS/service worker, 16/16 del manual, builds web/app y circuito completo **2/2 en preview** con el envío GPS retenido. Paquete final: backend, web y app compilados serialmente y 2.116 blobs de Git verificados antes/después. El overlay se generó por Git sobre `0e5ad03` y se comprobó el árbol completo, no sólo archivos modificados. Sin OOM ni kill; `memory.events max=12` registrado sin exceder 2 GiB.
+
+Publicado el 18/10/2026 a las 22:24:44 Mendoza: backend y frontend en sus releases `20261018-proactivo-gps-312d6f2`; SW v122/app 20261019012304. Smoke **44/44**. Segunda comprobación publicada completa **2/2**, eventual **2/2**, manual **3/3**, cero omitidos/fallos/reintentos automáticos. Casos finales CAP-2026-000046, CAP-2026-000041; incluye espera real de envío GPS antes de entrega, sin quitar la expectativa de cero HTTP inesperados. Evidencias `.qa-proactivo-gps-20261018/`, `.qa-release-proactivo-gps-20261018/` y `.qa-proactivo-gps-published-20261018/` en preview. La pasada fallida anterior permanece en `.qa-proactivo-published-20261018/`.
+
+Auditoría de sólo lectura a las 22:34:26, con principal escolar y SELECT sobre usuarios públicos denegado: 40 usuarios CAP, **62 manifiestos anteriores sin cambios de estado ni updatedAt**, incluidos los ensayos humanos. Veinte manifiestos propios de los dos intentos publicados conservados; cuatro Tratados, ocho certificados firmados (parcial 4 kg/final 10 kg), originales/pesajes de 10 kg intactos y adenda de 12 kg revisada independientemente; dos eventuales Tratados. Workers sin reinicios posteriores; `.env` idéntico. No se consultaron datos empresariales reales.
+
+Rollback inmediato del ajuste GPS: ambos enlaces a sus releases `20261018-proactivo-0e5ad03`, recarga exclusiva backend y misma configuración/vencimiento. Ese estado conserva la carrera GPS, por lo que la recuperación debe valorar ese límite. Rollback del afinamiento completo: releases `20261018-circuito-930d3e6` conservados. No restaurar base, cuentas o contraseñas, ni borrar prácticas. Auditoría final `/var/backups/sitrep/20261018-proactivo-gps/`; auditoría de primer despliegue `/var/backups/sitrep/20261018-proactivo/`.
+
+Gemelo propio detenido y relay cerrado; imagen/evidencias conservadas. Hojas A4 privadas actualizadas: `test-results-proactivo-20261018/output/pdf/SITREP-capacitacion-cuatro-telefonos-19-10-2026.pdf` y `SITREP-practica-eventual-adenda-19-10-2026.pdf`; una página cada una, QR decodificado y diseño inspeccionado. Claves no incluidas en Git/manual. El manual público conserva diseño y contiene el mismo recorrido.
+
+Para iniciar la clase: actualizar web/app, entrar cada persona con su cuenta, verificar banda CAP, tocar «Activar sonido», crear un caso nuevo y compartir su número. Permitir ubicación al transporte, mantener pantalla/Viaje en Curso abiertos y comprobar en C3/Hoy el mismo número y cambio de posición antes de entregar. La prueba automatizada emula coordenadas; no acredita sensor físico, audio físico, Android instalado, segundo plano ni carga masiva. No se promete GO global.

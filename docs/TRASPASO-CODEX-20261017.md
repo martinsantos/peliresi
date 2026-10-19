@@ -1,6 +1,20 @@
 # SITREP — traspaso vigente para la capacitación del lunes 19/10/2026
 
-## Estado vigente — circuito completo publicado, 18/10 a las 19:49:28 Mendoza
+## Estado vigente — avisos proactivos y entrega GPS corregida
+
+**Backend, web, app y manual publicados sobre `312d6f239a015b0528218bf7d9a710fff4f36d04`, el 18/10/2026 a las 22:24:44 Mendoza.** Leer [afinamiento, pruebas, límites y rollback](AFINADO-CAPACITACION-20261018.md). Único checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; main permanece `c840219`, sin integración. Commits `[skip ci]`, sin workflows.
+
+Los cuatro accesos CAP del equipo 1 conservan sus claves simples. Abrir `/app/` o web, actualizar la versión y tocar **Activar sonido**. El aviso nuevo aparece con enlace al caso, sin cubrir botones. Cualquier rol CAP crea la propuesta; generador firma, transporte y operador aprueban. Con las tres decisiones, una parte pulsa **Iniciar coordinación**; luego transporte confirma el retiro físico y envía GPS. El cierre espera los envíos GPS pendientes antes de confirmar entrega. Operador recibe/pesa/trata, firma y publica parcial/final; los otros descargan desde el mismo manifiesto. Fechas futuras son los mismos manifiestos programados. Adendas y eventual conservan sus revisiones y límites.
+
+Comprobación publicada final: **circuito 2/2, eventual 2/2, manual 3/3 y smoke 44/44**. Incluye cuatro sesiones independientes, aviso visible, inicio idempotente, GPS hacia C3, entrega con envío en vuelo, adenda independiente y certificados firmados. Casos finales: CAP-2026-000046, CAP-2026-000041. El intento previo sobre `0e5ad03` tuvo web fallida por una carrera GPS; se conserva la evidencia y se corrigió el producto, sin excluir el error del test. GPS emulado; no certificación de sensores, Android ni segundo plano.
+
+Auditoría a las 22:34:26: **62 manifiestos CAP anteriores intactos**, incluido el cierre humano de `CAP-1-ENTREGADO`; 40 cuentas CAP activas. Veinte manifiestos propios de los dos ensayos publicados conservados, cuatro tratados, ocho certificados, dos eventuales tratados. Datos reales no consultados. `.env` SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`, UPLOADS_DIR, flags false, correos apagados y VAPID vacío conservados; sin migraciones ni seeds. Accesos hasta `2026-10-20T03:00:00Z` (fin del lunes 19, Mendoza).
+
+Releases activos `20261018-proactivo-gps-312d6f2`. SW raíz **v122**, app **20261019012304**. Hojas A4 privadas con QR/usuarios/claves: `test-results-proactivo-20261018/output/pdf/`; no incorporar claves a Git/manual. Auditoría privada `/var/backups/sitrep/20261018-proactivo-gps/`.
+
+Rollback inmediato: volver ambos enlaces a sus releases `20261018-proactivo-0e5ad03` y recargar sólo backend conservando configuración y vencimiento. Ese release incluye los avisos, pero conserva la carrera GPS corregida ahora. Para volver al producto anterior a todo este afinamiento, se conservan ambos `20261018-circuito-930d3e6`. **No restaurar base ni borrar prácticas.** Gemelo propio detenido, relay cerrado, imagen/evidencias conservadas. Límites 1 CPU/2 GiB/swap cero, un worker; sin OOM (contador `memory.events max` 12 durante el build final, sin kill).
+
+## Instantánea histórica — circuito completo publicado, 18/10 a las 19:49:28 Mendoza
 
 **Backend, web, app y manual publicados sobre `930d3e6ae7c363789d5474d4aa40b4242b860825`.** Leer primero [circuito completo, resultados y rollback vigente](CIRCUITO-CAPACITACION-20261018.md). Fuente única: `sitrep-production-source-20261001`; rama `codex/sitrep-training-20261018`. Main permanece en `c840219`, sin integración. Commits `[skip ci]`, sin workflows.
 
