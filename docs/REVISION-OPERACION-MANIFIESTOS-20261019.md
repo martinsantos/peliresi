@@ -20,6 +20,8 @@ El modelo de datos debe separar el manifiesto de sus **tramos de transporte**. U
 
 Para un externo sin cuenta se guarda identidad declarada de empresa, móvil, chofer, contacto y vínculo con el manifiesto. El GPS continuo requiere un emisor autenticado y vinculado sólo a ese tramo; declarar un número de teléfono o cargar una posición manual no equivale a seguimiento en vivo. Se debe definir y probar la incorporación limitada del emisor antes de anunciar GPS externo disponible. La falta de CUIT o padrón no se tapa con un actor comodín ni se convierte en permiso operativo automático.
 
+**Puntos de integración actuales:** `transportistaId` y `asignacionTransporte` describen el vínculo y la selección originales. `applyRoleFilter`/`canAccessManifiesto`, `/ubicacion` y `/confirmar-entrega` usan ese único transportista; el C3 recibe puntos GPS sólo por `manifiestoId`. Por eso cambiar una tarjeta en la app no resuelve el relevo: hay que introducir tramo vigente e histórico, autorización del emisor y atribución del GPS en backend, consultas, C3 y documentos, manteniendo legibles los manifiestos anteriores sin migrarlos a un transportista ficticio.
+
 ## Casos que bloquearán la publicación del relevo
 
 - Dos retiros o dos relevos concurrentes no pueden crear dos tramos activos ni perder un evento.
