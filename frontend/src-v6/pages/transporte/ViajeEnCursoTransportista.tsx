@@ -118,6 +118,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
     id && localStorage.getItem(`viaje_status_${id}`) === 'PAUSADO' ? 'PAUSADO' : 'ACTIVO'
   ));
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
+  const [isFinishingTrip, setIsFinishingTrip] = useState(false);
+  const deliveryInFlightRef = useRef(false);
   const [showIncidenteModal, setShowIncidenteModal] = useState(false);
   const [incidenteTipo, setIncidenteTipo] = useState('');
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
@@ -139,7 +141,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
 
   const [elapsedTime, setElapsedTime] = useState(0);
 
-  const isActionPending = confirmarRetiro.isPending || confirmarEntrega.isPending || registrarIncidente.isPending;
+  const isActionPending = isFinishingTrip || confirmarRetiro.isPending || confirmarEntrega.isPending || registrarIncidente.isPending;
 
   // Default center (Mendoza, Argentina)
   const defaultCenter: [number, number] = [-32.9287, -68.8535];
@@ -194,7 +196,11 @@ const ViajeEnCursoTransportista: React.FC = () => {
   // Confirmar Entrega with GPS coordinates + offline queue
   const handleConfirmarEntrega = async () => {
     if (!currentUser) return toast.error('Sesión no disponible', 'Vuelva a iniciar sesión.');
+    if (deliveryInFlightRef.current) return;
+    deliveryInFlightRef.current = true;
+    setIsFinishingTrip(true);
     try {
+      await gps.stopAndDrain();
       const result = await offlineSafeMutation(
         () => confirmarEntrega.mutateAsync({
           id: id!,
@@ -221,7 +227,11 @@ const ViajeEnCursoTransportista: React.FC = () => {
       }
       setShowFinalizarModal(false);
     } catch (err: any) {
+      gps.resumeGps();
       toast.error('Error', err?.response?.data?.message || 'No se pudo confirmar la entrega');
+    } finally {
+      deliveryInFlightRef.current = false;
+      setIsFinishingTrip(false);
     }
   };
 
@@ -597,10 +607,10 @@ const ViajeEnCursoTransportista: React.FC = () => {
                 </p>
               )}
               <div className="space-y-3">
-                <Button fullWidth onClick={handleConfirmarEntrega} disabled={confirmarEntrega.isPending}>
-                  {confirmarEntrega.isPending ? 'Confirmando...' : 'Sí, Confirmar Entrega'}
+                <Button fullWidth onClick={handleConfirmarEntrega} disabled={isActionPending}>
+                  {isActionPending ? 'Confirmando...' : 'Sí, Confirmar Entrega'}
                 </Button>
-                <Button variant="outline" fullWidth onClick={() => setShowFinalizarModal(false)} disabled={confirmarEntrega.isPending}>
+                <Button variant="outline" fullWidth onClick={() => setShowFinalizarModal(false)} disabled={isActionPending}>
                   Cancelar
                 </Button>
               </div>

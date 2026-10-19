@@ -26,11 +26,11 @@ Lectura previa con principal `sitrep_training_role`, esquema escolar, transacci�
 
 Release anterior exacto: backend y web/app `20261018-circuito-930d3e6`. `.env` SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`; vencimiento de accesos `2026-10-20T03:00:00Z`. UPLOADS_DIR y flags sin cambios. Rollback de la nueva publicación: volver ambos enlaces a ese release y recargar sólo backend conservando ese vencimiento; no restaurar base ni credenciales.
 
-## Validación en curso
+## Evidencia de los intentos previos
 
 Primera suite backend: 1.117 pruebas pasaron; el archivo de propuestas no pudo importarse por una llave faltante en la consulta nueva de pendientes. Se corrigió el código y se repite completa, conservando la evidencia del fallo. No se publicó esa versión.
 
-Los resultados finales de preview, build y dominio publicado se agregan al cierre. No equivalen a certificación de Android, sonido físico, GPS físico, segundo plano o concurrencia masiva.
+Los resultados de preview, build y dominio publicado se documentan al cierre. No equivalen a certificación de Android, sonido físico, GPS físico, segundo plano o concurrencia masiva.
 
 
 ## Resultados previos al ensayo de navegador
@@ -41,3 +41,29 @@ Backend completo repetido: 1.132/1.132 y build correcto. Frontend completo: 1.57
 ## Ajustes encontrados en el ensayo completo
 
 La primera pasada web/app encontró una interacción incorrecta del test: cerraba el desplegable de programados si ya estaba abierto. Se condicionó la apertura a su estado real, conservando la expectativa de ver el caso exacto. La repetición encontró un defecto del producto: un aviso flotante podía cubrir «Siguiente» durante otro alta. Se interrumpió la segunda superficie de esa repetición y se conservó su evidencia; el aviso ahora reserva espacio en el layout, sin bloquear controles. Se repiten controles de avisos/acciones, ambos builds y el circuito completo antes de publicar.
+
+
+## Preview y artefacto final
+
+Después de reservar espacio para los avisos: 59/59 controles frontend, 16/16 del manual, build web y app correctos. Recorrido integral 2/2 (web y app, cuatro contextos independientes), eventual 2/2 y manual 3/3 (escritorio, web móvil y app); cero omitidos, fallos o reintentos automáticos. Se revisaron capturas de avisos/retirada/certificaciones y el PDF final con C3. Evidencias: `.qa-proactivo-visible-20261018/` en el gemelo, conservando `.qa-proactivo-20261018/` y `.qa-proactivo-retry-20261018/` para los intentos anteriores.
+
+Commit de producto publicado: `0e5ad039fac1c510002f19a02c81443b30b443b5`. La preparación verificó los 2.116 blobs de Git antes y después del build remoto serial. Backend, web y app compilaron; manual estático 16/16. API final `https://sitrep.ultimamilla.com.ar/api`; VITE_DEMO_MODE y los cuatro flags frontend false. Límites 1 CPU/2 GiB/swap cero y memoria sin eventos OOM. Artefactos y hashes en `.qa-release-proactivo-20261018/`.
+
+## Publicación
+
+Activación terminada el **18/10/2026 a las 21:56:56 de Mendoza**. Backend `/var/www/sitrep-backend-releases/20261018-proactivo-0e5ad03`; web/app `/var/www/sitrep-releases/20261018-proactivo-0e5ad03`. SW raíz v121 y app 20261019005502. Manual contenido 2026.20.6, conservando CSS/JS 2026.20.4 y el diseño existente. Smoke no mutante **44/44**, con contenido estático verificado por hash y ambos workers listos. No se ejecutaron migraciones, semillas ni instalaciones en producción; cliente Prisma reutilizado sólo después de comprobar esquema y paquetes idénticos. `.env` y uploads conservados.
+
+Auditoría privada: `/var/backups/sitrep/20261018-proactivo/` (`stage.json`, `deployment.json`, hashes/paquetes y baseline CAP). La verificación de circuitos publicados se añade al cierre; no confundir el smoke con una prueba del flujo autenticado.
+
+## Rollback del producto
+
+Conservar los releases activos anteriores `20261018-circuito-930d3e6` de backend y frontend. Ante un rollback autorizado, cambiar atómicamente `/var/www/sitrep-backend` a `/var/www/sitrep-backend-releases/20261018-circuito-930d3e6`, recargar únicamente `sitrep-backend` y comprobar readiness de ambos workers; cambiar `/var/www/sitrep` a `/var/www/sitrep-releases/20261018-circuito-930d3e6`. Mantener el mismo `.env`, `UPLOADS_DIR`, flags false, DISABLE_EMAILS=true, VAPID vacío y `TRAINING_DIRECT_LOGIN_UNTIL=2026-10-20T03:00:00Z` en PM2. No restaurar la base, hashes de contraseñas ni borrar los eventos nuevos. El script de activación conserva esta recuperación automática si falla su smoke.
+
+
+## Carrera de GPS encontrada en el dominio
+
+La primera comprobación publicada de `0e5ad03` completó ambos recorridos, pero **web falló su control final** por un POST GPS 404 durante la transición de entrega; app aprobó. No se excluyó ese error de las expectativas. Ambos casos terminaron tratados (000031 y 000036) y sus documentos permanecen conservados. El operador había completado el flujo, pero la comprobación web no se declara aprobada.
+
+El cliente podía confirmar entrega mientras quedaba un envío GPS en vuelo. La corrección detiene nuevos envíos y espera los pendientes antes del POST de entrega; ante un fallo de entrega reanuda el seguimiento. Los puntos guardados no se reenvían si el caso ya está entregado. El servidor conserva sus verificaciones de pertenencia y EN_TRANSITO, incluido el bloqueo entre workers. No se permite GPS posterior a la entrega ni se modifica la regla para hacer pasar QA.
+
+Pruebas unitarias GPS: 15/15, incluyendo espera de un envío pendiente, ausencia de envíos posteriores y reanudación. Se añadió al recorrido real una retención temporal de un request GPS (sin falsear su respuesta): mientras está pendiente la entrega no puede salir; luego se deja llegar al servidor y se exige la entrega correcta, manteniendo cero errores HTTP inesperados. SW raíz se incrementa a v122 para el paquete corregido. Resultados de repetición y release final se agregan abajo.

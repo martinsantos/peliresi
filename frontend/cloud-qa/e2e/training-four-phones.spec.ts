@@ -207,8 +207,22 @@ test('four independent phones hand off one new manifest and observe actual GPS s
     await agenda.getByRole('button',{name:'Ver detalle del viaje',exact:true}).click();
     await expect(admin).toHaveURL(new RegExp(prefix(info)+'/manifiestos/'+manifest.id+'$'));
     await expect(admin.getByText(manifest.numero,{exact:true}).first()).toBeVisible();
+    // Hold one real GPS request in flight: delivery must wait, not race its state change.
+    let releaseGps!:()=>void;let gpsHeld=false,deliveryRequests=0;
+    const gpsGate=new Promise<void>(resolve=>{releaseGps=resolve;});
+    const gpsPattern='**/api/manifiestos/'+manifest.id+'/ubicacion';
+    await transportista.route(gpsPattern,async route=>{gpsHeld=true;await gpsGate;await route.fallback();});
+    await expect.poll(()=>gpsHeld,{timeout:45000}).toBe(true);
+    transportista.on('request',r=>{if(r.method()==='POST'&&r.url().endsWith('/'+manifest.id+'/confirmar-entrega'))deliveryRequests++;});
     await transportista.getByRole('button',{name:'Confirmar entrega',exact:true}).click();
-    await post(transportista,'/'+manifest.id+'/confirmar-entrega',()=>transportista.getByRole('button',{name:'Sí, Confirmar Entrega',exact:true}).click());
+    const delivered=post(transportista,'/'+manifest.id+'/confirmar-entrega',()=>transportista.getByRole('button',{name:'Sí, Confirmar Entrega',exact:true}).click());
+    try{
+      await expect(transportista.getByRole('button',{name:'Confirmando...',exact:true})).toBeDisabled();
+      await new Promise(resolve=>setTimeout(resolve,500));
+      expect(deliveryRequests).toBe(0);
+    }finally{releaseGps();}
+    await delivered;await transportista.unroute(gpsPattern);
+    evidence.steps.push('delivery waits for an in-flight GPS write; no GPS writes after delivery');
     await openManifest(operador,info,manifest.numero);
     await post(operador,'/'+manifest.id+'/confirmar-recepcion',()=>operador.getByRole('button',{name:'Confirmar Recepcion',exact:true}).click());
     await operador.getByRole('button',{name:'Registrar Pesaje',exact:true}).click();

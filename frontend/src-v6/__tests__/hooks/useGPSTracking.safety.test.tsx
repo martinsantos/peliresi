@@ -89,6 +89,39 @@ describe('GPS position provenance and cleanup', () => {
     unmount();
   });
 
+  it('drains an in-flight GPS write before delivery and can resume after a failed delivery', async () => {
+    let finish!: () => void;
+    vi.mocked(manifiestoService.actualizarUbicacion).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position()));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(1);
+    let drained = false;
+    let stopping!: Promise<void>;
+    act(() => { stopping = result.current.stopAndDrain().then(() => { drained = true; }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(drained).toBe(false);
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(); await stopping; });
+    expect(drained).toBe(true);
+    act(() => result.current.resumeGps());
+    act(() => watchSuccess.at(-1)!(position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenLastCalledWith(trip.manifiestoId, -34, -70, null, null);
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('does not replay saved points when a trip is already delivered', async () => {
+    const point = { lat: -32, lng: -68, speed: null, heading: null };
+    localStorage.setItem(`gps_pending_${trip.manifiestoId}`, JSON.stringify([point]));
+    const { unmount } = renderHook(() => useGPSTracking({ ...trip, estado: 'ENTREGADO' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem(`gps_pending_${trip.manifiestoId}`)!)).toEqual([point]);
+    unmount();
+  });
+
   it('keeps the newest 500 visual points while preserving existing unsent GPS data', async () => {
     const pending = { lat: -32, lng: -68, speed: null, heading: null };
     const key = `gps_pending_${trip.manifiestoId}`;

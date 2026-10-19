@@ -50,6 +50,8 @@ interface UseGPSTrackingReturn {
   hasPending: boolean;
   lastSyncAt: Date | null;
   cleanupGps: () => void;
+  stopAndDrain: () => Promise<void>;
+  resumeGps: () => void;
 }
 
 export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrackingOptions): UseGPSTrackingReturn {
@@ -79,6 +81,15 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   useEffect(() => { gpsDetailsRef.current = gpsDetails; }, [gpsDetails]);
 
   const id = manifiestoId;
+  const uploadsStoppedRef = useRef(false);
+  const uploadsRef = useRef(new Set<Promise<unknown>>());
+  const [restart, setRestart] = useState(0);
+  const sendPoint = useCallback((tripId: string, p: PendingGpsPoint) => {
+    const request = manifiestoService.actualizarUbicacion(tripId, p.lat, p.lng, p.speed, p.heading);
+    uploadsRef.current.add(request);
+    void request.then(() => uploadsRef.current.delete(request), () => uploadsRef.current.delete(request));
+    return request;
+  }, []);
 
   const setPendingUpdates = useCallback((points: PendingGpsPoint[]) => {
     pendingUpdatesRef.current = points;
@@ -96,6 +107,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   const cleanupGps = useCallback(() => {
     // getCurrentPosition cannot be cancelled; invalidate its pending callbacks.
     trackingGenerationRef.current++;
+    uploadsStoppedRef.current = true;
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -113,6 +125,13 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
     }
   }, [id]);
+
+  // Finish in-flight HTTP writes before changing the server trip state.
+  const stopAndDrain = useCallback(async () => {
+    cleanupGps();
+    await Promise.allSettled([...uploadsRef.current]);
+  }, [cleanupGps]);
+  const resumeGps = useCallback(() => setRestart(value => value + 1), []);
 
   // Check GPS permission on mount
   useEffect(() => {
@@ -137,7 +156,8 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
 
   // Restore pending GPS updates from localStorage on mount and flush in order
   useEffect(() => {
-    if (!id) return;
+    if (!id || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
+    uploadsStoppedRef.current = false;
     let isMounted = true;
     const savedPending = localStorage.getItem(`gps_pending_${id}`);
     if (savedPending) {
@@ -148,8 +168,9 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
           (async () => {
             let flushed = 0;
             for (const p of parsed) {
+              if (!isMounted || uploadsStoppedRef.current) break;
               try {
-                await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
+                await sendPoint(id, p);
                 flushed++;
                 if (isMounted) setLastSyncAt(new Date());
               } catch {
@@ -179,7 +200,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     return () => {
       isMounted = false;
     };
-  }, [id, setPendingUpdates]);
+  }, [id, estado, viajeStatus, restart, setPendingUpdates, sendPoint]);
 
   // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
@@ -189,6 +210,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       return;
     }
 
+    uploadsStoppedRef.current = false;
     const generation = ++trackingGenerationRef.current;
     const isActive = () => trackingGenerationRef.current === generation;
     let fallbackPositionInFlight = false;
@@ -285,8 +307,9 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
           const pendingSnapshot = pendingUpdatesRef.current;
           let flushed = 0;
           for (const p of pendingSnapshot) {
+            if (!isActive()) return;
             try {
-              await manifiestoService.actualizarUbicacion(id, p.lat, p.lng, p.speed, p.heading);
+              await sendPoint(id, p);
               flushed++;
               setLastSyncAt(new Date());
             } catch {
@@ -299,7 +322,9 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
         }
 
         // Now send current position
-        await manifiestoService.actualizarUbicacion(id, point.lat, point.lng, point.speed, point.heading);
+        if (!isActive()) return;
+        await sendPoint(id, point);
+        if (!isActive()) return;
         setPendingUpdates([]);
         setLastSyncAt(new Date());
         setGpsSendStatus('ok');
@@ -321,7 +346,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [estado, viajeStatus, id, cleanupGps, setPendingUpdates]);
+  }, [estado, viajeStatus, id, restart, cleanupGps, setPendingUpdates, sendPoint]);
 
   return {
     position: currentPosition,
@@ -333,6 +358,8 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     hasPending: pendingCount > 0,
     lastSyncAt,
     cleanupGps,
+    stopAndDrain,
+    resumeGps,
   };
 }
 
