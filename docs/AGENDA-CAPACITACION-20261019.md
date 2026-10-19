@@ -1,6 +1,25 @@
 # Capacitación — agenda compacta y estados visuales, 19/10/2026
 
-## Estado vigente — íconos compactos simplificados, 19/10/2026
+## Estado vigente — agenda actualizada al crear, 19/10/2026
+
+Web, `/app` y manual publicados sobre **`ea92004b0f82897516be324cb5f32db09039ca3e`**, el **19/10/2026 09:29:02 Mendoza**. Backend `8de58de` conservado, mismos dos workers sin reinicio. SW raíz **v125**, manual **2026.20.9**; mismos accesos CAP y vencimiento.
+
+- La agenda conserva el orden de creación descendente de la API: el recién creado aparece primero en Todos, Hoy y los filtros de estado. Sólo **Próximos** ordena cronológicamente por fecha prevista.
+- Crear invalida inmediatamente la consulta de tareas y de programados. Otra sesión abierta recibe la propuesta por la actualización periódica existente (5 segundos), sin recargar.
+- **Te toca aprobar** cuando falta la decisión propia; **En espera** después de aprobar, mientras faltan otras partes. No hay aprobación automática ni cambios de permisos/reglas. Los tres íconos mantienen verde/gris, sin tildes adicionales.
+- Las filas nuevas entran con animación breve; los nodos existentes permanecen al actualizar. La animación se desactiva con movimiento reducido.
+
+La causa era el reordenamiento local por fecha/número ascendente, que dejaba las propuestas nuevas detrás de las seis filas visibles, junto con la falta de invalidación de las consultas al crear.
+
+Validación remota dirigida: **22/22 unitarias**, **16/16 manual**, **8/8 E2E** (cuatro roles × web móvil/app), dos sesiones independientes por caso. Incluye creación desde UI, aprobación explícita del creador, primer lugar en la agenda, espera, llegada a la contraparte sin recarga, filtro y movimiento reducido. Build web/app serial, 1 CPU/2 GiB/swap cero, un worker. Fuente comprobada contra los **2.124 blobs de Git** antes/después de compilar. No se repitieron las suites completas ni se certifica Android físico.
+
+El primer intento E2E conservado dio 4/8: el test esperaba espera antes de la aprobación propia del operador/transporte. Se corrigió el test para aprobar explícitamente, conservando el producto y las expectativas de unanimidad; repetición final 8/8. El runner final de preview tenía una etiqueta GITHUB_SHA provisional equivocada: `preview-source-proof.json` acredita de forma independiente los 2.124 archivos exactos de `ea92004`; no se usa aquella etiqueta como evidencia de procedencia. Build final y release sí llevan el SHA correcto.
+
+Publicación frontend/manual únicamente: **3/3 agenda publicada de sólo lectura** (escritorio, web móvil y app), **44/44 smoke HTTP**, 245 archivos web y 189 app verificados, cuatro archivos del manual verificados. `.env` SHA-256 `f8f1989ef1dc3fa8b3865783f49d8583cd7ba7a48533c546d2d74b74cd0255a7`, UPLOADS_DIR, flags apagados, correos y VAPID conservados. No se crearon casos en producción para este ajuste, no se consultaron datos reales y no se modificó main.
+
+**Rollback inmediato:** reemplazar atómicamente sólo el enlace `/var/www/sitrep` para volver a `/var/www/sitrep-releases/20261019-icons-88b1a0e` (manual `71780c6`). Backend permanece en `/var/www/sitrep-backend-releases/20261019-agenda-8de58de`; no recargarlo ni restaurar la base. Release actual `/var/www/sitrep-releases/20261019-agenda-live-ea92004`. Auditoría privada `/var/backups/sitrep/20261019-agenda-live/`; evidencias locales ignoradas `test-results-agenda-live-20261019/`. Gemelo propio detenido y relay cerrado a las 09:30:22 Mendoza; límites 1 CPU/2 GiB/swap cero verificados, sin eventos OOM ni presión max. Se conservan casos/evidencias de preview e imagen.
+
+## Historial — íconos compactos simplificados, 19/10/2026
 
 Web y `/app`: **`88b1a0e`**, sin círculo de tilde/reloj junto a los íconos compactos. Verde aprobado, gris pendiente; etiquetas accesibles conservadas. Detalle de aprobaciones sin cambios. Manual **`71780c6`**, recurso `2026.20.8`, explica los mismos colores. Backend permanece **`8de58de`**, sin reinicio ni cambio de `.env`, flags o datos.
 
