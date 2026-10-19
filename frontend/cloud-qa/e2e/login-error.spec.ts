@@ -18,9 +18,9 @@ for (const [status, message] of [
     await page.screenshot({ path: info.outputPath('error-visible.png') });
     await page.unroute('**/api/auth/login');
     await directTrainingLogin(page, info, 'generador', { manifests: new Set(), eventuals: new Set() });
-    await expect(page.getByRole('heading', { name: 'Mis trámites', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: info.project.name === 'app' ? 'Mis trámites' : 'Mis Manifiestos Recientes', exact: true })).toBeVisible();
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Mis trámites', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: info.project.name === 'app' ? 'Mis trámites' : 'Mis Manifiestos Recientes', exact: true })).toBeVisible();
     await expect(page.getByText('Capacitación · sin validez oficial', { exact: false }).first()).toBeVisible();
     await page.screenshot({ path: info.outputPath('generador-sesion-persistente.png') });
   });
