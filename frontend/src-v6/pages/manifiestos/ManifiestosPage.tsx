@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown,
-  ShieldCheck, Download, FileDown, Printer, Calendar, RefreshCw,
+  ShieldCheck, Download, FileDown, Printer, Calendar, RefreshCw, Clock3, Route, CircleCheck,
 } from 'lucide-react';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
@@ -120,6 +120,10 @@ const ManifiestosPage: React.FC = () => {
   // Filters
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [estadoFilter, setEstadoFilter] = useState(searchParams.get('estado') || '');
+  const [faseFilter, setFaseFilter] = useState<'all' | 'pendientes' | 'en_curso' | 'terminados'>(() => {
+    const raw = searchParams.get('fase');
+    return raw === 'pendientes' || raw === 'en_curso' || raw === 'terminados' ? raw : 'all';
+  });
   const [fechaDesde, setFechaDesde] = useState(searchParams.get('fechaDesde') || '');
   const [fechaHasta, setFechaHasta] = useState(searchParams.get('fechaHasta') || '');
   const [generadorFilter, setGeneradorFilter] = useState('');
@@ -170,12 +174,12 @@ const ManifiestosPage: React.FC = () => {
     }
   };
 
-  const filterCount = [fechaDesde, fechaHasta, estadoFilter, generadorFilter, operadorFilter].filter(Boolean).length;
+  const filterCount = [fechaDesde, fechaHasta, estadoFilter, generadorFilter, operadorFilter, faseFilter !== 'all' ? faseFilter : ''].filter(Boolean).length;
   const estadoOptions = [{ value: '', label: 'Todos los estados' }, ...Object.values(EstadoManifiesto).map((e) => ({ value: e, label: ESTADO_LABELS[e] || e }))];
   const showEventuales = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED, currentUser) && ['OPERADOR', 'ADMIN', 'GENERADOR', 'TRANSPORTISTA'].includes(currentUser?.rol || '');
 
   // Reset accumulator when any filter/sort changes
-  const filterKey = `${searchTerm}|${estadoFilter}|${generadorFilter}|${operadorFilter}|${fechaDesde}|${fechaHasta}|${sortBy}|${sortOrder}`;
+  const filterKey = `${searchTerm}|${estadoFilter}|${faseFilter}|${generadorFilter}|${operadorFilter}|${fechaDesde}|${fechaHasta}|${sortBy}|${sortOrder}`;
   useEffect(() => {
     setPage(1);
     setAllRows([]);
@@ -189,6 +193,7 @@ const ManifiestosPage: React.FC = () => {
   const { data: apiData, isLoading, isFetching, isError, refetch } = useManifiestos({
     search: searchTerm || undefined,
     estado: (estadoFilter || undefined) as EstadoManifiesto | undefined,
+    fase: !estadoFilter && faseFilter !== 'all' ? faseFilter : undefined,
     generadorId: generadorFilter || undefined,
     operadorId: operadorFilter || undefined,
     fechaDesde: fechaDesde || undefined,
@@ -327,7 +332,7 @@ const ManifiestosPage: React.FC = () => {
               <Input aria-label="Buscar manifiestos" placeholder="Buscar por número o generador..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} leftIcon={<Search size={18} />} />
             </div>
             <div className="hidden md:block md:w-48">
-              <Select value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={estadoOptions} placeholder="Filtrar estado..." size="sm" clearable />
+              <Select value={estadoFilter} onChange={(val) => { setEstadoFilter(val); if (val) setFaseFilter('all'); }} options={estadoOptions} placeholder="Filtrar estado..." size="sm" clearable />
             </div>
             <button type="button" aria-label={filterCount > 0 ? `Filtros, ${filterCount} activos` : 'Filtros'} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || filterCount > 0 ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-neutral-50 text-neutral-600 border-neutral-300 hover:border-neutral-400'}`}>
               <Filter size={15} />
@@ -336,6 +341,18 @@ const ManifiestosPage: React.FC = () => {
               <ChevronDown size={14} className={`hidden sm:block transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </button>
           </div>
+          <nav aria-label="Etapa de los manifiestos" className="mt-3 grid grid-cols-4 gap-1.5">
+            {([
+              ['all', 'Todos', FileText],
+              ['pendientes', 'Por iniciar', Clock3],
+              ['en_curso', 'En curso', Route],
+              ['terminados', 'Terminados', CircleCheck],
+            ] as const).map(([value, label, Icon]) => <button key={value} type="button" aria-pressed={faseFilter === value && !estadoFilter}
+              onClick={() => { setFaseFilter(value); setEstadoFilter(''); }}
+              className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] font-semibold sm:flex-row sm:gap-2 sm:text-sm ${faseFilter === value && !estadoFilter ? 'bg-primary-800 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-primary-50'}`}>
+              <Icon size={16} aria-hidden="true" /><span>{label}</span>
+            </button>)}
+          </nav>
           {!showFilters && activeFilters.length > 0 && (
             <ul aria-label="Filtros activos" className="mt-2 flex flex-wrap gap-2">
               {activeFilters.map(filter => (
@@ -350,7 +367,7 @@ const ManifiestosPage: React.FC = () => {
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
               <div className="md:hidden">
-                <Select label="Estado" value={estadoFilter} onChange={(val) => setEstadoFilter(val)} options={estadoOptions} placeholder="Todos los estados" size="sm" clearable />
+                <Select label="Estado" value={estadoFilter} onChange={(val) => { setEstadoFilter(val); if (val) setFaseFilter('all'); }} options={estadoOptions} placeholder="Todos los estados" size="sm" clearable />
               </div>
               <div className="flex flex-col gap-1 w-full sm:w-auto">
                 <label className="text-xs font-medium text-neutral-500">Ordenar por</label>
@@ -414,7 +431,7 @@ const ManifiestosPage: React.FC = () => {
                 </div>
               </div>
               {filterCount > 0 && (
-                <button type="button" onClick={() => { setEstadoFilter(''); setFechaDesde(''); setFechaHasta(''); setGeneradorFilter(''); setOperadorFilter(''); }} className="flex min-h-11 items-center gap-1 text-sm text-neutral-600 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
+                <button type="button" onClick={() => { setEstadoFilter(''); setFaseFilter('all'); setFechaDesde(''); setFechaHasta(''); setGeneradorFilter(''); setOperadorFilter(''); }} className="flex min-h-11 items-center gap-1 text-sm text-neutral-600 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
               )}
             </div>
           )}

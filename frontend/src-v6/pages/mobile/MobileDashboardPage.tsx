@@ -40,12 +40,12 @@ export const MobileDashboardPage: React.FC = () => {
   const isInspector = Boolean(currentUser?.esInspector);
 
   // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
-  const { data: tripsEnTransito } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, limit: 5 } : undefined,
+  const { data: tripsEnTransito, isLoading: activeTripsLoading, isError: activeTripsError } = useManifiestos(
+    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, limit: 50 } : undefined,
     { enabled: isTransportista },
   );
   const { data: tripsAprobados } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 5 } : undefined,
+    isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 50 } : undefined,
     { enabled: isTransportista },
   );
   const { data: entregadosOperador } = useManifiestos(
@@ -79,18 +79,19 @@ export const MobileDashboardPage: React.FC = () => {
     } catch { return null; }
   }, [savedTripId]);
 
+  const usingSavedTrip = activeTrips.length === 0 && (activeTripsLoading || activeTripsError) && Boolean(savedTripSnapshot && savedTripId && savedTripSnapshot.estado === EstadoManifiesto.EN_TRANSITO);
   const activeQueueTrips = useMemo(() => (
     activeTrips.length > 0
       ? activeTrips
-      : savedTripSnapshot && savedTripId
+      : usingSavedTrip && savedTripSnapshot && savedTripId
         ? [{
             id: savedTripId,
             numero: savedTripSnapshot.numero,
-            operador: { razonSocial: savedTripSnapshot.operador },
-            generador: { razonSocial: savedTripSnapshot.generador },
+            operador: savedTripSnapshot.operador,
+            generador: savedTripSnapshot.generador,
           }]
         : []
-  ), [activeTrips, savedTripId, savedTripSnapshot]);
+  ), [activeTrips, usingSavedTrip, savedTripId, savedTripSnapshot]);
 
   const isStandalone = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -141,7 +142,7 @@ export const MobileDashboardPage: React.FC = () => {
       <header>
         <p className="text-sm text-neutral-600">Hola, {currentUser?.nombre || 'Usuario'}</p>
         <h2 className="text-xl font-bold text-neutral-900">
-          {isInspector ? 'Trabajo de inspección' : isTransportista ? 'Mi viaje' : isOperador ? 'Cargas por resolver' : currentUser?.rol === 'GENERADOR' ? 'Mis trámites' : 'Trabajo pendiente'}
+          {isInspector ? 'Trabajo de inspección' : isTransportista ? 'Mis viajes' : isOperador ? 'Cargas por resolver' : currentUser?.rol === 'GENERADOR' ? 'Mis trámites' : 'Trabajo pendiente'}
         </h2>
       </header>
 
@@ -149,11 +150,13 @@ export const MobileDashboardPage: React.FC = () => {
 
       {currentUser?.training && <TrainingTaskQueue/>}
       {isTransportista && !currentUser?.training && (
-        <TransportistaTripQueue
+        <>{usingSavedTrip && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">Se muestra sólo el último viaje guardado en este teléfono. Conectate para ver todos los viajes actuales.</p>}<TransportistaTripQueue
           activeTrips={activeQueueTrips}
           pendingTrips={pendingTrips}
+          activeTotal={tripsEnTransito?.total}
+          pendingTotal={tripsAprobados?.total}
           onOpenTrip={(tripId) => navigate(mp(`/transporte/viaje/${tripId}`))}
-        />
+        /></>
       )}
 
       {isOperador && !currentUser?.training && (

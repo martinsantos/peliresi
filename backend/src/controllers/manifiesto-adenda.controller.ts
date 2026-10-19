@@ -13,6 +13,7 @@ import { addendumCreateSchema, addendumReviewSchema, addendumStageAllowed, canRe
 import { addendumDocument, documentaryStatus, DocumentaryCounts } from '../domain/manifiestoAdendaDocument';
 import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
+import { notifyAddendumParties } from '../services/manifiestoAddendumNotice.service';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
   if (!manifestFeatureEnabled('MANIFEST_ADDENDA_ENABLED')) return next(new AppError('Adendas no habilitadas', 404));
@@ -100,7 +101,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
     const record = await prisma.$transaction(async tx => {
       await lockTrainingDocuments(tx,manifest.id);
       await assertNoFinalTrainingCertificate(tx,manifest.id);
-      return tx.adendaManifiesto.upsert({ where: { id: command.id }, update: {}, create: {
+      const created = await tx.adendaManifiesto.upsert({ where: { id: command.id }, update: {}, create: {
       id: command.id, manifiestoId: manifest.id, creadoPorId: req.user.id,
       impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud: hash,
       motivo: command.motivo, rectificaId: command.rectificaId || null, residuos: command.residuos,
@@ -111,7 +112,10 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
         residuos: manifest.residuos.map(r => ({ id: r.id, tipoResiduoId: r.tipoResiduoId,
           corriente: r.tipoResiduo.codigo, cantidad: r.cantidad, unidad: r.unidad, descripcion: r.descripcion })) },
       revisiones: [],
-    } });
+      } });
+      verifyReplay(created);
+      await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id);
+      return created;
     }).catch(async (error: unknown) => {
       // Prisma can race its client-side upsert on simultaneous first requests.
       // Only recover a primary-key conflict, then verify the original request below.
@@ -124,7 +128,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
 }
 export async function reviewAddendum(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await accessibleManifest(req);
+    const manifest = await accessibleManifest(req);
     const parsed = addendumReviewSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const command = parsed.data;
@@ -151,6 +155,7 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
         await noticeNewCurrents(tx, (current.declaracion as { residuos?: unknown }).residuos, current.residuos,
           '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id);
       }
+      await notifyAddendumParties(tx, manifest, current.id, command.version + 1, command.decision, req.user.id);
       return tx.adendaManifiesto.findUniqueOrThrow({ where: { id: current.id } });
     });
     res.json({ success: true, data: { adenda: present(record, req) } });

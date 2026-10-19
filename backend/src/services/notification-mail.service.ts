@@ -101,6 +101,9 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones' : '/notificaciones';
   } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto'; path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
+  } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto')) {
+    family = 'manifiestos'; title = 'Novedad en un manifiesto';
+    path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId) + (data.tipo === 'adenda_manifiesto' ? '/adendas' : '');
   } else if (ALERT_TYPES.includes(notice.tipo) || (notice.tipo === 'INFO_GENERAL' && (data.familia === 'catalogo_verificable' || (data.tipo === 'seguimiento_cierre' && notice.manifiestoId)) && typeof data.casoId === 'string')) {
     family = 'alertas'; title = 'Aviso de seguimiento'; path = '/notificaciones';
   } else if (notice.tipo.startsWith('SOLICITUD_') && typeof data.solicitudId === 'string' && data.solicitudId) {
@@ -154,7 +157,23 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     CLASIFICAR: ['Clasificación del ticket actualizada', 'Se actualizó la clasificación del ticket. Revisá su seguimiento.'],
   };
   const event = typeof data.evento === 'string' ? data.evento : '';
-  const message = family === 'soporte' && Object.prototype.hasOwnProperty.call(supportEvents, event) ? supportEvents[event]
+  const proposalEvents: Record<string, [string, string]> = {
+    creada: ['Manifiesto pendiente de aprobación', 'Te vincularon a un manifiesto. Abrilo para revisar si te corresponde aprobarlo.'],
+    aprobada: ['Manifiesto aprobado por las tres partes', 'La coordinación puede comenzar. Revisá el manifiesto para ver el siguiente paso.'],
+    iniciada: ['Coordinación del manifiesto iniciada', 'Las partes ya pueden preparar el retiro. El viaje comienza al confirmar el retiro físico.'],
+    rechazada: ['Propuesta de manifiesto rechazada', 'Una parte rechazó la propuesta. Consultá el motivo y el historial.'],
+  };
+  const addendumEvents: Record<string, [string, string]> = {
+    CREADA: ['Nueva adenda para revisar', 'Se registró una diferencia en el manifiesto. Revisá el anexo y las acciones de tu perfil.'],
+    APROBADA: ['Adenda aprobada', 'La resolución quedó registrada en el manifiesto.'],
+    OBSERVADA: ['Adenda observada', 'Hay una observación sobre la adenda. Abrí el manifiesto para consultarla.'],
+    RECHAZADA: ['Adenda rechazada', 'La resolución y el anexo original siguen disponibles en el manifiesto.'],
+  };
+  const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
+  const message = data.tipo === 'propuesta_partes' && Object.prototype.hasOwnProperty.call(proposalEvents, proposalPhase) ? proposalEvents[proposalPhase]
+    : data.tipo === 'propuesta_partes' && proposalPhase.startsWith('aprobacion-') ? ['Una parte aprobó el manifiesto', 'Revisá qué aprobaciones faltan para iniciar la coordinación.']
+    : data.tipo === 'adenda_manifiesto' && Object.prototype.hasOwnProperty.call(addendumEvents, event) ? addendumEvents[event]
+    : family === 'soporte' && Object.prototype.hasOwnProperty.call(supportEvents, event) ? supportEvents[event]
     : family === 'inspecciones' && event === 'ASIGNADA' ? ['Tenés una inspección asignada', 'Revisá la ubicación, la agenda y los controles antes de iniciar la visita.']
     : labels[notice.tipo] || fallback;
   title = message[0];
@@ -173,7 +192,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;

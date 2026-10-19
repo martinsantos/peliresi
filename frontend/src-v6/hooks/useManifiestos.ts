@@ -28,6 +28,15 @@ function applyClientFilters(items: Manifiesto[], filters?: ManifiestoFilters): M
   let result = items;
   if (filters.estado) {
     result = result.filter(m => m.estado === filters.estado);
+  } else if (filters.fase) {
+    const groups = {
+      pendientes: ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO'],
+      en_curso: ['EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'],
+      terminados: ['TRATADO', 'RECHAZADO', 'CANCELADO'],
+      post_entrega: ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'RECHAZADO', 'CANCELADO'],
+    };
+    result = result.filter(m => groups[filters.fase!].includes(m.estado));
+    if (filters.fase === 'post_entrega') result = result.filter(m => Boolean(m.fechaEntrega));
   }
   if (filters.search) {
     const q = filters.search.toLowerCase();

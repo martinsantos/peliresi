@@ -248,7 +248,7 @@ export const MobileLayout: React.FC = () => {
       items.push({ to: mp('/transporte/perfil'), icon: <Truck size={20} />, label: 'Mis Viajes', section: 'main' });
       items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Todos los Manifiestos', section: 'main' });
       if (activeTripId) {
-        items.push({ to: mp(`/transporte/viaje/${activeTripId}`), icon: <Navigation size={20} />, label: 'Viaje en Curso', section: 'main' });
+        items.push({ to: mp(`/transporte/viaje/${activeTripId}`), icon: <Navigation size={20} />, label: 'Último viaje abierto', section: 'main' });
       }
     } else {
       items.push({ to: mp('/manifiestos'), icon: <FileText size={20} />, label: 'Manifiestos', section: 'main' });
@@ -360,7 +360,7 @@ export const MobileLayout: React.FC = () => {
   const showFab = /^\/(?:app\/)?manifiestos\/?$/.test(location.pathname) && (isAdmin || isGenerador);
   const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
   const floatingSupport = !inlineSupport;
-  const supportAboveTrip = showFab || Boolean(isTransportista && activeTripId && !isFieldTripRoute);
+  const supportAboveTrip = showFab;
 
   return (
     <div ref={inspectionShell} data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
@@ -444,21 +444,6 @@ export const MobileLayout: React.FC = () => {
           aria-label="Nuevo manifiesto"
         >
           <Plus size={28} />
-        </button>
-      )}
-
-      {/* Active Trip Banner — floats above bottom nav for TRANSPORTISTA */}
-      {isTransportista && activeTripId && !location.pathname.includes('/transporte/viaje/') && (
-        <button
-          onClick={() => navigate(mp(`/transporte/viaje/${activeTripId}`))}
-          className="fixed left-3 right-3 bottom-[76px] z-40 flex min-h-[56px] items-center gap-3 rounded-2xl bg-emerald-700 px-4 py-3 text-white shadow-xl active:scale-[0.99]"
-          aria-label="Volver al viaje en curso"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
-            <Navigation size={20} />
-          </div>
-          <span className="flex-1 text-left text-sm font-black">Viaje en curso</span>
-          <ChevronRight size={18} className="shrink-0 opacity-80" />
         </button>
       )}
 

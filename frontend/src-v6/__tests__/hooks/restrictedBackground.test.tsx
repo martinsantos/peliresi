@@ -64,4 +64,13 @@ describe('restricted applicants do not start full-access background services', (
     expect(mocks.notices).toHaveBeenCalledWith({ limit: 20, leida: false });
     hook.unmount(); poller.unmount();
   });
+  it('does not pick a default trip when a carrier has concurrent trips', async () => {
+    mocks.restricted = false;
+    mocks.list.mockResolvedValue({ items: [{ id: 'trip-one' }, { id: 'trip-two' }], total: 2 });
+    const hook = renderHook(() => useActiveTripRecovery(), { wrapper });
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledWith({ estado: 'EN_TRANSITO', limit: 2 }));
+    await act(async () => { await Promise.resolve(); });
+    expect(localStorage.getItem('sitrep_active_trip_id')).toBeNull();
+    hook.unmount();
+  });
 });

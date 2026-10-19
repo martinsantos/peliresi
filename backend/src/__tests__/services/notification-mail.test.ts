@@ -88,6 +88,15 @@ describe('committed notice mail relay', () => {
     expect(notificationMailContent({ ...manifestNotice, tipo })?.html).toContain('/manifiestos/manifest');
     expect(notificationMailContent({ ...manifestNotice, tipo, manifiestoId: null })).toBeNull();
   });
+  it('renders proposal and adenda mail from controlled events without copying private notes', () => {
+    const proposal = { ...manifestNotice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'propuesta_partes', fase: 'creada', motivo: 'PRIVATE' }) };
+    const adenda = { ...manifestNotice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'adenda_manifiesto', evento: 'OBSERVADA', nota: 'PRIVATE' }) };
+    expect(notificationMailContent(proposal)?.subject).toContain('pendiente de aprobación');
+    expect(notificationMailContent(proposal)?.html).toContain('/manifiestos/manifest');
+    expect(notificationMailContent(adenda)?.html).toContain('/manifiestos/manifest/adendas');
+    expect(notificationMailContent(adenda)?.html).not.toContain('PRIVATE');
+    expect(notificationMailContent({ ...adenda, manifiestoId: null })).toBeNull();
+  });
   it.each([null, { isDemoData: true }, { isDemoData: false, transportista: { usuarioId: 'reassigned' } }])('suppresses deleted, synthetic or reassigned manifest %j', async current => {
     vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'manifiestos');
     mocks.manifest.mockResolvedValue(current); mocks.notice.mockResolvedValue({ ...manifestNotice, usuario: manifestNotice });

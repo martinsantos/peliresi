@@ -47,7 +47,8 @@ const ViajeRedirectMobile: React.FC = () => {
   return <Navigate to={`/manifiestos/${id}`} replace />;
 };
 
-// Auto-redirect to active trip when PWA reopens
+// Open the trip list when the PWA reopens. One saved trip cannot represent
+// several concurrent manifests, and each device must choose its GPS session.
 const ActiveTripGuard: React.FC = () => {
   const activeTripId = localStorage.getItem('sitrep_active_trip_id');
   if (activeTripId) {
@@ -66,7 +67,7 @@ const ActiveTripGuard: React.FC = () => {
       localStorage.removeItem(`gps_pending_${activeTripId}`);
       return <Navigate to="/dashboard" replace />;
     }
-    return <Navigate to={`/transporte/viaje/${activeTripId}`} replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   return <Navigate to="/dashboard" replace />;
 };

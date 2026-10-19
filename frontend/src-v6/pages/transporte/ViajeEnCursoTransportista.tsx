@@ -411,6 +411,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
       </header>
 
       <div className="p-4 space-y-4">
+        <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800 underline"><Truck size={17} aria-hidden="true" />Ver todos mis viajes</Link>
         {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
         {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
@@ -464,7 +465,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
               <CardContent className="p-5">
                 <div className="flex items-center justify-center gap-2 mb-4">
                   <Clock className="text-white/80" size={20} />
-                  <span className="text-4xl font-bold tabular-nums text-white drop-shadow-sm">{formatTimer(elapsedTime)}</span>
+                  <div className="text-center"><span className="block text-xs font-semibold uppercase tracking-wide text-white/90">Tiempo transcurrido desde el retiro</span><span className="text-4xl font-bold tabular-nums text-white drop-shadow-sm">{formatTimer(elapsedTime)}</span></div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-4 border-t border-white/30">
                   <div className="text-center">
@@ -629,6 +630,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
                   <AlertTriangle className="text-error-600" size={32} />
                 </div>
                 <h3 className="text-xl font-bold text-neutral-900">Reportar Incidente</h3>
+                <p className="mt-2 text-sm text-neutral-600">Si hubo avería, registrala antes de coordinar otro vehículo o transportista. El incidente conserva el viaje y no cambia la asignación por sí solo.</p>
               </div>
               <div className="space-y-3 mb-4">
                 {/* Incident type buttons instead of native select */}

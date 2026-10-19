@@ -133,6 +133,7 @@ export interface RegistrarIncidenteRequest {
 
 export interface ManifiestoFilters {
   estado?: EstadoManifiesto;
+  fase?: 'pendientes' | 'en_curso' | 'terminados' | 'post_entrega';
   generadorId?: string;
   transportistaId?: string;
   operadorId?: string;

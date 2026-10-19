@@ -344,12 +344,14 @@ describe('MobileLayout Android shell', () => {
     expect(link).toHaveClass('bg-primary-50', 'text-primary-900');
   });
 
-  it('shows an accessible active trip return surface outside trip mode', async () => {
+  it('keeps the last trip in the menu without covering the multi-trip queue', async () => {
     localStorage.setItem('sitrep_active_trip_id', 'trip-123');
 
     renderMobileLayout('/dashboard');
 
-    expect(await screen.findByRole('button', { name: 'Volver al viaje en curso' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Volver al viaje en curso' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+    expect(await screen.findByRole('link', { name: 'Último viaje abierto' })).toHaveAttribute('href', '/transporte/viaje/trip-123');
   });
 
   it('reduces bottom padding on the field trip route', () => {
