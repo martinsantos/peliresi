@@ -1,6 +1,14 @@
 # Capacitación — agenda compacta y estados visuales, 19/10/2026
 
-## Estado publicado
+## Estado vigente — íconos compactos simplificados, 19/10/2026
+
+Web y `/app`: **`88b1a0e`**, sin círculo de tilde/reloj junto a los íconos compactos. Verde aprobado, gris pendiente; etiquetas accesibles conservadas. Detalle de aprobaciones sin cambios. Manual **`71780c6`**, recurso `2026.20.8`, explica los mismos colores. Backend permanece **`8de58de`**, sin reinicio ni cambio de `.env`, flags o datos.
+
+Verificación de este ajuste: build web/app serial en preview 1 CPU/2 GiB/swap cero, fuente verificada; agenda publicada 3/3 (escritorio/web móvil/app); smoke HTTP 44/44; manual estático 16/16 y archivos publicados 4/4. No se repitió el circuito mutante por este cambio visual; su evidencia 2/2 sobre `8de58de` queda debajo. SW raíz **v124**. Commits `[skip ci]`, sin workflows ni main. Preview detenido y relay cerrado.
+
+Rollback de este ajuste: volver sólo `/var/www/sitrep` al release `/var/www/sitrep-releases/20261019-agenda-8de58de`. No recargar backend ni restaurar base. Auditoría `/var/backups/sitrep/20261019-icons/`; evidencias locales ignoradas `test-results-icons-20261019/`.
+
+## Historial — publicación completa de la agenda
 
 Backend, web, `/app` y manual publicados sobre **`8de58de885bf888ab2cee1211bf1e388ca204ce3`**, el **19/10/2026 07:23:27 Mendoza**, en `sitrep.ultimamilla.com.ar`. Rama `codex/sitrep-training-20261018`; único checkout `sitrep-production-source-20261001`. Main `c840219` conservado. Commits `[skip ci]`; no se dispararon workflows.
 

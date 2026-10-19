@@ -1,6 +1,10 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Estado vigente — agenda de capacitación, 19/10/2026
+## Estado vigente — simplificación visual, 19/10/2026
+
+Web/app `88b1a0e`: íconos compactos sin tilde/reloj, verde aprobado y gris pendiente. Manual `71780c6` actualizado; backend `8de58de` conservado, sin reinicio. Agenda publicada 3/3, smoke 44/44, manual 16/16 + 4/4 archivos. SW v124; mismos accesos CAP. Rollback sólo frontend al release `20261019-agenda-8de58de`. Sin datos reales, main ni workflows. Leer [estado, pruebas y rollback](docs/AGENDA-CAPACITACION-20261019.md).
+
+## Historial — agenda de capacitación, 19/10/2026
 
 **Backend, web, app y manual publicados sobre `8de58de`, el 19/10/2026 07:23:27 Mendoza.** Leer [agenda, pruebas y rollback](docs/AGENDA-CAPACITACION-20261019.md). Inicio compacto con filtros y tres aprobaciones visibles; certificados con íconos/estados; adenda con teclado de texto; contraste y diálogo de entrega corregidos. Circuito aprobado conservado.
 
