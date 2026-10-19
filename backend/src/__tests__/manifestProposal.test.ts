@@ -1,6 +1,6 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const mock=vi.hoisted(()=>({tx:{} as any,manifest:{} as any,events:[] as any[]}));
-vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transaction'?async(fn:any)=>fn(mock.tx):mock.tx[key]})}));
+vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transaction'?async(fn:any)=>typeof fn==='function'?fn(mock.tx):Promise.all(fn):mock.tx[key]})}));
 vi.mock('qrcode',()=>({default:{toDataURL:vi.fn().mockResolvedValue('data:qr')}}));
 import {inTrainingSession,inOperationalSession} from '../lib/trainingScope';
 import {canCreateManifestProposal,MANIFEST_PROPOSAL,proposalRole,parseProposal} from '../domain/manifestProposal';
@@ -106,5 +106,23 @@ describe('training agenda metadata',()=>{
   mock.tx.manifiesto.findMany=vi.fn(async()=>['ENTREGADO','RECIBIDO','EN_TRATAMIENTO'].map(estado=>({...mock.manifest,estado,eventos:mock.events,residuos:[{cantidadRecibida:null}]})));
   const json=vi.fn(),next=vi.fn();await inTrainingSession(()=>getTrainingTasks(req('ADMIN'),{json} as any,next));expect(json.mock.calls[0][0].data.items).toHaveLength(3);
   mock.tx.manifiesto.findMany.mockClear();await inOperationalSession(()=>getTrainingTasks(req('ADMIN'),{json} as any,next));expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:404}));expect(mock.tx.manifiesto.findMany).not.toHaveBeenCalled();
+ });
+});
+
+describe('bounded searchable scheduled agenda',()=>{
+ it('returns later pages with the same actor filter and a bound of 50',async()=>{
+  const {getProposalAgenda}=await import('../controllers/manifest-proposal.controller');
+  mock.tx.manifiesto.findMany=vi.fn(async()=>[]);mock.tx.manifiesto.count=vi.fn(async()=>73);
+  const json=vi.fn(),next=vi.fn();await inTrainingSession(()=>getProposalAgenda({...req('OPERADOR'),query:{page:'2',search:' CAP-2026-000084 '}} as any,{json} as any,next));
+  expect(next).not.toHaveBeenCalled();expect(mock.tx.manifiesto.findMany).toHaveBeenCalledWith(expect.objectContaining({take:50,skip:50,where:expect.objectContaining({operadorId:'o',estado:'APROBADO',numero:{contains:'CAP-2026-000084',mode:'insensitive'}})}));
+  expect(json).toHaveBeenCalledWith({success:true,data:{items:[],total:73,page:2,pageSize:50}});
+ });
+ it.each(['0','-1','1.5','100001'])('rejects invalid page %s before querying',async page=>{
+  const {getProposalAgenda}=await import('../controllers/manifest-proposal.controller');const next=vi.fn();mock.tx.manifiesto.findMany=vi.fn();
+  await inTrainingSession(()=>getProposalAgenda({...req('OPERADOR'),query:{page}} as any,{json:vi.fn()} as any,next));expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:400}));expect(mock.tx.manifiesto.findMany).not.toHaveBeenCalled();
+ });
+ it('does not enable scheduled agenda for operational sessions',async()=>{
+  const {getProposalAgenda}=await import('../controllers/manifest-proposal.controller');const next=vi.fn();mock.tx.manifiesto.findMany=vi.fn();
+  await inOperationalSession(()=>getProposalAgenda({...req('ADMIN'),query:{}} as any,{json:vi.fn()} as any,next));expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:404}));expect(mock.tx.manifiesto.findMany).not.toHaveBeenCalled();
  });
 });

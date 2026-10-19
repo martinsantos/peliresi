@@ -95,14 +95,17 @@ export async function assertManifestProposalApproved(tx: Tx, id: string) {
 export async function getProposalAgenda(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     if (!isTrainingSession()) throw new AppError('Función no habilitada',404);
+    const page=Number(req.query.page??1),search=req.query.search??'';
+    if(!Number.isInteger(page)||page<1||page>100000||typeof search!=='string'||search.length>80)throw new AppError('Filtros de agenda inválidos',400);
     const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Mendoza'}).format(new Date());
     const where: any={estado:'APROBADO',fechaEstimadaRetiro:{gte:new Date(day+'T00:00:00-03:00')},eventos:{some:{tipo:MANIFEST_PROPOSAL}}};
+    if(search.trim())where.numero={contains:search.trim(),mode:'insensitive'};
     applyRoleFilter(where,req.user);
     const [items,total]=await prisma.$transaction([
-      prisma.manifiesto.findMany({where,select:{id:true,numero:true,fechaEstimadaRetiro:true,generador:{select:{razonSocial:true}},operador:{select:{razonSocial:true}}},orderBy:[{fechaEstimadaRetiro:'asc'},{id:'asc'}],take:50}),
+      prisma.manifiesto.findMany({where,select:{id:true,numero:true,fechaEstimadaRetiro:true,generador:{select:{razonSocial:true}},operador:{select:{razonSocial:true}}},orderBy:[{fechaEstimadaRetiro:'asc'},{id:'asc'}],take:50,skip:(page-1)*50}),
       prisma.manifiesto.count({where}),
     ]);
-    res.json({success:true,data:{items,total}});
+    res.json({success:true,data:{items,total,page,pageSize:50}});
   }catch(e){next(e);}
 }
 

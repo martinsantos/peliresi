@@ -155,6 +155,7 @@ test('four independent phones hand off one new manifest and observe actual GPS s
       for(const role of ['generador','operador','transportista','admin']){
         await navigation(pages[role],info,'/manifiestos');
         const schedule=pages[role].locator('details[aria-label="Próximos retiros"]');if(await schedule.getAttribute('open')===null)await schedule.locator('summary').click();
+        await schedule.getByLabel('Buscar manifiesto programado',{exact:true}).fill(m.numero);
         await expect(schedule.getByRole('link').filter({hasText:m.numero})).toBeVisible({timeout:20000});
       }
     }

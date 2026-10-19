@@ -9,7 +9,7 @@ test('compact training agenda, filters and certificate states remain readable',a
  const agenda=page.getByRole('region',{name:'Agenda de manifiestos',exact:true});await expect(agenda).toBeVisible();
  await expect(agenda.locator('[data-agenda-row]').first()).toBeVisible();
  const source=await page.evaluate(async()=>{const r=await fetch('/api/manifiestos/tareas-partes',{headers:{Authorization:'Bearer '+localStorage.getItem('sitrep_access_token')}});if(r.headers.get('x-sitrep-training')!=='true')throw Error('Not CAP');return (await r.json()).data;});
- const proposal=source.items.find((m:any)=>m.partes?.length===3);expect(proposal).toBeTruthy();
+ const proposal=(source.items.find((m:any)=>m.partes?.some((p:any)=>!p.aprobada))||source.items.find((m:any)=>m.partes?.length===3));expect(proposal).toBeTruthy();
  await agenda.getByLabel('Buscar manifiesto en agenda').fill(proposal.numero);
  await expect(agenda.locator('[data-agenda-row]')).toHaveCount(1);
  const row=agenda.locator('[data-agenda-row]');
