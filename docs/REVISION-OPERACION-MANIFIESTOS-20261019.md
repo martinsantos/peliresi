@@ -12,6 +12,8 @@ Estado: trabajo en la rama de capacitación, sin publicación ni cambio de `main
 
 Las listas de web y app deben distinguir **por iniciar**, **en curso** y **terminados** con el mismo nombre y estado real. La agenda de portada es una vista compacta del trabajo pendiente, con búsqueda y filtros; el listado completo sigue siendo el lugar para explorar todo el historial.
 
+**Alcance implementado en este corte:** la app deja elegir entre varios viajes activos y muestra su tiempo transcurrido. El GPS actual se envía desde la pantalla de un único viaje abierto: cambiar de viaje corta ese emisor. Por tanto, todavía no se puede afirmar que un teléfono cubra simultáneamente con GPS varios manifiestos cargados en el mismo móvil. La agenda, los avisos internos y las listas tienen pruebas unitarias y builds; aún falta un recorrido de aceptación web/app de este corte en navegador.
+
 ## Rotura y relevo en tránsito: diseño pendiente de implementación
 
 Se admite el relevo por un móvil de la misma empresa, por otra transportista registrada o por una empresa **externa eventual con identidad declarada y seguimiento**, según la respuesta del dueño. No se sustituye silenciosamente `transportistaId` ni la asignación firmada: cada tramo conserva transportista, móvil, chofer, quién declaró la entrega de custodia, quién la aceptó, motivo, fecha/hora, ubicación y evidencia disponible. Un relevo no supone habilitación regulatoria de la empresa eventual ni reescribe autorizaciones previas.
