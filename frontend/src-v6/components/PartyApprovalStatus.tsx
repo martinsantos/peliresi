@@ -9,8 +9,7 @@ export function PartyApprovalStatus({ partes, compact = false }: { partes: Party
       const label = `${name}: ${approved ? 'Aprobado' : 'Pendiente'}`;
       return <li key={rol} aria-label={label} title={label} className={`relative rounded-lg border ${approved ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-neutral-200 bg-neutral-100 text-neutral-600'} ${compact ? 'p-1.5' : 'p-2 text-center'}`}>
         <Icon aria-hidden="true" size={compact ? 17 : 22} className="mx-auto"/>
-        {compact ? <span className={`absolute -right-1 -bottom-1 rounded-full ${approved ? 'bg-emerald-800 text-white' : 'bg-white text-neutral-600'}`}>{approved ? <Check size={10} aria-hidden="true"/> : <Clock size={10} aria-hidden="true"/>}</span>
-          : <><span className="mt-1 block text-xs font-semibold">{name}</span><span className="mt-1 flex items-center justify-center gap-1 text-xs">{approved ? <Check size={12}/> : <Clock size={12}/>} {approved ? 'Aprobado' : 'Pendiente'}</span></>}
+        {!compact && <><span className="mt-1 block text-xs font-semibold">{name}</span><span className="mt-1 flex items-center justify-center gap-1 text-xs">{approved ? <Check size={12}/> : <Clock size={12}/>} {approved ? 'Aprobado' : 'Pendiente'}</span></>}
       </li>;
     })}
   </ul>;
