@@ -79,10 +79,18 @@ for(const role of ['operador','generador','transportista','admin'])test('new pro
  await directTrainingLogin(other,info,role==='operador'?'transportista':'operador',scope);
  await expect(other.getByRole('region',{name:'Agenda de manifiestos'})).toBeVisible();
  const m=await createProposal(page,info,role,1,1);
+ await expect(page).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
+ if(role!=='admin'){
+  const region=page.getByRole('region',{name:'Aprobaciones de las partes'});await expect(region).toBeVisible();
+  if(role==='generador'){
+   await region.getByRole('button',{name:'Firmar Manifiesto',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Firma del manifiesto',exact:true});await draw(page,dialog);
+   await post(page,'/'+m.id+'/firmar',()=>dialog.getByRole('button',{name:'Confirmar y Firmar',exact:true}).click());
+  }else await post(page,'/'+m.id+'/aprobar-parte',()=>region.getByRole('button',{name:role==='operador'?'Aprobar como operador':'Aprobar como transporte',exact:true}).click());
+ }
  await page.goto(home);
  const own=page.getByRole('region',{name:'Agenda de manifiestos'}),live=other.getByRole('region',{name:'Agenda de manifiestos'});
  await expect(own.locator('[data-agenda-row]').first()).toContainText(m.numero,{timeout:12000});
- await expect(own.locator('[data-agenda-row]').first()).toContainText(role==='generador'?'Te toca aprobar':'En espera');
+ await expect(own.locator('[data-agenda-row]').first()).toContainText('En espera');
  // The counterpart stays on its already-open homepage: no refresh or navigation.
  await expect(live.locator('[data-agenda-row]').first()).toContainText(m.numero,{timeout:12000});
  await expect(live.locator('[data-agenda-row]').first()).toContainText('Te toca aprobar');
