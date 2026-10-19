@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ========================================
@@ -80,6 +81,7 @@ vi.mock('../../components/OnboardingWizard', () => ({
 
 // Import AFTER mocks are declared
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
+import LoginPage from '../../pages/auth/LoginPage';
 import { authService } from '../../services/auth.service';
 import { api, clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
 import { clearSyncQueue } from '../../services/indexeddb';
@@ -177,6 +179,30 @@ describe('AuthContext', () => {
   });
 
   afterEach(() => vi.useRealTimers());
+
+  it.each([
+    [401, 'Credenciales inválidas'],
+    [429, 'Demasiados intentos de autenticación para esta cuenta, intente de nuevo en un minuto'],
+  ])('keeps the %s login failure visible after the loading gate remounts the form', async (status, message) => {
+    let rejectLogin!: (error: unknown) => void;
+    vi.mocked(authService.login).mockImplementationOnce(() => new Promise((_, reject) => { rejectLogin = reject; }));
+    function LoginGate() {
+      const auth = useAuth();
+      return auth.isLoading ? <div role="status">Cargando SITREP</div> : <LoginPage />;
+    }
+    render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter><AuthProvider><LoginGate /></AuthProvider></MemoryRouter></QueryClientProvider>);
+    const identifier = await screen.findByLabelText('Correo electrónico o CUIT');
+    const user = userEvent.setup();
+    await user.type(identifier, 'generador@capacitacion.invalid');
+    await user.type(screen.getByLabelText('Contraseña', { exact: true }), 'synthetic');
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando SITREP');
+    expect(screen.queryByRole('button', { name: 'Ingresar', exact: true })).not.toBeInTheDocument();
+    await act(async () => rejectLogin({ response: { status, data: { message } } }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByRole('button', { name: 'Ingresar', exact: true })).toBeEnabled();
+    expect(clearTokens).toHaveBeenCalled();
+  });
 
   it('restores the restricted UI after server validation and clears it after a full session', async () => {
     localStorage.setItem('sitrep_access_token', `header.${btoa(JSON.stringify({ id: inspector.id, restricted: true }))}.signature`);

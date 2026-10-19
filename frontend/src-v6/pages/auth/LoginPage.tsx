@@ -62,10 +62,10 @@ const LoginPage: React.FC = () => {
       </div>
 
       {/* Error message */}
-      {error && (
+      {(error || authError) && (
         <div data-testid="auth-error" role="alert" className="mb-6 p-3 bg-error-50 border border-error-200 rounded-xl flex items-center gap-2 text-sm text-error-700 animate-fade-in">
           <AlertCircle size={16} className="flex-shrink-0" />
-          {error}
+          {error || authError}
         </div>
       )}
 
