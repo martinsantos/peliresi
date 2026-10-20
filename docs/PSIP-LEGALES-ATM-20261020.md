@@ -1,6 +1,8 @@
 # PSIP: seguimiento de Legales y comprobantes ATM
 
-Revisión del 20/10/2026. Producto candidato **`2200e9555e8e97d394c342f9ef519604ed1f365a`**, sólo de preview sobre `de592fa2`; publicación conocida previa `25b0c30c`. No se accedió a producción, `main`, cuentas reales ni tickets reales. CAP cerrado; correos/push apagados. Las altas completas de actores quedan fuera de este cambio, salvo el análisis del comprobante y la aclaración de la simulación TEF.
+**Publicado después de la aceptación:** backend, web, app y manual **`2200e9555e8e97d394c342f9ef519604ed1f365a`** en `sitrep.ultimamilla.com.ar`, el **20/10/2026 a las 14:32:13 Mendoza**. Smoke no mutante **78/78**, externo **9/9**, PWA PASS. CAP cerrado, correos/push apagados, flags/uploads conservados; sin main, migraciones ni registros reales. [Publicación, respaldo, incidencias y rollback actual](DESPLIEGUE-PSIP-LEGALES-20261020.md).
+
+La revisión funcional que sigue se hizo el 20/10/2026 sólo en preview sobre `de592fa2`, antes de publicar y sin acceso a producción, main, cuentas ni tickets reales. Las altas completas de actores quedan fuera de este cambio, salvo el análisis del comprobante y la aclaración de la simulación TEF. Los pendientes fiscales descritos abajo siguen abiertos.
 
 ## Qué debe hacer cada parte
 
@@ -87,4 +89,4 @@ Capturas revisadas: `desktop-legal-progress.png`, `app-visible-progress.png` y `
 
 Auditoría final: **20/10/2026 14:09:58 Mendoza**. API, servidor estático y PostgreSQL propios cerrados; contenedor `sitrep-qa-training-20261018` detenido a las **14:12:27 Mendoza** y evidencia recuperada del volumen persistente. Imagen, base artificial, fuentes, intentos y documentos preservados. `memory.events`: max=0, oom=0, oom_kill=0; límites sin ampliar. Fuente y documentación con `[skip ci]`, sin push ni workflows. `main` sigue `c8402190edfc36b5e5d0dee1337c24bd1689420d`.
 
-**Sin publicación.** No hubo acceso a producción ni migraciones. Los bundles QA usan `/api` local y no son un paquete autorizado para desplegar. El último despliegue conocido sigue siendo `25b0c30c`; no se contactó para volver a verificarlo. Para retirar este candidato no hace falta restaurar una base productiva: no se modificó.
+**Cierre de aceptación previo a la publicación:** no hubo acceso a producción ni migraciones durante esta revisión. Los bundles QA usan `/api` local y no se desplegaron. Luego de la autorización específica del dueño se recompiló desde `2200e955` con la API final y se publicó según el documento enlazado al inicio; no se alteraron datos productivos ni se resolvieron las brechas fiscales pendientes.
