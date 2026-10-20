@@ -1,5 +1,13 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Candidato sólo preview — identidad de pagos ATM y facturas, 20/10/2026
+
+Producto **`a6a5c005`**, **no publicado**: reserva persistente del ID/operación del ticket ATM antes de aprobarlo; otra foto, alta, CUIT o año no habilita reutilizarlo. Reemplazar/retirar conserva reserva y eventos. Identificación administrativa por sector, original y huella; históricos pendientes requieren conciliación. OCR eléctrico con catálogo de once distribuidoras de Mendoza, campos explícitos y evidencia; no convierte kWh/kW/tarifa a HP ni cambia TEF. Leer [implementación, fuentes, límites, pruebas y cierre](docs/CONTROL-COMPROBANTES-ATM-Y-FACTURAS-20261020.md) y luego el [traspaso](docs/TRASPASO-CODEX-20261017.md).
+
+Preview: backend **166/166**, frontend **37/37**, API **11 grupos**, volumen **3 grupos**, migración final **3 grupos + diff vacío**, navegador **12/12 + 15/15** regresión, manual **21/21**, tipos/builds/lint y auditoría **5 grupos** PASS. Manual **2026.20.16**, CSS/renderer conservados. Once encabezados de facturas y un PDF híbrido **artificiales**; no certifican todos los formatos reales. Una migración aditiva nueva, aplicada sólo al esquema propio `payment_identity_20261020`; no a `public` compartido, CAP ni producción. Más de 500 históricos sin identificar requieren un plan de conciliación por lotes, aún sin herramienta masiva.
+
+CAP cerrado, correo/push apagados, cero intentos/envíos y flags conservados. QA serial/un worker/1 CPU/2 GiB/swap cero, datos sintéticos, fuentes por hash; `main` permanece `c840219`. Servicios QA/PostgreSQL cerrados y contenedor detenido **16:23:08 Mendoza**, sin OOM; imagen/base/evidencia conservadas. Este pedido no autoriza publicar, consultar registros reales ni activar proveedores. Sin push/workflows; commits `[skip ci]`. Última publicación documentada: **`2200e955`**, sin nueva inspección productiva durante esta revisión.
+
 ## Estado vigente — accesos de la capacitación cerrados, 19/10/2026
 
 Los cuatro alias directos de la clase (admin, generador, transporte y operador) quedaron **revocados inmediatamente** al terminar la demo. Ingreso nuevo y sesiones previas: 403 para los cuatro. `TRAINING_DIRECT_LOGIN_UNTIL=2000-01-01T00:00:00Z` está aplicado al `.env`, a ambos procesos PM2 y a su estado guardado; API lista. Las 40 identidades artificiales y los manifiestos de práctica se conservan como historial, sin acceso directo de la pizarra. No reactivar estos alias sin una nueva indicación del dueño. [Evidencia y cierre](docs/ACCESO-CAPACITACION-20261019.md).
