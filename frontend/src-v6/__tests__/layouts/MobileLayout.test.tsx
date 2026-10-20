@@ -106,6 +106,9 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="app/manifiestos/:id/adendas" element={<div>Adendas app</div>} />
           <Route path="mobile/manifiestos/:id/adendas" element={<div>Adendas móvil</div>} />
           <Route path="transporte/viaje/:id" element={<div data-testid="trip-content">Trip</div>} />
+          <Route path="transporte/cargas" element={<div>Cargas de este móvil</div>} />
+          <Route path="app/transporte/cargas" element={<div>Cargas app</div>} />
+          <Route path="mobile/transporte/cargas" element={<div>Cargas móvil</div>} />
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
           <Route path="inspecciones/:id" element={<div>Expediente de campo<textarea aria-label="Observación QA" /></div>} />
           <Route path="mis-inspecciones/:id" element={<div>Inspección del actor</div>} />
@@ -274,7 +277,7 @@ describe('MobileLayout Android shell', () => {
     expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
     expect(authState.currentUser.rol).toBe('GENERADOR');
   });
-  it.each(['/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip', '/manifiestos/qa-record/adendas', '/app/manifiestos/qa-record/adendas', '/mobile/manifiestos/qa-record/adendas'])('keeps technical help reachable without covering form/trip controls on %s', path => {
+  it.each(['/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip', '/transporte/cargas', '/app/transporte/cargas', '/mobile/transporte/cargas', '/manifiestos/qa-record/adendas', '/app/manifiestos/qa-record/adendas', '/mobile/manifiestos/qa-record/adendas'])('keeps technical help reachable without covering form/trip controls on %s', path => {
     renderMobileLayout(path);
     const help = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
     expect(help.closest('header')).toBe(screen.getByRole('banner'));

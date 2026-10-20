@@ -6,6 +6,7 @@ import NotificacionesPage from '../../pages/notificaciones/NotificacionesPage';
 
 const service = vi.hoisted(() => ({ list: vi.fn(), marcarLeida: vi.fn(), marcarTodasLeidas: vi.fn(), eliminar: vi.fn() }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: service }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa', training: true } }) }));
 const notice = { id: 'notice', titulo: 'Inspección asignada · GRP-2026-00001', mensaje: 'Visita programada', leida: false, tipo: 'INFO_GENERAL', prioridad: 'NORMAL', createdAt: '2026-10-01T12:00:00Z', datos: JSON.stringify({ inspeccionId: 'assigned' }) };
 const response = { items: [notice], total: 45, noLeidas: 31, page: 1, limit: 20, totalPages: 3 };
 function Location() {

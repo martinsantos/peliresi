@@ -13,12 +13,15 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { resolveNotificationPath } from '../../utils/notificationNavigation';
 import { notificationFollowup } from '../../utils/notificationFollowup';
 import type { Notificacion } from '../../types/models';
+import { useAuth } from '../../contexts/AuthContext';
+import { DeviceNotificationControl } from '../../components/DeviceNotificationControl';
 
 const PAGE_SIZE = 20;
 const focus = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700';
 
 const NotificacionesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const mp = useMobilePrefix();
   const [params, setParams] = useSearchParams();
   const unreadOnly = params.get('avisos') === 'sin-leer';
@@ -88,6 +91,8 @@ const NotificacionesPage: React.FC = () => {
           </Button>
         )}
       </header>
+
+      <DeviceNotificationControl key={currentUser?.id} training={currentUser?.training}/>
 
       <nav aria-label="Filtrar avisos" className="flex gap-2 border-b border-neutral-200">
         <button type="button" aria-pressed={!unreadOnly} onClick={() => changeFilter(false)}

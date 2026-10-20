@@ -227,7 +227,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes('/app/') && 'focus' in client) {
+        if (new URL(client.url).pathname.startsWith('/app/') && 'focus' in client) {
           client.navigate(url);
           return client.focus();
         }

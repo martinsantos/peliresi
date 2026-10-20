@@ -28,6 +28,8 @@ import { useDashboardStats } from '../../hooks/useDashboard';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
+import { manifestFeatureVisible } from '../../utils/manifestFeatures';
+import { Button } from '../../components/ui/ButtonV2';
 
 export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -149,12 +151,14 @@ export const MobileDashboardPage: React.FC = () => {
       {!connectivity.isOnline && <p role="status" className="rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900">Sin conexión. Revisá abajo qué trabajo quedó guardado en este dispositivo.</p>}
 
       {currentUser?.training && <TrainingTaskQueue/>}
+      {isTransportista&&manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser)&&<Button fullWidth leftIcon={<MapPin size={18}/>} onClick={()=>navigate(mp('/transporte/cargas'))}>Cargas en este móvil</Button>}
       {isTransportista && !currentUser?.training && (
         <>{usingSavedTrip && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">Se muestra sólo el último viaje guardado en este teléfono. Conectate para ver todos los viajes actuales.</p>}<TransportistaTripQueue
           activeTrips={activeQueueTrips}
           pendingTrips={pendingTrips}
           activeTotal={tripsEnTransito?.total}
           pendingTotal={tripsAprobados?.total}
+          simultaneousGpsAvailable={manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser)}
           onOpenTrip={(tripId) => navigate(mp(`/transporte/viaje/${tripId}`))}
         /></>
       )}

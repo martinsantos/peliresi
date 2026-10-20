@@ -24,7 +24,7 @@ import {
   InspeccionadoParticipacionPage,
   ManifiestosPage, BajaIntensidadPage, AdendasManifiestoPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
   VerificarInspeccionPage,
-  TransportePerfilPage, ViajeEnCursoTransportista,
+  TransportePerfilPage, CargasEnCursoPage, ViajeEnCursoTransportista,
   ActoresPage, OperadoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, NotificacionesPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
@@ -156,6 +156,7 @@ function AppMobile() {
             <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
+            <Route path="/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             {/* Actores overview */}
             <Route path="/actores" element={<ActoresPage />} />

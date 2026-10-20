@@ -16,6 +16,7 @@ interface TransportistaTripQueueProps {
   onOpenTrip: (id: string) => void;
   activeTotal?: number;
   pendingTotal?: number;
+  simultaneousGpsAvailable?: boolean;
 }
 
 const elapsed = (date?: string | null) => {
@@ -26,7 +27,7 @@ const elapsed = (date?: string | null) => {
   return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 };
 
-export const TransportistaTripQueue: React.FC<TransportistaTripQueueProps> = ({ activeTrips, pendingTrips, onOpenTrip, activeTotal, pendingTotal }) => {
+export const TransportistaTripQueue: React.FC<TransportistaTripQueueProps> = ({ activeTrips, pendingTrips, onOpenTrip, activeTotal, pendingTotal, simultaneousGpsAvailable }) => {
   if (activeTrips.length === 0 && pendingTrips.length === 0) {
     return (
       <Card>
@@ -57,7 +58,7 @@ export const TransportistaTripQueue: React.FC<TransportistaTripQueueProps> = ({ 
       })}</ul>
       {section.total > section.trips.length && <p className="mt-2 text-xs text-neutral-600">Se muestran {section.trips.length} de {section.total}. Abrí Manifiestos para ver el resto.</p>}
     </div>)}
-    {activeTrips.length > 1 && <p className="text-xs text-neutral-600">Cada móvil transmite GPS únicamente mientras tiene abierto el seguimiento de ese manifiesto.</p>}
+    {activeTrips.length > 1 && <p className="text-xs text-neutral-600">{simultaneousGpsAvailable?'Usá Cargas en este móvil para compartir el GPS de los manifiestos que llevás juntos.':'Cada móvil transmite GPS únicamente mientras tiene abierto el seguimiento de ese manifiesto.'}</p>}
   </section>;
 };
 

@@ -1,6 +1,7 @@
 import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
 import { canCreateManifestProposal } from '../domain/manifestProposal';
 import { handoffEnabled, listTransportLegs, createTransportHandoff, rotateTransportAccess, assignedTransportHandoffs, assignedTransportAccess } from '../controllers/transport-handoff.controller';
+import { multiGpsEnabled, transportGpsTargets } from '../controllers/transport-gps-session.controller';
 import { getManifestProposal, approveManifestParty, getProposalAgenda, startManifestCoordination, getTrainingTasks } from '../controllers/manifest-proposal.controller';
 import { Router } from 'express';
 import { isAuthenticated, hasRole, requireFullAccess } from '../middlewares/auth.middleware';
@@ -74,6 +75,7 @@ router.get('/verificar/:numero', verificarManifiesto);
 // Todas las rutas siguientes requieren autenticacion
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+router.get('/cargas-en-curso',multiGpsEnabled,hasRole('TRANSPORTISTA'),transportGpsTargets);
 router.get('/relevos-asignados',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportHandoffs);
 router.post('/relevos-asignados/:tramoId/acceso',handoffEnabled,hasRole('TRANSPORTISTA'),assignedTransportAccess);
 

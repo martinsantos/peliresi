@@ -25,6 +25,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { EstadoManifiesto } from '../../types/models';
 import { ESTADO_LABELS } from '../../utils/constants';
+import { manifestFeatureVisible } from '../../utils/manifestFeatures';
+import { Button } from '../../components/ui/ButtonV2';
 
 // Badge color helper for manifiesto estado
 function estadoBadgeColor(estado: string): 'success' | 'warning' | 'info' | 'error' | 'default' {
@@ -42,6 +44,7 @@ const TransportePerfilPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
+  const multiGps=manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser)&&currentUser?.rol==='TRANSPORTISTA';
   const [activeTab, setActiveTab] = useState<'viaje' | 'info' | 'historial'>('viaje');
 
   // Active trip - manifiestos EN_TRANSITO for this transportista
@@ -111,7 +114,9 @@ const TransportePerfilPage: React.FC = () => {
       <div className="space-y-4">
         {/* === TAB: VIAJES === */}
         {activeTab === 'viaje' && (
-          <div className="space-y-4"><AssignedHandoffs/>
+          <div className="space-y-4">
+          {multiGps&&<Button fullWidth leftIcon={<Navigation size={18}/>} onClick={()=>navigate(mp('/transporte/cargas'))}>Cargas en este móvil</Button>}
+          <AssignedHandoffs/>
           {(loadingViaje || loadingAprobados)
             ? <p role="status" className="rounded-xl bg-neutral-100 p-4 text-sm text-neutral-700">Cargando viajes…</p>
             : <TransportistaTripQueue
@@ -119,6 +124,7 @@ const TransportePerfilPage: React.FC = () => {
                 pendingTrips={viajesAsignados}
                 activeTotal={enTransitoData?.total}
                 pendingTotal={aprobadosData?.total}
+                simultaneousGpsAvailable={multiGps}
                 onOpenTrip={(tripId) => navigate(mp(`/transporte/viaje/${tripId}`))}
               />}
           </div>)}

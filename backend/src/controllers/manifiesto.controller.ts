@@ -1,4 +1,5 @@
 import { validateProposalParties, notifyManifestParties } from '../services/manifestProposal.service';
+import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import { isTrainingSession } from '../lib/trainingScope';
 import { canCreateManifestProposal, MANIFEST_PROPOSAL } from '../domain/manifestProposal';
 import { Request, Response, NextFunction } from 'express';
@@ -166,6 +167,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
 
     // Reserve the number and insert record/event under one database lock.
     // A process-local mutex would not protect both production PM2 workers.
+    let pushIds:string[]=[];
     const manifiesto = await prisma.$transaction(async (tx) => {
       if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: transportistaId!, operadorId });
       const asignacionTransporte = await prepareTransportAssignment(tx, { modalidad, transportistaId, vehiculoId, choferId });
@@ -227,10 +229,10 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         manifiestoId: created.id, tipo: MANIFEST_PROPOSAL, usuarioId: userId,
         descripcion: JSON.stringify({ version: 1, generadorId, transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
       } });
-      if (partyProposal) await notifyManifestParties(tx, created, 'creada', userId);
+      if (partyProposal) pushIds=await notifyManifestParties(tx, created, 'creada', userId);
       return created;
     });
-
+    scheduleCommittedManifestPush(pushIds);
     res.status(201).json({
       success: true,
       data: { manifiesto }

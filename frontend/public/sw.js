@@ -1,6 +1,6 @@
 // Service Worker para modo Offline-First (CU-T09)
 // Scope: / (main site)
-const CACHE_NAME = 'trazabilidad-rrpp-v126';
+const CACHE_NAME = 'trazabilidad-rrpp-v127';
 const RUNTIME_CACHE = 'runtime-cache-v121';
 
 // Recursos críticos para cachear en instalación
@@ -177,11 +177,15 @@ console.log('[SW] Service Worker cargado', CACHE_NAME);
 // ========================================
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  let target;
+  try { target = new URL(event.notification.data?.url || '/', self.location.origin); }
+  catch { target = new URL('/', self.location.origin); }
+  if (target.origin !== self.location.origin) target = new URL('/', self.location.origin);
+  const url = target.href;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ('focus' in client) {
+        if (!new URL(client.url).pathname.startsWith('/app/') && 'focus' in client) {
           client.navigate(url);
           return client.focus();
         }

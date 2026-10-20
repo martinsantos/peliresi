@@ -27,11 +27,14 @@ export async function notifyAddendumParties(
     RECHAZADA: ['Adenda rechazada', 'La adenda quedó rechazada; el original y la resolución se conservan.'],
   };
   const [title, message] = labels[event];
-  await tx.notificacion.createMany({ skipDuplicates: true, data: recipients.map(usuarioId => ({
+  const data = recipients.map(usuarioId => ({
     id: createHash('sha256').update(`adenda:${adendaId}:${version}:${event}:${usuarioId}`).digest('hex'),
-    usuarioId, tipo: 'INFO_GENERAL', titulo: title,
+    usuarioId, tipo: 'INFO_GENERAL' as const, titulo: title,
     mensaje: `${manifest.numero}. ${message}`, manifiestoId: manifest.id,
-    prioridad: event === 'CREADA' || event === 'OBSERVADA' ? 'ALTA' : 'NORMAL',
+    prioridad: event === 'CREADA' || event === 'OBSERVADA' ? 'ALTA' as const : 'NORMAL' as const,
     datos: JSON.stringify({ tipo: 'adenda_manifiesto', evento: event, adendaId, url: `/manifiestos/${manifest.id}/adendas` }),
-  })) });
+  }));
+  const inserted = await tx.notificacion.createMany({ skipDuplicates: true, data });
+  // A retried command never dispatches the already committed notices again.
+  return inserted.count === data.length ? data.map(notice => notice.id) : [];
 }

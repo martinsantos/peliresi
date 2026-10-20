@@ -10,6 +10,15 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('simultaneous loads and device notices have unedited synthetic captures and distinct delivery semantics',()=>{
+  const proof=JSON.parse(read('fleet-gps-capture-provenance.json'));
+  assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);assert.equal(proof.browserTestsPassed,2);
+  const loads=guides.find((g:any)=>g.id==='transporte-cargas-simultaneas'),notices=guides.find((g:any)=>g.id==='manifiestos-avisos');
+  assert.equal(loads.steps.filter((s:any)=>s.image).length,2);assert.equal(notices.steps.filter((s:any)=>s.image).length,1);
+  assert.match(JSON.stringify(loads),/las cargas ya elegidas/);assert.match(JSON.stringify(loads),/otras cargas siguen viajando/);
+  assert.match(JSON.stringify(notices),/un aviso guardado no acredita una entrega externa/);
+  for(const item of proof.files){const bytes=readFileSync(new URL('screenshots/'+item.file,root));assert.equal(createHash('sha256').update(bytes).digest('hex'),item.sha256);assert.equal(bytes.readUInt32BE(16),item.width);assert.equal(bytes.readUInt32BE(20),item.height);}
+});
 test('handoff guide uses original synthetic captures and distinguishes delegated GPS from user access',()=>{
   const proof=JSON.parse(read('transport-handoff-capture-provenance.json'));
   assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);assert.equal(proof.gpsEmulated,true);

@@ -1,4 +1,5 @@
 import { notifyManifestParties } from '../services/manifestProposal.service';
+import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import { applyRoleFilter } from '../utils/roleFilter';
 import { Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
@@ -43,7 +44,8 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
   const id = req.params.id;
   await assertCanAccessManifiesto(prisma, req.user, id);
   const qrCode = await QRCode.toDataURL(JSON.stringify({ id }));
-  return prisma.$transaction(async tx => {
+  let pushIds:string[]=[];
+  const result=await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`manifest-proposal:${id}`}))::text AS "lock"`;
     const value = await load(tx, id);
     if (!value) throw new AppError('No es una propuesta con aprobación de las partes', 404);
@@ -64,7 +66,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     } });
     if (reject) {
       const rejected = await tx.manifiesto.update({where:{id,estado:'PENDIENTE_APROBACION'},data:{estado:'RECHAZADO'}});
-      await notifyManifestParties(tx,rejected,'rechazada',req.user.id);
+      pushIds=await notifyManifestParties(tx,rejected,'rechazada',req.user.id);
       return rejected;
     }
     const complete = Object.values(APPROVAL_EVENTS).every(type => type === event.tipo || value.events.some(e => e.tipo === type));
@@ -72,9 +74,11 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
       ...(rol === 'GENERADOR' ? { fechaFirma: event.createdAt } : {}),
       ...(complete ? { estado: 'APROBADO', qrCode } : {}),
     } });
-    await notifyManifestParties(tx,updated,complete?'aprobada':`aprobacion-${rol}`,req.user.id);
+    pushIds=await notifyManifestParties(tx,updated,complete?'aprobada':`aprobacion-${rol}`,req.user.id);
     return updated;
   });
+  scheduleCommittedManifestPush(pushIds);
+  return result;
 }
 export async function approveManifestParty(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -114,6 +118,7 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
  try {
   if(!isTrainingSession())throw new AppError('Función no habilitada',404);
   await assertCanAccessManifiesto(prisma,req.user,req.params.id);
+  let pushIds:string[]=[];
   const result=await prisma.$transaction(async tx=>{
    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`manifest-proposal:${req.params.id}`}))::text AS "lock"`;
    const value=await load(tx,req.params.id);
@@ -123,9 +128,10 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    const existing=value.events.find(e=>e.tipo==='INICIO_COORDINACION_CAP');if(existing)return existing;
    if(value.manifest.estado!=='APROBADO'||value.events.some(e=>e.tipo==='RECHAZO_PARTE')||!Object.values(APPROVAL_EVENTS).every(t=>value.events.some(e=>e.tipo===t)))throw new AppError('Se necesitan las tres aprobaciones para iniciar',409);
    const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:'INICIO_COORDINACION_CAP',descripcion:`Coordinación iniciada por ${rol}. Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.`}});
-   await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id);
+   pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id);
    return event;
   });
+  scheduleCommittedManifestPush(pushIds);
   res.json({success:true,data:{inicio:result.createdAt}});
  }catch(e){next(e);}
 }

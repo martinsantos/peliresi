@@ -1,0 +1,55 @@
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn(), user: { id: 'qa-carrier', rol: 'TRANSPORTISTA', training: false, actorId: 'qa-actor' } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mocks.user }) }));
+vi.mock('../../services/fleet-gps.service', () => ({ fleetGpsService: { list: mocks.list, send: mocks.send } }));
+vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { confirmarEntrega: mocks.deliver } }));
+import CargasEnCursoPage from '../../pages/transporte/CargasEnCursoPage';
+const loads = ['A', 'B'].map(id => ({ key: 'MANIFIESTO:' + id, kind: 'MANIFIESTO', id, numero: 'QA-' + id,
+  origen: 'Origen artificial', destino: 'Planta QA', fechaInicio: new Date().toISOString(), referenciaTiempo: 'Desde el retiro', patente: null, puedeEntregar: true, gpsDisponible: true }));
+let locate: PositionCallback;
+const clearWatch = vi.fn();
+beforeEach(() => {
+  vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'true'); mocks.user.id = 'qa-carrier'; clearWatch.mockClear();
+  mocks.list.mockReset().mockImplementation(async search => ({ targets: search ? [] : loads, total: search ? 0 : 2, limit: 100 }));
+  mocks.send.mockReset().mockResolvedValue({}); mocks.deliver.mockReset().mockResolvedValue({});
+  vi.stubGlobal('navigator', { geolocation: { watchPosition: vi.fn((ok: PositionCallback) => { locate = ok; return 12; }), clearWatch } });
+});
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+function setup() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const tree = () => <QueryClientProvider client={client}><MemoryRouter><CargasEnCursoPage/></MemoryRouter></QueryClientProvider>;
+  const view = render(tree()); return { ...view, rerenderSession: () => view.rerender(tree()) };
+}
+async function chooseAndStart() {
+  for (const load of loads) fireEvent.click(await screen.findByRole('checkbox', { name: `Llevo ${load.numero} en este móvil` }));
+  expect(navigator.geolocation.watchPosition).not.toHaveBeenCalled(); fireEvent.click(screen.getByRole('button', { name: 'Iniciar GPS' }));
+  await act(async () => { locate({ coords: { latitude: -33, longitude: -69, accuracy: 10, speed: null, heading: null }, timestamp: Date.now() } as GeolocationPosition); });
+  await waitFor(() => expect(mocks.send).toHaveBeenCalledTimes(2));
+}
+it('retains explicit GPS selections through a search with no matches and keeps one watcher', async () => {
+  const view = setup(); await chooseAndStart(); fireEvent.click(screen.getByRole('button', { name: 'Elegir otras cargas' }));
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Número de manifiesto' }), { target: { value: 'no-match' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Buscar', exact: true }));
+  await screen.findByText('No hay cargas en tránsito con ese número.');
+  const selected = screen.getByRole('region', { name: 'Cargas marcadas' });
+  expect(selected).toHaveTextContent('QA-A'); expect(selected).toHaveTextContent('QA-B');
+  expect(navigator.geolocation.watchPosition).toHaveBeenCalledOnce(); view.unmount();
+});
+it('delivers one explicit load and clears an old GPS session on account change', async () => {
+  const view = setup(); await chooseAndStart(); fireEvent.click(screen.getByRole('button', { name: 'Entregar QA-A', exact: true }));
+  fireEvent.click(within(screen.getByRole('dialog', { name: 'Confirmar entrega' })).getByRole('button', { name: 'Confirmar entrega de esta carga' }));
+  await waitFor(() => expect(mocks.deliver).toHaveBeenCalledWith('A', expect.any(Object)));
+  const selected = screen.getByRole('region', { name: 'Cargas marcadas' });
+  await waitFor(() => expect(within(selected).queryByText('QA-A')).toBeNull()); expect(selected).toHaveTextContent('QA-B');
+  mocks.user.id = 'another-account'; view.rerenderSession();
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Cargas marcadas' })).toBeNull()); expect(clearWatch).toHaveBeenCalledWith(12);
+  view.unmount();
+});
+it('does not query loads or acquire location when the operational feature is disabled', () => {
+  vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'false'); const view = setup();
+  expect(screen.getByText('El GPS de varias cargas no está habilitado para esta sesión.')).toBeVisible();
+  expect(mocks.list).not.toHaveBeenCalled(); expect(navigator.geolocation.watchPosition).not.toHaveBeenCalled(); view.unmount();
+});

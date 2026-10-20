@@ -14,6 +14,7 @@ import { addendumDocument, documentaryStatus, DocumentaryCounts } from '../domai
 import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
 import { notifyAddendumParties } from '../services/manifiestoAddendumNotice.service';
+import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
   if (!manifestFeatureEnabled('MANIFEST_ADDENDA_ENABLED')) return next(new AppError('Adendas no habilitadas', 404));
@@ -98,6 +99,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
     if (command.rectificaId && !await prisma.adendaManifiesto.findFirst({ where: { id: command.rectificaId, manifiestoId: manifest.id } })) {
       throw new AppError('La rectificación debe referirse a una adenda de este manifiesto', 400);
     }
+    let pushIds: string[] = [];
     const record = await prisma.$transaction(async tx => {
       await lockTrainingDocuments(tx,manifest.id);
       await assertNoFinalTrainingCertificate(tx,manifest.id);
@@ -114,7 +116,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
       revisiones: [],
       } });
       verifyReplay(created);
-      await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id);
+      pushIds = await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id);
       return created;
     }).catch(async (error: unknown) => {
       // Prisma can race its client-side upsert on simultaneous first requests.
@@ -123,6 +125,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
       return prisma.adendaManifiesto.findUniqueOrThrow({ where: { id: command.id } });
     });
     verifyReplay(record);
+    scheduleCommittedManifestPush(pushIds);
     res.status(201).json({ success: true, data: { adenda: present(record, req) } });
   } catch (error) { next(error); }
 }
@@ -132,6 +135,7 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
     const parsed = addendumReviewSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const command = parsed.data;
+    let pushIds: string[] = [];
     const record = await prisma.$transaction(async tx => {
       await lockTrainingDocuments(tx,req.params.id);
       await assertNoFinalTrainingCertificate(tx,req.params.id);
@@ -155,9 +159,10 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
         await noticeNewCurrents(tx, (current.declaracion as { residuos?: unknown }).residuos, current.residuos,
           '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id);
       }
-      await notifyAddendumParties(tx, manifest, current.id, command.version + 1, command.decision, req.user.id);
+      pushIds = await notifyAddendumParties(tx, manifest, current.id, command.version + 1, command.decision, req.user.id);
       return tx.adendaManifiesto.findUniqueOrThrow({ where: { id: current.id } });
     });
+    scheduleCommittedManifestPush(pushIds);
     res.json({ success: true, data: { adenda: present(record, req) } });
   } catch (error) { next(error); }
 }

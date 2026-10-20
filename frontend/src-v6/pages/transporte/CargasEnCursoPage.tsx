@@ -1,0 +1,95 @@
+import {useEffect,useRef,useState} from 'react';
+import {Link} from 'react-router-dom';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {ArrowLeft,CheckCircle2,Clock3,MapPin,Navigation,Radio,Search,Square,Truck} from 'lucide-react';
+import {useAuth} from '../../contexts/AuthContext';
+import {useMobilePrefix} from '../../hooks/useMobilePrefix';
+import {useFleetGps} from '../../hooks/useFleetGps';
+import {fleetGpsService,type FleetGpsLoad} from '../../services/fleet-gps.service';
+import {manifiestoService} from '../../services/manifiesto.service';
+import {companyCacheScope} from '../../services/companyContext';
+import {getApiErrorMessage} from '../../utils/api-error';
+import {manifestFeatureVisible} from '../../utils/manifestFeatures';
+import {Card,CardContent,CardHeader} from '../../components/ui/CardV2';
+import {Button} from '../../components/ui/ButtonV2';
+import {Modal} from '../../components/ui/Modal';
+import {toast} from '../../components/ui/Toast';
+
+function elapsed(start:string|null,now:number) {
+  const date=start?new Date(start).getTime():NaN;
+  if(!Number.isFinite(date)||date>now)return null;
+  const minutes=Math.floor((now-date)/60000);
+  return minutes<60?`${minutes} min`:`${Math.floor(minutes/60)} h ${minutes%60} min`;
+}
+
+export default function CargasEnCursoPage() {
+  const {currentUser}=useAuth(),mp=useMobilePrefix(),qc=useQueryClient();
+  const scope=`${currentUser?.training?'cap':'op'}:${currentUser?.id}:${currentUser?.rol}:${currentUser?.actorId}:${companyCacheScope(currentUser?.empresaContexto??null)}`;
+  const allowed=currentUser?.rol==='TRANSPORTISTA'&&manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser);
+  const [owner,setOwner]=useState(scope),[known,setKnown]=useState<Record<string,FleetGpsLoad>>({}),[selected,setSelected]=useState<string[]>([]),[started,setStarted]=useState(false);
+  const [search,setSearch]=useState(''),[term,setTerm]=useState(''),[now,setNow]=useState(()=>Date.now());
+  const [choosing,setChoosing]=useState(true);
+  const [delivery,setDelivery]=useState<FleetGpsLoad|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const deliveryGuard=useRef(false),credentials=useRef(new Map<string,string>());
+  const query=useQuery({queryKey:['fleet-gps-targets',scope,term],queryFn:()=>fleetGpsService.list(term),enabled:allowed,refetchInterval:15000,retry:false});
+  const ownsSession=owner===scope;
+  useEffect(()=>{setOwner(scope);setKnown({});setSelected([]);setStarted(false);credentials.current.clear();setDelivery(null);setError('');},[scope]);
+  useEffect(()=>{if(query.data&&ownsSession)setKnown(previous=>({...previous,...Object.fromEntries(query.data.targets.map(load=>[load.key,load]))}));},[query.data,ownsSession]);
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),15000);return()=>window.clearInterval(timer);},[]);
+  const chosen=ownsSession?selected.map(key=>known[key]).filter((load):load is FleetGpsLoad=>!!load):[];
+  const gps=useFleetGps(chosen.filter(load=>load.gpsDisponible).map(load=>({key:load.key,send:point=>fleetGpsService.send(load,point,credentials.current)})),allowed&&ownsSession&&started);
+  const rows=query.data?.targets??[];
+  const refresh=async()=>{await qc.invalidateQueries({queryKey:['fleet-gps-targets',scope]});await qc.invalidateQueries({queryKey:['manifiestos']});};
+  const toggle=(load:FleetGpsLoad)=>{
+    if(selected.includes(load.key))setSelected(previous=>previous.filter(key=>key!==load.key));
+    else{setKnown(previous=>({...previous,[load.key]:load}));gps.resume(load.key);setSelected(previous=>[...previous,load.key]);}
+  };
+  const finish=async()=>{
+    if(!delivery||deliveryGuard.current)return;deliveryGuard.current=true;setBusy(true);setError('');
+    try{
+      await gps.holdAndDrain(delivery.key);
+      const point=gps.status==='active'&&gps.position&&Date.now()-gps.position.observedAt<60000?gps.position:null;
+      await manifiestoService.confirmarEntrega(delivery.id,{observaciones:'Entrega confirmada desde las cargas de este móvil',...(point?{latitud:point.latitud,longitud:point.longitud}:{})});
+      setSelected(previous=>previous.filter(key=>key!==delivery.key));setDelivery(null);await refresh();
+      toast.success(started&&chosen.length>1?'Entrega registrada. Las demás cargas siguen con GPS.':'Entrega registrada.');
+    }catch(cause){gps.resume(delivery.key);setError(getApiErrorMessage(cause,'No se pudo confirmar la entrega. Revisá la conexión y el estado del manifiesto.'));await query.refetch();}
+    finally{deliveryGuard.current=false;setBusy(false);}
+  };
+  if(!allowed)return <Card><CardContent><p className="text-sm text-neutral-700">El GPS de varias cargas no está habilitado para esta sesión.</p><Link to={mp('/transporte/perfil')} className="text-primary-800 underline">Volver a mis viajes</Link></CardContent></Card>;
+  const label=gps.status==='denied'?'Permití la ubicación y volvé a iniciar el GPS.':gps.status==='unavailable'?'Este dispositivo no dispone de ubicación.':!started?'GPS detenido':gps.activeCount===0?'Revisá las cargas marcadas: no se está enviando GPS.':gps.status==='active'?`GPS para ${gps.activeCount} carga${gps.activeCount===1?'':'s'}`:'Buscando una ubicación reciente…';
+  return <div className="mx-auto max-w-4xl space-y-4 pb-6">
+    <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800"><ArrowLeft size={18}/>Mis viajes</Link>
+    <header><h1 className="text-xl font-bold text-neutral-900">Cargas en este móvil</h1><p className="mt-1 text-sm text-neutral-600">Marcá sólo los manifiestos que llevás en este vehículo.</p></header>
+    <Card><CardContent className="space-y-3">
+      <p role="status" aria-live="polite" className={`flex items-center gap-2 rounded-lg p-3 text-sm font-semibold ${started&&gps.status==='active'?'bg-primary-50 text-primary-800':'bg-neutral-100 text-neutral-700'}`}><Radio size={18} aria-hidden="true"/>{label}</p>
+      <Button fullWidth disabled={!started&&chosen.filter(load=>load.gpsDisponible).length===0} leftIcon={started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(!started)setChoosing(false);setStarted(value=>!value);}}>{started?'Detener GPS':'Iniciar GPS'}</Button>
+      {chosen.length>0&&<button type="button" onClick={()=>setChoosing(value=>!value)} className="min-h-11 text-sm font-semibold text-primary-800 underline">{choosing?'Cerrar selección':'Elegir otras cargas'}</button>}
+      <p className="text-sm text-neutral-600">Mantené esta pantalla abierta. Una sola ubicación se envía a cada carga marcada cada 30 segundos. Al entregar una, las demás continúan.</p>
+    </CardContent></Card>
+    {chosen.length>0&&<Card role="region" aria-label="Cargas marcadas"><CardHeader title={`Cargas marcadas · ${chosen.length}`} icon={<Truck size={20}/>}/><CardContent className="divide-y divide-neutral-100">
+      {chosen.map(load=>{
+        const sent=gps.deliveries[load.key],duration=elapsed(load.fechaInicio,now),fresh=sent?.receivedAt&&now-sent.receivedAt.getTime()<60000;
+        const state=!load.gpsDisponible?'Pedí un nuevo enlace GPS a la transportista de origen.':sent?.state==='error'?sent.message:sent?.state==='sending'?'Enviando ubicación…':sent?.state==='received'&&fresh?'GPS recibido':sent?.receivedAt?'GPS sin actualización reciente':'Todavía sin envío GPS';
+        return <div key={load.key} className="space-y-2 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><strong className="block break-words text-sm text-neutral-900">{load.numero}</strong><p className="text-xs text-neutral-600">{load.destino}</p></div><button type="button" disabled={busy&&delivery?.key===load.key} onClick={()=>toggle(load)} className="min-h-11 px-2 text-xs font-semibold text-primary-800 underline" aria-label={`Quitar ${load.numero} del GPS`}>Quitar</button></div>
+          <p role="status" className={`text-sm ${sent?.state==='error'?'text-error-800':sent?.state==='received'&&fresh?'text-primary-800':'text-neutral-600'}`}>{state}{sent?.state==='received'&&sent.receivedAt&&<span className="ml-1 text-xs">· {sent.receivedAt.toLocaleTimeString('es-AR')}</span>}</p>
+          {sent?.state!=='received'&&sent?.receivedAt&&<p className="text-xs text-neutral-500">Última recepción: {sent.receivedAt.toLocaleTimeString('es-AR')}</p>}
+          {duration&&<p className="flex items-center gap-1 text-xs text-neutral-600"><Clock3 size={13}/>{load.referenciaTiempo}: {duration}</p>}
+          <div className="flex flex-wrap gap-2">{sent?.state==='error'&&sent.statusCode!==409&&<Button size="sm" variant="outline" onClick={()=>gps.resume(load.key)}>Reintentar GPS</Button>}{load.puedeEntregar?<Button size="sm" variant="outline" aria-label={`Entregar ${load.numero}`} leftIcon={<CheckCircle2 size={16}/>} onClick={()=>{setError('');setDelivery(load);}}>Entregar</Button>:<p className="text-xs text-neutral-600">Entrega a cargo de la transportista de origen.</p>}</div>
+        </div>;
+      })}
+    </CardContent></Card>}
+    {(choosing||chosen.length===0)&&<Card><CardHeader title="Elegir cargas" icon={<MapPin size={20}/>}/><CardContent className="space-y-3">
+      <form aria-label="Buscar cargas en tránsito" className="flex gap-2" onSubmit={event=>{event.preventDefault();setTerm(search.trim());}}><input aria-label="Número de manifiesto" type="search" maxLength={80} value={search} onChange={event=>setSearch(event.target.value)} placeholder="Buscar número" className="min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900"/><Button type="submit" variant="outline" leftIcon={<Search size={17}/>}>Buscar</Button></form>
+      {term&&<button type="button" onClick={()=>{setSearch('');setTerm('');}} className="min-h-11 text-sm font-semibold text-primary-800 underline">Ver todas las cargas</button>}
+      {query.isLoading&&<p role="status" className="text-sm text-neutral-600">Cargando manifiestos en tránsito…</p>}
+      {query.isError&&<div role="alert" className="rounded-lg bg-error-50 p-3 text-sm text-error-800">No se pudo actualizar la lista. Los envíos de las cargas ya marcadas muestran su resultado arriba. <button type="button" onClick={()=>query.refetch()} className="font-semibold underline">Reintentar</button></div>}
+      {!query.isLoading&&!query.isError&&rows.length===0&&<p className="text-sm text-neutral-600">{term?'No hay cargas en tránsito con ese número.':'No tenés cargas en tránsito para este GPS.'}</p>}
+      <ul className="divide-y divide-neutral-100">{rows.map(load=><li key={load.key}><label className={`flex min-h-16 items-center gap-3 rounded-lg py-3 ${load.gpsDisponible?'cursor-pointer':'opacity-60'}`}><input type="checkbox" aria-label={`Llevo ${load.numero} en este móvil`} checked={selected.includes(load.key)} disabled={!load.gpsDisponible} onChange={()=>toggle(load)} className="h-5 w-5 shrink-0 accent-primary-700"/><span className="min-w-0"><strong className="block break-words text-sm text-neutral-900">{load.numero}</strong><span className="block text-xs text-neutral-600">{load.destino}</span><span className="block text-xs text-neutral-500">{load.patente||'Sin patente declarada'}{load.kind==='RELEVO'?' · relevo':''}{!load.gpsDisponible?' · enlace GPS no disponible':''}</span></span></label></li>)}</ul>
+      {query.data&&query.data.total>rows.length&&<p className="text-xs text-neutral-600">Se muestran {rows.length} de {query.data.total}. Buscá un número para encontrar otra carga; las ya marcadas siguen enviando GPS.</p>}
+    </CardContent></Card>}
+    <Modal isOpen={!!delivery} onClose={()=>{if(!busy){setDelivery(null);setError('');}}} title="Confirmar entrega" description={delivery?.numero} size="sm" isBusy={busy}
+      footer={<><Button variant="outline" disabled={busy} onClick={()=>setDelivery(null)}>Volver</Button><Button isLoading={busy} onClick={finish}>Confirmar entrega de esta carga</Button></>}>
+      <p className="text-sm text-neutral-700">Confirmás la entrega de {delivery?.numero} en {delivery?.destino}. Las otras cargas marcadas continúan con su GPS.</p>{error&&<p role="alert" className="mt-3 text-sm text-error-800">{error}</p>}
+    </Modal>
+  </div>;
+}

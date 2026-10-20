@@ -137,7 +137,7 @@ export const MobileLayout: React.FC = () => {
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
   const isAddendaRoute = /\/manifiestos\/[^/]+\/adendas\/?$/.test(location.pathname);
   const boundedViewport = isInspectionCase || isAddendaRoute;
-  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/viaje\/[^/]+)\/?$/.test(location.pathname);
+  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/(?:viaje\/[^/]+|cargas))\/?$/.test(location.pathname);
   const inspectionShell = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const shell = inspectionShell.current, viewport = window.visualViewport;
@@ -328,6 +328,7 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/manifiestos')) return isTransportista ? 'Mis Viajes' : 'Manifiestos';
     if (path.includes('/inspecciones')) return 'Inspecciones';
     if (path.includes('/transporte/perfil')) return 'Mis Viajes';
+    if (path.includes('/transporte/cargas')) return 'Cargas en este móvil';
     if (path.includes('/transporte/viaje')) return 'Viaje en Curso';
     if (path.includes('/tracking')) return 'Tracking';
     if (path.includes('/admin/actores/generadores')) return 'Generadores';

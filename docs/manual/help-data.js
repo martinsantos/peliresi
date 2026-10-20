@@ -443,6 +443,46 @@
   });
 
   window.SITREP_HELP.guides.push({
+    id: 'transporte-cargas-simultaneas', profile: 'transportista', audiences: ['administrador'],
+    title: 'Llevar varias cargas en el mismo móvil', summary: 'Marcá lo que llevás, compartí GPS y entregá cada carga por separado.',
+    duration: '3 min', icon: 'local_shipping', keywords: ['varios', 'simultáneos', 'manifiestos', 'cargas', 'GPS', 'móvil', 'relevo'],
+    safety: 'Usá esta opción cuando aparezca Cargas en este móvil. Marcá sólo las cargas que están físicamente en ese vehículo; seleccionar no certifica capacidad ni habilitación. Mantené la pantalla abierta: no se promete GPS en segundo plano.',
+    steps: [
+      { title: 'Marcar las cargas que llevás juntas', body: [
+        'Mis viajes → Cargas en este móvil. Buscá por número y marcá cada manifiesto que está en tu vehículo. También aparecen los relevos que otra transportista registrada te asignó.',
+        'Tocá Iniciar GPS y permití la ubicación. Un mismo teléfono informa su ubicación a cada carga seleccionada; no hace falta abrir un seguimiento distinto para cada una.'
+      ], image:S+'desktop/fleet-gps-20261019.png',alt:'Dos cargas restantes con GPS recibido después de entregar una tercera',caption:'Datos sintéticos · preview aislado · GPS emulado · 19/10/2026.',expected: 'Cada carga marcada confirma GPS recibido después de su propio envío.', resources: [{label:'Cargas en este móvil',path:'/transporte/cargas'}] },
+      { title: 'Sumar una carga sin perder las otras', body: [
+        'Tocá Elegir otras cargas. Podés buscar otro número y marcarlo: las cargas ya elegidas siguen arriba y continúan con su GPS.',
+        'El tiempo transcurrido es informativo, desde el retiro o el relevo. Si falta señal o una carga cambió de tramo, se muestra el problema de esa carga sin detener las demás.'
+      ], expected: 'La lista Cargas marcadas conserva las seleccionadas aunque la búsqueda no las incluya.' },
+      { title: 'Entregar sólo la carga que llegó', body: [
+        'Buscá el número dentro de Cargas marcadas y tocá Entregar. Revisá número y destino en la confirmación. Las otras cargas siguen viajando y enviando su GPS.',
+        'Un relevo recibido sólo comparte el GPS: la transportista original confirma su entrega. Si dejaste de llevar una carga, tocá Quitar para dejar de enviar su ubicación desde este móvil. Detener GPS detiene todas las marcadas.'
+      ], image:S+'mobile/fleet-gps-20261019.png',alt:'App muestra las dos cargas que continúan con GPS después de entregar una',caption:'Datos sintéticos · preview aislado · GPS emulado · 19/10/2026.',expected: 'La carga entregada sale del GPS de este móvil y las restantes continúan.' }
+    ]
+  });
+  window.SITREP_HELP.guides.push({
+    id: 'manifiestos-avisos', profile: 'generador', audiences: ['transportista', 'operador', 'administrador'],
+    title: 'Enterarte de aprobaciones y cambios', summary: 'Aviso visible, campana e ingreso directo al paso que te corresponde.',
+    duration: '2 min', icon: 'notifications_active', keywords: ['avisos', 'campana', 'aprobaciones', 'adendas', 'relevo', 'push', 'correo', 'sonido'],
+    safety: 'Capacitación no envía correos ni push. En operación, esos canales requieren estar habilitados, una cuenta verificada y el permiso o preferencia correspondiente; un aviso guardado no acredita una entrega externa.',
+    steps: [
+      { title: 'Abrir el aviso de tu manifiesto', body: [
+        'Con la app abierta, una novedad aparece arriba y permite abrir el manifiesto relacionado. Activar sonido habilita el sonido de los avisos dentro de esa sesión.',
+        'La campana conserva el aviso después. Leerlo no aprueba una propuesta ni resuelve una adenda: abrí el registro y decidí desde tu rol.'
+      ], expected: 'Encontrás la acción pendiente y el historial sin adivinar qué cambió.', resources: [{label:'Mis avisos',path:'/notificaciones'}] },
+      { title: 'Reconocer una aprobación, adenda o relevo', body: [
+        'El aviso indica si hay una propuesta por aprobar, una aprobación de otra parte, unanimidad, coordinación iniciada o rechazo. Las tres aprobaciones siguen visibles como iconos en la agenda.',
+        'Una adenda nueva o su resolución avisa a las otras partes vinculadas. Un relevo avisa a las partes y al C3; la transportista registrada de reemplazo lo consulta en su propio perfil.'
+      ], expected: 'El aviso abre el registro que tu cuenta puede consultar; no otorga permisos adicionales.' },
+      { title: 'Distinguir aviso dentro de SITREP, push y correo', body: [
+        'Cuando estén habilitados, abrí Avisos → Activar avisos del teléfono y aceptá el permiso para mostrar el push del sistema y el correo llega a la dirección verificada con la preferencia de email activa. El equipo debe comprobar cada canal en el dispositivo de uso.',
+        'Al tocar el push de la app se abre la app; el de la web abre la web. Si un canal está apagado, el aviso sigue disponible en la campana. No uses el correo como prueba de aprobación ni de recepción legal.'
+      ], image:S+'mobile/device-notifications-20261019.png',alt:'Avisos del dispositivo informa que el canal está apagado y mantiene la campana',caption:'Datos sintéticos · preview aislado · canal push apagado; no acredita envío externo · 19/10/2026.',expected: 'Sabés dónde consultar el estado real, aunque no llegue un aviso externo.' }
+    ]
+  });
+  window.SITREP_HELP.guides.push({
     id: 'transporte-relevo', profile: 'transportista', audiences: ['generador', 'operador', 'administrador'],
     title: 'Relevar el transporte por una rotura', summary: 'La transportista de origen registra el cambio; el reemplazo comparte su GPS.',
     duration: '5 min', icon: 'local_shipping', keywords: ['rotura', 'relevo', 'traspaso', 'externo', 'eventual', 'GPS', 'custodia'],

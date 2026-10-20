@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import type { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/config';
@@ -77,6 +78,7 @@ export async function createTransportHandoff(req: AuthRequest, res: Response, ne
     if(!parsed.success) throw new AppError(parsed.error.issues[0].message,400);
     const command=parsed.data;
     const requestHash=createHash('sha256').update(JSON.stringify(command)).digest('hex');
+    let pushIds:string[]=[];
     const leg=await prisma.$transaction(async tx=>{
       const manifest=await carrierManifest(req,tx);
       const existing=await tx.tramoTransporte.findUnique({where:{id:command.id}});
@@ -124,13 +126,16 @@ export async function createTransportHandoff(req: AuthRequest, res: Response, ne
       ]);
       const admins=await tx.usuario.findMany({where:{rol:'ADMIN',activo:true},select:{id:true}});
       const recipients=[...new Set([req.user.id,...actors.map(a=>a?.usuarioId),...admins.map(a=>a.id)].filter((id):id is string=>!!id))];
-      await tx.notificacion.createMany({skipDuplicates:true,data:recipients.map(usuarioId=>({
-        id:createHash('sha256').update(`relevo:${created.id}:${usuarioId}`).digest('hex'),usuarioId,tipo:'INFO_GENERAL',
+      const notices=recipients.map(usuarioId=>({
+        id:createHash('sha256').update(`relevo:${created.id}:${usuarioId}`).digest('hex'),usuarioId,tipo:'INFO_GENERAL' as const,
         titulo:'Cambio de transporte en tránsito',mensaje:`${manifest.numero}: ${declaredTransportLabel(datos)}. La transportista de origen registró el traspaso.`,
         manifiestoId:manifest.id,datos:JSON.stringify({tipo:'relevo_transporte',tramoId:created.id,url:[actors[2]?.usuarioId,actors[3]?.usuarioId].includes(usuarioId)&&usuarioId!==req.user.id?'/transporte/perfil':`/manifiestos/${manifest.id}`}),
-      }))});
+      }));
+      const inserted=await tx.notificacion.createMany({skipDuplicates:true,data:notices});
+      if(inserted.count===notices.length)pushIds=notices.map(notice=>notice.id);
       return created;
     });
+    scheduleCommittedManifestPush(pushIds);
     res.setHeader('Cache-Control','private, no-store');
     res.status(201).json({success:true,data:{tramo:publicLeg(leg),acceso:issueAccess(leg)}});
   } catch(error) { next(error); }

@@ -33,4 +33,12 @@ describe('adenda cross-party notices', () => {
     expect(first.notificacion.createMany.mock.calls[0][0].data[0].id).toBe(retry.notificacion.createMany.mock.calls[0][0].data[0].id);
     expect(first.notificacion.createMany.mock.calls[0][0].data[0].id).not.toBe(later.notificacion.createMany.mock.calls[0][0].data[0].id);
   });
+
+  it('returns no external dispatch IDs for already committed notices on retry', async () => {
+    const db = tx();
+    const first = await notifyAddendumParties(db as never, manifest, 'adenda-qa', 0, 'CREADA', 'carrier');
+    expect(first).toHaveLength(2);
+    db.notificacion.createMany.mockResolvedValue({ count: 0 });
+    expect(await notifyAddendumParties(db as never, manifest, 'adenda-qa', 0, 'CREADA', 'carrier')).toEqual([]);
+  });
 });

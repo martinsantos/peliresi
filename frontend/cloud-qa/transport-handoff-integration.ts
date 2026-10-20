@@ -93,6 +93,24 @@ try{
   const ownHistory=await request('GET','/manifiestos/relevos-asignados',tokens.replacement);
   assert.ok(ownHistory.body.data.find((leg:any)=>leg.tramoId===secondLeg.id&&leg.fin&&!leg.accesoDisponible));
   checks.push('concurrent-stale-handoffs-one-winner','delivery-closes-leg-and-revokes-gps');
+  for(const action of ['cancel','reverse']){
+    const ended=await createTrip(action.toUpperCase());
+    const delegated=await request('POST',`/manifiestos/${ended.id}/tramos`,tokens.origin,{...command,id:randomUUID()});
+    assert.equal(delegated.status,201);
+    const change=action==='cancel'
+      ? await request('POST',`/manifiestos/${ended.id}/cancelar`,tokens.generator,{motivo:'Cancelación sintética con relevo activo'})
+      : await request('POST',`/manifiestos/${ended.id}/revertir-estado`,tokens.admin,{estadoNuevo:'APROBADO',motivo:'Reversión sintética antes de otro retiro'});
+    assert.equal(change.status,200,JSON.stringify(change.body));
+    const closed=await db.tramoTransporte.findUniqueOrThrow({where:{id:delegated.body.data.tramo.id}});
+    assert.ok(closed.fin);assert.equal(closed.accesoVersion,null);assert.equal(closed.accesoHasta,null);
+    assert.equal((await request('POST',`/seguimiento-relevo/${closed.id}/ubicacion`,delegated.body.data.acceso,{latitud:-33,longitud:-69})).status,403);
+    if(action==='reverse'){
+      assert.equal((await request('POST',`/manifiestos/${ended.id}/confirmar-retiro`,tokens.origin,{})).status,200);
+      assert.equal((await request('GET',`/seguimiento-relevo/${closed.id}`,delegated.body.data.acceso)).status,403);
+      await request('POST',`/manifiestos/${ended.id}/cancelar`,tokens.generator,{motivo:'Fin del ensayo de reanudación'});
+    }
+    checks.push(action==='cancel'?'cancellation-closes-custody-and-revokes-gps':'state-reversal-and-new-pickup-never-revive-old-gps');
+  }
   const browsers={web:await createTrip('BROWSER-WEB'),app:await createTrip('BROWSER-APP')};
   await writeFile(path.join(process.env.QA_ARTIFACTS!,'handoff-private.json'),JSON.stringify({password,users:Object.fromEntries(Object.entries(users).map(([name,user])=>[name,{id:user.id,email:user.email}])),carriers,vehicleId:vehicle.id,browsers}),{mode:0o600});
   await writeFile(path.join(process.env.QA_ARTIFACTS!,'handoff-http.json'),JSON.stringify({passed:true,checks,manifestId:manifest.id,production:false,externalDelivery:false},null,2));

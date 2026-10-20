@@ -4,20 +4,7 @@ import { MapPin, Navigation, Radio, Square, Truck } from 'lucide-react';
 import { Card,CardContent,CardHeader } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 
-interface LegInfo {tramoId:string;numero:string;empresa:string;destino:string;domicilioDestino:string;orden:number;training:boolean;ultimaPosicion:string|null;vence:string}
-type GpsPoint={latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number};
-const endpoint=(id:string)=>`${(import.meta.env.VITE_API_URL||'/api').replace(/\/$/,'')}/seguimiento-relevo/${encodeURIComponent(id)}`;
-export async function limitedLegRequest(id:string,token:string,point?:GpsPoint) {
-  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),15000);
-  try{
-  const response=await fetch(endpoint(id)+(point?'/ubicacion':''),{method:point?'POST':'GET',signal:controller.signal,
-    headers:{Authorization:`Bearer ${token}`,...(point?{'Content-Type':'application/json'}:{})},
-    credentials:'omit',cache:'no-store',referrerPolicy:'no-referrer',...(point?{body:JSON.stringify(point)}:{})});
-  const body=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error(body.message||'No se pudo conectar con SITREP'),{status:response.status});
-  return body.data;
-  }finally{clearTimeout(timeout);}
-}
+import { limitedLegRequest,type LimitedTransportInfo as LegInfo,type LimitedTransportUpload,type TransportGpsPoint as GpsPoint } from '../../services/limited-transport-gps';
 
 export default function RelevoGpsPage() {
   const {tramoId=''}=useParams();
@@ -50,7 +37,7 @@ export default function RelevoGpsPage() {
       if(Date.now()-lastAttempt<29000)return;
       lastAttempt=Date.now();inFlight=true;setStatus('Enviando ubicación…');
       try{
-        const data=await limitedLegRequest(tramoId,token,latest.point);
+        const data=await limitedLegRequest<LimitedTransportUpload>(tramoId,token,latest.point);
         if(alive&&!stopRef.current){setLastSent(data.tracking.timestamp);setStatus('Ubicación recibida por SITREP');setError('');}
       }catch(err:any){if(alive){setError(err.message);setStatus('Ubicación sin enviar');if([401,403,404].includes(err.status)){setBlocked(true);stop();}}}
       finally{inFlight=false;}

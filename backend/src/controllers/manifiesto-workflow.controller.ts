@@ -884,6 +884,9 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
         where: { id, estado: estadoAnterior },
         data: { estado: estadoNuevo, ...reversionCleanup(estadoNuevo) },
       });
+      // Leaving transit ends its delegated GPS authority permanently. A later
+      // pickup must not revive an old replacement capability.
+      if (estadoNuevo !== 'EN_TRANSITO') await tx.tramoTransporte.updateMany({where:{manifiestoId:id,fin:null},data:{fin:new Date(),accesoVersion:null,accesoHasta:null}});
       const evento = await tx.eventoManifiesto.create({
         data: {
           manifiestoId: id,
@@ -1058,6 +1061,7 @@ export const cancelarManifiesto = async (req: AuthRequest, res: Response, next: 
         },
       });
 
+      await tx.tramoTransporte.updateMany({where:{manifiestoId:id,fin:null},data:{fin:new Date(),accesoVersion:null,accesoHasta:null}});
       await updateRollingHash(tx, id, 'CANCELADO', new Date(), motivo || null, evento.id);
 
       return updated;

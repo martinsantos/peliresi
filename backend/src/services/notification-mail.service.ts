@@ -20,7 +20,7 @@ function enabledFamilies(): string[] {
 }
 
 /** Recheck the source at enqueue AND delivery, including reassignment/revocation. */
-async function sourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
+export async function notificationSourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
   const data = JSON.parse(notice.datos || '{}');
   if (family === 'padron') {
     const renewal = await prisma.renovacion.findUnique({ where: { id: data.renovacionId }, include: {
@@ -39,7 +39,17 @@ async function sourceEligible(notice: NoticeForMail, family: string): Promise<bo
     } });
     if (!manifest || manifest.isDemoData) return false;
     const owner = notice.rol === 'GENERADOR' ? manifest.generador : notice.rol === 'TRANSPORTISTA' ? manifest.transportista : notice.rol === 'OPERADOR' ? manifest.operador : null;
-    if (!isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) return false;
+    if (!isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) {
+      // A registered replacement can see its own leg history in the carrier
+      // profile. This never grants it the private original manifest dossier.
+      if (data.tipo !== 'relevo_transporte' || notice.rol !== 'TRANSPORTISTA' || !notice.usuarioId) return false;
+      const carrier = await prisma.transportista.findFirst({ where: { usuarioId: notice.usuarioId }, select: { id: true } });
+      if (!carrier) return false;
+      const ownLeg = await prisma.tramoTransporte.findFirst({ where: {
+        manifiestoId: notice.manifiestoId, tipo: 'REGISTRADO', transportistaId: carrier.id,
+      }, select: { id: true } });
+      if (!ownLeg) return false;
+    }
   }
   if (family === 'certificados') {
     const document = await prisma.documento.findUnique({ where: { id: data.documentoId }, include: {
@@ -86,7 +96,7 @@ export async function queuedNoticeStillEligible(queueId: string, recipient: stri
   const content = notificationMailContent({ ...notice, ...user });
   if (!content || !enabledFamilies().includes(content.family)) return false;
   if (!await recipientEligible({ ...notice, ...user }, content.family)) return false;
-  return sourceEligible({ ...notice, ...user }, content.family);
+  return notificationSourceEligible({ ...notice, ...user }, content.family);
 }
 export function notificationMailContent(notice: NoticeForMail): { family: string; subject: string; html: string } | null {
   let data: Record<string, unknown>;
@@ -104,6 +114,9 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto')) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto';
     path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId) + (data.tipo === 'adenda_manifiesto' ? '/adendas' : '');
+  } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && data.tipo === 'relevo_transporte' && typeof data.tramoId === 'string') {
+    family = 'manifiestos'; title = 'Cambio de transporte en tránsito';
+    path = notice.rol === 'TRANSPORTISTA' ? '/transporte/perfil' : '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
   } else if (ALERT_TYPES.includes(notice.tipo) || (notice.tipo === 'INFO_GENERAL' && (data.familia === 'catalogo_verificable' || (data.tipo === 'seguimiento_cierre' && notice.manifiestoId)) && typeof data.casoId === 'string')) {
     family = 'alertas'; title = 'Aviso de seguimiento'; path = '/notificaciones';
   } else if (notice.tipo.startsWith('SOLICITUD_') && typeof data.solicitudId === 'string' && data.solicitudId) {
@@ -173,6 +186,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   const message = data.tipo === 'propuesta_partes' && Object.prototype.hasOwnProperty.call(proposalEvents, proposalPhase) ? proposalEvents[proposalPhase]
     : data.tipo === 'propuesta_partes' && proposalPhase.startsWith('aprobacion-') ? ['Una parte aprobó el manifiesto', 'Revisá qué aprobaciones faltan para iniciar la coordinación.']
     : data.tipo === 'adenda_manifiesto' && Object.prototype.hasOwnProperty.call(addendumEvents, event) ? addendumEvents[event]
+    : data.tipo === 'relevo_transporte' ? ['Cambio de transporte en tránsito', 'La transportista de origen registró un relevo. Revisá el tramo y su seguimiento en SITREP.']
     : family === 'soporte' && Object.prototype.hasOwnProperty.call(supportEvents, event) ? supportEvents[event]
     : family === 'inspecciones' && event === 'ASIGNADA' ? ['Tenés una inspección asignada', 'Revisá la ubicación, la agenda y los controles antes de iniciar la visita.']
     : labels[notice.tipo] || fallback;
@@ -192,13 +206,13 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;
   for (const notice of notices) {
     const content = notificationMailContent(notice);
-    const trainingOrMissing = Boolean(content && !await sourceEligible(notice, content.family));
+    const trainingOrMissing = Boolean(content && !await notificationSourceEligible(notice, content.family));
     const eligible = content && families.includes(content.family) && !trainingOrMissing && await recipientEligible(notice, content.family);
     const result = await prisma.emailQueue.createMany({ skipDuplicates: true, data: [{
       id: 'notification:' + notice.id, to: notice.email,

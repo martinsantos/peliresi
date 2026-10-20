@@ -34,7 +34,7 @@ import {
   VerificarInspeccionPage,
   InspeccionadoParticipacionPage,
   ManifiestosPage, BajaIntensidadPage, AdendasManifiestoPage, ManifiestoDetallePage, NuevoManifiestoPage, EditarManifiestoPage, VerificarManifiestoPage,
-  TransportePerfilPage, ViajeEnCursoTransportista,
+  TransportePerfilPage, CargasEnCursoPage, ViajeEnCursoTransportista,
   ActoresPage, OperadorDetallePage, TransportistasPage, TransportistaDetallePage,
   ReportesPage, AlertasPage, ConfiguracionPage,
   UsuariosPage, AdminGeneradoresPage, GeneradorDetallePage, NuevoGeneradorPage,
@@ -120,6 +120,7 @@ function App() {
             <Route path="/mobile/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
+            <Route path="/mobile/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
             <Route path="/mobile/admin/usuarios" element={<UsuariosPage />} />
             <Route path="/mobile/reportes" element={<ReportesPage />} />
@@ -253,6 +254,7 @@ function App() {
 
             {/* Transporte */}
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
+            <Route path="/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
 
             {/* Reportes */}

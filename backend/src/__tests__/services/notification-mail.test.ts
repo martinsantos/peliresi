@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal } } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier } } }));
 import { notificationMailContent, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
@@ -96,6 +96,22 @@ describe('committed notice mail relay', () => {
     expect(notificationMailContent(adenda)?.html).toContain('/manifiestos/manifest/adendas');
     expect(notificationMailContent(adenda)?.html).not.toContain('PRIVATE');
     expect(notificationMailContent({ ...adenda, manifiestoId: null })).toBeNull();
+  });
+
+  it('mails a replacement through its limited profile and denies an unrelated carrier', async () => {
+    vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'manifiestos');
+    const handoff = { ...manifestNotice, tipo: 'INFO_GENERAL', datos: '{"tipo":"relevo_transporte","tramoId":"leg","url":"https://untrusted.invalid"}' };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, transportista: { usuarioId: 'original' } });
+    mocks.notice.mockResolvedValue({ ...handoff, usuario: handoff });
+    mocks.carrier.mockResolvedValue({ id: 'carrier' }); mocks.leg.mockResolvedValue({ id: 'own-leg' });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', handoff.email)).toBe(true);
+    expect(notificationMailContent(handoff)?.html).toContain('/transporte/perfil');
+    expect(notificationMailContent(handoff)?.html).not.toContain('untrusted');
+    mocks.leg.mockResolvedValue(null);
+    expect(await queuedNoticeStillEligible('notification:qa-notice', handoff.email)).toBe(false);
+    mocks.manifest.mockResolvedValue({ isDemoData: true });
+    mocks.carrier.mockResolvedValue({ id: 'carrier' }); mocks.leg.mockResolvedValue({ id: 'own-leg' });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', handoff.email)).toBe(false);
   });
   it.each([null, { isDemoData: true }, { isDemoData: false, transportista: { usuarioId: 'reassigned' } }])('suppresses deleted, synthetic or reassigned manifest %j', async current => {
     vi.stubEnv('EMAIL_NOTIFICATION_FAMILIES', 'manifiestos');
