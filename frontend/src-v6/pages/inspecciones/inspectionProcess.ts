@@ -4,7 +4,7 @@ import type { InspectionExchange, InspectionFollowUp, InspectionState } from '..
 export const INSPECTION_PHASES = {
   VISITA: { label: 'Preparación y visita', description: 'Preparar, programar, inspeccionar y revisar lo constatado.', states: ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO', 'EN_REVISION'] },
   SEGUIMIENTO: { label: 'Seguimiento', description: 'Observaciones, plazo, descargo y acreditación de subsanación.', states: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION'] },
-  DERIVACIONES: { label: 'Derivaciones', description: 'Seguimiento de la derivación a Legales o ATM.', states: ['DERIVADA_LEGALES', 'EN_TRAMITE_LEGAL', 'DERIVADA_ATM'] },
+  DERIVACIONES: { label: 'Derivaciones', description: 'Seguimiento administrativo de Legales. Los registros ATM existentes requieren validar su alcance.', states: ['DERIVADA_LEGALES', 'EN_TRAMITE_LEGAL', 'DERIVADA_ATM'] },
   CERRADAS: { label: 'Cerradas', description: 'Cierre conforme, finalización o cancelación. El historial se conserva.', states: ['CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA'] },
 } satisfies Record<string, { label: string; description: string; states: InspectionState[] }>;
 
@@ -13,6 +13,26 @@ export const inspectionPhaseOf = (state: InspectionState): InspectionPhase =>
   (Object.keys(INSPECTION_PHASES) as InspectionPhase[]).find((phase) => (INSPECTION_PHASES[phase].states as InspectionState[]).includes(state))!;
 export const isInspectionPhase = (value: string | null): value is InspectionPhase => Boolean(value && Object.hasOwn(INSPECTION_PHASES, value));
 export const isInspectionFollowUp = (state: InspectionState) => inspectionPhaseOf(state) === 'SEGUIMIENTO';
+
+/** Existing states only. A recorded derivation does not prove external receipt. */
+export function inspectionLegalFollowUp(state: InspectionState) {
+  if (state === 'DERIVADA_LEGALES') return {
+    title: 'Derivación a Legales registrada', label: 'Administración: registrar avance de Legales',
+    detail: 'La administración competente debe registrar el avance y la referencia del trámite. La derivación registrada no confirma recepción externa ni una decisión legal. No se admiten nuevas presentaciones en este intercambio.',
+    next: 'EN_TRAMITE_LEGAL' as const, action: 'Registrar trámite legal', step: 0, legacyAtm: false,
+  };
+  if (state === 'EN_TRAMITE_LEGAL') return {
+    title: 'Expediente en trámite legal', label: 'Administración: seguir el resultado de Legales',
+    detail: 'La administración competente sigue el trámite y registra su resultado cuando corresponda. Este estado no acredita sanción, firmeza ni finalización. No se admiten nuevas presentaciones en este intercambio.',
+    next: 'FINALIZADA' as const, action: 'Registrar finalización', step: 1, legacyAtm: false,
+  };
+  if (state === 'DERIVADA_ATM') return {
+    title: 'Registro ATM: alcance pendiente de validar', label: 'Administración: revisar el registro ATM',
+    detail: 'Se conserva el estado existente «Derivada a ATM». Su alcance debe confirmarse; no representa el control del ticket de sellado ni un envío o recepción acreditados. No se admiten nuevas presentaciones en este intercambio.',
+    next: null, action: null, step: null, legacyAtm: true,
+  };
+  return null;
+}
 
 const mendozaDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: '2-digit', day: '2-digit' });
 const deadlineFormat = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Mendoza', dateStyle: 'short', timeStyle: 'short', hour12: false });
@@ -81,6 +101,8 @@ export function inspectionExchangeDeadline(state: InspectionState, active: strin
 }
 
 export function inspectionExchangeNextStep(state: InspectionState, entries: InspectionExchange[], actor: boolean, now = Date.now()) {
+  const legal = inspectionLegalFollowUp(state);
+  if (legal) return { title: legal.title, detail: legal.detail, pending: [] as InspectionExchange[] };
   if (!isInspectionFollowUp(state)) return {
     title: state === 'CERRADA_CONFORME' ? 'Seguimiento cerrado conforme' : inspectionPhaseOf(state) === 'DERIVACIONES' ? 'Intercambio concluido · expediente derivado' : 'Intercambio cerrado',
     detail: 'Podés consultar las actuaciones y los adjuntos. No se admiten nuevas presentaciones en esta instancia.',

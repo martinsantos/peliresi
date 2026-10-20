@@ -197,6 +197,14 @@ export async function obtenerIntercambiosInspeccion(req: AuthRequest, res: Respo
       include: exchangeInclude,
       orderBy: { secuencia: 'asc' },
     });
+    // Only an explicitly public final-state record, after the same entity access
+    // check. Internal notes and the legal-progress detail remain staff-only.
+    const resultadoAdministrativo = inspection.estado === 'FINALIZADA'
+      ? await prisma.eventoInspeccion.findFirst({
+        where: { inspeccionId: inspection.id, tipo: 'CAMBIO_ESTADO', estadoHasta: 'FINALIZADA', visibleActor: true },
+        select: { id: true, detalle: true, createdAt: true },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }) : null;
     res.json({
       success: true,
       data: {
@@ -213,6 +221,7 @@ export async function obtenerIntercambiosInspeccion(req: AuthRequest, res: Respo
         },
         parteActual: party,
         intercambios: exchanges,
+        resultadoAdministrativo,
         comunicacionExterna: false,
       },
     });

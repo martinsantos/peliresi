@@ -21,6 +21,7 @@ describe('TEF belongs to administrative evaluation, not the public applicant', (
     expect(screen.getByLabelText('Potencia Instalada en HP')).toHaveValue(120);
     expect(screen.getByLabelText('Superficie Cubierta en M2')).toHaveValue(1250);
     expect(screen.getByText(/no guardan un importe, no emiten una liquidación/)).toBeVisible();
+    expect(screen.getByText(/Fórmula y parámetros de la simulación pendientes de conciliación/)).toBeVisible();
     fireEvent.click(screen.getByText('Evaluación TEF · Administración'));
     expect(details).not.toHaveAttribute('open');
   });

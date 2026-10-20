@@ -88,6 +88,8 @@ export function useInspection(id: string) {
       }
     },
     enabled: Boolean(id && cacheKey),
+    refetchInterval: query => query.state.data && ['DERIVADA_LEGALES', 'EN_TRAMITE_LEGAL', 'DERIVADA_ATM'].includes(query.state.data.estado) ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
   return { ...query, offlineCacheProblem: offlineCacheStatus.cacheKey === cacheKey && offlineCacheStatus.problem };
 }

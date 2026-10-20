@@ -14,12 +14,21 @@ describe('receipt feedback is readable evidence, never a payment certification',
     expect(screen.getByRole('alert')).toHaveTextContent('no acredita un pago nuevo');
   });
   it('makes the text optional and the legal limit explicit', () => {
-    const result = render(<DocumentAnalysis analysis={analysis} />);
-    const details = result.container.querySelector('details')!;
+    render(<DocumentAnalysis analysis={analysis} />);
+    const details = screen.getByText('Ver texto leído del recibo').closest('details')!;
     expect(details.open).toBe(false);
-    expect(screen.getByText(/no valida el pago/)).toBeInTheDocument();
+    expect(screen.getByText('Lectura automática para revisar; no valida el pago.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('RECIBO QA · 12500')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Ver texto leído del recibo'));
+    expect(details.open).toBe(true);
+  });
+  it('does not present absence of a byte match as proof that an ATM ticket is unique', () => {
+    render(<DocumentAnalysis analysis={analysis} />);
+    const scope = screen.getByTestId('receipt-control-scope');
+    expect(scope).toHaveTextContent('otra foto del mismo ticket puede no generar alerta');
+    expect(scope).toHaveTextContent('no valida el pago ante ATM');
+    expect(scope).toHaveTextContent('contra el trámite y la liquidación que corresponda');
+    expect(screen.queryByRole('alert')).toBeNull();
   });
   it.each(['SIN_TEXTO', 'NO_DISPONIBLE'] as const)('does not claim successful reading for %s', lectura => {
     render(<DocumentAnalysis analysis={{ ...analysis, lectura, texto: '' }} />);

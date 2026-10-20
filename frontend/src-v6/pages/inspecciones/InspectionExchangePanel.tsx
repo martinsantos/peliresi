@@ -20,6 +20,7 @@ import {
 import { Badge } from '../../components/ui/BadgeV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
+import { InspectionLegalProgress } from './InspectionLegalProgress';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { inspeccionService } from '../../services/inspeccion.service';
@@ -30,7 +31,7 @@ import type {
   InspectionExchangeType,
 } from '../../types/inspection';
 import { INSPECTION_STATE_COLORS, INSPECTION_STATE_LABELS, inspectionDate, inspectionErrorMessage } from './inspectionPresentation';
-import { INSPECTION_PHASES, inspectionPhaseOf, inspectionExchangeNextStep, inspectionExchangeDeadline, inspectionDeadlineDate, inspectionDeadlineStatus, inspectionFollowUpFromEntries, inspectionFollowUpStatus, inspectionReplyDeadline, inspectionDeadlineInput, inspectionDeadlineFromInput } from './inspectionProcess';
+import { INSPECTION_PHASES, inspectionPhaseOf, inspectionExchangeNextStep, inspectionExchangeDeadline, inspectionDeadlineDate, inspectionDeadlineStatus, inspectionFollowUpFromEntries, inspectionFollowUpStatus, inspectionReplyDeadline, inspectionDeadlineInput, inspectionDeadlineFromInput, inspectionLegalFollowUp } from './inspectionProcess';
 
 const TYPE_LABELS: Record<InspectionExchangeType, string> = {
   REQUERIMIENTO: 'Requerimiento',
@@ -263,6 +264,8 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
     queryFn: () => inspeccionService.getExchanges(inspectionId),
     enabled: Boolean(inspectionId && currentUser?.id),
     staleTime: 15_000,
+    refetchInterval: query => query.state.data && inspectionLegalFollowUp(query.state.data.inspeccion.estado) ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
   const timeline = exchangeQuery.data;
   const party = timeline?.parteActual || 'AUTORIDAD';
@@ -445,6 +448,7 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   if (exchangeQuery.isError || !timeline) return <Card className="border-error-200 bg-error-50 text-sm text-error-800">No se pudo abrir el intercambio formal de este expediente.</Card>;
 
   const followUp = inspectionFollowUpStatus(timeline.inspeccion.seguimiento || inspectionFollowUpFromEntries(timeline.inspeccion.estado, timeline.intercambios), now);
+  const legal = inspectionLegalFollowUp(timeline.inspeccion.estado);
   const deadlineExpired = followUp.overdue > 0;
   const displayedDeadline = followUp.next ? followUp.next.plazoRespuestaAt : inspectionExchangeDeadline(timeline.inspeccion.estado, timeline.inspeccion.plazoRespuestaAt, timeline.intercambios);
   const nextStep = inspectionExchangeNextStep(timeline.inspeccion.estado, timeline.intercambios, party === 'INSPECCIONADO', now);
@@ -475,7 +479,7 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
           <div className="py-3 sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">{!open ? 'Último plazo · histórico' : followUp.next ? `Plazo del pedido #${followUp.next.secuencia}` : 'Último plazo registrado · referencia'}</p><p data-testid="inspection-deadline-value" className={`mt-1 font-bold ${deadlineExpired && open ? 'text-error-700' : 'text-[#10213A]'}`}>{inspectionDeadlineDate(displayedDeadline)}</p>{displayedDeadline && <p className="mt-1 text-xs text-neutral-500">Hora de Mendoza</p>}</div>
         </div>
         <div data-testid="inspection-next-step" className="border-t border-neutral-200 px-4 py-4 sm:px-6">
-          <p data-testid="inspection-responsible" className="mb-2 text-xs font-bold uppercase tracking-wide text-primary-800">{followUp.responsible ? `Debe actuar: ${followUp.responsible}` : 'Sin intercambio abierto'}</p>
+          <p data-testid="inspection-responsible" className="mb-2 text-xs font-bold uppercase tracking-wide text-primary-800">{legal ? 'Debe actuar: Administración competente' : followUp.responsible ? `Debe actuar: ${followUp.responsible}` : 'Sin intercambio abierto'}</p>
           <p className="flex items-center gap-2 font-bold text-neutral-900"><Reply size={18} className="shrink-0 text-primary-800" aria-hidden="true" />{nextStep.title}</p>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{nextStep.detail}</p>
           {open && party === 'INSPECCIONADO' && nextStep.pending[0] && !composeOpen && <Button className="mt-3" disabled={presentMutation.isPending} leftIcon={<Reply size={16} />} onClick={() => beginReply(nextStep.pending[0])}>Responder requerimiento #{nextStep.pending[0].secuencia}</Button>}
@@ -492,6 +496,10 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
           <p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>
         </div>
       </Card>
+
+      {legal && <InspectionLegalProgress id={inspectionId} state={timeline.inspeccion.estado} version={timeline.inspeccion.version} canManage={canDecide && party === 'AUTORIDAD'} online={online} onRecorded={() => exchangeQuery.refetch()} />}
+
+      {timeline.inspeccion.estado === 'FINALIZADA' && timeline.resultadoAdministrativo && <Card data-testid="inspection-public-result" className="space-y-3"><h3 className="flex items-center gap-2 text-lg font-bold text-neutral-900"><FileCheck2 size={21} className="shrink-0 text-primary-800" aria-hidden="true" />Resultado administrativo registrado</h3><p className="whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800">{timeline.resultadoAdministrativo.detalle || 'La administración registró la finalización sin un resumen público adicional.'}</p><p className="text-xs text-neutral-600">{inspectionDeadlineDate(timeline.resultadoAdministrativo.createdAt)} · Mendoza. El registro no acredita por sí solo sanción ni firmeza.</p></Card>}
 
       {!online && <div role="status" className="flex items-start gap-3 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm text-warning-900"><WifiOff className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Sin conexión: no se enviará ninguna actuación.</p><p className="mt-0.5 leading-5">El texto y los adjuntos seleccionados se conservan en el almacenamiento local del navegador de este dispositivo. Al reconectar, revise la versión y confirme manualmente; SITREP nunca autoenvía un descargo.</p></div></div>}
       {restoredAt && composeOpen && <div role="status" className="flex items-start gap-3 rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900"><FileCheck2 className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Borrador local recuperado</p><p className="mt-0.5 leading-5">Guardado {inspectionDate(restoredAt, true)} con {files.length} {files.length === 1 ? 'adjunto' : 'adjuntos'}. Revíselo antes de presentar; todavía no integra el expediente.</p></div></div>}

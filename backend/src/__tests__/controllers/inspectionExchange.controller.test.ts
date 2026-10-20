@@ -19,11 +19,13 @@ const mocks = vi.hoisted(() => ({
   markViewed: vi.fn(),
   recipients: vi.fn(),
   notices: vi.fn(),
+  publicResult: vi.fn(),
 }));
 
 vi.mock('../../lib/prisma', () => ({ default: {
   inspeccion: { findUnique: mocks.inspection, findMany: mocks.inspections },
   intercambioInspeccion: { findMany: mocks.exchanges, findFirst: mocks.existingExchange, findUniqueOrThrow: mocks.finalExchange, updateMany: mocks.markViewed },
+  eventoInspeccion: { findFirst: mocks.publicResult },
   $transaction: mocks.transaction,
 } }));
 vi.mock('../../services/inspectionEvidence.service', () => ({
@@ -69,6 +71,7 @@ describe('inspection participant exchange controller', () => {
     vi.clearAllMocks();
     mocks.inspection.mockResolvedValue(actorInspection);
     mocks.exchanges.mockResolvedValue([]);
+    mocks.publicResult.mockResolvedValue(null);
     mocks.markViewed.mockResolvedValue({ count: 1 });
     mocks.recipients.mockResolvedValue([{ id: 'recipient' }]);
     mocks.notices.mockReset().mockResolvedValue({ count: 1 });
@@ -297,6 +300,37 @@ describe('inspection participant exchange controller', () => {
     expect(mocks.createExchange).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ presentadoFueraDePlazo: late, respondeAId: 'request-older' }),
     }));
+  });
+
+  it('returns only the explicitly public final-state summary of the authorized inspection', async () => {
+    mocks.inspection.mockResolvedValue({ ...actorInspection, estado: 'FINALIZADA' });
+    const result = { id: 'public-final', detalle: 'Resultado público QA, sin afirmar firmeza.', createdAt: new Date() };
+    mocks.publicResult.mockResolvedValue(result);
+    const res = response(), next = vi.fn();
+    await obtenerIntercambiosInspeccion({ params: { id: actorInspection.id }, user: actorUser() } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.publicResult).toHaveBeenCalledWith({
+      where: { inspeccionId: actorInspection.id, tipo: 'CAMBIO_ESTADO', estadoHasta: 'FINALIZADA', visibleActor: true },
+      select: { id: true, detalle: true, createdAt: true }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+    expect(res.json.mock.calls[0][0].data.resultadoAdministrativo).toEqual(result);
+  });
+
+  it.each(['DERIVADA_LEGALES', 'EN_TRAMITE_LEGAL', 'DERIVADA_ATM'])('does not retrieve or disclose internal progress for %s', async estado => {
+    mocks.inspection.mockResolvedValue({ ...actorInspection, estado });
+    mocks.publicResult.mockResolvedValue({ detalle: 'PRIVATE QA NOTE' });
+    const res = response(), next = vi.fn();
+    await obtenerIntercambiosInspeccion({ params: { id: actorInspection.id }, user: actorUser() } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled(); expect(mocks.publicResult).not.toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].data.resultadoAdministrativo).toBeNull();
+  });
+
+  it('checks entity access before reading a public finalization summary', async () => {
+    mocks.inspection.mockResolvedValue({ ...actorInspection, estado: 'FINALIZADA' });
+    const next = vi.fn(), res = response();
+    await obtenerIntercambiosInspeccion({ params: { id: actorInspection.id }, user: actorUser('another-generator') } as any, res as any, next);
+    expect(next).toHaveBeenCalledOnce(); expect(res.json).not.toHaveBeenCalled();
+    expect(mocks.publicResult).not.toHaveBeenCalled(); expect(mocks.markViewed).not.toHaveBeenCalled();
   });
 
 });

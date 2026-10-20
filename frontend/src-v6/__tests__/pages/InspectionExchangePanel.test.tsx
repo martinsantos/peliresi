@@ -308,4 +308,21 @@ describe('InspectionExchangePanel', () => {
     expect(screen.getByTestId('inspection-pending-request')).toHaveTextContent('Sin plazo registrado');
   });
 
+  it('shows only the explicitly public administrative result returned for a finalized file', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado: 'FINALIZADA', plazoRespuestaAt: null },
+      resultadoAdministrativo: { id: 'public-final', detalle: 'Resultado documentado y visible al inspeccionado.', createdAt: '2026-10-20T15:00:00Z' } });
+    renderPanel();
+    const result = await screen.findByTestId('inspection-public-result');
+    expect(result).toHaveTextContent('Resultado documentado y visible al inspeccionado.');
+    expect(result).toHaveTextContent('no acredita por sí solo sanción ni firmeza');
+    expect(screen.queryByTestId('inspection-overdue')).not.toBeInTheDocument();
+  });
+
+  it('does not invent a public result for a finalized file without a public event', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado: 'FINALIZADA' }, resultadoAdministrativo: null });
+    renderPanel();
+    await screen.findByTestId('inspection-next-step');
+    expect(screen.queryByTestId('inspection-public-result')).not.toBeInTheDocument();
+  });
+
 });

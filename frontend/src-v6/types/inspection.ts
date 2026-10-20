@@ -235,6 +235,7 @@ export interface InspectionExchangeTimeline {
   };
   parteActual: InspectionExchangeParty;
   intercambios: InspectionExchange[];
+  resultadoAdministrativo?: { id: string; detalle: string | null; createdAt: string } | null;
   comunicacionExterna: false;
 }
 
