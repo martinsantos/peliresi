@@ -1,5 +1,7 @@
 # Control de pagos ATM y lectura de facturas eléctricas — 20/10/2026
 
+**Actualización posterior: producto `a6a5c005` publicado a las 16:45:59 Mendoza**, con backup previo verificado, migración aditiva, CAP cerrado, canales y flags conservados. Smoke **95/95**, externo **9/9**, PWA PASS. Leer [publicación, límites y reversión actual](DESPLIEGUE-PAGOS-ATM-20261020.md). El resto de este documento conserva la validación previa en preview, anterior a la autorización de publicar. No se conciliaron ni modificaron comprobantes reales.
+
 ## Alcance y estado
 
 Candidato de **preview**, producto **`a6a5c005e94aa68ee20b6f410313515f094cb897`**, desde `6a452158`, en `codex/sitrep-training-20261018`. Único checkout autorizado: `sitrep-production-source-20261001` del traspaso. Esta revisión no se conectó a producción, no publicó ni migró allí y no tocó `main` (`c8402190edfc36b5e5d0dee1337c24bd1689420d`). La última publicación anterior sigue documentada como `2200e955`; no se volvió a inspeccionar producción para esta tarea.
