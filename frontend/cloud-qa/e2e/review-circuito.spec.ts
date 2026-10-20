@@ -71,6 +71,10 @@ test('driver can choose concurrent trips, pick up, pause, resume and deliver wit
   await login(page,info);const home=page.url();await expect(page.getByRole('region',{name:'Agenda de manifiestos',exact:true})).toHaveCount(0);
   await page.goto(prefix(info)+'/transporte/perfil');const queue=page.getByRole('region',{name:'Viajes del transportista',exact:true});
   for(const record of [set.records.EN_TRANSITO,set.records.second])await expect(queue.getByRole('button',{name:'Ir al viaje '+record.numero,exact:true})).toBeVisible();
+  const handoffs=page.getByRole('region',{name:'Relevos a mi cargo',exact:true});await expect(handoffs).toBeVisible();
+  const ownBox=await queue.boundingBox(),handoffBox=await handoffs.boundingBox();expect(ownBox).not.toBeNull();expect(handoffBox).not.toBeNull();
+  expect(ownBox!.y+ownBox!.height,'Own active and pending trips precede the assigned handoffs').toBeLessThanOrEqual(handoffBox!.y);
+  await expect(queue.getByRole('heading',{name:/^En tránsito:/})).toBeInViewport();
   await proof(page,info,'driver-trip-queue');
   await queue.getByRole('button',{name:'Abrir viaje asignado '+set.records.pickup.numero,exact:true}).click();await expect(page).toHaveURL(new RegExp('/transporte/viaje/'+set.records.pickup.id+'$'));
   const pickup=page.waitForResponse(r=>r.url().endsWith('/'+set.records.pickup.id+'/confirmar-retiro')&&r.request().method()==='POST');await page.getByRole('button',{name:'Confirmar retiro',exact:true}).click();expect((await pickup).status()).toBe(200);
@@ -89,17 +93,20 @@ test('driver can choose concurrent trips, pick up, pause, resume and deliver wit
  }finally{await ctx.close();}
 });
 
-test('multiple GPS handles a denied sensor, explicit restart and clearing a load without claiming delivery',async({browser},info)=>{
+test('multiple GPS handles a denied sensor, single-action retry and clearing a load without claiming delivery',async({browser},info)=>{
  const data=fixture(),set=data.cases[info.project.name],ctx=await context(browser,info),page=await ctx.newPage(),errors:string[]=[],sent:string[]=[];page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(()=>{const original=navigator.geolocation.watchPosition.bind(navigator.geolocation);(window as any).qaDeny=true;navigator.geolocation.watchPosition=(success,error,options)=>{if((window as any).qaDeny){queueMicrotask(()=>error?.({code:1,message:'QA denied sensor',PERMISSION_DENIED:1,POSITION_UNAVAILABLE:2,TIMEOUT:3}));return 99999;}return original(success,error,options);};});
+ await page.addInitScript(()=>{const original=navigator.geolocation.watchPosition.bind(navigator.geolocation),clear=navigator.geolocation.clearWatch.bind(navigator.geolocation),qa=window as any;qa.qaDeny=true;qa.qaWatchCalls=0;qa.qaWatchIds=new Set<number>();navigator.geolocation.watchPosition=(success,error,options)=>{qa.qaWatchCalls++;let id:number;if(qa.qaDeny){queueMicrotask(()=>error?.({code:1,message:'QA denied sensor',PERMISSION_DENIED:1,POSITION_UNAVAILABLE:2,TIMEOUT:3}));id=99999;}else id=original(success,error,options);qa.qaWatchIds.add(id);return id;};navigator.geolocation.clearWatch=id=>{qa.qaWatchIds.delete(id);clear(id);};});
  page.on('response',r=>{if(r.request().method()==='POST'&&r.url().endsWith('/ubicacion')&&r.status()===200)sent.push(r.url());});
  try{
   await login(page,info);await page.goto(prefix(info)+'/transporte/cargas');await page.getByRole('searchbox',{name:'Número de manifiesto',exact:true}).fill(set.records.permission.numero);await page.getByRole('button',{name:'Buscar',exact:true}).click();await page.getByRole('checkbox',{name:'Llevo '+set.records.permission.numero+' en este móvil',exact:true}).check();
-  await page.getByRole('button',{name:'Iniciar GPS',exact:true}).click();await expect(page.getByText('Permití la ubicación y volvé a iniciar el GPS.',{exact:true})).toBeVisible();expect(sent).toHaveLength(0);await proof(page,info,'gps-denied-clear-message');
-  await page.getByRole('button',{name:'Detener GPS',exact:true}).click();await page.evaluate(()=>{(window as any).qaDeny=false;});await page.getByRole('button',{name:'Iniciar GPS',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);await expect(page.getByRole('region',{name:'Cargas marcadas',exact:true})).toContainText('GPS recibido');
+  await page.getByRole('button',{name:'Iniciar GPS',exact:true}).click();await expect(page.getByText('Permití la ubicación del teléfono y tocá Reintentar GPS.',{exact:true})).toBeVisible();expect(sent).toHaveLength(0);await expect(page.getByRole('button',{name:'Detener GPS',exact:true})).toHaveCount(0);await proof(page,info,'gps-denied-clear-message');
+  await page.evaluate(()=>{(window as any).qaDeny=false;});await page.getByRole('button',{name:'Reintentar GPS',exact:true}).click();await expect.poll(()=>sent.length).toBe(1);await expect(page.getByRole('region',{name:'Cargas marcadas',exact:true})).toContainText('GPS recibido');
+  expect(await page.evaluate(()=>({calls:(window as any).qaWatchCalls,active:(window as any).qaWatchIds.size}))).toEqual({calls:2,active:1});
+  await proof(page,info,'gps-retry-single-action');
   await page.getByRole('button',{name:'Quitar '+set.records.permission.numero+' del GPS',exact:true}).click();await expect(page.getByRole('region',{name:'Cargas marcadas',exact:true})).toHaveCount(0);await expect(page.getByText('Revisá las cargas marcadas: no se está enviando GPS.',{exact:true})).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>(window as any).qaWatchIds.size)).toBe(0);
   const token=await page.evaluate(()=>localStorage.getItem('sitrep_access_token'));const detail=await page.request.get('/api/manifiestos/'+set.records.permission.id,{headers:{Authorization:'Bearer '+token}});expect(detail.status()).toBe(200);expect((await detail.json()).data.manifiesto.estado).toBe('EN_TRANSITO');
   await proof(page,info,'gps-selection-cleared-without-delivery');expect(errors).toEqual([]);
-  writeFileSync(info.outputPath('gps-denied-proof.json'),JSON.stringify({deniedBeforeAnyUpload:true,explicitRestart:true,afterRemovalStillInTransit:true,production:false}));
+  writeFileSync(info.outputPath('gps-denied-proof.json'),JSON.stringify({deniedBeforeAnyUpload:true,singleActionRetry:true,onlyOneWatcherAfterRetry:true,noWatcherAfterRemoval:true,afterRemovalStillInTransit:true,production:false}));
  }finally{await ctx.close();}
 });

@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
-import {ArrowLeft,CheckCircle2,Clock3,MapPin,Navigation,Radio,Search,Square,Truck} from 'lucide-react';
+import {ArrowLeft,CheckCircle2,Clock3,MapPin,Navigation,Radio,RefreshCw,Search,Square,Truck} from 'lucide-react';
 import {useAuth} from '../../contexts/AuthContext';
 import {useMobilePrefix} from '../../hooks/useMobilePrefix';
 import {useFleetGps} from '../../hooks/useFleetGps';
@@ -56,13 +56,14 @@ export default function CargasEnCursoPage() {
     finally{deliveryGuard.current=false;setBusy(false);}
   };
   if(!allowed)return <Card><CardContent><p className="text-sm text-neutral-700">El GPS de varias cargas no está habilitado para esta sesión.</p><Link to={mp('/transporte/perfil')} className="text-primary-800 underline">Volver a mis viajes</Link></CardContent></Card>;
-  const label=gps.status==='denied'?'Permití la ubicación y volvé a iniciar el GPS.':gps.status==='unavailable'?'Este dispositivo no dispone de ubicación.':!started?'GPS detenido':gps.activeCount===0?'Revisá las cargas marcadas: no se está enviando GPS.':gps.status==='active'?`GPS para ${gps.activeCount} carga${gps.activeCount===1?'':'s'}`:'Buscando una ubicación reciente…';
+  const retryLocation=started&&(gps.status==='denied'||gps.status==='unavailable');
+  const label=gps.status==='denied'?'Permití la ubicación del teléfono y tocá Reintentar GPS.':gps.status==='unavailable'?'No se pudo acceder al GPS del dispositivo. Revisá la ubicación y tocá Reintentar GPS.':!started?'GPS detenido':gps.activeCount===0?'Revisá las cargas marcadas: no se está enviando GPS.':gps.status==='active'?`GPS para ${gps.activeCount} carga${gps.activeCount===1?'':'s'}`:'Buscando una ubicación reciente…';
   return <div className="mx-auto max-w-4xl space-y-4 pb-6">
     <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800"><ArrowLeft size={18}/>Mis viajes</Link>
     <header><h1 className="text-xl font-bold text-neutral-900">Cargas en este móvil</h1><p className="mt-1 text-sm text-neutral-600">Marcá sólo los manifiestos que llevás en este vehículo.</p></header>
     <Card><CardContent className="space-y-3">
       <p role="status" aria-live="polite" className={`flex items-center gap-2 rounded-lg p-3 text-sm font-semibold ${started&&gps.status==='active'?'bg-primary-50 text-primary-800':'bg-neutral-100 text-neutral-700'}`}><Radio size={18} aria-hidden="true"/>{label}</p>
-      <Button fullWidth disabled={!started&&chosen.filter(load=>load.gpsDisponible).length===0} leftIcon={started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(!started)setChoosing(false);setStarted(value=>!value);}}>{started?'Detener GPS':'Iniciar GPS'}</Button>
+      <Button fullWidth disabled={!started&&chosen.filter(load=>load.gpsDisponible).length===0} leftIcon={retryLocation?<RefreshCw size={18}/>:started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(retryLocation){gps.retryLocation();return;}if(!started)setChoosing(false);setStarted(value=>!value);}}>{retryLocation?'Reintentar GPS':started?'Detener GPS':'Iniciar GPS'}</Button>
       {chosen.length>0&&<button type="button" onClick={()=>setChoosing(value=>!value)} className="min-h-11 text-sm font-semibold text-primary-800 underline">{choosing?'Cerrar selección':'Elegir otras cargas'}</button>}
       <p className="text-sm text-neutral-600">Mantené esta pantalla abierta. Una sola ubicación se envía a cada carga marcada cada 30 segundos. Al entregar una, las demás continúan.</p>
     </CardContent></Card>
@@ -74,7 +75,7 @@ export default function CargasEnCursoPage() {
           <p role="status" className={`text-sm ${sent?.state==='error'?'text-error-800':sent?.state==='received'&&fresh?'text-primary-800':'text-neutral-600'}`}>{state}{sent?.state==='received'&&sent.receivedAt&&<span className="ml-1 text-xs">· {sent.receivedAt.toLocaleTimeString('es-AR')}</span>}</p>
           {sent?.state!=='received'&&sent?.receivedAt&&<p className="text-xs text-neutral-500">Última recepción: {sent.receivedAt.toLocaleTimeString('es-AR')}</p>}
           {duration&&<p className="flex items-center gap-1 text-xs text-neutral-600"><Clock3 size={13}/>{load.referenciaTiempo}: {duration}</p>}
-          <div className="flex flex-wrap gap-2">{sent?.state==='error'&&sent.statusCode!==409&&<Button size="sm" variant="outline" onClick={()=>gps.resume(load.key)}>Reintentar GPS</Button>}{load.puedeEntregar?<Button size="sm" variant="outline" aria-label={`Entregar ${load.numero}`} leftIcon={<CheckCircle2 size={16}/>} onClick={()=>{setError('');setDelivery(load);}}>Entregar</Button>:<p className="text-xs text-neutral-600">Entrega a cargo de la transportista de origen.</p>}</div>
+          <div className="flex flex-wrap gap-2">{sent?.state==='error'&&sent.statusCode!==409&&<Button size="sm" variant="outline" aria-label={`Reintentar envío GPS de ${load.numero}`} onClick={()=>gps.resume(load.key)}>Reintentar envío</Button>}{load.puedeEntregar?<Button size="sm" variant="outline" aria-label={`Entregar ${load.numero}`} leftIcon={<CheckCircle2 size={16}/>} onClick={()=>{setError('');setDelivery(load);}}>Entregar</Button>:<p className="text-xs text-neutral-600">Entrega a cargo de la transportista de origen.</p>}</div>
         </div>;
       })}
     </CardContent></Card>}

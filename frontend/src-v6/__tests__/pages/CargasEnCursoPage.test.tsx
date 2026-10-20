@@ -10,12 +10,13 @@ import CargasEnCursoPage from '../../pages/transporte/CargasEnCursoPage';
 const loads = ['A', 'B'].map(id => ({ key: 'MANIFIESTO:' + id, kind: 'MANIFIESTO', id, numero: 'QA-' + id,
   origen: 'Origen artificial', destino: 'Planta QA', fechaInicio: new Date().toISOString(), referenciaTiempo: 'Desde el retiro', patente: null, puedeEntregar: true, gpsDisponible: true }));
 let locate: PositionCallback;
+let fail: PositionErrorCallback;
 const clearWatch = vi.fn();
 beforeEach(() => {
   vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'true'); mocks.user.id = 'qa-carrier'; clearWatch.mockClear();
   mocks.list.mockReset().mockImplementation(async search => ({ targets: search ? [] : loads, total: search ? 0 : 2, limit: 100 }));
   mocks.send.mockReset().mockResolvedValue({}); mocks.deliver.mockReset().mockResolvedValue({});
-  vi.stubGlobal('navigator', { geolocation: { watchPosition: vi.fn((ok: PositionCallback) => { locate = ok; return 12; }), clearWatch } });
+  vi.stubGlobal('navigator', { geolocation: { watchPosition: vi.fn((ok: PositionCallback, error: PositionErrorCallback) => { locate = ok; fail = error; return 12; }), clearWatch } });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 function setup() {
@@ -52,4 +53,23 @@ it('does not query loads or acquire location when the operational feature is dis
   vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'false'); const view = setup();
   expect(screen.getByText('El GPS de varias cargas no está habilitado para esta sesión.')).toBeVisible();
   expect(mocks.list).not.toHaveBeenCalled(); expect(navigator.geolocation.watchPosition).not.toHaveBeenCalled(); view.unmount();
+});
+
+it('offers one location retry after denial without confusing a failed load upload', async () => {
+  mocks.send.mockRejectedValueOnce(new Error('No se pudo enviar la carga A'));
+  const view = setup();
+  await chooseAndStart();
+  await act(async () => { fail({ code: 1 } as GeolocationPositionError); });
+  expect(screen.getByText('Permití la ubicación del teléfono y tocá Reintentar GPS.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Detener GPS', exact: true })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Reintentar envío GPS de QA-A', exact: true })).toHaveTextContent('Reintentar envío');
+  expect(mocks.send).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar GPS', exact: true }));
+  expect(clearWatch).toHaveBeenCalledOnce(); expect(navigator.geolocation.watchPosition).toHaveBeenCalledTimes(2);
+  const selected = screen.getByRole('region', { name: 'Cargas marcadas' });
+  expect(selected).toHaveTextContent('QA-A'); expect(selected).toHaveTextContent('QA-B');
+  await act(async () => { locate({ coords: { latitude: -33, longitude: -69, accuracy: 10, speed: null, heading: null }, timestamp: Date.now() } as GeolocationPosition); });
+  await waitFor(() => expect(mocks.send).toHaveBeenCalledTimes(4));
+  expect(screen.getByRole('button', { name: 'Detener GPS', exact: true })).toBeVisible();
+  expect(mocks.deliver).not.toHaveBeenCalled(); view.unmount();
 });

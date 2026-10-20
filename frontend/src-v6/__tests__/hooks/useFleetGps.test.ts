@@ -81,9 +81,41 @@ it('starts only when enabled and stops on disabled sessions or denied permission
   const send = vi.fn().mockResolvedValue({});
   const hook = renderHook(({ enabled }) => useFleetGps([{ key: 'a', send }], enabled), { initialProps: { enabled: false } });
   expect(navigator.geolocation.watchPosition).not.toHaveBeenCalled();
+  act(() => hook.result.current.retryLocation());
+  expect(navigator.geolocation.watchPosition).not.toHaveBeenCalled();
   hook.rerender({ enabled: true });
   await act(async () => { fail({ code: 1 } as GeolocationPositionError); locate(position()); await flush(); });
   expect(send).not.toHaveBeenCalled();
   hook.rerender({ enabled: false }); expect(clearWatch).toHaveBeenCalledWith(17);
+  hook.unmount();
+});
+
+it('retries denied location in one action, replaces the watcher and ignores its old callbacks', async () => {
+  const a = vi.fn().mockResolvedValue({}), b = vi.fn().mockResolvedValue({});
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send: a }, { key: 'b', send: b }], true));
+  const oldLocate = locate, oldFail = fail;
+  await act(async () => { fail({ code: 1 } as GeolocationPositionError); await flush(); });
+  expect(hook.result.current.status).toBe('denied'); expect(a).not.toHaveBeenCalled(); expect(b).not.toHaveBeenCalled();
+  act(() => hook.result.current.retryLocation());
+  expect(clearWatch).toHaveBeenCalledOnce(); expect(navigator.geolocation.watchPosition).toHaveBeenCalledTimes(2);
+  await act(async () => { oldLocate(position()); oldFail({ code: 1 } as GeolocationPositionError); await flush(); });
+  expect(hook.result.current.status).toBe('acquiring'); expect(a).not.toHaveBeenCalled(); expect(b).not.toHaveBeenCalled();
+  await act(async () => { locate(position()); await flush(); });
+  expect(a).toHaveBeenCalledOnce(); expect(b).toHaveBeenCalledOnce(); expect(hook.result.current.status).toBe('active');
+  hook.unmount(); expect(clearWatch).toHaveBeenCalledTimes(2);
+});
+
+it('requires a fresh observation after retry and keeps a handed-off load blocked', async () => {
+  const a = vi.fn().mockRejectedValue(Object.assign(new Error('El tramo cambió'), { status: 409 })), b = vi.fn().mockResolvedValue({});
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send: a }, { key: 'b', send: b }], true));
+  await act(async () => { locate(position()); await flush(); fail({ code: 1 } as GeolocationPositionError); });
+  expect(hook.result.current.deliveries.a).toMatchObject({ terminal: true, statusCode: 409 });
+  act(() => hook.result.current.retryLocation());
+  await act(async () => { vi.advanceTimersByTime(30000); await flush(); });
+  expect(a).toHaveBeenCalledOnce(); expect(b).toHaveBeenCalledOnce();
+  await act(async () => { locate(position()); await flush(); });
+  expect(a).toHaveBeenCalledOnce(); expect(b).toHaveBeenCalledTimes(2);
+  expect(hook.result.current.deliveries.a).toMatchObject({ terminal: true, statusCode: 409 });
+  expect(hook.result.current.deliveries.b.state).toBe('received');
   hook.unmount();
 });

@@ -18,6 +18,7 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
   const [status,setStatus]=useState<Status>('idle');
   const [position,setPosition]=useState<(FleetGpsPoint&{observedAt:number})|null>(null);
   const [deliveries,setDeliveries]=useState<Record<string,FleetGpsDelivery>>({});
+  const [locationAttempt,setLocationAttempt]=useState(0);
   const targetsRef=useRef(targets);
   const currentRef=useRef<{point:FleetGpsPoint;observedAt:number}|null>(null);
   const activeRef=useRef(false),generation=useRef(0),cycleRef=useRef(false);
@@ -58,6 +59,9 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
     heldRef.current.add(key);const pending=requestsRef.current.get(key);if(pending)await Promise.allSettled([pending]);
   },[]);
   const resume=useCallback((key:string)=>{heldRef.current.delete(key);attemptRef.current.delete(key);setDeliveries(previous=>{const next={...previous};delete next[key];return next;});void send();},[send]);
+  // Restart only the device watcher. Keep selected loads, acknowledgements and
+  // terminal access failures; retrying a sensor never grants access to a load.
+  const retryLocation=useCallback(()=>setLocationAttempt(attempt=>attempt+1),[]);
   useEffect(()=>{
     if(!trackingEnabled){setStatus('idle');return;}
     if(!navigator.geolocation){setStatus('unavailable');return;}
@@ -73,8 +77,8 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
       {enableHighAccuracy:true,maximumAge:0,timeout:20000});
     const timer=window.setInterval(()=>void send(),30000);
     return()=>{mounted=false;activeRef.current=false;generation.current++;navigator.geolocation.clearWatch(watch);window.clearInterval(timer);};
-  },[trackingEnabled,send]);
+  },[trackingEnabled,send,locationAttempt]);
   // Adding/removing a selected load does not tear down the device watcher.
   useEffect(()=>{if(trackingEnabled)void send();},[selected,trackingEnabled,send]);
-  return {status,position,deliveries,holdAndDrain,resume,activeCount};
+  return {status,position,deliveries,holdAndDrain,resume,retryLocation,activeCount};
 }
