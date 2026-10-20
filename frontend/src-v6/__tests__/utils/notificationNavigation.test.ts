@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { resolveNotificationPath } from '../../utils/notificationNavigation';
+import { describe, expect, it, vi } from 'vitest';
+import { resolveNotificationPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
 import type { Notificacion } from '../../types/models';
 
 const base: Notificacion = {
@@ -17,6 +17,23 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it('refreshes a PSIP dossier even when its notification opens the current URL', () => {
+    const invalidateQueries = vi.fn();
+    refreshInspectionNotification({ ...base, datos: '{"tipo":"intercambio_inspeccion","version":1}' }, { invalidateQueries } as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['inspecciones'] });
+    invalidateQueries.mockClear(); refreshInspectionNotification(base, { invalidateQueries } as any);
+    expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+  it.each(['participacion', 'inspeccion'])('opens a PSIP %s notice in the authorized dossier on web and app', destino => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino, soloCampana: true, ruta: '/wrong' }) };
+    const path = destino === 'participacion' ? '/mis-inspecciones/case-1' : '/inspecciones/case-1#intercambios';
+    expect(resolveNotificationPath(notice)).toBe(path);
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app' + path);
+  });
+  it.each([{ destino: 'other' }, { inspeccionId: '../other' }, { version: 2 }, { inspeccionId: null }])('keeps a malformed PSIP link in the inbox: %j', invalid => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino: 'participacion', ...invalid }) };
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app/notificaciones');
+  });
   it.each([['generador', 'generadores'], ['operador', 'operadores'], ['transportista', 'transportistas']])('opens the %s official certificate record on web and app', (actorTipo, plural) => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'certificado_ambiental', actorTipo, actorId: 'owner' }) };
     expect(resolveNotificationPath(notice)).toBe('/mi-perfil');

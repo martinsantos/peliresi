@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { createInspectionExchangeNotices } from '../services/inspectionExchangeNotice.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import {
@@ -354,6 +355,7 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
           },
         },
       });
+      await createInspectionExchangeNotices(tx, inspection, { id: exchange.id, secuencia, tipo: input.tipo, parte: party, autorId: req.user.id });
       return exchange;
     });
 
@@ -494,6 +496,7 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
           },
         },
       });
+      await createInspectionExchangeNotices(tx, inspection, { id: exchange.id, secuencia, tipo, parte: 'AUTORIDAD', autorId: req.user.id });
       return exchange;
     });
     storedKeys.length = 0;

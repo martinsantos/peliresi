@@ -1,5 +1,6 @@
 import type { Notificacion } from '../types/models';
 import { cataloguePath } from './alertCatalogue';
+import type { QueryClient } from '@tanstack/react-query';
 
 function parseNotificationData(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
@@ -20,8 +21,21 @@ function withBasePath(path: string, basePath: string): string {
   return `${normalizedBase}${normalizedPath}`;
 }
 
+/** A new/opened PSIP notice must not leave an already open expediente on stale data. */
+export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
+  const data = parseNotificationData(notificacion.datos);
+  if (data.tipo === 'intercambio_inspeccion' && data.version === 1) {
+    void queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
+  }
+}
+
 export function resolveNotificationPath(notificacion: Notificacion, basePath = ''): string {
   const data = parseNotificationData(notificacion.datos);
+  if (data.tipo === 'intercambio_inspeccion') {
+    if (data.version !== 1 || typeof data.inspeccionId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.inspeccionId)
+      || !['participacion', 'inspeccion'].includes(String(data.destino))) return withBasePath('/notificaciones', basePath);
+    return withBasePath(data.destino === 'participacion' ? `/mis-inspecciones/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}#intercambios`, basePath);
+  }
   const target = cataloguePath(notificacion.datos, true);
   if (data.familia === 'catalogo_verificable') return withBasePath(target || '/notificaciones', basePath);
   const explicitPath = typeof data.url === 'string'

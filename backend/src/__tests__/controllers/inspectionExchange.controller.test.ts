@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   createEvent: vi.fn(),
   finalExchange: vi.fn(),
   markViewed: vi.fn(),
+  recipients: vi.fn(),
+  notices: vi.fn(),
 }));
 
 vi.mock('../../lib/prisma', () => ({ default: {
@@ -68,6 +70,8 @@ describe('inspection participant exchange controller', () => {
     mocks.inspection.mockResolvedValue(actorInspection);
     mocks.exchanges.mockResolvedValue([]);
     mocks.markViewed.mockResolvedValue({ count: 1 });
+    mocks.recipients.mockResolvedValue([{ id: 'recipient' }]);
+    mocks.notices.mockReset().mockResolvedValue({ count: 1 });
     mocks.inspections.mockResolvedValue([{ ...actorInspection, _count: { intercambios: 2 } }]);
     mocks.existingExchange.mockResolvedValue(null);
     mocks.persist.mockResolvedValue({
@@ -83,6 +87,8 @@ describe('inspection participant exchange controller', () => {
       intercambioInspeccion: { findFirst: mocks.previousExchange, create: mocks.createExchange },
       evidenciaInspeccion: { create: mocks.createEvidence },
       eventoInspeccion: { create: mocks.createEvent },
+      usuario: { findMany: mocks.recipients },
+      notificacion: { createMany: mocks.notices },
     }));
   });
 
@@ -191,5 +197,31 @@ describe('inspection participant exchange controller', () => {
       data: expect.objectContaining({ metadata: expect.objectContaining({ adjuntosSha256: ['d'.repeat(64)], correoEnviado: false }) }),
     }));
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('No se envió correo') }));
+    expect(mocks.notices).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(mocks.notices.mock.calls[0][0].data[0].datos)).toMatchObject({ intercambioId: 'exchange-decision', evento: 'DERIVACION_LEGALES', destino: 'participacion', soloCampana: true });
+  });
+
+  it.each(['presentation', 'decision'])('does not duplicate bell notices on an idempotent %s retry', async operation => {
+    mocks.existingExchange.mockResolvedValue({ id: 'already-committed' });
+    const res = response(), next = vi.fn();
+    const handler = operation === 'decision' ? decidirIntercambioInspeccion : presentarIntercambioInspeccion;
+    await handler({ params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' }, body: {
+      version: 7, clienteId: 'retry_12345678', tipo: 'REQUERIMIENTO', asunto: 'Pedido documentado', cuerpo: 'Constancia artificial solicitada para revisión.',
+      decision: 'CERRADA_CONFORME', fundamento: 'Se revisó toda la documentación y se dispone el cierre conforme.',
+    } } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: { id: 'already-committed' } }));
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.notices).not.toHaveBeenCalled();
+  });
+  it('does not acknowledge a decision if its internal notice cannot be persisted', async () => {
+    mocks.notices.mockRejectedValue(new Error('notification persistence unavailable'));
+    const res = response(), next = vi.fn();
+    await decidirIntercambioInspeccion({ params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' }, body: {
+      version: 7, decision: 'CERRADA_CONFORME', fundamento: 'Se revisó toda la documentación y se dispone el cierre conforme.',
+    } } as any, res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'notification persistence unavailable' }));
+    expect(res.json).not.toHaveBeenCalled();
+    expect(mocks.finalExchange).not.toHaveBeenCalled();
   });
 });

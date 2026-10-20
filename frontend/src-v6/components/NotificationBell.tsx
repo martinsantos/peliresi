@@ -15,7 +15,7 @@ import { getAccessToken } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { Notificacion } from '../types/models';
 import { TipoNotificacion } from '../types/models';
-import { resolveNotificationPath } from '../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification } from '../utils/notificationNavigation';
 
 // ========================================
 // HELPERS
@@ -47,7 +47,7 @@ function getTypeIcon(type: NotificationType, notice: Notificacion) {
   if (type === 'info' && resolveNotificationPath(notice).includes('/soporte/')) {
     return <LifeBuoy size={16} className="text-primary-700 shrink-0" />;
   }
-  if (type === 'info' && resolveNotificationPath(notice).includes('/inspecciones/')) {
+  if (type === 'info' && /\/(?:mis-)?inspecciones\//.test(resolveNotificationPath(notice))) {
     return <ClipboardCheck size={16} className="text-primary-700 shrink-0" />;
   }
   switch (type) {
@@ -104,6 +104,7 @@ interface NotificationBellProps {
 
 export const NotificationBell: React.FC<NotificationBellProps> = React.memo(function NotificationBell({ basePath = '', inverse = false }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [panelTop, setPanelTop] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
@@ -129,6 +130,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
   useEffect(() => {
     if (!isOpen) return;
 
+    const reposition = () => setPanelTop(buttonRef.current?.getBoundingClientRect().bottom ?? 0);
+    reposition();
+    window.addEventListener('resize', reposition);
+    document.addEventListener('scroll', reposition, true);
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         panelRef.current &&
@@ -149,16 +155,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', reposition);
+      document.removeEventListener('scroll', reposition, true);
     };
   }, [isOpen]);
 
   const handleBellClick = useCallback(() => {
+    setPanelTop(buttonRef.current?.getBoundingClientRect().bottom ?? 0);
     if (!isOpen) void refetch();
     setIsOpen((prev) => !prev);
   }, [isOpen, refetch]);
 
   const handleNotificationClick = useCallback(
     (notif: Notificacion) => {
+      refreshInspectionNotification(notif, queryClient);
       void notificacionService.marcarLeida(notif.id)
         .then(() => queryClient.invalidateQueries({ queryKey: ['notificaciones'] }))
         .catch(() => { /* Keep the notice unread if acknowledgement was not confirmed. */ });
@@ -197,10 +207,12 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
       {isOpen && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-2 w-[min(24rem,calc(100vw-2rem))] bg-white text-neutral-900 border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden"
+          role="region" aria-label="Notificaciones recientes"
+          style={{ '--notification-panel-top': `${panelTop}px` } as React.CSSProperties}
+          className="fixed inset-x-4 top-[var(--notification-panel-top)] mt-2 flex max-h-[calc(100dvh-var(--notification-panel-top)-1rem)] flex-col bg-white text-neutral-900 border border-neutral-200 rounded-xl shadow-xl z-50 overflow-hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-96"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
+          <div className="flex shrink-0 items-center justify-between px-4 py-3 border-b border-neutral-100">
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-neutral-900 text-sm">Notificaciones</h3>
               {unreadCount > 0 && (
@@ -219,7 +231,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-80 min-h-0 overflow-y-auto">
             {isError && <div role="alert" className="border-b border-neutral-200 px-4 py-3 text-sm text-error-800">No se pudieron actualizar los avisos.{items.length > 0 && ' Se muestran los últimos disponibles.'}<button type="button" onClick={() => void refetch()} className="mt-2 block min-h-11 rounded-lg border border-neutral-400 px-3 font-semibold text-neutral-900">Reintentar</button></div>}
             {isPending ? <p role="status" className="px-4 py-6 text-sm text-neutral-700">Cargando avisos…</p> : items.length === 0 && !isError ? (
               <div className="py-10 text-center">
@@ -283,7 +295,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
           </div>
 
           {/* Footer */}
-          <div className="border-t border-neutral-100 p-2">
+          <div className="shrink-0 border-t border-neutral-100 p-2">
             <button
               onClick={handleViewAll}
               className="min-h-11 w-full py-2 text-sm font-semibold text-primary-800 hover:bg-primary-50 rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"

@@ -12,6 +12,16 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each([{ tipo: 'intercambio_inspeccion' }, { tipo: 'intercambio_inspeccion', soloCampana: true }, { soloCampana: true }])('never relays a PSIP or bell-only notice even with SMTP/family enabled: %j', async metadata => {
+    const internal = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ inspeccionId: 'inspection', ...metadata }) };
+    expect(notificationMailContent(internal)).toBeNull();
+    mocks.query.mockResolvedValue([internal]);
+    await queueCommittedNotificationEmails();
+    expect(mocks.insert).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ estado: 'SUPRIMIDO' })] }));
+    mocks.notice.mockResolvedValue({ ...internal, usuario: internal });
+    expect(await queuedNoticeStillEligible('notification:qa-notice', internal.email)).toBe(false);
+    expect(mocks.inspection).not.toHaveBeenCalled();
+  });
   it.each(['SOLICITUD_ENVIADA', 'SOLICITUD_OBSERVADA', 'SOLICITUD_MENSAJE', 'SOLICITUD_APROBADA', 'SOLICITUD_RECHAZADA'])('names the actual application event %s without private text', tipo => {
     const rendered = notificationMailContent({ ...notice, tipo, datos: JSON.stringify({ solicitudId: 'sol-qa', mensaje: 'PRIVATE DO NOT COPY' }) })!;
     expect(rendered.subject).not.toContain('Novedad');

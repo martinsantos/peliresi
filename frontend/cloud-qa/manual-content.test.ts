@@ -16,6 +16,8 @@ test('PSIP explains the existing follow-up loop for both parties without promisi
   assert.deepEqual(Array.from(guide.audiences), ['administrador', 'inspector', 'generador', 'transportista', 'operador', 'auditor']);
   const content = JSON.stringify(guide);
   for (const text of ['Notificada', 'En descargo', 'Requiere subsanación', 'Cerrada conforme', 'no envía correo ni push', 'fuera de plazo', 'responsable', 'CAP sigue cerrado']) assert.ok(content.includes(text), text);
+  assert.match(content, /genera un aviso en la campana/);
+  assert.match(content, /Leer el aviso no responde ni aprueba/);
   assert.equal(guide.steps.filter((step: any) => step.image).length, 3);
 });
 test('PSIP screenshots are original synthetic preview captures from successful browser tests', () => {

@@ -20,6 +20,14 @@ function setup(path = '/notificaciones') {
   return client;
 }
 describe('notification inbox states and interaction', () => {
+  it('names the PSIP expediente instead of a manifest and opens the actor route in app', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'psip-1', destino: 'participacion' }) }] });
+    setup('/app/notificaciones');
+    expect(await screen.findByText('Abrir expediente y ver el intercambio →')).toBeVisible();
+    expect(screen.queryByText('Abrir manifiesto y ver qué sigue →')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Nuevo requerimiento', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/mis-inspecciones/psip-1');
+  });
   beforeEach(() => {
     service.list.mockReset().mockResolvedValue(response);
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});

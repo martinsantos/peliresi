@@ -16,6 +16,14 @@ function setup() {
   return client;
 }
 describe('assignment notification delivery', () => {
+  it('opens the inspected actor PSIP portal with the inspection icon', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-psip', destino: 'participacion' }) }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    const title = await screen.findByText('PSIP · Nuevo requerimiento');
+    expect(title.closest('button')?.querySelector('svg.lucide-clipboard-check')).not.toBeNull();
+    fireEvent.click(title);
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/app/mis-inspecciones/case-psip'));
+  });
   beforeEach(() => { service.restricted = false; service.list.mockReset().mockResolvedValue({ items: [], noLeidas: 0 }); service.marcarLeida.mockReset().mockResolvedValue({}); });
   it('does not mount an unusable inbox or query full-access notices for a restricted applicant', () => {
     service.restricted = true;

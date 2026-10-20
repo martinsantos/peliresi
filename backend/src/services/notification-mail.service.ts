@@ -101,7 +101,7 @@ export async function queuedNoticeStillEligible(queueId: string, recipient: stri
 export function notificationMailContent(notice: NoticeForMail): { family: string; subject: string; html: string } | null {
   let data: Record<string, unknown>;
   try { data = JSON.parse(notice.datos || '{}'); } catch { return null; }
-  if (!data || typeof data !== 'object' || data.interno === true || data.isDemoData === true || data.modo === 'revision' || data.modo === 'prueba') return null;
+  if (!data || typeof data !== 'object' || data.soloCampana === true || data.tipo === 'intercambio_inspeccion' || data.interno === true || data.isDemoData === true || data.modo === 'revision' || data.modo === 'prueba') return null;
   let family: string, path: string, title: string;
   if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     family = 'certificados'; title = 'Certificado ambiental disponible';

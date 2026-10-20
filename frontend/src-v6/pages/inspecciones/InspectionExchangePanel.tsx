@@ -480,7 +480,7 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
           <p className="flex items-center gap-2 font-bold text-neutral-900"><Reply size={18} className="shrink-0 text-primary-800" aria-hidden="true" />{nextStep.title}</p>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{nextStep.detail}</p>
           {open && party === 'INSPECCIONADO' && nextStep.pending[0] && !composeOpen && <Button className="mt-3" disabled={presentMutation.isPending} leftIcon={<Reply size={16} />} onClick={() => beginReply(nextStep.pending[0])}>Responder requerimiento #{nextStep.pending[0].secuencia}</Button>}
-          <p className="mt-3 text-xs leading-5 text-neutral-600">Este canal registra en SITREP; no envía correos ni push. La primera apertura queda registrada y no equivale a una respuesta ni acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>
+          <p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>
         </div>
       </Card>
 

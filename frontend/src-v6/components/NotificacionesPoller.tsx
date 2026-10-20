@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { notificacionService } from '../services/notificacion.service';
-import { resolveNotificationPath } from '../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification } from '../utils/notificationNavigation';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { toast } from './ui/Toast';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -50,12 +50,13 @@ function AuthorizedNotificationsPoller({ userId }: { userId: string | number }) 
     if (nuevas.length) void qc.invalidateQueries({ queryKey: ['attention'] });
     nuevas.forEach((n) => {
       seen.current.add(n.id);
+      refreshInspectionNotification(n, qc);
       toastIds.current.push(toast.add({
         type:    n.prioridad === 'ALTA' || n.prioridad === 'URGENTE' ? 'warning' : 'info',
         title:   n.titulo,
         message: n.mensaje,
         duration: n.prioridad === 'URGENTE' ? 12_000 : 6_000,
-        actionLabel: 'Abrir', onAction: () => navigate(mp(resolveNotificationPath(n))),
+        actionLabel: 'Abrir', onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n))); },
       }));
     });
     if (seen.current.size > 200) seen.current = new Set(data.items.map(n => n.id));

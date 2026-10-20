@@ -82,15 +82,15 @@ La prueba de subsanación repetida descubrió una carrera real: un guardado offl
 ## Comunicación: implementado y límites
 
 - El portal registra presentación, autor, destinatario, fecha, versión, primera apertura, respuesta relacionada, adjuntos y huellas encadenadas. Los permisos existentes limitan la participación a la entidad vinculada; no se muestran los borradores internos ni expedientes ajenos.
-- **Este intercambio no crea automáticamente una campanita, correo o push por cada presentación.** Las reglas de alertas de inspecciones/vencimientos y requerimientos sin respuesta son otro circuito y dependen de su activación. No se las activó en esta revisión. Un evento de expediente no es una prueba de aviso externo entregado.
+- **Extensión posterior: el intercambio genera campanita por cada requerimiento, respuesta y decisión**, con destinatarios limitados a su contraparte y sin correo/push. Ver [avisos internos PSIP, alcance y validación](PSIP-AVISOS-INTERNOS-20261020.md). Las reglas de vencimientos y falta de respuesta siguen siendo otro circuito; no se activan en esta revisión. Un evento de expediente no es una prueba de aviso externo entregado.
 - Correos y push permanecen apagados; CAP permanece cerrado. La puesta a disposición y la primera apertura no acreditan por sí solas una notificación fehaciente. Se preserva la distinción ya documentada en [marco legal y resiliencia](INSPECCIONES-MARCO-LEGAL-Y-RESILIENCIA.md).
 - Una espontánea sin responsable identificado puede documentarse y revisarse, pero el servidor impide notificar sin responsable vinculado. El vínculo se completa en Borrador, Planificada o En campo; si ya está En revisión, la administración debe devolverla a campo antes de asociar el responsable. Una persona externa sin cuenta/vínculo no obtiene acceso al portal por completar un contacto libre. No se habilitaron accesos, se crearon usuarios reales ni se enviaron comunicaciones.
 
-Pendientes institucionales fuera de esta mejora: canal formal y constancia de notificación, cómputo aplicable del plazo, participación de un inspeccionado externo sin alta y protocolo de derivación/recepción a Legales o ATM. Integrar avisos automáticos por nuevas actuaciones es trabajo separado de la mera agrupación visual; no se declara implementado por describirlo en el manual.
+Pendientes institucionales fuera de esta mejora: canal formal y constancia de notificación, cómputo aplicable del plazo, participación de un inspeccionado externo sin alta y protocolo de derivación/recepción a Legales o ATM. Los avisos automáticos se incorporan en la extensión enlazada; no convierten la campana en un canal externo ni fehaciente.
 
 ## Manual y validación
 
-Guía **PSIP: del control al seguimiento de la inspección**, disponible desde la portada, perfiles de inspector/administración/actores y directorio §18. Las guías previas permanecen y se conserva el diseño del manual. `help-data.js` pasa a `2026.20.12` para evitar una copia antigua del contenido.
+Guía **PSIP: del control al seguimiento de la inspección**, disponible desde la portada, perfiles de inspector/administración/actores y directorio §18. Las guías previas permanecen y se conserva el diseño del manual. La agrupación se validó con `help-data.js` **2026.20.12**; la extensión de avisos lo actualiza a **2026.20.13**.
 
 La futura publicación debe incluir **backend + web + app + manual del mismo candidato**: el backend agrega el filtro opcional `estados`, por lo que publicar sólo la interfaz sobre un backend anterior no aplicaría correctamente los grupos. No hay migraciones ni flags nuevos. Esta revisión no publica artefactos, no reinicia servicios productivos y no cambia la configuración de comunicaciones o CAP.
 

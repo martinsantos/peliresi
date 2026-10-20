@@ -3,6 +3,7 @@
  * Una bandeja paginada; los estados y contadores provienen de la API.
  */
 import React, { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Bell, Check, CheckCheck, Trash2, FileText, Info, ClipboardCheck, ArrowLeft, ChevronRight, AlertTriangle, CheckCircle2, LifeBuoy } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
@@ -10,7 +11,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas, useEliminarNotificacion } from '../../hooks/useNotificaciones';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
 import { notificationFollowup } from '../../utils/notificationFollowup';
 import type { Notificacion } from '../../types/models';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,6 +22,7 @@ const focus = 'focus-visible:outline focus-visible:outline-2 focus-visible:outli
 
 const NotificacionesPage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { currentUser } = useAuth();
   const mp = useMobilePrefix();
   const [params, setParams] = useSearchParams();
@@ -69,6 +71,7 @@ const NotificacionesPage: React.FC = () => {
   const resetMutationErrors = () => { mark.reset(); markAll.reset(); remove.reset(); };
   const open = (notice: Notificacion) => {
     resetMutationErrors();
+    refreshInspectionNotification(notice, queryClient);
     if (!notice.leida) mark.mutate(notice.id);
     // Opening the expediente must not depend on a successful acknowledgement.
     navigate(resolveNotificationPath(notice, mp('')));
@@ -82,7 +85,7 @@ const NotificacionesPage: React.FC = () => {
             className={'flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-700 hover:bg-neutral-100 md:hidden ' + focus}>
             <ArrowLeft size={20} aria-hidden="true" />
           </button>
-          <div><h2 className="text-xl font-bold">Tus avisos</h2><p className="mt-1 text-sm text-neutral-600">Novedades de tus manifiestos. Abrí uno para ver el estado actual y el próximo paso.</p></div>
+          <div><h2 className="text-xl font-bold">Tus avisos</h2><p className="mt-1 text-sm text-neutral-600">Novedades de tus manifiestos, trámites e inspecciones. Abrí un aviso para ver el estado actual y el próximo paso.</p></div>
         </div>
         {data && data.noLeidas > 0 && (
           <Button variant="outline" leftIcon={<CheckCheck size={18} />} isLoading={markAll.isPending}
@@ -155,7 +158,7 @@ const NotificacionesPage: React.FC = () => {
                     )}
                     <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
                     {followup && <span className="mt-2 block text-sm font-semibold text-primary-800">{followup}</span>}
-                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">Abrir manifiesto y ver qué sigue →</span>}
+                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{/\/(?:mis-)?inspecciones\//.test(path) ? 'Abrir expediente y ver el intercambio →' : 'Abrir manifiesto y ver qué sigue →'}</span>}
                     <time dateTime={notice.createdAt} className="mt-2 block text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
                   </span>
                   {linked && <ChevronRight size={18} aria-hidden="true" className="mt-1 shrink-0 text-neutral-600" />}
