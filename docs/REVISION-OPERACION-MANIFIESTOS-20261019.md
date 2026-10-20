@@ -1,10 +1,48 @@
 # Revisión de operación de manifiestos — 19–20/10/2026
 
-Estado vigente: **`d372ce6e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar`, el 19/10 a las 21:25:45 Mendoza, con relevos y GPS múltiple habilitados por el dueño. Backup verificado y migración aditiva aplicados; smoke no mutante 57/57, HTTPS externo 9/9 y PWA PASS. CAP cerrado, correos/push apagados, cuatro flags originales false y `main` intacto. Leer [configuración, incidentes, evidencias y contención preparada](DESPLIEGUE-RELEVOS-20261019.md). Las secciones de candidato/preparación de abajo conservan el registro previo a publicar; su pendiente de migración ya quedó resuelto. La unanimidad y las certificaciones de escuela siguen limitadas a CAP; este despliegue no amplía esas reglas a operación real.
+Estado vigente: **web y app `6788c82c` publicados** en `sitrep.ultimamilla.com.ar` el **20/10/2026 a las 07:20:58 Mendoza**. Backend y manual **`d372ce6e` conservados**, sin reinicio ni migración. Smoke no mutante **62/62**, HTTPS externo **9/9** y PWA PASS. CAP cerrado, correos/push apagados, flags actuales y `main` intactos. Leer el cierre de publicación inmediato; las secciones de candidato/preparación conservan el registro histórico previo a publicar. La unanimidad y las certificaciones de escuela siguen limitadas a CAP.
+
+## Publicación de web y app — 20/10/2026
+
+Autorización explícita del dueño: publicar **`6788c82c6026dabf9eb9d342d738ffc39ade640e`** sólo en web/app, conservar flags actuales, CAP cerrado y canales externos apagados; sin tocar `main` ni datos reales, con smoke no mutante. El release incluye los ajustes de acciones/ayuda/reloj de `153ab704` y los dos pendientes del chofer resueltos abajo.
+
+- Frontend activo: `/var/www/sitrep` → `/var/www/sitrep-releases/20261020-chofer-6788c82c-r2`.
+- Backend conservado: `/var/www/sitrep-backend-releases/20261019-relevos-d372ce6e`. Mismos dos PIDs **507773/507788**, reinicios **26/26**, fecha de inicio y configuración; no se ejecutó reload, restart ni save de PM2, y Nginx no cambió.
+- [Identificación pública](https://sitrep.ultimamilla.com.ar/release.json): `source=6788c82c…`, `backendSource=d372ce6e…`, `manualSource=d372ce6e…`. Manual completo conservado; versión de datos **2026.20.11**, CSS/renderer y las seis entradas principales idénticos por hash.
+- `MANIFEST_TRANSPORT_HANDOFF_ENABLED` y `TRANSPORT_MULTI_GPS_ENABLED` siguen true, también en los builds Vite. Los cuatro flags Vite originales, demo y los cinco flags operativos originales siguen false.
+- `TRAINING_DIRECT_LOGIN_UNTIL=2000-01-01T00:00:00Z`, `DISABLE_EMAILS=true`, `PUSH_MANIFEST_NOTICES_ENABLED=false`, VAPID vacío y contraseña SMTP ausente. `UPLOADS_DIR=/var/lib/sitrep-uploads` conservado; no se accedió a documentos o registros de negocio.
+
+Se verificaron **2176 blobs** del commit autorizado antes/después de compilar. Tipado frontend efectivo correcto, builds seriales en el preview propio: web **29,95 s**, app **30,86 s**, con `VITE_API_URL=https://sitrep.ultimamilla.com.ar/api` y los mismos flags. **1 CPU/2 GiB/swap cero**, sin OOM. No se recompiló ni publicó el backend. No hubo migraciones, seeds, respaldos o restauraciones de datos en esta entrega de interfaz.
+
+Los paquetes y **253 archivos web + 195 app** se verificaron por SHA-256 antes de activar. Se conservaron assets anteriores para clientes abiertos. La única transformación posterior al build es el nombre de caché del SW raíz, **v127 → v128**, registrada con hash anterior/posterior en `build.json`; las fuentes y bundles de aplicación corresponden a `6788c82c`. SW app **20261020100715** generado por Vite. Se conserva la activación explícita del usuario para no forzar recargas de borradores o GPS.
+
+El cambio fue atómico, sólo del enlace de frontend. Smoke publicado **62/62**, exclusivamente GET: shells/rutas web/app, chunks nuevos de listado/viajes/GPS, tipos MIME, ambos SW, precache, offline, manual, asociación PWA, 404 de asset inexistente, redirección `/app`, health/live/readiness y rechazo 401 de rutas de transporte sin sesión. Verificación externa desde la Mac **9/9** y `scripts/ops/check-pwa-assets.sh` PASS. No hubo login, ejercicios, envíos GPS, correos o push en producción. La aceptación funcional es la del preview: **146/146** dirigidas, **77 grupos API**, **12/12** navegador; no se repitieron suites completas ni se certificó un teléfono físico al publicar.
+
+`.env` preservado exactamente: SHA-256 **`618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`**. Configuración guardada de SITREP en PM2 preservada: SHA-256 normalizado **`af3f8019519954da6a3dc5a70b0a6a455a3a27f5b2ba1910297a08df069bccfa`**, excluyendo únicamente la telemetría `axm_monitor`. Identidad de base/JWT y flags contrastados entre archivo, workers y configuración guardada, sin exponer secretos.
+
+### Rollback de esta interfaz
+
+Preparado y verificado, **no ejecutado**: `/var/www/sitrep-releases/20261020-chofer-6788c82c-r2-rollback`. Restaura la interfaz anterior **`d372ce6e`**, conserva también los assets de `6788c82c` para clientes abiertos y mantiene backend, flags y datos. Usa caché raíz **v129** y SW app **20261020102057** para distribuir el retorno sin reutilizar la caché activa. Inventario verificado de **4132 archivos** estáticos. Procedimiento privado y acotado a esta entrega:
+
+```sh
+ssh root@23.105.176.45 'node /var/backups/sitrep/20261020-chofer-6788c82c/deploy-frontend.js rollback'
+```
+
+Sólo admite como origen el release de esta publicación o el propio rollback; rechaza reemplazar otro release. Revalida backend/configuración y archivos, cambia únicamente frontend y comprueba la identificación pública. **No volver al backend anterior que desconoce tramos ni restaurar una base.** La contención del 19/10 que apaga entradas de transporte es otro procedimiento histórico; no es el rollback normal de esta publicación.
+
+### Incidencias y cierre de publicación
+
+Dos paradas de preparación conservaron el release anterior activo. Primero, una comparación del hash global de `dump.pm2` detectó la actualización periódica de `axm_monitor`; al comparar ambas instancias por `NODE_APP_INSTANCE`, el único cambio era telemetría. Se corrigió el guard para proteger todas las opciones guardadas de SITREP salvo ese objeto, además del `.env`, procesos y flags. Después, `tar --unlink-first` no pudo superponer directorios no vacíos de la copia inactiva. Se cambió a extracción normal sobre una copia nueva y se verificaron los mismos hashes; no se cambió producto ni se relajaron contratos funcionales.
+
+La protección local bloqueó eliminar la primera copia inactiva. Se conservó `/var/www/sitrep-releases/20261020-chofer-6788c82c` como evidencia y se publicó el directorio `-r2`; aquélla nunca quedó activa. No se borraron releases anteriores ni se modificó el árbol activo para resolver la extracción.
+
+Auditoría productiva privada: `/var/backups/sitrep/20261020-chofer-6788c82c/`, con preflights, paradas, paquetes/hashes, `deployment.json`, `final-state.json`, rollback y scripts. Copia local segura en `test-results-deploy-6788c82c/`, fuera de Git, sin dumps de base ni secretos. Artefactos de preview en `.qa-release-6788c82c-20261020` dentro de `/opt/sitrep-qa-enterprise-20261016/source`.
+
+Preview propio detenido el **20/10 a las 07:23:42 Mendoza**, imagen y evidencia conservadas, sin túnel; no se iniciaron backend ni PostgreSQL allí durante estos builds. Contadores `max=0`, `oom=0`, `oom_kill=0`. Rama `codex/sitrep-training-20261018`, único checkout activo; `main` conserva **`c8402190edfc36b5e5d0dee1337c24bd1689420d`**, sin push ni workflows. El cierre posterior sólo documenta con `[skip ci]`.
 
 ## Pendientes del chofer resueltos — 20/10/2026, sólo preview
 
-**Candidato `6788c82c6026dabf9eb9d342d738ffc39ade640e`, sin publicar**, sobre `4fe5e2e7`. Conserva las correcciones de `153ab704` y cierra los dos pendientes de usabilidad identificados en la revisión anterior. Único checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; commit `[skip ci]`, sin push ni workflows. No se contactó ni modificó producción y `main` conserva `c8402190edfc36b5e5d0dee1337c24bd1689420d`.
+**Validación previa de `6788c82c6026dabf9eb9d342d738ffc39ade640e`**, sobre `4fe5e2e7`; publicado después como se registra arriba. Conserva las correcciones de `153ab704` y cierra los dos pendientes de usabilidad identificados en la revisión anterior. Único checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; commit `[skip ci]`, sin push ni workflows. Durante esta validación no se contactó ni modificó producción y `main` conservó `c8402190edfc36b5e5d0dee1337c24bd1689420d`.
 
 | Antes | Después | Comprobación |
 | --- | --- | --- |

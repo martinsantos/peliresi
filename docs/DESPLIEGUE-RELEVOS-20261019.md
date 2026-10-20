@@ -1,8 +1,10 @@
 # Publicación de relevos y GPS múltiple — 19/10/2026
 
+**Actualización vigente del 20/10:** web/app pasaron a **`6788c82c`** a las **07:20:58 Mendoza**. Backend/manual `d372ce6e` y flags conservados, sin reinicios ni migraciones. Smoke 62/62, externo 9/9 y PWA PASS; CAP/correos/push cerrados. Leer [publicación y rollback actual de interfaz](REVISION-OPERACION-MANIFIESTOS-20261019.md). El resto de este documento conserva la publicación del 19/10; su contención que apaga entradas de transporte no es el rollback normal de la nueva interfaz.
+
 Publicado **`d372ce6e2c62b21dc97a8a42a72d84a6de4d707b`**, backend, web, `/app` y manual, en `sitrep.ultimamilla.com.ar`, el **19/10/2026 a las 21:25:45 Mendoza** (`2026-10-20T00:25:45.588Z`). Autorización explícita del dueño: publicar ese commit, habilitar relevos y GPS múltiple, respaldar antes de migrar, mantener CAP cerrado y correos/push apagados; smoke no mutante. No se integró ni modificó `main` ni se dispararon workflows.
 
-## Versiones y configuración vigentes
+## Versiones y configuración de la publicación del 19/10
 
 - Backend: `/var/www/sitrep-backend` → `/var/www/sitrep-backend-releases/20261019-relevos-d372ce6e`.
 - Web y app: `/var/www/sitrep` → `/var/www/sitrep-releases/20261019-relevos-d372ce6e`.
@@ -58,7 +60,7 @@ La aceptación funcional previa permanece en la [revisión de operación](REVISI
 
 Incidencias de herramientas: el primer `pg_restore --list` recibió el dump mediante un buffer y el cierre temprano de la lectura produjo EPIPE; el dump ya estaba completo. Se corrigió a descriptor de entrada y pasaron índice y decodificación completa antes de migrar. La primera comprobación externa buscó la versión del manual dentro de `help-data.js`; el versionado está en la URL del script de `index.html`. Se corrigió la ubicación, conservando la versión esperada y exigiendo además igualdad exacta de bytes; repetición final 9/9. El chequeo sintáctico local de scripts operativos se ejecutó por stdin porque ese Node no admite `.ts` en `--check`. No se relajaron contratos ni se cambió producto.
 
-## Recuperación preparada
+## Recuperación preparada en la publicación del 19/10
 
 Se conservan los releases previos:
 
