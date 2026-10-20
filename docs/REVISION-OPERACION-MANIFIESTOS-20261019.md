@@ -1,6 +1,6 @@
 # Revisión de operación de manifiestos — 19/10/2026
 
-Estado: trabajo en la rama de capacitación, sin publicación ni cambio de `main`. El relevo tiene implementación candidata y se valida en el preview; sigue apagado para operación real. La entrega externa de avisos conserva sus restricciones.
+Estado vigente: **`d372ce6e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar`, el 19/10 a las 21:25:45 Mendoza, con relevos y GPS múltiple habilitados por el dueño. Backup verificado y migración aditiva aplicados; smoke no mutante 57/57, HTTPS externo 9/9 y PWA PASS. CAP cerrado, correos/push apagados, cuatro flags originales false y `main` intacto. Leer [configuración, incidentes, evidencias y contención preparada](DESPLIEGUE-RELEVOS-20261019.md). Las secciones de candidato/preparación de abajo conservan el registro previo a publicar; su pendiente de migración ya quedó resuelto. La unanimidad y las certificaciones de escuela siguen limitadas a CAP; este despliegue no amplía esas reglas a operación real.
 
 ## Recorrido que debe entender cada persona
 
