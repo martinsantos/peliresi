@@ -2,6 +2,54 @@
 
 Estado vigente: **`d372ce6e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar`, el 19/10 a las 21:25:45 Mendoza, con relevos y GPS múltiple habilitados por el dueño. Backup verificado y migración aditiva aplicados; smoke no mutante 57/57, HTTPS externo 9/9 y PWA PASS. CAP cerrado, correos/push apagados, cuatro flags originales false y `main` intacto. Leer [configuración, incidentes, evidencias y contención preparada](DESPLIEGUE-RELEVOS-20261019.md). Las secciones de candidato/preparación de abajo conservan el registro previo a publicar; su pendiente de migración ya quedó resuelto. La unanimidad y las certificaciones de escuela siguen limitadas a CAP; este despliegue no amplía esas reglas a operación real.
 
+## Revisión posterior: agenda, listados y chofer — sólo preview
+
+**Candidato `153ab7045ce4396ec8394772b1b050d6767c6ef6`, sin publicar**, sobre el cierre documental `91255329`. Revisión completada el 19/10 por la noche, después del despliegue anterior. Se trabajó únicamente en el checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`. No se contactó producción durante esta revisión, no hubo push ni workflows y `main` conserva `c8402190edfc36b5e5d0dee1337c24bd1689420d`.
+
+### Hallazgos corregidos
+
+| Antes | Después | Motivo y comprobación |
+| --- | --- | --- |
+| El listado ofrecía crear a transporte/operador operativos y editar manifiestos terminados o de roles sin ese permiso. | Crear y editar se ofrecen según los permisos existentes del servidor; editar sólo en borrador para generador/administrador. La creación de propuestas por otros roles sigue limitada a sesiones CAP autenticadas. | Evitar botones que terminan en acceso restringido; navegador con cuatro roles, tres fases y tres vistas. No se ampliaron permisos. |
+| La ayuda flotante tapaba filas del listado/perfil y el layout móvil agregaba otro botón de crear. | Ayuda en el encabezado de esas pantallas; la creación queda en la acción del listado. | Capturas antes/después y navegación real desde el botón de generador/administrador. |
+| Al pausar, el reloj se congelaba y saltaba al recargar. | El tiempo transcurrido se calcula desde `fechaRetiro`, también durante las pausas; GPS y pausa conservan sus acciones. | Retiro, pausa, avance del reloj, recarga, reanudación, cambio de viaje y entrega en las tres vistas. No se agregaron plazos. |
+
+Se conservaron la tipografía, colores, componentes y estructura del producto; no hubo un rediseño del manual ni cambios en backend, reglas regulatorias, cantidades, permisos o históricos.
+
+### Resultado de las comprobaciones
+
+Todo se ejecutó de forma serial en `76.13.234.213`, contenedor propio `sitrep-qa-training-20261018`, **un worker, 1 CPU, 2 GiB y swap cero**. Base exclusivamente sintética y cuentas operativas artificiales `@qa.invalid`; no se reutilizaron los accesos CAP ni se consultaron datos reales. Builds Vite de web y `/app` con modo producción y API relativa `/api`; los bundles no contienen la API absoluta productiva. Los dos flags de transporte estaban habilitados sólo para el ensayo, los cuatro originales apagados, demo apagado y proveedores externos desconectados.
+
+| Comprobación | Resultado y alcance |
+| --- | --- |
+| Tipado y compilación | Backend `tsconfig.build.json` y frontend `tsconfig.app.json` correctos; builds web y app correctos, uno después del otro. |
+| Unitarias dirigidas | **143/143**, 12 archivos: agenda, fechas/filtros/error/reintento, actualización al crear, cola de viajes, GPS simple/múltiple, selección/entrega, consultas, acciones y ayuda/layout. |
+| API real de QA | **77 grupos correctos**: relevo 18, cargas múltiples 8 y revisión 51. Incluye cuatro roles × tres fases × tres conjuntos de casos, historial después de entrega y CAP cerrado. |
+| Navegador | **15 escenarios distintos verificados**, cinco por vista: web 1440×900, web móvil 360×800 y `/app` 360×800, Chromium remoto. En el último pase conjunto pasaron 12/15; los tres de permiso GPS pasaron luego 3/3 sobre los mismos builds, tras corregir la espera de una transición del test. No se presenta como una única suite final 15/15. |
+| Listados | Cuatro roles en cada vista: por iniciar/en curso/terminados, búsqueda, paginación real por scroll, vacío, acciones y acceso al formulario permitido. Tratado, rechazado y cancelado siguen diferenciados. |
+| Chofer y varias cargas | Elegir entre viajes sin redirección automática, retiro, pausa persistente al recargar, reloj informativo, reanudación y entrega/historial. Tres cargas seleccionadas: entregar una, relevar otra y mantener la restante con GPS. Búsqueda conserva selecciones y sólo hay un captor. |
+| Relevos y C3 | Externo con datos incompletos, reemplazo registrado, móvil/chofer, revocación y permisos; el transporte anterior deja de emitir para ese tramo. C3 espera GPS del reemplazo y conserva la secuencia de custodia. La entrega sigue a cargo del transporte original. |
+| GPS denegado | Mensaje explícito y cero envíos antes del permiso; recuperación con **Detener GPS → Iniciar GPS** después de permitir ubicación. Quitar una selección no declara entrega: el manifiesto sigue en tránsito. |
+| Interfaz y errores | 63 comprobaciones con captura; sin desborde horizontal en las pantallas medidas. 39 mediciones de acciones primarias habilitadas, contraste mínimo **7,74:1**, exigencia del test **4,5:1**. Cero errores JavaScript sin controlar. Los 403/409 corresponden a revocación o emisor anterior; avisos de SW bloqueado corresponden al aislamiento de Playwright. |
+
+La **agenda de tres partes sigue restringida a CAP**. Se revisaron su presentación y comportamiento mediante componentes con datos artificiales: filtros, hoy/próximos en la fecha de Mendoza aun después de medianoche UTC, error visible/reintento y nuevo manifiesto primero para los cuatro roles. En la API operativa, sus dos rutas devolvieron 404 para los cuatro roles; los cuatro alias de la pizarra devolvieron 403. Esto no equivale a reabrir CAP ni a ejecutar de nuevo el circuito escolar completo autenticado.
+
+Se conservaron los intentos fallidos. El diagnóstico inicial de listados reprodujo las acciones indebidas y el primer pase completo detectó el reloj congelado en las tres vistas. Después de corregir el producto, los tres fallos restantes del último pase eran lecturas de contraste durante los 150 ms de transición al habilitar un botón. El test ahora espera las transiciones finitas y exige la misma relación 4,5:1; no se modificó el color ni se relajó la expectativa. Las doce pruebas ya correctas no se repitieron sin un cambio que lo justificara.
+
+La revisión no repitió las suites completas históricas de backend 1177/1177 y frontend 1615/1615: esos resultados pertenecen a `d372ce6e`, documentados más abajo. Tampoco certifica sensores físicos, Android/iOS, GPS en segundo plano, funcionamiento offline del SW ni entrega externa de correo/push. Fuentes originales verificadas de tipografía en caché y mapas sintéticos etiquetados; sin simular respuestas de negocio para los recorridos positivos. D10 y la habilitación regulatoria de externos siguen pendientes.
+
+Observaciones de usabilidad para la siguiente iteración: con muchos relevos asignados, ese bloque antecede y desplaza la cola de viajes propios en el perfil; además, recuperar un permiso GPS denegado exige los dos botones indicados arriba. Las pruebas funcionales pasan, pero esos dos recorridos todavía pueden simplificarse sin alterar custodia ni selección de cargas.
+
+### Evidencia, cierre y continuación
+
+Fuentes contrastadas por blob Git en ambos entornos: **2176 archivos**, cinco archivos de producto modificados y siete de QA. `source-proof-final.json` y `source-verified-final.json` identifican los bytes; el campo `source=91255329…` de `runtime-proof.json` es una etiqueta heredada del arranque, **no** la procedencia del build modificado. Los cinco blobs de producto corresponden a `153ab704`; después del build sólo cambió la espera del test de contraste y el nombre del reporte de su repetición. Se conservaron hashes de 416 artefactos de web/app.
+
+Evidencias privadas fuera de Git: `test-results-review-circuito-20261019/` en el checkout y `.qa-review-circuito-20261019/` en `/opt/sitrep-qa-enterprise-20261016/source` del preview. Informes: `verification-audit.json`, `units.json`, `handoff-http.json`, `fleet-http.json`, `review-api.json`, `review-browser.json`, `gps-permission-browser.json` y `review-closure.json`. Capturas sintéticas originales en `after/`, con SHA-256 y procedencia en `capture-provenance.json`; fixtures con credenciales/tokens permanecen privados y no se incorporan al manual ni a Git. Orquestación local preservada en `runner.ts`; usa los guards de `frontend/cloud-qa/safety.ts` y las fases build/start/handoff-api/fleet-api/fixture/units/browser/gps-permission/close, siempre seriales.
+
+El cierre del **19/10 a las 22:37:24 Mendoza** detuvo backend, servidor estático y PostgreSQL de QA; luego sólo el contenedor propio. Sin procesos forzados ni OOM, `memory.events max=0`, sin túnel abierto. Imagen y casos sintéticos conservados. CAP vencido (`2000-01-01T00:00:00Z` en este runtime de QA), base CAP no conectada, `DISABLE_EMAILS=true`, SMTP/VAPID vacíos y `PUSH_MANIFEST_NOTICES_ENABLED=false` durante todo el ensayo.
+
+Estos cambios son **un candidato local pendiente de publicación**. No se cambió el service worker, no hubo migraciones ni configuración productiva y no se ejecutó rollback. Para descartar la revisión basta revertir su commit de interfaz/QA; no restaurar una base. El despliegue y la contención documentados de `d372ce6e` siguen siendo la última referencia productiva conocida. Los avisos Git de `._pack-…idx` se preservaron en el log local; no se repararon metadatos compartidos ni se usó otro checkout.
+
 ## Recorrido que debe entender cada persona
 
 1. **Propuesta:** generador, transporte u operador crea el manifiesto. Aparece arriba en la agenda de los tres, con número, fecha prevista y tres iconos de aprobación. Cada parte ve claramente si debe decidir o si está esperando a otra.
