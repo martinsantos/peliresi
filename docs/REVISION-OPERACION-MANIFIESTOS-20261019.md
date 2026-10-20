@@ -1,6 +1,40 @@
-# Revisión de operación de manifiestos — 19/10/2026
+# Revisión de operación de manifiestos — 19–20/10/2026
 
 Estado vigente: **`d372ce6e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar`, el 19/10 a las 21:25:45 Mendoza, con relevos y GPS múltiple habilitados por el dueño. Backup verificado y migración aditiva aplicados; smoke no mutante 57/57, HTTPS externo 9/9 y PWA PASS. CAP cerrado, correos/push apagados, cuatro flags originales false y `main` intacto. Leer [configuración, incidentes, evidencias y contención preparada](DESPLIEGUE-RELEVOS-20261019.md). Las secciones de candidato/preparación de abajo conservan el registro previo a publicar; su pendiente de migración ya quedó resuelto. La unanimidad y las certificaciones de escuela siguen limitadas a CAP; este despliegue no amplía esas reglas a operación real.
+
+## Pendientes del chofer resueltos — 20/10/2026, sólo preview
+
+**Candidato `6788c82c6026dabf9eb9d342d738ffc39ade640e`, sin publicar**, sobre `4fe5e2e7`. Conserva las correcciones de `153ab704` y cierra los dos pendientes de usabilidad identificados en la revisión anterior. Único checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`; commit `[skip ci]`, sin push ni workflows. No se contactó ni modificó producción y `main` conserva `c8402190edfc36b5e5d0dee1337c24bd1689420d`.
+
+| Antes | Después | Comprobación |
+| --- | --- | --- |
+| Los relevos asignados desplazaban los viajes propios hacia abajo. | La cola propia, tanto en tránsito como lista para retirar, aparece antes de **Relevos a mi cargo**. El acceso a **Cargas en este móvil** se conserva arriba. | Navegador comprueba el orden geométrico de ambos bloques, el encabezado propio dentro del viewport y la apertura de viajes/relevos. |
+| Recuperar GPS denegado exigía detenerlo y volverlo a iniciar. | **Reintentar GPS** reinicia la captura con un toque, conserva las cargas marcadas y reemplaza el captor anterior. | Denegación sin envíos, reintento explícito, GPS recibido y un único captor después del reintento en las tres vistas. |
+
+El reinicio de ubicación requiere una observación nueva, ignora callbacks del captor cerrado y conserva las recepciones anteriores y los errores terminales de acceso por carga. No habilita una carga relevada/revocada. La acción de una carga con error de envío ahora se llama **Reintentar envío**, con el número en su nombre accesible, para distinguirla del reintento del sensor. Si el teléfono tiene bloqueado el permiso, la persona debe permitir ubicación allí; la app no cambia ese permiso por su cuenta.
+
+### Validación del candidato
+
+Preview `76.13.234.213`, contenedor propio `sitrep-qa-training-20261018`; fases seriales, **un worker, 1 CPU, 2 GiB y swap cero**. Cuentas operativas artificiales y casos nuevos, sin abrir CAP ni consultar datos reales. Web/app compiladas secuencialmente con API relativa `/api`, demo apagado, los cuatro flags originales false y los dos de transporte true sólo para el ensayo. SMTP/VAPID vacíos, `DISABLE_EMAILS=true`, `PUSH_MANIFEST_NOTICES_ENABLED=false`, base CAP no conectada y vencimiento directo pasado. Las cuatro entradas CAP devolvieron 403 y sus rutas escolares operativas permanecieron cerradas.
+
+| Comprobación | Resultado |
+| --- | --- |
+| Tipado y builds finales | Backend `tsconfig.build.json`, frontend `tsconfig.app.json` y builds web/app correctos. Ninguna API absoluta productiva en los bundles. |
+| Unitarias dirigidas | **146/146**, 12 archivos. Incluyen reintento sin habilitar sesiones apagadas, cierre del captor previo, callbacks tardíos ignorados, observación nueva, carga relevada bloqueada y coexistencia de error de sensor/envío sin confundir botones. |
+| API real de QA | **77 grupos correctos**: relevo 18, varias cargas 8 y fases/permisos/CAP cerrado 51. |
+| Navegador del build final | **12/12 en un único pase**, cero reintentos automáticos o casos omitidos dentro de esa selección: cuatro escenarios por vista, web 1440×900, web móvil 360×800 y `/app` 360×800. |
+| Recorridos | Cola propia primero; retiro, pausa, recarga, reanudación, cambio de viaje y entrega; tres cargas con una entrega y un relevo sin detener la restante; externo y reemplazo registrado, GPS/C3, revocación e historial; permiso denegado y recuperación con un toque. Quitar una selección detiene ese captor cuando queda vacío y no declara entrega. |
+| Presentación y consola | 18 comprobaciones con captura, sin desborde horizontal; 18 mediciones de acciones primarias, contraste mínimo **7,74:1**, exigencia **4,5:1**. Cero errores JavaScript sin controlar. Tres 409 del emisor anterior y seis 403 de enlaces revocados son negativos esperados; los avisos de SW bloqueado proceden del aislamiento de Playwright. |
+
+La primera compilación fue correcta. Antes de iniciar las pruebas se distinguió también el texto del reintento de envío por carga y se recompiló; las 146 unitarias y el pase único de 12 escenarios corresponden a esos builds definitivos. No se cambiaron expectativas ni umbrales para obtener estos resultados. Los tres escenarios de listados de la revisión anterior no se repitieron: no hubo cambios en esas pantallas. Tampoco se repitieron las suites completas históricas ni se certificaron sensores físicos, Android/iOS, segundo plano, SW offline o correo/push real. GPS emulado, mapa sintético etiquetado y tipografía original en caché; respuestas positivas de negocio de la API real de QA.
+
+### Evidencia y cierre
+
+Tres archivos de producto y tres de QA modificados. Los **2176 blobs** del manifiesto de fuentes coinciden entre checkout, preview y árbol Git de `6788c82c`. `source-proof.json` y `source-verified-final.json` identifican los bytes, junto con hashes de 416 artefactos web/app; el `source=4fe5e2e7…` de `runtime-proof.json` es la etiqueta del arranque/base, no la procedencia por sí sola. Sin cambios en backend, migraciones, permisos, custodia, históricos, código del SW ni manual.
+
+Evidencias privadas fuera de Git: `test-results-driver-polish-20261020/` local y `.qa-driver-polish-20261020/` en `/opt/sitrep-qa-enterprise-20261016/source` del preview. Informes `verification-audit.json`, `units.json`, `handoff-http.json`, `fleet-http.json`, `review-api.json`, `review-browser.json` y `review-closure.json`. Capturas originales sin editar en `after/`, hashes/procedencia en `capture-provenance.json`; credenciales y tokens sólo en fixtures privados del preview. No hay nuevos accesos de pizarra.
+
+Backend, servidor estático y PostgreSQL de QA cerrados sin forzar procesos; contenedor propio detenido el **20/10 a las 06:54:49 Mendoza**. Imagen, casos y evidencia conservados, sin túnel; `memory.events max=0`, `oom=0`, `oom_kill=0`. No hubo publicación ni rollback. Para descartar sólo estos ajustes puede revertirse `6788c82c` conservando `153ab704`, sin restaurar una base. El último despliegue conocido y su contención siguen siendo los de `d372ce6e`.
 
 ## Revisión posterior: agenda, listados y chofer — sólo preview
 
@@ -38,7 +72,7 @@ Se conservaron los intentos fallidos. El diagnóstico inicial de listados reprod
 
 La revisión no repitió las suites completas históricas de backend 1177/1177 y frontend 1615/1615: esos resultados pertenecen a `d372ce6e`, documentados más abajo. Tampoco certifica sensores físicos, Android/iOS, GPS en segundo plano, funcionamiento offline del SW ni entrega externa de correo/push. Fuentes originales verificadas de tipografía en caché y mapas sintéticos etiquetados; sin simular respuestas de negocio para los recorridos positivos. D10 y la habilitación regulatoria de externos siguen pendientes.
 
-Observaciones de usabilidad para la siguiente iteración: con muchos relevos asignados, ese bloque antecede y desplaza la cola de viajes propios en el perfil; además, recuperar un permiso GPS denegado exige los dos botones indicados arriba. Las pruebas funcionales pasan, pero esos dos recorridos todavía pueden simplificarse sin alterar custodia ni selección de cargas.
+Observaciones de usabilidad que quedaron pendientes en esta etapa: con muchos relevos asignados, ese bloque antecedía y desplazaba la cola de viajes propios en el perfil; además, recuperar un permiso GPS denegado exigía los dos botones indicados arriba. **Ambas se resolvieron en `6788c82c`**, en el cierre del 20/10 registrado arriba, sin alterar custodia ni selección de cargas.
 
 ### Evidencia, cierre y continuación
 
