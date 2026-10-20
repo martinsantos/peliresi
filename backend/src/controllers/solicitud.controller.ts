@@ -15,6 +15,8 @@ import { registrationActorFields } from '../domain/registrationActorData';
 import { registrationFleet, declaredLicenseDocument, isLicenseDocument } from '../domain/registrationFleet';
 import { licenseFields } from '../domain/licenseReading';
 import { describeDocument, readReceipt, mergeReceiptRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { electricityReading } from '../domain/electricityReading';
+import { applySolicitudPayments, confirmPayment, notePaymentDecision, paymentAnalysis, requirePaymentIdentity, retainPaymentAllocation, solicitudPaymentScope } from '../services/paymentIdentity.service';
 import {
   getMissingRequiredDocumentTypes,
   getSolicitudRequirements,
@@ -450,15 +452,17 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
 
     const description = describeDocument(req.file);
     const input = { path: req.file.path, mimeType: description.mimeType };
-    const reading = license ? await readReceipt(input, 'LICENCIA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt(input) : undefined;
-    const analysis = reading && license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : reading;
-    let previous: Array<{ id: string; path: string; sha256: string | null }> = [];
+    const electric = tipo === 'FACTURA_ELECTRICA';
+    const reading = license ? await readReceipt(input, 'LICENCIA') : electric ? await readReceipt(input, 'FACTURA_ELECTRICA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt(input) : undefined;
+    let analysis = reading && license ? { ...reading, documentKind: 'LICENCIA' as const, campos: licenseFields(reading.texto) }
+      : reading && electric ? { ...reading, documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(reading.texto) } : reading;
+    let previous: Array<{ id: string; path: string; sha256: string | null; tipo: string; estado: string; analisis: unknown }> = [];
     const documento = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
       if (!current || !['BORRADOR', 'OBSERVADA'].includes(current.estado)) throw new AppError('La solicitud ya fue enviada; no se reemplazó ningún archivo.', 409);
       if (license && !declaredLicenseDocument(JSON.parse(jsonObject(current.datosActor)), tipo)) throw new AppError('El chofer cambió durante la carga. Guardá la lista y reintentá.', 409);
-      previous = await tx.documentoSolicitud.findMany({ where: { solicitudId: id, tipo }, select: { id: true, path: true, sha256: true } });
+      previous = await tx.documentoSolicitud.findMany({ where: { solicitudId: id, tipo }, select: { id: true, path: true, sha256: true, tipo: true, estado: true, analisis: true } });
       if (previous[0]?.sha256 === description.sha256) {
         const original = await tx.documentoSolicitud.findUniqueOrThrow({ where: { id: previous[0].id } });
         if (analysis && analysis.lectura === 'LEIDO' && (original.analisis as { lectura?: string } | null)?.lectura !== 'LEIDO') {
@@ -466,7 +470,11 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
         }
         return original;
       }
-      if (analysis && !license) analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
+      if (analysis && tipo === 'COMPROBANTE_PAGO') {
+        for (const old of previous) await retainPaymentAllocation(tx, old, solicitudPaymentScope(id), 'SOLICITUD', 'REEMPLAZADO', req.user!.id);
+        analysis.duplicado = await receiptDuplicate(tx, description.sha256, previous[0]?.id);
+        analysis = await paymentAnalysis(tx, analysis, solicitudPaymentScope(id));
+      }
       await tx.documentoSolicitud.deleteMany({ where: { solicitudId: id, tipo } });
       const saved = await tx.documentoSolicitud.create({
         data: {
@@ -479,7 +487,7 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
           estado: 'PENDIENTE',
         },
       });
-      if (analysis && !license) await retainReceiptDigest(tx, description.sha256, saved.id, 'SOLICITUD');
+      if (analysis && tipo === 'COMPROBANTE_PAGO') await retainReceiptDigest(tx, description.sha256, saved.id, 'SOLICITUD');
       if (analysis?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: saved.id });
       return saved;
     });
@@ -514,22 +522,26 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
     const original = await prisma.documentoSolicitud.findUnique({ where: { id: docId } });
     if (!original || original.solicitudId !== id) throw new AppError('Documento no encontrado', 404);
     const license = isLicenseDocument(original.tipo) && solicitud.tipoActor === 'TRANSPORTISTA';
-    if (original.tipo !== 'COMPROBANTE_PAGO' && !license) throw new AppError('La lectura automática corresponde a comprobantes o licencias de chofer', 400);
+    const electric = original.tipo === 'FACTURA_ELECTRICA';
+    if (original.tipo !== 'COMPROBANTE_PAGO' && !license && !electric) throw new AppError('La lectura automática corresponde a comprobantes, facturas eléctricas o licencias de chofer', 400);
     if (!fs.existsSync(original.path)) throw new AppError('Archivo no disponible', 404);
     const description = describeDocument({ path: original.path, mimetype: original.mimeType });
     if (original.sha256 && original.sha256 !== description.sha256) throw new AppError('El archivo no coincide con su huella registrada; requiere revisión.', 409);
     const input = { path: original.path, mimeType: description.mimeType };
-    const reading = license ? await readReceipt(input, 'LICENCIA') : await readReceipt(input);
+    const reading = license ? await readReceipt(input, 'LICENCIA') : electric ? await readReceipt(input, 'FACTURA_ELECTRICA') : await readReceipt(input);
     const documento = await prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
       const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
       if (!current || current.solicitudId !== id || current.path !== original.path || current.sha256 !== original.sha256) {
         throw new AppError('El adjunto cambió durante la lectura. Actualizá la solicitud para continuar.', 409);
       }
-      if (!license) reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
-      const analisis = license ? { ...reading, documentKind: 'LICENCIA', campos: licenseFields(reading.texto) } : mergeReceiptRead(current.analisis, reading);
+      if (original.tipo === 'COMPROBANTE_PAGO') reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
+      let analisis = license ? { ...reading, documentKind: 'LICENCIA' as const, campos: licenseFields(reading.texto) }
+        : electric ? { ...mergeReceiptRead(current.analisis, reading), documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(mergeReceiptRead(current.analisis, reading).texto) }
+        : mergeReceiptRead(current.analisis, reading);
+      if (original.tipo === 'COMPROBANTE_PAGO' && analisis.pago?.revision !== 'CONFIRMADO') analisis = await paymentAnalysis(tx, analisis, solicitudPaymentScope(id));
       const saved = await tx.documentoSolicitud.update({ where: { id: docId }, data: { sha256: description.sha256, analisis } });
-      if (!license) await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
+      if (original.tipo === 'COMPROBANTE_PAGO') await retainReceiptDigest(tx, description.sha256, docId, 'SOLICITUD');
       if (analisis.duplicado && !(current.analisis as { duplicado?: boolean } | null)?.duplicado) await receiptNotice(tx, solicitud.usuarioId, { solicitudId: id, documentoId: docId });
       return saved;
     });
@@ -579,6 +591,7 @@ export const deleteDocumento = async (req: AuthRequest, res: Response, next: Nex
       const saved = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
       if (!saved) throw new AppError('Documento no encontrado', 404);
       if (saved.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
+      await retainPaymentAllocation(tx, saved, solicitudPaymentScope(id), 'SOLICITUD', 'RETIRADO', req.user!.id);
       return tx.documentoSolicitud.delete({ where: { id: docId } });
     });
     // Remove bytes only AFTER the database commit. A failed transaction must
@@ -879,6 +892,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       const datosActor = JSON.parse(jsonObject(current.datosActor));
       if (datosActor.cuit && normalizeCuit(String(datosActor.cuit)) !== solicitud.usuario.cuit) throw new AppError('El CUIT declarado no coincide con el de la cuenta solicitante', 400);
       const declared = registrationActorFields(solicitud.tipoActor, datosActor);
+      await applySolicitudPayments(tx, id, solicitud.usuario.cuit || '', req.user!.id);
       const contact = typeof datosActor.emailContacto === 'string' && datosActor.emailContacto.trim()
         ? datosActor.emailContacto.trim() : solicitud.usuario.email;
       let generadorId: string | undefined;
@@ -1054,18 +1068,43 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
     if (!documento) throw new AppError('Documento no encontrado', 404);
     if (documento.solicitudId !== id) throw new AppError('El documento no pertenece a esta solicitud', 400);
 
-    const updated = await prisma.documentoSolicitud.update({
-      where: { id: docId },
-      data: {
-        estado,
-        observaciones: observaciones || undefined,
-        revisadoPor: req.user!.id,
-        revisadoAt: new Date(),
-      },
+    const updated = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!current || current.solicitudId !== id) throw new AppError('El documento cambió durante la revisión.', 409);
+      if (current.tipo === 'COMPROBANTE_PAGO') {
+        const user = await tx.usuario.findUniqueOrThrow({ where: { id: solicitud.usuarioId }, select: { cuit: true } });
+        const target = { origen: 'SOLICITUD' as const, documentoId: docId, ambito: solicitudPaymentScope(id), cuit: user.cuit || '', sha256: current.sha256 || '' };
+        if (estado === 'APROBADO') await requirePaymentIdentity(tx, target, current.analisis);
+        await notePaymentDecision(tx, target, current.analisis, estado, req.user!.id);
+      }
+      return tx.documentoSolicitud.update({ where: { id: docId }, data: { estado, observaciones: observaciones || undefined, revisadoPor: req.user!.id, revisadoAt: new Date() } });
     });
 
     res.json({ success: true, data: { documento: updated } });
   } catch (error) {
     next(error);
   }
+};
+
+/** Administration confirms only its own actor sector, with a fresh file hash. */
+export const confirmarIdentidadPago = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id, docId } = req.params;
+    const solicitud = await prisma.solicitudInscripcion.findUnique({ where: { id }, include: { usuario: { select: { cuit: true } } } });
+    if (!solicitud) throw new AppError('Solicitud no encontrada', 404);
+    assertReviewPermission(req, solicitud);
+    const documento = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.solicitudInscripcion.findUniqueOrThrow({ where: { id } });
+      const doc = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
+      if (!doc || doc.solicitudId !== id || doc.tipo !== 'COMPROBANTE_PAGO' || !doc.sha256) throw new AppError('Comprobante no encontrado o sin huella. Reintentá la lectura del original.', 409);
+      if (!['EN_REVISION', 'OBSERVADA'].includes(current.estado) && doc.estado !== 'APROBADO') throw new AppError('El pago se identifica durante la revisión del alta. La conciliación histórica sólo identifica documentos ya aprobados; no cambia su decisión.', 409);
+      if (req.body.expectedSha256 !== doc.sha256) throw new AppError('El documento cambió. Volvé a cargarlo antes de confirmar.', 409);
+      const pago = await confirmPayment(tx, { origen: 'SOLICITUD', documentoId: docId, ambito: solicitudPaymentScope(id), cuit: solicitud.usuario.cuit || '', sha256: doc.sha256, historico: doc.estado === 'APROBADO', aplicado: current.estado === 'APROBADA' }, req.body, req.user!.id);
+      const analysis = doc.analisis && typeof doc.analisis === 'object' && !Array.isArray(doc.analisis) ? doc.analisis : {};
+      return tx.documentoSolicitud.update({ where: { id: docId }, data: { analisis: { ...analysis, pago } } });
+    }, { timeout: 15_000 });
+    res.json({ success: true, data: { documento } });
+  } catch (error) { next(error); }
 };

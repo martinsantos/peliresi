@@ -10,7 +10,7 @@ import {
 } from '../controllers/actor.controller';
 import { getPagosTEF, createPagoTEF, updatePagoTEF, deletePagoTEF, getDDJJ, createDDJJ, updateDDJJ, deleteDDJJ } from '../controllers/generador-fiscal.controller';
 import { getPagosTEFOperador, createPagoTEFOperador, updatePagoTEFOperador, deletePagoTEFOperador, getDDJJOperador, createDDJJOperador, updateDDJJOperador, deleteDDJJOperador } from '../controllers/operador-fiscal.controller';
-import { upload, uploadDocumento, getDocumentos, downloadDocumento, revisarDocumento, deleteDocumento } from '../controllers/documento.controller';
+import { upload, uploadDocumento, getDocumentos, downloadDocumento, revisarDocumento, deleteDocumento, confirmarIdentidadPagoActor } from '../controllers/documento.controller';
 
 const router = Router();
 router.use(isAuthenticated);
@@ -162,6 +162,7 @@ router.post('/generadores/:id/documentos', requireAdminOrGenerador, upload.singl
 router.get('/documentos/:docId/download',                     downloadDocumento);
 // The document lookup in each controller enforces its actual actor sector.
 router.patch('/documentos/:docId/revisar', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'), revisarDocumento);
+router.post('/documentos/:docId/identidad-pago', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'), confirmarIdentidadPagoActor);
 router.delete('/documentos/:docId', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'), deleteDocumento);
 
 // ===== TRANSPORTISTAS =====

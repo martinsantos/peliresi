@@ -41,6 +41,7 @@ export function StepActividad({ form, up, isOperador }: StepActividadProps) {
           <input id="registration-tefCapacidad" type="number" min="0" step="any" inputMode="decimal" className={inputCls()} value={form.tefCapacidad || ''} onChange={event => up('tefCapacidad', event.target.value)} />
         </div>}
       </div>
+      <p className="text-sm leading-6 text-neutral-700">Podés adjuntar la factura eléctrica en Documentos para revisar la categoría tarifaria y el suministro. Los kWh de consumo y la potencia contratada en kW no reemplazan la potencia instalada en HP.</p>
     </div>
   );
 }

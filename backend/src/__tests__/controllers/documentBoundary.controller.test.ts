@@ -7,7 +7,8 @@ const mock = vi.hoisted(() => ({
   exists: vi.fn(), stream: vi.fn(), pipe: vi.fn(), unlink: vi.fn(),
 }));
 vi.mock('../../lib/prisma', () => ({
-  default: { documento: { findUnique: mock.find, findMany: mock.list, update: mock.update, delete: mock.remove } },
+  default: { documento: { findUnique: mock.find, findMany: mock.list, update: mock.update, delete: mock.remove },
+    $transaction: (callback: (tx: unknown) => unknown) => callback({ $queryRaw: vi.fn(), documento: { findUniqueOrThrow: mock.find, findUnique: mock.find, update: mock.update, delete: mock.remove } }) },
 }));
 vi.mock('../../config/config', () => ({
   config: { JWT_SECRET: 'unit-only-no-provider', NODE_ENV: 'test' },

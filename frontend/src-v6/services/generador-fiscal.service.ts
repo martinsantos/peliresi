@@ -1,4 +1,12 @@
 import api from './api';
+import type { ConfirmPaymentInput } from '../types/documentAnalysis';
+
+export const documentoIdentityService = {
+  async confirmarPago(docId: string, input: ConfirmPaymentInput): Promise<Documento> {
+    const { data } = await api.post(`/actores/documentos/${encodeURIComponent(docId)}/identidad-pago`, input);
+    return data.data.documento;
+  },
+};
 
 export const transportistaDocumentoService = {
   async upload(id: string, file: File, tipo: string, anio?: number): Promise<Documento> {

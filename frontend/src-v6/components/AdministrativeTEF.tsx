@@ -24,6 +24,7 @@ export function AdministrativeTEF({ actorType, identity, declaration, corrientes
       </summary>
       <div className="space-y-4 border-t border-neutral-200 p-4 sm:p-5">
         <p className="text-sm leading-6 text-neutral-700">Evaluación administrativa con los datos declarados. Los cambios de esta calculadora son una simulación: no guardan un importe, no emiten una liquidación y no validan el pago de un recibo.</p>
+        <p className="text-sm leading-6 text-neutral-700">Si se adjuntó factura eléctrica, revisá su lectura en Documentos. La categoría tarifaria y los kWh no determinan por sí solos la potencia instalada en HP ni cambian estos valores.</p>
         <p className="text-sm leading-6 text-amber-900">Fórmula y parámetros de la simulación pendientes de conciliación con la normativa vigente. Para controlar el comprobante, usá la liquidación correspondiente emitida por la autoridad.</p>
         {missing.length > 0 && <p className="text-sm leading-6 text-amber-800">Datos no declarados: {missing.join(', ')}. Completalos y revisá los coeficientes antes de usar el resultado; no es una tasa determinada.</p>}
         <CalculadoraTEF key={identity} corrientesY={corrientesY} tieneISO={tieneISO} initialInputs={inputs} inline />

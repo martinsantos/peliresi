@@ -1349,6 +1349,50 @@ model HuellaRecibo {
   @@map("huellas_recibo")
 }
 
+// Payment allocation is independent of attachment bytes and survives replacement.
+// No foreign key to a removable attachment/application; events retain provenance.
+model RegistroPagoComprobante {
+  id String @id @default(cuid())
+  ambito String
+  origen String
+  documentoId String
+  sha256 String
+  cuit String
+  identidad Json
+  estado String @default("CONFIRMADO")
+  confirmadoPor String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  claves ClavePagoComprobante[]
+  eventos EventoPagoComprobante[]
+  @@index([ambito])
+  @@index([origen, documentoId])
+  @@map("registros_pago_comprobante")
+}
+
+model ClavePagoComprobante {
+  clave String @id
+  registroId String
+  createdAt DateTime @default(now())
+  registro RegistroPagoComprobante @relation(fields: [registroId], references: [id], onDelete: Restrict)
+  @@index([registroId])
+  @@map("claves_pago_comprobante")
+}
+
+model EventoPagoComprobante {
+  id String @id @default(cuid())
+  registroId String
+  documentoId String
+  sha256 String
+  accion String
+  usuarioId String
+  datos Json
+  createdAt DateTime @default(now())
+  registro RegistroPagoComprobante @relation(fields: [registroId], references: [id], onDelete: Restrict)
+  @@unique([registroId, documentoId, sha256, accion])
+  @@map("eventos_pago_comprobante")
+}
+
 model MensajeSolicitud {
   id          String    @id @default(cuid())
   solicitudId String

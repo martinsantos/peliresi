@@ -28,6 +28,7 @@ import {
 import type { EstadoSolicitud, DocumentoSolicitud, MensajeSolicitud } from '../../types/api';
 import { solicitudService } from '../../services/solicitud.service';
 import { DocumentAnalysis } from '../../components/DocumentAnalysis';
+import { PaymentIdentityReview } from '../../components/PaymentIdentityReview';
 import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
@@ -186,8 +187,8 @@ const SolicitudDetallePage: React.FC = () => {
     try {
       await revisarDocumento.mutateAsync({ solicitudId: id, docId, estado });
       toast.success('Documento actualizado', `Documento ${estado.toLowerCase()}`);
-    } catch {
-      toast.error('Error', 'No se pudo actualizar el documento');
+    } catch (error) {
+      toast.error('Revisión del documento', getApiErrorMessage(error, 'No se pudo actualizar el documento'));
     }
   };
 
@@ -338,7 +339,8 @@ const SolicitudDetallePage: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
-                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : 'document'} retrying={readingReceipt} onRetry={canAct && (doc.tipo === 'COMPROBANTE_PAGO' || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
+                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt} onRetry={canAct && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
+                    {doc.tipo === 'COMPROBANTE_PAGO' && (canAct || doc.estado === 'APROBADO' && !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol)) && <PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} />}
 
                     <div className="flex items-center gap-1.5">
                       <button

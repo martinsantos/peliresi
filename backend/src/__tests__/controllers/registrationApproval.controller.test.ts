@@ -31,6 +31,7 @@ beforeEach(() => {
   mock.create.mockResolvedValue({ id: 'new-actor' }); mock.update.mockImplementation(async ({ data }) => ({ ...draft(), ...data }));
   mock.transaction.mockImplementation(callback => callback({ $queryRaw: mock.lock,
     solicitudInscripcion: { findUnique: mock.find, update: mock.update },
+    documentoSolicitud: { findMany: vi.fn().mockResolvedValue([]) },
     generador: { create: mock.create }, operador: { create: mock.create }, transportista: { create: mock.create },
     usuario: { update: mock.activate }, notificacion: { create: mock.notify },
   }));

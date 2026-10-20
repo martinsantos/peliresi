@@ -131,6 +131,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               {uploadErrors[doc.tipo] && <p className="mt-2 flex items-start gap-1.5 text-xs text-error-700" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{uploadErrors[doc.tipo]}</p>}
               {state === 'error' && pendingFile && <Button variant="outline" size="sm" className="mt-2" onClick={() => void onAddFile(doc.tipo, pendingFile)}>Reintentar {doc.nombre}</Button>}
               {doc.tipo === 'COMPROBANTE_PAGO' && !uploaded && <p className="mt-2 text-sm leading-6 text-neutral-700">Caja de banco o transferencia. El OCR no acredita el pago.</p>}
+              {doc.tipo === 'FACTURA_ELECTRICA' && !uploaded && <p className="mt-2 text-sm leading-6 text-neutral-700">Adjuntá la factura completa y legible del establecimiento. Se leerán distribuidora, tarifa, período, kWh y potencia si figuran. No modifica la potencia instalada que declaraste.</p>}
               <DocumentAnalysis analysis={reviewMode ? previewAnalyses[doc.tipo] : pendingFile ? undefined : uploaded?.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : 'document'} persisted={!reviewMode} retrying={isBusy} onRetry={(uploaded || reviewMode && pendingFile) && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
             </div>
           );

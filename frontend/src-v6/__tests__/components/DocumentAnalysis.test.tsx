@@ -25,9 +25,10 @@ describe('receipt feedback is readable evidence, never a payment certification',
   it('does not present absence of a byte match as proof that an ATM ticket is unique', () => {
     render(<DocumentAnalysis analysis={analysis} />);
     const scope = screen.getByTestId('receipt-control-scope');
-    expect(scope).toHaveTextContent('otra foto del mismo ticket puede no generar alerta');
-    expect(scope).toHaveTextContent('no valida el pago ante ATM');
-    expect(scope).toHaveTextContent('contra el trámite y la liquidación que corresponda');
+    expect(scope).toHaveTextContent('Una identidad ya reservada no puede usarse en otro trámite aunque cambie la foto');
+    expect(scope).toHaveTextContent('no valida fondos ante ATM');
+    expect(scope).toHaveTextContent('CUIT, concepto, fecha e importe contra el original y el trámite');
+    expect(scope).toHaveTextContent('si falta identidad legible, queda para revisión');
     expect(screen.queryByRole('alert')).toBeNull();
   });
   it.each(['SIN_TEXTO', 'NO_DISPONIBLE'] as const)('does not claim successful reading for %s', lectura => {
@@ -40,6 +41,10 @@ describe('receipt feedback is readable evidence, never a payment certification',
     render(<DocumentAnalysis analysis={{ ...analysis, lectura: 'NO_DISPONIBLE', texto: '', duplicado: true }} onRetry={retry} />);
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura', exact: true }));
     expect(retry).toHaveBeenCalledTimes(1); expect(screen.getByRole('alert')).toHaveTextContent('Comprobante repetido');
+  });
+  it('can retry an invoice whose PDF layer was readable but did not identify the tariff', () => {
+    const retry = vi.fn(); render(<DocumentAnalysis analysis={{ ...analysis, documentKind: 'FACTURA_ELECTRICA', aviso: 'Lectura parcial del PDF.', electricidad: { version: 1, distribuidora: 'EDEMSA', nombreDistribuidora: 'EDEMSA', campos: {}, conflictos: [], evidencias: [], aviso: 'No cambia la TEF.' } }} onRetry={retry} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Lectura parcial'); fireEvent.click(screen.getByRole('button', { name: 'Reintentar lectura', exact: true })); expect(retry).toHaveBeenCalledOnce();
   });
   it('disables repeated retries while a read is in progress', () => {
     const retry = vi.fn();

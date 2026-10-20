@@ -28,7 +28,7 @@ import { useGeneradoresEnrichment } from '../../hooks/useEnrichment';
 import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import DocumentUpload from '../../components/DocumentUpload';
 import { AdministrativeTEF } from '../../components/AdministrativeTEF';
-import { generadorFiscalService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
+import { generadorFiscalService, documentoIdentityService, type PagoTEF, type DeclaracionJurada, type Documento } from '../../services/generador-fiscal.service';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
@@ -155,7 +155,7 @@ const GeneradorDetallePage: React.FC = () => {
   const { data: apiGenerador, isLoading } = useGenerador(id || '');
   const { data: pagos = [] } = usePagosTEF(id || '');
   const { data: ddjjList = [] } = useDDJJ(id || '');
-  const { data: documentos = [] } = useDocumentos(id || '');
+  const { data: documentos = [], refetch: refetchDocumentos } = useDocumentos(id || '');
 
   const createPago = useCreatePago();
   const updatePago = useUpdatePago();
@@ -637,6 +637,8 @@ const GeneradorDetallePage: React.FC = () => {
                   onUpload={handleUploadDoc}
                   onDownload={handleDownloadDoc}
                   onRevisar={handleRevisarDoc}
+                  cuit={generador.cuit}
+                  onConfirmPayment={async (docId, input) => { await documentoIdentityService.confirmarPago(docId, input); await refetchDocumentos(); }}
                   onDelete={handleDeleteDoc}
                   isAdmin={canEdit}
                   readOnly={!canEdit}

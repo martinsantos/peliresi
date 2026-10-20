@@ -3,6 +3,8 @@ import { Upload, FileText, Download, CheckCircle, XCircle, Clock, Trash2 } from 
 import { Badge } from './ui/BadgeV2';
 import type { Documento } from '../services/generador-fiscal.service';
 import { DocumentAnalysis } from './DocumentAnalysis';
+import { PaymentIdentityReview } from './PaymentIdentityReview';
+import type { ConfirmPaymentInput } from '../types/documentAnalysis';
 
 const TIPO_LABELS: Record<string, string> = {
   CERTIFICADO_AMBIENTAL: 'Certificado Ambiental',
@@ -10,6 +12,7 @@ const TIPO_LABELS: Record<string, string> = {
   INFORME_TECNICO: 'Informe Tecnico',
   LIBRO_OPERATORIA: 'Libro de Operatoria',
   COMPROBANTE_PAGO: 'Comprobante de sellado / pago',
+  FACTURA_ELECTRICA: 'Factura de electricidad',
   OTRO: 'Otro',
 };
 
@@ -29,6 +32,8 @@ interface DocumentUploadProps {
   isPending?: boolean;
   readOnly?: boolean;
   initialTipo?: string;
+  cuit?: string;
+  onConfirmPayment?: (docId: string, input: ConfirmPaymentInput) => Promise<void>;
 }
 
 function formatSize(bytes: number): string {
@@ -38,7 +43,7 @@ function formatSize(bytes: number): string {
 }
 
 const DocumentUpload: React.FC<DocumentUploadProps> = ({
-  documentos, onUpload, onDownload, onRevisar, onDelete, isAdmin, isPending, readOnly = false, initialTipo = 'CERTIFICADO_AMBIENTAL'
+  documentos, onUpload, onDownload, onRevisar, onDelete, isAdmin, isPending, readOnly = false, initialTipo = 'CERTIFICADO_AMBIENTAL', cuit, onConfirmPayment
 }) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const controlId = useId();
@@ -196,6 +201,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                   </div>
                   </div>
                   {doc.analisis && <div className="col-span-2 w-full sm:basis-full"><DocumentAnalysis analysis={doc.analisis} /></div>}
+                  {!readOnly && isAdmin && doc.tipo === 'COMPROBANTE_PAGO' && onConfirmPayment && <div className="col-span-2 w-full sm:basis-full"><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} cuit={cuit} referencia={`Documento ${doc.id} · ${doc.anio || ''}`} onConfirm={input => onConfirmPayment(doc.id, input)} /></div>}
                 </div>
               );
             })}

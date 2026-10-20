@@ -60,6 +60,19 @@ describe('free OCR has bounded resources and reports real states', () => {
     mock.exec.mockImplementation((_command, _args, _options, callback) => callback(new Error('Engine unavailable'), '', ''));
     expect(await readReceipt({ path: '/virtual/receipt.pdf', mimeType: 'application/pdf' })).toMatchObject({ lectura: 'NO_DISPONIBLE', texto: '', motor: null, duplicado: false });
   });
+  it('uses real PDF electricity fields without rendering a complete textual invoice', async () => {
+    mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, 'EDEMSA\nTarifa: T2 R BT\nConsumo: 1200 kWh', ''));
+    expect(await readReceipt({ path: '/virtual/bill.pdf', mimeType: 'application/pdf' }, 'FACTURA_ELECTRICA')).toMatchObject({ lectura: 'LEIDO', motor: 'PDF_TEXT' }); expect(mock.exec).toHaveBeenCalledTimes(1);
+  });
+  it('reads the image of a hybrid invoice even when its digital layer contains a logo', async () => {
+    mock.exec.mockImplementation((_command, args, _options, callback) => callback(null, args.includes('pdftotext') ? 'EDEMSA FACTURA DIGITAL' : args.includes('tesseract') ? 'Tarifa: T2 R BT\nConsumo: 1200 kWh' : '', ''));
+    const result = await readReceipt({ path: '/virtual/hybrid.pdf', mimeType: 'application/pdf' }, 'FACTURA_ELECTRICA');
+    expect(result).toMatchObject({ lectura: 'LEIDO', motor: 'TESSERACT', texto: expect.stringContaining('Tarifa: T2 R BT') }); expect(result.texto).toContain('EDEMSA FACTURA DIGITAL'); expect(mock.exec).toHaveBeenCalledTimes(3);
+  });
+  it('keeps the useful PDF layer when complementary invoice OCR is unavailable', async () => {
+    mock.exec.mockImplementation((_command, args, _options, callback) => args.includes('pdftotext') ? callback(null, 'EDEMSA FACTURA DIGITAL', '') : callback(new Error('OCR_DEADLINE'), '', ''));
+    expect(await readReceipt({ path: '/virtual/hybrid.pdf', mimeType: 'application/pdf' }, 'FACTURA_ELECTRICA')).toMatchObject({ lectura: 'LEIDO', motor: 'PDF_TEXT', texto: 'EDEMSA FACTURA DIGITAL', aviso: expect.stringContaining('Lectura parcial') });
+  });
   it('limits same-worker concurrency instead of starting another raster/engine', async () => {
     let done: ((error: null, text: string, stderr: string) => void) | undefined;
     mock.exec.mockImplementation((_command, _args, _options, callback) => { done = callback; });

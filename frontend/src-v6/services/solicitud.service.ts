@@ -1,4 +1,5 @@
 import api from './api';
+import type { ConfirmPaymentInput } from '../types/documentAnalysis';
 import type {
   SolicitudInscripcion,
   DocumentoSolicitud,
@@ -58,6 +59,10 @@ export const solicitudService = {
   },
   async analizarDocumento(solicitudId: string, docId: string): Promise<DocumentoSolicitud> {
     const { data } = await api.post(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(docId)}/analizar`);
+    return data.data.documento;
+  },
+  async confirmarPago(solicitudId: string, docId: string, input: ConfirmPaymentInput): Promise<DocumentoSolicitud> {
+    const { data } = await api.post(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(docId)}/identidad-pago`, input);
     return data.data.documento;
   },
   async downloadDocumento(solicitudId: string, item: DocumentoSolicitud): Promise<void> {

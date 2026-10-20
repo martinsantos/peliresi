@@ -417,7 +417,7 @@ const InscripcionWizardPage: React.FC = () => {
     setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
     if (isReviewMode) {
       uploadsInFlight.current.add(tipo); setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
-      try { const result = await previewDocument(file, 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: result.analisis })); }
+      try { const result = await previewDocument(file, tipo === 'FACTURA_ELECTRICA' ? 'FACTURA_ELECTRICA' : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: result.analisis })); }
       catch (error) { setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo leer el archivo de prueba. Los datos siguen en el navegador.') })); }
       finally { uploadsInFlight.current.delete(tipo); setUploadStates(previous => ({ ...previous, [tipo]: undefined })); }
       return;

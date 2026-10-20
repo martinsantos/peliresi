@@ -11,6 +11,7 @@ describe('solicitudRequirements', () => {
       'CONSTANCIA_AFIP',
       'MEMORIA_TECNICA',
       'CERTIFICADO_HABILITACION',
+      'FACTURA_ELECTRICA',
       'COMPROBANTE_PAGO',
     ]);
     first[0].nombre = 'mutated';
@@ -22,6 +23,10 @@ describe('solicitudRequirements', () => {
     for (const actor of ['GENERADOR', 'OPERADOR', 'TRANSPORTISTA']) {
       expect(getSolicitudRequirements(actor).find(doc => doc.tipo === 'COMPROBANTE_PAGO')?.required).toBe(false);
     }
+  });
+  it('offers electrical evidence for generator/operator declarations without inventing a transport or tax requirement', () => {
+    for (const actor of ['GENERADOR', 'OPERADOR']) expect(getSolicitudRequirements(actor).find(doc => doc.tipo === 'FACTURA_ELECTRICA')?.required).toBe(false);
+    expect(getSolicitudRequirements('TRANSPORTISTA').find(doc => doc.tipo === 'FACTURA_ELECTRICA')).toBeUndefined();
   });
 
   it('returns only required documents that are still missing', () => {

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { AppError } from '../middlewares/errorHandler';
 import { describeDocument, readReceipt } from '../services/documentAnalysis.service';
 import { licenseFields } from '../domain/licenseReading';
+import { electricityReading } from '../domain/electricityReading';
 
 // Volatile single-file read. No Prisma, mail, account, application, payment or
 // provider call. Native extraction already has a cross-worker flock and deadline.
@@ -19,10 +20,11 @@ export const previewUpload = multer({ storage: multer.diskStorage({
 export async function previewDocument(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.file) throw new AppError('Seleccioná un documento para leer.', 400);
-    if (!['LICENCIA', 'DOCUMENTO'].includes(req.body.tipo)) throw new AppError('Tipo de lectura no permitido.', 400);
+    if (!['LICENCIA', 'DOCUMENTO', 'FACTURA_ELECTRICA'].includes(req.body.tipo)) throw new AppError('Tipo de lectura no permitido.', 400);
     const description = describeDocument(req.file);
     const file = { path: req.file.path, mimeType: description.mimeType };
-    const analisis = req.body.tipo === 'LICENCIA' ? await readReceipt(file, 'LICENCIA') : await readReceipt(file);
+    const reading = req.body.tipo === 'LICENCIA' ? await readReceipt(file, 'LICENCIA') : req.body.tipo === 'FACTURA_ELECTRICA' ? await readReceipt(file, 'FACTURA_ELECTRICA') : await readReceipt(file);
+    const analisis = req.body.tipo === 'FACTURA_ELECTRICA' ? { ...reading, documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(reading.texto) } : reading;
     // Preserve the failure category. A busy/missing engine is not a poor photo,
     // and this stateless endpoint removes its temporary original after reading.
     if (analisis.lectura === 'SIN_TEXTO') {

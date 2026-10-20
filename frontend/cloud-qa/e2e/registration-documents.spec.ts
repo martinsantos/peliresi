@@ -14,19 +14,20 @@ const sharp = backendRequire('sharp');
 
 // Synthetic bytes only, not a certificate or a real payment. All sessions below
 // come from real UI account creation/login; no business API interception.
-function receipt() {
-  const id = randomUUID();
+function receipt(cuit = '30-90000001-1') {
+  const id = '9' + randomUUID().replaceAll('-', '').slice(0, 12);
   const pdf = new jsPDF();
-  pdf.text(['RECIBO QA SIN VALIDEZ FISCAL', `Referencia ${id}`, 'IMPORTE 12500', 'Pago pendiente de revision humana'], 15, 25);
+  pdf.text(['RECIBO QA SIN VALIDEZ FISCAL', 'ATM ADMINISTRACION TRIBUTARIA MENDOZA', `ID Comprobante: ${id}`, `Transaccion: ${id}88`, `Control: ${id}77`, `CUIT: ${cuit}`, 'Codigo de Tasa: 162', 'Fecha Pago: 20/10/2026', 'IMPORTE TOTAL: $12.500,00', 'Pago pendiente de revision humana'], 15, 25);
   return Buffer.from(pdf.output('arraybuffer'));
 }
-type Draft = { id: string; authorization: string; documentStep: number; actor: string };
+type Draft = { id: string; authorization: string; documentStep: number; actor: string; cuit: string };
 async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> {
   await page.goto(`${prefix(info)}/inscripcion/${actor}`);
   const id = randomUUID();
   await page.getByLabel('Nombre completo *', { exact: true }).fill(`QA ${actor} ${id}`);
   await page.getByLabel('Email *', { exact: true }).fill(`${id}@night-qa.invalid`);
-  await page.getByLabel('CUIT *', { exact: true }).fill(`30-${String(Date.now()).slice(-8)}-1`);
+  const cuit = `30-${String(Date.now()).slice(-8)}-1`;
+  await page.getByLabel('CUIT *', { exact: true }).fill(cuit);
   await page.getByLabel('Contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await page.getByLabel('Confirmar contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   const posted = page.waitForResponse(response => new URL(response.url()).pathname === '/api/solicitudes/iniciar' && response.request().method() === 'POST');
@@ -51,7 +52,7 @@ async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> 
   }
   await page.getByRole('navigation', { name: 'Etapas de la inscripción' }).getByRole('button', { name: new RegExp(`^Paso ${documentStep} de .*: Documentos$`) }).click();
   await expect(page.getByTestId('registration-document-COMPROBANTE_PAGO')).toBeVisible();
-  return { id: body.solicitudId, authorization: `Bearer ${body.tokens.accessToken}`, documentStep, actor };
+  return { id: body.solicitudId, authorization: `Bearer ${body.tokens.accessToken}`, documentStep, actor, cuit };
 }
 async function attach(page: Page, id: string, type: string, bytes: Buffer, mimeType = 'application/pdf', name = 'QA.pdf') {
   const row = page.getByTestId(`registration-document-${type}`);
@@ -69,7 +70,7 @@ async function attach(page: Page, id: string, type: string, bytes: Buffer, mimeT
 for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: actual registration documents, bounded PDF reading and authenticated reload`, async ({ page }, info) => {
   test.setTimeout(120000);
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
-  const candidate = await draft(page, info, actor), bytes = receipt();
+  const candidate = await draft(page, info, actor), bytes = receipt(candidate.cuit);
   const legal = ['CONSTANCIA_AFIP', 'CERTIFICADO_HABILITACION', actor === 'generador' ? 'MEMORIA_TECNICA' : actor === 'operador' ? 'RESOLUCION_DPA' : 'SEGURO_AMBIENTAL'];
   for (const type of legal) await attach(page, candidate.id, type, bytes, 'application/pdf', `${type}-QA.pdf`);
   const read = await attach(page, candidate.id, 'COMPROBANTE_PAGO', bytes, 'application/pdf', 'Recibo-QA.pdf');
@@ -127,6 +128,13 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
     await evaluation.locator('summary').click();
     await expect(evaluation).not.toHaveAttribute('open', '');
   } else await expect(page.getByTestId('tef-admin-review')).toHaveCount(0);
+  const identity = page.getByTestId('payment-identity-review'); await identity.locator('summary').click();
+  await expect(identity.getByLabel('CUIT del obligado', { exact: true })).toHaveValue(candidate.cuit.replace(/\D/g, ''));
+  await identity.getByRole('checkbox').check();
+  const reservation = page.waitForResponse(response => response.url().endsWith(`/documentos/${read.id}/identidad-pago`));
+  await identity.getByRole('button', { name: 'Confirmar y reservar pago', exact: true }).click(); expect((await reservation).status()).toBe(200);
+  const decision = page.waitForResponse(response => response.url().endsWith(`/documentos/${read.id}/revisar`));
+  await page.getByRole('button', { name: 'Aprobar documento Recibo-QA.pdf', exact: true }).click(); expect((await decision).status()).toBe(200);
   const approval = page.waitForResponse(response => new URL(response.url()).pathname === `/api/solicitudes/${candidate.id}/aprobar` && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Aprobar', exact: true }).click();
   await page.getByRole('dialog', { name: 'Confirmar Aprobacion' }).getByRole('button', { name: 'Confirmar Aprobacion', exact: true }).click();
