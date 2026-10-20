@@ -62,6 +62,7 @@ test('new operational guides include relevant reusable captures, not text-only w
     assert.ok(guide.steps.filter((s: any) => s.image && s.alt).length >= minimum, id);
   }
   const provenance = JSON.parse(read('training-capture-provenance.json'));
+  const replacement = JSON.parse(read('actor-onboarding-capture-provenance.json'));
   assert.equal(provenance.synthetic, true);
   assert.equal(provenance.productionCapture, false);
   assert.equal(provenance.edited, false);
@@ -72,7 +73,12 @@ test('new operational guides include relevant reusable captures, not text-only w
     assert.equal(bytes.readUInt32BE(16), item.width);
     assert.equal(bytes.readUInt32BE(20), item.height);
     const steps = guides.flatMap((g: any) => g.steps).filter((s: any) => s.image === 'screenshots/' + item.file);
-    assert.ok(steps.length, item.file + ' must be used');
+    const superseded = replacement.supersedes.find((entry: any) => entry.file === item.file);
+    if (superseded) {
+      assert.equal(steps.length, 0, 'A superseded capture stays archived, without illustrating the current flow');
+      assert.ok(replacement.files.some((entry: any) => entry.file === superseded.replacement));
+      assert.ok(guides.find((g: any) => g.id === superseded.guide).steps.some((s: any) => s.image === 'screenshots/' + superseded.replacement));
+    } else assert.ok(steps.length, item.file + ' must be used');
     for (const step of steps) assert.match(step.caption, /Datos sintéticos/);
   }
 });

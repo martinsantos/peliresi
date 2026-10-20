@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 vi.mock('../../components/ActorActivities', () => ({ default: () => null }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isRestricted: true, logout: vi.fn() }) }));
 vi.mock('../../hooks/useSolicitudes', () => ({
   useMisSolicitudes: () => ({ data: [
     { id: 'g', tipoActor: 'GENERADOR', estado: 'OBSERVADA', observaciones: 'Generador observado' },

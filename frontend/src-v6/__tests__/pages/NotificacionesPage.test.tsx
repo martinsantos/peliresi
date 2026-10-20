@@ -20,6 +20,14 @@ function setup(path = '/notificaciones') {
   return client;
 }
 describe('notification inbox states and interaction', () => {
+  it('names an approved application and opens its result on app without an admin route', async () => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Solicitud aprobada', datos: '{"tipo":"solicitud_aprobada","solicitudId":"own-1"}' }] });
+    setup('/app/notificaciones');
+    expect(await screen.findByText('Abrir solicitud y ver su estado →')).toBeVisible();
+    expect(screen.queryByText('Abrir manifiesto y ver qué sigue →')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Solicitud aprobada', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/app/mi-solicitud?solicitud=own-1');
+  });
   it('names the PSIP expediente instead of a manifest and opens the actor route in app', async () => {
     service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'psip-1', destino: 'participacion' }) }] });
     setup('/app/notificaciones');

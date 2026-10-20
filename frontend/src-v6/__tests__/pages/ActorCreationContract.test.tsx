@@ -18,7 +18,7 @@ vi.mock('../../hooks/useActores', () => {
     useUpdateTransportista: update, useUpdateGenerador: update, useUpdateOperador: update };
 });
 vi.mock('../../hooks/useEnrichment', () => ({ useGeneradoresEnrichment: () => ({ data: {} }), useOperadoresEnrichment: () => ({ data: {} }) }));
-vi.mock('../../hooks/useGeneradorFiscal', () => ({ useUploadDocumento: () => ({ isPending: false }), useUploadOperadorDocumento: () => ({ isPending: false }) }));
+vi.mock('../../hooks/useGeneradorFiscal', () => ({ useUploadDocumento: () => ({ isPending: false, mutateAsync: mock.uploadDoc }), useUploadOperadorDocumento: () => ({ isPending: false, mutateAsync: mock.uploadDoc }) }));
 vi.mock('../../components/CalculadoraTEF', () => ({ default: () => null }));
 
 function open(type: 'transportista' | 'generador' | 'operador' = 'transportista', edit = false, base = '') {
@@ -36,6 +36,15 @@ function vehicle() { step('Vehiculos'); step('Agregar'); fill(/Patente/, 'QA123Z
 
 describe('actor creation contract', () => {
   beforeEach(() => { vi.clearAllMocks(); mock.existing = undefined; mock.create.mockResolvedValue({ id: 'created' }); mock.update.mockResolvedValue({}); mock.uploadDoc.mockResolvedValue({ id: 'qa-doc', nombre: 'QA.pdf', tipo: 'OTRO', size: 100, estado: 'PENDIENTE' }); });
+  it.each([['generador', 'Factura de Luz'], ['operador', 'Factura eléctrica']] as const)('%s retains its bill attachment through administrative creation', async (type, label) => {
+    open(type); basics(); step('Regulatorio'); fill(/Password Inicial/, 'OnlyLocal-QA-secret!'); step('Adjuntos');
+    fireEvent.change(screen.getByLabelText('Adjuntar ' + label), { target: { files: [new File(['QA'], 'Factura-QA.pdf', { type: 'application/pdf' })] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar Registro', exact: true }));
+    await waitFor(() => expect(screen.getByText('Listado')).toBeInTheDocument());
+    expect(mock.create).toHaveBeenCalledOnce(); expect(mock.uploadDoc).toHaveBeenCalledWith(expect.objectContaining({
+      [type + 'Id']: 'created', tipo: type === 'generador' ? 'FACTURA_LUZ' : 'FACTURA_ELECTRICA', file: expect.objectContaining({ name: 'Factura-QA.pdf' }),
+    }));
+  });
   it.each(['generador', 'operador', 'transportista'] as const)('%s focuses the first invalid field without taking focus back while typing', async type => {
     open(type); step(type === 'transportista' ? 'Siguiente' : 'Continuar');
     await waitFor(() => expect(screen.getByLabelText('Razon Social *')).toHaveFocus());

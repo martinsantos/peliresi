@@ -99,6 +99,7 @@ const InscripcionWizardPage: React.FC = () => {
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const validationRef = useRegistrationValidationFocus(attempted);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [observations, setObservations] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>(() => trialInitial?.data.form && typeof trialInitial.data.form === 'object'
     ? Object.fromEntries(Object.entries(trialInitial.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : reviewFixture?.form || {});
   const [previewAnalyses, setPreviewAnalyses] = useState<Record<string, ReceiptAnalysis>>({});
@@ -151,7 +152,7 @@ const InscripcionWizardPage: React.FC = () => {
     setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step) || 1)));
     setMissingLocalFiles(Array.isArray(local?.data.files) ? local.data.files.filter(item => typeof item === 'string') as string[] : []);
     setAdjuntos({}); setUploadedDocs({}); setPreviewAnalyses({}); setUploadStates({}); setUploadErrors({});
-    setOwner(null); setSolicitudId(null); setSubmitSuccess(false); setSaveError(null); setDirty(false);
+    setOwner(null); setSolicitudId(null); setSubmitSuccess(false); setSaveError(null); setDirty(false); setObservations(null);
     serverExtraFields.current = {}; setPhase(isReviewMode ? 2 : 1);
     setReg(reviewFixture?.reg || { nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
     setFormContext(context);
@@ -235,6 +236,7 @@ const InscripcionWizardPage: React.FC = () => {
       if (!solicitud || solicitud.tipoActor !== tipoActor || solicitud.id !== pending.id) throw new Error('Solicitud incompatible');
       if (!accountAtStart || solicitud.usuarioId !== accountAtStart || registrationSessionOwner(getAccessToken()) !== accountAtStart) throw new Error('La sesión no pertenece a este borrador');
       if (receivedState(solicitud.estado)) {
+        setObservations(null);
         setOwner(accountAtStart); setSolicitudId(solicitud.id); setConfirmedState(solicitud.estado);
         setConfirmedReason(solicitud.estado === 'RECHAZADA' && typeof solicitud.motivoRechazo === 'string' ? solicitud.motivoRechazo : null);
         setReceiptError(null);
@@ -244,6 +246,7 @@ const InscripcionWizardPage: React.FC = () => {
         return;
       }
       if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) throw new Error('Estado de solicitud no reconocido');
+      setObservations(solicitud.estado === 'OBSERVADA' && typeof solicitud.observaciones === 'string' ? solicitud.observaciones : null);
       let persistedForm: Record<string, string> = {};
       try {
         const data = typeof solicitud.datosActor === 'string' ? JSON.parse(solicitud.datosActor || '{}') : solicitud.datosActor;
@@ -297,6 +300,7 @@ const InscripcionWizardPage: React.FC = () => {
       setLocalConflict(null); setMissingLocalFiles([]); setDirty(false); setLocalSaved(false);
       setReg({ nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
       setConfirmedState(null); setConfirmedReason(null); setReceiptError(null); setSubmitSuccess(false); setSolicitudId(null);
+      setObservations(null);
       setResumeStatus('error'); setPhase(1);
   }, []);
   useEffect(() => {
@@ -600,6 +604,7 @@ const InscripcionWizardPage: React.FC = () => {
       clearRegistrationDraft(owner!, draftScope);
       try { localStorage.removeItem('sitrep_pending_solicitud'); } catch { /* submission was already confirmed by SITREP */ }
       setConfirmedState('ENVIADA');
+      setObservations(null);
       setSubmitSuccess(true);
       void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
     } catch (err: unknown) {
@@ -827,6 +832,7 @@ const InscripcionWizardPage: React.FC = () => {
           {!isReviewMode && ownership.status === 'unavailable' && <p role="alert" className="mb-4 text-sm text-error-800">El navegador no pudo proteger el borrador frente a otra pestaña. Los datos siguen en pantalla; no se guardará una edición sin proteger.</p>}
           {localConflict && <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p>El borrador de SITREP cambió desde tu copia local. Elegí qué conservar; no mezclamos ni sobrescribimos automáticamente.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setForm(localConflict); setLocalConflict(null); setDirty(true); editRevision.current++; }}>Recuperar mis cambios locales</Button><Button variant="outline" onClick={() => { clearRegistrationDraft(owner!, draftScope); setLocalConflict(null); }}>Conservar versión de SITREP</Button></div></div>}
           {missingLocalFiles.length > 0 && <p role="alert" className="mb-4 text-sm text-amber-900">{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : `Hay archivos que no llegaron a guardarse: ${missingLocalFiles.join(', ')}. Volvé a seleccionarlos en Documentos. Los originales ya guardados se recuperan.`}</p>}
+          {observations && <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Observaciones por corregir</p><p className="mt-1 whitespace-pre-wrap break-words">{observations}</p><p className="mt-2">Corregí lo solicitado y volvé a enviar desde el resumen.</p></div>}
           {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
           {validationError && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
           {renderStepContent()}

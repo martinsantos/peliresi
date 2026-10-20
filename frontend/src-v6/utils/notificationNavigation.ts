@@ -21,15 +21,18 @@ function withBasePath(path: string, basePath: string): string {
   return `${normalizedBase}${normalizedPath}`;
 }
 
-/** A new/opened PSIP notice must not leave an already open expediente on stale data. */
+/** Opening a workflow notice must refresh its linked expediente/application. */
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
+  if (typeof data.solicitudId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) {
+    void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
+  }
   if (data.tipo === 'intercambio_inspeccion' && data.version === 1) {
     void queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
   }
 }
 
-export function resolveNotificationPath(notificacion: Notificacion, basePath = ''): string {
+export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string): string {
   const data = parseNotificationData(notificacion.datos);
   if (data.tipo === 'intercambio_inspeccion') {
     if (data.version !== 1 || typeof data.inspeccionId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.inspeccionId)
@@ -50,7 +53,12 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   if (data.tipo === 'certificado_ambiental' && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     return withBasePath('/mi-perfil', basePath);
   }
-  if (typeof data.solicitudId === 'string') return withBasePath(`/admin/solicitudes/${data.solicitudId}`, basePath);
+  if (typeof data.solicitudId === 'string') {
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) return withBasePath('/notificaciones', basePath);
+    const applicant = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(recipientRole || '')
+      || ['solicitud_observada', 'solicitud_aprobada', 'solicitud_rechazada'].includes(String(data.tipo));
+    return withBasePath(applicant ? `/mi-solicitud?solicitud=${data.solicitudId}` : `/admin/solicitudes/${data.solicitudId}`, basePath);
+  }
   if (typeof data.inspeccionId === 'string') return withBasePath(`/inspecciones/${data.inspeccionId}`, basePath);
   if (notificacion.manifiestoId) return withBasePath(`/manifiestos/${notificacion.manifiestoId}`, basePath);
   if (typeof data.alertaId === 'string') return withBasePath('/alertas', basePath);

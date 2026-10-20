@@ -174,9 +174,9 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
         .catch(() => { /* Keep the notice unread if acknowledgement was not confirmed. */ });
       setIsOpen(false);
 
-      navigate(resolveNotificationPath(notif, basePath));
+      navigate(resolveNotificationPath(notif, basePath, currentUser?.rol));
     },
-    [navigate, queryClient, basePath]
+    [navigate, queryClient, basePath, currentUser?.rol]
   );
 
   const handleViewAll = useCallback(() => {

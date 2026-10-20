@@ -74,7 +74,7 @@ const NotificacionesPage: React.FC = () => {
     refreshInspectionNotification(notice, queryClient);
     if (!notice.leida) mark.mutate(notice.id);
     // Opening the expediente must not depend on a successful acknowledgement.
-    navigate(resolveNotificationPath(notice, mp('')));
+    navigate(resolveNotificationPath(notice, mp(''), currentUser?.rol));
   };
 
   return (
@@ -135,7 +135,7 @@ const NotificacionesPage: React.FC = () => {
             // A configurable rule has an identity. Do not replace its saved
             // name with a generic title; retain the fallback for legacy data.
             const title = followup ? notice.titulo?.trim() || 'Seguimiento de manifiesto' : notice.titulo;
-            const path = resolveNotificationPath(notice, mp(''));
+            const path = resolveNotificationPath(notice, mp(''), currentUser?.rol);
             const linked = path !== mp('/notificaciones');
             const Content = linked ? 'button' : 'div';
             const warning = /RECHAZ|INCIDENTE|ANOMALIA|VENCIMIENTO|ALERTA/.test(notice.tipo) || /rechaz|detenido/i.test(notice.titulo);
@@ -158,7 +158,7 @@ const NotificacionesPage: React.FC = () => {
                     )}
                     <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
                     {followup && <span className="mt-2 block text-sm font-semibold text-primary-800">{followup}</span>}
-                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{/\/(?:mis-)?inspecciones\//.test(path) ? 'Abrir expediente y ver el intercambio →' : 'Abrir manifiesto y ver qué sigue →'}</span>}
+                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{/\/(?:admin\/solicitudes\/|mi-solicitud(?:\?|$))/.test(path) ? 'Abrir solicitud y ver su estado →' : /\/(?:mis-)?inspecciones\//.test(path) ? 'Abrir expediente y ver el intercambio →' : 'Abrir manifiesto y ver qué sigue →'}</span>}
                     <time dateTime={notice.createdAt} className="mt-2 block text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
                   </span>
                   {linked && <ChevronRight size={18} aria-hidden="true" className="mt-1 shrink-0 text-neutral-600" />}

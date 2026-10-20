@@ -147,8 +147,8 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
           )}>
             {currentUser.avatar}
           </div>
-          <div className="hidden md:block text-left">
-            <p className={cn('text-sm font-semibold', currentConfig.color)}>
+          <div className="hidden min-w-0 max-w-[10rem] text-left xl:block">
+            <p title={currentUser.nombre} className={cn('overflow-hidden text-ellipsis whitespace-nowrap text-sm font-semibold', currentConfig.color)}>
               {currentUser.nombre}
             </p>
             <p className="text-xs text-neutral-700">
@@ -174,8 +174,8 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                   <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center font-bold text-lg">
                     {currentUser.avatar}
                   </div>
-                  <div>
-                    <p className="font-semibold text-neutral-900">{currentUser.nombre}</p>
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-neutral-900">{currentUser.nombre}</p>
                     <div className="flex items-center gap-1">
                       <CurrentIcon size={12} className={currentConfig.color} />
                       <span className={cn('text-xs', currentConfig.color)}>

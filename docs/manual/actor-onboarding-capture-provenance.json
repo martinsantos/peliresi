@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-20",
+  "generatedAt": "2026-10-20T23:34:09.606045+00:00",
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "capClosed": true,
+  "physicalDevice": false,
+  "viewport": {
+    "width": 360,
+    "height": 800
+  },
+  "suite": "browser-entry-final",
+  "suiteStartedAt": "2026-10-20T23:24:37.689Z",
+  "browserTestsPassed": 18,
+  "sourceManifestSHA256": "8972f84774ee0406c1072e72ee13fe04247eeb9e1973f84e9cdc76746c2b72dc",
+  "files": [
+    {
+      "file": "mobile/registration-observed-20261020.png",
+      "source": "browser-entry-final/actor-onboarding-generador-0f74b-ection-and-approved-account-app/generador-observed-entry.png",
+      "sha256": "ad90581602eeae56567fc8a1d6da6680cf49bae8b1b20994413caa68c62e6b30",
+      "width": 945,
+      "height": 2100,
+      "bytes": 143637
+    }
+  ],
+  "supersedes": [
+    {
+      "file": "mobile/registration-observed-20261012.png",
+      "replacement": "mobile/registration-observed-20261020.png",
+      "guide": "alta-borradores-ocr",
+      "step": 4,
+      "reason": "La captura actual muestra el acceso para corregir campos y documentos; el original anterior se conserva sin editar."
+    }
+  ]
+}

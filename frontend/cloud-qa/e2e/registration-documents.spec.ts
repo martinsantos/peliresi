@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix } from './helpers';
+import { isolatedMapTiles, login, prefix } from './helpers';
+test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); });
 const require = createRequire(new URL('../../package.json', import.meta.url));
 const backendRequire = createRequire(new URL('../../../backend/package.json', import.meta.url));
 const { jsPDF } = require('jspdf');
@@ -22,6 +23,7 @@ function receipt(cuit = '30-90000001-1') {
 }
 type Draft = { id: string; authorization: string; documentStep: number; actor: string; cuit: string };
 async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> {
+  await isolatedMapTiles(page, info);
   await page.goto(`${prefix(info)}/inscripcion/${actor}`);
   const id = randomUUID();
   await page.getByLabel('Nombre completo *', { exact: true }).fill(`QA ${actor} ${id}`);

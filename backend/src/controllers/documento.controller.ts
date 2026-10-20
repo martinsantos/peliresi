@@ -97,8 +97,9 @@ export const uploadDocumento = async (req: AuthRequest, res: Response, next: Nex
             if (file.mimetype !== 'application/pdf') throw new AppError('El certificado oficial debe ser un PDF', 400);
         }
         const description = describeDocument(file);
-        const reading = tipo === 'FACTURA_ELECTRICA' ? await readReceipt({ path: file.path, mimeType: description.mimeType }, 'FACTURA_ELECTRICA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt({ path: file.path, mimeType: description.mimeType }) : undefined;
-        let analysis = reading && tipo === 'FACTURA_ELECTRICA' ? { ...reading, documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(reading.texto) } : reading;
+        const electricBill = tipo === 'FACTURA_ELECTRICA' || tipo === 'FACTURA_LUZ';
+        const reading = electricBill ? await readReceipt({ path: file.path, mimeType: description.mimeType }, 'FACTURA_ELECTRICA') : tipo === 'COMPROBANTE_PAGO' ? await readReceipt({ path: file.path, mimeType: description.mimeType }) : undefined;
+        let analysis = reading && electricBill ? { ...reading, documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(reading.texto) } : reading;
         const documento = await prisma.$transaction(async transaction => {
           if (analysis && tipo === 'COMPROBANTE_PAGO') {
             analysis.duplicado = await receiptDuplicate(transaction, description.sha256);

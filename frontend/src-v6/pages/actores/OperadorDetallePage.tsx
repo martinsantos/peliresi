@@ -45,6 +45,7 @@ import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
+import { OperadorDocuments } from '../../components/OperadorDocuments';
 import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
@@ -215,6 +216,7 @@ const OperadorDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<FlaskConical size={16} />}>Información General</Tab>
           <Tab id="tratamientos" icon={<Beaker size={16} />}>Tratamientos</Tab>
+          <Tab id="documentos" icon={<FileText size={16} />}>Documentos</Tab>
           {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
@@ -496,6 +498,10 @@ const OperadorDetallePage: React.FC = () => {
               </Button>
             </div>}
           </div>
+        </TabPanel>
+
+        <TabPanel id="documentos">
+          <OperadorDocuments actorId={id || ''} cuit={operador.cuit} />
         </TabPanel>
 
         {/* Tab: Trazabilidad */}

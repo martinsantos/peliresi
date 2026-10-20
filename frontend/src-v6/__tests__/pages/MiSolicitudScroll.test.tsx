@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ messages: [] as unknown[], status: 'OBSERVADA', sentAt: null as string | null, loading: false, error: false, hasData: true, refetch: vi.fn() }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isRestricted: true, logout: vi.fn() }) }));
 vi.mock('../../hooks/useSolicitudes', () => ({
   useMisSolicitudes: () => ({ data: state.hasData ? [{ id: 'own', estado: state.status, fechaEnvio: state.sentAt, tipoActor: 'GENERADOR', observaciones: 'Completar domicilio' }] : undefined, isLoading: state.loading, isError: state.error, refetch: state.refetch }),
   useMensajesSolicitud: () => ({ data: state.messages }),

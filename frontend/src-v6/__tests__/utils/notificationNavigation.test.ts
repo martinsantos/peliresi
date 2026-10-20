@@ -17,6 +17,23 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('opens an application message in the %s own result, never administration', role => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'solicitud_mensaje', solicitudId: 'own-1' }) };
+    expect(resolveNotificationPath(notice, '', role)).toBe('/mi-solicitud?solicitud=own-1');
+    expect(resolveNotificationPath(notice, '/app', role)).toBe('/app/mi-solicitud?solicitud=own-1');
+  });
+  it.each(['solicitud_aprobada', 'solicitud_observada', 'solicitud_rechazada'])('preserves the applicant destination of %s in legacy notices', tipo => {
+    expect(resolveNotificationPath({ ...base, datos: JSON.stringify({ tipo, solicitudId: 'own-1' }) }, '/app')).toBe('/app/mi-solicitud?solicitud=own-1');
+  });
+  it('keeps the reviewer in administration and rejects malformed application IDs', () => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'solicitud_mensaje', solicitudId: 'case-1' }) };
+    expect(resolveNotificationPath(notice, '/app', 'ADMIN_OPERADOR')).toBe('/app/admin/solicitudes/case-1');
+    expect(resolveNotificationPath({ ...notice, datos: '{"solicitudId":"../other"}' }, '/app', 'GENERADOR')).toBe('/app/notificaciones');
+  });
+  it('refreshes owned application data when opening a notice on an already open result', () => {
+    const invalidateQueries = vi.fn(); refreshInspectionNotification({ ...base, datos: '{"tipo":"solicitud_observada","solicitudId":"own-1"}' }, { invalidateQueries } as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['solicitudes'] });
+  });
   it('refreshes a PSIP dossier even when its notification opens the current URL', () => {
     const invalidateQueries = vi.fn();
     refreshInspectionNotification({ ...base, datos: '{"tipo":"intercambio_inspeccion","version":1}' }, { invalidateQueries } as any);

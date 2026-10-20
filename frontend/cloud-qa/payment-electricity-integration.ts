@@ -5,7 +5,8 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { assertCloudDatabase, backendRequire, externalKeys, root } from './safety.ts';
 await assertCloudDatabase();
-assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'payment_identity_20261020');
+const schema = new URL(process.env.DATABASE_URL!).searchParams.get('schema');
+assert.ok(['payment_identity_20261020', 'actor_onboarding_20261020'].includes(schema || ''), 'Only the dedicated artificial payment/onboarding schemas');
 assert.equal(process.env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z'); for (const key of externalKeys) assert.equal(process.env[key], '');
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
 const frontendRequire = createRequire(path.join(root, 'frontend/package.json')), { jsPDF } = frontendRequire('jspdf'), sharp = backendRequire('sharp');
@@ -126,14 +127,23 @@ try {
     const clean = await prepare('GENERADOR', admin), conflict = await prepare('OPERADOR', admin, first.identity);
     cases[project] = { clean: { id: clean.id, docId: clean.doc.id, sha256: clean.doc.sha256, identity: clean.identity }, conflict: { id: conflict.id, docId: conflict.doc.id, sha256: conflict.doc.sha256, identity: conflict.identity } };
   }
-  const baseline = JSON.parse(readFileSync(path.join(out, 'shared-qa-original-records.json'), 'utf8'));
-  const sharedUrl = new URL(process.env.DATABASE_URL!); sharedUrl.searchParams.set('schema', 'public'); const shared = new PrismaClient({ datasources: { db: { url: sharedUrl.toString() } } });
-  try { for (const [table, rows] of Object.entries(baseline.tables)) assert.deepEqual((await shared[table].findMany({ orderBy: { id: 'asc' } })).map((row: any) => ({ id: row.id, hash: createHash('sha256').update(JSON.stringify(row)).digest('hex') })), rows); }
-  finally { await shared.$disconnect(); }
+  if (schema === 'actor_onboarding_20261020') {
+    const baseline = JSON.parse(readFileSync(path.join(out, 'protected-schemas-before.json'), 'utf8'));
+    for (const [key, rows] of Object.entries(baseline)) {
+      const [namespace, table] = key.split('.'); assert.notEqual(namespace, schema);
+      assert.match(namespace, /^[a-zA-Z_][a-zA-Z_0-9]*$/); assert.match(table, /^[a-zA-Z_][a-zA-Z_0-9]*$/);
+      assert.deepEqual(await db.$queryRawUnsafe(`SELECT COUNT(*)::int AS count, md5(COALESCE(string_agg(md5(row_to_json(t)::text), '' ORDER BY md5(row_to_json(t)::text)), '')) AS hash FROM "${namespace}"."${table}" t`), rows, key);
+    }
+  } else {
+    const baseline = JSON.parse(readFileSync(path.join(out, 'shared-qa-original-records.json'), 'utf8'));
+    const sharedUrl = new URL(process.env.DATABASE_URL!); sharedUrl.searchParams.set('schema', 'public'); const shared = new PrismaClient({ datasources: { db: { url: sharedUrl.toString() } } });
+    try { for (const [table, rows] of Object.entries(baseline.tables)) assert.deepEqual((await shared[table].findMany({ orderBy: { id: 'asc' } })).map((row: any) => ({ id: row.id, hash: createHash('sha256').update(JSON.stringify(row)).digest('hex') })), rows); }
+    finally { await shared.$disconnect(); }
+  }
   assert.equal(await db.emailQueue.count({ where: { estado: { not: 'SUPRIMIDO' } } }), 0); assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   checks.push('shared QA history untouched; all generated mail suppressed with zero delivery attempts, CAP still closed');
   writeFileSync(path.join(out, 'payment-electricity-fixture.json'), JSON.stringify({ prefix, cases, synthetic: true, production: false }, null, 2));
-  writeFileSync(path.join(out, 'payment-electricity-integration.json'), JSON.stringify({ at: new Date().toISOString(), passed: checks.length, checks, billProof, ledger: await db.registroPagoComprobante.count(), events: await db.eventoPagoComprobante.count(), suppressedEmails: await db.emailQueue.count(), namespace: 'payment_identity_20261020', capClosed: true, production: false }, null, 2));
+  writeFileSync(path.join(out, 'payment-electricity-integration.json'), JSON.stringify({ at: new Date().toISOString(), passed: checks.length, checks, billProof, ledger: await db.registroPagoComprobante.count(), events: await db.eventoPagoComprobante.count(), suppressedEmails: await db.emailQueue.count(), namespace: schema, capClosed: true, production: false }, null, 2));
   console.log('Payment/electricity integration: ' + checks.length + ' groups PASS, twelve native synthetic invoice reads');
 } catch (error) { writeFileSync(path.join(out, prefix + '-failure.json'), JSON.stringify({ at: new Date().toISOString(), passed: checks.length, checks, error: error instanceof Error ? error.message : String(error) }, null, 2)); console.error(JSON.stringify({ failed: true, prefix, passed: checks.length, error: error instanceof Error ? error.message : String(error) })); process.exitCode = 1; }
 finally { await db.$disconnect(); }

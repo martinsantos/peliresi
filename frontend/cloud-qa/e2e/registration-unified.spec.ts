@@ -1,7 +1,8 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix } from './helpers';
+import { isolatedMapTiles, login, prefix } from './helpers';
+test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); });
 import { assertCloudDatabase } from '../safety';
 const require = createRequire(new URL('../../package.json', import.meta.url));
 const back = createRequire(new URL('../../../backend/package.json', import.meta.url));

@@ -145,7 +145,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-neutral-900 truncate">{doc.nombre}</p>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5">
-                      <span className="text-xs text-neutral-400 break-words">{TIPO_LABELS[doc.tipo] || doc.tipo}</span>
+                      <span className="text-xs text-neutral-400 break-words">{TIPO_LABELS[doc.tipo] || (doc.tipo === 'FACTURA_LUZ' ? 'Factura de luz' : doc.tipo)}</span>
                       {doc.anio && <span className="text-xs text-neutral-400">· {doc.anio}</span>}
                       <span className="text-xs text-neutral-400">· {formatSize(doc.size)}</span>
                     </div>

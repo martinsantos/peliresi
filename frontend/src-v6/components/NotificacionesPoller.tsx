@@ -14,10 +14,10 @@ import { useAuth } from '../contexts/AuthContext';
 export function NotificacionesPoller() {
   const { currentUser, isRestricted } = useAuth();
   if(currentUser?.training && !isRestricted)return <TrainingLiveNotices key={currentUser.id} userId={currentUser.id}/>;
-  return currentUser && !isRestricted ? <AuthorizedNotificationsPoller key={currentUser.id} userId={currentUser.id} /> : null;
+  return currentUser && !isRestricted ? <AuthorizedNotificationsPoller key={currentUser.id} userId={currentUser.id} userRole={currentUser.rol} /> : null;
 }
 
-function AuthorizedNotificationsPoller({ userId }: { userId: string | number }) {
+function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | number; userRole: string }) {
   usePushNotifications();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
@@ -56,11 +56,11 @@ function AuthorizedNotificationsPoller({ userId }: { userId: string | number }) 
         title:   n.titulo,
         message: n.mensaje,
         duration: n.prioridad === 'URGENTE' ? 12_000 : 6_000,
-        actionLabel: 'Abrir', onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n))); },
+        actionLabel: 'Abrir', onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole))); },
       }));
     });
     if (seen.current.size > 200) seen.current = new Set(data.items.map(n => n.id));
-  }, [data, navigate, mp, qc]);
+  }, [data, navigate, mp, qc, userRole]);
   useEffect(() => () => toastIds.current.forEach(id => toast.remove(id)), []);
 
   return null;

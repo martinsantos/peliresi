@@ -61,6 +61,7 @@ const DOCUMENTOS_REQUERIDOS = [
   { tipo: 'POLIZA_SEGURO', nombre: 'Poliza de Seguro Ambiental', obligatorio: false },
   { tipo: 'PLANOS_PLANTA', nombre: 'Planos de Planta', obligatorio: false },
   { tipo: 'COMPROBANTE_PAGO', nombre: 'Recibo o comprobante de pago', obligatorio: false },
+  { tipo: 'FACTURA_ELECTRICA', nombre: 'Factura eléctrica', obligatorio: false },
 ];
 
 const CATEGORIAS = ['Planta Fija', 'Operador In Situ'];

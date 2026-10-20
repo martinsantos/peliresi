@@ -69,7 +69,7 @@ export function canAccessMobilePath(user: User, path: string): boolean {
   }
 
   if (path.startsWith('/admin/solicitudes')) {
-    return hasRole(user, ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']);
+    return hasRole(user, ALL_ADMIN_ROLES);
   }
 
   if (startsWithAny(path, ['/admin/blockchain', '/admin/carga-masiva', '/admin/auditoria'])) {

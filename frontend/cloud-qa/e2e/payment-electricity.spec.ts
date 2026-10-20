@@ -83,7 +83,11 @@ test('the existing manual renders payment reservation and electricity evidence w
   await expect(page.locator('#tutorialTitle')).toHaveText('Alta: documentos, OCR y borradores'); await expect(page).toHaveTitle(/SITREP/);
   await expect(page.locator('.guide-step')).toHaveCount(4); await expect(page.locator('vite-error-overlay')).toHaveCount(0);
   await expect(page.locator('body')).toContainText('Identificar y reservar pago ATM'); await expect(page.locator('body')).toContainText('no garantiza leer todas las facturas históricas');
-  const heading = page.locator('.guide-step').last().getByRole('heading', { name: 'Revisar antes de presentar', exact: true }); await heading.scrollIntoViewIfNeeded(); await expect(heading).toBeInViewport({ ratio: 1 });
+  await page.evaluate(() => document.fonts.ready.then(() => true));
+  if (info.project.name !== 'web-desktop') await page.getByRole('button', { name: /Índice del tutorial/ }).click();
+  await page.getByRole('navigation', { name: 'Pasos de la guía' }).getByRole('link', { name: /Revisar antes de presentar/ }).click();
+  await expect.poll(() => page.locator('.guide-step').nth(2).locator('img.guide-image').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  const heading = page.locator('.guide-step').last().getByRole('heading', { name: 'Revisar antes de presentar', exact: true }); await expect(heading).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: info.outputPath('manual-payments-electricity.png'), animations: 'disabled' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1); expect(business).toEqual([]); healthy();
 });

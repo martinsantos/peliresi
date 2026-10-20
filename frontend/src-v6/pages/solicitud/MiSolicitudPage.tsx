@@ -22,6 +22,7 @@ import {
 } from '../../hooks/useSolicitudes';
 import type { EstadoSolicitud, SolicitudInscripcion, MensajeSolicitud } from '../../types/api';
 import ActorActivities from '../../components/ActorActivities';
+import { useAuth } from '../../contexts/AuthContext';
 
 // ── Status config ──
 
@@ -50,6 +51,18 @@ const STEPS = [
 
 const MiSolicitudPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isRestricted, logout } = useAuth();
+  const [entering, setEntering] = useState(false);
+  const [entryError, setEntryError] = useState<string | null>(null);
+  const enterSystem = async () => {
+    setEntryError(null);
+    if (!isRestricted) { navigate('/dashboard'); return; }
+    // Approval does not turn the existing limited credential into full access.
+    setEntering(true);
+    try { await logout(); navigate('/login', { replace: true, state: { from: '/dashboard' } }); }
+    catch { setEntryError('No se pudo renovar el acceso. Volvé a intentar.'); }
+    finally { setEntering(false); }
+  };
   const [params, setParams] = useSearchParams();
   const [replyText, setReplyText] = useState('');
   const [messageText, setMessageText] = useState('');
@@ -187,8 +200,8 @@ const MiSolicitudPage: React.FC = () => {
             {solicitudes?.map(item => <option key={item.id} value={item.id}>{item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
           </select>
         </div>}
-        {solicitud.estado === 'BORRADOR' && <Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>Continuar borrador</Button>}
       </>}
+      {solicitud.estado === 'BORRADOR' && <Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>Continuar borrador</Button>}
       {/* Stepper */}
       <Card>
         <div className="flex items-center justify-between">
@@ -250,13 +263,16 @@ const MiSolicitudPage: React.FC = () => {
         <Card className="!border-amber-300 !bg-amber-50">
           <div className="flex items-start gap-3">
             <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
-            <div className="flex-1 space-y-3">
+            <div className="min-w-0 flex-1 space-y-3">
               <div>
                 <p className="font-semibold text-amber-800">Tu solicitud tiene observaciones</p>
                 <p className="text-sm text-amber-700 mt-1">
                   {solicitud.observaciones || 'El administrador ha dejado observaciones. Revisa los mensajes y responde para continuar.'}
                 </p>
               </div>
+              <Button variant="primary" size="sm" leftIcon={<FileText size={16} />} onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>
+                Corregir datos y documentos
+              </Button>
               <div>
                 <label className="block text-sm font-medium text-amber-800 mb-1">Tu respuesta</label>
                 <textarea
@@ -287,11 +303,12 @@ const MiSolicitudPage: React.FC = () => {
           <div className="text-4xl mb-3">&#127881;</div>
           <h3 className="text-xl font-bold text-green-800 mb-2">Tu inscripcion fue aprobada</h3>
           <p className="text-sm text-green-700 mb-6">
-            Tu inscripción como {solicitud.tipoActor} fue aprobada. El acceso al sistema requiere ingresar con tu cuenta habilitada y verificada.
+            Tu inscripción como {solicitud.tipoActor} fue aprobada. {isRestricted ? 'Ingresá nuevamente con tu cuenta habilitada y verificada para empezar.' : 'Ya podés continuar en SITREP.'}
           </p>
-          <Button variant="primary" onClick={() => navigate('/dashboard')}>
-            Ir al Dashboard <ArrowRight size={16} className="ml-1" />
+          <Button variant="primary" isLoading={entering} rightIcon={<ArrowRight size={16} />} onClick={() => void enterSystem()}>
+            {isRestricted ? 'Ingresar con mi cuenta' : 'Ir al Dashboard'}
           </Button>
+          {entryError && <p role="alert" className="mt-3 text-sm text-error-700">{entryError}</p>}
         </Card>
       )}
 
@@ -305,13 +322,7 @@ const MiSolicitudPage: React.FC = () => {
               {solicitud.motivoRechazo && (
                 <p className="text-sm text-red-700">Motivo: {solicitud.motivoRechazo}</p>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/inscripcion/${solicitud.tipoActor.toLowerCase()}`)}
-              >
-                Crear nueva solicitud
-              </Button>
+              <p className="text-sm text-red-700">Este trámite finalizó. Conservás el resultado y sus mensajes. Para evaluar otra presentación, consultá a administración por los canales habituales.</p>
             </div>
           </div>
         </Card>
@@ -361,8 +372,9 @@ const MiSolicitudPage: React.FC = () => {
         </div>
 
         {/* Compose */}
+        {solicitud.estado === 'RECHAZADA' && <p className="border-t border-neutral-200 px-4 py-3 text-sm text-neutral-600">Este trámite está cerrado: podés consultar los mensajes, pero no enviar respuestas.</p>}
         {solicitud.estado !== 'APROBADA' && solicitud.estado !== 'RECHAZADA' && (
-          <div className="px-4 py-3 border-t border-neutral-200 flex gap-2">
+        <div className="px-4 py-3 border-t border-neutral-200 flex gap-2">
             <input
               type="text"
               value={messageText}
@@ -380,7 +392,7 @@ const MiSolicitudPage: React.FC = () => {
             >
               <Send size={14} />
             </Button>
-          </div>
+        </div>
         )}
       </Card>
     </div>
