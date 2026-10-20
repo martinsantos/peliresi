@@ -1,10 +1,12 @@
 # Informe de hallazgo en la adenda y cola de revisión PSIP
 
+**Publicado `c9cd877f` en backend, web, app y manual el 20/10/2026 a las 18:15:18 Mendoza**, con backup verificado y migración aditiva en operación/CAP cerrado. [Despliegue, resultados y reversión vigente](DESPLIEGUE-HALLAZGOS-PSIP-20261020.md). Smoke **103/103**, externo **9/9**, PWA **8/8**. `.env`, flags y uploads conservados; CAP/correos/push apagados, adendas/eventuales/revisión de partes false y relevos/GPS múltiple true. Sin main, push ni workflows. El apartado de validación siguiente documenta el ensayo previo en datos artificiales.
+
 ## Definición del dueño
 
 El 20/10/2026 el dueño confirmó que «IES» significa corrientes Y y precisó que el operador, al recibir o tratar lo que trae el transporte, informa lo que no coincide con la declaración del generador. **Ese informe de hallazgo forma parte de la adenda del manifiesto.** El informe alimenta la revisión para inspecciones; no es un acta de inspección ni una infracción determinada. También alimentan esa cola los participantes eventuales sin alta y los transportistas externos de un relevo.
 
-**Candidato terminado y validado sólo en el preview aislado**, sobre la rama `codex/sitrep-training-20261018` y el único checkout del traspaso. No se publicó ni se inspeccionó producción; la última publicación sigue siendo `a6a5c005`. No autoriza activar eventuales/adendas en operación, reabrir CAP, enviar correo/push ni modificar `main`. No atribuye una regla normativa nueva ni presume mala fe, habilitación o compatibilidad por la aparición de una corriente.
+**Validación previa terminada en el preview aislado**, sobre la rama `codex/sitrep-training-20261018` y el único checkout del traspaso. Durante ese ensayo no se publicó ni inspeccionó producción; entonces la publicación activa era `a6a5c005`. La autorización posterior de `c9cd877f` y su publicación constan arriba. Se mantienen sin autorizar la activación de eventuales/adendas en operación, reapertura CAP, correo/push o cambios a `main`. El producto no atribuye una regla normativa nueva ni presume mala fe, habilitación o compatibilidad por la aparición de una corriente.
 
 ## Recorrido
 
@@ -56,13 +58,13 @@ El inspector ve los antecedentes de sus inspecciones asignadas y no evalúa la c
 
 Hay campana interna para la administración competente al recibir un antecedente, sin copia al autor ni cuentas inactivas. No existe despacho de correo/push en este circuito. Las revisiones de partes, avisos post facto y comunicaciones formales PSIP conservan sus destinatarios y decisiones propios. Descartar un antecedente no aprueba una adenda ni libera un certificado.
 
-## Persistencia y publicación futura
+## Persistencia y condiciones de publicación
 
 Migración aditiva `20261020210000_inspection_intake`: columna JSON nullable en adendas y tabla `antecedentes_fiscalizacion` con evidencia inmutable, huella canónica SHA-256, origen único, versión, historial agregado y vínculo opcional a inspección. No actualiza fuentes históricas ni rellena una cola retrospectiva. No altera fórmula TEF, alta, corrientes de padrón, firmas, cantidades, reglas de revisión/certificación o facultades de inspección.
 
-Una publicación requerirá autorización específica, respaldo verificado, migración, versión de caché/SW y compilaciones con API final. Las funcionalidades de origen conservan sus flags existentes. Las pruebas de origen habilitan adendas/eventuales sólo en procesos y builds del esquema artificial privado; eso no activa la instalación productiva. El manual **2026.20.17** conserva su CSS/renderer por hash y agrega la guía **Informe de hallazgo: de la adenda a PSIP**, con dos capturas originales de QA.
+La publicación posterior cumplió la autorización específica, respaldo verificado, migración, versión de caché/SW y compilaciones con API final; sus resultados constan en el despliegue enlazado arriba. Las funcionalidades de origen conservan sus flags existentes. Las pruebas de origen habilitan adendas/eventuales sólo en procesos y builds del esquema artificial privado; eso no activa la instalación productiva. El manual **2026.20.17** conserva su CSS/renderer por hash y agrega la guía **Informe de hallazgo: de la adenda a PSIP**, con dos capturas originales de QA.
 
-Tras una eventual publicación, una contención debe conservar base, evidencias y backend compatible con reservas ATM, tramos e informes/cola; puede retroceder la interfaz de forma controlada. No borrar columnas/antecedentes, restaurar una base anterior ni volver a un backend que deje de registrar las fuentes. Aquí no se ejecutó ningún rollback o despliegue productivo.
+Después de la publicación, una contención debe conservar base, evidencias y backend compatible con reservas ATM, tramos e informes/cola; puede retroceder la interfaz de forma controlada. No borrar columnas/antecedentes, restaurar una base anterior ni volver a un backend que deje de registrar las fuentes. El ensayo previo aquí documentado no ejecutó rollback o despliegue productivo; la reversión posterior quedó preparada sin ejecutar.
 
 ## Validación
 
