@@ -4,6 +4,12 @@
 
 Al terminar la demo, se revocaron los cuatro accesos directos CAP de la pizarra. Los cuatro nuevos ingresos y los cuatro tokens emitidos antes del cierre devolvieron 403; backend listo, dos workers online. El vencimiento pasado está tanto en `.env` como en PM2 y su estado guardado. Los datos artificiales, manifiestos y credenciales históricas quedan preservados, sin poder usar el ingreso directo. `main` y el frontend no cambiaron. [Cierre y auditoría](ACCESO-CAPACITACION-20261019.md).
 
+## Desarrollo posterior — candidato de operación sin publicar
+
+El dueño precisó el relevo: **la transportista original define el traspaso**, incluso a una empresa externa sin alta con los datos que pueda declarar. El candidato conserva custodia por tramos, GPS limitado revocable, avisos a partes/C3 y GPS de varias cargas seleccionadas en un mismo móvil. No cambia el acuerdo firmado ni habilita regulatoriamente a un externo. La entrega sigue en origen; D10 y la activación operativa siguen separados.
+
+Leer [revisión de operación, pruebas y reversión](REVISION-OPERACION-MANIFIESTOS-20261019.md) antes de continuar. Producto **`d372ce6e`**, sin push ni publicación, posterior al relevo `81c20f1d`. Backend completo 1177/1177; frontend completo 1615/1615; 26 grupos de API, 6/6 de navegador web/app, manual 15/15 y 3/3 rutas cerradas con flags apagados. Builds sólo del preview, API `/api`, SW candidato v127 y manual 2026.20.11 con CSS/renderer intactos. La migración nueva de tramos **no** se aplicó a producción. No repetir las doce migraciones históricas ni volver a un backend sin soporte de tramos si ya hubiera relevos activos. Sin publicar ni tocar `main`, accesos CAP, correos o push reales. QA cerrada y gemelo detenido, con su imagen y evidencias conservadas; 1 CPU/2 GiB/swap cero y ningún OOM.
+
 ## Historial — aviso de acceso corregido, 19/10/2026
 
 Web/app **`75f3062`**, publicado 11:42:46 Mendoza: conserva el mensaje de error al volver al formulario después de un login fallido. Generador CAP confirmado por API y UI; los cuatro alias responden 200. Credenciales, límites y permisos sin cambios. Backend `8de58de` sin reinicio, manual `ea92004` conservado, SW v126. Unitarias dirigidas 33/33; navegador publicado 4/4 (401/429 inyectados, login real y recarga de sesión en web/app); build remoto serial y smoke 44/44. Rollback sólo frontend a `20261019-agenda-live-ea92004`. Sin datos reales, main ni workflows. Leer [incidente, pruebas y rollback](ACCESO-CAPACITACION-20261019.md).

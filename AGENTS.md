@@ -4,9 +4,13 @@
 
 Los cuatro alias directos de la clase (admin, generador, transporte y operador) quedaron **revocados inmediatamente** al terminar la demo. Ingreso nuevo y sesiones previas: 403 para los cuatro. `TRAINING_DIRECT_LOGIN_UNTIL=2000-01-01T00:00:00Z` está aplicado al `.env`, a ambos procesos PM2 y a su estado guardado; API lista. Las 40 identidades artificiales y los manifiestos de práctica se conservan como historial, sin acceso directo de la pizarra. No reactivar estos alias sin una nueva indicación del dueño. [Evidencia y cierre](docs/ACCESO-CAPACITACION-20261019.md).
 
-## Desarrollo posterior a la demo — relevo de transporte
+## Desarrollo posterior a la demo — candidato sin publicar
 
-Candidato sin publicar en esta misma rama: tramos de custodia, relevo declarado por el transporte original (externo con datos opcionales), GPS limitado por enlace/QR revocable, consulta propia del reemplazo registrado y C3 por tramo. No modifica la asignación ni aprobaciones originales; la entrega sigue a cargo de origen. Flag opt-in apagado por defecto y una migración aditiva pendiente en producción. Preview: backend 1165/1165, API 16 grupos, navegador web/app 2/2; frontend 1593/1594 con fallo de ruta de capturas corregido después y manual 8/8 + 14/14. GPS de varias cargas todavía en desarrollo. Leer [alcance, límites, incidencias y evidencia](docs/REVISION-OPERACION-MANIFIESTOS-20261019.md). Producción, main, accesos CAP y canales externos sin cambios.
+Producto **`d372ce6e`**, posterior a `81c20f1d`, sin push ni publicación. En `codex/sitrep-training-20261018`, sólo este checkout: agenda/listas por fase, varios viajes, tramos de custodia y **Cargas en este móvil** para compartir un GPS con las cargas elegidas. El transporte original confirma el relevo y conserva la entrega; un externo puede tener datos incompletos y recibe un enlace GPS limitado/revocable. Asignación y aprobaciones originales intactas; C3 distingue cada tramo y espera GPS del reemplazo.
+
+Preview: backend completo **1177/1177**; frontend completo **1615/1615**; API **26 grupos**, navegador **6/6** (relevo, varias cargas y manual, web/app), manual **15/15**, tipos efectivos y ambos builds correctos. Flags apagados: **3/3** rutas cerradas por API. QA serial, un worker, 1 CPU/2 GiB/swap cero, sin proveedores ni datos reales. Leer [alcance, límites, incidencias, preparación y reversión](docs/REVISION-OPERACION-MANIFIESTOS-20261019.md).
+
+Los nuevos flags de transporte/push son opt-in y están apagados por defecto; la migración aditiva `20261019180000_transport_handoffs` sigue pendiente en producción y es necesaria antes de este backend, aun con los flags apagados. No volver a un backend que ignore tramos si ya existen relevos activos. La activación operativa, SMTP/VAPID y una nueva clase requieren decisión del dueño; no reactivar alias CAP. SW candidato v127, manual 2026.20.11. Backend/servidor QA y PostgreSQL cerrados; gemelo detenido, imagen/evidencias conservadas, sin OOM. Producción y `main` sin cambios; commits `[skip ci]`, sin workflows.
 
 ## Historial — aviso de acceso corregido, 19/10/2026
 
