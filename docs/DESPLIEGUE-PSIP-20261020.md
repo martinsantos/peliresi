@@ -1,5 +1,7 @@
 # PSIP publicado — 20/10/2026
 
+**Antecedente:** sustituido por [PSIP plazos y responsables `25b0c30c`](DESPLIEGUE-PSIP-PLAZOS-20261020.md), publicado el mismo día a las 12:57:42 Mendoza. El rollback vigente es el documentado allí, a `527d915c`; el comando de este registro conserva su función histórica de volver más atrás y no se ejecutó.
+
 **Backend, web, `/app` y manual publicados desde `527d915cf600b793333fd4772ea7e8178cd77f0f`** en `sitrep.ultimamilla.com.ar`, el **20/10/2026 a las 11:01:45 Mendoza** (`14:01:45.320Z`). Autorización explícita del dueño: publicar ese commit, preservar CAP cerrado, correos/push apagados y flags actuales, sin `main`, datos reales ni workflows, con smoke no mutante.
 
 Incluye agrupación PSIP, intercambio con responsables/plazos, corrección del borrador offline y avisos internos por actuación. [Flujo](PSIP-FLUJO-INSPECCIONES-20261020.md) y [avisos y validación funcional](PSIP-AVISOS-INTERNOS-20261020.md). No se modifican estados regulatorios o permisos ni se presenta una campana/apertura como notificación fehaciente.

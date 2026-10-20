@@ -2,7 +2,7 @@
 
 Revisión del 20/10/2026. PSIP es el nombre de este recorrido de producto y manual; no crea un procedimiento normativo ni amplía facultades. Alcance: interfaz, navegación, seguimiento de observaciones y documentación. **Validación inicial en preview; publicado después como `527d915c` el 20/10/2026 a las 11:01:45 Mendoza**, con autorización del dueño y sin cambios en `main`. [Publicación y rollback](DESPLIEGUE-PSIP-20261020.md).
 
-**Revisión posterior, todavía sin publicar:** [plazos por requerimiento y responsables](PSIP-PLAZOS-RESPONSABLES-20261020.md), candidato `25b0c30c`, manual 2026.20.14. Incorpora fecha propia de cada pedido, presentación tardía según su antecedente, pendientes parciales en los listados y grilla móvil corregida. Backend 177/177, frontend 47/47, navegador 12/12 y manual 20/20 + 6/6. El resto de este documento conserva la aceptación histórica de la versión publicada `527d915c`.
+**Revisión posterior publicada como `25b0c30c` el 20/10 a las 12:57:42 Mendoza:** [plazos por requerimiento y responsables](PSIP-PLAZOS-RESPONSABLES-20261020.md), manual 2026.20.14. Incorpora fecha propia de cada pedido, presentación tardía según su antecedente, pendientes parciales en los listados y grilla móvil corregida. Backend 177/177, frontend 47/47, navegador 12/12 y manual 20/20 + 6/6 previos; [publicación y rollback actual](DESPLIEGUE-PSIP-PLAZOS-20261020.md), smoke 78/78 + 9/9 y PWA PASS. El resto de este documento conserva la aceptación histórica de la versión `527d915c`.
 
 ## Hallazgo principal
 

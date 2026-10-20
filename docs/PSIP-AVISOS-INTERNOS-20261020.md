@@ -2,7 +2,7 @@
 
 Extensión de [PSIP: flujo de inspecciones](PSIP-FLUJO-INSPECCIONES-20261020.md), preparada y validada en `codex/sitrep-training-20261018`. **Publicada como `527d915c` el 20/10/2026 a las 11:01:45 Mendoza**, en backend, web, app y manual. [Publicación y rollback](DESPLIEGUE-PSIP-20261020.md). La validación descrita abajo se realizó antes de publicar y sólo en preview. Permisos, estados y plazos conservados; `main` intacto y CAP cerrado. El alcance autorizado es la campana; no se envía correo ni push a nadie.
 
-**Revisión posterior de vencimientos, sin publicar:** [plazos y responsables PSIP](PSIP-PLAZOS-RESPONSABLES-20261020.md), candidato `25b0c30c`. El catálogo existente se probó sólo con una regla artificial temporal: destinatarios exactos, sin duplicados ni correos, lectura conservada y resolución de la falta de respuesta sin aceptar subsanación. No se activaron reglas productivas ni se cambió su frecuencia. El circuito por actuación descrito debajo sigue siendo el publicado como `527d915c`.
+**Revisión posterior de vencimientos publicada como `25b0c30c` el 20/10 a las 12:57:42 Mendoza:** [plazos y responsables PSIP](PSIP-PLAZOS-RESPONSABLES-20261020.md) y [publicación/rollback actual](DESPLIEGUE-PSIP-PLAZOS-20261020.md). El catálogo existente se probó sólo con una regla artificial temporal: destinatarios exactos, sin duplicados ni correos, lectura conservada y resolución de la falta de respuesta sin aceptar subsanación. No se activaron reglas productivas ni se cambió su frecuencia. El circuito por actuación descrito debajo fue publicado inicialmente como `527d915c` y se conserva en la nueva versión.
 
 ## Qué avisa y a quién
 

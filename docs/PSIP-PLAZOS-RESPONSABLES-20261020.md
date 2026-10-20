@@ -1,6 +1,6 @@
 # PSIP — plazos, vencimientos y quién debe actuar
 
-Revisión terminada en el preview el 20/10/2026. Candidato **`25b0c30c860cc91091591ad51b9b2ab9dc72a0cf`**, con `[skip ci]`, en `codex/sitrep-training-20261018`. **Sin publicar**: la última publicación conocida continúa siendo `527d915c`, según el [registro de despliegue](DESPLIEGUE-PSIP-20261020.md). Esta revisión no accedió a producción, no modificó `main` ni usó datos reales. CAP cerrado, correos/push apagados.
+Revisión terminada en el preview el 20/10/2026. Producto **`25b0c30c860cc91091591ad51b9b2ab9dc72a0cf`**, con `[skip ci]`, en `codex/sitrep-training-20261018`. **Publicado después**, con autorización explícita, en backend/web/app/manual el **20/10 a las 12:57:42 Mendoza**: [despliegue, controles y rollback actual](DESPLIEGUE-PSIP-PLAZOS-20261020.md). La revisión funcional descrita abajo se realizó antes de publicar, sin producción, cambios en `main` ni datos reales. CAP cerrado, correos/push apagados.
 
 ## Resultado para el usuario
 
@@ -59,7 +59,7 @@ Esta aceptación es dirigida a PSIP; no se repitieron las suites globales ni se 
 
 ## Manual, evidencia y cierre
 
-Manual **2026.20.14**: misma guía PSIP de siete pasos, diseño, renderer, CSS y capturas anteriores conservados. El texto incorpora plazo por pedido, Mendoza, ausencia de fecha y responsable después de respuestas parciales. Los enlaces de la guía previa de capacitación siguen pasando sus comprobaciones. No se publicaron el manual ni las capturas de QA.
+Manual **2026.20.14**: misma guía PSIP de siete pasos, diseño, renderer, CSS y capturas anteriores conservados. El texto incorpora plazo por pedido, Mendoza, ausencia de fecha y responsable después de respuestas parciales. Los enlaces de la guía previa de capacitación siguen pasando sus comprobaciones. La validación inicial no publicó; el despliegue posterior autorizado incluyó ese manual. Las nuevas capturas de auditoría permanecen en la evidencia privada.
 
 Evidencia privada local: `test-results-psip-deadlines-20261020/remote-evidence/`, manifiestos de fuente y `container-closed.json`; remota: `/work/sitrep/.qa-psip-deadlines-20261020/` dentro del contenedor preservado. Incluye reportes JSON, logs, pruebas de recorrido y PNG originales por rol/superficie. El historial remoto conserva `attempt-1` a `attempt-4`: ajustes del arnés para el bloqueo de SW y la instalación del reloj, más la pasada funcional que reveló el problema visual real. Esa pasada no se cuenta como aceptación visual. La primera prueba de regresión del cálculo de fecha falló antes del arreglo; sus resultados se conservan. La extracción local inicialmente intentó Python, ausente en el contenedor; se completó con Node/tar sin repetir las pruebas.
 
@@ -67,4 +67,4 @@ Los dos procesos QA y PostgreSQL cerraron limpiamente a las **12:41:59 Mendoza**
 
 `main` permanece **`c8402190edfc36b5e5d0dee1337c24bd1689420d`**. Commits locales con `[skip ci]`, sin push ni workflows. Este cierre documental no altera las fuentes compiladas.
 
-Una eventual publicación requiere autorización aparte y backend + web + app + manual coherentes. No hay migraciones ni flags nuevos. Los bundles de este preview usan `/api` de loopback: no deben desplegarse directamente. Se deberá compilar con la API final y verificar versiones nuevas de service worker sin colisionar con la publicación activa v130 ni el rollback reservado v131. La publicación `527d915c` y su rollback siguen documentados sin cambios.
+La publicación posterior fue autorizada expresamente y compiló backend + web + app + manual desde `25b0c30c`, con API final, SW raíz v132 y app 20261020155342. Smoke no mutante **78/78**, externo **9/9** y controles PWA PASS. Sin migraciones ni flags nuevos; no se desplegaron los bundles QA `/api` de loopback. `.env`, CAP cerrado, canales apagados y `main` conservados; [rollback actual a `527d915c`](DESPLIEGUE-PSIP-PLAZOS-20261020.md), preparado sin ejecutar. El contenedor volvió a detenerse a las 12:59:11 Mendoza, con imagen y artefactos preservados.
