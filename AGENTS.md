@@ -1,5 +1,15 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Candidato en preview — hallazgos en adendas y cola PSIP, 20/10/2026
+
+**Producto local `c9cd877f`, validado sin publicar.** Leer [informe de hallazgo, fuentes de la cola, permisos y cierre de QA](docs/HALLAZGOS-ADENDAS-PSIP-20261020.md), después el [traspaso](docs/TRASPASO-CODEX-20261017.md). El operador registra el informe dentro de su adenda en destino: cantidad diferente, Y omitida y contraste con su ficha se distinguen. Las diferencias, participantes eventuales sin alta y relevos externos alimentan antecedentes internos por evaluar; no se crean infracciones ni inspecciones automáticas. Administración evalúa/vincula/abre; el inspector sólo consulta lo asignado. Originales, decisiones de adenda, permisos y habilitaciones conservados.
+
+Backend dirigido **69/69**, frontend **43/43**, API **11 grupos + 4 de alcance**, rollback **3 grupos**, PDF **3**, flags efectivos **3**, navegador **9/9**, manual **24/24 + 3/3 navegador**, tipos/builds/lint y diff Prisma PASS. Manual **2026.20.17**, mismo CSS/renderer, dos capturas originales. Auditoría: **115 tablas** previas de QA intactas, 49 antecedentes artificiales, cero correos encolados; 26 archivos de producto/manual contrastados por hash. No son suites globales ni certificación física.
+
+Única migración nueva **`20261020210000_inspection_intake`**, ensayada con rollback y aplicada sólo al esquema artificial propio `inspection_intake_20261020`; los esquemas compartidos anteriores, CAP y producción no se migraron. Adendas/eventuales se habilitaron únicamente en el proceso/build QA para probar sus fuentes y se verificó después el cierre efectivo con flags originales apagados. **CAP cerrado, correos/push apagados**, transporte con sus dos flags actuales true. No se inspeccionó producción ni se tocó `main`, push o workflows; la última publicación permanece **`a6a5c005`**.
+
+Preview cerrado **17:57:18 Mendoza**, servicios/PostgreSQL propios cerrados y contenedor detenido; 1 CPU/2 GiB/swap cero, `max/oom/oom_kill=0`. Imagen, base y evidencias conservadas. Publicar requiere nueva autorización, backup verificado, migración y builds/SW con API final. No desplegar bundles QA `/api`, reactivar CAP/proveedores ni repetir migraciones históricas. Commits `[skip ci]`.
+
 ## Última publicación — pagos ATM y facturas a6a5c005, 20/10/2026
 
 **`a6a5c005` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` a las **16:45:59 Mendoza**. Leer primero [despliegue, respaldo, límites y reversión actual](docs/DESPLIEGUE-PAGOS-ATM-20261020.md), luego el [traspaso](docs/TRASPASO-CODEX-20261017.md). Backup completo verificado antes de migrar; única migración `20261020180000_payment_identity` en `public` y mismo SQL aditivo en CAP cerrado. Sin seeds, conciliación ni consultas/modificaciones de registros reales. Los históricos sin identidad conservan el bloqueo administrativo; no se infiere su estado ni se automatiza una aprobación.
