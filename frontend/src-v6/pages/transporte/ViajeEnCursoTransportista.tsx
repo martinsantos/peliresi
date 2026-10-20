@@ -150,22 +150,19 @@ const ViajeEnCursoTransportista: React.FC = () => {
   // Default center (Mendoza, Argentina)
   const defaultCenter: [number, number] = [-32.9287, -68.8535];
 
-  // Timer persistence from server timestamp (fechaRetiro)
+  // Elapsed time is measured from the immutable pickup time, including stops.
+  // Recompute from the clock so a paused/backgrounded tab cannot lose minutes.
   useEffect(() => {
-    if (m.estado === EstadoManifiesto.EN_TRANSITO && m.fechaRetiro) {
-      const start = new Date(m.fechaRetiro).getTime();
-      const elapsed = Math.floor((Date.now() - start) / 1000);
-      setElapsedTime(elapsed > 0 ? elapsed : 0);
+    const start = m.fechaRetiro ? new Date(m.fechaRetiro).getTime() : NaN;
+    if (m.estado !== EstadoManifiesto.EN_TRANSITO || !Number.isFinite(start)) {
+      setElapsedTime(0);
+      return;
     }
+    const updateElapsed = () => setElapsedTime(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    updateElapsed();
+    const timer = setInterval(updateElapsed, 1000);
+    return () => clearInterval(timer);
   }, [m.estado, m.fechaRetiro]);
-
-  // Timer tick
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (m.estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
-    timerRef.current = setInterval(() => setElapsedTime(prev => prev + 1), 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [m.estado, viajeStatus]);
 
   const formatTimer = (seconds: number) => {
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');

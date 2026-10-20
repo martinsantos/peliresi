@@ -21,7 +21,6 @@ import {
   User,
   Settings,
   LogOut,
-  Plus,
   SwitchCamera,
   Eye,
   ArrowLeft,
@@ -137,7 +136,7 @@ export const MobileLayout: React.FC = () => {
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
   const isAddendaRoute = /\/manifiestos\/[^/]+\/adendas\/?$/.test(location.pathname);
   const boundedViewport = isInspectionCase || isAddendaRoute;
-  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos\/[^/]+(?:\/adendas)?|transporte\/(?:viaje\/[^/]+|cargas))\/?$/.test(location.pathname);
+  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
   const inspectionShell = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const shell = inspectionShell.current, viewport = window.visualViewport;
@@ -357,11 +356,8 @@ export const MobileLayout: React.FC = () => {
     return 'SITREP';
   };
 
-  // Create belongs to the list, not over the current record's fields or actor links.
-  const showFab = /^\/(?:app\/)?manifiestos\/?$/.test(location.pathname) && (isAdmin || isGenerador);
   const isFieldTripRoute = location.pathname.includes('/transporte/viaje/');
   const floatingSupport = !inlineSupport;
-  const supportAboveTrip = showFab;
 
   return (
     <div ref={inspectionShell} data-app-shell className="h-dvh overflow-hidden bg-[#F8F8F6] flex flex-col tap-transparent">
@@ -431,22 +427,12 @@ export const MobileLayout: React.FC = () => {
       {/* Keep absolutely positioned field controls inside this scroll container. */}
       <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>
         <div className={cn(isInspectionCase ? 'h-full min-h-0 p-3' : 'p-4', isInspectionCase ? '' : isFieldTripRoute ? 'pb-6' : 'pb-28')}
-          style={floatingSupport && !isFieldTripRoute ? { paddingBottom: mobileSupportClearance(supportAboveTrip) } : undefined}>
+          style={floatingSupport && !isFieldTripRoute ? { paddingBottom: mobileSupportClearance(false) } : undefined}>
           <Outlet />
         </div>
       </main>
 
-      {/* Floating Action Button */}
-      {floatingSupport && <SupportBubble mobile hidden={isMenuOpen} aboveTrip={supportAboveTrip} />}
-      {showFab && (
-        <button
-          onClick={() => navigate(mp('/manifiestos/nuevo'))}
-          className="fixed right-4 bottom-24 w-14 h-14 bg-primary-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors z-30 hover:bg-primary-800"
-          aria-label="Nuevo manifiesto"
-        >
-          <Plus size={28} />
-        </button>
-      )}
+      {floatingSupport && <SupportBubble mobile hidden={isMenuOpen} />}
 
       {/* Bottom Navigation */}
       {!isInspectionCase && <nav className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">

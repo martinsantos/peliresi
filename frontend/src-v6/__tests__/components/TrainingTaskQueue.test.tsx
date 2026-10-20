@@ -8,7 +8,7 @@ vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'u',tra
 vi.mock('../../services/manifiesto.service',()=>({manifiestoService:{create:mock.create}}));
 import {useCreateManifiesto} from '../../hooks/useManifiestoWorkflow';
 import {TrainingTaskQueue} from '../../components/TrainingTaskQueue';
-afterEach(()=>{cleanup();mock.training=true;mock.rol='OPERADOR';vi.clearAllMocks();});
+afterEach(()=>{cleanup();mock.training=true;mock.rol='OPERADOR';vi.clearAllMocks();vi.useRealTimers();});
 const partes=[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:true}];
 const items=[{id:'a',numero:'CAP-NEW',estado:'PENDIENTE_APROBACION',requiereMiAprobacion:true,partes,fechaEstimadaRetiro:'2099-10-20T12:00:00Z'},{id:'b',numero:'CAP-TRIP',estado:'EN_TRANSITO',partes:partes.map(p=>({...p,aprobada:true})),fechaEstimadaRetiro:'2020-10-20T12:00:00Z'}];
 function mount(){mock.get.mockResolvedValue({data:{data:{items,total:2,limited:false}}});render(<MemoryRouter><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);}
@@ -22,6 +22,29 @@ it('filters current work, preserves approval states and links to the exact manif
 });
 it('is not enabled in operational sessions',()=>{mock.training=false;mount();expect(mock.get).not.toHaveBeenCalled();expect(screen.queryByLabelText('Agenda de manifiestos')).not.toBeInTheDocument();});
 it('shows an operations agenda for the CAP administrator',async()=>{mock.rol='ADMIN';mount();expect(await screen.findByText('Agenda de operaciones')).toBeVisible();expect(await screen.findByText('CAP-TRIP')).toBeVisible();});
+
+it('keeps Hoy and Próximos on the Mendoza date when UTC is already the following day',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-20T01:30:00Z'));
+ const records=[
+  {...items[1],id:'today',numero:'CAP-HOY',fechaEstimadaRetiro:'2026-10-19T15:00:00Z'},
+  {...items[1],id:'utc-next',numero:'CAP-TARDE',fechaEstimadaRetiro:'2026-10-20T01:00:00Z'},
+  {...items[1],id:'future',numero:'CAP-MANANA',fechaEstimadaRetiro:'2026-10-20T15:00:00Z'},
+ ];
+ mock.get.mockResolvedValue({data:{data:{items:records,total:records.length,limited:false}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ await screen.findByText('CAP-HOY');fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'today'}});
+ expect(screen.getByText('CAP-HOY')).toBeVisible();expect(screen.getByText('CAP-TARDE')).toBeVisible();expect(screen.queryByText('CAP-MANANA')).toBeNull();
+ fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'future'}});expect(screen.getByText('CAP-MANANA')).toBeVisible();expect(screen.queryByText('CAP-HOY')).toBeNull();expect(screen.queryByText('CAP-TARDE')).toBeNull();client.clear();
+});
+
+it('shows an update error instead of a false empty agenda and recovers on retry',async()=>{
+ mock.get.mockRejectedValueOnce(new Error('Synthetic connection failure'));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos actualizar la agenda');expect(screen.queryByText('Sin manifiestos para estos filtros.')).toBeNull();
+ mock.get.mockResolvedValue({data:{data:{items,total:2,limited:false}}});fireEvent.click(screen.getByRole('button',{name:'Reintentar',exact:true}));await screen.findByText('CAP-NEW');expect(screen.queryByRole('alert')).toBeNull();client.clear();
+});
 
 function Creation(){const mutation=useCreateManifiesto();return <button onClick={()=>mutation.mutate({} as any)}>Crear propuesta de prueba</button>;}
 it.each(['OPERADOR','GENERADOR','TRANSPORTISTA','ADMIN'])('shows a newly created waiting proposal first without waiting for polling: %s',async(role)=>{

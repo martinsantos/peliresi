@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
@@ -149,9 +149,23 @@ export async function readableMapLayers(group: Locator) {
 export const prefix = (info: TestInfo) => info.project.name === 'app' ? '/app' : '';
 
 const fixturePages = new WeakSet<Page>();
+let consoleCapture = 0;
 export async function isolatedMapTiles(page: Page, info: TestInfo) {
   if (process.env.SITREP_QA_EXECUTOR !== 'preview-container' || fixturePages.has(page)) return;
   fixturePages.add(page);
+  await page.route(/^https?:\/\/(?:sitrep\.ultimamilla\.com\.ar|rptrazar\.mendoza\.gov\.ar)(?:\/|$)/, async route => {
+    await route.abort('blockedbyclient');
+    throw new Error('QA blocked an attempted production request: '+new URL(route.request().url()).pathname);
+  });
+  if (process.env.QA_REVIEW_CONSOLE === 'true') {
+    const capture = consoleCapture++;
+    const events: Array<{type: string; text: string}> = [];
+    const redact = (text: string) => text.replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[JWT omitted]');
+    page.on('console', message => { if (['error', 'warning'].includes(message.type())) events.push({type: message.type(), text: redact(message.text())}); });
+    page.on('pageerror', error => events.push({type: 'uncaught', text: redact(error.message)}));
+    page.on('response', response => { if (response.status() >= 400) events.push({type: 'http-'+response.status(), text: response.request().method()+' '+new URL(response.url()).pathname}); });
+    page.once('close', () => writeFileSync(info.outputPath('console-'+capture+'.json'), JSON.stringify({url: page.url().split('#')[0], events}, null, 2)));
+  }
   const fontRoot=path.resolve(process.env.QA_ARTIFACTS!,'../.qa-fonts');
   const fonts=JSON.parse(readFileSync(path.join(fontRoot,'manifest.json'),'utf8'));
   info.annotations.push({type:'provider-cache',description:'Original public Google font CSS/WOFF bytes served from a verified offline cache; no substitute typography.'});

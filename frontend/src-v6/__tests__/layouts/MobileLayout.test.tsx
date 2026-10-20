@@ -100,6 +100,9 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="actores" element={<div>Consulta de actores</div>} />
           <Route path="notificaciones" element={<div>Bandeja de avisos</div>} />
           <Route path="manifiestos" element={<div>Listado de manifiestos</div>} />
+          <Route path="app/manifiestos" element={<div>Listado app</div>} />
+          <Route path="mobile/manifiestos" element={<div>Listado móvil</div>} />
+          <Route path="transporte/perfil" element={<div>Mis viajes</div>} />
           <Route path="manifiestos/nuevo" element={<div>Formulario de nuevo manifiesto</div>} />
           <Route path="manifiestos/:id" element={<div>Detalle del manifiesto</div>} />
           <Route path="manifiestos/:id/adendas" element={<div>Adendas</div>} />
@@ -251,11 +254,10 @@ describe('MobileLayout Android shell', () => {
     expect(screen.getByText('14', { exact: true })).toHaveClass('bg-error-700', 'text-white');
   });
 
-  it.each(['ADMIN', 'GENERADOR'])('keeps the list create action working for %s', role => {
+  it.each(['ADMIN', 'GENERADOR'])('leaves creation to the list instead of overlaying its rows for %s', role => {
     authState.currentUser = { ...authState.currentUser, rol: role };
     renderMobileLayout('/manifiestos');
-    fireEvent.click(screen.getByRole('button', { name: 'Nuevo manifiesto', exact: true }));
-    expect(screen.getByText('Formulario de nuevo manifiesto')).toBeInTheDocument();
+    expect(screen.getByText('Listado de manifiestos')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Nuevo manifiesto', exact: true })).not.toBeInTheDocument();
   });
 
@@ -277,7 +279,7 @@ describe('MobileLayout Android shell', () => {
     expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
     expect(authState.currentUser.rol).toBe('GENERADOR');
   });
-  it.each(['/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip', '/transporte/cargas', '/app/transporte/cargas', '/mobile/transporte/cargas', '/manifiestos/qa-record/adendas', '/app/manifiestos/qa-record/adendas', '/mobile/manifiestos/qa-record/adendas'])('keeps technical help reachable without covering form/trip controls on %s', path => {
+  it.each(['/manifiestos', '/app/manifiestos', '/mobile/manifiestos', '/transporte/perfil', '/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip', '/transporte/cargas', '/app/transporte/cargas', '/mobile/transporte/cargas', '/manifiestos/qa-record/adendas', '/app/manifiestos/qa-record/adendas', '/mobile/manifiestos/qa-record/adendas'])('keeps technical help reachable without covering form/trip controls on %s', path => {
     renderMobileLayout(path);
     const help = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
     expect(help.closest('header')).toBe(screen.getByRole('banner'));

@@ -22,7 +22,7 @@ import { toast } from '../../components/ui/Toast';
 import { useManifiestos } from '../../hooks/useManifiestos';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useAuth } from '../../contexts/AuthContext';
-import { canOfferManifestDelete } from '../../utils/manifestActions';
+import { canOfferManifestCreate, canOfferManifestDelete, canOfferManifestEdit } from '../../utils/manifestActions';
 import { useGeneradores } from '../../hooks/useGeneradores';
 import { useOperadores } from '../../hooks/useOperadores';
 import { manifiestoService } from '../../services/manifiesto.service';
@@ -318,7 +318,7 @@ const ManifiestosPage: React.FC = () => {
             }}
             className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
           ><FileDown size={13} /> PDF</button>
-          <Button size="sm" aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>
+          {canOfferManifestCreate(currentUser?.rol, currentUser?.training) && <Button size="sm" aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>}
         </div>
       </div>
 
@@ -536,7 +536,7 @@ const ManifiestosPage: React.FC = () => {
                     <div className="px-3 py-2 text-sm text-neutral-700 whitespace-nowrap hidden lg:block">{typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} {m.unidad}</div>
                     <div className="px-3 py-2 flex items-center justify-end gap-0.5">
                       <button aria-label={`Ver manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`)); }}><Eye size={15} /></button>
-                      <button aria-label={`Editar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>
+                      {canOfferManifestEdit(currentUser?.rol, m.estado) && <button aria-label={`Editar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>}
                       {canOfferManifestDelete(currentUser?.rol, m.estado) && <button aria-label={`Eliminar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>}
                     </div>
                   </div>
