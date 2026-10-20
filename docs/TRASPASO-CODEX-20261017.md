@@ -1,5 +1,17 @@
 # SITREP — traspaso vigente de operación
 
+## Revisión de altas — producto 4b5c8bdd sin publicar, 20/10/2026
+
+**Sólo preview, sin producción ni main.** Candidato **`4b5c8bdd3380beb3bc03674d902a31ff0b91f76e`**, rama `codex/sitrep-training-20261018`, checkout único de este traspaso. Leer [revisión integral de Generador, Transportista y Operador](REVISION-ALTAS-20261020.md) antes de continuar. La última publicación documentada sigue siendo `c9cd877f`; no se consultó producción durante esta revisión.
+
+Se corrigen entradas a borradores y solicitudes observadas, conservación de observaciones, renovación del acceso después de aprobar, destino/etiqueta de avisos de alta y guardia de administración de transporte en app. Se completa la consulta/revisión de documentos del operador y el OCR de Factura de Luz histórica sin cambiar el original. Permisos backend, requisitos, TEF/importes, pagos e históricos conservados; ninguna migración fuente nueva. Manual **2026.20.18**, misma guía y renderer, captura artificial original; CSS **2026.20.5** contiene URLs largas para evitar recortar los botones en móvil.
+
+Validación final: backend **169/169**, frontend **312/312**, navegador **60/60** (altas públicas/directas, ATM, electricidad, recibos, flota y manual entre web/web móvil/app), manual **25/25**, API/OCR **11 grupos**, auditoría **11 grupos**, tipos/builds/lint PASS y diff Prisma vacío. Cero omitidos/flaky/reintentos; **81 páginas instrumentadas** sin errores inesperados. **175 tablas previas** de QA conservan conteos/huellas; **311 correos suprimidos, cero intentos/envíos**, CAP expirado y flags/proveedores efectivos verificados.
+
+Servicios QA/PostgreSQL cerrados y contenedor propio detenido **20/10, 20:48:11 Mendoza**, `Running=false/Pid=0/OOMKilled=false`; imagen, base y evidencias conservadas. Serial/un worker/1 CPU/2 GiB/swap cero, `memory.events max=5970` por presión de memoria y `oom/oom_kill=0`. **46 blobs cambiados** coinciden con lo probado; builds sobre **2.277 fuentes**, API local `/api`, no son paquetes para producción. `main` sigue `c8402190edfc36b5e5d0dee1337c24bd1689420d`; sin push/workflows, commits `[skip ci]`.
+
+Límites: verificación de email con comprobante sintético y controlador real; correo/recuperación no llegan a usuarios con canales apagados. OCR sobre once encabezados y un PDF híbrido artificiales; no todas las facturas reales ni dispositivos físicos certificados. La categoría eléctrica para el test y la fórmula R requieren decisión fiscal separada. Publicar requiere autorización nueva, build de dominio final y versión SW de release, manteniendo CAP/canales/flags como se indique entonces.
+
 ## Estado vigente — capacitación cerrada desde el 19/10/2026
 
 Al terminar la demo, se revocaron los cuatro accesos directos CAP de la pizarra. Los cuatro nuevos ingresos y los cuatro tokens emitidos antes del cierre devolvieron 403. El vencimiento pasado está tanto en `.env` como en PM2 y su estado guardado, también después de la publicación operativa siguiente. Los datos artificiales, manifiestos y credenciales históricas quedan preservados, sin poder usar el ingreso directo. Aquel cierre no cambió `main` ni frontend. [Cierre y auditoría](ACCESO-CAPACITACION-20261019.md).

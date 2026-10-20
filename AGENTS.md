@@ -1,5 +1,13 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Revisión de altas — 4b5c8bdd sólo en preview, 20/10/2026
+
+**`4b5c8bdd` validado, sin publicar.** Leer primero [altas: cambios, circuitos, pruebas y límites](docs/REVISION-ALTAS-20261020.md). Generador/Transportista/Operador: retomar borrador, corregir observaciones y adjuntos, reenviar, aprobar o rechazar y abrir el resultado desde el aviso propio. La aprobación ofrece renovar el acceso limitado sin bucle. Administración de transporte en app alineada con web/backend; documentos del operador y factura eléctrica, incluido el tipo histórico Factura de Luz. No se alteran permisos backend, requisitos, importes ni históricos.
+
+Preview: backend **169/169**, frontend **312/312**, navegador **60/60**, API/OCR **11 grupos**, manual **25/25**, auditoría **11 grupos**, tipos/builds/lint y diff Prisma vacío. **175 tablas previas** intactas; 311 correos suprimidos, cero intentos/envíos. CAP cerrado, correos/push apagados y flags conservados. Manual **2026.20.18**, renderer idéntico; CSS **2026.20.5**, sólo contención de URLs largas que desbordaban el viewport móvil. Captura original artificial y procedencia guardadas.
+
+QA serial/un worker/1 CPU/2 GiB/swap cero; servicios/PostgreSQL cerrados y contenedor detenido **20:48:11 Mendoza**, sin OOM (`max=5970` por presión de memoria). Imagen/base/evidencias conservadas. Sin producción, `main`, push ni workflows; commits `[skip ci]`. Última publicación documentada **c9cd877f**, abajo, sin nueva inspección productiva. Entrega de verificación por correo y formatos reales de facturas no certificados; categoría eléctrica para el test y fórmula fiscal R siguen pendientes. Una publicación requiere nueva autorización y paquetes con API/SW de release; no desplegar bundles `/api` de QA.
+
 ## Última publicación — informe de hallazgo y cola PSIP c9cd877f, 20/10/2026
 
 **`c9cd877f` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` a las **18:15:18 Mendoza**, con autorización del dueño. Leer primero [despliegue, backup, límites y reversión actual](docs/DESPLIEGUE-HALLAZGOS-PSIP-20261020.md), después [informe dentro de la adenda y cola PSIP](docs/HALLAZGOS-ADENDAS-PSIP-20261020.md) y el [traspaso](docs/TRASPASO-CODEX-20261017.md). Las diferencias y actores externos aportan antecedentes internos por evaluar, no infracciones ni inspecciones automáticas. Permisos, originales y decisiones de adenda conservados.
