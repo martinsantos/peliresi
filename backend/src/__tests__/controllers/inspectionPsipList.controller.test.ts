@@ -38,4 +38,21 @@ describe('PSIP multi-state filters', () => {
     await list({ estado: 'EN_CAMPO' });
     expect(db.findMany.mock.calls[0][0].where.estado).toBe('EN_CAMPO');
   });
+  it('counts live deadlines only on unanswered dated requests, not the dossier reference date', async () => {
+    await list({ estados: 'NOTIFICADA,EN_DESCARGO,REQUIERE_SUBSANACION' });
+    const where = db.count.mock.calls[1][0].where;
+    expect(where).not.toHaveProperty('plazoRespuestaAt');
+    expect(where.intercambios.some).toMatchObject({ tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', destinatario: 'INSPECCIONADO',
+      plazoRespuestaAt: { gte: expect.any(Date) }, respuestas: { none: { parte: 'INSPECCIONADO', tipo: { in: ['RESPUESTA', 'DESCARGO', 'SUBSANACION'] } } } });
+  });
+  it('returns a privacy-limited pending summary without shipping all exchanges in list rows', async () => {
+    db.transaction.mockResolvedValue([[{ id: 'a', estado: 'EN_DESCARGO', intercambios: [
+      { id: 'request', secuencia: 1, tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', destinatario: 'INSPECCIONADO', respondeAId: null, plazoRespuestaAt: null },
+    ] }], 1, [], 0]);
+    const { res, next } = await list({});
+    expect(next).not.toHaveBeenCalled();
+    const row = res.json.mock.calls[0][0].data.items[0];
+    expect(row.seguimiento).toEqual({ paso: 'RESPONDER', pendientes: [{ id: 'request', secuencia: 1, plazoRespuestaAt: null }] });
+    expect(row).not.toHaveProperty('intercambios');
+  });
 });

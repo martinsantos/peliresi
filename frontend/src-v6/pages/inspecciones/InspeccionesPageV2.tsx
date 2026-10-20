@@ -15,13 +15,14 @@ import type { InspectionActorType, InspectionState, InspectionType } from '../..
 import { inspectionActor, INSPECTION_TYPES, inspectionTypeOf, inspectionNumberExample } from '../../types/inspection';
 import { downloadCsv } from '../../utils/exportCsv';
 import { INSPECTION_ACTOR_LABELS, INSPECTION_STATE_COLORS, INSPECTION_STATE_LABELS, inspectionActorRoute, inspectionDate, inspectionErrorMessage, inspectionRelevantDate, isTrainingActNumber } from './inspectionPresentation';
+import { InspectionFollowUpSummary } from './InspectionFollowUpSummary';
 import { InspectorSelect } from './InspectorSelect';
 import { InspectionOperationsPanel } from './InspectionOperationsPanel';
 import { useConnectivity } from '../../hooks/useConnectivity';
 import { SpontaneousFindingPanel } from './SpontaneousFindingPanel';
 import { InspectionLocationField } from './InspectionLocationField';
 import { inspectionLocationSuggestions } from './inspectionLocations';
-import { INSPECTION_PHASES, inspectionPhaseOf, isInspectionPhase, type InspectionPhase } from './inspectionProcess';
+import { INSPECTION_PHASES, inspectionPhaseOf, isInspectionPhase, isInspectionFollowUp, type InspectionPhase } from './inspectionProcess';
 
 const isActorType = (value: string | null): value is InspectionActorType => value === 'GENERADOR' || value === 'TRANSPORTISTA' || value === 'OPERADOR';
 
@@ -42,6 +43,8 @@ const InspeccionesPageV2: React.FC = () => {
   const [page, setPage] = useState(Math.max(1, Number(searchParams.get('page')) || 1));
   const [showCreate, setShowCreate] = useState(false);
   const [agendaOpen, setAgendaOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
   const [type, setType] = useState<InspectionActorType>(initialType || (currentUser?.rol === 'ADMIN_OPERADOR' ? 'OPERADOR' : currentUser?.rol === 'ADMIN_TRANSPORTISTA' ? 'TRANSPORTISTA' : 'GENERADOR'));
   const [actorId, setActorId] = useState(initialActor);
   const [withoutActor, setWithoutActor] = useState(false);
@@ -144,7 +147,7 @@ const InspeccionesPageV2: React.FC = () => {
       <button aria-pressed={!phase && !state && !agendaOpen} className={!phase && !state && !agendaOpen ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(''); setState(''); setAgendaOpen(false); setPage(1); }}>Todas</button>
       {(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).map((key) => <button key={key} aria-pressed={phase === key && !agendaOpen} className={phase === key && !agendaOpen ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(key); setState(''); setAgendaOpen(false); setPage(1); }}>{INSPECTION_PHASES[key].label} <span className="ml-1 tabular-nums">{totalsUnknown ? '—' : INSPECTION_PHASES[key].states.reduce((sum, value) => sum + (stateCounts[value] || 0), 0)}</span></button>)}
       <button aria-pressed={agendaOpen} className="min-h-11 text-neutral-600" onClick={() => setAgendaOpen((value) => !value)}>Agenda</button>
-      <span className="hidden shrink-0 text-neutral-500 xl:inline">{totalsUnknown ? '—' : deadlines} con plazo abierto</span>
+      <span className="hidden shrink-0 text-neutral-500 xl:inline">{totalsUnknown ? '—' : deadlines} con plazo vigente sin responder</span>
       <Button aria-label="Exportar" title="Exportar listado" className="ml-auto shrink-0 max-sm:w-11 max-sm:px-0" variant="ghost" size="sm" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}><span className="sr-only sm:not-sr-only">Exportar</span></Button>
     </nav>
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-neutral-600"><p>{phase ? INSPECTION_PHASES[phase].description : 'PSIP · De la visita al seguimiento y la resolución del expediente.'}</p><a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold text-primary-800 underline underline-offset-2">Ver flujo PSIP</a></div>
@@ -164,9 +167,9 @@ const InspeccionesPageV2: React.FC = () => {
         const resume = currentUser?.id ? readInspectionResume(currentUser.id, inspection.id) : null;
         return <div key={inspection.id} onClick={(event) => { if (!(event.target as HTMLElement).closest('a,button,input')) navigate(inspectionRoute + (resume?.hash || '')); }} data-testid={`inspection-row-${inspection.id}`} className="group grid w-full min-w-0 cursor-pointer grid-cols-1 gap-2 border-b border-neutral-100 p-4 text-left transition-colors last:border-0 hover:bg-neutral-50/60 active:bg-neutral-100/60 focus-within:bg-neutral-50 focus-visible:relative focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 lg:grid-cols-[0.92fr_1.35fr_1fr_1fr_auto] lg:items-center lg:gap-4 lg:px-4 lg:py-2.5">
           <div><div className="flex flex-wrap items-center justify-between gap-2 lg:justify-start"><Link to={inspectionRoute + (resume?.hash || '')} aria-label={`${resume ? 'Retomar' : 'Abrir'} expediente ${inspection.numero}${resume ? ` en ${resume.label}` : ''}`} className="rounded font-mono text-sm font-semibold text-neutral-900 hover:text-primary-700 focus-visible:ring-2 focus-visible:ring-primary-500">{inspection.numero}</Link>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación</Badge>}<Badge className="lg:hidden" color={INSPECTION_STATE_COLORS[inspection.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[inspection.estado]}</Badge></div><p className="mt-1 flex items-center gap-1.5 text-xs text-neutral-500"><CalendarDays size={14} className="text-neutral-400" />{inspectionDate(dateValue)}</p>{resume && <p className="mt-1 line-clamp-2 text-xs font-semibold text-primary-800">Retomar: {resume.label}</p>}</div>
-          <div className="min-w-0">{actor ? <Link to={inspectionActorRoute(inspection.tipoActor, actor.id, mobile)} state={{ inspectionReturn: inspectionRoute }} aria-label={'Abrir ficha de ' + actor.razonSocial} className="inline-block max-w-full rounded text-sm font-medium text-neutral-700 hover:text-primary-700 hover:underline focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link> : <p className="font-semibold text-neutral-900">{INSPECTION_TYPES[inspectionTypeOf(inspection)].label}</p>}<p className="mt-1 text-xs text-neutral-500">{INSPECTION_TYPES[inspectionTypeOf(inspection)].label}{!inspection.tipoActor && ' · Sin responsable vinculado'}{actor?.cuit ? ` · CUIT ${actor.cuit}` : ''}</p></div>
+          <div className="min-w-0">{actor ? <Link to={inspectionActorRoute(inspection.tipoActor, actor.id, mobile)} state={{ inspectionReturn: inspectionRoute }} aria-label={'Abrir ficha de ' + actor.razonSocial} className="inline-block max-w-full rounded text-sm font-medium text-neutral-700 hover:text-primary-700 hover:underline focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link> : <p className="font-semibold text-neutral-900">{INSPECTION_TYPES[inspectionTypeOf(inspection)].label}</p>}<p className="mt-1 text-xs text-neutral-500">{INSPECTION_TYPES[inspectionTypeOf(inspection)].label}{!inspection.tipoActor && ' · Sin responsable vinculado'}{actor?.cuit ? ` · CUIT ${actor.cuit}` : ''}</p>{isInspectionFollowUp(inspection.estado) && <InspectionFollowUpSummary seguimiento={inspection.seguimiento} now={now} />}</div>
           <div className="space-y-1.5 text-sm text-neutral-600"><p className="flex items-center gap-2"><UserRound size={15} className="shrink-0 text-neutral-400" />{inspection.inspector?.nombre || 'Sin asignar'} {inspection.inspector?.apellido || ''}</p><p className="flex items-center gap-2 text-xs text-neutral-500"><MapPin size={14} className="shrink-0" /><span className="line-clamp-2">{inspection.ubicacion || 'Sin ubicación'}</span></p></div>
-          <div className="hidden lg:block"><Badge color={INSPECTION_STATE_COLORS[inspection.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[inspection.estado]}</Badge>{inspection.plazoRespuestaAt && <p className="mt-2 text-xs text-neutral-500">Plazo: {inspectionDate(inspection.plazoRespuestaAt)}</p>}</div>
+          <div className="hidden lg:block"><Badge color={INSPECTION_STATE_COLORS[inspection.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[inspection.estado]}</Badge></div>
           <div className="flex items-center justify-between gap-4 pt-1 text-xs text-neutral-500 lg:block lg:border-0 lg:pt-0 lg:text-right"><span>{inspection._count?.evidencias || 0} evidencias</span><span className="lg:mt-1 lg:block">{inspection._count?.eventos || 0} eventos</span><span aria-hidden="true" className="rounded-md text-neutral-400 transition-colors group-hover:text-primary-700 lg:ml-auto lg:mt-1 lg:inline-flex lg:p-1"><ChevronRight size={17} /></span></div>
         </div>;
       })}

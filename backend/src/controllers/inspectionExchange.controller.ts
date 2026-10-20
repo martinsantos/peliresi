@@ -9,6 +9,7 @@ import {
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { createInspectionExchangeNotices } from '../services/inspectionExchangeNotice.service';
+import { inspectionFollowUp, inspectionFollowUpSelect } from '../services/inspectionFollowUp.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import {
@@ -71,6 +72,25 @@ const inspectionAccessSelect = {
   transportista: { select: { id: true, razonSocial: true, cuit: true } },
   operador: { select: { id: true, razonSocial: true, cuit: true } },
 } satisfies Prisma.InspeccionSelect;
+
+const replyContextSelect = {
+  id: true, parte: true, tipo: true, secuencia: true, respondeAId: true, plazoRespuestaAt: true,
+} satisfies Prisma.IntercambioInspeccionSelect;
+type ReplyContext = Prisma.IntercambioInspeccionGetPayload<{ select: typeof replyContextSelect }>;
+
+/** Follow only this reply's immutable ancestry; a later request never extends it. */
+async function replyDeadline(tx: Prisma.TransactionClient, inspectionId: string, parent: ReplyContext | null): Promise<Date | null> {
+  let entry = parent;
+  while (entry) {
+    if (entry.parte === 'AUTORIDAD' && entry.tipo === 'REQUERIMIENTO') return entry.plazoRespuestaAt;
+    if (!entry.respondeAId) return null;
+    entry = await tx.intercambioInspeccion.findFirst({
+      where: { id: entry.respondeAId, inspeccionId: inspectionId, secuencia: { lt: entry.secuencia } },
+      select: replyContextSelect,
+    });
+  }
+  return null;
+}
 
 const exchangeInclude = {
   autor: { select: { id: true, nombre: true, apellido: true, rol: true } },
@@ -138,6 +158,7 @@ export async function listarParticipacionInspeccionado(req: AuthRequest, res: Re
       select: {
         ...inspectionAccessSelect,
         _count: { select: { intercambios: true } },
+        intercambios: { select: inspectionFollowUpSelect },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -153,6 +174,7 @@ export async function listarParticipacionInspeccionado(req: AuthRequest, res: Re
         plazoRespuestaAt: inspection.plazoRespuestaAt,
         version: inspection.version,
         cantidadPresentaciones: inspection._count.intercambios,
+        seguimiento: inspectionFollowUp(inspection.estado, inspection.intercambios || []),
       })),
     });
   } catch (error) { next(error); }
@@ -187,6 +209,7 @@ export async function obtenerIntercambiosInspeccion(req: AuthRequest, res: Respo
           actor: actorSummary(inspection),
           plazoRespuestaAt: inspection.plazoRespuestaAt,
           version: inspection.version,
+          seguimiento: inspectionFollowUp(inspection.estado, exchanges),
         },
         parteActual: party,
         intercambios: exchanges,
@@ -214,7 +237,6 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
     if (!isExchangeTypeAllowed(party, input.tipo)) throw new AppError('El tipo de presentación no corresponde a la parte autenticada', 403);
     if (party === 'INSPECCIONADO' && input.plazoRespuestaAt) throw new AppError('El inspeccionado no puede fijar el plazo de respuesta', 403);
     if (input.plazoRespuestaAt && input.tipo !== 'REQUERIMIENTO') throw new AppError('Sólo un requerimiento puede fijar un nuevo plazo', 400);
-    if (input.plazoRespuestaAt && new Date(input.plazoRespuestaAt).getTime() <= Date.now()) throw new AppError('El plazo debe ser posterior al momento actual', 400);
 
     if (input.clienteId) {
       const existing = await prisma.intercambioInspeccion.findFirst({
@@ -223,6 +245,7 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
       });
       if (existing) return res.json({ success: true, data: existing, message: 'La presentación ya estaba incorporada.' });
     }
+    if (input.plazoRespuestaAt && new Date(input.plazoRespuestaAt).getTime() <= Date.now()) throw new AppError('El plazo debe ser posterior al momento actual', 400);
 
     const storedFiles: Array<{ file: Express.Multer.File; stored: StoredInspectionEvidence }> = [];
     for (const file of files) {
@@ -245,7 +268,7 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
       const parent = input.respondeAId
         ? await tx.intercambioInspeccion.findFirst({
           where: { id: input.respondeAId, inspeccionId: inspection.id },
-          select: { id: true, parte: true },
+          select: replyContextSelect,
         })
         : null;
       if (input.respondeAId && !parent) throw new AppError('La presentación respondida no pertenece a este expediente', 400);
@@ -260,8 +283,8 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
       const createdAt = new Date();
       const nextState = nextInspectionStateForExchange(locked.estado, party, input.tipo);
       const destinatario: ParteIntercambioInspeccion = party === 'AUTORIDAD' ? 'INSPECCIONADO' : 'AUTORIDAD';
-      const late = party === 'INSPECCIONADO'
-        && Boolean(locked.plazoRespuestaAt && createdAt.getTime() > locked.plazoRespuestaAt.getTime());
+      const responseDeadline = party === 'INSPECCIONADO' ? await replyDeadline(tx, inspection.id, parent) : null;
+      const late = Boolean(responseDeadline && createdAt.getTime() > responseDeadline.getTime());
       const digests = buildInspectionExchangeDigests({
         inspeccionId: inspection.id,
         secuencia,

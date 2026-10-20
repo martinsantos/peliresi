@@ -30,7 +30,7 @@ import type {
   InspectionExchangeType,
 } from '../../types/inspection';
 import { INSPECTION_STATE_COLORS, INSPECTION_STATE_LABELS, inspectionDate, inspectionErrorMessage } from './inspectionPresentation';
-import { INSPECTION_PHASES, inspectionPhaseOf, inspectionExchangeNextStep, inspectionExchangeDeadline } from './inspectionProcess';
+import { INSPECTION_PHASES, inspectionPhaseOf, inspectionExchangeNextStep, inspectionExchangeDeadline, inspectionDeadlineDate, inspectionDeadlineStatus, inspectionFollowUpFromEntries, inspectionFollowUpStatus, inspectionReplyDeadline, inspectionDeadlineInput, inspectionDeadlineFromInput } from './inspectionProcess';
 
 const TYPE_LABELS: Record<InspectionExchangeType, string> = {
   REQUERIMIENTO: 'Requerimiento',
@@ -66,10 +66,6 @@ const formatBytes = (bytes: number) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
-
-const localDate = (value?: string | null) => value
-  ? new Date(new Date(value).getTime() - new Date(value).getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
-  : '';
 
 function storedExchangeDraft(key: string): ExchangeDraft | null {
   if (!key) return null;
@@ -213,7 +209,7 @@ function ExchangeLedger({
 
                       <p className="mt-3 max-w-[76ch] whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800">{entry.cuerpo}</p>
 
-                      {entry.plazoRespuestaAt && <div className="mt-3 flex w-fit max-w-full items-start gap-2 border-l-2 border-warning-500 bg-warning-50 px-3 py-2 text-xs font-semibold leading-5 text-warning-900"><Clock3 size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Plazo de respuesta: {inspectionDate(entry.plazoRespuestaAt, true)}</span></div>}
+                      {entry.plazoRespuestaAt && <div className="mt-3 flex w-fit max-w-full items-start gap-2 border-l-2 border-warning-500 bg-warning-50 px-3 py-2 text-xs font-semibold leading-5 text-warning-900"><Clock3 size={15} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Plazo de este pedido: {inspectionDeadlineDate(entry.plazoRespuestaAt)} · Mendoza</span></div>}
 
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-neutral-600"><span>Puesta a disposición: {inspectionDate(entry.puestaDisposicionAt || entry.createdAt, true)}</span><span className={entry.vistaPorDestinatarioAt ? 'font-semibold text-success-800' : 'font-semibold text-warning-800'}>{entry.vistaPorDestinatarioAt ? `Vista por el destinatario: ${inspectionDate(entry.vistaPorDestinatarioAt, true)}` : 'Aún no abierta por el destinatario'}</span></div>
 
@@ -337,7 +333,7 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
         asunto: draft.asunto.trim(),
         cuerpo: draft.cuerpo.trim(),
         respondeAId: draft.respondeAId || undefined,
-        plazoRespuestaAt: draft.plazoRespuestaAt ? new Date(draft.plazoRespuestaAt).toISOString() : undefined,
+        plazoRespuestaAt: draft.plazoRespuestaAt ? inspectionDeadlineFromInput(draft.plazoRespuestaAt) : undefined,
         files,
       });
     },
@@ -448,9 +444,11 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   if (exchangeQuery.isLoading) return <Card className="text-sm text-neutral-600">Cargando presentaciones auditadas…</Card>;
   if (exchangeQuery.isError || !timeline) return <Card className="border-error-200 bg-error-50 text-sm text-error-800">No se pudo abrir el intercambio formal de este expediente.</Card>;
 
-  const deadlineExpired = Boolean(timeline.inspeccion.plazoRespuestaAt && new Date(timeline.inspeccion.plazoRespuestaAt).getTime() < now);
-  const displayedDeadline = inspectionExchangeDeadline(timeline.inspeccion.estado, timeline.inspeccion.plazoRespuestaAt, timeline.intercambios);
-  const nextStep = inspectionExchangeNextStep(timeline.inspeccion.estado, timeline.intercambios, party === 'INSPECCIONADO');
+  const followUp = inspectionFollowUpStatus(timeline.inspeccion.seguimiento || inspectionFollowUpFromEntries(timeline.inspeccion.estado, timeline.intercambios), now);
+  const deadlineExpired = followUp.overdue > 0;
+  const displayedDeadline = followUp.next ? followUp.next.plazoRespuestaAt : inspectionExchangeDeadline(timeline.inspeccion.estado, timeline.inspeccion.plazoRespuestaAt, timeline.intercambios);
+  const nextStep = inspectionExchangeNextStep(timeline.inspeccion.estado, timeline.intercambios, party === 'INSPECCIONADO', now);
+  const selectedDeadline = draft.respondeAId ? inspectionReplyDeadline(timeline.intercambios, draft.respondeAId) : null;
 
   return (
     <section className={compact ? 'space-y-4' : 'space-y-5'} aria-labelledby="inspection-exchange-title">
@@ -474,19 +472,30 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
         <div className="grid gap-0 divide-y divide-neutral-200 px-4 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
           <div className="py-3 sm:pr-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Expediente</p><p className="mt-1 font-bold text-[#10213A]">{timeline.inspeccion.numero}</p></div>
           <div className="py-3 sm:px-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Presentaciones</p><p className="mt-1 font-bold text-[#10213A]">{timeline.intercambios.length}</p></div>
-          <div className="py-3 sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">{open ? 'Plazo del seguimiento' : 'Último plazo · histórico'}</p><p data-testid="inspection-deadline-value" className={`mt-1 font-bold ${deadlineExpired && open ? 'text-error-700' : 'text-[#10213A]'}`}>{displayedDeadline ? inspectionDate(displayedDeadline, true) : 'Sin plazo registrado'}</p></div>
+          <div className="py-3 sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">{!open ? 'Último plazo · histórico' : followUp.next ? `Plazo del pedido #${followUp.next.secuencia}` : 'Último plazo registrado · referencia'}</p><p data-testid="inspection-deadline-value" className={`mt-1 font-bold ${deadlineExpired && open ? 'text-error-700' : 'text-[#10213A]'}`}>{inspectionDeadlineDate(displayedDeadline)}</p>{displayedDeadline && <p className="mt-1 text-xs text-neutral-500">Hora de Mendoza</p>}</div>
         </div>
         <div data-testid="inspection-next-step" className="border-t border-neutral-200 px-4 py-4 sm:px-6">
+          <p data-testid="inspection-responsible" className="mb-2 text-xs font-bold uppercase tracking-wide text-primary-800">{followUp.responsible ? `Debe actuar: ${followUp.responsible}` : 'Sin intercambio abierto'}</p>
           <p className="flex items-center gap-2 font-bold text-neutral-900"><Reply size={18} className="shrink-0 text-primary-800" aria-hidden="true" />{nextStep.title}</p>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{nextStep.detail}</p>
           {open && party === 'INSPECCIONADO' && nextStep.pending[0] && !composeOpen && <Button className="mt-3" disabled={presentMutation.isPending} leftIcon={<Reply size={16} />} onClick={() => beginReply(nextStep.pending[0])}>Responder requerimiento #{nextStep.pending[0].secuencia}</Button>}
+          {open && nextStep.pending.length > 0 && <div aria-label="Requerimientos sin respuesta" role="region" className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200">
+            {nextStep.pending.map(entry => {
+              const status = inspectionDeadlineStatus(entry.plazoRespuestaAt, now);
+              return <div key={entry.id} data-testid="inspection-pending-request" className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <div className="col-span-2 min-w-0 sm:col-span-1"><p className="break-words text-sm font-semibold text-neutral-900">#{entry.secuencia} · {entry.asunto}</p><p className="mt-1 text-xs text-neutral-600">{inspectionDeadlineDate(entry.plazoRespuestaAt)}{entry.plazoRespuestaAt ? ' · Mendoza' : ''}</p></div>
+                <Badge className="justify-self-start" color={status === 'Vencido' ? 'error' : status === 'Vence hoy' ? 'warning' : 'neutral'}>{status}</Badge>
+                {party === 'INSPECCIONADO' && <Button aria-label={`Responder pedido #${entry.secuencia}`} className="justify-self-end" size="sm" variant="outline" disabled={presentMutation.isPending} onClick={() => beginReply(entry)}>Responder</Button>}
+              </div>;
+            })}
+          </div>}
           <p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>
         </div>
       </Card>
 
       {!online && <div role="status" className="flex items-start gap-3 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm text-warning-900"><WifiOff className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Sin conexión: no se enviará ninguna actuación.</p><p className="mt-0.5 leading-5">El texto y los adjuntos seleccionados se conservan en el almacenamiento local del navegador de este dispositivo. Al reconectar, revise la versión y confirme manualmente; SITREP nunca autoenvía un descargo.</p></div></div>}
       {restoredAt && composeOpen && <div role="status" className="flex items-start gap-3 rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900"><FileCheck2 className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Borrador local recuperado</p><p className="mt-0.5 leading-5">Guardado {inspectionDate(restoredAt, true)} con {files.length} {files.length === 1 ? 'adjunto' : 'adjuntos'}. Revíselo antes de presentar; todavía no integra el expediente.</p></div></div>}
-      {deadlineExpired && open && <div className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-900"><AlertTriangle className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Plazo vencido</p><p className="mt-0.5">El sistema admite la presentación y la marcará como fuera de plazo; la valoración corresponde a la autoridad competente.</p></div></div>}
+      {deadlineExpired && open && <div data-testid="inspection-overdue" className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-900"><AlertTriangle className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">{followUp.overdue} {followUp.overdue === 1 ? 'requerimiento vencido sin respuesta' : 'requerimientos vencidos sin respuesta'}</p><p className="mt-0.5">Se admiten presentaciones; la marca fuera de plazo depende del pedido al que respondés. La autoridad debe evaluar lo presentado; no se aplica una decisión automática.</p></div></div>}
 
       {timeline.intercambios.length === 0 ? (
         <Card className="py-10 text-center"><Files className="mx-auto text-neutral-300" size={36} /><p className="mt-3 font-bold text-[#10213A]">Todavía no hay presentaciones formales</p><p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-neutral-600">La autoridad inicia el circuito con un requerimiento. El inspeccionado podrá responder sobre ese antecedente.</p></Card>
@@ -512,9 +521,10 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
               <button type="button" aria-label="Cerrar formulario" className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" onClick={() => setComposeOpen(false)}><X size={18} /></button>
             </div>
             {draft.respondeAId && <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">Antecedente: presentación #{parentById.get(draft.respondeAId)?.secuencia || '—'} · {parentById.get(draft.respondeAId)?.asunto}</div>}
+            {party === 'INSPECCIONADO' && draft.respondeAId && <p data-testid="inspection-reply-deadline" className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-800">Plazo del pedido respondido: <strong>{inspectionDeadlineDate(selectedDeadline)}{selectedDeadline ? ' · Mendoza' : ''}</strong>{selectedDeadline && <span className="ml-2 font-semibold">{inspectionDeadlineStatus(selectedDeadline, now)}</span>}</p>}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="text-sm font-semibold text-neutral-800">Tipo de actuación<select value={draft.tipo} onChange={(event) => setDraft((value) => ({ ...value, tipo: event.target.value as InspectionExchangeType, plazoRespuestaAt: event.target.value === 'REQUERIMIENTO' ? value.plazoRespuestaAt : '' }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 font-normal">{exchangeTypeOptions(party, Boolean(draft.respondeAId)).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-              {party === 'AUTORIDAD' && draft.tipo === 'REQUERIMIENTO' && <label className="text-sm font-semibold text-neutral-800">Plazo de respuesta<input type="datetime-local" min={localDate(new Date(now).toISOString())} value={draft.plazoRespuestaAt} onChange={(event) => setDraft((value) => ({ ...value, plazoRespuestaAt: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>}
+              {party === 'AUTORIDAD' && draft.tipo === 'REQUERIMIENTO' && <label className="text-sm font-semibold text-neutral-800">Plazo de respuesta<input aria-label="Plazo de respuesta" type="datetime-local" min={inspectionDeadlineInput(new Date((Math.floor(now / 60_000) + 1) * 60_000).toISOString())} value={draft.plazoRespuestaAt} onChange={(event) => setDraft((value) => ({ ...value, plazoRespuestaAt: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /><span className="mt-1 block text-xs font-normal text-neutral-600">Fecha y hora de Mendoza. Sin fecha, este pedido queda sin plazo registrado.</span></label>}
             </div>
             <label className="block text-sm font-semibold text-neutral-800">Asunto<input value={draft.asunto} maxLength={180} onChange={(event) => setDraft((value) => ({ ...value, asunto: event.target.value }))} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" placeholder="Objeto preciso de la presentación" /></label>
             <label className="block text-sm font-semibold text-neutral-800">Contenido<textarea value={draft.cuerpo} maxLength={12_000} onChange={(event) => setDraft((value) => ({ ...value, cuerpo: event.target.value }))} className="mt-1.5 min-h-36 w-full resize-y rounded-lg border border-neutral-300 px-3 py-3 font-normal leading-6" placeholder="Exponga hechos, documentación y petición de forma clara." /></label>

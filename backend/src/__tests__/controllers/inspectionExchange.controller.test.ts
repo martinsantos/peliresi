@@ -224,4 +224,79 @@ describe('inspection participant exchange controller', () => {
     expect(res.json).not.toHaveBeenCalled();
     expect(mocks.finalExchange).not.toHaveBeenCalled();
   });
+  it('still rejects a new request with a past deadline before storing any evidence', async () => {
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' }, body: {
+      version: 7, clienteId: 'new_expired_1234', tipo: 'REQUERIMIENTO', asunto: 'Pedido nuevo con fecha pasada',
+      cuerpo: 'Una nueva presentación no puede registrar ahora un plazo ya vencido.', plazoRespuestaAt: '2020-01-01T12:00:00Z',
+    } } as any, res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(mocks.persist).not.toHaveBeenCalled(); expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([-1, 0, 1])('marks the response late only after the exact timestamp (%s ms)', async offset => {
+    const due = new Date('2026-10-20T15:00:00Z');
+    vi.useFakeTimers(); vi.setSystemTime(new Date(due.getTime() + offset));
+    try {
+      mocks.lockedInspection.mockResolvedValue({ version: 7, estado: 'EN_DESCARGO', plazoRespuestaAt: null });
+      mocks.previousExchange.mockResolvedValueOnce({ secuencia: 2, hashCadena: 'c'.repeat(64) }).mockResolvedValueOnce({
+        id: 'exact-request', parte: 'AUTORIDAD', tipo: 'REQUERIMIENTO', secuencia: 1, respondeAId: null, plazoRespuestaAt: due,
+      });
+      const next = vi.fn();
+      await presentarIntercambioInspeccion({ params: { id: 'inspection-1' }, user: actorUser(), body: {
+        version: 7, tipo: 'RESPUESTA', respondeAId: 'exact-request', asunto: 'Respuesta en el límite temporal', cuerpo: 'Constancia artificial para verificar el instante exacto de presentación.',
+      } } as any, response() as any, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(mocks.createExchange).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ presentadoFueraDePlazo: offset > 0 }) }));
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('recognizes an already committed request on retry after its deadline', async () => {
+    mocks.existingExchange.mockResolvedValue({ id: 'expired-committed-request' });
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' }, body: {
+      version: 7, clienteId: 'retry_expired_1234', tipo: 'REQUERIMIENTO', asunto: 'Pedido ya registrado',
+      cuerpo: 'Reintento artificial del mismo pedido ya guardado, sin alterar el plazo.', plazoRespuestaAt: '2020-01-01T12:00:00Z',
+    } } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: { id: 'expired-committed-request' } }));
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('follows the same reply thread to its original request, without using another thread deadline', async () => {
+    mocks.lockedInspection.mockResolvedValue({ version: 7, estado: 'EN_DESCARGO', plazoRespuestaAt: new Date('2030-01-01T12:00:00Z') });
+    mocks.previousExchange.mockResolvedValueOnce({ secuencia: 4, hashCadena: 'c'.repeat(64) })
+      .mockResolvedValueOnce({ id: 'authority-answer', parte: 'AUTORIDAD', tipo: 'RESPUESTA', secuencia: 3, respondeAId: 'actor-answer', plazoRespuestaAt: null })
+      .mockResolvedValueOnce({ id: 'actor-answer', parte: 'INSPECCIONADO', tipo: 'RESPUESTA', secuencia: 2, respondeAId: 'original', plazoRespuestaAt: null })
+      .mockResolvedValueOnce({ id: 'original', parte: 'AUTORIDAD', tipo: 'REQUERIMIENTO', secuencia: 1, respondeAId: null, plazoRespuestaAt: new Date('2020-01-01T12:00:00Z') });
+    const next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: 'inspection-1' }, user: actorUser(), body: {
+      version: 7, tipo: 'SUBSANACION', respondeAId: 'authority-answer', asunto: 'Subsanación del mismo pedido', cuerpo: 'Constancias artificiales de la misma cadena de intercambio.',
+    } } as any, response() as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.createExchange).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ presentadoFueraDePlazo: true }) }));
+    expect(mocks.previousExchange).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'original', inspeccionId: 'inspection-1', secuencia: { lt: 2 } } }));
+  });
+
+  it.each([
+    ['older request expired, newer deadline future', '2030-01-01T12:00:00Z', '2020-01-01T12:00:00Z', true],
+    ['older request still open, newer deadline expired', '2020-01-01T12:00:00Z', '2030-01-01T12:00:00Z', false],
+    ['request without a registered deadline', '2020-01-01T12:00:00Z', null, false],
+  ] as const)('uses the answered request deadline: %s', async (_label, active, own, late) => {
+    mocks.lockedInspection.mockResolvedValue({ version: 7, estado: 'EN_DESCARGO', plazoRespuestaAt: new Date(active) });
+    mocks.previousExchange.mockResolvedValueOnce({ secuencia: 3, hashCadena: 'c'.repeat(64) }).mockResolvedValueOnce({
+      id: 'request-older', parte: 'AUTORIDAD', tipo: 'REQUERIMIENTO', secuencia: 1, respondeAId: null,
+      plazoRespuestaAt: own ? new Date(own) : null,
+    });
+    const next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: 'inspection-1' }, user: actorUser(), body: {
+      version: 7, tipo: 'RESPUESTA', respondeAId: 'request-older', asunto: 'Constancia del pedido anterior',
+      cuerpo: 'Respuesta artificial vinculada al requerimiento concreto, sin alterar otras fechas.',
+    } } as any, response() as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(mocks.createExchange).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ presentadoFueraDePlazo: late, respondeAId: 'request-older' }),
+    }));
+  });
+
 });

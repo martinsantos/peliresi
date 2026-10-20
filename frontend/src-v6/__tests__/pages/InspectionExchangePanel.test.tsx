@@ -3,8 +3,8 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '../../contexts/AuthContext';
+import { inspectionDeadlineDate } from '../../pages/inspecciones/inspectionProcess';
 import { InspectionExchangePanel } from '../../pages/inspecciones/InspectionExchangePanel';
-import { inspectionDate } from '../../pages/inspecciones/inspectionPresentation';
 import type { InspectionExchangeTimeline } from '../../types/inspection';
 
 const auth = vi.hoisted(() => ({
@@ -114,7 +114,7 @@ describe('InspectionExchangePanel', () => {
   it('retains the historical deadline when the real closure clears the active deadline', async () => {
     mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado: 'CERRADA_CONFORME', plazoRespuestaAt: null } });
     renderPanel();
-    expect((await screen.findByTestId('inspection-deadline-value')).textContent).toBe(inspectionDate(timeline.intercambios[0].plazoRespuestaAt, true));
+    expect((await screen.findByTestId('inspection-deadline-value')).textContent).toBe(inspectionDeadlineDate(timeline.intercambios[0].plazoRespuestaAt));
     expect(screen.getByText('Último plazo · histórico')).toBeInTheDocument();
   });
 
@@ -280,4 +280,32 @@ describe('InspectionExchangePanel', () => {
     expect(screen.getByRole('textbox', { name: 'Fundamento de la decisión' })).toHaveValue(reason);
     expect(mocks.decideExchange).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ decision: 'CERRADA_CONFORME', fundamento: reason }));
   });
+  it('does not keep an overdue absence warning after the linked actor response', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, plazoRespuestaAt: '2020-01-01T12:00:00Z' } });
+    renderPanel();
+    expect(await screen.findByTestId('inspection-responsible')).toHaveTextContent('Debe actuar: Autoridad');
+    expect(screen.queryByTestId('inspection-overdue')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('inspection-pending-request')).not.toBeInTheDocument();
+  });
+  it('offers the older expired request before a newer one and shows both concrete dates', async () => {
+    const first = { ...timeline.intercambios[0], plazoRespuestaAt: '2020-01-01T12:00:00Z' };
+    const second = { ...first, id: 'new-request', secuencia: 3, asunto: 'Otro pedido todavía vigente', plazoRespuestaAt: '2030-01-01T12:00:00Z' };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, plazoRespuestaAt: second.plazoRespuestaAt }, intercambios: [first, second] });
+    renderPanel();
+    expect(await screen.findByTestId('inspection-overdue')).toHaveTextContent('1 requerimiento vencido sin respuesta');
+    expect(screen.getByTestId('inspection-responsible')).toHaveTextContent('Debe actuar: Inspeccionado');
+    expect(screen.getAllByTestId('inspection-pending-request')).toHaveLength(2);
+    expect(screen.getAllByTestId('inspection-pending-request')[0]).toHaveTextContent(first.asunto);
+    await userEvent.click(screen.getByRole('button', { name: 'Responder requerimiento #1' }));
+    expect(screen.getByTestId('inspection-reply-deadline')).toHaveTextContent('Vencido');
+    expect(screen.getByTestId('inspection-reply-deadline')).toHaveTextContent('Mendoza');
+  });
+  it('does not borrow the dossier deadline for a request with no date', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, plazoRespuestaAt: '2020-01-01T12:00:00Z' }, intercambios: [{ ...timeline.intercambios[0], plazoRespuestaAt: null }] });
+    renderPanel();
+    expect(await screen.findByTestId('inspection-deadline-value')).toHaveTextContent('Sin plazo registrado');
+    expect(screen.queryByTestId('inspection-overdue')).not.toBeInTheDocument();
+    expect(screen.getByTestId('inspection-pending-request')).toHaveTextContent('Sin plazo registrado');
+  });
+
 });

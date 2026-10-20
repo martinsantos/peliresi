@@ -216,6 +216,11 @@ export interface InspectionExchange {
   adjuntos: InspectionExchangeAttachment[];
 }
 
+export interface InspectionFollowUp {
+  paso: 'PUBLICAR' | 'RESPONDER' | 'REVISAR' | 'CERRADO';
+  pendientes: Array<{ id: string; secuencia: number; plazoRespuestaAt: string | null }>;
+}
+
 export interface InspectionExchangeTimeline {
   inspeccion: {
     id: string;
@@ -226,6 +231,7 @@ export interface InspectionExchangeTimeline {
     actor: InspectionActor | null;
     plazoRespuestaAt?: string | null;
     version: number;
+    seguimiento?: InspectionFollowUp;
   };
   parteActual: InspectionExchangeParty;
   intercambios: InspectionExchange[];
@@ -250,6 +256,7 @@ export interface Inspection {
   iniciadaAt?: string | null;
   cerradaCampoAt?: string | null;
   plazoRespuestaAt?: string | null;
+  seguimiento?: InspectionFollowUp;
   observaciones?: string | null;
   datosActa?: InspectionActData | null;
   informeTecnico?: InspectionTechnicalReport | null;

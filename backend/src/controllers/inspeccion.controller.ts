@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { inspectionFollowUp, inspectionFollowUpSelect } from '../services/inspectionFollowUp.service';
 import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
 import type { AuthRequest } from '../middlewares/auth.middleware';
@@ -406,6 +407,7 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
           transportista: { select: { id: true, razonSocial: true, cuit: true } },
           operador: { select: { id: true, razonSocial: true, cuit: true } },
           _count: { select: { items: true, evidencias: true, eventos: true } },
+          intercambios: { select: inspectionFollowUpSelect },
         },
       }),
       prisma.inspeccion.count({ where }),
@@ -413,15 +415,19 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
       prisma.inspeccion.count({
         where: {
           ...baseWhere,
-          plazoRespuestaAt: { gt: new Date() },
           estado: { in: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION'] },
+          intercambios: { some: {
+            tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', destinatario: 'INSPECCIONADO',
+            plazoRespuestaAt: { gte: new Date() },
+            respuestas: { none: { parte: 'INSPECCIONADO', tipo: { in: ['RESPUESTA', 'DESCARGO', 'SUBSANACION'] } } },
+          } },
         },
       }),
     ]);
     res.json({
       success: true,
       data: {
-        items,
+        items: items.map(({ intercambios, ...inspection }) => ({ ...inspection, seguimiento: inspectionFollowUp(inspection.estado, intercambios || []) })),
         total,
         page,
         limit,

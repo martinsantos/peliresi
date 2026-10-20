@@ -11,6 +11,7 @@ import type {
   InspectionVerification,
   InspectionExchangeTimeline,
   InspectionExchangeType,
+  InspectionFollowUp,
 } from '../types/inspection';
 
 export interface PublicInspectionVerification {
@@ -49,6 +50,7 @@ export interface InspectionParticipationSummary {
   plazoRespuestaAt?: string | null;
   version: number;
   cantidadPresentaciones: number;
+  seguimiento?: InspectionFollowUp;
 }
 
 export const inspeccionService = {
