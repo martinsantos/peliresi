@@ -11,13 +11,14 @@ import type { InspectionActorType, InspectionState } from '../types/inspection';
 
 export interface InspectionListResult extends PaginatedInspections { offline?: true }
 
-type InspectionListParams = { estado?: InspectionState; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number };
+type InspectionListParams = { estado?: InspectionState; estados?: InspectionState[]; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number };
 
 export function filterCachedInspections(inspections: Inspection[], params?: InspectionListParams): InspectionListResult {
   const search = params?.search?.trim().toLocaleLowerCase('es-AR') || '';
   const filtered = inspections.filter((inspection) => {
     const actor = inspectionActor(inspection);
     return (!params?.estado || inspection.estado === params.estado)
+      && (!params?.estados || params.estados.includes(inspection.estado))
       && (!params?.tipoInspeccion || inspectionTypeOf(inspection) === params.tipoInspeccion)
       && (!params?.tipoActor || inspection.tipoActor === params.tipoActor)
       && (!params?.actorId || actor?.id === params.actorId)

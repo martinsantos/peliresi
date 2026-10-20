@@ -30,6 +30,7 @@ import type {
   InspectionExchangeType,
 } from '../../types/inspection';
 import { INSPECTION_STATE_COLORS, INSPECTION_STATE_LABELS, inspectionDate, inspectionErrorMessage } from './inspectionPresentation';
+import { INSPECTION_PHASES, inspectionPhaseOf, inspectionExchangeNextStep, inspectionExchangeDeadline } from './inspectionProcess';
 
 const TYPE_LABELS: Record<InspectionExchangeType, string> = {
   REQUERIMIENTO: 'Requerimiento',
@@ -255,6 +256,11 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   const [expedienteLegal, setExpedienteLegal] = useState('');
   const [decisionFiles, setDecisionFiles] = useState<File[]>([]);
   const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  const draftWrites = useRef<Promise<void>>(Promise.resolve());
+  const persistenceBlocked = useRef(false);
+  const draftSaveEpoch = useRef(0);
+  const draftInteraction = useRef(0);
+  const [persistenceRevision, setPersistenceRevision] = useState(0);
 
   const exchangeQuery = useQuery({
     queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId],
@@ -280,15 +286,17 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
 
   useEffect(() => {
     if (!draftKey || !composeOpen) return;
-    const timer = window.setTimeout(() => localStorage.setItem(draftKey, JSON.stringify(draft)), 250);
+    const epoch = draftSaveEpoch.current;
+    const timer = window.setTimeout(() => { if (!persistenceBlocked.current && epoch === draftSaveEpoch.current) localStorage.setItem(draftKey, JSON.stringify(draft)); }, 250);
     return () => window.clearTimeout(timer);
-  }, [composeOpen, draft, draftKey]);
+  }, [composeOpen, draft, draftKey, persistenceRevision]);
 
   useEffect(() => {
     if (!currentUser?.id || !inspectionId) return;
     let cancelled = false;
+    const interaction = draftInteraction.current;
     void loadOfflineExchangeDraft(String(currentUser.id), inspectionId).then((saved) => {
-      if (cancelled || !saved) return;
+      if (cancelled || !saved || persistenceBlocked.current || interaction !== draftInteraction.current) return;
       setDraft(saved.draft);
       setFiles(saved.files);
       setRestoredAt(saved.savedAt);
@@ -299,17 +307,23 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
 
   useEffect(() => {
     if (!composeOpen || !currentUser?.id || !inspectionId) return;
+    const epoch = draftSaveEpoch.current;
     const timer = window.setTimeout(() => {
-      void saveOfflineExchangeDraft(String(currentUser.id), inspectionId, draft, files).catch(() => undefined);
+      if (persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      // Acknowledgement must wait for every queued write before removing the draft.
+      draftWrites.current = draftWrites.current.catch(() => undefined)
+        .then(() => saveOfflineExchangeDraft(String(currentUser.id), inspectionId, draft, files)).catch(() => undefined);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [composeOpen, currentUser?.id, draft, files, inspectionId]);
+  }, [composeOpen, currentUser?.id, draft, files, inspectionId, persistenceRevision]);
 
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId] }),
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'participacion'] }),
       queryClient.invalidateQueries({ queryKey: ['inspecciones', 'detail'] }),
+      queryClient.invalidateQueries({ queryKey: ['inspecciones', 'list'] }),
+      queryClient.invalidateQueries({ queryKey: ['inspecciones', 'operaciones'] }),
     ]);
   };
 
@@ -328,7 +342,10 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
       });
     },
     onSuccess: async () => {
+      persistenceBlocked.current = true;
+      setComposeOpen(false);
       if (draftKey) localStorage.removeItem(draftKey);
+      await draftWrites.current;
       if (currentUser?.id) await removeOfflineExchangeDraft(String(currentUser.id), inspectionId).catch(() => undefined);
       setDraft(initialDraft(party));
       setFiles([]);
@@ -336,9 +353,14 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
       setRestoredAt(null);
       if (fileRef.current) fileRef.current.value = '';
       await refresh();
+      persistenceBlocked.current = false;
       toast.success('Presentación registrada', 'Quedó incorporada al expediente con huella de integridad. No se envió correo.');
     },
-    onError: (error) => toast.error('No se pudo presentar', inspectionErrorMessage(error, 'Conserve el borrador y vuelva a intentar.')),
+    onError: (error) => {
+      persistenceBlocked.current = false;
+      setPersistenceRevision((value) => value + 1);
+      toast.error('No se pudo presentar', inspectionErrorMessage(error, 'Conserve el borrador y vuelva a intentar.'));
+    },
   });
 
   const decisionMutation = useMutation({
@@ -372,6 +394,8 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   const open = Boolean(timeline && OPEN_STATES.has(timeline.inspeccion.estado));
 
   const beginNew = () => {
+    if (presentMutation.isPending) return;
+    draftInteraction.current += 1;
     const next = initialDraft(party);
     setDraft(next);
     setFiles([]);
@@ -379,6 +403,8 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   };
 
   const beginReply = (entry: InspectionExchange) => {
+    if (presentMutation.isPending) return;
+    draftInteraction.current += 1;
     const next = initialDraft(party);
     next.respondeAId = entry.id;
     next.tipo = party === 'INSPECCIONADO' ? 'DESCARGO' : 'RESPUESTA';
@@ -398,6 +424,9 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
     if (draft.asunto.trim().length < 5 || draft.cuerpo.trim().length < 10) return toast.warning('Presentación incompleta', 'Complete asunto y contenido antes de presentar.');
     if (party === 'INSPECCIONADO' && !draft.respondeAId) return toast.warning('Seleccione el antecedente', 'Toda presentación del inspeccionado debe responder a una actuación de la autoridad.');
     if (files.length > 5 || files.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024) return toast.warning('Adjuntos excedidos', 'Puede adjuntar hasta 5 archivos y 50 MB por presentación.');
+    persistenceBlocked.current = true;
+    draftSaveEpoch.current += 1;
+    draftInteraction.current += 1;
     presentMutation.mutate();
   };
 
@@ -420,6 +449,8 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   if (exchangeQuery.isError || !timeline) return <Card className="border-error-200 bg-error-50 text-sm text-error-800">No se pudo abrir el intercambio formal de este expediente.</Card>;
 
   const deadlineExpired = Boolean(timeline.inspeccion.plazoRespuestaAt && new Date(timeline.inspeccion.plazoRespuestaAt).getTime() < now);
+  const displayedDeadline = inspectionExchangeDeadline(timeline.inspeccion.estado, timeline.inspeccion.plazoRespuestaAt, timeline.intercambios);
+  const nextStep = inspectionExchangeNextStep(timeline.inspeccion.estado, timeline.intercambios, party === 'INSPECCIONADO');
 
   return (
     <section className={compact ? 'space-y-4' : 'space-y-5'} aria-labelledby="inspection-exchange-title">
@@ -429,9 +460,9 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
             <div className="flex min-w-0 items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E6F4EC] text-[#1B5E3C]"><Scale size={21} /></div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B5E3C]">Instancia contradictoria</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B5E3C]">PSIP · {INSPECTION_PHASES[inspectionPhaseOf(timeline.inspeccion.estado)].label}</p>
                 <h3 id="inspection-exchange-title" className="mt-1 text-xl font-extrabold tracking-tight text-[#10213A]">Presentaciones y respuestas</h3>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">Cada actuación identifica autor y destinatario, registra puesta a disposición y primera apertura, vincula sus adjuntos y encadena huellas SHA-256. Este canal registra en SITREP; no envía correos.</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">Observaciones de la autoridad, respuesta del inspeccionado y decisión en el mismo expediente.</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -443,7 +474,13 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
         <div className="grid gap-0 divide-y divide-neutral-200 px-4 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
           <div className="py-3 sm:pr-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Expediente</p><p className="mt-1 font-bold text-[#10213A]">{timeline.inspeccion.numero}</p></div>
           <div className="py-3 sm:px-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Presentaciones</p><p className="mt-1 font-bold text-[#10213A]">{timeline.intercambios.length}</p></div>
-          <div className="py-3 sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Plazo vigente</p><p className={`mt-1 font-bold ${deadlineExpired ? 'text-error-700' : 'text-[#10213A]'}`}>{timeline.inspeccion.plazoRespuestaAt ? inspectionDate(timeline.inspeccion.plazoRespuestaAt, true) : 'Sin plazo abierto'}</p></div>
+          <div className="py-3 sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">{open ? 'Plazo del seguimiento' : 'Último plazo · histórico'}</p><p data-testid="inspection-deadline-value" className={`mt-1 font-bold ${deadlineExpired && open ? 'text-error-700' : 'text-[#10213A]'}`}>{displayedDeadline ? inspectionDate(displayedDeadline, true) : 'Sin plazo registrado'}</p></div>
+        </div>
+        <div data-testid="inspection-next-step" className="border-t border-neutral-200 px-4 py-4 sm:px-6">
+          <p className="flex items-center gap-2 font-bold text-neutral-900"><Reply size={18} className="shrink-0 text-primary-800" aria-hidden="true" />{nextStep.title}</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{nextStep.detail}</p>
+          {open && party === 'INSPECCIONADO' && nextStep.pending[0] && !composeOpen && <Button className="mt-3" disabled={presentMutation.isPending} leftIcon={<Reply size={16} />} onClick={() => beginReply(nextStep.pending[0])}>Responder requerimiento #{nextStep.pending[0].secuencia}</Button>}
+          <p className="mt-3 text-xs leading-5 text-neutral-600">Este canal registra en SITREP; no envía correos ni push. La primera apertura queda registrada y no equivale a una respuesta ni acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>
         </div>
       </Card>
 
@@ -458,18 +495,18 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
           cycles={exchangeCycles}
           parentById={parentById}
           party={party}
-          open={open}
+          open={open && !presentMutation.isPending}
           onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
           onReply={beginReply}
         />
       )}
 
-      {open && !composeOpen && party === 'AUTORIDAD' && <Button leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
+      {open && !composeOpen && party === 'AUTORIDAD' && <Button disabled={presentMutation.isPending} leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
       {open && !composeOpen && party === 'INSPECCIONADO' && timeline.intercambios.some((entry) => entry.parte === 'AUTORIDAD') && <p className="rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900">Para contestar, seleccione <strong>Responder esta actuación</strong> en el requerimiento correspondiente. Así la relación queda inequívoca.</p>}
 
       {open && composeOpen && (
         <Card id="inspection-exchange-form" className="border-primary-200">
-          <form onSubmit={submitPresentation} className="space-y-4">
+          <form onSubmit={submitPresentation} onChange={() => { draftInteraction.current += 1; }} className="space-y-4">
             <div className="flex items-start justify-between gap-3 border-b border-neutral-200 pb-4">
               <div><p className="text-xs font-bold uppercase tracking-wide text-primary-700">Nueva presentación formal</p><h4 className="mt-1 text-lg font-extrabold text-[#10213A]">{draft.respondeAId ? 'Respuesta vinculada' : 'Requerimiento de la autoridad'}</h4></div>
               <button type="button" aria-label="Cerrar formulario" className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" onClick={() => setComposeOpen(false)}><X size={18} /></button>

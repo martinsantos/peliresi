@@ -363,6 +363,9 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const estado = req.query.estado && Object.values(EstadoInspeccion).includes(req.query.estado as EstadoInspeccion)
       ? req.query.estado as EstadoInspeccion : undefined;
+    // Multi-state navigation is applied before pagination, under the same scope.
+    const estados = req.query.estados === undefined ? undefined : z.string().transform((value) => value.split(','))
+      .pipe(z.array(z.nativeEnum(EstadoInspeccion)).min(1).max(Object.values(EstadoInspeccion).length)).parse(req.query.estados);
     const tipoActor = req.query.tipoActor && Object.values(TipoActorInspeccion).includes(req.query.tipoActor as TipoActorInspeccion)
       ? req.query.tipoActor as TipoActorInspeccion : undefined;
     const actorId = String(req.query.actorId || '').trim();
@@ -388,7 +391,9 @@ export async function listarInspecciones(req: AuthRequest, res: Response, next: 
         ],
       } : {}),
     };
-    const where: Prisma.InspeccionWhereInput = { ...baseWhere, ...(estado ? { estado } : {}) };
+    const where: Prisma.InspeccionWhereInput = { ...baseWhere,
+      ...(estados ? { estado: { in: estados.filter((value) => !estado || value === estado) } } : estado ? { estado } : {}),
+    };
     const [items, total, groupedStates, openDeadlines] = await prisma.$transaction([
       prisma.inspeccion.findMany({
         where,

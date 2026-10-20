@@ -76,8 +76,8 @@ export const inspeccionService = {
     return data.data;
   },
 
-  async list(params?: { estado?: InspectionState; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedInspections> {
-    const { data } = await api.get('/inspecciones', { params });
+  async list(params?: { estado?: InspectionState; estados?: InspectionState[]; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedInspections> {
+    const { data } = await api.get('/inspecciones', { params: params?.estados ? { ...params, estados: params.estados.join(',') } : params });
     return data.data;
   },
 

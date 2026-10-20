@@ -33,6 +33,18 @@ describe('InspeccionesPage', () => {
     mocks.useInspections.mockReturnValue({ data: { items: [], total: 0 }, isLoading: false, isError: false, refetch: mocks.refetch });
   });
 
+  it('filters the full follow-up phase and narrows its detailed states', () => {
+    mocks.useInspections.mockReturnValue({ data: { items: [], total: 0, summary: { byState: { NOTIFICADA: 8, EN_DESCARGO: 2, REQUIERE_SUBSANACION: 3, CERRADA_CONFORME: 7 } } }, refetch: mocks.refetch });
+    render(<MemoryRouter initialEntries={['/inspecciones?page=3']}><InspeccionesPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Seguimiento 13' }));
+    expect(mocks.useInspections).toHaveBeenLastCalledWith(expect.objectContaining({ estados: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION'], estado: undefined, page: 1 }));
+    expect(screen.queryByRole('option', { name: 'Cerrada conforme' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Filtrar por estado'), { target: { value: 'EN_DESCARGO' } });
+    expect(mocks.useInspections).toHaveBeenLastCalledWith(expect.objectContaining({ estado: 'EN_DESCARGO' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cerradas 7' }));
+    expect(mocks.useInspections).toHaveBeenLastCalledWith(expect.objectContaining({ estados: ['CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA'], estado: undefined }));
+  });
+
   it('shows the empty state and opens the actor-aware creation form', () => {
     render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
 

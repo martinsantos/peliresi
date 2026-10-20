@@ -267,6 +267,7 @@
     <a href="#inspecciones" class="nav-link" data-nav-role="admin">18.1 Recorrido de campo</a>
     <a href="#inspecciones-evidencia" class="nav-link level-2" data-nav-role="admin">Fotos y guardado</a>
     <a href="#inspecciones-informe" class="nav-link level-2" data-nav-role="admin">Acta e informe</a>
+    <a href="#inspecciones-psip" class="nav-link level-2" data-nav-role="admin">PSIP: etapas y seguimiento</a>
     <a href="#inspecciones-trazabilidad" class="nav-link level-2" data-nav-role="admin">Respuesta y trazabilidad</a>
     <a href="#inspecciones-contingencia" class="nav-link level-2" data-nav-role="admin">Sin conexión</a>
   </div>
@@ -8076,6 +8077,18 @@ bash backend/tests/smoke-test.sh ${SITREP_BASE_URL}</pre>
 <p>El menu <strong>Exportar</strong> ofrece dos documentos distintos: <strong>Acta de inspeccion</strong> (constatacion de campo) e <strong>Informe tecnico</strong> (analisis para intervencion del area legal). Revisá que los datos del actor, el numero de acta, las observaciones, los resultados comparativos y las evidencias esten completos antes de exportar. El QR y la huella permiten consultar la version y trazabilidad del expediente; <strong>no son una firma digital ni acreditan por si solos una notificacion legal</strong>.</p>
 
 <div class="cu-screenshot"><a href="screenshots/desktop/inspection_report_qa.png" target="_blank"><img src="screenshots/desktop/inspection_report_qa.png" alt="Simulacion del resultado de una inspeccion cerrada con opciones de exportacion" loading="lazy"></a><div class="cu-screenshot-caption">Simulacion de capacitacion: resultado consolidado y acceso a los dos documentos. Los datos mostrados no son una inspeccion real.</div></div>
+
+<h3 id="inspecciones-psip">PSIP — flujo de inspecciones</h3>
+<p><a href="tutorial.html?guide=psip-flujo-inspecciones">Abrir la guía PSIP paso a paso, para autoridad e inspeccionado</a>. PSIP agrupa el trabajo sin reemplazar los estados, las series ni los permisos.</p>
+<div class="table-wrapper"><table><thead><tr><th>Etapa</th><th>Estados existentes</th><th>Qué ocurre</th></tr></thead><tbody>
+<tr><td>Preparación y visita</td><td>Borrador · Planificada · En campo · En revisión</td><td>Preparar y programar; constatar en campo; guardar y enviar a la administración competente para revisión.</td></tr>
+<tr><td>Seguimiento</td><td>Notificada · En descargo · Requiere subsanación</td><td>La autoridad publica observaciones con plazo. El inspeccionado responde en Mis inspecciones, vincula el descargo o la subsanación al pedido y adjunta evidencia. La autoridad evalúa; puede pedir otra subsanación.</td></tr>
+<tr><td>Derivaciones</td><td>Derivada a legales · En trámite legal · Derivada a ATM</td><td>El intercambio concluye y se sigue la derivación según la competencia correspondiente.</td></tr>
+<tr><td>Cerradas</td><td>Cerrada conforme · Finalizada · Cancelada</td><td>Cerrada conforme es el resultado favorable del seguimiento. Se conserva el historial y el último plazo se consulta como histórico.</td></tr>
+</tbody></table></div>
+<p><strong>Ida y vuelta:</strong> autoridad → requerimiento concreto y plazo → inspeccionado → respuesta, descargo o evidencia de subsanación → autoridad → nuevo requerimiento o decisión fundada. Abrir no es responder; presentar no es conformidad automática; cambiar a Notificada no crea el texto del requerimiento. Los pedidos pendientes se cuentan por su respuesta vinculada, no por la última actividad general.</p>
+<p>Este seguimiento aplica a generadores, transportistas y operadores. Una inspección espontánea conserva su serie; antes de notificar debe vincular un responsable. La autoridad fija fecha y hora de respuesta; PSIP no define un plazo legal nuevo ni calcula días hábiles.</p>
+<div class="callout callout-info"><strong>Comunicación real:</strong> las actuaciones quedan registradas en el portal y se registra la primera apertura. Este intercambio no envía correos ni push; las reglas de alertas activas son independientes. Una puesta a disposición o primera apertura no acredita por sí sola notificación fehaciente. CAP permanece cerrado: los ensayos se hacen sólo en el preview con datos artificiales.</div>
 
 <h3 id="inspecciones-trazabilidad">18.3 Comunicaciones, respuestas y cierre</h3>
 <p>Cuando la inspeccion llega a las etapas habilitadas, el expediente muestra las actuaciones de la autoridad y del inspeccionado en orden cronologico, con autor, fecha, version, respuesta relacionada y adjuntos. El interesado puede presentar descargo, respuesta o subsanacion segun la etapa; la autoridad puede formular requerimientos o pronunciarse. Cada intercambio se agrega al historial: no se reemplaza el acta original. El cierre conforme o la derivacion a Legales debe responder al estado y competencia aplicables. <strong>Un correo informativo no equivale automaticamente a notificacion fehaciente.</strong></p>

@@ -41,6 +41,7 @@ import { InspectionOrganizationPanel } from './InspectionOrganizationPanel';
 import { InspectionVerificationBlock } from './InspectionVerificationBlock';
 import { InspectionDocumentsPanel } from './InspectionDocumentsPanel';
 import { getInspectionDossierReadiness, type InspectionDossierReadiness } from './inspectionDossierReadiness';
+import { INSPECTION_PHASES, inspectionPhaseOf } from './inspectionProcess';
 import { inspectionActorRoute, inspectionDate, inspectionErrorMessage, isTrainingActNumber } from './inspectionPresentation';
 import { OfflineDictation } from './OfflineDictation';
 import { appendDictatedText } from './appendDictatedText';
@@ -815,7 +816,7 @@ const InspeccionExpedientePage: React.FC = () => {
     <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div data-testid="inspection-case-identity" className="min-w-0 sm:flex-1"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h1 className="text-lg sm:text-2xl font-bold text-neutral-900 break-words">{inspection.numero}</h1><Badge variant="soft" color={COLORS[inspection.estado] || 'neutral'}>{LABELS[inspection.estado]}</Badge>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación · datos sintéticos</Badge>}</div>
           {actor && <Link to={actorRoute} state={{ inspectionReturn: location.pathname + location.search + location.hash }} onClick={(event) => { if (dictating) { event.preventDefault(); return; } if (!flushDraft()) event.preventDefault(); }} aria-label={'Abrir actor inspeccionado: ' + actor.razonSocial} className="mt-1 block max-w-full rounded-sm break-words text-sm font-semibold text-neutral-700 !no-underline hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link>}
-          <p className="mt-1 hidden text-xs text-neutral-500 lg:block">Actualizada {inspectionDate(inspection.updatedAt, true)} · Versión {inspection.version}</p>
+          <p className="mt-1 hidden text-xs text-neutral-500 lg:block">{INSPECTION_PHASES[inspectionPhaseOf(inspection.estado)].label} · Actualizada {inspectionDate(inspection.updatedAt, true)} · Versión {inspection.version}</p>
         </div>
         <div data-testid="inspection-case-actions" className="flex shrink-0 items-center justify-between gap-1 sm:justify-end">
           <Button variant="ghost" size="sm" aria-label="Volver al listado" title="Volver al listado" leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} disabled={dictating} className="min-h-11 shrink-0 px-2"><span>Listado</span></Button>

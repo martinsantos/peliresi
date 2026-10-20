@@ -10,6 +10,27 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('PSIP explains the existing follow-up loop for both parties without promising external delivery', () => {
+  const guide = guides.find((item: any) => item.id === 'psip-flujo-inspecciones');
+  assert.ok(guide); assert.equal(guide.steps.length, 7);
+  assert.deepEqual(Array.from(guide.audiences), ['administrador', 'inspector', 'generador', 'transportista', 'operador', 'auditor']);
+  const content = JSON.stringify(guide);
+  for (const text of ['Notificada', 'En descargo', 'Requiere subsanación', 'Cerrada conforme', 'no envía correo ni push', 'fuera de plazo', 'responsable', 'CAP sigue cerrado']) assert.ok(content.includes(text), text);
+  assert.equal(guide.steps.filter((step: any) => step.image).length, 3);
+});
+test('PSIP screenshots are original synthetic preview captures from successful browser tests', () => {
+  const proof = JSON.parse(read('psip-capture-provenance.json'));
+  assert.equal(proof.synthetic, true); assert.equal(proof.productionCapture, false); assert.equal(proof.edited, false);
+  assert.equal(proof.files.length, 3); assert.equal(proof.browserTestsPassed, 18);
+  const guide = guides.find((item: any) => item.id === 'psip-flujo-inspecciones');
+  for (const item of proof.files) {
+    const bytes = readFileSync(new URL('screenshots/' + item.file, root));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), item.sha256);
+    assert.equal(bytes.readUInt32BE(16), item.width); assert.equal(bytes.readUInt32BE(20), item.height);
+    const step = guide.steps.find((value: any) => value.image === 'screenshots/' + item.file);
+    assert.ok(step); assert.match(step.caption, /Datos sintéticos/);
+  }
+});
 test('simultaneous loads and device notices have unedited synthetic captures and distinct delivery semantics',()=>{
   const proof=JSON.parse(read('fleet-gps-capture-provenance.json'));
   assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);assert.equal(proof.browserTestsPassed,2);

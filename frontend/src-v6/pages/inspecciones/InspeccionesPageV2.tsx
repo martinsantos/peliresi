@@ -21,6 +21,7 @@ import { useConnectivity } from '../../hooks/useConnectivity';
 import { SpontaneousFindingPanel } from './SpontaneousFindingPanel';
 import { InspectionLocationField } from './InspectionLocationField';
 import { inspectionLocationSuggestions } from './inspectionLocations';
+import { INSPECTION_PHASES, inspectionPhaseOf, isInspectionPhase, type InspectionPhase } from './inspectionProcess';
 
 const isActorType = (value: string | null): value is InspectionActorType => value === 'GENERADOR' || value === 'TRANSPORTISTA' || value === 'OPERADOR';
 
@@ -33,7 +34,8 @@ const InspeccionesPageV2: React.FC = () => {
   const initialType = isActorType(searchParams.get('tipoActor')) ? searchParams.get('tipoActor') as InspectionActorType : '';
   const initialActor = searchParams.get('actorId') || '';
   const [search, setSearch] = useState(searchParams.get('search') || '');
-  const [state, setState] = useState<InspectionState | ''>((searchParams.get('estado') || '') as InspectionState | '');
+  const [state, setState] = useState<InspectionState | ''>(() => { const value = searchParams.get('estado'); return value && Object.hasOwn(INSPECTION_STATE_LABELS, value) ? value as InspectionState : ''; });
+  const [phase, setPhase] = useState<InspectionPhase | ''>(() => { const value = searchParams.get('etapa'); return isInspectionPhase(value) ? value : ''; });
   const [typeFilter, setTypeFilter] = useState<InspectionActorType | ''>(initialType);
   const [inspectionFilter, setInspectionFilter] = useState<InspectionType | ''>(() => { const value = searchParams.get('tipoInspeccion'); return value && Object.hasOwn(INSPECTION_TYPES, value) ? value as InspectionType : ''; });
   const [actorFilter, setActorFilter] = useState(initialActor);
@@ -58,7 +60,8 @@ const InspeccionesPageV2: React.FC = () => {
   const [findingRequest, setFindingRequest] = useState(0);
 
   const allowed = Boolean(isAdmin || currentUser?.esInspector || currentUser?.rol.startsWith('ADMIN_'));
-  const inspections = useInspections({ estado: state || undefined, tipoInspeccion: inspectionFilter || undefined, tipoActor: typeFilter || undefined, actorId: actorFilter || undefined, search: search || undefined, page, limit: 25 });
+  const listFilters = { estado: state || undefined, estados: phase ? INSPECTION_PHASES[phase].states : undefined, tipoInspeccion: inspectionFilter || undefined, tipoActor: typeFilter || undefined, actorId: actorFilter || undefined, search: search || undefined };
+  const inspections = useInspections({ ...listFilters, page, limit: 25 });
   const generadores = useCatalogoGeneradores((showCreate && type === 'GENERADOR') || findingActorType === 'GENERADOR' || Boolean(actorFilter && typeFilter === 'GENERADOR'));
   const transportistas = useCatalogoTransportistas((showCreate && type === 'TRANSPORTISTA') || findingActorType === 'TRANSPORTISTA' || Boolean(actorFilter && typeFilter === 'TRANSPORTISTA'));
   const operadores = useCatalogoOperadores((showCreate && type === 'OPERADOR') || findingActorType === 'OPERADOR' || Boolean(actorFilter && typeFilter === 'OPERADOR'));
@@ -74,12 +77,13 @@ const InspeccionesPageV2: React.FC = () => {
     const next = new URLSearchParams();
     if (search) next.set('search', search);
     if (state) next.set('estado', state);
+    if (phase) next.set('etapa', phase);
     if (typeFilter) next.set('tipoActor', typeFilter);
     if (inspectionFilter) next.set('tipoInspeccion', inspectionFilter);
     if (actorFilter) next.set('actorId', actorFilter);
     if (page > 1) next.set('page', String(page));
     setSearchParams(next, { replace: true });
-  }, [search, state, typeFilter, inspectionFilter, actorFilter, page, setSearchParams]);
+  }, [search, state, phase, typeFilter, inspectionFilter, actorFilter, page, setSearchParams]);
 
   const createMutation = useInspectionMutation(async () => inspeccionService.create({ clienteId: creationId, tipoInspeccion: inspectionType, observaciones: description || undefined, tipoActor: withoutActor ? null : type, actorId: withoutActor ? null : actorId, inspectorId: assignedInspector || undefined, numeroActa: numeroActa || undefined, ubicacion: ubicacion || undefined, fechaProgramada: fechaProgramada ? new Date(fechaProgramada).toISOString() : undefined }));
 
@@ -96,14 +100,14 @@ const InspeccionesPageV2: React.FC = () => {
   const exportList = async () => {
     setExporting(true);
     try {
-      const result = await inspeccionService.list({ estado: state || undefined, tipoInspeccion: inspectionFilter || undefined, tipoActor: typeFilter || undefined, actorId: actorFilter || undefined, search: search || undefined, limit: 100 });
+      const result = await inspeccionService.list({ ...listFilters, limit: 100 });
       downloadCsv(result.items.map((inspection) => {
         const actor = inspectionActor(inspection);
         return {
-          Expediente: inspection.numero, Tipo_inspeccion: INSPECTION_TYPES[inspectionTypeOf(inspection)].label, Acta: inspection.numeroActa || '', Estado: INSPECTION_STATE_LABELS[inspection.estado], Tipo_actor: (inspection.tipoActor ? INSPECTION_ACTOR_LABELS[inspection.tipoActor] : 'Sin identificar'), Actor: actor?.razonSocial || '', CUIT: actor?.cuit || '',
+          Expediente: inspection.numero, Tipo_inspeccion: INSPECTION_TYPES[inspectionTypeOf(inspection)].label, Acta: inspection.numeroActa || '', Etapa_PSIP: INSPECTION_PHASES[inspectionPhaseOf(inspection.estado)].label, Estado: INSPECTION_STATE_LABELS[inspection.estado], Tipo_actor: (inspection.tipoActor ? INSPECTION_ACTOR_LABELS[inspection.tipoActor] : 'Sin identificar'), Actor: actor?.razonSocial || '', CUIT: actor?.cuit || '',
           Fecha_programada: inspectionDate(inspection.fechaProgramada), Inicio_campo: inspectionDate(inspection.iniciadaAt, true), Inspector: `${inspection.inspector.nombre} ${inspection.inspector.apellido || ''}`.trim(), Ubicacion: inspection.ubicacion || '', Evidencias: inspection._count?.evidencias || 0, Eventos: inspection._count?.eventos || 0, Actualizada: inspectionDate(inspection.updatedAt, true),
         };
-      }), `inspecciones_${new Date().toISOString().slice(0, 10)}`, { titulo: 'Listado de inspecciones', filtros: [state && INSPECTION_STATE_LABELS[state], typeFilter && INSPECTION_ACTOR_LABELS[typeFilter], inspectionFilter && INSPECTION_TYPES[inspectionFilter].label, filteredActorName, search].filter(Boolean).join(' · ') || 'Todos', total: result.total });
+      }), `inspecciones_${new Date().toISOString().slice(0, 10)}`, { titulo: 'Listado de inspecciones', filtros: [phase && INSPECTION_PHASES[phase].label, state && INSPECTION_STATE_LABELS[state], typeFilter && INSPECTION_ACTOR_LABELS[typeFilter], inspectionFilter && INSPECTION_TYPES[inspectionFilter].label, filteredActorName, search].filter(Boolean).join(' · ') || 'Todos', total: result.total });
       if (result.total > 100) toast.warning('Exportación parcial', 'Se exportaron los primeros 100 resultados del filtro actual.');
       else toast.success('Listado exportado', `${result.total} inspecciones incluidas.`);
     } catch { toast.error('No se pudo exportar', 'Volvé a intentar con los filtros actuales.'); } finally { setExporting(false); }
@@ -115,8 +119,6 @@ const InspeccionesPageV2: React.FC = () => {
   const offline = Boolean(inspections.data?.offline);
   const totalsUnknown = offline || inspections.isError;
   const stateCounts = inspections.data?.summary?.byState || {};
-  const inField = stateCounts.EN_CAMPO || 0;
-  const pendingReview = stateCounts.EN_REVISION || 0;
   const deadlines = inspections.data?.summary?.openDeadlines || 0;
   const totalPages = inspections.data?.totalPages || 1;
   const resumeInspection = rows.filter((row) => row.estado === 'EN_CAMPO' && String(row.inspectorId || row.inspector?.id) === String(currentUser?.id)).sort((left, right) => (readInspectionResume(currentUser!.id, right.id)?.updatedAt || 0) - (readInspectionResume(currentUser!.id, left.id)?.updatedAt || 0))[0];
@@ -138,18 +140,18 @@ const InspeccionesPageV2: React.FC = () => {
 
     {currentUser?.id && <SpontaneousFindingPanel createRequest={findingRequest} hideTrigger userId={currentUser.id} online={!offline && isOnline && navigator.onLine} mobile={mobile} onActorTypeNeeded={setFindingActorType} actors={{ GENERADOR: generadores.data || [], TRANSPORTISTA: transportistas.data || [], OPERADOR: operadores.data || [] }} />}
 
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-neutral-200 text-sm [&>button]:shrink-0">
-      <button className={state === '' && !agendaOpen ? 'min-h-11 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setState(''); setAgendaOpen(false); setPage(1); }}>Todas</button>
-      <button className={state === 'EN_CAMPO' ? 'min-h-11 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setState('EN_CAMPO'); setAgendaOpen(false); setPage(1); }}>En campo <span className="ml-1 tabular-nums">{totalsUnknown ? '—' : inField}</span></button>
-      <button className={state === 'EN_REVISION' ? 'min-h-11 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setState('EN_REVISION'); setAgendaOpen(false); setPage(1); }}>En revisión <span className="ml-1 tabular-nums">{totalsUnknown ? '—' : pendingReview}</span></button>
+    <nav aria-label="Etapas PSIP" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-neutral-200 text-sm [&>button]:shrink-0">
+      <button aria-pressed={!phase && !state && !agendaOpen} className={!phase && !state && !agendaOpen ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(''); setState(''); setAgendaOpen(false); setPage(1); }}>Todas</button>
+      {(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).map((key) => <button key={key} aria-pressed={phase === key && !agendaOpen} className={phase === key && !agendaOpen ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(key); setState(''); setAgendaOpen(false); setPage(1); }}>{INSPECTION_PHASES[key].label} <span className="ml-1 tabular-nums">{totalsUnknown ? '—' : INSPECTION_PHASES[key].states.reduce((sum, value) => sum + (stateCounts[value] || 0), 0)}</span></button>)}
       <button aria-pressed={agendaOpen} className="min-h-11 text-neutral-600" onClick={() => setAgendaOpen((value) => !value)}>Agenda</button>
       <span className="hidden shrink-0 text-neutral-500 xl:inline">{totalsUnknown ? '—' : deadlines} con plazo abierto</span>
       <Button aria-label="Exportar" title="Exportar listado" className="ml-auto shrink-0 max-sm:w-11 max-sm:px-0" variant="ghost" size="sm" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}><span className="sr-only sm:not-sr-only">Exportar</span></Button>
-    </div>
+    </nav>
+    <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-neutral-600"><p>{phase ? INSPECTION_PHASES[phase].description : 'PSIP · De la visita al seguimiento y la resolución del expediente.'}</p><a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold text-primary-800 underline underline-offset-2">Ver flujo PSIP</a></div>
     {agendaOpen && <InspectionOperationsPanel />}
     <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E0E0DC] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:grid-cols-2 lg:grid-cols-[minmax(160px,1fr)_190px_170px]">
       <label className="relative sm:col-span-2 lg:col-span-1"><span className="sr-only">Buscar inspección</span><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={17} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar por expediente, acta o actor" className="h-11 w-full rounded-lg border border-neutral-400 bg-white pl-10 pr-3 text-base sm:text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100" /></label>
-      <select aria-label="Filtrar por estado" value={state} onChange={(event) => { setState(event.target.value as InspectionState | ''); setPage(1); }} className="h-11 min-w-0 rounded-xl border border-neutral-200 bg-white px-2 text-base sm:text-sm text-neutral-800 focus:border-primary-600 focus:outline-none"><option value="">Todos los estados</option>{Object.entries(INSPECTION_STATE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+      <select aria-label="Filtrar por estado" value={state} onChange={(event) => { const value = event.target.value as InspectionState | ''; setState(value); if (value) setPhase(inspectionPhaseOf(value)); setPage(1); }} className="h-11 min-w-0 rounded-xl border border-neutral-200 bg-white px-2 text-base sm:text-sm text-neutral-800 focus:border-primary-600 focus:outline-none"><option value="">{phase ? 'Todos en esta etapa' : 'Todos los estados'}</option>{(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).filter((key) => !phase || phase === key).map((key) => <optgroup key={key} label={INSPECTION_PHASES[key].label}>{INSPECTION_PHASES[key].states.map((value) => <option key={value} value={value}>{INSPECTION_STATE_LABELS[value]}</option>)}</optgroup>)}</select>
       <select aria-label="Filtrar por tipo de inspección" value={inspectionFilter} onChange={(event) => { setInspectionFilter(event.target.value as InspectionType | ''); setTypeFilter(''); setActorFilter(''); setPage(1); }} className="h-11 min-w-0 rounded-xl border border-neutral-200 bg-white px-2 text-base sm:text-sm text-neutral-800 focus:border-primary-600 focus:outline-none"><option value="">Todos los tipos</option>{Object.entries(INSPECTION_TYPES).map(([value, type]) => <option key={value} value={value}>{type.label}</option>)}</select>
     </div>
 

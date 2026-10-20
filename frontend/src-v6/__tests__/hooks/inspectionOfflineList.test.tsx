@@ -19,6 +19,12 @@ const cached = (id: string, numero: string, actorId: string, updatedAt: string):
 describe('local inspection discovery', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('applies phase states before offline pagination without including closed cases', () => {
+    const cases = [cached('a', 'I-001', 'actor', '2026-09-21'), cached('b', 'I-002', 'actor', '2026-09-22'), cached('c', 'I-003', 'actor', '2026-09-23')];
+    cases[0].estado = 'NOTIFICADA'; cases[1].estado = 'REQUIERE_SUBSANACION'; cases[2].estado = 'CERRADA_CONFORME';
+    expect(filterCachedInspections(cases, { estados: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION'], page: 2, limit: 1 })).toMatchObject({ offline: true, total: 2, totalPages: 2, items: [{ id: 'a' }] });
+  });
+
   it('filters and paginates only cached cases while marking totals as local', () => {
     const cases = [cached('one', 'I-001', 'a-1', '2026-09-20T00:00:00Z'), cached('two', 'I-002', 'a-2', '2026-09-22T00:00:00Z')];
     expect(filterCachedInspections(cases, { actorId: 'a-1' })).toMatchObject({ offline: true, total: 1, items: [{ id: 'one' }] });
