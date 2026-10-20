@@ -20,6 +20,8 @@ import { InspectorSelect } from './InspectorSelect';
 import { InspectionOperationsPanel } from './InspectionOperationsPanel';
 import { useConnectivity } from '../../hooks/useConnectivity';
 import { SpontaneousFindingPanel } from './SpontaneousFindingPanel';
+import { InspectionIntakePanel } from './InspectionIntakePanel';
+import type { InspectionIntake } from '../../types/inspectionIntake';
 import { InspectionLocationField } from './InspectionLocationField';
 import { inspectionLocationSuggestions } from './inspectionLocations';
 import { INSPECTION_PHASES, inspectionPhaseOf, isInspectionPhase, isInspectionFollowUp, type InspectionPhase } from './inspectionProcess';
@@ -42,6 +44,8 @@ const InspeccionesPageV2: React.FC = () => {
   const [actorFilter, setActorFilter] = useState(initialActor);
   const [page, setPage] = useState(Math.max(1, Number(searchParams.get('page')) || 1));
   const [showCreate, setShowCreate] = useState(false);
+  const [showQueue, setShowQueue] = useState(searchParams.get('vista') === 'antecedentes');
+  const [sourceIntake, setSourceIntake] = useState<InspectionIntake | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
@@ -78,6 +82,7 @@ const InspeccionesPageV2: React.FC = () => {
 
   useEffect(() => {
     const next = new URLSearchParams();
+    if (showQueue) next.set('vista', 'antecedentes');
     if (search) next.set('search', search);
     if (state) next.set('estado', state);
     if (phase) next.set('etapa', phase);
@@ -86,9 +91,16 @@ const InspeccionesPageV2: React.FC = () => {
     if (actorFilter) next.set('actorId', actorFilter);
     if (page > 1) next.set('page', String(page));
     setSearchParams(next, { replace: true });
-  }, [search, state, phase, typeFilter, inspectionFilter, actorFilter, page, setSearchParams]);
+  }, [search, state, phase, typeFilter, inspectionFilter, actorFilter, page, showQueue, setSearchParams]);
 
-  const createMutation = useInspectionMutation(async () => inspeccionService.create({ clienteId: creationId, tipoInspeccion: inspectionType, observaciones: description || undefined, tipoActor: withoutActor ? null : type, actorId: withoutActor ? null : actorId, inspectorId: assignedInspector || undefined, numeroActa: numeroActa || undefined, ubicacion: ubicacion || undefined, fechaProgramada: fechaProgramada ? new Date(fechaProgramada).toISOString() : undefined }));
+  const createMutation = useInspectionMutation(async () => inspeccionService.create({ clienteId: creationId, ...(sourceIntake ? { antecedenteId: sourceIntake.id } : {}), tipoInspeccion: inspectionType, observaciones: description || undefined, tipoActor: withoutActor ? null : type, actorId: withoutActor ? null : actorId, inspectorId: assignedInspector || undefined, numeroActa: numeroActa || undefined, ubicacion: ubicacion || undefined, fechaProgramada: fechaProgramada ? new Date(fechaProgramada).toISOString() : undefined }));
+
+  const createFromIntake = (item: InspectionIntake) => {
+    setSourceIntake(item); setType(item.tipoActor); setActorId(item.actorId || ''); setWithoutActor(!item.actorId);
+    setInspectionType(item.actorId ? item.tipoActor : 'ESPONTANEA'); setAssignedInspector(''); setCreationId(crypto.randomUUID());
+    setDescription(`Antecedente ${item.referencia} · ${item.actorNombre}. Evaluación pendiente; no acredita infracción.`);
+    setNumeroActa(''); setUbicacion(''); setFechaProgramada(''); setShowCreate(true);
+  };
 
   const createInspection = async () => {
     if (!withoutActor && !actorId) return toast.warning('Actor requerido', 'Seleccione la entidad que se inspeccionará.');
@@ -130,8 +142,10 @@ const InspeccionesPageV2: React.FC = () => {
   return <div className="space-y-4">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="sr-only">Inspecciones</h2>
-      <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setFindingRequest((value) => value + 1)}>Denuncia / hallazgo</Button><Button size="sm" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => setShowCreate(true)}>Nueva inspección</Button></div>
+      <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" aria-pressed={showQueue} onClick={() => setShowQueue(!showQueue)}>{showQueue ? 'Volver a inspecciones' : 'Cola de revisión'}</Button><Button size="sm" variant="outline" onClick={() => { setShowQueue(false); setFindingRequest((value) => value + 1); }}>Denuncia / hallazgo</Button><Button size="sm" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }}>Nueva inspección</Button></div>
     </header>
+    {showQueue && <InspectionIntakePanel mobile={mobile} online={isOnline && navigator.onLine} onCreate={createFromIntake} />}
+    {!showQueue && <>
 
     {resumeInspection && <Link data-testid="inspection-resume-task" aria-label="Continuar mi inspección en campo" to={`${mobile ? '/mobile' : ''}/inspecciones/${resumeInspection.id}${resumePoint?.hash || '#checklist'}`} className="flex min-h-16 items-center justify-between gap-3 rounded-lg border-l-4 border-primary-600 bg-primary-50 px-4 py-3 !no-underline hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"><div className="min-w-0"><p className="text-xs font-semibold text-primary-800">En campo · {resumeInspection.numero}</p><h3 className="mt-0.5 truncate text-sm font-semibold text-neutral-900">{inspectionActor(resumeInspection)?.razonSocial || 'Inspección en curso'}</h3>{resumePoint && <p className="mt-0.5 text-xs text-neutral-600">Retomá en {resumePoint.label}</p>}</div><span className="flex min-h-11 shrink-0 items-center gap-1 text-sm font-semibold text-primary-800"><span className="sr-only sm:not-sr-only">Continuar inspección</span><ChevronRight size={20} /></span></Link>}
 
@@ -177,9 +191,11 @@ const InspeccionesPageV2: React.FC = () => {
 
     <div className="flex flex-col gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"><p className="text-neutral-600">{inspections.isError ? rows.length ? `${rows.length} resultados anteriores · sin actualizar` : 'Listado no disponible' : `${inspections.data?.total || 0} ${offline ? 'copias locales' : 'resultados'} · página ${page} de ${totalPages}`}</p><div className="flex gap-2"><Button variant="outline" size="sm" leftIcon={<ChevronLeft size={16} />} disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Anterior</Button><Button variant="outline" size="sm" rightIcon={<ChevronRight size={16} />} disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Siguiente</Button></div></div>
 
+    </>}
     <Modal isOpen={showCreate} onClose={() => { if (!createMutation.isPending) setShowCreate(false); }} title="Nueva inspección" size="lg" closeOnOverlayClick={false}
       footer={<><Button variant="outline" disabled={createMutation.isPending} onClick={() => setShowCreate(false)}>Cancelar</Button><Button isLoading={createMutation.isPending} leftIcon={<Plus size={17} />} onClick={createInspection}>Crear expediente</Button></>}>
       <fieldset disabled={createMutation.isPending} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+        {sourceIntake && <p className="rounded-lg bg-primary-50 p-3 text-sm text-primary-950 sm:col-span-2">Origen: {sourceIntake.referencia} · {sourceIntake.actorNombre}. El antecedente se vincula al crear el expediente, sin alterar su evidencia.</p>}
         <label className="text-sm font-semibold text-neutral-800 sm:col-span-2">Tipo de inspección
           <select value={inspectionType} onChange={(event) => {
             const selected = event.target.value as InspectionType;

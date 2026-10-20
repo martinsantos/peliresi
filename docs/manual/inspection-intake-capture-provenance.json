@@ -1,0 +1,29 @@
+{
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "browserTestsPassed": 9,
+  "suite": "inspection-intake.spec.ts",
+  "attempt": "browser-accepted",
+  "viewports": {
+    "web-desktop": "1440x900",
+    "web-responsive": "360x800",
+    "app": "360x800"
+  },
+  "files": [
+    {
+      "file": "mobile/adenda-informe-hallazgo-20261020.png",
+      "sha256": "3f4c50c0e69e83b70c718bd861d679adf4dd213381cf7d77a8c95578f3643e9d",
+      "width": 945,
+      "height": 2100,
+      "project": "app"
+    },
+    {
+      "file": "desktop/psip-hallazgo-cola-20261020.png",
+      "sha256": "4dd1771f2900f5067329a8cdfaddb97dbe535093e715aa57088ad1e3f7b2a632",
+      "width": 1440,
+      "height": 900,
+      "project": "web-desktop"
+    }
+  ]
+}

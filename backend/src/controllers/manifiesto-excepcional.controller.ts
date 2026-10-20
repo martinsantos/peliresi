@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { canReviewAsCounterpart } from '../domain/partyReview';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
+import { recordEventualIntakes } from '../services/inspectionIntake.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
@@ -117,11 +118,18 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
     const aprobaciones = exceptionalApprovers(creator, req.user.id, { generador, transportista, operador }, active);
     const datos = { ...input.data, generador, transportista, operador, aprobaciones } as unknown as Prisma.InputJsonValue;
     // Upsert with an empty update gives retry-safe creation without changing facts.
-    const record = await prisma.registroManifiestoExcepcional.upsert({
+    const record = await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`eventual:${input.data.id}`}, 0))::text`;
+      const repeated = await tx.registroManifiestoExcepcional.findUnique({ where: { id: input.data.id } });
+      if (repeated) return repeated;
+      const created = await tx.registroManifiestoExcepcional.upsert({
       where: { id: input.data.id }, update: {},
       create: { id: input.data.id, operadorId: operador.padronId || null, creadoPorId: req.user.id,
         autorRol: creator.rol, autorActorId: creator.rol === 'ADMIN' ? null : creator.actorId,
         impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud, datos, eventos: [] },
+      });
+      await recordEventualIntakes(tx, created);
+      return created;
     });
     // Compare the normalized request fingerprint; the original padrón snapshot remains immutable.
     if (record.creadoPorId !== req.user.id || record.impersonadoPorId !== (req.user.impersonatedBy?.id || null) || record.huellaSolicitud !== huellaSolicitud) throw new AppError('La referencia ya se usó para otro registro', 409);

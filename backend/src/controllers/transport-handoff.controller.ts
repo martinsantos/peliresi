@@ -12,6 +12,7 @@ import { assertCanAccessManifiesto } from '../utils/roleFilter';
 import { prepareTransportAssignment, readTransportAssignment } from '../domain/manifiestoTransportAssignment';
 import { declaredTransportLabel, gpsPointSchema, handoffSchema, isOriginalCarrier, TRANSPORT_GPS_PURPOSE, transportHandoffEnabled } from '../domain/transportHandoff';
 import { computeRollingHash } from '../services/blockchain.service';
+import { recordInspectionIntake } from '../services/inspectionIntake.service';
 import type { TramoTransporte, Prisma } from '@prisma/client';
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -111,6 +112,15 @@ export async function createTransportHandoff(req: AuthRequest, res: Response, ne
         transportistaId:command.tipo==='REGISTRADO'?command.transportistaId:null,datos,creadoPorId:req.user.id,impersonadoPorId:req.user.impersonatedBy?.id??null,motivo:command.motivo,
         huellaSolicitud:requestHash,inicio:now,latitud:command.latitud,longitud:command.longitud,
         accesoVersion:randomUUID(),accesoHasta:new Date(now.getTime()+24*60*60*1000)}});
+      if (command.tipo === 'EXTERNO') await recordInspectionIntake(tx, {
+        origen: 'RELEVO_EXTERNO', origenId: created.id, referencia: manifest.numero, tipoActor: 'TRANSPORTISTA',
+        actorNombre: declaredTransportLabel(datos), creadoPorId: req.user.id,
+        motivos: ['RELEVO_SIN_ALTA', ...(!datos.empresa || !datos.cuit ? ['IDENTIDAD_INCOMPLETA'] : [])],
+        evidencia: { participante: datos, motivo: command.motivo, manifiestoId: manifest.id, tramoId: created.id,
+          transportistaOrigenId: manifest.transportistaId, inicio: now.toISOString(),
+          ...(command.latitud !== undefined ? { latitud: command.latitud, longitud: command.longitud! } : {}),
+          advertencia: 'Traspaso declarado por la transportista de origen. Identidad externa no validada; no acredita habilitación.' },
+      });
       const event=await tx.eventoManifiesto.create({data:{manifiestoId:manifest.id,tipo:'RELEVO_TRANSPORTE',usuarioId:req.user.id,
         descripcion:`Traspaso declarado por la transportista de origen a ${declaredTransportLabel(datos)}${command.tipo==='EXTERNO'?' (eventual con datos declarados)':''}. Motivo: ${command.motivo}`,
         latitud:command.latitud,longitud:command.longitud}});

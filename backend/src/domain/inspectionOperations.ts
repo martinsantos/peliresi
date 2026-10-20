@@ -48,6 +48,7 @@ export const inspectionCreateSchema = z.object({
   tipoActor: z.nativeEnum(TipoActorInspeccion).optional().nullable(),
   actorId: z.string().min(1).optional().nullable(),
   clienteId: z.string().min(8).max(100).optional(),
+  antecedenteId: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   inspectorId: z.string().min(1).optional(),
   numeroActa: z.string().trim().max(80).optional().nullable(),
   ubicacion: z.string().trim().max(300).optional().nullable(),

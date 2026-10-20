@@ -1,4 +1,6 @@
 import fs from 'fs';
+import { intakeScope } from '../domain/inspectionIntake';
+import { assertIntakeInspection } from '../services/inspectionIntake.service';
 import type { NextFunction, Request, Response } from 'express';
 import {
   EstadoInspeccion,
@@ -540,6 +542,16 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
         }
       }
       const numero = await nextInspectionNumber(tx, input.tipoActor, input.tipoInspeccion);
+      const antecedent = input.antecedenteId ? await tx.antecedenteFiscalizacion.findFirst({ where: { AND: [{ id: input.antecedenteId }, intakeScope(req.user)] } }) : null;
+      if (input.antecedenteId) {
+        if (!isAuthorizedAdmin(req.user) || req.user.impersonatedBy) throw new AppError('La administración competente decide la apertura desde un antecedente', 403);
+        if (!antecedent) throw new AppError('Antecedente no encontrado', 404);
+        if (!['PENDIENTE', 'EN_EVALUACION'].includes(antecedent.estado)) throw new AppError('El antecedente ya fue resuelto; actualizá la cola', 409);
+        assertIntakeInspection(antecedent, { tipoActor: input.tipoActor || null, generadorId: input.tipoActor === 'GENERADOR' ? input.actorId || null : null,
+          transportistaId: input.tipoActor === 'TRANSPORTISTA' ? input.actorId || null : null, operadorId: input.tipoActor === 'OPERADOR' ? input.actorId || null : null });
+        if (!input.tipoActor && req.user.rol !== 'ADMIN') throw new AppError('Un externo sin responsable vinculado requiere jefatura general', 403);
+        if (!input.tipoActor && inspectionType !== 'ESPONTANEA') throw new AppError('Un externo sin identidad se abre como hallazgo espontáneo', 400);
+      }
       const snapshot = input.tipoActor && input.actorId ? await buildDeclaredInspectionSnapshot(tx, input.tipoActor, input.actorId) : null;
       const inspection = await tx.inspeccion.create({
         data: {
@@ -571,6 +583,15 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
       await tx.eventoInspeccion.create({
         data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'CREADA', titulo: 'Inspeccion creada' },
       });
+      if (antecedent) {
+        const linked = await tx.antecedenteFiscalizacion.updateMany({ where: { id: antecedent.id, version: antecedent.version, estado: { in: ['PENDIENTE', 'EN_EVALUACION'] } }, data: {
+          inspeccionId: inspection.id, estado: 'VINCULADA', version: { increment: 1 }, eventos: [...antecedent.eventos as Prisma.JsonArray,
+            { id: input.clienteId || inspection.id, accion: 'VINCULADA', motivo: 'Apertura de expediente desde el antecedente', autorId: req.user.id, fecha: new Date().toISOString(), version: antecedent.version, inspeccionId: inspection.id }],
+        } });
+        if (linked.count !== 1) throw new AppError('Otro administrador evaluó el antecedente; actualizá', 409);
+        await tx.eventoInspeccion.create({ data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'ANTECEDENTE_VINCULADO', titulo: 'Origen del expediente: antecedente de fiscalización', visibleActor: false,
+          detalle: antecedent.referencia, metadata: { antecedenteId: antecedent.id, origen: antecedent.origen, origenId: antecedent.origenId, huellaEvidencia: antecedent.huellaEvidencia } } });
+      }
       if (inspectorId !== req.user.id || input.fechaProgramada) {
         await tx.notificacion.create({ data: {
           usuarioId: inspectorId, tipo: 'INFO_GENERAL', titulo: `Inspección asignada · ${numero}`,

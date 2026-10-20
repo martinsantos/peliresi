@@ -311,6 +311,8 @@ model AdendaManifiesto {
   huellaSolicitud String
   declaracion Json
   residuos Json
+  // Immutable operator finding at destination; legacy addenda remain NULL.
+  informeHallazgo Json?
   motivo String
   rectificaId String?
   revisiones Json
@@ -320,6 +322,35 @@ model AdendaManifiesto {
 
   @@index([manifiestoId, createdAt])
   @@map("adendas_manifiesto")
+}
+
+// An operational observation is an intake, never an infraction or an inspection.
+// Source evidence is immutable; evaluations append to eventos using version checks.
+model AntecedenteFiscalizacion {
+  id String @id
+  claveOrigen String @unique
+  origen String
+  origenId String
+  referencia String
+  tipoActor TipoActorInspeccion
+  actorId String?
+  actorNombre String
+  motivos String[]
+  evidencia Json
+  huellaEvidencia String
+  creadoPorId String
+  estado String @default("PENDIENTE")
+  version Int @default(0)
+  eventos Json
+  inspeccionId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  inspeccion Inspeccion? @relation(fields: [inspeccionId], references: [id], onDelete: Restrict)
+
+  @@index([estado, tipoActor, createdAt])
+  @@index([origen, origenId])
+  @@index([inspeccionId])
+  @@map("antecedentes_fiscalizacion")
 }
 
 model Manifiesto {
@@ -604,6 +635,7 @@ model Inspeccion {
   evidencias    EvidenciaInspeccion[]
   eventos       EventoInspeccion[]
   intercambios  IntercambioInspeccion[]
+  antecedentes AntecedenteFiscalizacion[]
 
   @@index([estado, createdAt])
   @@index([inspectorId, estado])

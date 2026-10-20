@@ -15,6 +15,8 @@ import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
 import { notifyAddendumParties } from '../services/manifiestoAddendumNotice.service';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
+import { findingAtDestination } from '../domain/inspectionIntake';
+import { buildOperatorFinding, recordFindingIntakes } from '../services/inspectionIntake.service';
 
 export function addendaEnabled(_req: AuthRequest, _res: Response, next: NextFunction) {
   if (!manifestFeatureEnabled('MANIFEST_ADDENDA_ENABLED')) return next(new AppError('Adendas no habilitadas', 404));
@@ -53,7 +55,9 @@ export async function listAddenda(req: AuthRequest, res: Response, next: NextFun
     const finalLiberado = await hasFinalTrainingCertificate(prisma, manifest.id);
     res.json({ success: true, data: { adendas: items.map(r => ({...present(r, req), ...(finalLiberado ? {puedeResolver:false} : {})})), total: summary.total, finalLiberado,
       documental: { ...summary, estado: documentaryStatus(summary), cierreAcreditado: false },
-      manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado },
+      manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado,
+        residuos: manifest.residuos.map(row => ({ corriente: row.tipoResiduo.codigo, cantidad: row.cantidad, unidad: row.unidad })) },
+      puedeInformarHallazgo: findingAtDestination(req.user.rol, manifest.estado) && canRecordAddendum(req.user, manifest),
       puedeRegistrar: !finalLiberado && canRecordAddendum(req.user, manifest) && addendumStageAllowed(manifest.estado) } });
   } catch (error) { next(error); }
 }
@@ -103,10 +107,19 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
     const record = await prisma.$transaction(async tx => {
       await lockTrainingDocuments(tx,manifest.id);
       await assertNoFinalTrainingCertificate(tx,manifest.id);
+      const replay = await tx.adendaManifiesto.findUnique({ where: { id: command.id } });
+      if (replay) { verifyReplay(replay); return replay; }
+      const currentManifest = await tx.manifiesto.findUniqueOrThrow({ where: { id: manifest.id }, select: { estado: true } });
+      if (!addendumStageAllowed(currentManifest.estado)) throw new AppError('El manifiesto ya no admite esta adenda', 409);
+      const informeHallazgo = findingAtDestination(req.user.rol, currentManifest.estado) ? await buildOperatorFinding(tx, {
+        operadorId: manifest.operadorId, autorId: req.user.id, estado: currentManifest.estado, motivo: command.motivo,
+        declarado: manifest.residuos.map(row => ({ corriente: row.tipoResiduo.codigo, cantidad: row.cantidad, unidad: row.unidad })), observado: command.residuos,
+      }) : null;
       const created = await tx.adendaManifiesto.upsert({ where: { id: command.id }, update: {}, create: {
       id: command.id, manifiestoId: manifest.id, creadoPorId: req.user.id,
       impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud: hash,
       motivo: command.motivo, rectificaId: command.rectificaId || null, residuos: command.residuos,
+      ...(informeHallazgo ? { informeHallazgo } : {}),
       // Declared quantities only, never replace them with received weights or add observed totals to them.
       declaracion: { numero: manifest.numero, estadoAlRegistrar: manifest.estado,
         fechaFirma: manifest.fechaFirma?.toISOString() || null,
@@ -116,6 +129,8 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
       revisiones: [],
       } });
       verifyReplay(created);
+      if (informeHallazgo) await recordFindingIntakes(tx, { adendaId: created.id, referencia: manifest.numero,
+        generadorId: manifest.generadorId, creadoPorId: req.user.id, informe: informeHallazgo });
       pushIds = await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id);
       return created;
     }).catch(async (error: unknown) => {

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { listInspectionIntakes, decideInspectionIntake } from '../controllers/inspection-intake.controller';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
@@ -55,6 +56,8 @@ router.get('/verificar/:token', inspectionTraceLimiter, verificarInspeccionPubli
 router.use(isAuthenticated);
 router.use(requireFullAccess);
 router.get('/participacion', listarParticipacionInspeccionado);
+router.get('/antecedentes', listInspectionIntakes);
+router.post('/antecedentes/:antecedenteId/decisiones', decideInspectionIntake);
 router.get('/operaciones', operacionesInspecciones);
 router.get('/operaciones/exportar', operacionesInspecciones);
 router.get('/inspectores', listarInspectores);

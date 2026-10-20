@@ -93,6 +93,7 @@ export const inspeccionService = {
     tipoActor?: InspectionActorType | null;
     actorId?: string | null;
     clienteId?: string;
+    antecedenteId?: string;
     inspectorId?: string;
     latitud?: number;
     longitud?: number;

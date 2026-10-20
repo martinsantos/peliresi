@@ -9,7 +9,7 @@ export function documentaryStatus(counts: DocumentaryCounts) {
   return 'ADENDAS_REVISADAS';
 }
 type Record = { id: string; manifiestoId: string; creadoPorId: string; impersonadoPorId: string | null; createdAt: Date;
-  motivo: string; rectificaId: string | null; version: number; declaracion: unknown; residuos: unknown; revisiones: unknown };
+  motivo: string; rectificaId: string | null; version: number; declaracion: unknown; residuos: unknown; revisiones: unknown; informeHallazgo?: unknown };
 export function addendumDocument(record: Record, version: number) {
   if (!Number.isSafeInteger(version) || version < 0 || version > record.version) throw new Error('Versión de anexo inexistente');
   const reviews = (record.revisiones as AddendumReview[]).slice(0, version);
@@ -18,6 +18,7 @@ export function addendumDocument(record: Record, version: number) {
     version, creadoPorId: record.creadoPorId, impersonadoPorId: record.impersonadoPorId,
     fechaRegistro: record.createdAt.toISOString(), motivo: record.motivo, rectificaId: record.rectificaId,
     declaracion: record.declaracion, residuos: record.residuos, revisiones: reviews,
+    ...(record.informeHallazgo ? { informeHallazgo: record.informeHallazgo } : {}),
     estado: reviews[reviews.length - 1]?.decision || 'PENDIENTE' };
   return { ...content, huella: createHash('sha256').update(JSON.stringify(content)).digest('hex') };
 }

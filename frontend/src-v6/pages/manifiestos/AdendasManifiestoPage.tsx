@@ -8,12 +8,15 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
+import { OperatorFindingSummary } from '../../components/manifiestos/OperatorFindingSummary';
+import type { OperatorFinding } from '../../types/inspectionIntake';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
 type Adenda = { id: string; motivo: string; rectificaId: string | null; version: number; estadoRevision: string; puedeResolver: boolean;
+  informeHallazgo?: OperatorFinding | null;
   creadoPorId: string; createdAt: string; residuos: Waste[]; declaracion: { numero: string; residuos: Waste[] };
   revisiones: { id: string; autorId: string; fecha: string; decision: string; nota: string }[] };
-type Data = { finalLiberado?: boolean; adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: string };
+type Data = { finalLiberado?: boolean; puedeInformarHallazgo?: boolean; adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: string; residuos?: Waste[] };
   documental?: { pendientes: number; observadas: number; rechazadas: number; estado: string; cierreAcreditado: boolean } };
 const labels: Record<string, string> = { PENDIENTE: 'Pendiente de revisión', APROBADA: 'Aprobada post facto', OBSERVADA: 'Observada', RECHAZADA: 'Conformidad rechazada' };
 const emptyWaste = (): Waste => ({ corriente: '', cantidad: 0, unidad: 'kg' });
@@ -67,7 +70,7 @@ export default function AdendasManifiestoPage() {
   return <section className="mx-auto w-full max-w-4xl space-y-4 py-6" aria-label="Adendas del manifiesto">
     <Link to={mp(`/manifiestos/${id}`)} className="text-primary-700 underline">Volver al manifiesto</Link>
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-xl font-bold">Adendas · {data?.manifiesto.numero || 'Manifiesto'}</h1>
-      {data?.puedeRegistrar && !creating && <Button onClick={() => { setCreating(true); setSaved(''); }}>Registrar diferencia</Button>}
+      {data?.puedeRegistrar && !creating && <Button onClick={() => { setCreating(true); setSaved(''); setWastes(data.manifiesto.residuos?.map(row => ({ ...row })) || [emptyWaste()]); }}>{data.puedeInformarHallazgo ? 'Informar hallazgo' : 'Registrar diferencia'}</Button>}
     </div>
     {data && <p className="text-sm text-neutral-600">Operación: {data.manifiesto.estado}. La revisión de adendas no detiene el circuito.</p>}
     {data?.finalLiberado && <p role="status" className="rounded border border-neutral-200 p-3">El operador ya liberó la disposición final CAP. Se conservan el certificado y las adendas revisadas; este expediente queda en consulta.</p>}
@@ -81,7 +84,8 @@ export default function AdendasManifiestoPage() {
     {error && <p role="alert" className="text-error-700">{error} <Button variant="outline" onClick={() => void query.refetch()}>Actualizar revisiones</Button></p>}
     {saved && <p role="status">{saved}</p>}
     {creating && <Card className="p-4"><form className="space-y-4" onSubmit={e => { e.preventDefault(); void send(endpoint, { motivo, residuos: wastes, ...(rectificaId ? { rectificaId } : {}) }); }}>
-      <h2 className="font-semibold">{rectificaId ? 'Rectificar mediante una nueva adenda' : 'Carga observada completa'}</h2>
+      <h2 className="font-semibold">{rectificaId ? 'Rectificar mediante una nueva adenda' : data?.puedeInformarHallazgo ? 'Informe de hallazgo dentro de la adenda' : 'Carga observada completa'}</h2>
+      {data?.puedeInformarHallazgo && <p className="text-sm text-neutral-700">Ajustá las cantidades a lo recibido y agregá las Y encontradas. Conservá toda la carga observada. El informe queda en esta adenda y las diferencias pasan a evaluación en PSIP.</p>}
       <p className="text-sm text-neutral-600">No se suma automáticamente a lo declarado. Compatibilidad de corrientes pendiente de verificar.</p>
       {wastes.map((row, i) => <fieldset key={i} className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-0"><legend className="sr-only">Residuo {i + 1}</legend>
         <Input label={`Corriente observada ${i + 1}`} type="text" inputMode="text" autoCapitalize="characters" autoCorrect="off" helperText="Letra Y y número: Y1, Y21…" title="Ingresá la letra Y seguida del número, por ejemplo Y21" required pattern="Y[0-9]{1,3}" maxLength={4} placeholder="Y1" value={row.corriente} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, corriente: e.target.value.toUpperCase() } : v))} />
@@ -102,6 +106,7 @@ export default function AdendasManifiestoPage() {
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Adenda {data.total - (page - 1) * 20 - i}</h2><span role="status" aria-label="Estado de revisión">{labels[item.estadoRevision]}</span></div>
         <p className="break-words">{item.motivo}</p>
         <div className="grid gap-4 sm:grid-cols-2"><div><h3 className="font-medium">Declaración conservada</h3><Load rows={item.declaracion.residuos} /></div><div><h3 className="font-medium">Carga observada</h3><Load rows={item.residuos} /></div></div>
+        {item.informeHallazgo && <OperatorFindingSummary finding={item.informeHallazgo} />}
         {item.rectificaId && <p className="text-sm break-all">Rectifica adenda {item.rectificaId}; el antecedente se conserva.</p>}
         <p className="text-sm text-amber-800">Compatibilidad de corrientes sin verificar. Registrar no implica habilitación.</p>
         <Button variant="outline" disabled={busy || currentUser?.training} onClick={() => void download(item, item.version)}>Descargar anexo v{item.version}</Button>

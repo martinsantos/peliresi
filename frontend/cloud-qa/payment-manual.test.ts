@@ -11,5 +11,5 @@ test('the registration guide explains identity reservation, legacy review and di
   for (const phrase of ['Identificar y reservar pago ATM', 'Confirmar y reservar pago', 'misma operación', 'aunque cambien la foto', 'conciliación administrativa', 'sin alterar su decisión histórica', 'potencia instalada en HP', 'ni cambia automáticamente la TEF', 'EDEMSA', 'COSPAC Bowen', 'Sud Río Tunuyán']) assert.ok(prose.includes(phrase), phrase);
   assert.ok(!prose.includes('El registro por identidad de pago queda pendiente'));
   assert.ok(prose.includes('no garantiza leer todas las facturas históricas'));
-  for (const name of ['index.html', 'tutorial.html', 'search.html']) assert.ok(readFileSync(path.join(manual, name), 'utf8').includes('help-data.js?v=2026.20.16'));
+  for (const name of ['index.html', 'tutorial.html', 'search.html']) assert.ok(readFileSync(path.join(manual, name), 'utf8').includes('help-data.js?v=2026.20.17'));
 });

@@ -106,3 +106,13 @@ it('allows letters in the current code and free text in the reason, preserving Y
  const reason=screen.getByLabelText('Motivo de la adenda');expect(reason).toHaveAttribute('inputmode','text');
  fireEvent.change(reason,{target:{value:'Se observó una diferencia de carga'}});expect(reason).toHaveValue('Se observó una diferencia de carga');
 });
+it('starts a destination finding with the declared load, without editing the original or asking to retype it', async () => {
+ mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: true, puedeInformarHallazgo: true, manifiesto: { ...data.manifiesto, residuos: record.declaracion.residuos } } } });
+ view(); fireEvent.click(await screen.findByRole('button', { name: 'Informar hallazgo' }));
+ expect(screen.getByRole('heading', { name: 'Informe de hallazgo dentro de la adenda' })).toBeVisible();
+ expect(screen.getByLabelText('Corriente observada 1')).toHaveValue('Y1');
+ expect(screen.getByLabelText('Cantidad observada 1')).toHaveValue(10);
+ fireEvent.change(screen.getByLabelText('Cantidad observada 1'), { target: { value: '12' } });
+ expect(record.declaracion.residuos[0].cantidad).toBe(10);
+ expect(screen.getByText('Y1 · 10 kg')).toBeVisible();
+});
