@@ -1,6 +1,6 @@
 # Revisión de operación de manifiestos — 19–20/10/2026
 
-Estado vigente: **web y app `6788c82c` publicados** en `sitrep.ultimamilla.com.ar` el **20/10/2026 a las 07:20:58 Mendoza**. Backend y manual **`d372ce6e` conservados**, sin reinicio ni migración. Smoke no mutante **62/62**, HTTPS externo **9/9** y PWA PASS. CAP cerrado, correos/push apagados, flags actuales y `main` intactos. Leer el cierre de publicación inmediato; las secciones de candidato/preparación conservan el registro histórico previo a publicar. La unanimidad y las certificaciones de escuela siguen limitadas a CAP.
+Estado vigente: **backend, web, app y manual `527d915c` publicados** el **20/10/2026 a las 11:01:45 Mendoza**. [Publicación y rollback actual de PSIP](DESPLIEGUE-PSIP-20261020.md): smoke 76/76, externo 9/9 y PWA PASS; CAP cerrado, correos/push apagados, flags/uploads conservados y `main` intacto. El cierre de `6788c82c` y sus rutas de rollback que siguen son históricos. La unanimidad y las certificaciones de escuela siguen limitadas a CAP.
 
 ## Publicación de web y app — 20/10/2026
 

@@ -1,6 +1,6 @@
 # PSIP — flujo de inspecciones
 
-Revisión del 20/10/2026. PSIP es el nombre de este recorrido de producto y manual; no crea un procedimiento normativo ni amplía facultades. Alcance: interfaz, navegación, seguimiento de observaciones y documentación. **Sin publicación en producción ni cambios en `main`.**
+Revisión del 20/10/2026. PSIP es el nombre de este recorrido de producto y manual; no crea un procedimiento normativo ni amplía facultades. Alcance: interfaz, navegación, seguimiento de observaciones y documentación. **Validación inicial en preview; publicado después como `527d915c` el 20/10/2026 a las 11:01:45 Mendoza**, con autorización del dueño y sin cambios en `main`. [Publicación y rollback](DESPLIEGUE-PSIP-20261020.md).
 
 ## Hallazgo principal
 
@@ -92,7 +92,7 @@ Pendientes institucionales fuera de esta mejora: canal formal y constancia de no
 
 Guía **PSIP: del control al seguimiento de la inspección**, disponible desde la portada, perfiles de inspector/administración/actores y directorio §18. Las guías previas permanecen y se conserva el diseño del manual. La agrupación se validó con `help-data.js` **2026.20.12**; la extensión de avisos lo actualiza a **2026.20.13**.
 
-La futura publicación debe incluir **backend + web + app + manual del mismo candidato**: el backend agrega el filtro opcional `estados`, por lo que publicar sólo la interfaz sobre un backend anterior no aplicaría correctamente los grupos. No hay migraciones ni flags nuevos. Esta revisión no publica artefactos, no reinicia servicios productivos y no cambia la configuración de comunicaciones o CAP.
+La publicación posterior incluyó **backend + web + app + manual de `527d915c`**: el backend agrega el filtro opcional `estados`, por lo que publicar sólo la interfaz sobre un backend anterior no aplicaría correctamente los grupos. Sin migraciones ni flags nuevos. La revisión inicial se mantuvo aislada; el [despliegue autorizado](DESPLIEGUE-PSIP-20261020.md) conservó CAP cerrado, correos/push apagados y la configuración vigente.
 
 Validación terminada en el preview aislado `76.13.234.213`, contenedor propio, un worker, **1 CPU, 2 GiB y swap cero**, pruebas pesadas sólo allí:
 

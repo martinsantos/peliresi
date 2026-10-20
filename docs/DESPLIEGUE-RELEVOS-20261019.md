@@ -1,6 +1,6 @@
 # Publicación de relevos y GPS múltiple — 19/10/2026
 
-**Actualización vigente del 20/10:** web/app pasaron a **`6788c82c`** a las **07:20:58 Mendoza**. Backend/manual `d372ce6e` y flags conservados, sin reinicios ni migraciones. Smoke 62/62, externo 9/9 y PWA PASS; CAP/correos/push cerrados. Leer [publicación y rollback actual de interfaz](REVISION-OPERACION-MANIFIESTOS-20261019.md). El resto de este documento conserva la publicación del 19/10; su contención que apaga entradas de transporte no es el rollback normal de la nueva interfaz.
+**Actualización vigente del 20/10:** backend, web, app y manual pasaron a **`527d915c`** a las **11:01:45 Mendoza**. CAP cerrado, correos/push apagados y flags/uploads conservados; sin migraciones nuevas. Smoke 76/76, externo 9/9 y PWA PASS. Leer [publicación y rollback actual de PSIP](DESPLIEGUE-PSIP-20261020.md). El resto de este documento conserva la publicación del 19/10; su contención que apaga entradas de transporte no es el rollback normal de PSIP.
 
 Publicado **`d372ce6e2c62b21dc97a8a42a72d84a6de4d707b`**, backend, web, `/app` y manual, en `sitrep.ultimamilla.com.ar`, el **19/10/2026 a las 21:25:45 Mendoza** (`2026-10-20T00:25:45.588Z`). Autorización explícita del dueño: publicar ese commit, habilitar relevos y GPS múltiple, respaldar antes de migrar, mantener CAP cerrado y correos/push apagados; smoke no mutante. No se integró ni modificó `main` ni se dispararon workflows.
 

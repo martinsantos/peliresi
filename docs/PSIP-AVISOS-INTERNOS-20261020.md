@@ -1,6 +1,6 @@
 # PSIP — avisos internos por actuación
 
-Extensión de [PSIP: flujo de inspecciones](PSIP-FLUJO-INSPECCIONES-20261020.md), preparada en `codex/sitrep-training-20261018`. **Candidato sin publicar**. No se modifican producción, `main`, permisos, estados ni plazos. CAP continúa cerrado. El alcance autorizado es la campana; no se envía correo ni push a nadie.
+Extensión de [PSIP: flujo de inspecciones](PSIP-FLUJO-INSPECCIONES-20261020.md), preparada y validada en `codex/sitrep-training-20261018`. **Publicada como `527d915c` el 20/10/2026 a las 11:01:45 Mendoza**, en backend, web, app y manual. [Publicación y rollback](DESPLIEGUE-PSIP-20261020.md). La validación descrita abajo se realizó antes de publicar y sólo en preview. Permisos, estados y plazos conservados; `main` intacto y CAP cerrado. El alcance autorizado es la campana; no se envía correo ni push a nadie.
 
 ## Qué avisa y a quién
 
@@ -46,6 +46,6 @@ Evidencia privada: `test-results-psip-notices-20261020/` local y `.qa-psip-notic
 
 El preview usa la base artificial `sitrep_night_qa_20260926`, un worker, 1 CPU y 2 GiB, sin swap. `memory.events`: `max=0`, `oom=0`, `oom_kill=0`. CAP cerrado, SMTP/VAPID vacíos, correos/push apagados y flags conservados en ambos procesos. Servicios QA y PostgreSQL cerrados limpiamente; contenedor propio detenido el **20/10/2026 a las 10:40:25 Mendoza** (`13:40:25Z`), `OOMKilled=false`; salida 143 por el SIGTERM de cierre. Imagen, base artificial y evidencias preservadas.
 
-Cierre local con **`[skip ci]`**, sin push ni workflows. `main` conserva `c8402190edfc36b5e5d0dee1337c24bd1689420d`. No se accedió al servidor productivo ni a datos reales.
+Cierre de la validación previa con **`[skip ci]`**, sin push ni workflows. `main` conserva `c8402190edfc36b5e5d0dee1337c24bd1689420d`. Durante esa validación no se accedió al servidor productivo ni a datos reales.
 
-Manual candidato **2026.20.13**, misma guía PSIP y mismo diseño. Una eventual publicación requiere autorización nueva y backend + web + app + manual coherentes, compilados para el dominio final. No hay migraciones ni flags nuevos; los bundles de QA con API `/api` de loopback no son un paquete de despliegue.
+Manual **2026.20.13**, misma guía PSIP y mismo diseño. La publicación posterior fue autorizada expresamente y recompiló backend + web + app + manual desde `527d915c`, con la API del dominio final. Smoke no mutante **76/76**, externo **9/9** y PWA PASS, según el [registro de despliegue](DESPLIEGUE-PSIP-20261020.md). Sin migraciones ni flags nuevos; los bundles previos de QA con API `/api` de loopback no se desplegaron.
