@@ -7,7 +7,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
 import { canAccessManifiesto } from '../utils/roleFilter';
-import { exceptionalCanReview } from './manifiesto-excepcional.controller';
+import { canReviewAsAddendumAuthority } from '../domain/addendumAuthority';
 import { canReviewAsCounterpart, ReviewParties } from '../domain/partyReview';
 import { addendumCreateSchema, addendumReviewSchema, addendumStageAllowed, canRecordAddendum, AddendumReview } from '../domain/manifiestoAdenda';
 import { addendumDocument, documentaryStatus, DocumentaryCounts } from '../domain/manifiestoAdendaDocument';
@@ -29,7 +29,7 @@ async function accessibleManifest(req: AuthRequest) {
   return manifest;
 }
 function canReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue }) {
-  return exceptionalCanReview(req, record) || (manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED')
+  return canReviewAsAddendumAuthority(req.user, record) || (manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED')
     && canReviewAsCounterpart(manifestPracticeIdentity(req.user), record, record.declaracion as ReviewParties));
 }
 function present(record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {

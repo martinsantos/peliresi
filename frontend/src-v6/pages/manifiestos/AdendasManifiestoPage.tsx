@@ -14,7 +14,8 @@ import type { OperatorFinding } from '../../types/inspectionIntake';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
 type Author = { nombre: string; rol: string };
-const roleLabels: Record<string, string> = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transporte', OPERADOR: 'Operador', ADMIN: 'Administración' };
+const roleLabels: Record<string, string> = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transporte', OPERADOR: 'Operador', ADMIN: 'Administración',
+  ADMIN_GENERADOR: 'Administración de Generadores', ADMIN_OPERADOR: 'Administración de Operadores', ADMIN_TRANSPORTISTA: 'Administración de Transporte' };
 const authorLabel = (author: Author | null | undefined, id: string) => author ? `${roleLabels[author.rol] || author.rol} · ${author.nombre}` : `Cuenta ${id}`;
 type Adenda = { id: string; motivo: string; rectificaId: string | null; version: number; estadoRevision: string; puedeResolver: boolean;
   informeHallazgo?: OperatorFinding | null; autor?: Author | null;

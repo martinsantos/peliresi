@@ -24,7 +24,15 @@ it('authority receives manifest, version, currents and responsible without impli
   const tx = { usuario: { findMany: vi.fn().mockResolvedValue([{ id: 'qa-authority' }]) }, notificacion: { createMany: vi.fn() } };
   await noticeNewCurrents(tx as never, [{ corriente: 'Y1' }], [{ corriente: 'Y1' }, { corriente: 'Y21' }], '/manifiestos/m/adendas', 'review', 'carrier', { id: 'adenda', version: 2, manifiestoId: 'm', numero: 'QA-1' });
   const notice = tx.notificacion.createMany.mock.calls[0][0].data[0];
+  expect(tx.usuario.findMany).toHaveBeenCalledWith({ where: { id: { in: ['qa-authority'] }, rol: { in: ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA'] }, activo: true }, select: { id: true } });
   expect(notice).toMatchObject({ usuarioId: 'qa-authority', manifiestoId: 'm', mensaje: expect.stringContaining('QA-1 · adenda v2. Y21') });
   expect(JSON.parse(notice.datos)).toMatchObject({ adendaId: 'adenda', versionAdenda: 2, reviewerId: 'carrier', reviewId: 'review', corrientes: ['Y21'] });
   expect(notice.mensaje).toContain('no modifica habilitaciones ni acredita unanimidad');
+});
+
+it('keeps non-addendum authority notices restricted to active designated ADMIN accounts', async () => {
+  vi.stubEnv('MANIFEST_PARTY_REVIEW_ENABLED', 'true'); vi.stubEnv('MANIFEST_EXCEPTIONAL_REVIEWERS', 'qa-authority');
+  const tx = { usuario: { findMany: vi.fn().mockResolvedValue([{ id: 'qa-authority' }]) }, notificacion: { createMany: vi.fn() } };
+  await noticeNewCurrents(tx as never, [], [{ corriente: 'Y21' }], '/eventual', 'review');
+  expect(tx.usuario.findMany).toHaveBeenCalledWith({ where: { id: { in: ['qa-authority'] }, rol: 'ADMIN', activo: true }, select: { id: true } });
 });

@@ -1,5 +1,7 @@
 # Preparación de db68b24e — pendiente de resolver autoridades
 
+**Actualización posterior:** el soporte de las cuatro funciones fue implementado y probado en un candidato nuevo. Ver [autoridades de adendas y validación](AUTORIDADES-ADENDAS-20261021.md). Sigue pendiente la identidad de las cuentas productivas y la publicación del nuevo SHA; estos paquetes db68b24e no contienen la corrección. El resto de este documento conserva el registro de aquella preparación.
+
 **No publicado. Producción continúa en 47ea8470.** El dueño autorizó publicar `db68b24e4b4a4e04ec5a1bae308d1bd1a41deab8` en backend, web, app y manual, habilitar adendas y verificar la autoridad, manteniendo CAP cerrado y correos/push apagados. La inspección en lectura encontró `MANIFEST_EXCEPTIONAL_REVIEWERS` vacío.
 
 Consultado por esa designación, indicó los administradores de Generadores, Operadores y Transporte, además del Super Admin. La comprobación detectó dos impedimentos concretos:

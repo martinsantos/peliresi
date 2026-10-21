@@ -4,7 +4,7 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {assertCloudDatabase,assertCloudEnvironment,backendRequire,externalKeys} from './safety.ts';
 await assertCloudDatabase();
-assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'),'adenda_operations_20261021');
+assert.ok(['adenda_operations_20261021','adenda_authorities_20261021'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema')!));
 const out=process.env.QA_ARTIFACTS!,f=JSON.parse(readFileSync(out+'/fixture.json','utf8'));
 const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient(),base='http://127.0.0.1:4177/api';
 const tokens=new Map<string,string>(),checks:string[]=[];
@@ -40,7 +40,7 @@ try{
   checks.push('flags off close reads and writes without reopening CAP');
   writeFileSync(out+'/adenda-off.json',JSON.stringify({checks}));
  }else if(phase==='adenda-audit'){
-  for(const proc of JSON.parse(readFileSync(out+'/processes.json','utf8'))){const env=Object.fromEntries(readFileSync(`/proc/${proc.pid}/environ`,'utf8').split('\0').filter(Boolean).map(v=>[v.slice(0,v.indexOf('=')),v.slice(v.indexOf('=')+1)]));assertCloudEnvironment(env);assert.equal(new URL(env.DATABASE_URL).searchParams.get('schema'),'adenda_operations_20261021');assert.equal(env.TRAINING_DATABASE_URL,'');assert.equal(env.TRAINING_DIRECT_LOGIN_UNTIL,'2000-01-01T00:00:00Z');assert.equal(env.PUSH_MANIFEST_NOTICES_ENABLED,'false');for(const key of externalKeys)assert.equal(env[key],'');}
+  for(const proc of JSON.parse(readFileSync(out+'/processes.json','utf8'))){const env=Object.fromEntries(readFileSync(`/proc/${proc.pid}/environ`,'utf8').split('\0').filter(Boolean).map(v=>[v.slice(0,v.indexOf('=')),v.slice(v.indexOf('=')+1)]));assertCloudEnvironment(env);assert.equal(new URL(env.DATABASE_URL).searchParams.get('schema'),new URL(process.env.DATABASE_URL!).searchParams.get('schema'));assert.equal(env.TRAINING_DATABASE_URL,'');assert.equal(env.TRAINING_DIRECT_LOGIN_UNTIL,'2000-01-01T00:00:00Z');assert.equal(env.PUSH_MANIFEST_NOTICES_ENABLED,'false');for(const key of externalKeys)assert.equal(env[key],'');}
   for(const role of ['admin','generador','transporte','operador']){const r=await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json',Cookie:'sitrep_qa_client=127.12.23.99'},body:JSON.stringify({email:role+'@capacitacion.invalid',password:'expired-probe'})});assert.equal(r.status,403);}
   checks.push('actual runtime providers closed; four CAP aliases 403');
   const compiled=backendRequire('./dist/lib/prisma.js').default;

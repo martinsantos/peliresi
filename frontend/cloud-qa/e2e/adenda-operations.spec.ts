@@ -60,7 +60,7 @@ test('operator finding, live counterpart decisions, notices and independent rect
 test('adenda manual is available, navigable and readable with preserved layout',async({page},info)=>{
  await isolatedMapTiles(page,info);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/manual/tutorial.html?guide=adendas-hallazgos-partes');await expect(page.locator('#tutorialTitle')).toHaveText('Adendas: informar un hallazgo y revisar entre partes');await expect(page.locator('.guide-step')).toHaveCount(5);
- for(const text of ['carga observada completa','no representa unanimidad','Cerrar formulario','versión cero','CAP cerrado'])await expect(page.locator('body')).toContainText(text);
+ for(const text of ['carga observada completa','no representa unanimidad','Cerrar formulario','versión cero','CAP cerrado','administración de Generadores, Operadores o Transporte','el rol por sí solo no habilita la revisión'])await expect(page.locator('body')).toContainText(text);
  if(info.project.name!=='web-desktop')await page.getByRole('button',{name:/Índice del tutorial/}).click();
  await page.locator('#tutorialIndex a').last().click();await expect(page.locator('.guide-step').last().getByRole('heading')).toBeInViewport({ratio:1});await page.reload();await expect(page.locator('#tutorialIndex a').last()).toHaveAttribute('aria-current','step');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);await page.screenshot({path:info.outputPath('manual-adendas.png'),animations:'disabled'});expect(errors).toEqual([]);

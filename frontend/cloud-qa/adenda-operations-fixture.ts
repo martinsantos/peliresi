@@ -3,7 +3,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { assertCloudDatabase, assertCloudEnvironment, backendRequire } from './safety.ts';
 
 await assertCloudDatabase();
-const schema = 'adenda_operations_20261021';
+const schema = new URL(process.env.DATABASE_URL!).searchParams.get('schema')!;
+assert.ok(['adenda_operations_20261021', 'adenda_authorities_20261021'].includes(schema));
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), schema);
 assert.equal(process.env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z');
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
@@ -23,7 +24,7 @@ try {
     assert.deepEqual(await db.$queryRawUnsafe('SELECT nspname FROM pg_namespace WHERE nspname=$1', schema), []);
     const before = await protectedTables();
     writeFileSync(out + '/protected-schemas-before.json', JSON.stringify(before, null, 2));
-    await db.$executeRawUnsafe('CREATE SCHEMA adenda_operations_20261021');
+    await db.$executeRawUnsafe('CREATE SCHEMA "' + schema + '"');
     console.log('New private schema allocated; prior QA tables fingerprinted: ' + Object.keys(before).length);
   } else if (process.argv[2] === 'seed') {
     assert.deepEqual(await db.$queryRawUnsafe('SELECT current_schema() AS name'), [{ name: schema }]);
