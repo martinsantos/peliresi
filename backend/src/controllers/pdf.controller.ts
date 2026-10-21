@@ -1,3 +1,5 @@
+import { CERTIFICATE_MANAGED, CERTIFICATE_EVENT } from '../services/manifestCertificate.service';
+import { sendStoredCertificate } from './manifest-certificate.controller';
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import PDFDocument from 'pdfkit';
@@ -424,6 +426,11 @@ export const generarCertificado = async (req: AuthRequest, res: Response, next: 
 
         if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
         if (!canAccessManifiesto(req.user, manifiesto)) throw new AppError('Manifiesto no encontrado', 404);
+        if (manifiesto.eventos.some(e => [CERTIFICATE_MANAGED, CERTIFICATE_EVENT].includes(e.tipo))) {
+            const issued = await prisma.certificadoManifiesto.findFirst({where:{manifiestoId:id,tipo:'FINAL'}});
+            if (!issued) throw new AppError('El operador todavía no emitió la certificación final',409);
+            sendStoredCertificate(res,issued); return;
+        }
         if (manifiesto.estado !== 'TRATADO') {
             throw new AppError('Solo se pueden generar certificados de manifiestos tratados', 400);
         }

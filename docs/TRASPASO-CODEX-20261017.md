@@ -1,5 +1,15 @@
 # SITREP — traspaso vigente de operación
 
+## Revisión vigente — certificados ordinarios, sólo preview, 21/10/2026
+
+**Candidato probado, sin publicar.** Leer [emisión, acceso, avisos, evidencia y límites](CERTIFICADOS-OPERATIVOS-20261021.md). Operador vinculado firma y emite parciales/final; generador y transporte reciben el aviso en la campana y descargan el mismo PDF conservado. Se corrigió el refresco de la bandeja abierta y el acceso al documento exacto. Totales, concurrencia, adendas y expediente firmado protegidos; históricos preservados.
+
+Preview: suites completas **1456 backend / 1801 frontend** antes de los últimos ajustes; regresión final **95 backend / 127 frontend** PASS. **6/6 E2E únicos** en web/web angosta/app, API **6 grupos**, flag off y dos PDF PASS. Manual **2026.21.4**, **6 unit + 3 E2E** finales (subconjunto repetido), mismo renderer/CSS y capturas directas. Tipos/builds/lint sin errores; alcance de cada revisión detallado en el informe, sin GO global ni certificación física.
+
+**475 tablas previas QA intactas**, 55 sobres de correo simulados, cero cola activa/intentos/envíos; cuatro alias CAP 403, proveedores/push apagados. Preview serial/un worker/1 CPU/2 GiB/swap cero; runtime/PG/contenedor cerrados **20:09:40 Mendoza**, sin OOM/presión; base, imagen y evidencias preservadas.
+
+Nueva migración aditiva `20261021200000_manifest_certificates` y flags independientes `MANIFEST_CERTIFICATES_ENABLED` / `VITE_MANIFEST_CERTIFICATES_ENABLED`, false por defecto. Una futura publicación exige autorización, respaldo/migración, API final y SW; **no desplegar bundles QA**. Tras emitir, una reversión conserva tabla/documentos/backend con guardas; sólo se apaga emisión, manteniendo lectura. Producción no se accedió en esta tanda; último despliegue documentado **66a1c29e**, abajo. Main `c840219` intacto, sin push/workflows; commit `[skip ci]`.
+
 ## Última publicación — autoridades 66a1c29e, 21/10/2026
 
 **`66a1c29e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 15:45:25 Mendoza**. Leer primero [publicación, evidencia y reversión vigente](DESPLIEGUE-AUTORIDADES-20261021.md). Soporte de cuatro funciones de autoridad incorporado, con designación explícita por ID; asignación de cuentas diferida por el dueño.

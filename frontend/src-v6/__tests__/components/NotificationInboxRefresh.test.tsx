@@ -1,0 +1,23 @@
+import {expect,it,vi} from 'vitest';
+import {render,waitFor} from '@testing-library/react';
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {MemoryRouter} from 'react-router-dom';
+import {NotificacionesPoller} from '../../components/NotificacionesPoller';
+const mocks=vi.hoisted(()=>({add:vi.fn(()=> 'toast-id'),remove:vi.fn(),list:vi.fn()}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'g',rol:'GENERADOR'},isRestricted:false})}));
+vi.mock('../../hooks/usePushNotifications',()=>({usePushNotifications:()=>({})}));
+vi.mock('../../services/notificacion.service',()=>({notificacionService:{list:mocks.list}}));
+vi.mock('../../components/ui/Toast',()=>({toast:{add:mocks.add,remove:mocks.remove}}));
+it('a newly received certificate refreshes an open inbox and unread badge without re-polling or marking it read',async()=>{
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ mocks.list.mockResolvedValue({items:[],noLeidas:0});
+ const view=render(<MemoryRouter><QueryClientProvider client={client}><NotificacionesPoller/></QueryClientProvider></MemoryRouter>);
+ await waitFor(()=>expect(mocks.list).toHaveBeenCalledTimes(1));await waitFor(()=>expect(client.getQueryData(['notificaciones','poll','g'])).toEqual({items:[],noLeidas:0}));
+ const spy=vi.spyOn(client,'invalidateQueries');
+ client.setQueryData(['notificaciones','poll','g'],{items:[{id:'new',titulo:'Certificación parcial disponible',mensaje:'M-P01',prioridad:'NORMAL',manifiestoId:'m',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'c',tipoCertificado:'PARCIAL'})}],noLeidas:1});
+ await waitFor(()=>expect(spy).toHaveBeenCalledWith({queryKey:['notificaciones','list']}));
+ expect(spy).toHaveBeenCalledWith({queryKey:['notificaciones','no-leidas']});expect(spy).toHaveBeenCalledWith({queryKey:['manifest-certificates']});
+ expect(spy).not.toHaveBeenCalledWith({queryKey:['notificaciones','poll','g']});
+ expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({title:'Certificación parcial disponible'}));
+ view.unmount();client.clear();
+});

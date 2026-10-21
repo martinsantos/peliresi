@@ -18,6 +18,15 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it('opens the exact released certificate on both surfaces and refreshes its documents', () => {
+    const notice={...base,manifiestoId:'m',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'d',tipoCertificado:'FINAL',url:'/wrong'})};
+    expect(resolveNotificationPath(notice)).toBe('/manifiestos/m?certificado=d#certificaciones');
+    expect(resolveNotificationPath(notice,'/app')).toBe('/app/manifiestos/m?certificado=d#certificaciones');
+    expect(notificationActionLabel(resolveNotificationPath(notice))).toBe('Ver certificación y descargar →');
+    const invalidateQueries=vi.fn();refreshInspectionNotification(notice,{invalidateQueries} as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({queryKey:['manifest-certificates']});
+    expect(resolveNotificationPath({...notice,manifiestoId:'../bad'})).toBe('/notificaciones');
+  });
   it('opening a new intake notice invalidates an already displayed queue without changing its data', () => {
     const client = new QueryClient(), key = ['inspection-intakes', 'admin', 'PENDIENTE'];
     const previous = { items: [{ id: 'old-case' }] }; client.setQueryData(key, previous);

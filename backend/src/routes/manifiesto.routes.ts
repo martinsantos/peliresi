@@ -1,3 +1,4 @@
+import { listManifestCertificates, releaseManifestCertificate, downloadManifestCertificate } from '../controllers/manifest-certificate.controller';
 import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
 import { canCreateManifestProposal } from '../domain/manifestProposal';
 import { handoffEnabled, listTransportLegs, createTransportHandoff, rotateTransportAccess, assignedTransportHandoffs, assignedTransportAccess } from '../controllers/transport-handoff.controller';
@@ -291,6 +292,10 @@ router.get('/:id', getManifiestoById);
  *         description: Rol no autorizado
  */
 router.post('/', (req: any, res, next) => canCreateManifestProposal(req.user) ? next() : hasRole('GENERADOR', 'ADMIN')(req, res, next), createManifiesto);
+router.get('/:id/certificados', listManifestCertificates);
+router.post('/:id/certificados', releaseManifestCertificate);
+router.get('/:id/certificados/:documentId/archivo', downloadManifestCertificate);
+
 router.get('/:id/documentos-cap', listTrainingCertificates);
 router.post('/:id/documentos-cap', releaseTrainingCertificate);
 router.get('/:id/documentos-cap/:documentId/archivo', downloadTrainingCertificate);

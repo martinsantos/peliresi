@@ -24,6 +24,9 @@ function withBasePath(path: string, basePath: string): string {
 /** Opening a workflow notice must refresh its linked expediente/application. */
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
+  if(data.tipo === 'certificado_manifiesto' && data.version === 1) {
+    for(const key of ['manifest-certificates','manifiestos']) void queryClient.invalidateQueries({queryKey:[key]});
+  }
   if (data.tipo === 'adenda_manifiesto') void queryClient.invalidateQueries({ queryKey: ['manifiesto-adendas'] });
   if (data.tipo === 'propuesta_partes') {
     for (const key of ['manifiestos','manifest-proposal','training-tasks','manifest-agenda']) void queryClient.invalidateQueries({ queryKey: [key] });
@@ -51,12 +54,17 @@ export function notificationActionLabel(path: string): string {
   if (pathname === '/admin/renovaciones') return 'Revisar solicitud de cambio →';
   if (pathname === '/alertas') return 'Revisar alerta →';
   if (/^\/manifiestos\/[^/]+\/adendas$/.test(pathname)) return 'Abrir adenda y revisiones →';
+  if (/^\/manifiestos\/[^/]+$/.test(pathname) && new URLSearchParams(query).has('certificado')) return 'Ver certificación y descargar →';
   if (/^\/manifiestos(?:\/|$)/.test(pathname)) return 'Abrir manifiesto y ver qué sigue →';
   return 'Abrir detalle →';
 }
 
 export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string): string {
   const data = parseNotificationData(notificacion.datos);
+  if(data.tipo === 'certificado_manifiesto') {
+    const safe=(v:unknown):v is string=>typeof v==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v);
+    return withBasePath(data.version===1&&safe(notificacion.manifiestoId)&&safe(data.documentoId)&&['PARCIAL','FINAL'].includes(String(data.tipoCertificado)) ? '/manifiestos/'+notificacion.manifiestoId+'?certificado='+data.documentoId+'#certificaciones' : '/notificaciones',basePath);
+  }
   if (data.tipo === 'manifiesto_eventual') {
     return withBasePath(data.version === 1 && typeof data.registroId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.registroId)
       ? '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(data.registroId) : '/notificaciones', basePath);

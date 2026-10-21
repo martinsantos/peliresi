@@ -47,7 +47,13 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
     }
 
     const nuevas = data.items.filter((n) => !seen.current.has(n.id));
-    if (nuevas.length) void qc.invalidateQueries({ queryKey: ['attention'] });
+    if (nuevas.length) {
+      void qc.invalidateQueries({ queryKey: ['attention'] });
+      // Refresh the open inbox and badge, without invalidating this poll and
+      // creating a request loop. Receiving a notice never marks it as read.
+      void qc.invalidateQueries({ queryKey: ['notificaciones', 'list'] });
+      void qc.invalidateQueries({ queryKey: ['notificaciones', 'no-leidas'] });
+    }
     nuevas.forEach((n) => {
       seen.current.add(n.id);
       refreshInspectionNotification(n, qc);

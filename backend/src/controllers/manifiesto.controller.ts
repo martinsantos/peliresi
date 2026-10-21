@@ -1,3 +1,4 @@
+import { certificatesEnabled, CERTIFICATE_MANAGED } from '../services/manifestCertificate.service';
 import { isTrainingSession } from '../lib/trainingScope';
 import { validateProposalParties, notifyManifestParties } from '../services/manifestProposal.service';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
@@ -221,6 +222,8 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         usuarioId: userId
       }
     });
+
+    if (certificatesEnabled()) await tx.eventoManifiesto.create({data:{manifiestoId:created.id,usuarioId:userId,tipo:CERTIFICATE_MANAGED,descripcion:'Certificaciones emitidas y firmadas por el operador'}});
 
     if (asignacionTransporte) await tx.eventoManifiesto.create({ data: {
       manifiestoId: created.id, tipo: 'ASIGNACION_TRANSPORTE', usuarioId: userId,

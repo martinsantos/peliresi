@@ -1,0 +1,31 @@
+{
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "browserTestsPassed": 6,
+  "suite": "manifest-certificates.spec.ts",
+  "attempt": "browser-final",
+  "viewports": {
+    "web-desktop": "1440x900",
+    "web-responsive": "360x844 (recorrido); 360x800 (manual)",
+    "app": "390x844"
+  },
+  "files": [
+    {
+      "file": "mobile/certificados-recibidos-20261021.png",
+      "sha256": "0e8a71fc2a8049a0e5ae9b185006963404a71b18678ca8edf639333de0526e9b",
+      "width": 940,
+      "height": 1664,
+      "project": "app",
+      "source": "certificates-e2e-browser-final/manifest-certificates-oper-1d72e-tices-and-the-identical-PDF-app/certificates-block.png"
+    },
+    {
+      "file": "desktop/certificados-aviso-20261021.png",
+      "sha256": "2bb89fbf3c9f9a76121f1a235808d04d988948375d4b80149d2ed95e3f7a6c25",
+      "width": 1440,
+      "height": 900,
+      "project": "web-desktop",
+      "source": "certificates-e2e-browser-final/manifest-certificates-oper-1d72e-tices-and-the-identical-PDF-web-desktop/final-notice-generador.png"
+    }
+  ]
+}

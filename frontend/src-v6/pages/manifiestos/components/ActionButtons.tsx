@@ -32,6 +32,7 @@ export interface ActionButtonsProps {
   isActionPending: boolean;
   isInSitu?: boolean;
   training?: boolean;
+  operatorCertificates?: boolean;
   immutableProposal?: boolean;
   pickupBlocked?: boolean;
   isCancelling: boolean;
@@ -67,6 +68,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   isActionPending,
   isInSitu,
   training,
+  operatorCertificates,
   immutableProposal,
   pickupBlocked,
   isCancelling,
@@ -212,7 +214,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
         Descargar PDF
       </Button>}
 
-      {!training && estado === EstadoManifiesto.TRATADO && (
+      {!training && !operatorCertificates && estado === EstadoManifiesto.TRATADO && (
         <Button fullWidth disabled={training} aria-describedby={training ? 'training-document-limit' : undefined} leftIcon={<Award size={16} />} onClick={onDescargarCertificado} className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900">
           Descargar Certificado
         </Button>

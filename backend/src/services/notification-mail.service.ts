@@ -75,6 +75,11 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
       if (!ownLeg) return false;
     }
   }
+  if (family === 'manifiestos' && data.tipo === 'certificado_manifiesto') {
+    if(data.version!==1 || !notice.manifiestoId || typeof data.documentoId!=='string' || !['PARCIAL','FINAL'].includes(data.tipoCertificado)) return false;
+    const certificate=await prisma.certificadoManifiesto.findFirst({where:{id:data.documentoId,manifiestoId:notice.manifiestoId,tipo:data.tipoCertificado},select:{id:true}});
+    return Boolean(certificate);
+  }
   if (family === 'certificados') {
     const document = await prisma.documento.findUnique({ where: { id: data.documentoId }, include: {
       generador: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } },
@@ -214,6 +219,8 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones' : '/notificaciones';
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && validEventualMail(data)) {
     family = 'manifiestos'; title = 'Novedad en un eventual'; path = '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(String(data.registroId));
+  } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && data.tipo === 'certificado_manifiesto' && data.version === 1 && typeof data.documentoId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.documentoId) && ['PARCIAL','FINAL'].includes(String(data.tipoCertificado))) {
+    family='manifiestos'; title='Certificación disponible'; path='/manifiestos/'+encodeURIComponent(notice.manifiestoId)+'?certificado='+encodeURIComponent(data.documentoId)+'#certificaciones';
   } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto'; path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto')) {
@@ -300,6 +307,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     : data.tipo === 'propuesta_partes' && Object.prototype.hasOwnProperty.call(proposalEvents, proposalPhase) ? proposalEvents[proposalPhase]
     : data.tipo === 'propuesta_partes' && proposalPhase.startsWith('aprobacion-') ? ['Una parte aprobó el manifiesto', 'Revisá qué aprobaciones faltan para iniciar la coordinación.']
     : data.tipo === 'adenda_manifiesto' && Object.prototype.hasOwnProperty.call(addendumEvents, event) ? addendumEvents[event]
+    : data.tipo === 'certificado_manifiesto' ? [data.tipoCertificado === 'FINAL' ? 'Certificación final total disponible' : 'Certificación parcial disponible', 'El operador emitió el documento firmado. Ingresá al manifiesto para consultarlo y descargarlo.']
     : data.tipo === 'relevo_transporte' ? ['Cambio de transporte en tránsito', 'La transportista de origen registró un relevo. Revisá el tramo y su seguimiento en SITREP.']
     : family === 'soporte' && Object.prototype.hasOwnProperty.call(supportEvents, event) ? supportEvents[event]
     : family === 'inspecciones' && event === 'ASIGNADA' ? ['Tenés una inspección asignada', 'Revisá la ubicación, la agenda y los controles antes de iniciar la visita.']
@@ -320,7 +328,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;

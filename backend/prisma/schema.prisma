@@ -46,6 +46,7 @@ model Usuario {
   operador                     Operador?
   refreshTokens                RefreshToken[]
   manifiestosCreados           Manifiesto[]            @relation("UsuarioManifiestos")
+  certificadosEmitidos         CertificadoManifiesto[]
   eventos                      EventoManifiesto[]
   auditorias                   Auditoria[]             @relation("UsuarioAuditorias")
   notificaciones               Notificacion[]
@@ -393,6 +394,7 @@ model Manifiesto {
   creadoPor        Usuario              @relation("UsuarioManifiestos", fields: [creadoPorId], references: [id])
   creadoPorId      String
   residuos         ManifiestoResiduo[]
+  certificados     CertificadoManifiesto[]
   eventos          EventoManifiesto[]
   tracking         TrackingGPS[]
   tramosTransporte  TramoTransporte[]
@@ -1499,6 +1501,28 @@ model EmailQueue {
 }
 
 // Additive enterprise boundary. Legacy actor/account links are retained.
+// Immutable issued PDF and signed declaration; no editing endpoint.
+model CertificadoManifiesto {
+  id String @id
+  manifiestoId String
+  autorId String
+  tipo String
+  numero String @unique
+  finalKey String?
+  documento Json
+  pdf Bytes
+  pdfSha256 String
+  firmaImagen String
+  firmaSha256 String
+  solicitudSha256 String
+  createdAt DateTime @default(now())
+  manifiesto Manifiesto @relation(fields: [manifiestoId], references: [id], onDelete: Restrict)
+  autor Usuario @relation(fields: [autorId], references: [id], onDelete: Restrict)
+  @@unique([manifiestoId, finalKey])
+  @@index([manifiestoId, createdAt])
+  @@map("certificados_manifiesto")
+}
+
 model Empresa {
   id String @id @default(cuid())
   cuit String @unique

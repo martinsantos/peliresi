@@ -436,7 +436,7 @@ const ManifiestoDetailPage: React.FC = () => {
 
       {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
 
-      {currentUser?.training && <TrainingCertificates manifest={m} />}
+      {(currentUser?.training || import.meta.env.VITE_MANIFEST_CERTIFICATES_ENABLED === 'true' || m.eventos?.some(e=>['CERTIFICACION_OPERADOR_V1','CERTIFICADO_OPERADOR_V1'].includes(e.tipo))) && <TrainingCertificates key={m.id} manifest={m} />}
       {m.transportistaId&&m.estado!==EstadoManifiesto.BORRADOR&&<TransportLegs id={id!}/>}
 
       {/* Content grid */}

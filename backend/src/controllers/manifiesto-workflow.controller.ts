@@ -1,3 +1,4 @@
+import { CERTIFICATE_EVENT } from '../services/manifestCertificate.service';
 import { approveManifestProposal, assertManifestProposalApproved } from './manifest-proposal.controller';
 import { updateRollingHash } from '../services/manifestIntegrity.service';
 import { MANIFEST_PROPOSAL } from '../domain/manifestProposal';
@@ -830,6 +831,7 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
       const manifiesto = await tx.manifiesto.findUnique({ where: { id } });
       if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
 
+      if(await tx.eventoManifiesto.findFirst({where:{manifiestoId:id,tipo:CERTIFICATE_EVENT}})) throw new AppError('El manifiesto tiene certificados emitidos; se conserva su recorrido firmado',409);
       const estadoAnterior = manifiesto.estado;
       if (!canRevertManifest(estadoAnterior, estadoNuevo)) {
         const validTargets = VALID_MANIFEST_REVERSIONS[estadoAnterior];

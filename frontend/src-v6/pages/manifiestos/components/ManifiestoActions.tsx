@@ -127,7 +127,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             onOpenReversionModal={() => setShowReversionModal(true)}
             onDescargarPDF={onDescargarPDF}
             training={training}
-            immutableProposal={m.eventos?.some(e => e.tipo === 'PROPUESTA_PARTES_V1')}
+            operatorCertificates={m.eventos?.some(e=>['CERTIFICACION_OPERADOR_V1','CERTIFICADO_OPERADOR_V1'].includes(e.tipo))}
+            immutableProposal={m.eventos?.some(e => ['PROPUESTA_PARTES_V1','CERTIFICADO_OPERADOR_V1'].includes(e.tipo))}
             onDescargarCertificado={onDescargarCertificado}
           />
         </CardContent>
