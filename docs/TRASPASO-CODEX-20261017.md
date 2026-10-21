@@ -1,5 +1,11 @@
 # SITREP — traspaso vigente de operación
 
+## Publicación db68b24e preparada, sin activar — 21/10/2026
+
+Leer primero [preparación y bloqueo de autoridades](PREPARACION-ADENDAS-20261021.md). Producción verificada en **47ea8470**, sin cambios. Build de **db68b24e** terminado: backend/tipos/web/app, 2.339 blobs exactos, API final, manual 2026.21.2, SW v144/app 20261021124024; serial/1 CPU/2 GiB/swap cero. Preview detenido **09:44:13 Mendoza**.
+
+El dueño designó administradores de Generadores, Operadores y Transporte, más Super Admin. **db68b24e sólo admite ADMIN como autoridad**; no basta agregar IDs sectoriales al `.env`. Inspección limitada en lectura: 0 ADMIN_GENERADOR activos, 0 ADMIN_OPERADOR, 1 ADMIN_TRANSPORTISTA, 8 ADMIN; lista designada vacía. No elegir por defecto los ocho ADMIN, crear/activar cuentas, cambiar sus roles ni publicar un SHA diferente sin autorización. Pendiente elegir soporte de cuatro roles en nuevo commit probado en preview, o cuenta ADMIN explícita para publicar db68b24e. No hay smoke del candidato ni staging/recarga productiva. CAP/canales cerrados, main intacto, sin push/workflows.
+
 ## Revisión vigente — adendas fuera de CAP, sólo preview, 21/10/2026
 
 **Revisión terminada sin publicar.** Leer [adendas: correcciones, circuito, pruebas y límites](ADENDAS-OPERATIVAS-20261021.md). Hallazgo del operador, observación/aprobación/rechazo individuales, rectificación, anexos y avisos entre partes y a autoridad. Actualización entre sesiones, protección del motivo contra versiones concurrentes, vínculo de rectificación corregido y autor visible. Sin modificar permisos, declaración/historial, regla de revisión ni habilitaciones.

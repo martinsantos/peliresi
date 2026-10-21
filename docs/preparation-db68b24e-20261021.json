@@ -1,0 +1,135 @@
+{
+  "status": "prepared-not-published",
+  "source": "db68b24e4b4a4e04ec5a1bae308d1bd1a41deab8",
+  "activeSource": "47ea8470f98faba50305643b0e4350b5a269ae85",
+  "build": {
+    "verifiedSourceFiles": 2339,
+    "resources": {
+      "platform": "linux",
+      "docker": true,
+      "root": "/work/sitrep",
+      "cpu": "100000 100000\n",
+      "memory": "2147483648\n",
+      "swap": "0\n"
+    },
+    "flags": {
+      "VITE_MANIFEST_PROPOSALS_ENABLED": "true",
+      "VITE_MANIFEST_PARTY_REVIEW_ENABLED": "true",
+      "VITE_API_URL": "https://sitrep.ultimamilla.com.ar/api",
+      "VITE_ENTERPRISE_ENABLED": "false",
+      "VITE_MANIFEST_EXCEPTIONAL_ENABLED": "false",
+      "VITE_MANIFEST_ADDENDA_ENABLED": "true",
+      "VITE_ACTOR_MULTIROLE_ENABLED": "false",
+      "VITE_DEMO_MODE": "false",
+      "VITE_MANIFEST_TRANSPORT_HANDOFF_ENABLED": "true",
+      "VITE_TRANSPORT_MULTI_GPS_ENABLED": "true"
+    },
+    "steps": [
+      {
+        "name": "backend compiler",
+        "seconds": 24.253
+      },
+      {
+        "name": "pinned OCR asset",
+        "seconds": 0.072
+      },
+      {
+        "name": "Prisma client from target schema",
+        "seconds": 3.09
+      },
+      {
+        "name": "canonical schema verification",
+        "seconds": 1.015
+      },
+      {
+        "name": "frontend effective types",
+        "seconds": 34.899
+      },
+      {
+        "name": "web",
+        "seconds": 34.005
+      },
+      {
+        "name": "app",
+        "seconds": 37.944
+      }
+    ],
+    "packages": {
+      "backend": {
+        "file": "sitrep-backend.tar.gz",
+        "sha256": "b53b254fdd217202b86c1f511798aa2f7e23d337f80074329c1778f7070c0747",
+        "bytes": 12841419,
+        "files": 388
+      },
+      "web": {
+        "file": "sitrep-web.tar.gz",
+        "sha256": "31815499fd8da8d56f19ebe00a9b0ac3def59dc670bf49a269402ec82b836b86",
+        "bytes": 68012395,
+        "files": 513
+      },
+      "app": {
+        "file": "sitrep-app.tar.gz",
+        "sha256": "1e26505ba8755e99b933287c0c5a5560ff83b278cf73625b001f18d3ed47c7e2",
+        "bytes": 3632257,
+        "files": 200
+      },
+      "client": {
+        "file": "sitrep-client.tar.gz",
+        "sha256": "7d73702dab1969b391965b9ee85d1ec42cd37bab3b30f562a0b889262d5f6d18",
+        "bytes": 15303965,
+        "files": 14
+      }
+    },
+    "manualVersion": "2026.21.2",
+    "rootCache": "trazabilidad-rrpp-v144",
+    "appVersion": "20261021124024",
+    "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+  },
+  "authority": {
+    "configuredBefore": 0,
+    "requestedRoles": [
+      "ADMIN_GENERADOR",
+      "ADMIN_OPERADOR",
+      "ADMIN_TRANSPORTISTA",
+      "ADMIN"
+    ],
+    "activeAccountCounts": {
+      "ADMIN_GENERADOR": 0,
+      "ADMIN_OPERADOR": 0,
+      "ADMIN_TRANSPORTISTA": 1,
+      "ADMIN": 8
+    },
+    "supportedByAuthorizedCommit": [
+      "ADMIN"
+    ],
+    "compatibleWithRequest": false,
+    "inspectionReadOnly": true,
+    "accountIdsAndPersonalDetailsOmitted": true
+  },
+  "production": {
+    "mutations": 0,
+    "logins": 0,
+    "businessRecordsRead": 0,
+    "nonMutatingHealthChecks": 3,
+    "targetReleaseSmokeExecuted": false,
+    "capClosed": true,
+    "emailsOff": true,
+    "pushOff": true
+  },
+  "preview": {
+    "closed": true,
+    "finishedAt": "2026-10-21T12:44:13.295282006Z",
+    "oomKilled": false
+  },
+  "migrationsRequired": false,
+  "mainUnchanged": "c8402190edfc36b5e5d0dee1337c24bd1689420d",
+  "pushOrWorkflows": false,
+  "evidenceHashes": {
+    "build.json": "2b8c6c6c7a9bae38ec03eeeb9e2996d00ea5fb70f721e8e6f700814ad4575782",
+    "source-proof.json": "12a909be87109a10bb47355efb7e3e1298c7feb392cb770be796589edafd1991",
+    "artifact-verification.json": "0a207430b34b40d2b16f73beff90dcd9c82ba1c196094ff04f6916a15e56b59b",
+    "closure-proof.json": "a1ae517d5ce463581e428d71222212224513519b7551fa0cb90f17e4a217d11e",
+    "authority-candidates.json": "c100e86cd13508ce9c4d972252811650f4e510f3a9869f2f5095936ac5b96854",
+    "publish-production.js": "6f530fc91c2fab35344b0f27abe3545cda189f10bc9642c6b0bc93584235e476"
+  }
+}
