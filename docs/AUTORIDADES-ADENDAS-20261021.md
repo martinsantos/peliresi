@@ -1,6 +1,6 @@
 # Autoridades de adendas ordinarias — 21/10/2026
 
-Trabajo sobre `ea8ae868`, que contiene el producto `db68b24e`, en el único checkout autorizado y rama `codex/sitrep-training-20261018`. **Sólo preview; sin inspeccionar ni modificar producción, cuentas reales o main.** Este candidato resuelve el impedimento técnico documentado en [la preparación anterior](PREPARACION-ADENDAS-20261021.md). La designación de cuentas productivas sigue pendiente.
+Trabajo sobre `ea8ae868`, que contiene el producto `db68b24e`, en el único checkout autorizado y rama `codex/sitrep-training-20261018`. **Sólo preview; sin inspeccionar ni modificar producción, cuentas reales o main.** Este candidato resuelve el impedimento técnico documentado en [la preparación anterior](PREPARACION-ADENDAS-20261021.md). El dueño confirmó después que por ahora importa incorporar las funciones que autorizan; difirió la asignación de cuentas concretas. El soporte quedó en **f7b0ad60**.
 
 ## Cambio y límites
 
@@ -60,10 +60,10 @@ Capturas originales de la corrida aprobada, con datos artificiales y sin edició
 
 ![Autoridad de Operadores en app](evidence/autoridades-adendas-20261021/autoridad-operadores-app.png)
 
-## Qué falta para publicar
+## Decisión del dueño y futura activación
 
-La última inspección productiva, anterior a este trabajo, verificó **47ea8470**, adendas/revisión apagadas y lista de autoridades vacía. Encontró **0 ADMIN_GENERADOR activos, 0 ADMIN_OPERADOR, 1 ADMIN_TRANSPORTISTA y 8 ADMIN**. El dueño indicó las cuatro funciones; falta identificar por correo/ID a Super Admin y a los responsables de Generadores y Operadores. No se crearon/activaron cuentas ni se cambiaron roles por inferencia; la consulta de identidades de aquella preparación no examinó datos de negocio.
+La última inspección productiva, anterior a este trabajo, verificó **47ea8470**, adendas/revisión apagadas y lista de autoridades vacía. Encontró **0 ADMIN_GENERADOR activos, 0 ADMIN_OPERADOR, 1 ADMIN_TRANSPORTISTA y 8 ADMIN**. El dueño indicó las cuatro funciones y, el 21/10/2026, respondió que por ahora sólo importa incorporar que ellas autorizan. La asignación por correo/ID queda diferida por su decisión; no queda una pregunta sin responder ni se necesita para cerrar esta revisión. No se crearon/activaron cuentas ni se cambiaron roles por inferencia; la consulta de identidades de aquella preparación no examinó datos de negocio.
 
-Este trabajo prepara el soporte y sus pruebas. Antes de publicar: resolver las identidades y cualquier alta/cambio de rol necesario por autorización expresa, aprobar el nuevo SHA, recompilar para `https://sitrep.ultimamilla.com.ar/api` y versiones SW de release, verificar configuración y respaldos, activar adendas/revisión y hacer smoke no mutante. **No desplegar estos bundles con `/api` de QA ni copiar usuarios artificiales.** CAP, correo y push deben permanecer cerrados; propuestas/relevos/GPS múltiple y uploads conservados.
+El soporte de esas autoridades y sus pruebas están completos; no se requiere ahora identificar personas ni cambiar el mecanismo de designación explícita. La aclaración no autoriza una nueva publicación o activación. Cuando se retome esa etapa: resolver las identidades y cualquier alta/cambio de rol necesario por autorización expresa, aprobar el nuevo SHA, recompilar para `https://sitrep.ultimamilla.com.ar/api` y versiones SW de release, verificar configuración y respaldos, activar adendas/revisión y hacer smoke no mutante. **No desplegar estos bundles con `/api` de QA ni copiar usuarios artificiales.** CAP, correo y push deben permanecer cerrados; propuestas/relevos/GPS múltiple y uploads conservados.
 
 Los paquetes previos de `db68b24e` no contienen este cambio. No se transfirieron artefactos ni se hicieron staging, migraciones o recargas productivas. La [reversión vigente de 47ea8470](DESPLIEGUE-PROPUESTAS-20261021.md) permanece intacta; no existe una nueva publicación que revertir.

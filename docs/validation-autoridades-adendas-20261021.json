@@ -212,5 +212,17 @@
       "sha256": "a320fb4869b73f3d3c80bc7636fbbd722ab03286fec18b4c3c451633f012c1a1"
     }
   ],
-  "pending": "Identificar cuentas operativas de Super Admin, Generadores y Operadores; autorizar publicación del nuevo SHA. Sin altas, activaciones o cambios de roles inferidos."
+  "pending": "Asignación de cuentas productivas diferida por el dueño el 21/10/2026. Funciones que autorizan incorporadas y probadas en f7b0ad60: Super Admin y administraciones de Generadores, Operadores y Transporte. No se requiere identificar personas en esta fase; no hay nueva publicación autorizada.",
+  "ownerClarification": {
+    "date": "2026-10-21",
+    "authorities": [
+      "ADMIN",
+      "ADMIN_GENERADOR",
+      "ADMIN_OPERADOR",
+      "ADMIN_TRANSPORTISTA"
+    ],
+    "accountAssignment": "deferred_by_owner",
+    "implementationCommit": "f7b0ad602037252429161e9517ac3e52b437a1a6",
+    "codeOrPermissionsChangedByClarification": false
+  }
 }

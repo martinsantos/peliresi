@@ -1,6 +1,6 @@
 # Preparación de db68b24e — pendiente de resolver autoridades
 
-**Actualización posterior:** el soporte de las cuatro funciones fue implementado y probado en un candidato nuevo. Ver [autoridades de adendas y validación](AUTORIDADES-ADENDAS-20261021.md). Sigue pendiente la identidad de las cuentas productivas y la publicación del nuevo SHA; estos paquetes db68b24e no contienen la corrección. El resto de este documento conserva el registro de aquella preparación.
+**Actualización posterior:** el soporte de las cuatro funciones fue implementado y probado en un candidato nuevo. Ver [autoridades de adendas y validación](AUTORIDADES-ADENDAS-20261021.md). El dueño difirió la identificación de cuentas: por ahora sólo pide incorporar las cuatro funciones que autorizan, ya soportadas en f7b0ad60. No volver a pedir correos en esta fase. La publicación no se realizó; estos paquetes db68b24e no contienen la corrección. El resto de este documento conserva el registro de aquella preparación.
 
 **No publicado. Producción continúa en 47ea8470.** El dueño autorizó publicar `db68b24e4b4a4e04ec5a1bae308d1bd1a41deab8` en backend, web, app y manual, habilitar adendas y verificar la autoridad, manteniendo CAP cerrado y correos/push apagados. La inspección en lectura encontró `MANIFEST_EXCEPTIONAL_REVIEWERS` vacío.
 
@@ -28,6 +28,6 @@ Sólo lecturas: release/symlinks, entorno filtrado, estado de workers, salud pú
 
 No se transfirieron paquetes a producción, no se prepararon directorios activos, respaldos nuevos o enlaces allí, ni se recargó PM2. La [reversión vigente de 47ea8470](DESPLIEGUE-PROPUESTAS-20261021.md) sigue siendo la única validada. El script local adaptado para db68b24e es **preparación sin ejecutar**: exige selección explícita y válida, nuevo preflight, respaldo verificado, staging, activación y smoke. Su intención es conservar backend con guardas persistidas, volver a la interfaz/manual previos y apagar sólo adendas/revisión, preservando propuestas; todavía no hay release de rollback construido en producción.
 
-Artefactos: `/opt/sitrep-qa-enterprise-20261016/source/.qa-release-db68b24e-20261021/`. Scripts y evidencia local ignorada: `test-results-deploy-db68b24e/`; `authority-candidates.json` contiene sólo IDs/roles y quedó privado (0600). Nunca copiar la cuenta QA. Al retomar, verificar de nuevo release/entorno/autoridades y resolver la respuesta pendiente antes de cualquier activación. **Sin push ni workflows.**
+Artefactos: `/opt/sitrep-qa-enterprise-20261016/source/.qa-release-db68b24e-20261021/`. Scripts y evidencia local ignorada: `test-results-deploy-db68b24e/`; `authority-candidates.json` contiene sólo IDs/roles y quedó privado (0600). Nunca copiar la cuenta QA. Al preparar una futura activación, verificar de nuevo release/entorno y configurar las autoridades; la identificación de cuentas quedó diferida expresamente por el dueño en la actualización posterior. **Sin push ni workflows.**
 
 [Resumen y hashes](preparation-db68b24e-20261021.json). Este documento registra una preparación; no afirma publicación, smoke del candidato ni soporte de autoridades sectoriales.
