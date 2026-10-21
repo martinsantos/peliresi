@@ -1,8 +1,20 @@
 # SITREP — traspaso vigente de operación
 
-## Revisión vigente — propuestas ordinarias fuera de CAP, 21/10/2026
+## Última publicación — propuestas de tres partes 47ea8470, 21/10/2026
 
-**Sólo preview, sin publicar.** Leer primero [circuito, pruebas y límites](PROPUESTAS-OPERATIVAS-20261021.md) y [plan ejecutado](PLAN-PROPUESTAS-OPERATIVAS-20261021.md). Generador, transportista u operador pueden proponer; cada parte aprueba expresamente, el generador firma y el retiro requiere unanimidad más inicio de coordinación. Agenda/campana y actualización entre sesiones en web/app; rechazos, concurrencia, historial y recorrido in situ protegidos. Flag nuevo independiente `MANIFEST_PROPOSALS_ENABLED` / `VITE_MANIFEST_PROPOSALS_ENABLED`, false por defecto; sólo true en QA. Sin migraciones.
+**`47ea8470` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 08:31:08 Mendoza**, con autorización del dueño. Leer primero [despliegue, flags y reversión vigente](DESPLIEGUE-PROPUESTAS-20261021.md). Propuestas ordinarias habilitadas en backend/frontend: creación por G/T/O, aprobación expresa de cada parte, firma del generador, coordinación unánime y retiro físico posterior. Administración no reemplaza decisiones; históricos e in situ conservados.
+
+**Único cambio de configuración: `MANIFEST_PROPOSALS_ENABLED=true` / `VITE_MANIFEST_PROPOSALS_ENABLED=true`.** CAP cerrado, correos/push apagados, uploads y demás flags conservados. Eventuales/adendas/revisión posterior false; relevos/GPS múltiple true. Entorno nuevo SHA-256 `97ef23d52f52f0f9b17ce26e467880670f264671c5a14acc8750feb94835d28f`, resto de bytes intacto; comprobado en ambos workers y PM2 guardado.
+
+Build de **2.327 blobs exactos**, API final, serial/1 CPU/2 GiB/swap cero; backend/tipos/web/app PASS. **Sin migraciones ni instalaciones productivas**. Respaldo de release/configuración verificado antes de activar. Smoke no mutante **131/131**, externo **9/9**, PWA **8/8**; dos workers estables, cero logins/consultas de registros/mutaciones de negocio. Manual **2026.21.1**, renderer/CSS conservados; SW raíz **v142**, app **20261021112835**, actualización explícita y assets anteriores preservados.
+
+**Reversión: interfaz/manual a 13af2fb0, backend 47ea8470 conservado y propuestas apagadas. No usar reversiones anteriores ni degradar las guardas de aprobaciones persistidas.** SW reversión v143/app 20261021113031. No restaura base ni borra historial; preparada, no ejecutada.
+
+Preview detenido **08:30:15 Mendoza**, sin OOM ni presión de memoria; base/imagen/evidencia conservadas. `main` intacto, sin push/workflows; cierre `[skip ci]`. La revisión funcional previa está abajo; esta publicación no hizo E2E autenticado productivo ni certificación física.
+
+## Validación previa — propuestas ordinarias fuera de CAP, 21/10/2026
+
+**Revisión previa realizada sólo en preview, antes de la publicación registrada arriba.** Leer [circuito, pruebas y límites](PROPUESTAS-OPERATIVAS-20261021.md) y [plan ejecutado](PLAN-PROPUESTAS-OPERATIVAS-20261021.md). Generador, transportista u operador pueden proponer; cada parte aprueba expresamente, el generador firma y el retiro requiere unanimidad más inicio de coordinación. Agenda/campana y actualización entre sesiones en web/app; rechazos, concurrencia, historial y recorrido in situ protegidos. Flag nuevo independiente `MANIFEST_PROPOSALS_ENABLED` / `VITE_MANIFEST_PROPOSALS_ENABLED`, false por defecto; sólo true en QA. Sin migraciones.
 
 Validación: suites completas previas **1438/1438 backend y 1790/1790 frontend**; ajustes finales dirigidos **33 backend, 65 interfaz/manual y 6 continuidad del chofer**, todos PASS. **12 casos E2E únicos**: v3 12/12 y repetición final móvil/app v4 8/8; **8 grupos HTTP + 1 de flag apagado**. Tipos/builds/lint sin errores; advertencias y fallos de harness conservados en el informe. Manual **2026.21.1**, mismo renderer/CSS. No afirmar suites completas posteriores a los últimos ajustes ni certificación física.
 

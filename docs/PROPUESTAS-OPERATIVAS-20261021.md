@@ -1,6 +1,6 @@
 # Propuestas ordinarias de manifiestos — revisión 21/10/2026
 
-Estado: circuito implementado y validado, sólo preview. No publicado. CAP cerrado y servicios de QA detenidos.
+Estado actual: **47ea8470 publicado el 21/10/2026 08:31:08 Mendoza** con propuestas habilitadas por autorización posterior. Ver [despliegue y reversión](DESPLIEGUE-PROPUESTAS-20261021.md). CAP y canales externos siguen cerrados. El resto de este documento registra la revisión previa, realizada sólo en preview; sus límites no describen el estado productivo posterior.
 
 ## Alcance autorizado
 

@@ -1,5 +1,7 @@
 # Revisión integral publicada — 21/10/2026
 
+> Antecedente reemplazado por [47ea8470 y su reversión vigente](DESPLIEGUE-PROPUESTAS-20261021.md). **No ejecutar la reversión de este documento:** la versión actual conserva guardas de aprobaciones operativas persistidas que 13af2fb0/c9cd877f no contienen.
+
 **Backend, web, `/app` y manual `13af2fb02e02d9fd39b2d4471bc40c2505c8f060` publicados** en `sitrep.ultimamilla.com.ar` el **21/10/2026 07:00:01 Mendoza**. Autorización expresa del dueño para este SHA, conservando flags, CAP cerrado y correos/push apagados; sin main, datos reales ni workflows. Los controles finales no mutantes pasaron.
 
 Incluye la [revisión integral de circuitos y trece correcciones](REVISION-INTEGRAL-CIRCUITOS-20261020.md), y las [mejoras de altas de los tres actores](REVISION-ALTAS-20261020.md) previamente pendientes. Se publican los arreglos de formularios y acceso, avisos de agenda PSIP y eventuales, elegibilidad de correos, unidades de adendas, contexto por rol, documentos del transporte y navegación del manual. No se amplían permisos, cambian reglas regulatorias ni se habilitan funciones por este despliegue.
