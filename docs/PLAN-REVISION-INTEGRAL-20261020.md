@@ -1,6 +1,6 @@
 # Revisión integral de circuitos y experiencia por rol
 
-Estado: **revisión completada en preview, cierre 21/10/2026**, desde `7e8ffe0c` / producto previo `4b5c8bdd`. Resultado: backend **1430/1430**, frontend **1781/1781**, **369 casos E2E únicos**, **78 grupos HTTP**. Ver [evidencia y límites](REVISION-INTEGRAL-CIRCUITOS-20261020.md). Sólo preview, datos artificiales, CAP cerrado y correo/push externos apagados. Producción y `main` fuera del alcance; commits `[skip ci]`, sin push ni workflows.
+Estado: **revisión completada en preview, candidato `13af2fb0`, cierre 21/10/2026**, desde `7e8ffe0c` / producto previo `4b5c8bdd`. Resultado: backend **1430/1430**, frontend **1781/1781**, **369 casos E2E únicos**, **78 grupos HTTP**. Ver [evidencia y límites](REVISION-INTEGRAL-CIRCUITOS-20261020.md). Sólo preview, datos artificiales, CAP cerrado y correo/push externos apagados. Producción y `main` fuera del alcance; commits `[skip ci]`, sin push ni workflows.
 
 ## Resultado buscado
 

@@ -1,6 +1,6 @@
 # Revisión integral de circuitos — preview
 
-**Revisión completada en preview; sin publicar. Cierre 21/10/2026.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, con las mejoras de altas `4b5c8bdd` todavía sin desplegar. La última publicación documentada sigue siendo `c9cd877f`; no se inspeccionó producción durante esta revisión. El [plan](PLAN-REVISION-INTEGRAL-20261020.md) y la [matriz](MATRIZ-CIRCUITOS-20261020.md) definen el alcance y distinguen los contratos operativos de los de capacitación.
+**Candidato `13af2fb02e02d9fd39b2d4471bc40c2505c8f060`: revisión completada en preview, sin publicar. Cierre 21/10/2026.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, con las mejoras de altas `4b5c8bdd` todavía sin desplegar. La última publicación documentada sigue siendo `c9cd877f`; no se inspeccionó producción durante esta revisión. El [plan](PLAN-REVISION-INTEGRAL-20261020.md) y la [matriz](MATRIZ-CIRCUITOS-20261020.md) definen el alcance y distinguen los contratos operativos de los de capacitación.
 
 ## Problemas reproducidos y correcciones
 

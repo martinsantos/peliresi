@@ -2,7 +2,7 @@
 
 ## Revisión integral — candidato sólo en preview, 21/10/2026
 
-**Revisión completada, sin publicar.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, incluye altas `4b5c8bdd` pendientes. Leer primero [circuitos, trece correcciones, validación y límites](docs/REVISION-INTEGRAL-CIRCUITOS-20261020.md), luego [matriz](docs/MATRIZ-CIRCUITOS-20261020.md) y [plan ejecutado](docs/PLAN-REVISION-INTEGRAL-20261020.md). Última producción documentada: **c9cd877f**, sin nueva inspección ni modificación productiva.
+**Candidato `13af2fb02e02d9fd39b2d4471bc40c2505c8f060` validado, sin publicar.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, incluye altas `4b5c8bdd` pendientes. Leer primero [circuitos, trece correcciones, validación y límites](docs/REVISION-INTEGRAL-CIRCUITOS-20261020.md), luego [matriz](docs/MATRIZ-CIRCUITOS-20261020.md) y [plan ejecutado](docs/PLAN-REVISION-INTEGRAL-20261020.md). Última producción documentada: **c9cd877f**, sin nueva inspección ni modificación productiva.
 
 backend **1430/1430**, frontend **1781/1781**, **369 casos E2E únicos**, **78 grupos HTTP**; **107 variantes de correo simuladas**, auditoría **8/8**, tipos/builds/lint PASS. Casos únicos deduplicados: no sumar intentos ni pruebas dirigidas. Se corrigieron identidad/estado/errores de ABM, pérdida del formulario de login, avisos de agenda PSIP y eventuales, elegibilidad de correos, unidades de adendas, próxima acción por rol, documentos del transporte y navegación del manual. Sin migración nueva ni ampliación de permisos.
 
