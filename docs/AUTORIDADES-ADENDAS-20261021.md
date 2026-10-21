@@ -1,5 +1,7 @@
 # Autoridades de adendas ordinarias — 21/10/2026
 
+**Publicación posterior:** el candidato `66a1c29e`, con este mismo producto, fue publicado conservando los flags actuales: adendas/revisión apagadas y cuentas de autoridad aún sin asignar. Ver [despliegue y reversión vigente](DESPLIEGUE-AUTORIDADES-20261021.md). El resto de este documento registra la validación previa en preview.
+
 Trabajo sobre `ea8ae868`, que contiene el producto `db68b24e`, en el único checkout autorizado y rama `codex/sitrep-training-20261018`. **Sólo preview; sin inspeccionar ni modificar producción, cuentas reales o main.** Este candidato resuelve el impedimento técnico documentado en [la preparación anterior](PREPARACION-ADENDAS-20261021.md). El dueño confirmó después que por ahora importa incorporar las funciones que autorizan; difirió la asignación de cuentas concretas. El soporte quedó en **f7b0ad60**.
 
 ## Cambio y límites

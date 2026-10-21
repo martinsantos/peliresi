@@ -1,5 +1,15 @@
 # SITREP — traspaso vigente de operación
 
+## Última publicación — autoridades 66a1c29e, 21/10/2026
+
+**`66a1c29e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 15:45:25 Mendoza**. Leer primero [publicación, evidencia y reversión vigente](DESPLIEGUE-AUTORIDADES-20261021.md). Soporte de cuatro funciones de autoridad incorporado, con designación explícita por ID; asignación de cuentas diferida por el dueño.
+
+**Configuración íntegra conservada**: adendas/revisión/eventuales false, propuestas/relevos/GPS múltiple true, autoridades sin asignar; CAP cerrado y correos/push apagados. `.env` idéntico por hash `97ef23d52f52f0f9b17ce26e467880670f264671c5a14acc8750feb94835d28f`, uploads/identidades y PM2 conservados. Sin consultas o modificaciones de negocio, main ni workflows.
+
+Build exacto de **2.350 blobs**, API final, backend/tipos/web/app PASS; serial/1 CPU/2 GiB/swap cero. **Sin migraciones o instalaciones productivas**; respaldo de release/configuración verificado. Smoke no mutante **132/132**, externo **9/9**, PWA **8/8**; dos workers estables. Manual **2026.21.3**, renderer/CSS conservados; SW raíz **v146**, app **20261021184131**.
+
+Reversión preparada a interfaz/manual **47ea8470**, conservando **backend 66a1c29e y todos los flags**. No usar reversiones anteriores que deshabilitan propuestas o degradan guardas; no restaurar base. Preview detenido **21/10/2026 15:42:23 Mendoza**, sin OOM/presión, evidencias preservadas. Cierre `[skip ci]`, sin push. Validación funcional previa: 1451 backend / 1796 frontend / 18 E2E, detallada abajo; no se repitió en producción.
+
 ## Autoridades de adendas — candidato probado, sin publicar, 21/10/2026
 
 Leer primero [autoridades, validación y asignación diferida](AUTORIDADES-ADENDAS-20261021.md). Se completó el soporte solicitado para **ADMIN, ADMIN_GENERADOR, ADMIN_OPERADOR y ADMIN_TRANSPORTISTA**, activos y **designados por ID**. Autoridad de adendas ordinarias y destinatarios de nuevas Y; sin autoaprobación, suplantación ni promoción automática por rol. Eventuales conservan sus permisos. No se modificaron cuentas reales ni se accedió a producción en esta tanda.
