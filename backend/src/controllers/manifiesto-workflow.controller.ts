@@ -1,6 +1,6 @@
 import { approveManifestProposal, assertManifestProposalApproved } from './manifest-proposal.controller';
+import { updateRollingHash } from '../services/manifestIntegrity.service';
 import { MANIFEST_PROPOSAL } from '../domain/manifestProposal';
-import { isTrainingSession } from '../lib/trainingScope';
 import { Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
@@ -8,7 +8,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { domainEvents } from '../services/domainEvent.service';
-import { computeRollingHash, computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
+import { computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
 import { prepareManifiestoSignature } from '../domain/manifiestoSignature';
@@ -32,47 +32,6 @@ const cerrarManifiestoSchema = z.object({
   observaciones: z.string().max(1000).optional(),
 });
 
-/**
- * Compute rolling hash and save it on the manifiesto + evento inside a $transaction.
- * `tx` is the Prisma transaction client.
- */
-async function updateRollingHash(
-  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  manifiestoId: string,
-  estado: string,
-  fecha: Date,
-  observaciones: string | null,
-  eventoId: string,
-) {
-  // Fetch current rolling hash + genesis blockchain timestamp
-  const current = await tx.manifiesto.findUnique({
-    where: { id: manifiestoId },
-    select: { rollingHash: true, blockchainTimestamp: true },
-  });
-  const eventCount = await tx.eventoManifiesto.count({ where: { manifiestoId } });
-
-  const newRollingHash = computeRollingHash({
-    previousHash: current?.rollingHash ?? null,
-    genesisBlockchainTimestamp: current?.blockchainTimestamp?.toISOString() ?? null,
-    estado,
-    fecha: fecha.toISOString(),
-    eventCount,
-    observaciones,
-  });
-
-  await tx.manifiesto.update({
-    where: { id: manifiestoId },
-    data: { rollingHash: newRollingHash },
-  });
-
-  await tx.eventoManifiesto.update({
-    where: { id: eventoId },
-    data: { integrityHash: newRollingHash },
-  });
-
-  return newRollingHash;
-}
-
 // Firmar manifiesto
 export const firmarManifiesto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -80,7 +39,7 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     await assertCanAccessManifiesto(prisma, req.user, id);
     const userId = req.user.id;
     const firma = await prepareManifiestoSignature(req.body?.firma);
-    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) {
+    if (await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) {
       const manifiesto = await approveManifestProposal(req, firma);
       res.json({ success: true, data: { manifiesto } });
       return;
@@ -857,7 +816,7 @@ export const revertirEstado = async (req: AuthRequest, res: Response, next: Next
   try {
     const { id } = req.params;
     await assertCanAccessManifiesto(prisma, req.user, id);
-    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta conserva las decisiones y el recorrido de las partes; creá un caso nuevo para repetir la práctica', 409);
+    if (await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta conserva las decisiones y el recorrido de las partes; creá una nueva propuesta para acordar cambios', 409);
     const parsed = revertirManifiestoSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
     const { estadoNuevo, motivo } = parsed.data;

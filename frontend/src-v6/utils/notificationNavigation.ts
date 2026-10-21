@@ -24,6 +24,9 @@ function withBasePath(path: string, basePath: string): string {
 /** Opening a workflow notice must refresh its linked expediente/application. */
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
+  if (data.tipo === 'propuesta_partes') {
+    for (const key of ['manifiestos','manifest-proposal','training-tasks','manifest-agenda']) void queryClient.invalidateQueries({ queryKey: [key] });
+  }
   if (data.tipo === 'manifiesto_eventual' && data.version === 1) void queryClient.invalidateQueries({ queryKey: ['baja-intensidad'] });
   if (data.tipo === 'antecedente_fiscalizacion' && data.version === 1) void queryClient.invalidateQueries({ queryKey: ['inspection-intakes'] });
   if (typeof data.solicitudId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) {

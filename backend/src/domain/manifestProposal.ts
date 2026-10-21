@@ -4,16 +4,20 @@ import { isTrainingSession } from '../lib/trainingScope';
 export const MANIFEST_PROPOSAL = 'PROPUESTA_PARTES_V1';
 export const APPROVAL_EVENTS = { GENERADOR: 'FIRMA', TRANSPORTISTA: 'APROBACION_TRANSPORTISTA', OPERADOR: 'APROBACION_OPERADOR' } as const;
 export type ProposalRole = keyof typeof APPROVAL_EVENTS;
-type Identity = { id: string; rol: string; restricted?: boolean; generador?: { id: string } | null; transportista?: { id: string } | null; operador?: { id: string } | null };
+type Identity = { id: string; rol: string; restricted?: boolean; impersonatedBy?: unknown; generador?: { id: string; activo?: boolean } | null; transportista?: { id: string; activo?: boolean } | null; operador?: { id: string; activo?: boolean } | null };
 export type Proposal = { version: 1; generadorId: string; transportistaId: string; operadorId: string; creadoPorId: string; autorRol: string };
+export const COORDINATION_EVENTS = ['INICIO_COORDINACION', 'INICIO_COORDINACION_CAP'];
+export function manifestProposalsEnabled() {
+  return isTrainingSession() || process.env.MANIFEST_PROPOSALS_ENABLED === 'true';
+}
 export function canCreateManifestProposal(user: Identity) {
-  return isTrainingSession() && !user.restricted && (user.rol === 'ADMIN' || (user.rol === 'GENERADOR' && !!user.generador?.id) || (user.rol === 'TRANSPORTISTA' && !!user.transportista?.id) || (user.rol === 'OPERADOR' && !!user.operador?.id));
+  return manifestProposalsEnabled() && !user.restricted && !user.impersonatedBy && (user.rol === 'ADMIN' || (user.rol === 'GENERADOR' && !!user.generador?.id && user.generador.activo !== false) || (user.rol === 'TRANSPORTISTA' && !!user.transportista?.id && user.transportista.activo !== false) || (user.rol === 'OPERADOR' && !!user.operador?.id && user.operador.activo !== false));
 }
 export function proposalRole(user: Identity, proposal: Proposal): ProposalRole | null {
-  if (user.restricted) return null;
-  if (user.rol === 'GENERADOR' && user.generador?.id === proposal.generadorId) return 'GENERADOR';
-  if (user.rol === 'TRANSPORTISTA' && user.transportista?.id === proposal.transportistaId) return 'TRANSPORTISTA';
-  if (user.rol === 'OPERADOR' && user.operador?.id === proposal.operadorId) return 'OPERADOR';
+  if (user.restricted || user.impersonatedBy) return null;
+  if (user.rol === 'GENERADOR' && user.generador?.id === proposal.generadorId && user.generador.activo !== false) return 'GENERADOR';
+  if (user.rol === 'TRANSPORTISTA' && user.transportista?.id === proposal.transportistaId && user.transportista.activo !== false) return 'TRANSPORTISTA';
+  if (user.rol === 'OPERADOR' && user.operador?.id === proposal.operadorId && user.operador.activo !== false) return 'OPERADOR';
   return null;
 }
 export function parseProposal(description: string): Proposal {

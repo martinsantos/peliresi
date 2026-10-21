@@ -1,3 +1,4 @@
+import { manifestProposalsVisible } from '../../utils/manifestFeatures';
 import { ManifestAgenda } from './components/ManifestAgenda';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
@@ -322,7 +323,7 @@ const ManifiestosPage: React.FC = () => {
         </div>
       </div>
 
-      {currentUser?.training && <ManifestAgenda />}
+      {manifestProposalsVisible(currentUser) && <ManifestAgenda />}
 
       {/* Filters — sticky. Phones: search + Filtros in one row; state joins the other filters. */}
       <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-1 pb-2 md:pt-2">

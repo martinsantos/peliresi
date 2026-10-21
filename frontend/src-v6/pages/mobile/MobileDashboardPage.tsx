@@ -1,3 +1,4 @@
+import { manifestProposalsVisible } from '../../utils/manifestFeatures';
 import { TrainingTaskQueue } from '../../components/TrainingTaskQueue';
 /**
  * SITREP v6 - Mobile Dashboard Page
@@ -150,20 +151,20 @@ export const MobileDashboardPage: React.FC = () => {
 
       {!connectivity.isOnline && <p role="status" className="rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900">Sin conexión. Revisá abajo qué trabajo quedó guardado en este dispositivo.</p>}
 
-      {currentUser?.training && <TrainingTaskQueue/>}
+      {manifestProposalsVisible(currentUser) && <TrainingTaskQueue/>}
       {isTransportista&&manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser)&&<Button fullWidth leftIcon={<MapPin size={18}/>} onClick={()=>navigate(mp('/transporte/cargas'))}>Cargas en este móvil</Button>}
-      {isTransportista && !currentUser?.training && (
+      {isTransportista && !currentUser?.training && (!manifestProposalsVisible(currentUser) || activeQueueTrips.length > 0) && (
         <>{usingSavedTrip && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">Se muestra sólo el último viaje guardado en este teléfono. Conectate para ver todos los viajes actuales.</p>}<TransportistaTripQueue
           activeTrips={activeQueueTrips}
-          pendingTrips={pendingTrips}
+          pendingTrips={manifestProposalsVisible(currentUser) ? [] : pendingTrips}
           activeTotal={tripsEnTransito?.total}
-          pendingTotal={tripsAprobados?.total}
+          pendingTotal={manifestProposalsVisible(currentUser) ? 0 : tripsAprobados?.total}
           simultaneousGpsAvailable={manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser)}
           onOpenTrip={(tripId) => navigate(mp(`/transporte/viaje/${tripId}`))}
         /></>
       )}
 
-      {isOperador && !currentUser?.training && (
+      {isOperador && !manifestProposalsVisible(currentUser) && (
         <OperatorActionQueue
           manifiestos={operatorQueue}
           onOpenManifiesto={(manifiestoId) => navigate(mp(`/manifiestos/${manifiestoId}`))}

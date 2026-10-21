@@ -8,7 +8,7 @@ import { useMobilePrefix } from '../../../hooks/useMobilePrefix';
 import { Button } from '../../../components/ui/ButtonV2';
 export function ManifestAgenda(){
  const {currentUser}=useAuth();const mp=useMobilePrefix();const [search,setSearch]=useState(''),[page,setPage]=useState(1);
- const query=useQuery({queryKey:['manifest-agenda',currentUser?.id,search,page],queryFn:async()=>(await api.get('/manifiestos/agenda-partes',{params:{search,page}})).data.data as {total:number;items:{id:string;numero:string;fechaEstimadaRetiro:string}[]},refetchInterval:15000,staleTime:0});
+ const query=useQuery({queryKey:['manifest-agenda',currentUser?.id,currentUser?.rol,currentUser?.actorId,search,page],queryFn:async()=>(await api.get('/manifiestos/agenda-partes',{params:{search,page}})).data.data as {total:number;items:{id:string;numero:string;fechaEstimadaRetiro:string}[]},refetchInterval:15000,staleTime:0});
  return <details aria-label="Próximos retiros" className="border-b border-neutral-200 pb-3"><summary className="min-h-11 cursor-pointer py-3 font-semibold text-primary-800">Ver manifiestos programados · {query.data?.total ?? "…"}</summary><div className="space-y-2">
    <div className="flex items-center justify-between gap-2"><h2 className="font-semibold">Próximos retiros</h2><Button size="sm" variant="outline" onClick={()=>void query.refetch()}>Actualizar agenda</Button></div>
    <Input label="Buscar manifiesto programado" type="search" maxLength={80} placeholder="Número de manifiesto" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/>

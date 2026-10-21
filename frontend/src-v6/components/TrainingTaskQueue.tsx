@@ -1,3 +1,4 @@
+import { manifestProposalsVisible } from '../utils/manifestFeatures';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -7,12 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { Card, CardHeader } from './ui/CardV2';
 import { PartyApprovalStatus, type PartyApproval } from './PartyApprovalStatus';
-type Task={id:string;numero:string;estado:string;fechaEstimadaRetiro:string|null;partes:PartyApproval[]|null;inicio:string|null;requiereMiAprobacion:boolean;pesajePendiente:boolean};
+type Task={id:string;numero:string;estado:string;modalidad?:string;fechaEstimadaRetiro:string|null;partes:PartyApproval[]|null;inicio:string|null;requiereMiAprobacion:boolean;pesajePendiente:boolean};
 const day=(value:string|Date)=>new Date(value).toLocaleDateString('sv-SE',{timeZone:'America/Argentina/Mendoza'});
 function label(m:Task,role:string){
  switch(m.estado){
  case 'PENDIENTE_APROBACION':return m.requiereMiAprobacion?'Te toca aprobar':'En espera';
- case 'APROBADO':return !m.partes?'Retiro pendiente':!m.inicio?'Listo para iniciar':role==='TRANSPORTISTA'?'Confirmar retiro':'Preparando retiro';
+ case 'APROBADO':return !m.partes?(m.modalidad==='IN_SITU'?'Recepción in situ':'Retiro pendiente'):!m.inicio?'Listo para iniciar':role==='TRANSPORTISTA'?'Confirmar retiro':'Preparando retiro';
  case 'EN_TRANSITO':return 'En viaje · GPS';
  case 'ENTREGADO':return 'Recepción pendiente';
  case 'RECIBIDO':return m.pesajePendiente?'Registrar pesaje':'Registrar tratamiento';
@@ -24,8 +25,8 @@ function label(m:Task,role:string){
 export function TrainingTaskQueue(){
  const {currentUser}=useAuth(),mp=useMobilePrefix();
  const [filter,setFilter]=useState('all'),[period,setPeriod]=useState('all'),[search,setSearch]=useState(''),[count,setCount]=useState(6);
- const query=useQuery({queryKey:['training-tasks',currentUser?.id],enabled:!!currentUser?.training,queryFn:async()=>(await api.get('/manifiestos/tareas-partes')).data.data as {items:Task[];total:number;limited:boolean},refetchInterval:5000,staleTime:0});
- if(!currentUser?.training)return null;
+ const query=useQuery({queryKey:['training-tasks',currentUser?.id,currentUser?.rol,currentUser?.actorId],enabled:manifestProposalsVisible(currentUser),queryFn:async()=>(await api.get('/manifiestos/tareas-partes')).data.data as {items:Task[];total:number;limited:boolean},refetchInterval:5000,staleTime:0});
+ if(!manifestProposalsVisible(currentUser) || !currentUser)return null;
  const today=day(new Date());
  const items=(query.data?.items||[]).filter(m=>{
   const date=m.fechaEstimadaRetiro?day(m.fechaEstimadaRetiro):null;

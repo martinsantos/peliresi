@@ -17,6 +17,18 @@
 
     guides: [
       {
+        id: 'manifiestos-tres-partes', profile: 'generador', audiences: ['transportista', 'operador', 'administrador'],
+        title: 'Proponer un manifiesto y aprobar entre las tres partes', summary: 'Crear, decidir y coordinar el retiro desde la cuenta de cada actor, en web y app.',
+        duration: '4 min', icon: 'assignment_turned_in', keywords: ['propuesta', 'manifiesto', 'tres partes', 'aprobaciones', 'agenda', 'campana', 'operador', 'transportista'],
+        safety: 'Circuito operativo disponible sólo cuando se habilitan las propuestas de tres partes. Validado en preview con datos artificiales; CAP cerrado y correo/push apagados. Los manifiestos anteriores y el trabajo in situ conservan su recorrido.',
+        steps: [
+          { title: 'Crear desde cualquiera de las tres cuentas', body: ['Entrá con tu cuenta de generador, transporte u operador. En Manifiestos elegí Nuevo manifiesto. Tu empresa queda fija en tu lugar del circuito; elegí las otras dos partes registradas y activas.', 'Completá residuos, cantidades, fecha prevista y, si corresponde, vehículo y chofer del transporte elegido. Revisá antes de crear: la propuesta conserva lo presentado y no permite cambiar las partes después.'], expected: 'Aparece Pendiente aprobación. Crear no aprueba: las tres partes reciben un aviso y deben decidir, incluido quien creó.', resources: [{label: 'Manifiestos', path: '/manifiestos'}] },
+          { title: 'Revisar y decidir desde cada rol', body: ['Abrí el aviso de la campana o el manifiesto desde Mi agenda. Te toca aprobar identifica tu turno; En espera significa que ya aprobaste y falta otra parte. Verde aprobado, gris pendiente: los tres íconos muestran el acuerdo de un vistazo.', 'Generador firma su participación. Transporte y operador pulsan Aprobar como su rol. El administrador puede consultar y proponer, pero no reemplaza ninguna de esas decisiones. Si no podés participar, abrí No puedo participar / rechazar e indicá el motivo.'], expected: 'Sólo con 3 de 3 aprobaciones pasa a Aprobado. Un rechazo detiene la propuesta y conserva el motivo; requiere una nueva propuesta para corregir el acuerdo.' },
+          { title: 'Programar y coordinar el retiro', body: ['Mi agenda se actualiza y permite filtrar Por aprobar, En espera, En curso, Hoy y Próximos. En Manifiestos → Ver manifiestos programados buscá el número o avanzá por fecha.', 'Con las tres aprobaciones, cualquiera de las partes pulsa Iniciar coordinación. El generador prepara la carga, el operador coordina la recepción y el transporte prepara el retiro. Las otras partes reciben el aviso del inicio.'], expected: 'Coordinación iniciada muestra el tiempo de preparación. Todavía no se afirma que la carga esté en viaje.' },
+          { title: 'Confirmar el hecho físico y continuar', body: ['El transporte confirma el retiro cuando recibe la carga: recién entonces empieza el viaje y el GPS. Continúa con entrega; el operador recibe, pesa, registra tratamiento y cierra según el circuito existente.', 'Leer un aviso no aprueba ni completa una tarea. No repitas el proceso en otro manifiesto para simular que avanzó éste: todos deben seguir el mismo número. Los reintentos no duplican decisiones ni avisos.'], expected: 'Cada paso conserva su autor, fecha y trazabilidad. Las cuentas ajenas no ven ni deciden por las partes vinculadas.' }
+        ]
+      },
+      {
         id: 'eventuales-aprobaciones-avisos', profile: 'operador', audiences: ['generador', 'transportista', 'administrador'],
         title: 'Eventuales: qué apruebo y quién sigue', summary: 'Tres pasos para declarar, aprobar y seguir una operación con participantes sin alta.',
         duration: '3 min', icon: 'assignment', keywords: ['eventual', 'aprobaciones', 'campana', 'avisos', 'diferencias', 'revisión posterior'],
@@ -209,7 +221,7 @@
         duration: '7 min',
         icon: 'note_add',
         keywords: ['crear manifiesto', 'nuevo', 'residuos', 'generador', 'borrador'],
-        safety: 'Podés guardar como borrador y revisar la información antes de firmar. Un borrador todavía no inicia el circuito operativo.',
+        safety: 'El recorrido descrito abajo corresponde al modo de borrador anterior y al trabajo in situ. Si aparecen las aprobaciones de tres partes, seguí el tutorial Proponer un manifiesto y aprobar entre las tres partes: la creación queda pendiente de las tres decisiones y no como borrador.',
         steps: [
           { title: 'Iniciar un manifiesto', body: ['Abrí Manifiestos y elegí Nuevo manifiesto.', 'Confirmá que el generador mostrado corresponda a tu establecimiento.'], image: S + 'desktop/49_nuevo_manifiesto_generador.png', alt: 'Inicio de un nuevo manifiesto del generador', expected: 'Se abre el asistente y el manifiesto aún no fue firmado.' },
           { title: 'Seleccionar los actores', body: ['Elegí transportista y operador habilitados.', 'Revisá CUIT, domicilio y habilitación que completa el sistema.'], image: S + 'desktop/15_nuevo_manifiesto_paso2.png', alt: 'Selección de transportista y operador', expected: 'Los tres actores del circuito están correctamente identificados.' },

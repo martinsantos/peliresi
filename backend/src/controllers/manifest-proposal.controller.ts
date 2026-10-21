@@ -1,3 +1,5 @@
+import { updateRollingHash } from '../services/manifestIntegrity.service';
+import { hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { notifyManifestParties } from '../services/manifestProposal.service';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import { applyRoleFilter } from '../utils/roleFilter';
@@ -8,7 +10,7 @@ import { isTrainingSession } from '../lib/trainingScope';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
-import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, parseProposal, proposalRole, ProposalRole } from '../domain/manifestProposal';
+import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, parseProposal, proposalRole, ProposalRole } from '../domain/manifestProposal';
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 async function load(tx: Tx, id: string) {
@@ -17,12 +19,12 @@ async function load(tx: Tx, id: string) {
   const proposal = parseProposal(marker.descripcion);
   const manifest = await tx.manifiesto.findUniqueOrThrow({ where: { id } });
   if (manifest.generadorId !== proposal.generadorId || manifest.transportistaId !== proposal.transportistaId || manifest.operadorId !== proposal.operadorId || manifest.creadoPorId !== proposal.creadoPorId) throw new AppError('Las partes no coinciden con la propuesta original', 409);
-  const events = await tx.eventoManifiesto.findMany({ where: { manifiestoId: id, tipo: { in: [...Object.values(APPROVAL_EVENTS), 'RECHAZO_PARTE', 'INICIO_COORDINACION_CAP'] } }, orderBy: { createdAt: 'asc' } });
+  const events = await tx.eventoManifiesto.findMany({ where: { manifiestoId: id, tipo: { in: [...Object.values(APPROVAL_EVENTS), 'RECHAZO_PARTE', ...COORDINATION_EVENTS] } }, orderBy: { createdAt: 'asc' } });
   return { proposal, manifest, events };
 }
 export async function getManifestProposal(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!isTrainingSession()) throw new AppError('Función no habilitada', 404);
+    if (!manifestProposalsEnabled()) throw new AppError('Función no habilitada', 404);
     await assertCanAccessManifiesto(prisma, req.user, req.params.id);
     const value = await prisma.$transaction(tx => load(tx, req.params.id));
     const role = value ? proposalRole(req.user, value.proposal) : null;
@@ -32,21 +34,24 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
         const event = value.events.find(e => e.tipo === APPROVAL_EVENTS[rol]);
         return { rol, aprobada: !!event, usuarioId: event?.usuarioId, fecha: event?.createdAt };
       }),
-      inicio: value.events.find(e => e.tipo === 'INICIO_COORDINACION_CAP')?.createdAt || null,
-      puedeIniciar: !!role && value.manifest.estado === 'APROBADO' && !value.events.some(e => e.tipo === 'INICIO_COORDINACION_CAP'),
+      inicio: value.events.find(e => COORDINATION_EVENTS.includes(e.tipo))?.createdAt || null,
+      puedeIniciar: !!role && value.manifest.estado === 'APROBADO' && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)),
       puedeAprobar: value.manifest.estado === 'PENDIENTE_APROBACION' && role && !value.events.some(e => e.tipo === APPROVAL_EVENTS[role]) ? role : null,
     } : null });
   } catch (error) { next(error); }
 }
 /** One DB lock per immutable proposal protects approvals across PM2 workers. */
 export async function approveManifestProposal(req: AuthRequest, firma?: { imagen: string; sha256: string } | null) {
-  if (!isTrainingSession()) throw new AppError('Función no habilitada', 404);
+  if (!manifestProposalsEnabled()) throw new AppError('Función no habilitada', 404);
   const id = req.params.id;
   await assertCanAccessManifiesto(prisma, req.user, id);
-  const qrCode = await QRCode.toDataURL(JSON.stringify({ id }));
+  const preview = await prisma.manifiesto.findUniqueOrThrow({ where: { id }, select: { numero: true } });
+  const qrCode = await QRCode.toDataURL(JSON.stringify({ id, numero: preview.numero, timestamp: new Date().toISOString() }));
   let pushIds:string[]=[];
+  let genesisHash: string | undefined;
   const result=await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`manifest-proposal:${id}`}))::text AS "lock"`;
+    await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
     const value = await load(tx, id);
     if (!value) throw new AppError('No es una propuesta con aprobación de las partes', 404);
     const rol = proposalRole(req.user, value.proposal);
@@ -66,6 +71,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     } });
     if (reject) {
       const rejected = await tx.manifiesto.update({where:{id,estado:'PENDIENTE_APROBACION'},data:{estado:'RECHAZADO'}});
+      if (!isTrainingSession()) await updateRollingHash(tx,id,rejected.estado,event.createdAt,event.descripcion,event.id);
       pushIds=await notifyManifestParties(tx,rejected,'rechazada',req.user.id);
       return rejected;
     }
@@ -74,15 +80,23 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
       ...(rol === 'GENERADOR' ? { fechaFirma: event.createdAt } : {}),
       ...(complete ? { estado: 'APROBADO', qrCode } : {}),
     } });
+    if (!isTrainingSession()) {
+      await updateRollingHash(tx,id,updated.estado,event.createdAt,event.descripcion,event.id);
+      if (complete) {
+        const sealed = await tx.manifiesto.findUniqueOrThrow({ where: { id }, include: { generador:true, transportista:true, operador:true, residuos:true } });
+        genesisHash = hashManifiesto(sealed);
+      }
+    }
     pushIds=await notifyManifestParties(tx,updated,complete?'aprobada':`aprobacion-${rol}`,req.user.id);
     return updated;
   });
   scheduleCommittedManifestPush(pushIds);
+  if (genesisHash) { const hash=genesisHash; setImmediate(()=>{void registrarSello(id,'GENESIS',hash).catch(()=>{});}); }
   return result;
 }
 export async function approveManifestParty(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!isTrainingSession()) throw new AppError('Función no habilitada',404);
+    if (!manifestProposalsEnabled()) throw new AppError('Función no habilitada',404);
     if (req.body?.decision && !['APROBADA','RECHAZADA'].includes(req.body.decision)) throw new AppError('Decisión inválida',400);
     if (req.user.rol === 'GENERADOR' && req.body?.decision !== 'RECHAZADA') throw new AppError('Usá Firmar Manifiesto para aprobar como generador', 400);
     res.json({ success: true, data: { manifiesto: await approveManifestProposal(req) } });
@@ -90,15 +104,14 @@ export async function approveManifestParty(req: AuthRequest, res: Response, next
 }
 /** Also guards direct HTTP pickup and any later administrative state reversal. */
 export async function assertManifestProposalApproved(tx: Tx, id: string) {
-  if (!isTrainingSession()) return;
   const value = await load(tx, id);
   if (value && (value.events.some(e => e.tipo === 'RECHAZO_PARTE') || !Object.values(APPROVAL_EVENTS).every(type => value.events.some(e => e.tipo === type)))) throw new AppError('Falta la aprobación del generador, transporte u operador; no se puede retirar', 409);
-  if(value && !value.events.some(e=>e.tipo==='INICIO_COORDINACION_CAP')) throw new AppError('Las partes aprobaron: falta iniciar la coordinación antes del retiro',409);
+  if(value && !value.events.some(e=>COORDINATION_EVENTS.includes(e.tipo))) throw new AppError('Las partes aprobaron: falta iniciar la coordinación antes del retiro',409);
 }
 
 export async function getProposalAgenda(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!isTrainingSession()) throw new AppError('Función no habilitada',404);
+    if (!manifestProposalsEnabled()) throw new AppError('Función no habilitada',404);
     const page=Number(req.query.page??1),search=req.query.search??'';
     if(!Number.isInteger(page)||page<1||page>100000||typeof search!=='string'||search.length>80)throw new AppError('Filtros de agenda inválidos',400);
     const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Mendoza'}).format(new Date());
@@ -116,18 +129,20 @@ export async function getProposalAgenda(req: AuthRequest, res: Response, next: N
 /** Coordination is a separate, idempotent event; it never asserts physical pickup. */
 export async function startManifestCoordination(req: AuthRequest,res: Response,next: NextFunction){
  try {
-  if(!isTrainingSession())throw new AppError('Función no habilitada',404);
+  if(!manifestProposalsEnabled())throw new AppError('Función no habilitada',404);
   await assertCanAccessManifiesto(prisma,req.user,req.params.id);
   let pushIds:string[]=[];
   const result=await prisma.$transaction(async tx=>{
    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`manifest-proposal:${req.params.id}`}))::text AS "lock"`;
+   await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${req.params.id} FOR UPDATE`;
    const value=await load(tx,req.params.id);
    if(!value)throw new AppError('No es una propuesta de las partes',404);
    const rol=proposalRole(req.user,value.proposal);
    if(!rol)throw new AppError('Sólo una de las tres partes vinculadas puede iniciar',403);
-   const existing=value.events.find(e=>e.tipo==='INICIO_COORDINACION_CAP');if(existing)return existing;
+   const existing=value.events.find(e=>COORDINATION_EVENTS.includes(e.tipo));if(existing)return existing;
    if(value.manifest.estado!=='APROBADO'||value.events.some(e=>e.tipo==='RECHAZO_PARTE')||!Object.values(APPROVAL_EVENTS).every(t=>value.events.some(e=>e.tipo===t)))throw new AppError('Se necesitan las tres aprobaciones para iniciar',409);
-   const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:'INICIO_COORDINACION_CAP',descripcion:`Coordinación iniciada por ${rol}. Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.`}});
+   const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:isTrainingSession()?'INICIO_COORDINACION_CAP':'INICIO_COORDINACION',descripcion:`Coordinación iniciada por ${rol}. Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.`}});
+   if (!isTrainingSession()) await updateRollingHash(tx,req.params.id,value.manifest.estado,event.createdAt,event.descripcion,event.id);
    pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id);
    return event;
   });
@@ -136,12 +151,12 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
  }catch(e){next(e);}
 }
 
-/** Current work, distinct from unread history. No operational realm access. */
+/** Current work, distinct from unread history. Queries retain the authenticated actor scope. */
 export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFunction){
  try{
-  if(!isTrainingSession())throw new AppError('Función no habilitada',404);
-  const where:any={estado:{in:['PENDIENTE_APROBACION','APROBADO','EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','TRATADO']}};applyRoleFilter(where,req.user);
-  const rows=await prisma.manifiesto.findMany({where,orderBy:{createdAt:'desc'},take:100,include:{eventos:{where:{tipo:{in:[MANIFEST_PROPOSAL,...Object.values(APPROVAL_EVENTS),'INICIO_COORDINACION_CAP','CERTIFICADO_CAP_V1']}}},residuos:{select:{cantidadRecibida:true}}}});
+  if(!manifestProposalsEnabled())throw new AppError('Función no habilitada',404);
+  const where:any={estado:{in:['PENDIENTE_APROBACION','APROBADO','EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO',...(isTrainingSession()?['TRATADO']:[])]}};applyRoleFilter(where,req.user);
+  const rows=await prisma.manifiesto.findMany({where,orderBy:{createdAt:'desc'},take:100,include:{eventos:{where:{tipo:{in:[MANIFEST_PROPOSAL,...Object.values(APPROVAL_EVENTS),...COORDINATION_EVENTS,'CERTIFICADO_CAP_V1']}}},residuos:{select:{cantidadRecibida:true}}}});
   const labels:Record<string,string>={GENERADOR:'generador',TRANSPORTISTA:'transporte',OPERADOR:'operador'};
   const items=rows.flatMap(m=>{
    const marker=m.eventos.find(e=>e.tipo===MANIFEST_PROPOSAL),proposal=marker?parseProposal(marker.descripcion):null;
@@ -151,18 +166,18 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
     const missing=(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).filter(r=>!m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[r]));
     action=role&&missing.includes(role as ProposalRole)?'Revisá y aprobá tu participación':'Esperando a las otras partes';detail='Falta aprobar: '+missing.map(r=>labels[r]).join(', ')+'.';
    }else if(m.estado==='APROBADO'&&proposal){
-    const started=m.eventos.some(e=>e.tipo==='INICIO_COORDINACION_CAP');
+    const started=m.eventos.some(e=>COORDINATION_EVENTS.includes(e.tipo));
     action=!started?'Las tres partes aprobaron: iniciar coordinación':role==='TRANSPORTISTA'?'Confirmá el retiro cuando recibas la carga':'Coordinación iniciada: preparando el retiro';
     detail=!started?'Generador, transporte u operador pueden dar inicio.':'Generador prepara la carga; operador prepara la recepción. El viaje empieza con el retiro.';
-   }else if(m.estado==='EN_TRANSITO'){action=role==='TRANSPORTISTA'?'Continuá el viaje y compartí GPS':'El transporte está en viaje';detail='La entrega se confirma al llegar al destino.';}
+   }else if(m.estado==='APROBADO'){action=m.modalidad==='IN_SITU'?'Recepción in situ pendiente':'Retiro pendiente';detail='Conserva el recorrido anterior, sin nuevas aprobaciones de partes.';}else if(m.estado==='EN_TRANSITO'){action=role==='TRANSPORTISTA'?'Continuá el viaje y compartí GPS':'El transporte está en viaje';detail='La entrega se confirma al llegar al destino.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='ENTREGADO'){action='Confirmá la recepción de esta carga';detail='Después registrá el peso realmente recibido.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='RECIBIDO'){action=m.residuos.some(r=>!r.cantidadRecibida)?'Registrá el pesaje recibido':'Registrá el tratamiento';detail='El pesaje y el tratamiento permiten emitir la certificación parcial.';}
-   else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='EN_TRATAMIENTO'){action='Emití un parcial o cerrá el tratamiento';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
-   else if(m.estado==='TRATADO'&&!m.eventos.some(e=>e.tipo==='CERTIFICADO_CAP_V1'&&JSON.parse(e.descripcion).tipo==='FINAL')){action=role==='OPERADOR'?'Revisá adendas y emití la certificación final total':'Tratamiento cerrado: esperando la certificación final';detail='El operador decide cuándo firmarla y liberarla.';}
+   else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='EN_TRATAMIENTO'){action=isTrainingSession()?'Emití un parcial o cerrá el tratamiento':'Cerrá el tratamiento cuando corresponda';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
+   else if(isTrainingSession()&&m.estado==='TRATADO'&&!m.eventos.some(e=>e.tipo==='CERTIFICADO_CAP_V1'&&JSON.parse(e.descripcion).tipo==='FINAL')){action=role==='OPERADOR'?'Revisá adendas y emití la certificación final total':'Tratamiento cerrado: esperando la certificación final';detail='El operador decide cuándo firmarla y liberarla.';}
    const partes=proposal?(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
-   const inicio=m.eventos.find(e=>e.tipo==='INICIO_COORDINACION_CAP')?.createdAt||null;
+   const inicio=m.eventos.find(e=>COORDINATION_EVENTS.includes(e.tipo))?.createdAt||null;
    const requiereMiAprobacion=!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
-   return action?[{id:m.id,numero:m.numero,estado:m.estado,action,detail,fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida)}]:[];
+   return action?[{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida)}]:[];
   });
   res.json({success:true,data:{items,total:items.length,limited:rows.length===100}});
  }catch(e){next(e);}

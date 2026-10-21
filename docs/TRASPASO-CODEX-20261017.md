@@ -1,5 +1,13 @@
 # SITREP — traspaso vigente de operación
 
+## Revisión vigente — propuestas ordinarias fuera de CAP, 21/10/2026
+
+**Sólo preview, sin publicar.** Leer primero [circuito, pruebas y límites](PROPUESTAS-OPERATIVAS-20261021.md) y [plan ejecutado](PLAN-PROPUESTAS-OPERATIVAS-20261021.md). Generador, transportista u operador pueden proponer; cada parte aprueba expresamente, el generador firma y el retiro requiere unanimidad más inicio de coordinación. Agenda/campana y actualización entre sesiones en web/app; rechazos, concurrencia, historial y recorrido in situ protegidos. Flag nuevo independiente `MANIFEST_PROPOSALS_ENABLED` / `VITE_MANIFEST_PROPOSALS_ENABLED`, false por defecto; sólo true en QA. Sin migraciones.
+
+Validación: suites completas previas **1438/1438 backend y 1790/1790 frontend**; ajustes finales dirigidos **33 backend, 65 interfaz/manual y 6 continuidad del chofer**, todos PASS. **12 casos E2E únicos**: v3 12/12 y repetición final móvil/app v4 8/8; **8 grupos HTTP + 1 de flag apagado**. Tipos/builds/lint sin errores; advertencias y fallos de harness conservados en el informe. Manual **2026.21.1**, mismo renderer/CSS. No afirmar suites completas posteriores a los últimos ajustes ni certificación física.
+
+CAP cerrado, correos/push/proveedores apagados; cuatro alias rechazados con 403, **354 avisos de siete fases simulados, cero intentos/envíos**. **295 tablas previas de QA intactas**. Preview serial/un worker/1 CPU/2 GiB/swap cero, cerrado **08:11:50 Mendoza**, sin OOM; base/imagen/evidencia conservadas. `main` intacto (`c840219`), sin push/workflows, cierre `[skip ci]`. Producción **no se inspeccionó ni modificó**; última publicación documentada **13af2fb0**, abajo. No desplegar bundles `/api` de QA: una publicación requiere autorización, flags explícitos, API final y SW de release.
+
 ## Última publicación — revisión integral 13af2fb0, 21/10/2026
 
 **`13af2fb0` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 07:00:01 Mendoza**, con autorización del dueño. Leer primero [despliegue, comprobaciones y reversión vigente](DESPLIEGUE-CIRCUITOS-20261021.md). Incluye la revisión integral y las altas pendientes; no amplía permisos ni activa flags.

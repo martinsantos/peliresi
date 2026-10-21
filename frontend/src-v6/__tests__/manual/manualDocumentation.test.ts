@@ -75,7 +75,7 @@ describe('manual documentation stays usable and truthful', () => {
       const html = readFileSync(manual + file, 'utf8');
       // Guide content uses its own current cache key; the corrected renderer has its own key; CSS retains its version.
       // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.20.20');
+      expect(html).toContain('help-data.js?v=2026.21.1');
       expect(html).toContain('manual.js?v=2026.20.6');
       expect(html).toContain('manual.css?v=2026.20.5');
     }
@@ -84,4 +84,12 @@ describe('manual documentation stays usable and truthful', () => {
     expect(script).toContain('escapeHTML(step.caption ||');
     expect(readFileSync(manual + 'directorio.html', 'utf8')).toContain('id="alertas-catalogo"');
   });
+});
+
+it('documents operational proposals separately from CAP and keeps the old manifest contract explicit',()=>{
+ const guide=data.guides.find(g=>g.id==='manifiestos-tres-partes')!;
+ const text=guide.steps.flatMap(s=>s.body.concat(s.expected)).join(' ');
+ for(const value of ['Crear no aprueba','Generador firma','3 de 3','Iniciar coordinación','Leer un aviso no aprueba'])expect(text).toContain(value);
+ expect(guide.safety).toContain('CAP cerrado y correo/push apagados');
+ expect(data.guides.find(g=>g.id==='generador-crear-manifiesto')!.safety).toContain('modo de borrador anterior');
 });

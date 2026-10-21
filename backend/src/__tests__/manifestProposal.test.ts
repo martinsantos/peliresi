@@ -2,6 +2,8 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 const mock=vi.hoisted(()=>({tx:{} as any,manifest:{} as any,events:[] as any[]}));
 vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transaction'?async(fn:any)=>typeof fn==='function'?fn(mock.tx):Promise.all(fn):mock.tx[key]})}));
 vi.mock('qrcode',()=>({default:{toDataURL:vi.fn().mockResolvedValue('data:qr')}}));
+vi.mock('../services/blockchain.service', async importOriginal => ({...await importOriginal<typeof import('../services/blockchain.service')>(),registrarSello:vi.fn().mockResolvedValue(null)}));
+import QRCode from 'qrcode';
 import {inTrainingSession,inOperationalSession} from '../lib/trainingScope';
 import {canCreateManifestProposal,MANIFEST_PROPOSAL,proposalRole,parseProposal} from '../domain/manifestProposal';
 import {approveManifestProposal,assertManifestProposalApproved,startManifestCoordination} from '../controllers/manifest-proposal.controller';
@@ -10,9 +12,11 @@ const users={GENERADOR:{id:'ug',rol:'GENERADOR',generador:{id:'g'}},TRANSPORTIST
 const req=(rol:keyof typeof users,body={})=>({params:{id:'m'},user:users[rol],body} as any);
 const signature={imagen:'signed-image',sha256:'signed-hash'};
 beforeEach(()=>{
- mock.manifest={id:'m',numero:'CAP-TEST',estado:'PENDIENTE_APROBACION',...p,fechaEstimadaRetiro:new Date('2026-10-19T15:00:00Z')};
+ vi.unstubAllEnvs();
+ mock.manifest={id:'m',numero:'CAP-TEST',estado:'PENDIENTE_APROBACION',...p,generador:{cuit:'QA-G'},transportista:{cuit:'QA-T'},operador:{cuit:'QA-O'},residuos:[],fechaEstimadaRetiro:new Date('2026-10-19T15:00:00Z')};
  mock.events=[{id:'marker',tipo:MANIFEST_PROPOSAL,descripcion:JSON.stringify(p)}];
  mock.tx={$queryRaw:vi.fn(),manifiesto:{findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{
+ count:vi.fn(async()=>mock.events.length),update:vi.fn(async({where,data}:any)=>Object.assign(mock.events.find(e=>e.id===where.id),data)),
  findFirst:vi.fn(async()=>mock.events.find(e=>e.tipo===MANIFEST_PROPOSAL)),findMany:vi.fn(async()=>mock.events.filter(e=>e.tipo!==MANIFEST_PROPOSAL)),create:vi.fn(async({data}:any)=>{const e={...data,id:String(mock.events.length),createdAt:new Date()};mock.events.push(e);return e;})},
  generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn(async({data}:any)=>({count:data.length}))}};
 });
@@ -48,6 +52,7 @@ describe('three independently authenticated parties',()=>{
   await inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
   await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
   expect(mock.manifest.estado).toBe('APROBADO');
+  expect(JSON.parse(vi.mocked(QRCode.toDataURL).mock.calls.at(-1)![0] as string)).toMatchObject({id:'m',numero:'CAP-TEST'});
   expect(mock.events.filter(e=>e.tipo!==MANIFEST_PROPOSAL).map(e=>e.usuarioId)).toEqual(['uo','ug','ut']);
   expect(mock.events.find(e=>e.tipo==='FIRMA')).toMatchObject({firmaImagen:'signed-image',firmaSha256:'signed-hash'});
   await inTrainingSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
@@ -125,4 +130,68 @@ describe('bounded searchable scheduled agenda',()=>{
   const {getProposalAgenda}=await import('../controllers/manifest-proposal.controller');const next=vi.fn();mock.tx.manifiesto.findMany=vi.fn();
   await inOperationalSession(()=>getProposalAgenda({...req('ADMIN'),query:{}} as any,{json:vi.fn()} as any,next));expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:404}));expect(mock.tx.manifiesto.findMany).not.toHaveBeenCalled();
  });
+});
+
+
+describe('operational three-party proposals', () => {
+ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'] as const)('permits %s only with the separate operational flag', role => {
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  expect(inOperationalSession(()=>canCreateManifestProposal(users[role]))).toBe(true);
+  expect(inOperationalSession(()=>canCreateManifestProposal({...users[role],restricted:true}))).toBe(false);
+  expect(inOperationalSession(()=>canCreateManifestProposal({...users[role],impersonatedBy:'ua'} as any))).toBe(false);
+ });
+ it('never allows impersonation to approve a party', () => {
+  expect(proposalRole({...users.OPERADOR,impersonatedBy:'ua'} as any,p)).toBeNull();
+  expect(proposalRole({...users.OPERADOR,operador:{id:'o',activo:false}},p)).toBeNull();
+ });
+ it('does not bypass a persisted proposal when the flag is off', async () => {
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','false');
+  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+ });
+ it('leaves a legacy record on its existing pickup contract', async () => {
+  mock.events=[];
+  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+ });
+});
+
+describe('operational decisions and integrity',()=>{
+ it('records three authenticated approvals and operational coordination, with integrity and idempotent notices',async()=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  for (const role of ['OPERADOR','GENERADOR','TRANSPORTISTA'] as const) {
+   await inOperationalSession(()=>approveManifestProposal(req(role),role==='GENERADOR'?signature:undefined));
+   await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+  }
+  expect(mock.manifest.estado).toBe('APROBADO');
+  expect(JSON.parse(vi.mocked(QRCode.toDataURL).mock.calls.at(-1)![0] as string)).toMatchObject({id:'m',numero:'CAP-TEST'});
+  expect(mock.events.filter(e=>e.tipo!==MANIFEST_PROPOSAL).every(e=>/^[a-f0-9]{64}$/.test(e.integrityHash))).toBe(true);
+  const next=vi.fn(),res={json:vi.fn()} as any;
+  await inOperationalSession(()=>startManifestCoordination(req('OPERADOR'),res,next));
+  expect(next).not.toHaveBeenCalled();expect(mock.events.filter(e=>e.tipo==='INICIO_COORDINACION')).toHaveLength(1);
+  await inOperationalSession(()=>approveManifestProposal(req('TRANSPORTISTA')));
+  await inOperationalSession(()=>startManifestCoordination(req('TRANSPORTISTA'),res,next));
+  expect(mock.tx.notificacion.createMany).toHaveBeenCalledTimes(4);
+  expect(mock.manifest.fechaRetiro).toBeUndefined();
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','false');
+  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+ });
+ it('rejects, records its reason and never unlocks pickup',async()=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  await inOperationalSession(()=>approveManifestProposal(req('OPERADOR',{decision:'RECHAZADA',motivo:'No recibimos esta corriente'})));
+  expect(mock.manifest.estado).toBe('RECHAZADO');expect(mock.events.at(-1).integrityHash).toMatch(/^[a-f0-9]{64}$/);
+  await expect(inOperationalSession(()=>approveManifestProposal(req('GENERADOR'),signature))).rejects.toMatchObject({statusCode:409});
+ });
+});
+
+it('requires active participant records as well as active accounts',async()=>{
+ const {validateProposalParties}=await import('../services/manifestProposal.service');
+ mock.tx.operador.findUnique.mockResolvedValue({activo:false,usuario:{id:'uo',activo:true}});
+ await expect(validateProposalParties(mock.tx,p)).rejects.toMatchObject({statusCode:400});
+});
+
+it('keeps legacy approved trips and in-situ receipts visible in the operational agenda',async()=>{
+ vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+ const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
+ mock.tx.manifiesto.findMany=vi.fn(async()=>['FIJO','IN_SITU'].map(modalidad=>({...mock.manifest,estado:'APROBADO',modalidad,eventos:[],residuos:[]})));
+ const json=vi.fn(),next=vi.fn();await inOperationalSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
+ expect(next).not.toHaveBeenCalled();expect(json.mock.calls[0][0].data.items.map((m:any)=>[m.action,m.partes])).toEqual([['Retiro pendiente',null],['Recepción in situ pendiente',null]]);
 });

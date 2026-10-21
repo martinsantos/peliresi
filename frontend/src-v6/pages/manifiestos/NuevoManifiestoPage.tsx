@@ -1,3 +1,4 @@
+import { manifestProposalsVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Nuevo Manifiesto Page
  * ==================================
@@ -62,10 +63,10 @@ export const NuevoManifiestoPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser, isAdmin, isGenerador } = useAuth();
-  const partyProposal = currentUser?.training === true && ['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'].includes(currentUser.rol);
-  const carrierProposal = partyProposal && currentUser?.rol === 'TRANSPORTISTA';
+  const proposalsAvailable = manifestProposalsVisible(currentUser) && ['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'].includes(currentUser?.rol || '');
+  const carrierProposal = proposalsAvailable && currentUser?.rol === 'TRANSPORTISTA';
   const ownCarrierId = carrierProposal ? currentUser?.actorId || '' : '';
-  const operatorProposal = currentUser?.training === true && currentUser.rol === 'OPERADOR';
+  const operatorProposal = proposalsAvailable && currentUser?.rol === 'OPERADOR';
   const ownOperatorId = operatorProposal ? currentUser?.actorId || '' : '';
   const [step, setStep] = useState(1);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -107,6 +108,8 @@ export const NuevoManifiestoPage: React.FC = () => {
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
   });
+
+  const partyProposal = proposalsAvailable && formData.modalidad === 'FIJO';
 
   // Selected actor details (auto-populated from catalogs)
   const selectedGenerador = companyGeneratorView(generadoresList.find((g) => g.id === formData.generadorId),currentUser?.empresaContexto);
@@ -575,8 +578,8 @@ export const NuevoManifiestoPage: React.FC = () => {
                   <button
                     type="button"
                     aria-pressed={formData.modalidad === 'IN_SITU'}
-                    disabled={partyProposal}
-                    title={partyProposal ? 'Este ensayo de tres partes usa destino fijo y transporte' : undefined}
+                    disabled={carrierProposal || operatorProposal || !!currentUser?.training}
+                    title={carrierProposal || operatorProposal ? 'La propuesta de tres partes requiere transporte y destino fijo' : undefined}
                     onClick={() => {
                       if (formData.modalidad === 'IN_SITU') return;
                       setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: ownCarrierId, vehiculoId: '', choferId: '', operador: ownOperatorId }));

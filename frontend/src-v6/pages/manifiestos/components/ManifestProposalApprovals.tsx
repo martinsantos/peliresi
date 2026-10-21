@@ -1,3 +1,4 @@
+import { manifestProposalsVisible } from '../../../utils/manifestFeatures';
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, XCircle } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,23 +10,26 @@ import { Button } from '../../../components/ui/ButtonV2';
 type Approval = { autorRol: string; rechazo?: string; estado: string; inicio: string|null; puedeIniciar: boolean; partes: { rol: string; aprobada: boolean }[]; puedeAprobar: string | null };
 const names: Record<string, string> = { OPERADOR: 'Operador', GENERADOR: 'Generador', TRANSPORTISTA: 'Transporte' };
 import { PartyApprovalStatus } from '../../../components/PartyApprovalStatus';
-export function ManifestProposalApprovals({ id, estado, onSign }: { id: string; estado?: string; onSign: () => void }) {
+export function ManifestProposalApprovals({ id, onSign }: { id: string; estado?: string; onSign: () => void }) {
   const { currentUser } = useAuth(); const qc = useQueryClient();
   const [motivo,setMotivo] = useState(''),[rejecting,setRejecting]=useState(false);
   const [busy,setBusy] = useState(false), [error,setError] = useState(''),[now,setNow]=useState(Date.now()); const lock=useRef(false);
-  const key=['manifest-proposal',currentUser?.id,id];
-  const query=useQuery({queryKey:key,enabled:!!currentUser?.training,
+  const key=['manifest-proposal',currentUser?.id,currentUser?.rol,currentUser?.actorId,id];
+  const query=useQuery({queryKey:key,enabled:manifestProposalsVisible(currentUser),
     queryFn:async()=> (await api.get(`/manifiestos/${id}/aprobaciones`)).data.data as Approval|null,
     refetchInterval:5000,refetchOnMount:'always', staleTime:0, retry:false});
-  useEffect(()=>{if(query.data && query.data.estado!==estado)void qc.invalidateQueries({queryKey:['manifiestos','detail',id]});},[query.data,estado,id,qc]);
+  const revision = query.data ? JSON.stringify([query.data.estado,query.data.inicio,query.data.rechazo,query.data.partes]) : null;
+  // Coordination does not change APROBADO. Refresh the parent on event changes too,
+  // so another party's start unlocks physical pickup without a page reload.
+  useEffect(()=>{if(revision)void qc.invalidateQueries({queryKey:['manifiestos','detail',id]});},[revision,id,qc]);
   useEffect(()=>{if(!query.data?.inicio||query.data.estado!=='APROBADO')return;const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[query.data?.inicio,query.data?.estado]);
-  if(!currentUser?.training)return null;
+  if(!manifestProposalsVisible(currentUser) || !currentUser)return null;
   if(query.isError)return <p role="alert">No pudimos comprobar las aprobaciones. <Button onClick={()=>void query.refetch()}>Actualizar aprobaciones</Button></p>;
   if(!query.data)return null;
   const data=query.data,approved=data.partes.filter(p=>p.aprobada).length,missing=data.partes.filter(p=>!p.aprobada).map(p=>names[p.rol]).join(', ');
   async function act(action:'approve'|'reject'|'start'){
     if(lock.current)return;lock.current=true;setBusy(true);setError('');
-    try{await api.post(`/manifiestos/${id}/${action==='start'?'iniciar-coordinacion':'aprobar-parte'}`,action==='reject'?{decision:'RECHAZADA',motivo}:undefined);await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});await qc.invalidateQueries({queryKey:['training-tasks']});}
+    try{await api.post(`/manifiestos/${id}/${action==='start'?'iniciar-coordinacion':'aprobar-parte'}`,action==='reject'?{decision:'RECHAZADA',motivo}:undefined);await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});await qc.invalidateQueries({queryKey:['training-tasks']});await qc.invalidateQueries({queryKey:['manifest-agenda']});}
     catch(e:any){setError(e.response?.data?.message||'No se pudo guardar. Reintentá.');}
     finally{lock.current=false;setBusy(false);}
   }

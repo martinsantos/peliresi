@@ -1,7 +1,7 @@
+import { isTrainingSession } from '../lib/trainingScope';
 import { validateProposalParties, notifyManifestParties } from '../services/manifestProposal.service';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
-import { isTrainingSession } from '../lib/trainingScope';
-import { canCreateManifestProposal, MANIFEST_PROPOSAL } from '../domain/manifestProposal';
+import { manifestProposalsEnabled, canCreateManifestProposal, MANIFEST_PROPOSAL } from '../domain/manifestProposal';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AppError } from '../middlewares/errorHandler';
@@ -116,7 +116,9 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
-    const partyProposal = canCreateManifestProposal(req.user);
+    const partyProposal = canCreateManifestProposal(req.user) && modalidad === 'FIJO';
+    if (manifestProposalsEnabled() && modalidad === 'FIJO' && !partyProposal) throw new AppError('Se requiere una cuenta propia de una parte vinculada para proponer', 403);
+    if (partyProposal && req.user.rol === 'GENERADOR' && bodyGeneradorId && bodyGeneradorId !== req.user.generador?.id) throw new AppError('El generador debe ser tu propia empresa', 403);
     if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN' && !partyProposal) {
       throw new AppError('Solo los generadores pueden crear manifiestos', 403);
     }
@@ -124,7 +126,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     // ADMIN can specify generadorId in body; GENERADOR uses their own
     if (partyProposal && req.user.rol === 'OPERADOR' && operadorId !== req.user.operador.id) throw new AppError('El operador de destino debe ser tu propia empresa', 403);
     if (partyProposal && req.user.rol === 'TRANSPORTISTA' && transportistaId !== req.user.transportista.id) throw new AppError('El transporte debe ser tu propia empresa', 403);
-    if (partyProposal && modalidad !== 'FIJO') throw new AppError('El circuito de tres partes requiere transporte y destino fijo', 400);
+    if (canCreateManifestProposal(req.user) && modalidad !== 'FIJO' && (isTrainingSession() || !['GENERADOR','ADMIN'].includes(req.user.rol))) throw new AppError('El circuito de tres partes requiere transporte y destino fijo', 400);
     const generadorId = req.user.rol !== 'GENERADOR'
       ? (bodyGeneradorId || (req.user.generador && req.user.generador.id))
       : req.user.generador?.id;
@@ -252,7 +254,7 @@ export const updateManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta conserva lo presentado a las partes; creá otra propuesta para corregirla', 409);
+    if (await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta conserva lo presentado a las partes; creá otra propuesta para corregirla', 409);
 
     if (manifiesto.estado !== 'BORRADOR') {
       throw new AppError('Solo se pueden editar manifiestos en estado BORRADOR', 400);
@@ -319,7 +321,7 @@ export const deleteManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    if (isTrainingSession() && await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta y sus decisiones se conservan en el historial; no se pueden eliminar', 409);
+    if (await prisma.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } })) throw new AppError('La propuesta y sus decisiones se conservan en el historial; no se pueden eliminar', 409);
 
     if (manifiesto.estado !== 'BORRADOR' && manifiesto.estado !== 'CANCELADO') {
       throw new AppError('Solo se pueden eliminar manifiestos en estado BORRADOR o CANCELADO', 400);

@@ -9,11 +9,11 @@ async function parties(tx: Tx, p: Parties) {
     p.transportistaId ? tx.transportista.findUnique({where:{id:p.transportistaId},include:{usuario:{select:{id:true,activo:true}}}}) : null,
     tx.operador.findUnique({where:{id:p.operadorId},include:{usuario:{select:{id:true,activo:true}}}}),
   ]);
-  return [g?.usuario,t?.usuario,o?.usuario];
+  return [g,t,o].map(actor => actor?.activo === false ? undefined : actor?.usuario);
 }
 export async function validateProposalParties(tx: Tx, p: Parties) {
   const users=await parties(tx,p);
-  if(users.some(u=>!u?.activo))throw new AppError('Las tres partes deben tener una cuenta activa para aprobar. Si falta un alta, usá Eventuales.',400);
+  if(users.some(u=>!u?.activo))throw new AppError('Las tres partes y sus cuentas deben estar activas para aprobar. Si falta un alta, usá Eventuales.',400);
 }
 /** Creation and inbox commit together. Return only fresh IDs for a caller's
  * post-commit dispatch; CAP never sends external notifications. */

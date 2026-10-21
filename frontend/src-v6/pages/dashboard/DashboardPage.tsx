@@ -1,3 +1,4 @@
+import { manifestProposalsVisible } from '../../utils/manifestFeatures';
 import { TrainingTaskQueue } from '../../components/TrainingTaskQueue';
 /**
  * SITREP v6 - Dashboard Page
@@ -257,7 +258,7 @@ const GeneradorDashboard: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
         <p className="text-neutral-600">{currentUser?.sector}</p>
-        {currentUser?.training && <TrainingTaskQueue/>}
+        {manifestProposalsVisible(currentUser) && <TrainingTaskQueue/>}
       </div>
 
       {/* Stats Grid */}
@@ -376,7 +377,7 @@ const TransportistaDashboard: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
         <p className="text-neutral-600">{currentUser?.sector}</p>
-        {currentUser?.training && <TrainingTaskQueue/>}
+        {manifestProposalsVisible(currentUser) && <TrainingTaskQueue/>}
       </div>
 
       {/* Trip Assignment Banner — viajes EN_TRANSITO o APROBADO */}
@@ -557,7 +558,7 @@ const OperadorDashboard: React.FC = () => {
       <div>
         <h2 className="text-2xl font-bold text-neutral-900">¡Hola, {currentUser?.nombre?.split(' ')[0] || 'Usuario'}!</h2>
         <p className="text-neutral-600">{currentUser?.sector}</p>
-        {currentUser?.training && <TrainingTaskQueue/>}
+        {manifestProposalsVisible(currentUser) && <TrainingTaskQueue/>}
       </div>
 
       {/* Stats Grid */}

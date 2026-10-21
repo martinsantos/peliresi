@@ -420,9 +420,9 @@ const ViajeEnCursoTransportista: React.FC = () => {
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>
         </dl>}
-        {currentUser?.training && m.estado === EstadoManifiesto.APROBADO && <ManifestProposalApprovals id={id!} estado={m.estado} onSign={()=>{}}/>}
+        {eventos.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && m.estado === EstadoManifiesto.APROBADO && <ManifestProposalApprovals id={id!} estado={m.estado} onSign={()=>{}}/>}
         {/* APROBADO state: Show confirm pickup */}
-        {m.estado === EstadoManifiesto.APROBADO && (!currentUser?.training || !eventos.some(e=>e.tipo==='PROPUESTA_PARTES_V1') || eventos.some(e=>e.tipo==='INICIO_COORDINACION_CAP')) && (
+        {m.estado === EstadoManifiesto.APROBADO && (!eventos.some(e=>e.tipo==='PROPUESTA_PARTES_V1') || eventos.some(e=>['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo))) && (
           <>
             <Card variant="elevated" className="border-2 border-primary-200">
               <CardContent className="p-5 text-center">

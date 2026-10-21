@@ -8,7 +8,7 @@ vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'u',tra
 vi.mock('../../services/manifiesto.service',()=>({manifiestoService:{create:mock.create}}));
 import {useCreateManifiesto} from '../../hooks/useManifiestoWorkflow';
 import {TrainingTaskQueue} from '../../components/TrainingTaskQueue';
-afterEach(()=>{cleanup();mock.training=true;mock.rol='OPERADOR';vi.clearAllMocks();vi.useRealTimers();});
+afterEach(()=>{vi.unstubAllEnvs();cleanup();mock.training=true;mock.rol='OPERADOR';vi.clearAllMocks();vi.useRealTimers();});
 const partes=[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:true}];
 const items=[{id:'a',numero:'CAP-NEW',estado:'PENDIENTE_APROBACION',requiereMiAprobacion:true,partes,fechaEstimadaRetiro:'2099-10-20T12:00:00Z'},{id:'b',numero:'CAP-TRIP',estado:'EN_TRANSITO',partes:partes.map(p=>({...p,aprobada:true})),fechaEstimadaRetiro:'2020-10-20T12:00:00Z'}];
 function mount(){mock.get.mockResolvedValue({data:{data:{items,total:2,limited:false}}});render(<MemoryRouter><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);}
@@ -62,4 +62,10 @@ it.each(['OPERADOR','GENERADOR','TRANSPORTISTA','ADMIN'])('shows a newly created
  expect(screen.getByRole('link',{name:/CAP-OLD-0/})).toBe(oldRow);
  fireEvent.click(screen.getByRole('button',{name:'En espera',exact:true}));expect(screen.getByRole('link',{name:/CAP-LATEST/})).toBeVisible();expect(screen.queryByText('CAP-OLD-0')).not.toBeInTheDocument();
  client.clear();
+});
+
+it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('offers the live operational agenda only when its flag is enabled: %s',async role=>{
+ mock.training=false;mock.rol=role;vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');mount();
+ await screen.findByText('CAP-NEW');expect(screen.getByRole('region',{name:'Agenda de manifiestos'})).toBeVisible();
+ expect(mock.get).toHaveBeenCalledWith('/manifiestos/tareas-partes');
 });

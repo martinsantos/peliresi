@@ -95,13 +95,13 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
       <Card>
         <CardHeader title="Acciones" icon={<ClipboardCheck size={22}/>} />
         <CardContent>
-          {training && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
+          {m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           <ActionButtons
             estado={m.estado}
             isAdmin={isAdmin}
             userRol={userRol}
             isActionPending={isActionPending}
-            pickupBlocked={!!(training && m.estado === 'APROBADO' && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && !m.eventos?.some(e=>e.tipo==='INICIO_COORDINACION_CAP'))}
+            pickupBlocked={!!(m.estado === 'APROBADO' && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && !m.eventos?.some(e=>['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo)))}
             isInSitu={isInSitu}
             isCancelling={isCancelling}
             mutations={{
@@ -127,7 +127,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             onOpenReversionModal={() => setShowReversionModal(true)}
             onDescargarPDF={onDescargarPDF}
             training={training}
-            immutableProposal={!!training && m.eventos?.some(e => e.tipo === 'PROPUESTA_PARTES_V1')}
+            immutableProposal={m.eventos?.some(e => e.tipo === 'PROPUESTA_PARTES_V1')}
             onDescargarCertificado={onDescargarCertificado}
           />
         </CardContent>

@@ -47,6 +47,8 @@ export function useUpdateManifiesto() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -61,6 +63,8 @@ export function useFirmarManifiesto() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -75,6 +79,8 @@ export function useConfirmarRetiro() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -89,6 +95,8 @@ export function useConfirmarEntrega() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -103,6 +111,8 @@ export function usePesaje() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
     },
   });
 }
@@ -116,6 +126,8 @@ export function useConfirmarRecepcion() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -130,6 +142,8 @@ export function useConfirmarRecepcionInSitu() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -144,6 +158,8 @@ export function useRegistrarTratamiento() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -158,6 +174,8 @@ export function useRechazarManifiesto() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -172,6 +190,8 @@ export function useRegistrarIncidente() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -185,6 +205,8 @@ export function useCerrarManifiesto() {
     onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -199,6 +221,8 @@ export function useCancelarManifiesto() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
@@ -213,6 +237,8 @@ export function useRevertirEstado() {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });
+      qc.invalidateQueries({ queryKey: ['training-tasks'] });
+      qc.invalidateQueries({ queryKey: ['manifest-agenda'] });
       qc.invalidateQueries({ queryKey: KEYS.lists() });
     },
   });
