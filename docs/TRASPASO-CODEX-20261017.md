@@ -1,8 +1,18 @@
 # SITREP — traspaso vigente de operación
 
-## Revisión integral — candidato sólo en preview, 21/10/2026
+## Última publicación — revisión integral 13af2fb0, 21/10/2026
 
-**Candidato `13af2fb02e02d9fd39b2d4471bc40c2505c8f060` validado, sin publicar.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, incluye altas `4b5c8bdd` pendientes. Leer primero [circuitos, trece correcciones, validación y límites](REVISION-INTEGRAL-CIRCUITOS-20261020.md), luego [matriz](MATRIZ-CIRCUITOS-20261020.md) y [plan ejecutado](PLAN-REVISION-INTEGRAL-20261020.md). Última producción documentada: **c9cd877f**, sin nueva inspección ni modificación productiva.
+**`13af2fb0` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 07:00:01 Mendoza**, con autorización del dueño. Leer primero [despliegue, comprobaciones y reversión vigente](DESPLIEGUE-CIRCUITOS-20261021.md). Incluye la revisión integral y las altas pendientes; no amplía permisos ni activa flags.
+
+Build exacto de **2.310 blobs**, serial/1 CPU/2 GiB/swap cero, API final; tipos/backend/web/app PASS. **Sin migraciones**: Prisma y dependencias idénticos a c9cd877f. Smoke no mutante **120/120**, externo **9/9**, PWA **8/8**, dos workers estables. `.env` idéntico por hash `618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93`; uploads/flags conservados, **CAP/correos/push cerrados**. Adendas/eventuales/revisión de partes false; relevos/GPS múltiple true. Sin logins ni consultas/modificaciones de registros reales.
+
+Manual **2026.20.20**, renderer **2026.20.6**, CSS **2026.20.5**; inventario exacto. SW raíz **v140**, app **20261021095619**, assets previos y activación explícita conservados. Reversión preparada a **c9cd877f** compatible, sin restaurar base; SW v141/app **20261021095850**. Conserva informes, cola, pagos y tramos. No ejecutada.
+
+Preview detenido **06:57:26 Mendoza**, sin OOM; imagen/base/evidencia conservadas. `main` intacto, sin push/workflows; cierre `[skip ci]`. La aceptación previa completa se detalla abajo; esta publicación recompiló y verificó artefactos/smoke, no hizo E2E autenticado productivo ni certificación física.
+
+## Validación previa — revisión integral, 21/10/2026
+
+**Candidato `13af2fb02e02d9fd39b2d4471bc40c2505c8f060` validado antes de la publicación registrada arriba.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, incluye altas `4b5c8bdd` pendientes. Leer primero [circuitos, trece correcciones, validación y límites](REVISION-INTEGRAL-CIRCUITOS-20261020.md), luego [matriz](MATRIZ-CIRCUITOS-20261020.md) y [plan ejecutado](PLAN-REVISION-INTEGRAL-20261020.md). Durante esa revisión, producción seguía en **c9cd877f**, sin inspección ni modificación productiva.
 
 backend **1430/1430**, frontend **1781/1781**, **369 casos E2E únicos**, **78 grupos HTTP**; **107 variantes de correo simuladas**, auditoría **8/8**, tipos/builds/lint PASS. Casos únicos deduplicados: no sumar intentos ni pruebas dirigidas. Se corrigieron identidad/estado/errores de ABM, pérdida del formulario de login, avisos de agenda PSIP y eventuales, elegibilidad de correos, unidades de adendas, próxima acción por rol, documentos del transporte y navegación del manual. Sin migración nueva ni ampliación de permisos.
 

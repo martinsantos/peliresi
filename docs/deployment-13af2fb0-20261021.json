@@ -1,0 +1,45 @@
+{
+  "source": "13af2fb02e02d9fd39b2d4471bc40c2505c8f060",
+  "deployedAt": "2026-10-21T10:00:01.078Z",
+  "smoke": 120,
+  "external": 9,
+  "pwa": 8,
+  "schemaUnchanged": true,
+  "databaseMigration": false,
+  "environmentUnchanged": true,
+  "capClosed": true,
+  "channelsOff": true,
+  "stableWorkers": true,
+  "previewStopped": true,
+  "mainUnchanged": true,
+  "deploymentBusinessQueriesAndMutations": 0,
+  "workflows": false,
+  "rootCache": "trazabilidad-rrpp-v140",
+  "appVersion": "20261021095619",
+  "reports": {
+    "preflight": "53d0b834fb54b8d5c71106f685c644982ccd05219fed5010a88d408190269575",
+    "build": "29f63c56d4fa6be9186e145027d0b47899ad45f90687e47cdde3ad763783a3a5",
+    "artifact-verification": "f624a842798ac83d94b93c8cf0cf5dcc9675aa32673fd8b94126e0554339327e",
+    "stage": "dbd7b234f543220f62e2361d88b2b9588f25227726305c4be024c35902330ba5",
+    "deployment": "f4b42f27b9fcedd2adad26efeda02f37f2af8cd51793aa405fce2ec99587b11c",
+    "smoke": "16ef6322d95f249de52b5d97d2c9ae7c0c3e7cd75dee16e55b85ca80ec27fc7e",
+    "external-smoke": "46c6e4d309bf2dab5e85f2e489180024a3b2e3209ef60020810676ed9247c5dd",
+    "pwa-smoke": "c0778f73c14fca53ed9af778d089e8cb19651912faef72edfc8c20762b4c62f0",
+    "final-state": "94a3067ad2cde7cf1177b7282abf4f9c25859ca8b09b7fd526b1068b39c76874"
+  },
+  "releasePaths": {
+    "backend": "/var/www/sitrep-backend-releases/20261021-circuitos-13af2fb0",
+    "frontend": "/var/www/sitrep-releases/20261021-circuitos-13af2fb0"
+  },
+  "rollback": {
+    "backend": "/var/www/sitrep-backend-releases/20261020-hallazgos-psip-c9cd877f",
+    "frontend": "/var/www/sitrep-releases/20261021-circuitos-13af2fb0-rollback",
+    "scope": "previous compatible backend, web, app and manual; same schema, evidence and configuration retained",
+    "backendDowngrade": true,
+    "rootCache": "trazabilidad-rrpp-v141",
+    "appVersion": "20261021095850",
+    "databaseRestore": false
+  },
+  "environmentSha256": "618b3536e18b0d122e088a053b708b71bacc3f1c81375d4ac81b2f2cb6838a93",
+  "manualVersion": "2026.20.20"
+}
