@@ -15,6 +15,16 @@ it('routes a new-current classroom notice to that synthetic team only, retaining
 it('never silently approves a new current without a configured operational authority', async () => {
   vi.stubEnv('MANIFEST_PARTY_REVIEW_ENABLED','true'); vi.stubEnv('MANIFEST_EXCEPTIONAL_REVIEWERS','');
   const tx = { usuario:{findMany:vi.fn().mockResolvedValue([])},notificacion:{createMany:vi.fn()} };
-  await expect(noticeNewCurrents(tx as never,[],[{corriente:'Y1'}],'/test','review')).rejects.toThrow('No hay autoridad designada');
+  await expect(noticeNewCurrents(tx as never,[],[{corriente:'Y1'}],'/test','review')).rejects.toMatchObject({ statusCode: 409, message: expect.stringContaining('falta una autoridad activa designada') });
   expect(tx.notificacion.createMany).not.toHaveBeenCalled();
+});
+
+it('authority receives manifest, version, currents and responsible without implied unanimity', async () => {
+  vi.stubEnv('MANIFEST_PARTY_REVIEW_ENABLED', 'true'); vi.stubEnv('MANIFEST_EXCEPTIONAL_REVIEWERS', 'qa-authority');
+  const tx = { usuario: { findMany: vi.fn().mockResolvedValue([{ id: 'qa-authority' }]) }, notificacion: { createMany: vi.fn() } };
+  await noticeNewCurrents(tx as never, [{ corriente: 'Y1' }], [{ corriente: 'Y1' }, { corriente: 'Y21' }], '/manifiestos/m/adendas', 'review', 'carrier', { id: 'adenda', version: 2, manifiestoId: 'm', numero: 'QA-1' });
+  const notice = tx.notificacion.createMany.mock.calls[0][0].data[0];
+  expect(notice).toMatchObject({ usuarioId: 'qa-authority', manifiestoId: 'm', mensaje: expect.stringContaining('QA-1 · adenda v2. Y21') });
+  expect(JSON.parse(notice.datos)).toMatchObject({ adendaId: 'adenda', versionAdenda: 2, reviewerId: 'carrier', reviewId: 'review', corrientes: ['Y21'] });
+  expect(notice.mensaje).toContain('no modifica habilitaciones ni acredita unanimidad');
 });

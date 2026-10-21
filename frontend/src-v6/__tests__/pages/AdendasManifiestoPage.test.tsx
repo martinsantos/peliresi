@@ -135,3 +135,39 @@ it('requires explicit correction of an unsupported historical unit instead of si
  expect(screen.getByRole('option', { name: 'Revisar unidad declarada: desconocida' })).toBeVisible();
  expect(mock.post).not.toHaveBeenCalled();
 });
+
+it('closing a rectification then starting an independent report does not reuse its reference', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: true, manifiesto: { ...data.manifiesto, residuos: record.declaracion.residuos } } } });
+  mock.post.mockResolvedValue({ data: {} }); view();
+  fireEvent.click(await screen.findByRole('button', { name: 'Agregar rectificación' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar formulario' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Registrar diferencia' }));
+  fireEvent.change(screen.getByLabelText('Motivo de la adenda'), { target: { value: 'Otro hallazgo independiente' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar y solicitar revisión' }));
+  await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(1));
+  expect(mock.post.mock.calls[0][1]).not.toHaveProperty('rectificaId');
+  expect(mock.post.mock.calls[0][1].residuos).toEqual(record.declaracion.residuos);
+});
+it('shows the author and latest individual review without claiming agreement by everyone', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, autor: { nombre: 'QA Operador', rol: 'OPERADOR' }, estadoRevision: 'OBSERVADA', revisiones: [{ id: 'review', autorId: 'generator', autor: { nombre: 'QA Generador', rol: 'GENERADOR' }, decision: 'OBSERVADA', nota: 'Verificar pesaje recibido', fecha: '2026-10-21' }] }] } } });
+  view(); expect(await screen.findByText('Operador · QA Operador')).toBeVisible();
+  expect(screen.getByLabelText('Última revisión')).toHaveTextContent('Generador · QA Generador');
+  expect(screen.getByLabelText('Última revisión')).toHaveTextContent('Verificar pesaje recibido');
+  expect(screen.getByText(/no representa unanimidad ni cierre documental/)).toBeVisible();
+});
+
+it('a remote revision cannot silently rebase a decision already being written', async () => {
+  const reviewable = { ...record, puedeResolver: true };
+  mock.get.mockResolvedValueOnce({ data: { data: { ...data, adendas: [reviewable] } } })
+    .mockResolvedValue({ data: { data: { ...data, adendas: [{ ...reviewable, version: 1, estadoRevision: 'OBSERVADA' }] } } });
+  mock.post.mockRejectedValueOnce({ response: { data: { message: 'La revisión cambió; recargá antes de resolver' } } }).mockResolvedValue({ data: {} });
+  view(); fireEvent.change(await screen.findByLabelText('Motivo de resolución'), { target: { value: 'Mi decisión escrita sobre versión cero' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Aprobar post facto' })); await screen.findByRole('alert');
+  fireEvent.click(screen.getByRole('button', { name: 'Actualizar revisiones' })); await screen.findByText('Observada');
+  expect(screen.getByRole('button', { name: 'Aprobar post facto' })).toBeDisabled();
+  expect(screen.getByLabelText('Motivo de resolución')).toHaveValue('Mi decisión escrita sobre versión cero');
+  fireEvent.click(screen.getByRole('button', { name: 'Usar revisión actual' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Aprobar post facto' }));
+  await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2));
+  expect(mock.post.mock.calls[0][1].version).toBe(0); expect(mock.post.mock.calls[1][1].version).toBe(1);
+});

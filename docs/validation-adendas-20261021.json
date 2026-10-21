@@ -1,0 +1,162 @@
+{
+  "base": "dcc619115c4c849ceeb1276e7590beddc3875627",
+  "branch": "codex/sitrep-training-20261018",
+  "main": "c8402190edfc36b5e5d0dee1337c24bd1689420d",
+  "productionAccessed": false,
+  "pushed": false,
+  "workflowsTriggered": false,
+  "backendUnit": {
+    "numTotalTests": 36,
+    "numPassedTests": 36,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "frontendUnit": {
+    "numTotalTests": 57,
+    "numPassedTests": 57,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "browser": {
+    "startTime": "2026-10-21T12:05:14.369Z",
+    "duration": 150501.35100000002,
+    "expected": 6,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "http": [
+    "normal accounts and linked roles only; draft/forged finding rejected",
+    "quantity and omitted Y conserved in finding; independent generator/operator intake",
+    "idempotent creation preserves exact notices and request identity",
+    "counterpart observation, no self/admin review; stale version blocked and replay deduplicated",
+    "independent decisions and historic PDF/finding retained; current annex includes finding/reviews",
+    "rectification appends, original rejected record retained; cross-manifest link denied",
+    "concurrent creation once; one version decision wins, loser must refresh",
+    "carrier difference stays distinct from destination operator finding; operator counterpart can observe",
+    "inactive recipient account or actor receives no new internal party notice",
+    "manifest status/declaration/events unchanged; review does not certify documentary closure"
+  ],
+  "missingAuthority": [
+    "missing authority returns actionable 409; review/version/notices roll back atomically"
+  ],
+  "flagOff": [
+    "flags off close reads and writes without reopening CAP"
+  ],
+  "audit": {
+    "checks": [
+      "actual runtime providers closed; four CAP aliases 403",
+      "all four phases render simulated mail; zero attempts/sends; legacy original unchanged"
+    ],
+    "simulated": 112,
+    "demoSourcesSuppressed": 112,
+    "phases": [
+      "CREADA",
+      "OBSERVADA",
+      "APROBADA",
+      "RECHAZADA"
+    ],
+    "attempts": 0,
+    "sent": 0,
+    "emailQueue": 0
+  },
+  "protectedTables": 355,
+  "sourceVerification": {
+    "artifactHashesVerified": 214,
+    "validatedProductFiles": {
+      "frontend-manual": 936,
+      "backend": 405
+    },
+    "schemaDependenciesWorkflowsManualRendererUnchanged": true
+  },
+  "shutdown": {
+    "at": "2026-10-21T12:09:32.668Z",
+    "portsClosed": [
+      3037,
+      4177
+    ],
+    "postgresStopped": true,
+    "pgLog": "waiting for server to shut down.... done\nserver stopped\n",
+    "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+  },
+  "container": {
+    "name": "/sitrep-qa-training-20261018",
+    "status": "exited",
+    "oom": false,
+    "finishedAt": "2026-10-21T12:09:32.712273588Z",
+    "cpu": 1000000000,
+    "memory": 2147483648,
+    "swap": 2147483648
+  },
+  "screenshots": [
+    {
+      "path": "docs/evidence/adendas-20261021/web-hallazgo-observado.png",
+      "sha256": "632231d6281f6cedb0caeb70ff264492fb67e8ae5ffd2a8e9268cb29f4b92875",
+      "origin": "adenda-e2e-browser-final/adenda-operations-operator-53204-d-independent-rectification-web-desktop/finding-observed.png"
+    },
+    {
+      "path": "docs/evidence/adendas-20261021/app-hallazgo-revisado.png",
+      "sha256": "d9081853c337c14ca5952284c300e55db4636cbde3a70d33d28cc04ece120040",
+      "origin": "adenda-e2e-browser-final/adenda-operations-operator-53204-d-independent-rectification-app/finding-reviewed.png"
+    },
+    {
+      "path": "docs/evidence/adendas-20261021/manual-adendas-movil.png",
+      "sha256": "a40f190a6e61191848c5ae1e1157263bb2210bb417bf0c1564457835a5346e93",
+      "origin": "adenda-e2e-browser-final/adenda-operations-adenda-m-2e0cb-dable-with-preserved-layout-web-responsive/manual-adendas.png"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "adenda-backend-authority.json",
+      "sha256": "1ecdf7948f3d5738810670932e589627f91b2c7e9ea250e984b2bce4db32cc05"
+    },
+    {
+      "path": "adenda-ui-authority.json",
+      "sha256": "f410a241f4f7b7313bff664a8197d058a40514b599a033fe5582b14db8e19888"
+    },
+    {
+      "path": "adenda-e2e-browser-final.json",
+      "sha256": "d97d048a4cc8ee1e7f52cb667f1071854da432b77846670720b21f345e221ee0"
+    },
+    {
+      "path": "adenda-http.json",
+      "sha256": "9d51f5b57f573c7044cfb1d111655f2169bdb646f70f65da961ae46764970021"
+    },
+    {
+      "path": "adenda-noauthority.json",
+      "sha256": "ee4fbcafd6491ad0146666e44d97b74834e0afe24da4dc6266d393adf8b9bf0d"
+    },
+    {
+      "path": "adenda-off.json",
+      "sha256": "7acd79842c9358cb9c9153839fd158bfba43a0b744e8f57cefd88fc6facd8fc9"
+    },
+    {
+      "path": "adenda-audit.json",
+      "sha256": "3368f33fff39349fb7ddfbf9bfa7fecf9de992d14fa64e7e0b2256b419f234e9"
+    },
+    {
+      "path": "protected-schemas-before.json",
+      "sha256": "451b9952f025bfd8e6de9a1ec7e9c1d7511c7a4b8165e89d8323732b50800269"
+    },
+    {
+      "path": "build-snapshot.json",
+      "sha256": "915ea821d995f1a037c9b98ee6da51cc89fbb8fb987c75ff2e3244156f3b40e0"
+    },
+    {
+      "path": "backend-final-snapshot.json",
+      "sha256": "bc1e7a2382aced336d30adb910c8dca76674a38085b1bab489f8c40d0dddd480"
+    },
+    {
+      "path": "shutdown.json",
+      "sha256": "7d616561e4ea37bd4a25a516e69d09433c8fe578a67ff589ba3cdc8c59344e1c"
+    },
+    {
+      "path": "container-closed.json",
+      "sha256": "56c0f98f4849c4d4028fbafa48a39b5931ea203ce1702b8a850e1e33b22f0199"
+    },
+    {
+      "path": "lint-final.json",
+      "sha256": "a320fb4869b73f3d3c80bc7636fbbd722ab03286fec18b4c3c451633f012c1a1"
+    }
+  ]
+}

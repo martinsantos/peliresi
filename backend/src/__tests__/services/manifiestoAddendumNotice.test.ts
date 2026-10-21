@@ -5,9 +5,9 @@ const manifest = { id: 'manifest-qa', numero: 'QA-2026-1', generadorId: 'g', tra
 const tx = () => {
   const createMany = vi.fn().mockResolvedValue({ count: 2 });
   return {
-    generador: { findUnique: vi.fn().mockResolvedValue({ usuarioId: 'generator' }) },
-    transportista: { findUnique: vi.fn().mockResolvedValue({ usuarioId: 'carrier' }) },
-    operador: { findUnique: vi.fn().mockResolvedValue({ usuarioId: 'operator' }) },
+    generador: { findUnique: vi.fn().mockResolvedValue({ activo: true, usuario: { id: 'generator', activo: true } }) },
+    transportista: { findUnique: vi.fn().mockResolvedValue({ activo: true, usuario: { id: 'carrier', activo: true } }) },
+    operador: { findUnique: vi.fn().mockResolvedValue({ activo: true, usuario: { id: 'operator', activo: true } }) },
     notificacion: { createMany },
   };
 };
@@ -41,4 +41,18 @@ describe('adenda cross-party notices', () => {
     db.notificacion.createMany.mockResolvedValue({ count: 0 });
     expect(await notifyAddendumParties(db as never, manifest, 'adenda-qa', 0, 'CREADA', 'carrier')).toEqual([]);
   });
+});
+
+it('excludes inactive actors/accounts and identifies whose approval it records', async () => {
+  const db = tx();
+  db.generador.findUnique.mockResolvedValue({ activo: true, usuario: { id: 'generator', activo: false } });
+  db.transportista.findUnique.mockResolvedValue({ activo: false, usuario: { id: 'carrier', activo: true } });
+  db.notificacion.createMany.mockResolvedValue({ count: 0 });
+  expect(await notifyAddendumParties(db as never, manifest, 'adenda-qa', 2, 'APROBADA', 'operator')).toEqual([]);
+  expect(db.notificacion.createMany.mock.calls[0][0].data).toEqual([]);
+  const active = tx(); await notifyAddendumParties(active as never, manifest, 'adenda-qa', 2, 'APROBADA', 'generator');
+  const notice = active.notificacion.createMany.mock.calls[0][0].data[0];
+  expect(notice.mensaje).toContain('Generador:');
+  expect(notice.mensaje).toContain('No representa la decisión de las otras partes');
+  expect(JSON.parse(notice.datos)).toMatchObject({ autorId: 'generator', autorRol: 'Generador' });
 });

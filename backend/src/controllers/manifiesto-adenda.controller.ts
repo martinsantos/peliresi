@@ -36,6 +36,14 @@ function present(record: { creadoPorId: string; impersonadoPorId: string | null;
   const reviews = record.revisiones as unknown as AddendumReview[];
   return { ...record, estadoRevision: reviews[reviews.length - 1]?.decision || 'PENDIENTE', puedeResolver: canReview(req, record) };
 }
+/** Names are presentation metadata; stored declarations/revisions and PDF hashes stay intact. */
+async function presentRecords(records: Parameters<typeof present>[0][], req: AuthRequest) {
+  const ids = [...new Set(records.flatMap(record => [record.creadoPorId, ...(record.revisiones as unknown as AddendumReview[]).map(review => review.autorId)]))];
+  const users = ids.length ? await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, apellido: true, rol: true } }) : [];
+  const authors = new Map(users.map(user => [user.id, { nombre: [user.nombre, user.apellido].filter(Boolean).join(' '), rol: user.rol }]));
+  return records.map(record => ({ ...present(record, req), autor: authors.get(record.creadoPorId) || null,
+    revisiones: (record.revisiones as unknown as AddendumReview[]).map(review => ({ ...review, autor: authors.get(review.autorId) || null })) }));
+}
 export async function listAddenda(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const manifest = await accessibleManifest(req);
@@ -53,7 +61,7 @@ export async function listAddenda(req: AuthRequest, res: Response, next: NextFun
     ]);
     const summary = counts[0];
     const finalLiberado = await hasFinalTrainingCertificate(prisma, manifest.id);
-    res.json({ success: true, data: { adendas: items.map(r => ({...present(r, req), ...(finalLiberado ? {puedeResolver:false} : {})})), total: summary.total, finalLiberado,
+    res.json({ success: true, data: { adendas: (await presentRecords(items, req)).map(r => ({...r, ...(finalLiberado ? {puedeResolver:false} : {})})), total: summary.total, finalLiberado,
       documental: { ...summary, estado: documentaryStatus(summary), cierreAcreditado: false },
       manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado,
         residuos: manifest.residuos.map(row => ({ corriente: row.tipoResiduo.codigo, cantidad: row.cantidad, unidad: row.unidad })) },
@@ -97,7 +105,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
     };
     const existing = await prisma.adendaManifiesto.findUnique({ where: { id: command.id } });
     if (existing) {
-      verifyReplay(existing); res.status(201).json({ success: true, data: { adenda: present(existing, req) } }); return;
+      verifyReplay(existing); res.status(201).json({ success: true, data: { adenda: (await presentRecords([existing], req))[0] } }); return;
     }
     if (!addendumStageAllowed(manifest.estado)) throw new AppError('Las adendas corresponden a manifiestos aprobados o ejecutados', 409);
     if (command.rectificaId && !await prisma.adendaManifiesto.findFirst({ where: { id: command.rectificaId, manifiestoId: manifest.id } })) {
@@ -141,7 +149,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
     });
     verifyReplay(record);
     scheduleCommittedManifestPush(pushIds);
-    res.status(201).json({ success: true, data: { adenda: present(record, req) } });
+    res.status(201).json({ success: true, data: { adenda: (await presentRecords([record], req))[0] } });
   } catch (error) { next(error); }
 }
 export async function reviewAddendum(req: AuthRequest, res: Response, next: NextFunction) {
@@ -172,12 +180,13 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
       if (updated.count !== 1) throw new AppError('Otro revisor resolvió esta versión; recargá', 409);
       if (command.decision === 'APROBADA') {
         await noticeNewCurrents(tx, (current.declaracion as { residuos?: unknown }).residuos, current.residuos,
-          '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id);
+          '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id,
+          { id: current.id, version: command.version + 1, manifiestoId: manifest.id, numero: manifest.numero });
       }
       pushIds = await notifyAddendumParties(tx, manifest, current.id, command.version + 1, command.decision, req.user.id);
       return tx.adendaManifiesto.findUniqueOrThrow({ where: { id: current.id } });
     });
     scheduleCommittedManifestPush(pushIds);
-    res.json({ success: true, data: { adenda: present(record, req) } });
+    res.json({ success: true, data: { adenda: (await presentRecords([record], req))[0] } });
   } catch (error) { next(error); }
 }

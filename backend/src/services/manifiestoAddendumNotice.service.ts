@@ -14,15 +14,17 @@ export async function notifyAddendumParties(
   authorId: string,
 ) {
   const [generador, transportista, operador] = await Promise.all([
-    tx.generador.findUnique({ where: { id: manifest.generadorId }, select: { usuarioId: true } }),
-    manifest.transportistaId ? tx.transportista.findUnique({ where: { id: manifest.transportistaId }, select: { usuarioId: true } }) : null,
-    tx.operador.findUnique({ where: { id: manifest.operadorId }, select: { usuarioId: true } }),
+    tx.generador.findUnique({ where: { id: manifest.generadorId }, select: { activo: true, usuario: { select: { id: true, activo: true } } } }),
+    manifest.transportistaId ? tx.transportista.findUnique({ where: { id: manifest.transportistaId }, select: { activo: true, usuario: { select: { id: true, activo: true } } } }) : null,
+    tx.operador.findUnique({ where: { id: manifest.operadorId }, select: { activo: true, usuario: { select: { id: true, activo: true } } } }),
   ]);
-  const recipients = [...new Set([generador?.usuarioId, transportista?.usuarioId, operador?.usuarioId])]
+  const parties = [generador, transportista, operador];
+  const actor = ['Generador', 'Transporte', 'Operador'][parties.findIndex(party => party?.usuario?.id === authorId)] || 'Revisor designado';
+  const recipients = [...new Set(parties.filter(party => party?.activo && party.usuario?.activo).map(party => party!.usuario!.id))]
     .filter((id): id is string => !!id && id !== authorId);
   const labels: Record<AddendumEvent, [string, string]> = {
     CREADA: ['Nueva adenda en tu manifiesto', 'Abrí la adenda para ver la diferencia declarada y, si te corresponde, revisarla.'],
-    APROBADA: ['Adenda aprobada', 'La revisión quedó registrada. Consultá el manifiesto y su anexo.'],
+    APROBADA: ['Adenda aprobada', 'Registró su aprobación. No representa la decisión de las otras partes ni el cierre documental.'],
     OBSERVADA: ['Adenda observada', 'Hay una observación para revisar en el manifiesto.'],
     RECHAZADA: ['Adenda rechazada', 'La adenda quedó rechazada; el original y la resolución se conservan.'],
   };
@@ -30,9 +32,9 @@ export async function notifyAddendumParties(
   const data = recipients.map(usuarioId => ({
     id: createHash('sha256').update(`adenda:${adendaId}:${version}:${event}:${usuarioId}`).digest('hex'),
     usuarioId, tipo: 'INFO_GENERAL' as const, titulo: title,
-    mensaje: `${manifest.numero}. ${message}`, manifiestoId: manifest.id,
+    mensaje: `${manifest.numero}. ${actor}: ${message}`, manifiestoId: manifest.id,
     prioridad: event === 'CREADA' || event === 'OBSERVADA' ? 'ALTA' as const : 'NORMAL' as const,
-    datos: JSON.stringify({ tipo: 'adenda_manifiesto', evento: event, adendaId, url: `/manifiestos/${manifest.id}/adendas` }),
+    datos: JSON.stringify({ tipo: 'adenda_manifiesto', evento: event, adendaId, autorId: authorId, autorRol: actor, url: `/manifiestos/${manifest.id}/adendas` }),
   }));
   const inserted = await tx.notificacion.createMany({ skipDuplicates: true, data });
   // A retried command never dispatches the already committed notices again.

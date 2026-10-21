@@ -24,6 +24,7 @@ function withBasePath(path: string, basePath: string): string {
 /** Opening a workflow notice must refresh its linked expediente/application. */
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
+  if (data.tipo === 'adenda_manifiesto') void queryClient.invalidateQueries({ queryKey: ['manifiesto-adendas'] });
   if (data.tipo === 'propuesta_partes') {
     for (const key of ['manifiestos','manifest-proposal','training-tasks','manifest-agenda']) void queryClient.invalidateQueries({ queryKey: [key] });
   }
@@ -49,6 +50,7 @@ export function notificationActionLabel(path: string): string {
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
   if (pathname === '/admin/renovaciones') return 'Revisar solicitud de cambio →';
   if (pathname === '/alertas') return 'Revisar alerta →';
+  if (/^\/manifiestos\/[^/]+\/adendas$/.test(pathname)) return 'Abrir adenda y revisiones →';
   if (/^\/manifiestos(?:\/|$)/.test(pathname)) return 'Abrir manifiesto y ver qué sigue →';
   return 'Abrir detalle →';
 }

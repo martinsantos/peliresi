@@ -1,5 +1,6 @@
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import React, { useRef, useState } from 'react';
+import { FileSearch, ClipboardCheck, UserRound } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -12,10 +13,13 @@ import { OperatorFindingSummary } from '../../components/manifiestos/OperatorFin
 import type { OperatorFinding } from '../../types/inspectionIntake';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
+type Author = { nombre: string; rol: string };
+const roleLabels: Record<string, string> = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transporte', OPERADOR: 'Operador', ADMIN: 'Administración' };
+const authorLabel = (author: Author | null | undefined, id: string) => author ? `${roleLabels[author.rol] || author.rol} · ${author.nombre}` : `Cuenta ${id}`;
 type Adenda = { id: string; motivo: string; rectificaId: string | null; version: number; estadoRevision: string; puedeResolver: boolean;
-  informeHallazgo?: OperatorFinding | null;
+  informeHallazgo?: OperatorFinding | null; autor?: Author | null;
   creadoPorId: string; createdAt: string; residuos: Waste[]; declaracion: { numero: string; residuos: Waste[] };
-  revisiones: { id: string; autorId: string; fecha: string; decision: string; nota: string }[] };
+  revisiones: { autor?: Author | null; id: string; autorId: string; fecha: string; decision: string; nota: string }[] };
 type Data = { finalLiberado?: boolean; puedeInformarHallazgo?: boolean; adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: string; residuos?: Waste[] };
   documental?: { pendientes: number; observadas: number; rechazadas: number; estado: string; cierreAcreditado: boolean } };
 const labels: Record<string, string> = { PENDIENTE: 'Pendiente de revisión', APROBADA: 'Aprobada post facto', OBSERVADA: 'Observada', RECHAZADA: 'Conformidad rechazada' };
@@ -31,10 +35,11 @@ export default function AdendasManifiestoPage() {
   const key = ['manifiesto-adendas', currentUser?.id, id];
   const endpoint = `/manifiestos/${encodeURIComponent(id || '')}/adendas`;
   const query = useQuery({ queryKey: [...key, page], enabled: enabled && !!id && !!currentUser,
-    queryFn: async () => (await api.get(endpoint, { params: { page } })).data.data as Data, retry: false });
+    queryFn: async () => (await api.get(endpoint, { params: { page } })).data.data as Data, retry: false, refetchInterval: 5000 });
   const [creating, setCreating] = useState(false); const [rectificaId, setRectificaId] = useState<string | undefined>();
   const [wastes, setWastes] = useState<Waste[]>([emptyWaste()]); const [motivo, setMotivo] = useState('');
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const [noteVersions, setNoteVersions] = useState<Record<string, number>>({});
   const [versions, setVersions] = useState<Record<string, number>>({});
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [saved, setSaved] = useState('');
   const lock = useRef(false); const pending = useRef<{ signature: string; id: string } | undefined>(undefined);
@@ -59,7 +64,7 @@ export default function AdendasManifiestoPage() {
       await api.post(path, { ...body, id: pending.current.id });
       // Refresh bounded lists, including fresh shared caches. Never mutate the manifest cache or declaration.
       await qc.invalidateQueries({ queryKey: key });
-      setCreating(false); setRectificaId(undefined); setMotivo(''); setWastes([emptyWaste()]); setNotes({});
+      setCreating(false); setRectificaId(undefined); setMotivo(''); setWastes([emptyWaste()]); setNotes({}); setNoteVersions({});
       setSaved('Adenda actualizada. El manifiesto conserva su declaración y su estado operativo.'); pending.current = undefined;
     } catch (cause: unknown) {
       const message = (cause as { response?: { data?: { message?: string } } }).response?.data?.message;
@@ -71,21 +76,22 @@ export default function AdendasManifiestoPage() {
   return <section className="mx-auto w-full max-w-4xl space-y-4 py-6" aria-label="Adendas del manifiesto">
     <Link to={mp(`/manifiestos/${id}`)} className="text-primary-700 underline">Volver al manifiesto</Link>
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-xl font-bold">Adendas · {data?.manifiesto.numero || 'Manifiesto'}</h1>
-      {data?.puedeRegistrar && !creating && <Button onClick={() => { setCreating(true); setSaved(''); setWastes(data.manifiesto.residuos?.map(row => ({ ...row })) || [emptyWaste()]); }}>{data.puedeInformarHallazgo ? 'Informar hallazgo' : 'Registrar diferencia'}</Button>}
+      {data?.puedeRegistrar && !creating && <Button onClick={() => { setRectificaId(undefined); pending.current = undefined; setMotivo(''); setCreating(true); setSaved(''); setWastes(data.manifiesto.residuos?.map(row => ({ ...row })) || [emptyWaste()]); }}>{data.puedeInformarHallazgo ? 'Informar hallazgo' : 'Registrar diferencia'}</Button>}
     </div>
     {data && <p className="text-sm text-neutral-600">Operación: {data.manifiesto.estado}. La revisión de adendas no detiene el circuito.</p>}
     {data?.finalLiberado && <p role="status" className="rounded border border-neutral-200 p-3">El operador ya liberó la disposición final CAP. Se conservan el certificado y las adendas revisadas; este expediente queda en consulta.</p>}
     {data?.documental && <Card className="p-4 space-y-1" role="region" aria-label="Control documental">
-      <h2 className="font-semibold">Control documental</h2>
+      <h2 className="flex items-center gap-2 font-semibold"><ClipboardCheck size={20} className="text-primary-700" aria-hidden="true" />Control documental</h2>
       <p>{data.documental.pendientes} {data.documental.pendientes === 1 ? 'pendiente' : 'pendientes'} · {data.documental.observadas} {data.documental.observadas === 1 ? 'observada' : 'observadas'} · {data.documental.rechazadas} {data.documental.rechazadas === 1 ? 'rechazada' : 'rechazadas'}</p>
       <p className="text-sm text-neutral-600">{data.total === 0 ? 'Sin adendas registradas.' : data.documental.estado === 'ADENDAS_REVISADAS' ? 'Adendas revisadas. No acredita el cierre documental del expediente.' : 'Hay revisiones por atender. El cierre operativo no las aprueba.'}</p>
     </Card>}
+    <p className="text-sm text-neutral-600">Cada revisión expresa la decisión de su autor. La última revisión indica el estado actual; no representa unanimidad ni cierre documental.</p>
     {query.isPending && <p role="status">Cargando adendas…</p>}
     {query.isError && <p role="alert">No se pudieron cargar las adendas. <Button variant="outline" onClick={() => void query.refetch()}>Reintentar carga</Button></p>}
     {error && <p role="alert" className="text-error-700">{error} <Button variant="outline" onClick={() => void query.refetch()}>Actualizar revisiones</Button></p>}
     {saved && <p role="status">{saved}</p>}
     {creating && <Card className="p-4"><form className="space-y-4" onSubmit={e => { e.preventDefault(); void send(endpoint, { motivo, residuos: wastes, ...(rectificaId ? { rectificaId } : {}) }); }}>
-      <h2 className="font-semibold">{rectificaId ? 'Rectificar mediante una nueva adenda' : data?.puedeInformarHallazgo ? 'Informe de hallazgo dentro de la adenda' : 'Carga observada completa'}</h2>
+      <h2 className="flex items-center gap-2 font-semibold"><FileSearch size={20} className="text-primary-700" aria-hidden="true" />{rectificaId ? 'Rectificar mediante una nueva adenda' : data?.puedeInformarHallazgo ? 'Informe de hallazgo dentro de la adenda' : 'Carga observada completa'}</h2>
       {data?.puedeInformarHallazgo && <p className="text-sm text-neutral-700">Ajustá las cantidades a lo recibido y agregá las Y encontradas. Conservá toda la carga observada. El informe queda en esta adenda y las diferencias pasan a evaluación en PSIP.</p>}
       <p className="text-sm text-neutral-600">No se suma automáticamente a lo declarado. Compatibilidad de corrientes pendiente de verificar.</p>
       {wastes.map((row, i) => <fieldset key={i} className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-0"><legend className="sr-only">Residuo {i + 1}</legend>
@@ -99,21 +105,28 @@ export default function AdendasManifiestoPage() {
       </fieldset>)}
       <Button type="button" variant="outline" disabled={wastes.length >= 50 || busy} onClick={() => setWastes([...wastes, emptyWaste()])}>Agregar corriente</Button>
       <Input label="Motivo de la adenda" type="text" inputMode="text" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
-      <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy}>Guardar y solicitar revisión</Button><Button type="button" variant="outline" disabled={busy} onClick={() => setCreating(false)}>Cerrar formulario</Button></div>
+      <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy}>Guardar y solicitar revisión</Button><Button type="button" variant="outline" disabled={busy} onClick={() => { setCreating(false); setRectificaId(undefined); }}>Cerrar formulario</Button></div>
     </form></Card>}
     {currentUser?.training && <p className="text-sm text-neutral-600">Capacitación: sin anexos ni documentos oficiales.</p>}
     {data && <>
       {data.total === 0 && <p>Todavía no hay adendas.</p>}
       {data.adendas.map((item, i) => <Card key={item.id} className="p-4 space-y-3" role="region" aria-label={`Adenda ${item.id}`}>
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Adenda {data.total - (page - 1) * 20 - i}</h2><span role="status" aria-label="Estado de revisión">{labels[item.estadoRevision]}</span></div>
+        <p className="flex items-center gap-2 text-sm text-neutral-600"><UserRound size={16} className="shrink-0" aria-hidden="true" />{authorLabel(item.autor, item.creadoPorId)}</p>
         <p className="break-words">{item.motivo}</p>
+        {item.revisiones.length > 0 && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm" aria-label="Última revisión">
+          <p className="font-semibold">{authorLabel(item.revisiones.at(-1)?.autor, item.revisiones.at(-1)!.autorId)}</p>
+          <p>{item.revisiones.at(-1)!.nota}</p>
+        </div>}
+        <p className="text-sm font-medium text-primary-800">{item.puedeResolver ? 'Podés revisar la evidencia y registrar tu decisión.' : item.creadoPorId === currentUser?.id && data.puedeRegistrar ? 'Informe registrado. Las otras partes pueden revisarlo; vos podés agregar una rectificación.' : 'Consultá las decisiones y el anexo conservado.'}</p>
         <div className="grid gap-4 sm:grid-cols-2"><div><h3 className="font-medium">Declaración conservada</h3><Load rows={item.declaracion.residuos} /></div><div><h3 className="font-medium">Carga observada</h3><Load rows={item.residuos} /></div></div>
         {item.informeHallazgo && <OperatorFindingSummary finding={item.informeHallazgo} />}
         {item.rectificaId && <p className="text-sm break-all">Rectifica adenda {item.rectificaId}; el antecedente se conserva.</p>}
         <p className="text-sm text-amber-800">Compatibilidad de corrientes sin verificar. Registrar no implica habilitación.</p>
         <Button variant="outline" disabled={busy || currentUser?.training} onClick={() => void download(item, item.version)}>Descargar anexo v{item.version}</Button>
-        {item.puedeResolver && <div className="space-y-2"><Input id={`resolucion-${item.id}`} label="Motivo de resolución" maxLength={500} value={notes[item.id] || ''} onChange={e => setNotes({ ...notes, [item.id]: e.target.value })} />
-          <div className="flex flex-wrap gap-2">{[['APROBADA', 'Aprobar post facto'], ['OBSERVADA', 'Observar'], ['RECHAZADA', 'Rechazar conformidad']].map(([decision, label]) => <Button key={decision} variant="outline" disabled={busy || !notes[item.id]?.trim()} onClick={() => void send(endpoint + '/' + item.id + '/revisiones', { version: item.version, decision, nota: notes[item.id] })}>{label}</Button>)}</div>
+        {item.puedeResolver && <div className="space-y-2"><Input id={`resolucion-${item.id}`} label="Motivo de resolución" maxLength={500} value={notes[item.id] || ''} onChange={e => { setNotes({ ...notes, [item.id]: e.target.value }); setNoteVersions(previous => ({ ...previous, [item.id]: previous[item.id] ?? item.version })); }} />
+          {noteVersions[item.id] !== undefined && noteVersions[item.id] !== item.version && <div role="status" className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Hay una revisión nueva. Leela antes de reenviar; conservamos tu motivo. <Button variant="outline" disabled={busy} onClick={() => { setNoteVersions(previous => ({ ...previous, [item.id]: item.version })); setError(''); }}>Usar revisión actual</Button></div>}
+          <div className="flex flex-wrap gap-2">{[['APROBADA', 'Aprobar post facto'], ['OBSERVADA', 'Observar'], ['RECHAZADA', 'Rechazar conformidad']].map(([decision, label]) => <Button key={decision} variant="outline" disabled={busy || !notes[item.id]?.trim() || (noteVersions[item.id] !== undefined && noteVersions[item.id] !== item.version)} onClick={() => void send(endpoint + '/' + item.id + '/revisiones', { version: noteVersions[item.id] ?? item.version, decision, nota: notes[item.id] })}>{label}</Button>)}</div>
         </div>}
         {data.puedeRegistrar && <Button variant="outline" disabled={busy} onClick={() => { setRectificaId(item.id); setWastes(item.residuos.map(r => ({ ...r }))); setMotivo(''); setCreating(true); setSaved(''); }}>Agregar rectificación</Button>}
         <details><summary className="cursor-pointer py-2 text-sm">Trazabilidad de la adenda</summary><p className="text-sm break-all">{item.id} · {item.createdAt} · {item.creadoPorId}</p>
@@ -121,7 +134,7 @@ export default function AdendasManifiestoPage() {
             <Input label="Versión anterior" type="number" inputMode="numeric" min={0} max={item.version - 1} step={1} value={versions[item.id] ?? 0} onChange={e => setVersions({ ...versions, [item.id]: Number(e.target.value) })} />
             <Button variant="outline" disabled={busy || currentUser?.training || !Number.isSafeInteger(versions[item.id] ?? 0) || (versions[item.id] ?? 0) < 0 || (versions[item.id] ?? 0) >= item.version} onClick={() => void download(item, versions[item.id] ?? 0)}>Descargar versión anterior</Button>
           </div>}
-          <ul className="space-y-2">{item.revisiones.map(r => <li key={r.id} className="text-sm break-words">{labels[r.decision]} · {r.nota}<span className="block text-neutral-600 break-all">{r.fecha} · {r.autorId}</span></li>)}</ul>
+          <ul className="space-y-2">{item.revisiones.map(r => <li key={r.id} className="text-sm break-words">{labels[r.decision]} · {r.nota}<span className="block text-neutral-600 break-all">{r.fecha} · {authorLabel(r.autor, r.autorId)}</span></li>)}</ul>
         </details>
       </Card>)}
       {data.total > 20 && <nav aria-label="Páginas de adendas" className="flex items-center gap-3"><Button variant="outline" disabled={page === 1 || busy} onClick={() => setPage(page - 1)}>Anterior</Button><span>{page} / {Math.ceil(data.total / 20)}</span><Button variant="outline" disabled={page * 20 >= data.total || busy} onClick={() => setPage(page + 1)}>Siguiente</Button></nav>}

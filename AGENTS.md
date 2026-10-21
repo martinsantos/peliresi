@@ -1,5 +1,13 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Revisión vigente — adendas fuera de CAP, sólo preview, 21/10/2026
+
+**Revisión terminada sin publicar.** Leer [adendas: correcciones, circuito, pruebas y límites](docs/ADENDAS-OPERATIVAS-20261021.md). Hallazgo del operador, observación/aprobación/rechazo individuales, rectificación, anexos y avisos entre partes y a autoridad. Actualización entre sesiones, protección del motivo contra versiones concurrentes, vínculo de rectificación corregido y autor visible. Sin modificar permisos, declaración/historial, regla de revisión ni habilitaciones.
+
+Preview: **36/36 backend, 57/57 interfaz/manual, 6/6 E2E únicos**, HTTP **10 grupos + autoridad ausente + flags off**. Backend/tipos/web/app/lint PASS; **355 tablas previas intactas**. Correo simulado: **112 avisos, cero cola/intentos/envíos**; CAP cerrado (cuatro alias 403), push/proveedores apagados. Manual **2026.21.2**, renderer/CSS conservados. No suites globales ni certificación física.
+
+QA serial/un worker/1 CPU/2 GiB/swap cero; runtime/PG/contenedor detenidos **09:09:32 Mendoza**, sin OOM/presión. Base/imagen/evidencias preservadas. Main `c840219` intacto, sin push/workflows; cierre `[skip ci]`. **Producción no se inspeccionó ni modificó**: última publicación documentada `47ea8470`, abajo. Adendas/revisión siguen apagadas allí según ese cierre. Una futura activación exige autorización, build API final/SW y autoridad operativa activa designada para nuevas Y; no copiar la cuenta artificial QA ni desplegar bundles `/api`.
+
 ## Última publicación — propuestas de tres partes 47ea8470, 21/10/2026
 
 **`47ea8470` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 08:31:08 Mendoza**, con autorización del dueño. Leer primero [despliegue, flags y reversión vigente](docs/DESPLIEGUE-PROPUESTAS-20261021.md). Propuestas ordinarias habilitadas en backend/frontend: creación por G/T/O, aprobación expresa de cada parte, firma del generador, coordinación unánime y retiro físico posterior. Administración no reemplaza decisiones; históricos e in situ conservados.

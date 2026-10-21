@@ -1,12 +1,13 @@
 import { manifestFeatureEnabled } from '../lib/manifestTraining';
 import { isTrainingSession } from '../lib/trainingScope';
+import { AppError } from '../middlewares/errorHandler';
 import { Prisma } from '@prisma/client';
 
 function currents(value: unknown): string[] {
   return Array.isArray(value) ? value.flatMap(row => row && typeof row === 'object' && typeof row.corriente === 'string' ? [row.corriente] : []) : [];
 }
 /** Internal authority notice only; no email/push dispatcher and no permit mutation. */
-export async function noticeNewCurrents(tx: Prisma.TransactionClient, original: unknown, observed: unknown, url: string, reviewId: string, reviewerId?: string) {
+export async function noticeNewCurrents(tx: Prisma.TransactionClient, original: unknown, observed: unknown, url: string, reviewId: string, reviewerId?: string, adenda?: { id: string; version: number; manifiestoId: string; numero: string }) {
   if (!manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED')) return;
   const added = [...new Set(currents(observed).filter(y => !currents(original).includes(y)))];
   if (!added.length) return;
@@ -17,10 +18,11 @@ export async function noticeNewCurrents(tx: Prisma.TransactionClient, original: 
     ? school ? [school[1] + '-admin-' + school[2]] : []
     : (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').filter(Boolean);
   const recipients = await tx.usuario.findMany({ where: { id: { in: designated }, rol: 'ADMIN', activo: true }, select: { id: true } });
-  if (!recipients.length) throw new Error('No hay autoridad designada para comunicar las corrientes nuevas');
+  if (!recipients.length) throw new AppError('No se pudo registrar la aprobación: falta una autoridad activa designada para recibir las corrientes nuevas. Pedí a Administración que revise la configuración; tu motivo se conserva para reintentar.', 409);
   await tx.notificacion.createMany({ data: recipients.map(user => ({
     usuarioId: user.id, tipo: 'INFO_GENERAL', titulo: 'Nueva corriente aprobada post facto',
-    mensaje: added.join(', ') + '. Conformidad entre partes; no modifica habilitaciones.',
-    prioridad: 'ALTA', datos: JSON.stringify({ tipo: 'ADENDA_POST_FACTO', url, reviewId, corrientes: added }),
+    mensaje: (adenda ? `${adenda.numero} · adenda v${adenda.version}. ` : '') + added.join(', ') + '. Aprobación individual registrada; no modifica habilitaciones ni acredita unanimidad.',
+    ...(adenda ? { manifiestoId: adenda.manifiestoId } : {}),
+    prioridad: 'ALTA', datos: JSON.stringify({ tipo: 'ADENDA_POST_FACTO', url, reviewId, reviewerId, corrientes: added, ...(adenda ? { adendaId: adenda.id, versionAdenda: adenda.version, manifiestoId: adenda.manifiestoId } : {}) }),
   })) });
 }

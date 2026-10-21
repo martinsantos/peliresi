@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveNotificationPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel } from '../../utils/notificationNavigation';
 import type { Notificacion } from '../../types/models';
 import { QueryClient } from '@tanstack/react-query';
 
@@ -102,4 +102,18 @@ describe('resolveNotificationPath', () => {
   it('falls back to the notifications inbox, never to unrelated alerts', () => {
     expect(resolveNotificationPath(base, '/app')).toBe('/app/notificaciones');
   });
+});
+
+it('refreshes adendas when a notice arrives and describes the web/app destination', () => {
+  const client = new QueryClient(), key = ['manifiesto-adendas', 'actor', 'manifest', 1];
+  const previous = { version: 0 }; client.setQueryData(key, previous);
+  const notice = { ...base, datos: JSON.stringify({ tipo: 'adenda_manifiesto', adendaId: 'one', url: '/manifiestos/manifest/adendas' }) };
+  refreshInspectionNotification(notice, client); expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  expect(client.getQueryData(key)).toBe(previous);
+  for (const prefix of ['', '/app']) {
+    const target = resolveNotificationPath(notice, prefix);
+    expect(target).toBe(prefix + '/manifiestos/manifest/adendas');
+    expect(notificationActionLabel(target)).toBe('Abrir adenda y revisiones →');
+  }
+  client.clear();
 });
