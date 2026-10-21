@@ -31,6 +31,7 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   description?: string;
+  error?: string;
   size?: ModalSize;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -59,6 +60,7 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   description,
+  error,
   size = 'base',
   children,
   footer,
@@ -68,6 +70,10 @@ export const Modal: React.FC<ModalProps> = ({
   isBusy = false,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isOpen && error) errorRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [isOpen, error]);
   const depth = useContext(ModalDepth);
   const titleId = useId();
   const descriptionId = useId();
@@ -135,7 +141,8 @@ export const Modal: React.FC<ModalProps> = ({
     document.addEventListener('keydown', handleKey);
     // Auto-focus first focusable element
     const frame = requestAnimationFrame(() => {
-      if (isTopDialog()) (visibleFocusable()[0] || dialog).focus({ preventScroll: true });
+      // A person may already have selected a field before this frame runs.
+      if (isTopDialog() && !dialog.contains(document.activeElement)) (visibleFocusable()[0] || dialog).focus({ preventScroll: true });
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -206,6 +213,7 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Content */}
         <div className={cn('min-h-0 p-4 sm:p-6 overflow-y-auto flex-1', !title && !showCloseButton && 'pt-6')}>
+          {error && <div ref={errorRef} role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800">{error}</div>}
           {children}
         </div>
 

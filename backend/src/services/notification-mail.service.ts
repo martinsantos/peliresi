@@ -6,6 +6,12 @@ import prisma from '../lib/prisma';
 import { mailPolicy } from './email-policy';
 import { escapeMail, mailAction, mailShell } from './email-templates';
 import { isFullAccess } from '../utils/roleFilter';
+import { INSPECTION_EXCHANGE_LABELS } from './inspectionExchangeNotice.service';
+import { PARTICIPANT_VISIBLE_STATES } from './inspectionExchange.service';
+import { INSPECTION_AGENDA_LABELS } from './inspectionAgendaNotice.service';
+import { requirementSituation } from './alertCataloguePolicy.service';
+import { EVENTUAL_NOTICE_LABELS, eventualNoticeAudience, eventualNoticeEvent } from './eventualNotice.service';
+import { manifestFeatureEnabled } from '../lib/manifestTraining';
 
 export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
@@ -19,9 +25,27 @@ function enabledFamilies(): string[] {
   return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').map(item => item.trim()).filter(item => ['solicitudes', 'soporte', 'inspecciones', 'certificados', 'manifiestos', 'alertas', 'padron'].includes(item));
 }
 
+type InspectionMailScope = { inspectorId: string; tipoActor: string | null; estado: string;
+  generador: { usuarioId: string } | null; transportista: { usuarioId: string } | null; operador: { usuarioId: string } | null };
+function inspectionAudience(notice: NoticeForMail, inspection: InspectionMailScope) {
+  const authority = notice.rol === 'ADMIN' || notice.rol === `ADMIN_${inspection.tipoActor}`
+    || (!notice.rol.startsWith('ADMIN_') && notice.esInspector === true && notice.usuarioId === inspection.inspectorId);
+  const owner = inspection.tipoActor === 'GENERADOR' ? inspection.generador : inspection.tipoActor === 'TRANSPORTISTA' ? inspection.transportista : inspection.operador;
+  const participant = Boolean(PARTICIPANT_VISIBLE_STATES.includes(inspection.estado as typeof PARTICIPANT_VISIBLE_STATES[number]) && inspection.tipoActor && notice.rol === inspection.tipoActor && owner?.usuarioId === notice.usuarioId);
+  return { authority, participant };
+}
+
 /** Recheck the source at enqueue AND delivery, including reassignment/revocation. */
 export async function notificationSourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
   const data = JSON.parse(notice.datos || '{}');
+  if (family === 'manifiestos' && data.tipo === 'manifiesto_eventual') {
+    if (!manifestFeatureEnabled('MANIFEST_EXCEPTIONAL_ENABLED') || !validEventualMail(data) || !notice.usuarioId) return false;
+    const record = await prisma.registroManifiestoExcepcional.findUnique({ where: { id: data.registroId as string } });
+    if (!record) return false;
+    const event = eventualNoticeEvent(record, data.eventoId as string);
+    if (!event || event.kind !== data.evento) return false;
+    return (await eventualNoticeAudience(prisma, record, event.kind, event.authorId)).some(user => user.id === notice.usuarioId);
+  }
   if (family === 'padron') {
     const renewal = await prisma.renovacion.findUnique({ where: { id: data.renovacionId }, include: {
       generador: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
@@ -61,14 +85,90 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
     return owners.length === 1 && owners[0]?.usuarioId === notice.usuarioId && actorId === data.actorId;
   }
   if (family === 'alertas' && typeof data.casoId === 'string') {
-    const alert = await prisma.alertaGenerada.findUnique({ where: { id: data.casoId }, select: { estado: true, regla: { select: { activa: true } } } });
-    return Boolean(alert?.regla.activa && ['PENDIENTE', 'EN_REVISION'].includes(alert.estado));
+    const alert = await prisma.alertaGenerada.findUnique({ where: { id: data.casoId }, select: { estado: true, datos: true, regla: { select: { activa: true } } } });
+    if (!alert?.regla.activa || !['PENDIENTE', 'EN_REVISION'].includes(alert.estado)) return false;
+    if (data.familia === 'catalogo_verificable' && data.tipo === 'requerimiento_inspeccion') {
+      if (!notice.usuarioId || data.version !== 1 || typeof data.entidadId !== 'string' || typeof data.inspeccionId !== 'string') return false;
+      let original: Record<string, unknown>;
+      try { original = JSON.parse(alert.datos); } catch { return false; }
+      if (!original || original.tipo !== data.tipo || original.entidadId !== data.entidadId || original.inspeccionId !== data.inspeccionId || original.vencimiento !== data.vencimiento) return false;
+      const requirement = await prisma.intercambioInspeccion.findUnique({ where: { id: data.entidadId }, include: {
+        respuestas: { select: { tipo: true, parte: true } },
+        inspeccion: { select: { inspectorId: true, tipoActor: true, estado: true,
+          generador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } } } },
+      } });
+      if (!requirement || requirement.inspeccionId !== data.inspeccionId || requirement.plazoRespuestaAt?.toISOString() !== data.vencimiento || requirementSituation(requirement, new Date()) !== 'PENDIENTE') return false;
+      const audience = inspectionAudience(notice, requirement.inspeccion);
+      return data.destino === 'inspeccion' ? audience.authority : data.destino === 'participacion' && audience.participant;
+    }
+    return true;
+  }
+  if (family === 'inspecciones' && data.tipo === 'antecedente_fiscalizacion') {
+    if (!validIntakeMail(data) || !notice.usuarioId) return false;
+    const intake = await prisma.antecedenteFiscalizacion.findUnique({ where: { id: data.antecedenteId },
+      select: { tipoActor: true, estado: true, creadoPorId: true } });
+    return Boolean(intake && ['PENDIENTE', 'EN_EVALUACION'].includes(intake.estado)
+      && ['ADMIN', `ADMIN_${intake.tipoActor}`].includes(notice.rol) && intake.creadoPorId !== notice.usuarioId);
   }
   if (family === 'inspecciones') {
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: data.inspeccionId }, select: { numeroActa: true } });
-    return Boolean(inspection && !/^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || ''));
+    if (!notice.usuarioId || typeof data.inspeccionId !== 'string' || !data.inspeccionId) return false;
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: data.inspeccionId }, select: {
+      numeroActa: true, inspectorId: true, tipoActor: true, estado: true,
+      generador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
+    } });
+    if (!inspection || /^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || '')) return false;
+    const { authority, participant } = inspectionAudience(notice, inspection);
+    if (data.tipo === 'agenda_inspeccion') {
+      if (!validAgendaMail(data)) return false;
+      const event = await prisma.eventoInspeccion.findUnique({ where: { id: data.eventoId }, select: { inspeccionId: true, metadata: true } });
+      const details = event?.metadata as Record<string, unknown> | null;
+      if (!event || event.inspeccionId !== data.inspeccionId || details?.avisoAgenda !== data.evento) return false;
+      return data.destino === 'inspeccion' ? authority
+        : ['NOTIFICADA', 'EN_TRAMITE_LEGAL', 'FINALIZADA'].includes(String(data.evento)) && participant;
+    }
+    if (data.tipo === 'intercambio_inspeccion') {
+      if (!validExchangeMail(data)) return false;
+      const exchange = await prisma.intercambioInspeccion.findUnique({ where: { id: data.intercambioId }, select: {
+        inspeccionId: true, secuencia: true, tipo: true, parte: true, autorId: true,
+      } });
+      if (!exchange || exchange.inspeccionId !== data.inspeccionId || exchange.secuencia !== data.secuencia
+        || exchange.tipo !== data.evento || exchange.parte !== data.parte || exchange.autorId === notice.usuarioId) return false;
+      return exchange.parte === 'AUTORIDAD' ? data.destino === 'participacion' && participant : data.destino === 'inspeccion' && authority;
+    }
+    return authority || (data.evento !== 'ASIGNADA' && participant);
   }
   return true;
+}
+
+/** Explicit new contract; legacy bell-only records never become a mail backfill. */
+function validExchangeMail(data: Record<string, unknown>): data is Record<string, unknown> & { intercambioId: string } {
+  return data.version === 1 && data.correoVersion === 1 && data.soloCampana !== true
+    && typeof data.inspeccionId === 'string' && Boolean(data.inspeccionId)
+    && typeof data.intercambioId === 'string' && Boolean(data.intercambioId)
+    && Number.isSafeInteger(data.secuencia) && Number(data.secuencia) > 0
+    && ['AUTORIDAD', 'INSPECCIONADO'].includes(String(data.parte))
+    && ['participacion', 'inspeccion'].includes(String(data.destino))
+    && Object.prototype.hasOwnProperty.call(INSPECTION_EXCHANGE_LABELS, String(data.evento));
+}
+
+function validAgendaMail(data: Record<string, unknown>): data is Record<string, unknown> & { eventoId: string } {
+  return data.version === 1 && data.correoVersion === 1 && data.soloCampana !== true
+    && typeof data.inspeccionId === 'string' && Boolean(data.inspeccionId)
+    && typeof data.eventoId === 'string' && Boolean(data.eventoId)
+    && ['participacion', 'inspeccion'].includes(String(data.destino))
+    && Object.prototype.hasOwnProperty.call(INSPECTION_AGENDA_LABELS, String(data.evento));
+}
+
+function validIntakeMail(data: Record<string, unknown>): data is Record<string, unknown> & { antecedenteId: string } {
+  return data.version === 1 && data.correoVersion === 1 && data.soloCampana !== true
+    && typeof data.antecedenteId === 'string' && Boolean(data.antecedenteId);
+}
+
+function validEventualMail(data: Record<string, unknown>) {
+  return data.version === 1 && data.correoVersion === 1 && data.soloCampana !== true
+    && typeof data.registroId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.registroId)
+    && typeof data.eventoId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.eventoId)
+    && Object.prototype.hasOwnProperty.call(EVENTUAL_NOTICE_LABELS, String(data.evento));
 }
 
 /** Pending is explicit and limited to the applicant's own application/result. */
@@ -101,7 +201,10 @@ export async function queuedNoticeStillEligible(queueId: string, recipient: stri
 export function notificationMailContent(notice: NoticeForMail): { family: string; subject: string; html: string } | null {
   let data: Record<string, unknown>;
   try { data = JSON.parse(notice.datos || '{}'); } catch { return null; }
-  if (!data || typeof data !== 'object' || data.soloCampana === true || data.tipo === 'intercambio_inspeccion' || data.interno === true || data.isDemoData === true || data.modo === 'revision' || data.modo === 'prueba') return null;
+  if (!data || typeof data !== 'object' || data.soloCampana === true || (data.tipo === 'intercambio_inspeccion' && !validExchangeMail(data)) || data.interno === true || data.isDemoData === true || data.modo === 'revision' || data.modo === 'prueba') return null;
+  if (data.tipo === 'agenda_inspeccion' && !validAgendaMail(data)) return null;
+  if (data.tipo === 'antecedente_fiscalizacion' && !validIntakeMail(data)) return null;
+  if (data.tipo === 'manifiesto_eventual' && !validEventualMail(data)) return null;
   let family: string, path: string, title: string;
   if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     family = 'certificados'; title = 'Certificado ambiental disponible';
@@ -109,6 +212,8 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   } else if (['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(notice.tipo) && typeof data.renovacionId === 'string' && data.renovacionId) {
     family = 'padron'; title = 'Novedad en una solicitud de padrón';
     path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones' : '/notificaciones';
+  } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && validEventualMail(data)) {
+    family = 'manifiestos'; title = 'Novedad en un eventual'; path = '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(String(data.registroId));
   } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto'; path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto')) {
@@ -124,8 +229,13 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     path = notice.rol.startsWith('ADMIN') ? '/admin/solicitudes/' + encodeURIComponent(data.solicitudId) : '/mi-solicitud';
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'soporte' && typeof data.ticketId === 'string' && data.ticketId) {
     family = 'soporte'; title = 'Novedad en Soporte'; path = '/soporte/' + encodeURIComponent(data.ticketId);
+  } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data)) {
+    family = 'inspecciones'; title = 'Nuevo antecedente para evaluar en PSIP'; path = '/inspecciones?vista=antecedentes';
   } else if (notice.tipo === 'INFO_GENERAL' && typeof data.inspeccionId === 'string' && data.inspeccionId) {
-    family = 'inspecciones'; title = 'Novedad en una inspección'; path = '/inspecciones/' + encodeURIComponent(data.inspeccionId);
+    family = 'inspecciones'; title = 'Novedad en una inspección';
+    const participant = ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) ? data.destino === 'participacion' : !notice.rol.startsWith('ADMIN') && !notice.esInspector;
+    path = (participant ? '/mis-inspecciones/' : '/inspecciones/') + encodeURIComponent(data.inspeccionId)
+      + (!participant && data.tipo === 'intercambio_inspeccion' ? '#intercambios' : '');
   } else return null;
   // Only controlled event labels. Never copy free text, notes, attachments or amounts.
   const labels: Record<string, [string, string]> = {
@@ -183,7 +293,11 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     RECHAZADA: ['Adenda rechazada', 'La resolución y el anexo original siguen disponibles en el manifiesto.'],
   };
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
-  const message = data.tipo === 'propuesta_partes' && Object.prototype.hasOwnProperty.call(proposalEvents, proposalPhase) ? proposalEvents[proposalPhase]
+  const message = data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
+    : data.tipo === 'manifiesto_eventual' && validEventualMail(data) ? EVENTUAL_NOTICE_LABELS[String(data.evento) as keyof typeof EVENTUAL_NOTICE_LABELS]
+    : data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) ? INSPECTION_EXCHANGE_LABELS[String(data.evento) as keyof typeof INSPECTION_EXCHANGE_LABELS]
+    : data.tipo === 'agenda_inspeccion' && validAgendaMail(data) ? INSPECTION_AGENDA_LABELS[String(data.evento) as keyof typeof INSPECTION_AGENDA_LABELS]
+    : data.tipo === 'propuesta_partes' && Object.prototype.hasOwnProperty.call(proposalEvents, proposalPhase) ? proposalEvents[proposalPhase]
     : data.tipo === 'propuesta_partes' && proposalPhase.startsWith('aprobacion-') ? ['Una parte aprobó el manifiesto', 'Revisá qué aprobaciones faltan para iniciar la coordinación.']
     : data.tipo === 'adenda_manifiesto' && Object.prototype.hasOwnProperty.call(addendumEvents, event) ? addendumEvents[event]
     : data.tipo === 'relevo_transporte' ? ['Cambio de transporte en tránsito', 'La transportista de origen registró un relevo. Revisá el tramo y su seguimiento en SITREP.']
@@ -206,7 +320,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;

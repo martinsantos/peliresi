@@ -5,9 +5,9 @@ test('real manifest UI completes approval, transport, receipt, treatment and cer
   await login(page, info);
   if (info.project.name === 'app') {
     await page.goto(`${prefix(info)}/manifiestos`);
-    await page.getByRole('button', { name: 'Nuevo manifiesto', exact: true }).click();
+    await page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true }).click();
     await expect(page).toHaveURL(/\/app\/manifiestos\/nuevo$/);
-    await expect(page.getByRole('button', { name: 'Nuevo manifiesto', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true })).toHaveCount(0);
   } else {
     await page.goto(`${prefix(info)}/manifiestos/nuevo`);
   }
@@ -104,7 +104,7 @@ test('real manifest UI completes approval, transport, receipt, treatment and cer
   await page.reload();
   await expect(page.getByRole('button', { name: 'Descargar Certificado', exact: true })).toBeVisible();
   if (info.project.name === 'app') {
-    await expect(page.getByRole('button', { name: 'Nuevo manifiesto', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true })).toHaveCount(0);
   }
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Descargar Certificado', exact: true }).click();

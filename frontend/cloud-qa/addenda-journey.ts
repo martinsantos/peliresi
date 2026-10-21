@@ -2,10 +2,10 @@ import { expect, type Page, type Locator } from '@playwright/test';
 async function press(page: Page, target: Locator) {
   if (await page.evaluate(() => navigator.maxTouchPoints > 0)) await target.tap(); else await target.click();
 }
-export async function recordOrdinaryAddendum(page: Page, hideKeyboard = async () => {}) {
+export async function recordOrdinaryAddendum(page: Page, hideKeyboard = async () => {}, action = 'Registrar diferencia') {
   await press(page, page.getByRole('link', { name: 'Adendas y revisión posterior', exact: true }));
   await expect(page).toHaveURL(/\/manifiestos\/[^/]+\/adendas$/);
-  await press(page, page.getByRole('button', { name: 'Registrar diferencia', exact: true }));
+  await press(page, page.getByRole('button', { name: action, exact: true }));
   await page.getByLabel('Corriente observada 1', { exact: true }).fill('Y2');
   await page.getByLabel('Cantidad observada 1', { exact: true }).fill('42');
   await page.getByLabel('Motivo de la adenda', { exact: true }).fill('QA diferencia de carga, continuar y revisar después');

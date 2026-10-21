@@ -338,10 +338,11 @@
       var link = document.createElement('a');
       link.href = '#' + id;
       link.innerHTML = '<span class="index-marker">' + (index + 1) + '</span><span>' + escapeHTML(step.title) + '</span>';
-      link.addEventListener('click', function () {
-        restoringHashIndex = index;
-        updateActive(index, true);
+      link.addEventListener('click', function (event) {
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button > 0) return;
+        event.preventDefault();
         if (window.innerWidth <= 820) setMobileIndex(false);
+        goToStep(index);
       });
       listItem.appendChild(link);
       indexList.appendChild(listItem);
@@ -383,6 +384,31 @@
       if (replaceHash) window.history.replaceState(null, '', '#' + stepSections[activeIndex].id);
     }
 
+    function restoreHashStep() {
+      if (restoringHashIndex < 0) return;
+      stepSections[restoringHashIndex].scrollIntoView({ behavior: 'instant', block: 'start' });
+    }
+    function loadStepsThrough(index) {
+      stepSections.slice(0, index + 1).forEach(function (section) {
+        section.querySelectorAll('img.guide-image').forEach(function (image) {
+          if (!image.complete) image.loading = 'eager';
+        });
+      });
+    }
+    // Newly chosen steps need the same protection as an initial deep link.
+    // Once the reader scrolls, releaseHashRestoration stops all realignment.
+    stepsRoot.querySelectorAll('img.guide-image').forEach(function (image) {
+      image.addEventListener('load', restoreHashStep, { once: true });
+      image.addEventListener('error', restoreHashStep, { once: true });
+    });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(restoreHashStep);
+    // A font or decoded capture can resize a step after its load callback.
+    // Observe the resulting layout, while still yielding to the reader's input.
+    if (window.ResizeObserver) {
+      var stepLayoutObserver = new window.ResizeObserver(restoreHashStep);
+      stepSections.forEach(function (section) { stepLayoutObserver.observe(section); });
+    }
+
     function goToStep(index) {
       releaseHashRestoration();
       var target = Math.max(0, Math.min(index, guide.steps.length - 1));
@@ -393,6 +419,7 @@
         return;
       }
       restoringHashIndex = target;
+      loadStepsThrough(target);
       stepSections[target].scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
       updateActive(target, true);
     }
@@ -433,21 +460,9 @@
     updateActive(initial, false);
     if (hashIndex >= 0) {
       restoringHashIndex = hashIndex;
-      var restoreHashStep = function () {
-        if (restoringHashIndex < 0) return;
-        stepSections[restoringHashIndex].scrollIntoView({ behavior: 'instant', block: 'start' });
-      };
+      loadStepsThrough(hashIndex);
       window.setTimeout(restoreHashStep, 60);
       window.addEventListener('load', restoreHashStep, { once: true });
-      stepSections.slice(0, hashIndex + 1).forEach(function (section) {
-        section.querySelectorAll('img.guide-image').forEach(function (image) {
-          if (image.complete) return;
-          image.loading = 'eager';
-          image.addEventListener('load', restoreHashStep, { once: true });
-          image.addEventListener('error', restoreHashStep, { once: true });
-        });
-      });
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(restoreHashStep);
     }
     // Explicit navigation owns its destination while native smooth scrolling
     // crosses other steps. Only a new user gesture resumes reading-position sync.

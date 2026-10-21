@@ -97,7 +97,7 @@ it('facts wait for every approval; the party approves only its own slot', async 
   mock.get.mockResolvedValue({ data: { data: { registro: pending } } });
   mock.post.mockResolvedValue({ data: { data: { registro: pending } } });
   view(true); await screen.findByText('Aprobación de las partes: pendiente');
-  expect(screen.getByText(/Operador · Pendiente/)).toBeVisible();
+  expect(screen.getByRole('listitem', { name: 'Operador · Pendiente · Te toca' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Registrar retirado' })).toBeDisabled();
   expect(screen.getByText('Faltan aprobaciones de las partes para avanzar.')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Solicitar revisión' })).not.toBeInTheDocument();
@@ -131,4 +131,22 @@ it('legacy records without required approvals keep advancing as before', async (
   view(true); await screen.findByText('Operación: Recibido');
   expect(screen.queryByText(/Aprobación de las partes/)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Registrar tratado' })).toBeEnabled();
+});
+
+it.each([
+  ['OPERADOR', ['operador'], 'PENDIENTE', 'Te toca aprobar', true],
+  ['TRANSPORTISTA', [], 'PENDIENTE', 'Esperando aprobaciones', true],
+  ['OPERADOR', [], 'APROBADO', 'Listo para registrar el retiro', false],
+  ['OPERADOR', [], 'RECHAZADO', 'Operación detenida', true],
+])('shows the current task for %s with %s / %s without changing action permissions', async (rol, puedeAprobar, estado, message, blocked) => {
+  mock.user = { id: 'qa-current', rol: rol as string };
+  const partes = pending.aprobacion.partes.map(part => ({ ...part, estado: estado === 'APROBADO' ? 'APROBADA' : part.estado }));
+  mock.get.mockResolvedValue({ data: { data: { registro: { ...pending, puedeAprobar, aprobacion: { estado, partes } } } } });
+  view(true);
+  expect(await screen.findByText(message as string, { exact: true })).toBeVisible();
+  const approvals = screen.getByRole('list', { name: 'Participantes que deben aprobar' });
+  expect(approvals.children).toHaveLength(2); // No fictitious approval for an external participant.
+  expect(screen.getByText('Generador · creador')).toBeVisible();
+  const action = screen.getByRole('button', { name: 'Registrar retirado' });
+  if (blocked) expect(action).toBeDisabled(); else expect(action).toBeEnabled();
 });

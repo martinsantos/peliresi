@@ -511,6 +511,7 @@ export interface UpdateUsuarioRequest {
 }
 
 export interface UsuarioFilters {
+  estadoAcceso?: 'activo' | 'pendiente' | 'inactivo';
   rol?: Rol;
   roles?: Array<Rol | 'ADMIN_GENERADOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_OPERADOR'>;
   activo?: boolean;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -126,6 +126,7 @@ describe('authenticated redirect destination', () => {
 
 describe('standalone PWA AuthGate redirect destination', () => {
   beforeEach(() => {
+    loginMock.mockReset();
     authState = {
       currentUser: null,
       isLoading: false,
@@ -133,6 +134,39 @@ describe('standalone PWA AuthGate redirect destination', () => {
       login: loginMock,
       authError: null,
     };
+  });
+
+  it.each([401, 429])('keeps the same login form during validation and after HTTP %s', async status => {
+    let rejectLogin!: (error: unknown) => void;
+    loginMock.mockImplementation(() => new Promise((_resolve, reject) => { rejectLogin = reject; }));
+    const form = () => <MemoryRouter initialEntries={['/login']}><AuthGate><LoginPage /></AuthGate></MemoryRouter>;
+    const view = render(form());
+    const submitButton = screen.getByRole('button', { name: /ingresar/i });
+    await submitLogin();
+    const identifier = screen.getByLabelText('Correo electrónico o CUIT');
+    authState.isLoading = true;
+    view.rerender(form());
+    expect(screen.getByLabelText('Correo electrónico o CUIT')).toBe(identifier);
+    expect(identifier).toHaveValue('qa@example.com');
+    expect(submitButton).toBeDisabled();
+    const message = status === 401 ? 'Credenciales inválidas' : 'Demasiados intentos';
+    await act(async () => {
+      authState.isLoading = false;
+      authState.authError = message;
+      rejectLogin({ response: { status, data: { message } } });
+    });
+    view.rerender(form());
+    expect(screen.getByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByLabelText('Correo electrónico o CUIT')).toBe(identifier);
+    expect(identifier).toHaveValue('qa@example.com');
+    expect(screen.getByRole('button', { name: /ingresar/i })).toBeEnabled();
+  });
+
+  it('keeps private content hidden while the session is being resolved', () => {
+    authState.isLoading = true;
+    authState.currentUser = { rol: 'ADMIN' };
+    render(<MemoryRouter initialEntries={['/inspecciones']}><AuthGate><span>private inspection</span></AuthGate></MemoryRouter>);
+    expect(screen.queryByText('private inspection')).not.toBeInTheDocument();
   });
 
   it('does not downgrade an assigned inspector to actor participation after login', async () => {

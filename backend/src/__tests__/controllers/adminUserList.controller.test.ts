@@ -9,6 +9,26 @@ import { getUsuarios } from '../../controllers/admin.controller';
 
 describe('admin user list: complete server-side filtering', () => {
   beforeEach(() => { vi.clearAllMocks(); db.usuario.findMany.mockResolvedValue([]); db.usuario.count.mockResolvedValue(23); });
+  it.each([
+    ['activo', { activo: true }],
+    ['pendiente', { activo: false, motivoInactividad: 'PENDIENTE_APROBACION' }],
+    ['inactivo', { activo: false, OR: [{ motivoInactividad: null }, { motivoInactividad: { not: 'PENDIENTE_APROBACION' } }] }],
+  ])('uses the actual account reason for %s without confusing verified disabled users with applicants', async (estadoAcceso, condition) => {
+    const next = vi.fn();
+    await getUsuarios({ query: { estadoAcceso, search: 'QA Persona' } } as never, { json: vi.fn() } as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const request = db.usuario.findMany.mock.calls[0][0];
+    expect(request.where.AND).toContainEqual(condition);
+    expect(request.where.AND).toHaveLength(3);
+    expect(request.select.motivoInactividad).toBe(true);
+    expect(db.usuario.count).toHaveBeenCalledWith({ where: request.where });
+  });
+  it('rejects an unknown account state instead of silently listing a different population', async () => {
+    const next = vi.fn();
+    await getUsuarios({ query: { estadoAcceso: 'unknown' } } as never, { json: vi.fn() } as never, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(db.usuario.findMany).not.toHaveBeenCalled();
+  });
   it('paginates five per category and excludes the signed-in administrator before counting', async () => {
     await getUsuarios({ user: { id: 'admin' }, query: { rol: 'GENERADOR', esInspector: 'false', excludeSelf: 'true', activo: 'true', page: '2', limit: '5', sortBy: 'nombre' } } as never, { json: vi.fn() } as never, vi.fn());
     const request = db.usuario.findMany.mock.calls[0][0];

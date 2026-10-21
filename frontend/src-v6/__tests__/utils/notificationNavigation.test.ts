@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { resolveNotificationPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
 import type { Notificacion } from '../../types/models';
+import { QueryClient } from '@tanstack/react-query';
 
 const base: Notificacion = {
   id: 'n-1',
@@ -17,6 +18,30 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it('opening a new intake notice invalidates an already displayed queue without changing its data', () => {
+    const client = new QueryClient(), key = ['inspection-intakes', 'admin', 'PENDIENTE'];
+    const previous = { items: [{ id: 'old-case' }] }; client.setQueryData(key, previous);
+    refreshInspectionNotification({ ...base, datos: '{"tipo":"antecedente_fiscalizacion","version":1,"antecedenteId":"new-case"}' }, client);
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+    expect(client.getQueryData(key)).toBe(previous);
+    client.clear();
+  });
+  it('opens and refreshes the exact eventual on web and app, ignoring an untrusted URL', () => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'manifiesto_eventual', version: 1, registroId: 'eventual-1', url: '/wrong' }) };
+    expect(resolveNotificationPath(notice)).toBe('/manifiestos/baja-intensidad?registro=eventual-1');
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app/manifiestos/baja-intensidad?registro=eventual-1');
+    const invalidateQueries = vi.fn(); refreshInspectionNotification(notice, { invalidateQueries } as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['baja-intensidad'] });
+    expect(resolveNotificationPath({ ...notice, datos: JSON.stringify({ tipo: 'manifiesto_eventual', version: 1, registroId: '../other', url: '/wrong' }) }, '/app')).toBe('/app/notificaciones');
+  });
+  it.each(['participacion', 'inspeccion'])('opens agenda %s and refreshes current operations without trusting a supplied URL', destino => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'agenda_inspeccion', version: 1, inspeccionId: 'case-1', destino, url: '/wrong' }) };
+    const path = destino === 'participacion' ? '/mis-inspecciones/case-1' : '/inspecciones/case-1';
+    expect(resolveNotificationPath(notice)).toBe(path);
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app' + path);
+    const invalidateQueries = vi.fn(); refreshInspectionNotification(notice, { invalidateQueries } as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['inspecciones'] });
+  });
   it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('opens an application message in the %s own result, never administration', role => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'solicitud_mensaje', solicitudId: 'own-1' }) };
     expect(resolveNotificationPath(notice, '', role)).toBe('/mi-solicitud?solicitud=own-1');

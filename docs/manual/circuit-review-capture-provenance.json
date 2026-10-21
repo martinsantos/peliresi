@@ -1,0 +1,52 @@
+{
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "baseline": "7e8ffe0c3e4edb7fc74cdf165bf8269b5953ea0e",
+  "run": "Mixed runs: see each file",
+  "build": "Mixed builds: see each file",
+  "files": [
+    {
+      "file": "mobile/circuit-user-edit-20261020.png",
+      "sha256": "ddf1c806f0ac8bcd205dc70693ed0ad0ca1112291eff079b6a910ce0208e2bd8",
+      "width": 945,
+      "height": 2100,
+      "source": "browser-users-fixed/circuit-users-user-edit-pr-f0845-itly-clears-optional-fields-app/user-edit-before-save.png",
+      "run": "circuit_review_20261020/browser-users-fixed",
+      "build": "build-snapshot-v3.json"
+    },
+    {
+      "file": "mobile/circuit-user-inactive-20261020.png",
+      "sha256": "8cfc7e7153d8997321b921bf1ff31d310b287e4cddc478bffd8cdcc7bd9c5e0f",
+      "width": 945,
+      "height": 2100,
+      "source": "browser-users-fixed/circuit-users-a-disabled-v-b036c-ears-in-the-inactive-filter-app/user-disabled-detail.png",
+      "run": "circuit_review_20261020/browser-users-fixed",
+      "build": "build-snapshot-v3.json"
+    },
+    {
+      "file": "mobile/circuit-eventual-approvals-20261020.png",
+      "sha256": "9985746dd0880fa2bd95f1219d74e1f6fb88350e15fc1c020447366b884e02c6",
+      "width": 940,
+      "height": 562,
+      "source": "manifest-e2e/manifest-exceptional-mixed-f9b6f-ot-before-anything-advances-app/exceptional-approval-card.png",
+      "run": "circuit_review_20261020/browser-eventual-final",
+      "build": "build-snapshot-v7.json",
+      "runtimeSource": "source-proof-access-green.json",
+      "surface": "app",
+      "captureMode": "Playwright locator screenshot of the complete rendered card; no image editing"
+    },
+    {
+      "file": "mobile/circuit-eventual-review-20261020.png",
+      "sha256": "854dacc06d143c0d44e9c9a4002ad022f03c2b97d555d781281fb235871f80f2",
+      "width": 861,
+      "height": 1150,
+      "source": "manifest-e2e/manifest-exceptional-baja--c0a48--review-and-preserved-facts-web-responsive/exceptional-review-card.png",
+      "run": "circuit_review_20261020/browser-eventual-final",
+      "build": "build-snapshot-v7.json",
+      "runtimeSource": "source-proof-access-green.json",
+      "surface": "web-responsive",
+      "captureMode": "Playwright locator screenshot of the complete rendered card; no image editing"
+    }
+  ]
+}

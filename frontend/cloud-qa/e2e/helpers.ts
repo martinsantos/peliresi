@@ -74,9 +74,12 @@ export async function nonObstructingNotices(page: Page) {
 /** Page overflow alone misses clipped text in fixed navigation and dialog actions. */
 export async function readableFixedAction(action: Locator, container: Locator) {
   await expect(action).toBeVisible();
-  const containerBounds = await container.boundingBox();
-  expect(containerBounds).not.toBeNull();
+  const containerElement = await container.elementHandle();
+  expect(containerElement).not.toBeNull();
   const result = await action.evaluate((element, parent) => {
+    // Measure both rectangles in the same browser frame. A resize/React layout
+    // update between separate round trips must not compare two viewport sizes.
+    const containerBounds = parent.getBoundingClientRect();
     const bounds = element.getBoundingClientRect();
     const viewport = window.visualViewport;
     const visible = { left: viewport?.offsetLeft ?? 0, top: viewport?.offsetTop ?? 0,
@@ -96,9 +99,10 @@ export async function readableFixedAction(action: Locator, container: Locator) {
     }
     return { name: element.textContent?.trim(), width: bounds.width, height: bounds.height,
       button: { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom }, visible,
-      containedByParent: inside(bounds, { left: parent.x, top: parent.y, right: parent.x + parent.width, bottom: parent.y + parent.height }),
+      containedByParent: parent.isConnected && parent.contains(element) && inside(bounds, containerBounds),
       containedByViewport: inside(bounds, visible), textContained: texts.every(rect => inside(rect, bounds)), texts };
-  }, containerBounds!);
+  }, containerElement!);
+  await containerElement!.dispose();
   expect(result, `Readable fixed action: ${result.name}`).toMatchObject({ containedByParent: true, containedByViewport: true, textContained: true });
   expect(result.height).toBeGreaterThanOrEqual(44);
 }

@@ -11,7 +11,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas, useEliminarNotificacion } from '../../hooks/useNotificaciones';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath, refreshInspectionNotification } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel } from '../../utils/notificationNavigation';
 import { notificationFollowup } from '../../utils/notificationFollowup';
 import type { Notificacion } from '../../types/models';
 import { useAuth } from '../../contexts/AuthContext';
@@ -143,7 +143,7 @@ const NotificacionesPage: React.FC = () => {
             const day=(date:string)=>new Date(date).toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza',day:'numeric',month:'long'});
             const dateLabel=day(notice.createdAt);
             const groupStart=index===0||day(items[index-1].createdAt)!==dateLabel;
-            const Icon = warning ? AlertTriangle : /\/soporte\//.test(path) ? LifeBuoy : /\/(?:mis-)?inspecciones\//.test(path) ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
+            const Icon = warning ? AlertTriangle : /\/soporte\//.test(path) ? LifeBuoy : /\/(?:mis-)?inspecciones(?:[/?#]|$)/.test(path) ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
             return (
               <li key={notice.id} className={notice.leida ? 'border-l-4 border-l-transparent opacity-80' : 'border-l-4 border-l-primary-600 bg-primary-50/40'}>
                 {groupStart && <p className="border-b border-neutral-200 bg-neutral-100 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-600">{dateLabel}</p>}
@@ -158,7 +158,7 @@ const NotificacionesPage: React.FC = () => {
                     )}
                     <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
                     {followup && <span className="mt-2 block text-sm font-semibold text-primary-800">{followup}</span>}
-                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{/\/(?:admin\/solicitudes\/|mi-solicitud(?:\?|$))/.test(path) ? 'Abrir solicitud y ver su estado →' : /\/(?:mis-)?inspecciones\//.test(path) ? 'Abrir expediente y ver el intercambio →' : 'Abrir manifiesto y ver qué sigue →'}</span>}
+                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{notificationActionLabel(path)}</span>}
                     <time dateTime={notice.createdAt} className="mt-2 block text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
                   </span>
                   {linked && <ChevronRight size={18} aria-hidden="true" className="mt-1 shrink-0 text-neutral-600" />}

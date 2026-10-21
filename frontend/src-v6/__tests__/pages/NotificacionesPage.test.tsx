@@ -20,6 +20,22 @@ function setup(path = '/notificaciones') {
   return client;
 }
 describe('notification inbox states and interaction', () => {
+  for (const base of ['', '/app']) it.each([
+    ['/inspecciones?vista=antecedentes', 'Abrir cola de revisión →'],
+    ['/soporte/qa-ticket', 'Abrir consulta de soporte →'],
+    ['/mi-perfil', 'Abrir mi ficha y documentos →'],
+    ['/admin/usuarios', 'Revisar cuentas de usuarios →'],
+    ['/admin/renovaciones', 'Revisar solicitud de cambio →'],
+    ['/alertas', 'Revisar alerta →'],
+    ['/otra-pantalla', 'Abrir detalle →'],
+  ])(`names the actual destination %s on ${base || 'web'}`, async (path, label) => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Novedad de mi trámite', datos: JSON.stringify({ url: path }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText(label)).toBeVisible();
+    expect(screen.queryByText('Abrir manifiesto y ver qué sigue →')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Novedad de mi trámite', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + path);
+  });
   it('names an approved application and opens its result on app without an admin route', async () => {
     service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Solicitud aprobada', datos: '{"tipo":"solicitud_aprobada","solicitudId":"own-1"}' }] });
     setup('/app/notificaciones');

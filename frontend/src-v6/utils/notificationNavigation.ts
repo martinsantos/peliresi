@@ -24,20 +24,42 @@ function withBasePath(path: string, basePath: string): string {
 /** Opening a workflow notice must refresh its linked expediente/application. */
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
+  if (data.tipo === 'manifiesto_eventual' && data.version === 1) void queryClient.invalidateQueries({ queryKey: ['baja-intensidad'] });
+  if (data.tipo === 'antecedente_fiscalizacion' && data.version === 1) void queryClient.invalidateQueries({ queryKey: ['inspection-intakes'] });
   if (typeof data.solicitudId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) {
     void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
   }
-  if (data.tipo === 'intercambio_inspeccion' && data.version === 1) {
+  if (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1) {
     void queryClient.invalidateQueries({ queryKey: ['inspecciones'] });
   }
 }
 
+/** The action describes the resolved destination, including notices without a manifest. */
+export function notificationActionLabel(path: string): string {
+  const [pathname, query = ''] = path.replace(/^\/app(?=\/|$)/, '').split('#')[0].split('?');
+  if (pathname === '/inspecciones' && new URLSearchParams(query).get('vista') === 'antecedentes') return 'Abrir cola de revisión →';
+  if (/^\/(?:admin\/solicitudes\/|mi-solicitud$)/.test(pathname)) return 'Abrir solicitud y ver su estado →';
+  if (/^\/(?:mis-)?inspecciones\//.test(pathname)) return 'Abrir expediente y ver el intercambio →';
+  if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';
+  if (/^\/soporte(?:\/|$)/.test(pathname)) return 'Abrir consulta de soporte →';
+  if (pathname === '/mi-perfil') return 'Abrir mi ficha y documentos →';
+  if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
+  if (pathname === '/admin/renovaciones') return 'Revisar solicitud de cambio →';
+  if (pathname === '/alertas') return 'Revisar alerta →';
+  if (/^\/manifiestos(?:\/|$)/.test(pathname)) return 'Abrir manifiesto y ver qué sigue →';
+  return 'Abrir detalle →';
+}
+
 export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string): string {
   const data = parseNotificationData(notificacion.datos);
-  if (data.tipo === 'intercambio_inspeccion') {
+  if (data.tipo === 'manifiesto_eventual') {
+    return withBasePath(data.version === 1 && typeof data.registroId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.registroId)
+      ? '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(data.registroId) : '/notificaciones', basePath);
+  }
+  if (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))) {
     if (data.version !== 1 || typeof data.inspeccionId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.inspeccionId)
       || !['participacion', 'inspeccion'].includes(String(data.destino))) return withBasePath('/notificaciones', basePath);
-    return withBasePath(data.destino === 'participacion' ? `/mis-inspecciones/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}#intercambios`, basePath);
+    return withBasePath(data.destino === 'participacion' ? `/mis-inspecciones/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}${data.tipo === 'intercambio_inspeccion' ? '#intercambios' : ''}`, basePath);
   }
   const target = cataloguePath(notificacion.datos, true);
   if (data.familia === 'catalogo_verificable') return withBasePath(target || '/notificaciones', basePath);

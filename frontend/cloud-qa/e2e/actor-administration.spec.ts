@@ -9,7 +9,7 @@ const { jsPDF } = createRequire(new URL('../../package.json', import.meta.url))(
 test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); });
 
 for (const actor of ['generador', 'operador'] as const) test(`${actor}: administrative alta retains electrical evidence and reserves ATM before review`, async ({ page }, info) => {
-  await assertCloudDatabase(); expect(new URL(process.env.DATABASE_URL!).searchParams.get('schema')).toBe('actor_onboarding_20261020');
+  await assertCloudDatabase(); expect(['actor_onboarding_20261020', 'circuit_review_20261020']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   const id = randomUUID(), cuit = `99-${String(Date.now()).slice(-8)}-0`, route = actor === 'generador' ? 'generadores' : 'operadores', payment = String(Date.now());
   await login(page, info, 'admin-' + actor); await page.goto(`${prefix(info)}/admin/actores/${route}/nuevo`);

@@ -2,6 +2,14 @@ import { test, expect } from '@playwright/test';
 import { login, prefix, readablePageHeading } from './helpers';
 import { approveExceptionalJourney, createExceptionalJourney, continueExceptionalJourney, reviewExceptionalJourney } from '../exceptional-journey';
 
+async function openEventualNotice(page: import('@playwright/test').Page, base: string, id: string, title: string) {
+  await page.getByRole('button', { name: /^Notificaciones(?: \(|$)/ }).click();
+  const panel = page.getByRole('region', { name: 'Notificaciones recientes', exact: true });
+  const notice = panel.getByRole('button').filter({ has: page.getByText(title, { exact: true }) }).filter({ hasText: 'BI-' + id });
+  await expect(notice).toBeVisible(); await notice.click();
+  await expect(page).toHaveURL('http://127.0.0.1:4177' + base + '/manifiestos/baja-intensidad?registro=' + id);
+}
+
 test('baja intensidad continues with independent post-facto review and preserved facts', async ({ page, browser }, info) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -24,6 +32,7 @@ test('baja intensidad continues with independent post-facto review and preserved
     await reviewExceptionalJourney(reviewer, prefix(info), id);
     await reviewer.getByRole('heading', { name: 'Revisión posterior', exact: true }).scrollIntoViewIfNeeded();
     await reviewer.screenshot({ path: info.outputPath('exceptional-post-facto.png') });
+    await reviewer.getByRole('heading', { name: 'Revisión posterior', exact: true }).locator('..').screenshot({ path: info.outputPath('exceptional-review-card.png') });
     expect(await reviewer.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     await expect(reviewer.locator('vite-error-overlay')).toHaveCount(0);
     await expect(reviewer).toHaveTitle(/SITREP/i);
@@ -40,7 +49,7 @@ test('mixed participant keeps identity; the linked actor approves its own slot b
   try {
     const participant = await context.newPage();
     await login(participant, info, 'transportista');
-    await participant.goto('http://127.0.0.1:4177' + prefix(info) + '/manifiestos/baja-intensidad?registro=' + id);
+    await openEventualNotice(participant, prefix(info), id, 'Nuevo eventual: revisá tu participación');
     await expect(participant.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Registrado');
     await participant.getByText('Identidades declaradas', { exact: true }).click();
     await expect(participant.locator('details')).toContainText('QA Transporte 1');
@@ -50,9 +59,13 @@ test('mixed participant keeps identity; the linked actor approves its own slot b
     await expect(participant.getByRole('button', { name: 'Aprobar como quien lo creó', exact: true })).toHaveCount(0);
     await approveExceptionalJourney(participant, 'transportista');
     await expect(participant.getByText('Aprobación de las partes: pendiente', { exact: true })).toBeVisible();
+    await expect(participant.getByText('Esperando aprobaciones', { exact: true })).toBeVisible();
     await expect(participant.getByRole('button', { name: 'Registrar retirado', exact: true })).toBeDisabled();
     await expect(participant.getByRole('button', { name: 'Aprobar post facto', exact: true })).toHaveCount(0);
     await participant.screenshot({ path: info.outputPath('exceptional-linked-readonly.png') });
+    await participant.getByRole('status').filter({ hasText: 'Aprobación de las partes: pendiente' }).locator('..').screenshot({ path: info.outputPath('exceptional-approval-card.png') });
+    await openEventualNotice(page, prefix(info), id, 'Una parte aprobó el eventual');
+    await expect(page.getByText('Aprobación de las partes: pendiente', { exact: true })).toBeVisible();
   } finally { await context.close(); }
 });
 
@@ -78,12 +91,12 @@ test('a generator links a registered operator, who approves before the generator
   try {
     const operator = await context.newPage();
     await login(operator, info, 'operador');
-    await operator.goto('http://127.0.0.1:4177' + prefix(info) + '/manifiestos/baja-intensidad?registro=' + id);
+    await openEventualNotice(operator, prefix(info), id, 'Nuevo eventual: revisá tu participación');
     await approveExceptionalJourney(operator, 'operador');
     await expect(operator.getByText('Aprobación de las partes: aprobado', { exact: true })).toBeVisible();
     await operator.screenshot({ path: info.outputPath('eventual-operator-approved.png') });
   } finally { await context.close(); }
-  await page.reload();
+  await openEventualNotice(page, prefix(info), id, 'Eventual aprobado por sus participantes');
   await page.getByRole('button', { name: 'Registrar retirado', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Estado operativo' })).toHaveText('Operación: Retirado');
 });

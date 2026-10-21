@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); 
 
 async function syntheticVerification(email: string) {
   await assertCloudDatabase();
-  expect(new URL(process.env.DATABASE_URL!).searchParams.get('schema')).toBe('actor_onboarding_20261020');
+  expect(['actor_onboarding_20261020', 'circuit_review_20261020']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
   const db = new PrismaClient(), token = 'qa-proof-' + randomUUID();
   try {
     const user = await db.usuario.findUniqueOrThrow({ where: { email } });

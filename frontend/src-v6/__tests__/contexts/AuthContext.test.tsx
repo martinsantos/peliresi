@@ -204,6 +204,22 @@ describe('AuthContext', () => {
     expect(clearTokens).toHaveBeenCalled();
   });
 
+  it('shows the latest rejection when a second login attempt has a different error', async () => {
+    vi.mocked(authService.login)
+      .mockRejectedValueOnce({ response: { status: 401, data: { message: 'Credenciales inválidas' } } })
+      .mockRejectedValueOnce({ response: { status: 429, data: { message: 'Demasiados intentos: esperá un minuto' } } });
+    render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter><AuthProvider><LoginPage /></AuthProvider></MemoryRouter></QueryClientProvider>);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Correo electrónico o CUIT'), 'generador@qa.invalid');
+    await user.type(screen.getByLabelText('Contraseña', { exact: true }), 'synthetic');
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Credenciales inválidas'));
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Demasiados intentos: esperá un minuto'));
+    expect(screen.getByLabelText('Correo electrónico o CUIT')).toHaveValue('generador@qa.invalid');
+    expect(authService.login).toHaveBeenCalledTimes(2);
+  });
+
   it('restores the restricted UI after server validation and clears it after a full session', async () => {
     localStorage.setItem('sitrep_access_token', `header.${btoa(JSON.stringify({ id: inspector.id, restricted: true }))}.signature`);
     vi.mocked(authService.getMe).mockResolvedValue({ ...inspector, activo: false });

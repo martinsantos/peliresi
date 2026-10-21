@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, afterEach, test, vi, expect } from 'vitest';
 import ManifiestoDetallePage from '../../pages/manifiestos/ManifiestoDetallePage';
 import { canAccessMobilePath } from '../../utils/mobileAccess';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const state = vi.hoisted(() => ({ user: {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}, writes: vi.fn(), status: 'TRATADO' }));
 vi.mock('../../contexts/AuthContext', () => ({useAuth: () => ({currentUser: state.user, isAdmin: state.user.rol === 'ADMIN'})}));
@@ -24,9 +25,14 @@ vi.mock('../../pages/manifiestos/components/ManifiestoTimeline', () => ({default
 vi.mock('../../pages/manifiestos/components/ManifiestoActions', () => ({default: () => null}));
 vi.mock('../../services/manifiesto.service', () => ({manifiestoService: {}}));
 
-beforeEach(() => { state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}; state.writes.mockClear(); state.status = 'TRATADO'; });
-afterEach(cleanup);
-const open = () => render(<MemoryRouter initialEntries={['/manifiestos/m-1']}><Routes><Route path="/manifiestos/:id" element={<ManifiestoDetallePage/>}/></Routes></MemoryRouter>);
+let queryClient: QueryClient;
+beforeEach(() => {
+  state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}; state.writes.mockClear(); state.status = 'TRATADO';
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  queryClient.setQueryData(['tramos-transporte', 'm-1', undefined], { tramos: [], puedeRegistrar: false });
+});
+afterEach(() => { cleanup(); queryClient.clear(); });
+const open = () => render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={['/manifiestos/m-1']}><Routes><Route path="/manifiestos/:id" element={<ManifiestoDetallePage/>}/></Routes></MemoryRouter></QueryClientProvider>);
 const actorLinks = () => screen.queryAllByRole('link').filter(link => (link.getAttribute('href') || '').includes('/admin/actores/'));
 test('administrator actor blocks are semantic keyboard links to the exact three fichas', () => {
   open();

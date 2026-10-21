@@ -6,7 +6,7 @@ import path from 'node:path';
 import { assertCloudDatabase, backendRequire, externalKeys, root } from './safety.ts';
 await assertCloudDatabase();
 const schema = new URL(process.env.DATABASE_URL!).searchParams.get('schema');
-assert.ok(['payment_identity_20261020', 'actor_onboarding_20261020'].includes(schema || ''), 'Only the dedicated artificial payment/onboarding schemas');
+assert.ok(['payment_identity_20261020', 'actor_onboarding_20261020', 'circuit_review_20261020'].includes(schema || ''), 'Only the dedicated artificial payment/onboarding/circuit review schemas');
 assert.equal(process.env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z'); for (const key of externalKeys) assert.equal(process.env[key], '');
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
 const frontendRequire = createRequire(path.join(root, 'frontend/package.json')), { jsPDF } = frontendRequire('jspdf'), sharp = backendRequire('sharp');
@@ -127,7 +127,7 @@ try {
     const clean = await prepare('GENERADOR', admin), conflict = await prepare('OPERADOR', admin, first.identity);
     cases[project] = { clean: { id: clean.id, docId: clean.doc.id, sha256: clean.doc.sha256, identity: clean.identity }, conflict: { id: conflict.id, docId: conflict.doc.id, sha256: conflict.doc.sha256, identity: conflict.identity } };
   }
-  if (schema === 'actor_onboarding_20261020') {
+  if (['actor_onboarding_20261020', 'circuit_review_20261020'].includes(schema || '')) {
     const baseline = JSON.parse(readFileSync(path.join(out, 'protected-schemas-before.json'), 'utf8'));
     for (const [key, rows] of Object.entries(baseline)) {
       const [namespace, table] = key.split('.'); assert.notEqual(namespace, schema);

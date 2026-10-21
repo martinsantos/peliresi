@@ -4,6 +4,27 @@ import path from 'node:path';
 import { login, prefix, readableWholeWords } from './helpers';
 
 const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'psip-deadlines-fixture.json'), 'utf8'));
+async function findReminder(page: Page, base: string, title: string, message: string) {
+  await page.goto(`${base}/notificaciones`);
+  const inbox = page.getByRole('list', { name: 'Avisos', exact: true });
+  await expect(inbox).toBeVisible();
+  const reminder = inbox.getByRole('button', { name: `Abrir aviso: ${title}`, exact: true }).filter({ hasText: message });
+  // Other independent journeys can add newer notices. Use the real pagination;
+  // never delete those notices or assume this reminder is on the first page.
+  const next = page.getByRole('button', { name: 'Siguiente página', exact: true });
+  let current = 1;
+  while (await reminder.count() === 0 && await next.isEnabled()) {
+    current++;
+    const loaded = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/notificaciones' && url.searchParams.get('offset') === String((current - 1) * 20);
+    });
+    await next.click(); expect((await loaded).status()).toBe(200);
+    await expect(page.getByRole('navigation', { name: 'Paginación de avisos' })).toContainText(`Página ${current} de`);
+  }
+  await expect(reminder).toBeVisible();
+  return reminder;
+}
 async function api(page: Page, endpoint: string) {
   return page.evaluate(async endpoint => {
     const response = await fetch('/api' + endpoint, { headers: { Authorization: 'Bearer ' + localStorage.getItem('sitrep_access_token') } });
@@ -76,11 +97,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
         return data.reglaId === fixture.ruleId && data.entidadId === cases.mixed.requirements[0].id;
       });
       expect(reminders).toHaveLength(1);
-      await actor.goto(`${base}/notificaciones`);
-      const inbox = actor.getByRole('list', { name: 'Avisos', exact: true });
-      const reminder = inbox.getByRole('button', { name: `Abrir aviso: ${reminders[0].titulo}`, exact: true })
-        .filter({ hasText: `${cases.mixed.number} · ${cases.mixed.requirements[0].asunto}.` });
-      await expect(reminder).toBeVisible();
+      const reminder = await findReminder(actor, base, reminders[0].titulo, `${cases.mixed.number} · ${cases.mixed.requirements[0].asunto}.`);
       await reminder.click();
       await expect(actor).toHaveURL(new RegExp(`/mis-inspecciones/${cases.mixed.id}$`));
       await expect(actor.getByTestId('inspection-pending-request')).toHaveCount(3);
@@ -97,9 +114,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
       await expect(actor.getByTestId('inspection-pending-request')).toHaveCount(0);
       const reviewRow = await participantRow(cases.mixed);
       await expect(reviewRow.getByTestId('inspection-follow-up')).toContainText('Autoridad: revisar presentación');
-      await actor.goto(`${base}/notificaciones`);
-      await actor.getByRole('list', { name: 'Avisos', exact: true }).getByRole('button', { name: `Abrir aviso: ${reminders[0].titulo}`, exact: true })
-        .filter({ hasText: `${cases.mixed.number} · ${cases.mixed.requirements[0].asunto}.` }).click();
+      await (await findReminder(actor, base, reminders[0].titulo, `${cases.mixed.number} · ${cases.mixed.requirements[0].asunto}.`)).click();
       await expect(actor.getByTestId('inspection-responsible')).toHaveText('Debe actuar: Autoridad');
       await expect(actor.getByTestId('inspection-overdue')).toHaveCount(0);
       await open(page, cases.mixed, true);

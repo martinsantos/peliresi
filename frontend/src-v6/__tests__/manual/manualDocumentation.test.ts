@@ -52,14 +52,32 @@ describe('manual documentation stays usable and truthful', () => {
       expect(receipt.files.some((item: { file: string }) => step.image === 'screenshots/' + item.file)).toBe(true);
     }
   });
+  it('preserves the current account-edit captures and explains the notice delivery boundary', () => {
+    const provenance = JSON.parse(readFileSync(manual + 'circuit-review-capture-provenance.json', 'utf8'));
+    expect(provenance).toMatchObject({ synthetic: true, productionCapture: false, edited: false });
+    expect(provenance.files).toHaveLength(4);
+    for (const image of provenance.files) {
+      const bytes = readFileSync(manual + 'screenshots/' + image.file);
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(image.sha256);
+      expect(bytes.readUInt32BE(16)).toBe(image.width); expect(bytes.readUInt32BE(20)).toBe(image.height);
+    }
+    const psip = data.guides.find(guide => guide.id === 'psip-flujo-inspecciones')!;
+    const body = psip.steps.flatMap(step => step.body).join(' ');
+    expect(body).toContain('Quitar la fecha no cancela');
+    expect(body).toContain('históricos sólo-campana no se reenvían');
+    expect(body).toContain('correo y push siguen apagados');
+    const account = data.guides.find(guide => guide.id === 'administrador-editar-usuarios')!;
+    expect(account.steps.flatMap(step => step.body).join(' ')).toContain('Nombre y Apellido son campos separados');
+  });
+
   it('exposes the tutorial in all entry pages and escapes the explicit capture caption', () => {
     for (const file of ['index.html', 'search.html', 'tutorial.html']) {
       const html = readFileSync(manual + file, 'utf8');
-      // Guide content uses its own current cache key; unchanged CSS/JS retain theirs.
+      // Guide content uses its own current cache key; the corrected renderer has its own key; CSS retains its version.
       // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.20.11');
-      expect(html).toContain('manual.js?v=2026.20.4');
-      expect(html).toContain('manual.css?v=2026.20.4');
+      expect(html).toContain('help-data.js?v=2026.20.20');
+      expect(html).toContain('manual.js?v=2026.20.6');
+      expect(html).toContain('manual.css?v=2026.20.5');
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');
     expect(script).toContain("'administrador-alertas-proactivas'");

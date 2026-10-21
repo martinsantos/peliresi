@@ -1,5 +1,15 @@
 # SITREP — traspaso vigente de operación
 
+## Revisión integral — candidato sólo en preview, 21/10/2026
+
+**Revisión completada, sin publicar.** Rama `codex/sitrep-training-20261018`, base `7e8ffe0c`, incluye altas `4b5c8bdd` pendientes. Leer primero [circuitos, trece correcciones, validación y límites](REVISION-INTEGRAL-CIRCUITOS-20261020.md), luego [matriz](MATRIZ-CIRCUITOS-20261020.md) y [plan ejecutado](PLAN-REVISION-INTEGRAL-20261020.md). Última producción documentada: **c9cd877f**, sin nueva inspección ni modificación productiva.
+
+backend **1430/1430**, frontend **1781/1781**, **369 casos E2E únicos**, **78 grupos HTTP**; **107 variantes de correo simuladas**, auditoría **8/8**, tipos/builds/lint PASS. Casos únicos deduplicados: no sumar intentos ni pruebas dirigidas. Se corrigieron identidad/estado/errores de ABM, pérdida del formulario de login, avisos de agenda PSIP y eventuales, elegibilidad de correos, unidades de adendas, próxima acción por rol, documentos del transporte y navegación del manual. Sin migración nueva ni ampliación de permisos.
+
+Manual **2026.20.20**, renderer **2026.20.6**, CSS **2026.20.5** intacto; directorio conservado. Fuentes y capturas con hashes. CAP cerrado, correo/push/proveedores apagados; **235 tablas previas intactas, 224 correos suprimidos y cero intentos/envíos**. QA serial/un worker/1 CPU/2 GiB/swap cero. Servicios/PG cerrados y contenedor detenido **21/10/2026 02:46:53 Mendoza**, sin OOM; imagen/base/evidencia conservadas.
+
+Sólo checkout autorizado, `main` sigue `c8402190edfc36b5e5d0dee1337c24bd1689420d`; sin push/workflows. Commits `[skip ci]`. Builds v13 con `/api` local: **no desplegarlos**. Publicación requiere nueva autorización, API final y versiones SW propias. Propuesta ordinaria de tres partes limitada a CAP; no se reabrieron sus cuentas. Navegadores no certifican Android/iOS físico; correo simulado no acredita entrega; OCR/ATM no deciden categoría fiscal ni acreditación externa.
+
 ## Revisión de altas — producto 4b5c8bdd sin publicar, 20/10/2026
 
 **Sólo preview, sin producción ni main.** Candidato **`4b5c8bdd3380beb3bc03674d902a31ff0b91f76e`**, rama `codex/sitrep-training-20261018`, checkout único de este traspaso. Leer [revisión integral de Generador, Transportista y Operador](REVISION-ALTAS-20261020.md) antes de continuar. La última publicación documentada sigue siendo `c9cd877f`; no se consultó producción durante esta revisión.

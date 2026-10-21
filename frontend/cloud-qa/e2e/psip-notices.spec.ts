@@ -43,7 +43,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
       const senderExcluded = async (sender: Page, exchange: any) => expect(await notices(sender, exchange.id)).toHaveLength(0);
       const openBell = async (recipient: Page, exchange: any, destination: 'participacion' | 'inspeccion') => {
         const own = await notices(recipient, exchange.id); expect(own).toHaveLength(1); expect(own[0].leida).toBe(false);
-        expect(JSON.parse(own[0].datos)).toMatchObject({ inspeccionId: id, secuencia: exchange.secuencia, evento: exchange.tipo, destino: destination, soloCampana: true });
+        expect(JSON.parse(own[0].datos)).toMatchObject({ inspeccionId: id, secuencia: exchange.secuencia, evento: exchange.tipo, destino: destination, correoVersion: 1 });
         await recipient.getByRole('button', { name: /^Notificaciones(?: \(|$)/ }).click();
         const panel = recipient.getByRole('region', { name: 'Notificaciones recientes', exact: true });
         await expect(panel).toBeVisible();

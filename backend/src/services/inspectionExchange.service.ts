@@ -38,6 +38,17 @@ export type ExchangeDigestInput = {
   adjuntos: ExchangeAttachmentDigest[];
 };
 
+export const PARTICIPANT_VISIBLE_STATES: EstadoInspeccion[] = [
+  'NOTIFICADA',
+  'EN_DESCARGO',
+  'REQUIERE_SUBSANACION',
+  'CERRADA_CONFORME',
+  'DERIVADA_LEGALES',
+  'EN_TRAMITE_LEGAL',
+  'DERIVADA_ATM',
+  'FINALIZADA',
+];
+
 const ACTOR_RESPONSE_TYPES = new Set<TipoIntercambioInspeccion>(['RESPUESTA', 'DESCARGO', 'SUBSANACION']);
 const AUTHORITY_MESSAGE_TYPES = new Set<TipoIntercambioInspeccion>(['REQUERIMIENTO', 'RESPUESTA', 'PRONUNCIAMIENTO']);
 const EXCHANGE_OPEN_STATES = new Set<EstadoInspeccion>(['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION']);

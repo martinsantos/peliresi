@@ -7,7 +7,7 @@ function transaction(recipients = [{ id: 'recipient' }]) {
   return { usuario: { findMany: vi.fn().mockResolvedValue(recipients) }, notificacion: { createMany: vi.fn().mockResolvedValue({ count: recipients.length }) } };
 }
 
-describe('PSIP bell-only delivery', () => {
+describe('PSIP transactional notices without direct delivery', () => {
   it.each([
     ['GENERADOR', 'generador', 'generadorId'], ['TRANSPORTISTA', 'transportista', 'transportistaId'], ['OPERADOR', 'operador', 'operadorId'],
   ])('limits authority messages to the linked active %s, without copying the sender', async (tipoActor, relation, field) => {
@@ -31,7 +31,7 @@ describe('PSIP bell-only delivery', () => {
     await createInspectionExchangeNotices(tx as any, inspection, { ...exchange, tipo });
     const row = tx.notificacion.createMany.mock.calls[0][0].data[0];
     expect(row).toMatchObject({ tipo: 'INFO_GENERAL', prioridad: 'NORMAL', titulo: expect.stringMatching(/^PSIP · /), mensaje: expect.stringContaining('QA-PSIP-1 · Actuación #3.') });
-    expect(JSON.parse(row.datos)).toEqual({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', numero: 'QA-PSIP-1', intercambioId: 'exchange-1', secuencia: 3, evento: tipo, parte: 'AUTORIDAD', destino: 'participacion', soloCampana: true });
+    expect(JSON.parse(row.datos)).toEqual({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', numero: 'QA-PSIP-1', intercambioId: 'exchange-1', secuencia: 3, evento: tipo, parte: 'AUTORIDAD', destino: 'participacion', correoVersion: 1 });
     // The transaction exposes only user lookup and notice insertion. No external dispatcher.
     expect(Object.keys(tx)).toEqual(['usuario', 'notificacion']);
   });

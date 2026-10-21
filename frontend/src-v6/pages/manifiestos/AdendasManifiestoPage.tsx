@@ -20,6 +20,7 @@ type Data = { finalLiberado?: boolean; puedeInformarHallazgo?: boolean; adendas:
   documental?: { pendientes: number; observadas: number; rechazadas: number; estado: string; cierreAcreditado: boolean } };
 const labels: Record<string, string> = { PENDIENTE: 'Pendiente de revisión', APROBADA: 'Aprobada post facto', OBSERVADA: 'Observada', RECHAZADA: 'Conformidad rechazada' };
 const emptyWaste = (): Waste => ({ corriente: '', cantidad: 0, unidad: 'kg' });
+const observedUnits = ['kg', 'lt', 'tn', 'un', 'l', 't', 'm3'];
 function Load({ rows }: { rows: Waste[] }) {
   return <ul className="space-y-1">{rows.map((row, i) => <li key={i}>{row.corriente} · {row.cantidad} {row.unidad}</li>)}</ul>;
 }
@@ -90,8 +91,9 @@ export default function AdendasManifiestoPage() {
       {wastes.map((row, i) => <fieldset key={i} className="grid grid-cols-2 sm:grid-cols-3 gap-3 min-w-0"><legend className="sr-only">Residuo {i + 1}</legend>
         <Input label={`Corriente observada ${i + 1}`} type="text" inputMode="text" autoCapitalize="characters" autoCorrect="off" helperText="Letra Y y número: Y1, Y21…" title="Ingresá la letra Y seguida del número, por ejemplo Y21" required pattern="Y[0-9]{1,3}" maxLength={4} placeholder="Y1" value={row.corriente} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, corriente: e.target.value.toUpperCase() } : v))} />
         <Input label={`Cantidad observada ${i + 1}`} required type="number" inputMode="decimal" min="0.001" max="1000000000000" step="any" value={row.cantidad || ''} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, cantidad: Number(e.target.value) } : v))} />
-        <label className="text-sm font-medium">Unidad observada {i + 1}<select className="mt-1 block h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-base" value={row.unidad} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, unidad: e.target.value } : v))}>
-          {['kg', 'l', 't', 'm3'].map(unit => <option key={unit}>{unit}</option>)}
+        <label className="text-sm font-medium">Unidad observada {i + 1}<select required className="mt-1 block h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-base" value={observedUnits.includes(row.unidad) ? row.unidad : ''} onChange={e => setWastes(wastes.map((v, n) => n === i ? { ...v, unidad: e.target.value } : v))}>
+          {!observedUnits.includes(row.unidad) && <option value="" disabled>Revisar unidad declarada: {row.unidad || 'sin informar'}</option>}
+          {observedUnits.map(unit => <option key={unit}>{unit}</option>)}
         </select></label>
         {wastes.length > 1 && <Button type="button" variant="ghost" onClick={() => setWastes(wastes.filter((_, n) => n !== i))}>Quitar residuo {i + 1}</Button>}
       </fieldset>)}

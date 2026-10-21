@@ -4,7 +4,7 @@ import type { InspectionExchangeAccessTarget } from './inspectionExchange.servic
 type NoticeInspection = InspectionExchangeAccessTarget & { id: string; numero: string };
 type NoticeExchange = { id: string; secuencia: number; tipo: TipoIntercambioInspeccion; parte: ParteIntercambioInspeccion; autorId: string };
 
-const LABELS: Record<TipoIntercambioInspeccion, [string, string]> = {
+export const INSPECTION_EXCHANGE_LABELS: Record<TipoIntercambioInspeccion, [string, string]> = {
   REQUERIMIENTO: ['Nuevo requerimiento', 'Revisá el pedido y su plazo para responder desde el expediente.'],
   RESPUESTA: ['Nueva respuesta', 'Abrí el intercambio para leer la respuesta y revisar qué sigue.'],
   DESCARGO: ['Descargo presentado', 'Revisá el descargo recibido antes de resolver.'],
@@ -14,7 +14,7 @@ const LABELS: Record<TipoIntercambioInspeccion, [string, string]> = {
   DERIVACION_LEGALES: ['Derivación a Legales', 'La autoridad derivó el expediente a Legales. Consultá el fundamento de la decisión.'],
 };
 
-/** Bell only, committed atomically with the exchange. Never dispatch external channels.
+/** Committed atomically with the exchange. Never dispatch external channels here.
  * Actor submissions go to the assigned inspector and competent administrators;
  * authority submissions go only to the linked inspected actor. No copies to the author.
  * Idempotent controller retries return the existing exchange before entering this transaction.
@@ -45,7 +45,7 @@ export async function createInspectionExchangeNotices(
   });
   const ids = [...new Set(recipients.map(user => user.id))];
   if (!ids.length) return;
-  const [title, action] = LABELS[exchange.tipo];
+  const [title, action] = INSPECTION_EXCHANGE_LABELS[exchange.tipo];
   await tx.notificacion.createMany({ data: ids.map(usuarioId => ({
     usuarioId, tipo: 'INFO_GENERAL', prioridad: 'NORMAL',
     titulo: `PSIP · ${title}`,
@@ -55,7 +55,9 @@ export async function createInspectionExchangeNotices(
       inspeccionId: inspection.id, numero: inspection.numero,
       intercambioId: exchange.id, secuencia: exchange.secuencia, evento: exchange.tipo,
       parte: exchange.parte, destino: participant ? 'participacion' : 'inspeccion',
-      soloCampana: true,
+      // New notices explicitly support the opt-in relay. Historic soloCampana
+      // rows remain excluded; provider/family/cutoff/recipient gates still apply.
+      correoVersion: 1,
     }),
   })) });
 }

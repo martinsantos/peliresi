@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import SeguimientoExterno from './SeguimientoExterno';
+import { Factory, Truck, FlaskConical, Shield, ClipboardList, ClipboardCheck } from 'lucide-react';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
 type Participant = { nombre: string; identificacion: string; domicilio: string; nombreFantasia?: string; telefono?: string; padronId?: string };
@@ -34,6 +35,7 @@ const ownSlot: Record<string, Slot> = { GENERADOR: 'generador', TRANSPORTISTA: '
 const creators = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN'];
 const approvalLabels: Record<string, string> = { PENDIENTE: 'pendiente', APROBADO: 'aprobado', RECHAZADO: 'rechazado' };
 const partLabels: Record<string, string> = { creador: 'Quien lo creó', generador: 'Generador', transportista: 'Transportista', operador: 'Operador' };
+const approvalRoles: Record<string, { title: string; Icon: typeof Factory }> = { GENERADOR: { title: 'Generador', Icon: Factory }, TRANSPORTISTA: { title: 'Transporte', Icon: Truck }, OPERADOR: { title: 'Operador', Icon: FlaskConical }, ADMIN: { title: 'Administración', Icon: Shield } };
 const decisionLabels: Record<string, string> = { PENDIENTE: 'Pendiente', APROBADA: 'Aprobada', RECHAZADA: 'Rechazada' };
 
 function ParticipantFields({ title, value, onChange }: { title: string; value: Participant; onChange: (v: Participant) => void }) {
@@ -180,10 +182,17 @@ export default function BajaIntensidadPage() {
           <p>{entry.datos.motivo}</p>
         </details>
       </Card>
-      {approval && <Card><h2 className="font-semibold" role="status">Aprobación de las partes: {approvalLabels[approval.estado]}</h2>
-        <ul className="text-sm mt-2 space-y-1">{approval.partes.map(p => <li key={p.parte}>{partLabels[p.parte]} · {decisionLabels[p.estado]}</li>)}</ul>
-        {approval.estado === 'PENDIENTE' && <p className="text-sm text-amber-900 mt-2">Faltan aprobaciones de las partes para avanzar.</p>}
-        {approval.estado === 'RECHAZADO' && <p className="text-sm text-error-800 mt-2">Rechazado por una parte: se conserva como antecedente y no avanza.</p>}
+      {approval && <Card><h2 className="flex items-center gap-2 text-base font-semibold" role="status"><ClipboardList size={20} aria-hidden="true" className="shrink-0 text-primary-700" />Aprobación de las partes: {approvalLabels[approval.estado]}</h2>
+        <ul aria-label="Participantes que deben aprobar" className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">{approval.partes.map(p => {
+          const { title, Icon } = approvalRoles[p.rol] || { title: partLabels[p.parte], Icon: Shield };
+          const own = entry.puedeAprobar?.includes(p.parte);
+          return <li key={p.parte} aria-label={`${title} · ${decisionLabels[p.estado]}${own ? ' · Te toca' : ''}`} className={`flex items-center gap-2 rounded-lg border p-2 ${p.estado === 'APROBADA' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : p.estado === 'RECHAZADA' ? 'bg-error-50 border-error-200 text-error-800' : 'bg-neutral-100 border-neutral-200 text-neutral-700'}`}>
+            <Icon size={22} aria-hidden="true" className="shrink-0" /><div className="min-w-0 text-xs"><p className="font-semibold">{title}{p.parte === 'creador' ? ' · creador' : ''}</p><p>{decisionLabels[p.estado]}{own ? ' · Te toca' : ''}</p></div>
+          </li>;
+        })}</ul>
+        {approval.estado === 'PENDIENTE' && <div className="text-sm text-amber-900 mt-3"><p className="font-semibold">{entry.puedeAprobar?.length ? 'Te toca aprobar' : 'Esperando aprobaciones'}</p><p>Faltan aprobaciones de las partes para avanzar.</p></div>}
+        {approval.estado === 'APROBADO' && entry.etapa === 'REGISTRADO' && entry.puedeRegistrar && <p className="text-sm font-semibold text-primary-800 mt-3">Listo para registrar el retiro</p>}
+        {approval.estado === 'RECHAZADO' && <div className="text-sm text-error-800 mt-3"><p className="font-semibold">Operación detenida</p><p>Rechazado por una parte: se conserva como antecedente y no avanza.</p></div>}
         {!!entry.puedeAprobar?.length && <div className="flex flex-wrap gap-2 mt-3">{entry.puedeAprobar.map(parte => <React.Fragment key={parte}>
           <Button disabled={busy} onClick={() => void event({ tipo: 'APROBAR_PARTE', parte, nota })}>Aprobar como {partLabels[parte].toLowerCase()}</Button>
           <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RECHAZAR_PARTE', parte, nota })}>Rechazar como {partLabels[parte].toLowerCase()}</Button>
@@ -198,7 +207,7 @@ export default function BajaIntensidadPage() {
         <p className="text-sm">Carga observada completa; no se suma automáticamente al original.</p>
         {wasteInputs}<Button type="submit" disabled={busy || !nota.trim()}>Guardar diferencia</Button>
       </form>}</Card>}
-      <Card><h2 className="font-semibold mb-3">Revisión posterior</h2><div className="space-y-4">
+      <Card><h2 className="flex items-center gap-2 text-base font-semibold mb-3"><ClipboardCheck size={20} aria-hidden="true" className="shrink-0 text-primary-700" />Revisión posterior</h2><div className="space-y-4">
         {entry.revisiones.map((review, i) => <section key={review.objetivo} aria-label={i === 0 ? 'Revisión original' : 'Revisión diferencia ' + i} className="border-b border-neutral-200 pb-3 last:border-0">
           <h3 className="font-medium">{i === 0 ? 'Registro original' : 'Diferencia ' + i}</h3>
           <p className="text-sm mb-2">{review.estado === 'APROBADA' ? 'Conformidad aprobada' : review.estado === 'OBSERVADA' ? 'Observada · requiere atención' : review.estado === 'RECHAZADA' ? 'Conformidad rechazada · hechos conservados' : 'Pendiente de conformidad'}{review.solicitada ? ' · Revisión solicitada' : ''}</p>

@@ -1,3 +1,4 @@
+import { createInspectionAgendaNotices, inspectionScheduleChange } from '../services/inspectionAgendaNotice.service';
 import type { NextFunction, Response } from 'express';
 import { EstadoInspeccion, Prisma, TipoActorInspeccion } from '@prisma/client';
 import { z } from 'zod';
@@ -144,9 +145,12 @@ export async function organizarInspeccion(req: AuthRequest, res: Response, next:
         } : {}),
       };
       await tx.inspeccion.update({ where: { id: current.id }, data });
-      await tx.eventoInspeccion.create({ data: { inspeccionId: current.id, usuarioId: req.user.id, tipo: 'ORGANIZACION_ACTUALIZADA', titulo: snapshot ? 'Sujeto vinculado por el inspector' : 'Asignación o agenda actualizada', detalle: input.motivo,
-        metadata: { inspectorAnterior: current.inspectorId, inspectorNuevo: input.inspectorId || current.inspectorId, fechaAnterior: current.fechaProgramada?.toISOString() || null, fechaNueva: input.fechaProgramada === undefined ? current.fechaProgramada?.toISOString() || null : input.fechaProgramada, actorVinculado: input.actorId || null } } });
-      if (input.inspectorId || input.fechaProgramada !== undefined) await tx.notificacion.create({ data: { usuarioId: input.inspectorId || current.inspectorId, tipo: 'INFO_GENERAL', titulo: `Agenda de inspección · ${current.numero}`, mensaje: 'La asignación o fecha de una inspección cambió. Revise el expediente.', datos: JSON.stringify({ inspeccionId: current.id }) } });
+      const noticeEvent = input.inspectorId && input.inspectorId !== current.inspectorId ? 'REASIGNADA'
+        : inspectionScheduleChange(current.fechaProgramada, input.fechaProgramada) || (snapshot ? 'SUJETO_VINCULADO' : null);
+      const organizationEvent = await tx.eventoInspeccion.create({ data: { inspeccionId: current.id, usuarioId: req.user.id, tipo: 'ORGANIZACION_ACTUALIZADA', titulo: snapshot ? 'Sujeto vinculado por el inspector' : 'Asignación o agenda actualizada', detalle: input.motivo,
+        metadata: { avisoAgenda: noticeEvent, inspectorAnterior: current.inspectorId, inspectorNuevo: input.inspectorId || current.inspectorId, fechaAnterior: current.fechaProgramada?.toISOString() || null, fechaNueva: input.fechaProgramada === undefined ? current.fechaProgramada?.toISOString() || null : input.fechaProgramada, actorVinculado: input.actorId || null } } });
+      if (noticeEvent) await createInspectionAgendaNotices(tx, { ...current, inspectorId: input.inspectorId || current.inspectorId, tipoActor: input.tipoActor || current.tipoActor },
+        { evento: noticeEvent, eventoId: organizationEvent.id, autorId: req.user.id });
     });
     res.json({ success: true });
   } catch (error) { next(error); }

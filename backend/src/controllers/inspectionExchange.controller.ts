@@ -14,6 +14,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import {
   buildInspectionExchangeDigests,
+  PARTICIPANT_VISIBLE_STATES,
   canDecideInspectionExchange,
   exchangePartyForUser,
   isExchangeTypeAllowed,
@@ -26,17 +27,6 @@ import {
   resolveInspectionEvidence,
   StoredInspectionEvidence,
 } from '../services/inspectionEvidence.service';
-
-const PARTICIPANT_VISIBLE_STATES: EstadoInspeccion[] = [
-  'NOTIFICADA',
-  'EN_DESCARGO',
-  'REQUIERE_SUBSANACION',
-  'CERRADA_CONFORME',
-  'DERIVADA_LEGALES',
-  'EN_TRAMITE_LEGAL',
-  'DERIVADA_ATM',
-  'FINALIZADA',
-];
 
 const exchangeInputSchema = z.object({
   version: z.coerce.number().int().positive(),

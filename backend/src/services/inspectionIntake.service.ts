@@ -22,7 +22,7 @@ export async function recordInspectionIntake(tx: Prisma.TransactionClient, input
   await tx.notificacion.createMany({ skipDuplicates: true, data: recipients.map(user => ({
     id: digest(`antecedente:${id}:${user.id}`), usuarioId: user.id, tipo: 'INFO_GENERAL',
     titulo: 'Nuevo antecedente para evaluar en PSIP', mensaje: `${input.referencia} · ${input.actorNombre}. Administración debe evaluar el antecedente; no acredita una infracción.`,
-    datos: JSON.stringify({ tipo: 'antecedente_fiscalizacion', antecedenteId: id, url: '/inspecciones?vista=antecedentes' }),
+    datos: JSON.stringify({ tipo: 'antecedente_fiscalizacion', version: 1, correoVersion: 1, antecedenteId: id, url: '/inspecciones?vista=antecedentes' }),
   })) });
 }
 

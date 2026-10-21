@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
 await assertCloudDatabase();
-assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'inspection_intake_20261020');
+assert.ok(['inspection_intake_20261020', 'circuit_review_20261020'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema') || ''));
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
 const initial = JSON.parse(readFileSync(process.env.QA_ARTIFACTS + '/fixture.json', 'utf8'));
 const stamp = randomUUID().slice(0, 8), users: Record<string, any> = {}, actors: Record<string, any> = {};

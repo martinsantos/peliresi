@@ -48,6 +48,9 @@ import { getApiErrorMessage } from '../../utils/api-error';
 type UsuarioLocal = {
   id: string;
   nombre: string;
+  nombres: string;
+  apellido: string;
+  empresa: string;
   email: string;
   telefono: string;
   rol: string;
@@ -94,11 +97,14 @@ function apiUserToLocal(u: any): UsuarioLocal {
   return {
     id: u.id,
     nombre: [u.nombre, u.apellido].filter(Boolean).join(' '),
+    nombres: u.nombre || '',
+    apellido: u.apellido || '',
+    empresa: u.empresa || '',
     email: u.email,
     telefono: u.telefono || '',
     rol: u.rol,
     sector: u.empresa || u.generador?.razonSocial || u.transportista?.razonSocial || u.operador?.razonSocial || '',
-    estado: u.activo ? 'activo' : (u.emailVerified ? 'pendiente' : 'inactivo'),
+    estado: u.activo ? 'activo' : (u.motivoInactividad === 'PENDIENTE_APROBACION' ? 'pendiente' : 'inactivo'),
     ultimoAcceso: u.lastLoginAt ? timeSince(u.lastLoginAt) : 'No informado',
     fechaRegistro: u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : '',
     avatar: initials,
@@ -132,8 +138,7 @@ const UsuariosPage: React.FC = () => {
     page: currentPage, limit: itemsPerPage, sortBy, sortOrder, search: search || undefined,
     rol: filtroRol !== 'todos' && filtroRol !== 'ADMIN_GRUPO' ? filtroRol as Rol : undefined,
     roles: filtroRol === 'ADMIN_GRUPO' ? ['ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] : undefined,
-    activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo',
-    emailVerified: filtroEstado === 'pendiente' ? true : filtroEstado === 'inactivo' ? false : undefined,
+    estadoAcceso: filtroEstado === 'todos' ? undefined : filtroEstado as 'activo' | 'pendiente' | 'inactivo',
   });
   const createMutation = useCreateUsuario();
   const deleteMutation = useDeleteUsuario();
@@ -154,6 +159,9 @@ const UsuariosPage: React.FC = () => {
   const [modalEditar, setModalEditar] = useState(false);
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<UsuarioLocal | null>(null);
   const [modalEliminar, setModalEliminar] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [editError, setEditError] = useState('');
   const [modalPromover, setModalPromover] = useState(false);
   const [promoverPassword, setPromoverPassword] = useState('');
   const [promoverLoading, setPromoverLoading] = useState(false);
@@ -171,6 +179,8 @@ const UsuariosPage: React.FC = () => {
   // Form state for edit user
   const [editEmail, setEditEmail] = useState('');
   const [editNombre, setEditNombre] = useState('');
+  const [editApellido, setEditApellido] = useState('');
+  const [editErrors, setEditErrors] = useState<{ nombre?: string; email?: string }>({});
   const [editTelefono, setEditTelefono] = useState('');
   const [editEmpresa, setEditEmpresa] = useState('');
   const [editEsInspector, setEditEsInspector] = useState(false);
@@ -197,13 +207,14 @@ const UsuariosPage: React.FC = () => {
 
   const eliminarUsuario = () => {
     if (usuarioSeleccionado && !deleteMutation.isPending) {
+      setDeleteError('');
       deleteMutation.mutate(usuarioSeleccionado.id, {
         onSuccess: () => {
           setModalEliminar(false);
           toast.success('Usuario eliminado', 'El usuario fue eliminado correctamente');
         },
         onError: error => {
-          toast.error('No se pudo eliminar el usuario', getApiErrorMessage(error, 'El servidor no confirmó la eliminación. Podés volver a intentar.'));
+          setDeleteError(getApiErrorMessage(error, 'El servidor no confirmó la eliminación. Podés volver a intentar.'));
         },
       });
     }
@@ -211,12 +222,13 @@ const UsuariosPage: React.FC = () => {
 
   const crearUsuario = () => {
     if (createMutation.isPending) return;
+    setCreateError('');
     if (!formEmail || !formNombre || !formRol) {
-      toast.error('Error', 'Completa los campos obligatorios: nombre, email y rol');
+      setCreateError('Completá los campos obligatorios: nombre, email y rol.');
       return;
     }
     if (!formPassword || formPassword.length < 8) {
-      toast.error('Revisá la contraseña', 'Debe tener al menos 8 caracteres.');
+      setCreateError('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
     createMutation.mutate(
@@ -236,13 +248,14 @@ const UsuariosPage: React.FC = () => {
           toast.success('Usuario creado', 'El servidor confirmó el alta.');
         },
         onError: error => {
-          toast.error('No se pudo crear el usuario', getApiErrorMessage(error, 'Conservamos los datos del formulario para que puedas volver a intentar.'));
+          setCreateError(getApiErrorMessage(error, 'No se pudo crear el usuario. Conservamos los datos para que puedas volver a intentar.'));
         },
       }
     );
   };
 
   const resetForm = () => {
+    setCreateError('');
     setFormNombre('');
     setFormApellido('');
     setFormEmail('');
@@ -260,9 +273,12 @@ const UsuariosPage: React.FC = () => {
   const abrirEditar = (usuario: UsuarioLocal) => {
     setUsuarioSeleccionado(usuario);
     setEditEmail(usuario.email);
-    setEditNombre(usuario.nombre);
+    setEditNombre(usuario.nombres);
+    setEditApellido(usuario.apellido);
+    setEditErrors({});
+    setEditError('');
     setEditTelefono(usuario.telefono);
-    setEditEmpresa(usuario.sector);
+    setEditEmpresa(usuario.empresa);
     setEditEsInspector(usuario.esInspector);
     setModalVer(false);
     setModalEditar(true);
@@ -270,20 +286,21 @@ const UsuariosPage: React.FC = () => {
 
   const guardarEdicion = () => {
     if (updateMutation.isPending) return;
-    if (!usuarioSeleccionado || !editEmail) {
-      toast.error('Error', 'El email es obligatorio');
-      return;
-    }
-    const [nombre, ...apellidoParts] = editNombre.split(' ');
+    if (!usuarioSeleccionado) return;
+    setEditError('');
+    const errors = { ...(!editNombre.trim() ? { nombre: 'Ingresá el nombre.' } : {}),
+      ...(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail.trim()) ? { email: 'Ingresá un correo válido.' } : {}) };
+    setEditErrors(errors);
+    if (Object.keys(errors).length) return;
     updateMutation.mutate(
-      { id: usuarioSeleccionado.id, data: { email: editEmail, nombre: nombre || editNombre, apellido: apellidoParts.join(' ') || undefined, telefono: editTelefono || undefined, empresa: editEmpresa || undefined, esInspector: editEsInspector } },
+      { id: usuarioSeleccionado.id, data: { email: editEmail.trim(), nombre: editNombre.trim(), apellido: editApellido.trim(), telefono: editTelefono.trim(), empresa: editEmpresa.trim(), esInspector: editEsInspector } },
       {
         onSuccess: () => {
           setModalEditar(false);
           toast.success('Usuario actualizado', 'Los datos se guardaron correctamente');
         },
         onError: (err: any) => {
-          toast.error('Error', err?.response?.data?.message || 'No se pudo actualizar el usuario');
+          setEditError(getApiErrorMessage(err, 'No se pudo actualizar el usuario. Conservamos los datos para que puedas volver a intentar.'));
         },
       }
     );
@@ -386,7 +403,7 @@ const UsuariosPage: React.FC = () => {
         >
           {row.estado === 'activo' && <CheckCircle size={12} className="mr-1" />}
           {row.estado === 'inactivo' && <XCircle size={12} className="mr-1" />}
-          {row.estado === 'pendiente' && <span title="Email verificado — pendiente de aprobación del administrador" className="mr-1">⏳</span>}
+          {row.estado === 'pendiente' && <span title="Inscripción pendiente de aprobación" className="mr-1">⏳</span>}
           {row.estado.charAt(0).toUpperCase() + row.estado.slice(1)}
         </Badge>
       ),
@@ -443,7 +460,7 @@ const UsuariosPage: React.FC = () => {
             size="sm"
             className="p-2 text-error-500"
             aria-label={`Eliminar a ${row.nombre}`}
-            onClick={(e: any) => { e.stopPropagation(); setUsuarioSeleccionado(row); setModalEliminar(true); }}
+            onClick={(e: any) => { e.stopPropagation(); setUsuarioSeleccionado(row); setDeleteError(''); setModalEliminar(true); }}
           >
             <Trash2 size={16} />
           </Button>
@@ -613,7 +630,7 @@ const UsuariosPage: React.FC = () => {
                         <Button
                           variant="ghost" size="sm" className="p-2 text-error-500"
                           aria-label={`Eliminar a ${usuario.nombre}`}
-                          onClick={() => { setUsuarioSeleccionado(usuario); setModalEliminar(true); }}
+                          onClick={() => { setUsuarioSeleccionado(usuario); setDeleteError(''); setModalEliminar(true); }}
                         >
                           <Trash2 size={16} />
                         </Button>
@@ -724,6 +741,7 @@ const UsuariosPage: React.FC = () => {
         isOpen={modalEditar}
         onClose={() => setModalEditar(false)}
         title="Editar Usuario"
+        error={editError}
         isBusy={updateMutation.isPending}
         size="lg"
         footer={
@@ -736,8 +754,11 @@ const UsuariosPage: React.FC = () => {
         }
       >
         <div className="space-y-4 animate-fade-in">
-          <Input label="Email" type="email" placeholder="usuario@empresa.com" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
-          <Input label="Nombre completo" placeholder="Juan Perez" value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+          <Input label="Email" type="email" placeholder="usuario@empresa.com" value={editEmail} errorMessage={editErrors.email} onChange={(e) => { setEditEmail(e.target.value); setEditErrors(errors => ({ ...errors, email: undefined })); }} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <Input label="Nombre" autoComplete="given-name" value={editNombre} errorMessage={editErrors.nombre} onChange={(e) => { setEditNombre(e.target.value); setEditErrors(errors => ({ ...errors, nombre: undefined })); }} />
+            <Input label="Apellido" autoComplete="family-name" value={editApellido} onChange={(e) => setEditApellido(e.target.value)} />
+          </div>
           <Input label="Telefono" placeholder="+54 261 123-4567" value={editTelefono} onChange={(e) => setEditTelefono(e.target.value)} />
           <Input label="Empresa / Sector" placeholder="Razon social" value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} />
           <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
@@ -766,6 +787,7 @@ const UsuariosPage: React.FC = () => {
         isOpen={modalCrear}
         onClose={() => { setModalCrear(false); resetForm(); }}
         title="Nuevo Usuario"
+        error={createError}
         isBusy={createMutation.isPending}
         size="lg"
         footer={
@@ -816,6 +838,7 @@ const UsuariosPage: React.FC = () => {
         onClose={() => setModalEliminar(false)}
         onConfirm={eliminarUsuario}
         title="Eliminar Usuario"
+        error={deleteError}
         description={`Estas seguro de eliminar a ${usuarioSeleccionado?.nombre}? Esta accion no se puede deshacer.`}
         confirmText="Si, eliminar"
         cancelText="Cancelar"

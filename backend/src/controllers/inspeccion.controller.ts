@@ -1,3 +1,4 @@
+import { createInspectionAgendaNotices, recordInspectionScheduleChange, INSPECTION_AGENDA_LABELS, type InspectionAgendaEvent } from '../services/inspectionAgendaNotice.service';
 import fs from 'fs';
 import { intakeScope } from '../domain/inspectionIntake';
 import { assertIntakeInspection } from '../services/inspectionIntake.service';
@@ -580,8 +581,8 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
           },
         },
       });
-      await tx.eventoInspeccion.create({
-        data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'CREADA', titulo: 'Inspeccion creada' },
+      const createdEvent = await tx.eventoInspeccion.create({
+        data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'CREADA', titulo: 'Inspeccion creada', metadata: { avisoAgenda: input.fechaProgramada ? 'PROGRAMADA' : 'CREADA' } },
       });
       if (antecedent) {
         const linked = await tx.antecedenteFiscalizacion.updateMany({ where: { id: antecedent.id, version: antecedent.version, estado: { in: ['PENDIENTE', 'EN_EVALUACION'] } }, data: {
@@ -592,13 +593,7 @@ export async function crearInspeccion(req: AuthRequest, res: Response, next: Nex
         await tx.eventoInspeccion.create({ data: { inspeccionId: inspection.id, usuarioId: req.user.id, tipo: 'ANTECEDENTE_VINCULADO', titulo: 'Origen del expediente: antecedente de fiscalización', visibleActor: false,
           detalle: antecedent.referencia, metadata: { antecedenteId: antecedent.id, origen: antecedent.origen, origenId: antecedent.origenId, huellaEvidencia: antecedent.huellaEvidencia } } });
       }
-      if (inspectorId !== req.user.id || input.fechaProgramada) {
-        await tx.notificacion.create({ data: {
-          usuarioId: inspectorId, tipo: 'INFO_GENERAL', titulo: `Inspección asignada · ${numero}`,
-          mensaje: input.fechaProgramada ? 'Tiene una inspección programada. Revise la fecha y el expediente.' : 'Tiene una nueva inspección asignada.',
-          datos: JSON.stringify({ inspeccionId: inspection.id, evento: 'ASIGNADA' }),
-        } });
-      }
+      await createInspectionAgendaNotices(tx, inspection, { evento: input.fechaProgramada ? 'PROGRAMADA' : 'CREADA', eventoId: createdEvent.id, autorId: req.user.id, assignedSelf: Boolean(input.fechaProgramada && inspectorId === req.user.id) });
       return inspection;
     });
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: created.id }, include: inspectionInclude });
@@ -674,11 +669,12 @@ export async function agregarEventoInspeccion(req: AuthRequest, res: Response, n
 export async function actualizarInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const input = updateSchema.parse(req.body);
-    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { inspectorId: true, tipoActor: true, estado: true, version: true } });
+    const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: { id: true, numero: true, inspectorId: true, tipoActor: true, estado: true, version: true, fechaProgramada: true } });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
     const { version, datosActa, informeTecnico, ...fields } = input;
-    const result = await prisma.inspeccion.updateMany({
+    await prisma.$transaction(async tx => {
+    const result = await tx.inspeccion.updateMany({
       where: { id: req.params.id, version, estado: { in: Array.from(EDITABLE_STATES) } },
       data: {
         ...fields,
@@ -690,6 +686,8 @@ export async function actualizarInspeccion(req: AuthRequest, res: Response, next
       },
     });
     if (result.count !== 1) throw new AppError('La inspeccion fue modificada en otro dispositivo. Actualice antes de continuar.', 409);
+    await recordInspectionScheduleChange(tx, inspection, fields.fechaProgramada, req.user.id, version);
+    });
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
     res.json({ success: true, data: full });
   } catch (error) { next(error); }
@@ -700,7 +698,7 @@ export async function guardarBorradorInspeccion(req: AuthRequest, res: Response,
     const input = draftSchema.parse(req.body);
     const inspection = await prisma.inspeccion.findUnique({
       where: { id: req.params.id },
-      select: { inspectorId: true, tipoActor: true, estado: true, version: true },
+      select: { id: true, numero: true, inspectorId: true, tipoActor: true, estado: true, version: true, fechaProgramada: true },
     });
     if (!inspection) throw new AppError('Inspeccion no encontrada', 404);
     assertCanEdit(req, inspection);
@@ -771,6 +769,7 @@ export async function guardarBorradorInspeccion(req: AuthRequest, res: Response,
           metadata: { schemaVersion: 1, versionBase: version, versionNueva: version + 1, itemIds, comparacionIds, contenidoSha256: hashCanonicalPayload(input) },
         },
       });
+      await recordInspectionScheduleChange(tx, inspection, fields.fechaProgramada, req.user.id, version);
       return tx.inspeccion.findUniqueOrThrow({ where: { id: req.params.id }, include: inspectionInclude });
     });
     res.json({ success: true, data: full });
@@ -929,7 +928,7 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
         },
       });
       if (updated.count !== 1) throw new AppError('La inspeccion cambio mientras se procesaba la accion', 409);
-      await tx.eventoInspeccion.create({
+      const stateEvent = await tx.eventoInspeccion.create({
         data: {
           inspeccionId: inspection.id,
           usuarioId: req.user.id,
@@ -940,14 +939,18 @@ export async function cambiarEstadoInspeccion(req: AuthRequest, res: Response, n
           estadoHasta: input.estado,
           visibleActor: ['NOTIFICADA', 'EN_DESCARGO', 'REQUIERE_SUBSANACION', 'CERRADA_CONFORME', 'DERIVADA_LEGALES', 'FINALIZADA'].includes(input.estado),
           metadata: fieldClosureSnapshot ? {
+            avisoAgenda: input.estado,
             schemaVersion: 1,
             versionBase: input.version,
             versionNueva: input.version + 1,
             actaSha256: hashCanonicalPayload(fieldClosureSnapshot),
             actaSnapshot: fieldClosureSnapshotJson,
-          } as Prisma.InputJsonValue : undefined,
+          } as Prisma.InputJsonValue : { avisoAgenda: input.estado },
         },
       });
+      if (Object.prototype.hasOwnProperty.call(INSPECTION_AGENDA_LABELS, input.estado)) {
+        await createInspectionAgendaNotices(tx, inspection, { evento: input.estado as InspectionAgendaEvent, eventoId: stateEvent.id, autorId: req.user.id });
+      }
     });
     const full = await prisma.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, include: inspectionInclude });
     res.json({ success: true, data: full, message: 'Estado actualizado. No se envio ninguna comunicacion externa.' });

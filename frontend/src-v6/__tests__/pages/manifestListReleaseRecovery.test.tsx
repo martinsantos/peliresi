@@ -59,10 +59,12 @@ it('keeps the accessible names of compact header actions',()=>{
  expect(screen.getByRole('heading',{name:'Manifiestos'})).toBeInTheDocument();
 });
 it('names the exceptional circuit Eventuales only where it is enabled',()=>{
- vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED','true');
- try{render(<View/>);expect(screen.getByRole('link',{name:'Eventuales'})).toHaveAttribute('href','/manifiestos/baja-intensidad');}
- finally{vi.unstubAllEnvs();}
- cleanup();render(<View/>);expect(screen.queryByRole('link',{name:'Eventuales'})).not.toBeInTheDocument();
+ try{
+  vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED','true');
+  render(<View/>);expect(screen.getByRole('link',{name:'Eventuales'})).toHaveAttribute('href','/manifiestos/baja-intensidad');
+  cleanup();vi.stubEnv('VITE_MANIFEST_EXCEPTIONAL_ENABLED','false');
+  render(<View/>);expect(screen.queryByRole('link',{name:'Eventuales'})).not.toBeInTheDocument();
+ }finally{vi.unstubAllEnvs();}
 });
 it('clears every filter, including state, from the expanded panel',()=>{
  render(<MemoryRouter initialEntries={['/manifiestos?estado=TRATADO']}><ManifiestosPage/></MemoryRouter>);

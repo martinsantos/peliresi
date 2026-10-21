@@ -1,6 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Modal } from '../../components/ui/Modal';
+import { Modal, ConfirmModal } from '../../components/ui/Modal';
 
 class VisibleViewport extends EventTarget {
   width = 360;
@@ -21,6 +21,36 @@ describe('modal remains usable above the mobile keyboard', () => {
   const content = <input aria-label="Ubicación prevista" defaultValue="" />;
   const footer = <button type="button">Crear expediente</button>;
   const dialog = (isOpen = true) => <Modal isOpen={isOpen} title="Nueva inspección" onClose={vi.fn()} footer={footer}>{content}</Modal>;
+
+  it('keeps a rejected confirmation readable inside the active dialog and preserves the retry', () => {
+    const confirm = vi.fn(), close = vi.fn();
+    const renderDialog = (error = '') => <ConfirmModal isOpen title="Eliminar Usuario" onClose={close} onConfirm={confirm} error={error} confirmText="Si, eliminar" />;
+    const { rerender } = render(renderDialog());
+    fireEvent.click(screen.getByRole('button', { name: 'Si, eliminar' }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    rerender(renderDialog('No se puede eliminar: tiene manifiestos.'));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('tiene manifiestos');
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Si, eliminar' }));
+    expect(confirm).toHaveBeenCalledTimes(2);
+    rerender(renderDialog());
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('does not steal focus from a field selected before deferred autofocus runs', () => {
+    let focusFrame: FrameRequestCallback | undefined;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { focusFrame = callback; return 1; });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    render(dialog());
+    const input = screen.getByLabelText('Ubicación prevista');
+    input.focus();
+    expect(input).toHaveFocus();
+    act(() => focusFrame!(0));
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: 'Dato elegido por la persona' } });
+    expect(input).toHaveValue('Dato elegido por la persona');
+  });
 
   it('fits the visible viewport as the keyboard opens, keeping typed text and focus', async () => {
     const viewport = new VisibleViewport();

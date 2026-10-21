@@ -1,0 +1,42 @@
+{
+  "productionCapture": false,
+  "edited": false,
+  "files": [
+    {
+      "file": "generador-history-protected.png",
+      "sha256": "034f3a177db7d2680f0bd278f7edee151403bc7faf1ad28f77988a2b18ecec1e",
+      "build": "v10",
+      "reportFamily": "browser-users-lifecycle-mobile",
+      "surface": "app",
+      "synthetic": true,
+      "edited": false
+    },
+    {
+      "file": "generador-history-protected-green.png",
+      "sha256": "bf9a099c2eb2ffa44342131b1d285ee027dff553328c8e98bfef6211ec1d614d",
+      "build": "v11",
+      "reportFamily": "browser-users-dialog-green",
+      "surface": "app",
+      "synthetic": true,
+      "edited": false
+    },
+    {
+      "file": "transport-documents-before.png",
+      "sha256": "36c5a1d50ea50251034f41d130dd98f936bf3b2be7c7395fe70d61b0710a475c",
+      "build": "v11",
+      "reportFamily": "browser-transport-admin-red",
+      "surface": "app",
+      "synthetic": true,
+      "edited": false
+    },
+    {
+      "file": "transport-documents-reviewed.png",
+      "sha256": "3c19c7a3b7d6196bceebf27024f1108995732d6b883350fc61292e61e7dfc540",
+      "build": "v12",
+      "reportFamily": "browser-transport-admin-green",
+      "surface": "app",
+      "synthetic": true,
+      "edited": false
+    }
+  ]
+}

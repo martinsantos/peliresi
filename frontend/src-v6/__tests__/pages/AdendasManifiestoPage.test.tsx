@@ -116,3 +116,22 @@ it('starts a destination finding with the declared load, without editing the ori
  expect(record.declaracion.residuos[0].cantidad).toBe(10);
  expect(screen.getByText('Y1 · 10 kg')).toBeVisible();
 });
+it.each(['kg', 'lt', 'tn', 'un', 'l', 't', 'm3'])('prefills and submits %s as declared, never showing another unit', async unidad => {
+ const residues = [{ corriente: 'Y1', cantidad: 12.5, unidad }];
+ mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: true, manifiesto: { ...data.manifiesto, residuos: residues } } } });
+ mock.post.mockRejectedValue(new Error('offline')); view();
+ fireEvent.click(await screen.findByRole('button', { name: 'Registrar diferencia' }));
+ expect(screen.getByLabelText('Unidad observada 1')).toHaveValue(unidad);
+ fireEvent.change(screen.getByLabelText('Motivo de la adenda'), { target: { value: 'Carga verificada' } });
+ fireEvent.click(screen.getByRole('button', { name: 'Guardar y solicitar revisión' }));
+ await waitFor(() => expect(mock.post).toHaveBeenCalledWith('/manifiestos/qa-id/adendas', expect.objectContaining({ residuos: residues })));
+ expect(screen.getByLabelText('Unidad observada 1')).toHaveValue(unidad);
+});
+it('requires explicit correction of an unsupported historical unit instead of silently displaying kilograms', async () => {
+ mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: true, manifiesto: { ...data.manifiesto, residuos: [{ corriente: 'Y1', cantidad: 2, unidad: 'desconocida' }] } } } });
+ view(); fireEvent.click(await screen.findByRole('button', { name: 'Registrar diferencia' }));
+ const unit = screen.getByLabelText('Unidad observada 1');
+ expect(unit).toHaveValue(''); expect(unit).toBeRequired(); expect(unit).toBeInvalid();
+ expect(screen.getByRole('option', { name: 'Revisar unidad declarada: desconocida' })).toBeVisible();
+ expect(mock.post).not.toHaveBeenCalled();
+});

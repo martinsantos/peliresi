@@ -11,7 +11,10 @@ export function wasteDifferences(declared: ObservedWaste[], observed: ObservedWa
   const totals = (rows: ObservedWaste[]) => {
     const result = new Map<string, { corriente: string; unidad: string; cantidad: number }>();
     for (const row of rows) {
-      const key = `${row.corriente}:${row.unidad}`;
+      // Equivalent spellings only, never conversion between kg and tonnes.
+      // The declaration and observed rows retain their literal unit.
+      const unit = row.unidad === 'lt' ? 'l' : row.unidad === 'tn' ? 't' : row.unidad;
+      const key = `${row.corriente}:${unit}`;
       result.set(key, { corriente: row.corriente, unidad: row.unidad, cantidad: (result.get(key)?.cantidad || 0) + row.cantidad });
     }
     return result;

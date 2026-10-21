@@ -37,6 +37,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { Modal } from '../../components/ui/Modal';
+import { ActorDocuments } from '../../components/ActorDocuments';
 import {
   useTransportista,
   useCreateVehiculo,
@@ -386,6 +387,7 @@ const TransportistaDetallePage: React.FC = () => {
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>
+          <Tab id="documentos" icon={<FileText size={16} />}>Documentos</Tab>
           {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
         </TabList>
@@ -721,6 +723,10 @@ const TransportistaDetallePage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+        </TabPanel>
+
+        <TabPanel id="documentos">
+          <ActorDocuments actorType="TRANSPORTISTA" actorId={id || ''} cuit={transportista.cuit} />
         </TabPanel>
 
         {/* Tab: Trazabilidad */}

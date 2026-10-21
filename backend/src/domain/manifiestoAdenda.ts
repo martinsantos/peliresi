@@ -1,9 +1,13 @@
 import { z } from 'zod';
 import { wasteSchema } from './manifiestoExcepcional';
 
+// Ordinary manifests use lt/tn/un; keep that literal evidence as well as the
+// existing addendum spellings. This changes neither quantities nor the original.
+const observedWasteSchema = wasteSchema.extend({ unidad: z.enum(['kg', 'lt', 'tn', 'un', 'l', 't', 'm3']) });
+
 export const addendumCreateSchema = z.object({
   id: z.string().uuid(), motivo: z.string().trim().min(1).max(500),
-  residuos: z.array(wasteSchema).min(1).max(50),
+  residuos: z.array(observedWasteSchema).min(1).max(50),
   rectificaId: z.string().uuid().optional(),
 }).strict();
 export const addendumReviewSchema = z.object({

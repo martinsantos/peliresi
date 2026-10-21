@@ -55,6 +55,7 @@ export async function createExceptionalJourney(page: Page, prefix: string, hideK
   return record.id as string;
 }
 export async function approveExceptionalJourney(page: Page, parte: string, hideKeyboard = async () => {}) {
+  await expect(page.getByText('Te toca aprobar', { exact: true })).toBeVisible();
   await hideKeyboard();
   const response = page.waitForResponse(r => /\/baja-intensidad\/[^/]+\/eventos$/.test(r.url()) && r.request().method() === 'POST');
   await press(page, page.getByRole('button', { name: 'Aprobar como ' + parte, exact: true }));

@@ -82,9 +82,10 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const publicPaths = ['/relevo/', '/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
   const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
 
-  // While auth state is loading, show loader (even for public routes,
-  // so we can redirect logged-in users away from /login once resolved)
-  if (isLoading) return <PageLoader />;
+  // Keep public forms mounted while validating a session or login attempt.
+  // Replacing them with the loader discards the user's input on a failed login.
+  // Private content still waits for authentication to finish.
+  if (isLoading) return isPublic ? <>{children}</> : <PageLoader />;
 
   // Logged-in user on /login → resume a safe local deep link when available
   if (currentUser && location.pathname === '/login') {

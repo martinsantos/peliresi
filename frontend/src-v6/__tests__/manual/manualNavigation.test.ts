@@ -6,10 +6,16 @@ import path from 'node:path';
 const manual = path.resolve(process.cwd(), '../docs/manual');
 const script = readFileSync(path.join(manual, 'manual.js'), 'utf8');
 let targetTop = 600;
+let layoutChanged: () => void;
 let scroll: ReturnType<typeof vi.fn>;
 const listeners: Array<{target:Window|Document;type:string;listener:EventListenerOrEventListenerObject}>=[];
 beforeEach(() => {
-  vi.useFakeTimers(); localStorage.clear(); targetTop = 600;
+  vi.useFakeTimers(); localStorage.clear(); targetTop = 600; layoutChanged = () => {};
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) { layoutChanged = callback; }
+    observe() {}
+    disconnect() {}
+  });
   const html = readFileSync(path.join(manual, 'tutorial.html'), 'utf8');
   document.body.innerHTML = html.match(/<body[^>]*>([\s\S]*?)<\/body>/)![1];
   document.body.setAttribute('data-page', 'tutorial');
@@ -81,4 +87,51 @@ it('an explicit index destination survives intermediate smooth-scroll events unt
   window.dispatchEvent(new Event('wheel')); targetTop=600;
   window.dispatchEvent(new Event('scroll')); vi.advanceTimersByTime(20);
   expect(current()).toContain('Paso 2');
+});
+
+it.each(['index', 'next'])('late images preserve a newly selected %s step without an initial hash', control => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount(true);
+  if (control === 'index') (document.querySelectorAll('#tutorialIndex a')[2] as HTMLElement).click();
+  else {
+    (document.getElementById('nextStep') as HTMLElement).click();
+    (document.getElementById('nextStep') as HTMLElement).click();
+  }
+  vi.advanceTimersByTime(100);
+  targetTop = 600;
+  const previous = scroll.mock.calls.length;
+  document.querySelector('img.guide-image')!.dispatchEvent(new Event('load'));
+  vi.advanceTimersByTime(100);
+  expect(scroll.mock.calls.length).toBeGreaterThan(previous);
+  expect(targetTop).toBe(180);
+  expect(current()).toContain('Paso 3');
+});
+
+it.each(['ctrlKey', 'metaKey'])('index retains native open-in-new-tab behavior with %s', modifier => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount();
+  const event = new MouseEvent('click', { cancelable: true, bubbles: true, [modifier]: true });
+  expect(document.querySelectorAll('#tutorialIndex a')[2].dispatchEvent(event)).toBe(true);
+  expect(event.defaultPrevented).toBe(false);
+  expect(current()).toContain('Paso 1');
+});
+
+it('late layout changes keep the selected heading in view after images have loaded', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  mount();
+  (document.querySelectorAll('#tutorialIndex a')[2] as HTMLElement).click();
+  vi.advanceTimersByTime(100);
+  targetTop = -600;
+  layoutChanged();
+  vi.advanceTimersByTime(100);
+  expect(targetTop).toBe(180);
+  expect(current()).toContain('Paso 3');
+});
+it('a later layout change cannot override the reader scrolling away', () => {
+  mount(); vi.advanceTimersByTime(100);
+  window.dispatchEvent(new Event('wheel')); targetTop = 600;
+  const previous = scroll.mock.calls.length;
+  layoutChanged(); vi.advanceTimersByTime(100);
+  expect(scroll).toHaveBeenCalledTimes(previous);
+  expect(targetTop).toBe(600);
 });

@@ -71,12 +71,14 @@ function txWithReservation(count: number) {
     comparacionInspeccion: { updateMany: mocks.updateComparisonMany },
     evidenciaInspeccion: { create: mocks.createEvidence, update: vi.fn() },
     eventoInspeccion: { create: mocks.createEvent },
+    usuario: { findMany: vi.fn().mockResolvedValue([]) },
   };
 }
 
 describe('inspection authorization and atomic field closure', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.createEvent.mockImplementation(async ({ data }) => ({ id: 'event-1', ...data }));
     mocks.findInspection.mockResolvedValue(fieldInspection());
     mocks.findFullInspection.mockResolvedValue(fieldInspection());
     mocks.findItem.mockResolvedValue({ codigo: 'SEG-01', etiqueta: 'EPP disponible' });

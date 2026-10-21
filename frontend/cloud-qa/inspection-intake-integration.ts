@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
 await assertCloudDatabase();
-assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'inspection_intake_20261020');
+assert.ok(['inspection_intake_20261020', 'circuit_review_20261020'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema') || ''));
 const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
 const f = JSON.parse(readFileSync(process.env.QA_ARTIFACTS + '/intake-fixture.json', 'utf8'));
 const tokens: Record<string, string> = {}, checks: string[] = [];
@@ -17,6 +17,7 @@ const waste = (corriente: string, cantidad: number, unidad = 'kg') => ({ corrien
 const report = (rows = [waste('Y1', 12), waste('Y21', 3)]) => ({ id: randomUUID(), motivo: 'Informe artificial de hallazgo al recibir la carga', residuos: rows });
 const queue = (where = {}) => db.antecedenteFiscalizacion.findMany({ where, orderBy: { createdAt: 'asc' } });
 try {
+  const emailQueueBefore = await db.emailQueue.count();
   // Every attempt adds its own cases; interrupted attempts are never reset.
   const attempt = randomUUID().slice(0, 8);
   for (const name of Object.keys(f.http)) {
@@ -48,7 +49,8 @@ try {
   assert.equal(hash(await db.manifiesto.findUniqueOrThrow({ where: { id: original.id }, include: { residuos: true, eventos: true } })), hash(original));
   checks.push('destination operator finding, quantity and omitted Y, immutable original, replay/forgery/permission guards');
   const authorityNotices = await db.notificacion.findMany({ where: { datos: { contains: intakes[0].id } } });
-  assert.deepEqual(authorityNotices.map((n: any) => n.usuarioId).sort(), [f.initialUsers.admin, f.initialUsers['admin-generador']].sort());
+  const currentAuthorities = await db.usuario.findMany({ where: { activo: true, rol: { in: ['ADMIN', `ADMIN_${intakes[0].tipoActor}`] }, id: { not: f.users.operator.id } }, select: { id: true } });
+  assert.deepEqual(authorityNotices.map((n: any) => n.usuarioId).sort(), currentAuthorities.map((row: any) => row.id).sort());
   assert.equal(await db.notificacion.count({ where: { datos: { contains: input.id }, titulo: 'Nueva adenda en tu manifiesto' } }), 2);
   checks.push('exact sector authority and party internal recipients, no duplicate on replay');
   const reportHash = hash(await queue({ origenId: input.id }));
@@ -121,8 +123,8 @@ try {
   const discard = { id: randomUUID(), version: 0, accion: 'DESCARTADA', motivo: 'Diferencia de balanza documentada en QA' };
   assert.equal((await request('POST', `/inspecciones/antecedentes/${toDiscard.id}/decisiones`, 'admin', discard)).status, 200);
   const retained = await db.antecedenteFiscalizacion.findUniqueOrThrow({ where: { id: toDiscard.id } }); assert.equal(retained.huellaEvidencia, toDiscard.huellaEvidencia); assert.equal(retained.eventos.length, 1);
-  assert.equal(await db.emailQueue.count(), 0);
+  assert.equal(await db.emailQueue.count(), emailQueueBefore);
   assert.equal((await request('GET', '/inspecciones/antecedentes?estado=forged')).status, 400);
-  writeFileSync(process.env.QA_ARTIFACTS + '/integration.json', JSON.stringify({ passed: checks.length, checks, production: false, capClosed: true, emailQueue: 0 }, null, 2));
+  writeFileSync(process.env.QA_ARTIFACTS + '/integration.json', JSON.stringify({ passed: checks.length, checks, production: false, capClosed: true, emailQueueUnchanged: true, emailQueueBefore }, null, 2));
   console.log('Inspection intake API: ' + checks.length + ' groups PASS.');
 } finally { await db.$disconnect(); }

@@ -1,0 +1,2251 @@
+{
+  "browserBySurface": {
+    "web-desktop": 123,
+    "web-responsive": 123,
+    "app": 123
+  },
+  "browserByProject": {
+    "web-desktop": 118,
+    "web-responsive": 118,
+    "app": 123,
+    "web": 5,
+    "web-mobile": 5
+  },
+  "browserByFile": {
+    "actor-administration.spec.ts": 6,
+    "actor-certificates.spec.ts": 9,
+    "actor-edit-history.spec.ts": 9,
+    "actor-onboarding-manual.spec.ts": 3,
+    "actor-onboarding.spec.ts": 18,
+    "actor-uploads.spec.ts": 9,
+    "alert-catalogue.spec.ts": 6,
+    "alert-repository.spec.ts": 3,
+    "circuit-inspection-agenda.spec.ts": 3,
+    "circuit-login.spec.ts": 6,
+    "circuit-manual.spec.ts": 9,
+    "circuit-notice-context.spec.ts": 3,
+    "circuit-transport-admin.spec.ts": 3,
+    "circuit-users.spec.ts": 30,
+    "fleet-gps.spec.ts": 3,
+    "global-operation.spec.ts": 12,
+    "inbox.spec.ts": 9,
+    "inspection-exchange.spec.ts": 6,
+    "inspection-hierarchy.spec.ts": 3,
+    "inspection-intake.spec.ts": 9,
+    "mail-e2e/mail-links.spec.ts": 66,
+    "manifest-exceptional.spec.ts": 12,
+    "manifest-lifecycle.spec.ts": 3,
+    "manifest-transport.spec.ts": 6,
+    "payment-electricity.spec.ts": 12,
+    "psip-deadlines.spec.ts": 12,
+    "psip-legal.spec.ts": 9,
+    "psip-notices.spec.ts": 9,
+    "public-recovery.spec.ts": 3,
+    "registration-documents.spec.ts": 18,
+    "registration-recovery.spec.ts": 27,
+    "registration-unified.spec.ts": 12,
+    "review-circuito.spec.ts": 9,
+    "role-handoff.spec.ts": 3,
+    "sessions.spec.ts": 6,
+    "transport-handoff.spec.ts": 3
+  },
+  "immutableBuild": "v13",
+  "buildSnapshotSha256": "0a604b1b99f5bf3ec4a4ded6dc53e64e18aa60b6a95e935dc289f920cbe0290d",
+  "productSourceFiles": 1233,
+  "productSourceSha256": "f4fc5acdb6195300f2d5a8875ae2a2c47a795f753a2a93800db887c30b48b9ef",
+  "scope": "Isolated preview only; no production/main or real delivery",
+  "baseline": "7e8ffe0c3e4edb7fc74cdf165bf8269b5953ea0e",
+  "unitReports": [
+    {
+      "report": "backend-final-access.json",
+      "sha256": "e4e01ac4ed284d6453181b266eb47db71935b708fe559718c319173237ff26f0",
+      "passed": 1430,
+      "total": 1430,
+      "scope": "complete"
+    },
+    {
+      "report": "frontend-final-login.json",
+      "sha256": "db615e2cb4b4c1049d1571f621cedf16775e99bb45e7c62cb4f54b894dde2293",
+      "passed": 1781,
+      "total": 1781,
+      "scope": "complete"
+    },
+    {
+      "report": "manual-navigation-layout-green.json",
+      "sha256": "51faa90f84932398d5baf83ea20ceb1b7d0f2cbbf2e6855c2db9d3ed7f5e85b4",
+      "passed": 10,
+      "total": 10,
+      "scope": "directed"
+    },
+    {
+      "report": "transport-documents-unit.json",
+      "sha256": "8b36ad292cdcff358a25e212d51f28f454c9fbfef7b88ee3da68c9faaca8789c",
+      "passed": 5,
+      "total": 5,
+      "scope": "directed"
+    }
+  ],
+  "reproductions": [
+    {
+      "report": "adenda-domain-red.json",
+      "sha256": "b7fac8a7ad3a0a2737f035425c12a737703dd6746763596fef3d7c02239f899d",
+      "failedBeforeFix": 5
+    },
+    {
+      "report": "adenda-ui-red.json",
+      "sha256": "7587ecbf7bb2b7a51a42456d1be108d4e525fef59d1edaf957d22e6e79f4159b",
+      "failedBeforeFix": 4
+    },
+    {
+      "report": "browser-notice-context-red.json",
+      "sha256": "988d69effe76458242d911d188907fec654c5bdc0bf63086bf54b9ef26a1609e",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "browser-transport-admin-red.json",
+      "sha256": "e0b6141b5f14745a1f5bf347aef5ecfe6555a9b9e25fe59a99f501210e044050",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "browser-users-dialog-red.json",
+      "sha256": "f06d2d502b448767bef3ccfa9f10cce2f6761f610238fd246fcb8094407d033f",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "browser-users-name-red.json",
+      "sha256": "65fead7aafbd9005473cc0e7521ed5e8c1155d1166fbcead5089774ba4a508e0",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "browser-users-state-red-confirmed.json",
+      "sha256": "c9ed85f6bcb9ead67cc9935413a602ab1a1334c136231f13a1fb2fa3182723fd",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "browser-users-state-red.json",
+      "sha256": "4666c75fa3f0446fba800eac2ab6f472278d5ec2c1e27cac531eeed5b473b7c7",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "eventual-notice-red.json",
+      "sha256": "0fea749e72386a550820296818cec9fbea095bff933f89184f25d38caa3f3fe2",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "eventual-ui-red.json",
+      "sha256": "0df41903b921a649b97168c21a4611b9339d9ae0fbce601195b7947bb740ff87",
+      "failedBeforeFix": 4
+    },
+    {
+      "report": "inbox-ui-red.json",
+      "sha256": "529424362430a5e95447337560eb2f8ea1b893b85c8622bbedbd0204c0a155d7",
+      "failedBeforeFix": 15
+    },
+    {
+      "report": "login-ui-red.json",
+      "sha256": "f831919af659179e44f5d1499eaa04251335760c3c27b6803603701e27331b7f",
+      "failedBeforeFix": 2
+    },
+    {
+      "report": "login-ui-sequence-red.json",
+      "sha256": "2a4e74a2b6a7c0fc929636b49b7e399ca294011b3213bc852d77ef5413a596cd",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "mail-access-red.json",
+      "sha256": "16e55f36a8d952aa7ea3dfdbeff45d6ee2f0b6d71df2ed5efc2f4a5e05790a4d",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "mail-intake-red.json",
+      "sha256": "075e12ab09f5a374cd5d8355d08df6ce7661cda604d3d90318a7d2f467cfacd0",
+      "failedBeforeFix": 3
+    },
+    {
+      "report": "mail-red.json",
+      "sha256": "1c5d82bd776248a75395a9c41fe4e29aa0de41a0b32929ddbe48039d1b55f007",
+      "failedBeforeFix": 18
+    },
+    {
+      "report": "mail-reminder-red.json",
+      "sha256": "d98cb3f25bf36e980d8b1025c53f7b79227819b032d387b598f93d2bad4daba7",
+      "failedBeforeFix": 6
+    },
+    {
+      "report": "mail-visibility-red.json",
+      "sha256": "96867eb207037c1e13bdc756f65c6a12d8e1594dbe49fba6820b304501949a18",
+      "failedBeforeFix": 5
+    },
+    {
+      "report": "manifest-action-label-red.json",
+      "sha256": "54469acdab86ba6452dba87fc965f002c866be9f3715cde6e54cdabea3929463",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "manifest-create-label-red.json",
+      "sha256": "e8c04fd977d41edc03446b57ef51c3d5fb72af3d08aa29362b936e44be3e888c",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "manifest-units-red.json",
+      "sha256": "5673063a4df06e0653e8c10545ab3f83ef4dc5307c0b56b1e604e6ca526f38c0",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "manual-navigation-layout-red.json",
+      "sha256": "159886567676a24fba6c996bae53035e94e9adf0e522c7d03abf54abf90c8407",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "manual-navigation-red.json",
+      "sha256": "a2b642b1858c72e6ebc5f124743a99d14b4c440f4ddeda6257ef97e67b4b5864",
+      "failedBeforeFix": 2
+    },
+    {
+      "report": "ui-targeted-focus-red.json",
+      "sha256": "b291ceed3618aea83627ba9aede9a76c7644b309e8d0c22d185a60ad2c467162",
+      "failedBeforeFix": 1
+    },
+    {
+      "report": "users-red.json",
+      "sha256": "791ac5d441920446647abaa4d7b26bcfa4fbe6d7112a90986a5432fb366bbb3d",
+      "failedBeforeFix": 4
+    }
+  ],
+  "uniqueBrowserCases": 369,
+  "browserReports": [
+    {
+      "report": "browser-users-final.json",
+      "sha256": "a52e3561465339525865655ba4cc6ac743e55b2550c9d80f7df479289b3ab2f7",
+      "stats": {
+        "startTime": "2026-10-21T01:22:33.958Z",
+        "duration": 86454.44499999999,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-users-lifecycle.json",
+      "sha256": "fc76190a02a643361f132d59b3d42c717d925a5b9dc81661096aa0f473e07ff1",
+      "stats": {
+        "startTime": "2026-10-21T04:37:43.047Z",
+        "duration": 74540.093,
+        "expected": 6,
+        "skipped": 11,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-users-lifecycle-mobile.json",
+      "sha256": "f6ec9f52e50961e230ad6d298e45d5eeefd35df132acf9385de2983d1c26cb59",
+      "stats": {
+        "startTime": "2026-10-21T04:42:54.769Z",
+        "duration": 99316.08899999999,
+        "expected": 12,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-users-dialog-green.json",
+      "sha256": "52ec511e8e518585251ba2ff97c81710efb24b2e5f142ff764ef764f1f686525",
+      "stats": {
+        "startTime": "2026-10-21T04:57:08.755Z",
+        "duration": 268318.317,
+        "expected": 30,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-agenda-corrected.json",
+      "sha256": "8fc2b4dccc961124327a5f51f7c5b8cf9a241c8a82413f03535ad5c0aa23f5ca",
+      "stats": {
+        "startTime": "2026-10-21T00:48:34.222Z",
+        "duration": 124853.051,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-notice-context-green.json",
+      "sha256": "a6ac3962fa82c98bab23b51628e274b10172a455fbc0523841227439a0cebf09",
+      "stats": {
+        "startTime": "2026-10-21T03:33:44.063Z",
+        "duration": 25118.331,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-notice-context-visibility.json",
+      "sha256": "dcc1072629755b112216354e4075ec082b94d3b31ba8ddbeb5af1e223c21d8e1",
+      "stats": {
+        "startTime": "2026-10-21T03:51:00.813Z",
+        "duration": 24339.018,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "manifest-v7-24-pass.json",
+      "sha256": "98a8ed57ff121306b2f2c77bcb54694c89af7946d581288ee203fb8ab5807e3d",
+      "stats": {
+        "startTime": "2026-10-21T02:14:12.234Z",
+        "duration": 451533.939,
+        "expected": 24,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "manifest-e2e.json",
+      "sha256": "8d280bdc4f364e51cd7f1e9f5924b80ef85d4bfb32cbe7b5d56202873377f3b6",
+      "stats": {
+        "startTime": "2026-10-21T02:38:54.060Z",
+        "duration": 193926.29700000002,
+        "expected": 12,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "psip-notices-browser.json",
+      "sha256": "76c57c5bc945f3e25a5742c2c1f664fe79e071b1ec60016db6d909282aa480b4",
+      "stats": {
+        "startTime": "2026-10-21T02:21:46.886Z",
+        "duration": 381140.56899999996,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "psip-deadlines-resource-stop.json",
+      "sha256": "a8c7d1139d6056194c96bbd17e14bbbd280b653f3f32584efd674c43163a2e61",
+      "stats": {
+        "startTime": "2026-10-21T02:28:12.375Z",
+        "duration": 259794.2,
+        "expected": 8,
+        "skipped": 3,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "psip-deadlines-pagination-stop.json",
+      "sha256": "c3d40400f6a7aa193f0484663ff36dec79d5170c35650953fc392b9ccdfdc75d",
+      "stats": {
+        "startTime": "2026-10-21T02:42:10.041Z",
+        "duration": 87383.961,
+        "expected": 2,
+        "skipped": 1,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "psip-deadlines-offset-stop.json",
+      "sha256": "612e0acaff366a20799757bc8293eb1bffb9120408e9e995b572f5e2b22b8bbe",
+      "stats": {
+        "startTime": "2026-10-21T02:46:40.429Z",
+        "duration": 30797.868,
+        "expected": 0,
+        "skipped": 1,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "psip-deadlines-browser.json",
+      "sha256": "c0d87d79c6df78032f38b3d94ab1741e5ef4ea9e762f2cf4c187ef27780b96b7",
+      "stats": {
+        "startTime": "2026-10-21T02:48:06.849Z",
+        "duration": 41652.87,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "legal-browser.json",
+      "sha256": "cb6b27e7f51127eeb708f5e8c10cd14808f9a40ac5f51fede56511d3fdc6d5d1",
+      "stats": {
+        "startTime": "2026-10-21T02:48:52.570Z",
+        "duration": 351598.391,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-actors.json",
+      "sha256": "742138b19fd08ea792d63aaada153ef4224e5bae55f85644d6b009ad991d1e5d",
+      "stats": {
+        "startTime": "2026-10-21T02:54:46.749Z",
+        "duration": 525747.5839999999,
+        "expected": 24,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-transport-admin-green.json",
+      "sha256": "c874c70b0e94032c985b06089d0f20878b3c6ae7e02804c4b97e15b37b19effe",
+      "stats": {
+        "startTime": "2026-10-21T05:17:46.626Z",
+        "duration": 58412.85,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-operator-documents.json",
+      "sha256": "1b8fdb10b6fb16cd1272f7fc98faf26a7a4b9e3a36ea278339128bf03e5a6ea9",
+      "stats": {
+        "startTime": "2026-10-21T05:18:47.055Z",
+        "duration": 40731.32,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "review-browser.json",
+      "sha256": "b67b3abf72497ed717edf385d24c2c0f98000928bbc388f11eb0ec31f239bc6f",
+      "stats": {
+        "startTime": "2026-10-21T03:03:40.849Z",
+        "duration": 441740.90699999995,
+        "expected": 15,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "intake-browser.json",
+      "sha256": "99e0e643b15807e906ffd7830c36e6e5cb59df6474ad21efced6bae4bdbcec5f",
+      "stats": {
+        "startTime": "2026-10-21T03:34:13.311Z",
+        "duration": 110248.88500000001,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-payments.json",
+      "sha256": "d103c5aa2f7d7b03d59a80a1809f994d51beada129d426344f03074ebb69e35a",
+      "stats": {
+        "startTime": "2026-10-21T03:36:19.654Z",
+        "duration": 72476.743,
+        "expected": 12,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-receipts.json",
+      "sha256": "65cbb87008f93c75bc6ec7f67673a3600514168c189b412666120383aaf3867e",
+      "stats": {
+        "startTime": "2026-10-21T03:37:34.001Z",
+        "duration": 199679.724,
+        "expected": 18,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "fleet-final.json",
+      "sha256": "1882035afb6aaa10297dbec1978eb58f1f8ee05e33cf2bfba427c5fc7df6a64e",
+      "stats": {
+        "startTime": "2026-10-21T03:40:55.680Z",
+        "duration": 46772.399,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-registration-extra.json",
+      "sha256": "92d0f1bad5eb185fffd089fa1636ce5564216a1d9d93ea9761d9d1718535cada",
+      "stats": {
+        "startTime": "2026-10-21T04:23:07.726Z",
+        "duration": 74052.744,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-global.json",
+      "sha256": "d93a3d61e0fe6d821abea8b40c352208e080591f30df13a0435c329d7c2aca30",
+      "stats": {
+        "startTime": "2026-10-21T04:24:23.663Z",
+        "duration": 113770.10399999999,
+        "expected": 12,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-forms-source-stop.json",
+      "sha256": "4b943546b8feaed9e03b037ebf7d9830ac22e5f0fc9d0bee08dd38660017d496",
+      "stats": {
+        "startTime": "2026-10-21T03:44:06.292Z",
+        "duration": 176146.537,
+        "expected": 18,
+        "skipped": 50,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-forms-desktop-rest.json",
+      "sha256": "28dbf76d0c2effd0747f51e2cf4fc62d1b8c0a4a0ddd2c24f562a85cfab773af",
+      "stats": {
+        "startTime": "2026-10-21T03:51:26.945Z",
+        "duration": 37288.255,
+        "expected": 5,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-forms-mobile.json",
+      "sha256": "ac4f5d9a308a5520a9f541a91d7eb3a5fe8895914571235b6f12e8e194c3570b",
+      "stats": {
+        "startTime": "2026-10-21T03:52:06.350Z",
+        "duration": 261259.926,
+        "expected": 32,
+        "skipped": 13,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-forms-login-final.json",
+      "sha256": "97fddb1451178bcdb3df3832e6dad86cbc43eaecfe25663cb1035d0f5637cc56",
+      "stats": {
+        "startTime": "2026-10-21T04:15:39.638Z",
+        "duration": 39578.527,
+        "expected": 6,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-forms-app-rest.json",
+      "sha256": "2d96c9ccc7ceecce530db6e2db82dde02f76b3529aa37a18ed9f20e3ed104b2e",
+      "stats": {
+        "startTime": "2026-10-21T04:16:21.143Z",
+        "duration": 28484.726,
+        "expected": 4,
+        "skipped": 7,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-forms-app-final.json",
+      "sha256": "ae23a98e33ef4e4b7136f1d00b698b758eddf4db535eb905ef8f52fd53cf404a",
+      "stats": {
+        "startTime": "2026-10-21T04:22:12.153Z",
+        "duration": 53692.873,
+        "expected": 8,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-alerts.json",
+      "sha256": "293bbb9078cdc85a4a2e4b36d7d2ff05f3af309076fef09a785647b4798630c5",
+      "stats": {
+        "startTime": "2026-10-21T04:26:19.345Z",
+        "duration": 220243.052,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-inbox.json",
+      "sha256": "93b15d99555a71000d7c8ed57ec325db952b9402b1c2621228c3d6e3070eb4f1",
+      "stats": {
+        "startTime": "2026-10-21T04:30:02.472Z",
+        "duration": 144456.085,
+        "expected": 5,
+        "skipped": 12,
+        "unexpected": 1,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-inbox-hierarchy.json",
+      "sha256": "0efe71f300266dede1999ee5ca89fd1ff7de959edc54a46b9b24c5f0662b5b4a",
+      "stats": {
+        "startTime": "2026-10-21T04:44:36.027Z",
+        "duration": 66060.542,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-inbox-mobile.json",
+      "sha256": "56bd4ef5fa8783697467dc2110533985371a3531f892056b4776edf07c612394",
+      "stats": {
+        "startTime": "2026-10-21T04:45:44.056Z",
+        "duration": 209947.727,
+        "expected": 10,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-manual-last.json",
+      "sha256": "d38ed01f32c6d8a0536e86fa910e8dc5697625174d86a3842cf724baa7b182a7",
+      "stats": {
+        "startTime": "2026-10-21T05:26:08.722Z",
+        "duration": 32911.131,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "browser-manual-layout.json",
+      "sha256": "aba5e56979afc08e15bfb12c132b628665dded23e10f4268953adbe8a541d71a",
+      "stats": {
+        "startTime": "2026-10-21T05:44:42.273Z",
+        "duration": 11298.020999999999,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "report": "e2e.json",
+      "sha256": "6bc02bb84a67f88e571f11138c1bc1897bdc33a1c4e7f8d273aed9048707ae0c",
+      "stats": {
+        "startTime": "2026-10-21T05:26:43.754Z",
+        "duration": 417062.50299999997,
+        "expected": 66,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    }
+  ],
+  "browserCases": {
+    "circuit-users.spec.ts | web-desktop | user edit preserves compound names and explicitly clears optional fields": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | a disabled verified user remains inactive and appears in the inactive filter": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | validation and a failed connection preserve the edit and allow a single deliberate retry": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | user edit preserves compound names and explicitly clears optional fields": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | a disabled verified user remains inactive and appears in the inactive filter": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | validation and a failed connection preserve the edit and allow a single deliberate retry": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | user edit preserves compound names and explicitly clears optional fields": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | a disabled verified user remains inactive and appears in the inactive filter": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | validation and a failed connection preserve the edit and allow a single deliberate retry": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | generador: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | generador: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | transportista: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | transportista: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | operador: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | operador: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | generador: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | generador: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | transportista: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | transportista: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | operador: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | operador: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | generador: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | generador: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | transportista: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | transportista: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | operador: account lifecycle revokes access, restores it and requires explicit deletion": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | operador: historical actor and account deletion are refused without losing their manifest": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-desktop | create validation and a duplicate account stay readable inside the form without losing entered data": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | web-responsive | create validation and a duplicate account stay readable inside the form without losing entered data": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-users.spec.ts | app | create validation and a duplicate account stay readable inside the form without losing entered data": {
+      "status": "passed",
+      "report": "browser-users-dialog-green.json"
+    },
+    "circuit-inspection-agenda.spec.ts | web-desktop | inspection agenda changes reach the current inspector and competent administration, not the actor": {
+      "status": "passed",
+      "report": "browser-agenda-corrected.json"
+    },
+    "circuit-inspection-agenda.spec.ts | web-responsive | inspection agenda changes reach the current inspector and competent administration, not the actor": {
+      "status": "passed",
+      "report": "browser-agenda-corrected.json"
+    },
+    "circuit-inspection-agenda.spec.ts | app | inspection agenda changes reach the current inspector and competent administration, not the actor": {
+      "status": "passed",
+      "report": "browser-agenda-corrected.json"
+    },
+    "circuit-notice-context.spec.ts | web-desktop | an inspection intake notice names its own queue and opens it in the same surface": {
+      "status": "passed",
+      "report": "browser-notice-context-visibility.json"
+    },
+    "circuit-notice-context.spec.ts | web-responsive | an inspection intake notice names its own queue and opens it in the same surface": {
+      "status": "passed",
+      "report": "browser-notice-context-visibility.json"
+    },
+    "circuit-notice-context.spec.ts | app | an inspection intake notice names its own queue and opens it in the same surface": {
+      "status": "passed",
+      "report": "browser-notice-context-visibility.json"
+    },
+    "manifest-exceptional.spec.ts | web-desktop | baja intensidad continues with independent post-facto review and preserved facts": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | web-desktop | mixed participant keeps identity; the linked actor approves its own slot before anything advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | web-desktop | a generator starts an eventual with every other party external, approves alone and advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | web-desktop | a generator links a registered operator, who approves before the generator advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | web-responsive | baja intensidad continues with independent post-facto review and preserved facts": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | web-responsive | mixed participant keeps identity; the linked actor approves its own slot before anything advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | web-responsive | a generator starts an eventual with every other party external, approves alone and advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | web-responsive | a generator links a registered operator, who approves before the generator advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | app | baja intensidad continues with independent post-facto review and preserved facts": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | app | mixed participant keeps identity; the linked actor approves its own slot before anything advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | app | a generator starts an eventual with every other party external, approves alone and advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-exceptional.spec.ts | app | a generator links a registered operator, who approves before the generator advances": {
+      "status": "passed",
+      "report": "manifest-e2e.json"
+    },
+    "manifest-lifecycle.spec.ts | web-desktop | real manifest UI completes approval, transport, receipt, treatment and certificate": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-lifecycle.spec.ts | web-responsive | real manifest UI completes approval, transport, receipt, treatment and certificate": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-lifecycle.spec.ts | app | real manifest UI completes approval, transport, receipt, treatment and certificate": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-transport.spec.ts | web-desktop | explicit second vehicle and driver persist in real manifest and PDF on this surface": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-transport.spec.ts | web-desktop | carrier and modality changes clear only fleet selections and never infer replacements": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-transport.spec.ts | web-responsive | explicit second vehicle and driver persist in real manifest and PDF on this surface": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-transport.spec.ts | web-responsive | carrier and modality changes clear only fleet selections and never infer replacements": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-transport.spec.ts | app | explicit second vehicle and driver persist in real manifest and PDF on this surface": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "manifest-transport.spec.ts | app | carrier and modality changes clear only fleet selections and never infer replacements": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "role-handoff.spec.ts | web-desktop | separate real users hand a manifest from generator to transport to operator": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "role-handoff.spec.ts | web-responsive | separate real users hand a manifest from generator to transport to operator": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "role-handoff.spec.ts | app | separate real users hand a manifest from generator to transport to operator": {
+      "status": "passed",
+      "report": "manifest-v7-24-pass.json"
+    },
+    "psip-notices.spec.ts | web-desktop | PSIP bell GENERADOR: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | web-desktop | PSIP bell TRANSPORTISTA: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | web-desktop | PSIP bell OPERADOR: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | web-responsive | PSIP bell GENERADOR: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | web-responsive | PSIP bell TRANSPORTISTA: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | web-responsive | PSIP bell OPERADOR: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | app | PSIP bell GENERADOR: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | app | PSIP bell TRANSPORTISTA: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-notices.spec.ts | app | PSIP bell OPERADOR: every requirement, reply and decision, scoped and without duplicates": {
+      "status": "passed",
+      "report": "psip-notices-browser.json"
+    },
+    "psip-deadlines.spec.ts | web-desktop | PSIP deadlines GENERADOR: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | web-desktop | PSIP deadlines TRANSPORTISTA: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | web-desktop | PSIP deadlines OPERADOR: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | web-desktop | PSIP deadline boundary: no early expiry, refresh after the exact timestamp": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | web-responsive | PSIP deadlines GENERADOR: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | web-responsive | PSIP deadlines TRANSPORTISTA: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | web-responsive | PSIP deadlines OPERADOR: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | web-responsive | PSIP deadline boundary: no early expiry, refresh after the exact timestamp": {
+      "status": "passed",
+      "report": "psip-deadlines-resource-stop.json"
+    },
+    "psip-deadlines.spec.ts | app | PSIP deadlines GENERADOR: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-pagination-stop.json"
+    },
+    "psip-deadlines.spec.ts | app | PSIP deadlines TRANSPORTISTA: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-pagination-stop.json"
+    },
+    "psip-deadlines.spec.ts | app | PSIP deadlines OPERADOR: exact request, late response and next responsible party": {
+      "status": "passed",
+      "report": "psip-deadlines-browser.json"
+    },
+    "psip-deadlines.spec.ts | app | PSIP deadline boundary: no early expiry, refresh after the exact timestamp": {
+      "status": "passed",
+      "report": "psip-deadlines-browser.json"
+    },
+    "psip-legal.spec.ts | web-desktop | PSIP legal GENERADOR: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | web-desktop | PSIP legal TRANSPORTISTA: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | web-desktop | PSIP legal OPERADOR: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | web-responsive | PSIP legal GENERADOR: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | web-responsive | PSIP legal TRANSPORTISTA: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | web-responsive | PSIP legal OPERADOR: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | app | PSIP legal GENERADOR: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | app | PSIP legal TRANSPORTISTA: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "psip-legal.spec.ts | app | PSIP legal OPERADOR: recorded derivation, administrative progress and public final result": {
+      "status": "passed",
+      "report": "legal-browser.json"
+    },
+    "actor-administration.spec.ts | web-desktop | generador: administrative alta retains electrical evidence and reserves ATM before review": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-administration.spec.ts | web-desktop | operador: administrative alta retains electrical evidence and reserves ATM before review": {
+      "status": "passed",
+      "report": "browser-operator-documents.json"
+    },
+    "actor-administration.spec.ts | web-responsive | generador: administrative alta retains electrical evidence and reserves ATM before review": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-administration.spec.ts | web-responsive | operador: administrative alta retains electrical evidence and reserves ATM before review": {
+      "status": "passed",
+      "report": "browser-operator-documents.json"
+    },
+    "actor-administration.spec.ts | app | generador: administrative alta retains electrical evidence and reserves ATM before review": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-administration.spec.ts | app | operador: administrative alta retains electrical evidence and reserves ATM before review": {
+      "status": "passed",
+      "report": "browser-operator-documents.json"
+    },
+    "actor-onboarding.spec.ts | web-desktop | generador: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-desktop | transportista: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-desktop | operador: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-desktop | generador: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-desktop | transportista: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-desktop | operador: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-responsive | generador: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-responsive | transportista: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-responsive | operador: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-responsive | generador: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-responsive | transportista: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | web-responsive | operador: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | app | generador: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | app | transportista: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | app | operador: verified draft, full declaration, ATM, correction and approved account": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | app | generador: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | app | transportista: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "actor-onboarding.spec.ts | app | operador: rejected result remains readable without offering forbidden actions": {
+      "status": "passed",
+      "report": "browser-actors.json"
+    },
+    "circuit-transport-admin.spec.ts | web-desktop | administrative transport preserves fleet and partial uploads, then reviews ATM from its own dossier": {
+      "status": "passed",
+      "report": "browser-transport-admin-green.json"
+    },
+    "circuit-transport-admin.spec.ts | web-responsive | administrative transport preserves fleet and partial uploads, then reviews ATM from its own dossier": {
+      "status": "passed",
+      "report": "browser-transport-admin-green.json"
+    },
+    "circuit-transport-admin.spec.ts | app | administrative transport preserves fleet and partial uploads, then reviews ATM from its own dossier": {
+      "status": "passed",
+      "report": "browser-transport-admin-green.json"
+    },
+    "fleet-gps.spec.ts | web | one phone tracks three selected loads, delivers one and isolates a subsequent handoff": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "fleet-gps.spec.ts | web-mobile | one phone tracks three selected loads, delivers one and isolates a subsequent handoff": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "fleet-gps.spec.ts | app | one phone tracks three selected loads, delivers one and isolates a subsequent handoff": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | web | lists preserve phase, pagination, role actions and completed records": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | web | driver can choose concurrent trips, pick up, pause, resume and deliver without redirecting to another trip": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | web | multiple GPS handles a denied sensor, single-action retry and clearing a load without claiming delivery": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | web-mobile | lists preserve phase, pagination, role actions and completed records": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | web-mobile | driver can choose concurrent trips, pick up, pause, resume and deliver without redirecting to another trip": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | web-mobile | multiple GPS handles a denied sensor, single-action retry and clearing a load without claiming delivery": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | app | lists preserve phase, pagination, role actions and completed records": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | app | driver can choose concurrent trips, pick up, pause, resume and deliver without redirecting to another trip": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "review-circuito.spec.ts | app | multiple GPS handles a denied sensor, single-action retry and clearing a load without claiming delivery": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "transport-handoff.spec.ts | web | external then registered handoffs keep custody, GPS, C3 and own history coherent": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "transport-handoff.spec.ts | web-mobile | external then registered handoffs keep custody, GPS, C3 and own history coherent": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "transport-handoff.spec.ts | app | external then registered handoffs keep custody, GPS, C3 and own history coherent": {
+      "status": "passed",
+      "report": "review-browser.json"
+    },
+    "inspection-intake.spec.ts | web-desktop | operator finding remains in its adenda and reaches an assigned PSIP inspection": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | web-desktop | external handoff and incomplete eventual keep separate declared identities in the queue": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | web-desktop | finding manual opens in the same web/app context without business requests": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | web-responsive | operator finding remains in its adenda and reaches an assigned PSIP inspection": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | web-responsive | external handoff and incomplete eventual keep separate declared identities in the queue": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | web-responsive | finding manual opens in the same web/app context without business requests": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | app | operator finding remains in its adenda and reaches an assigned PSIP inspection": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | app | external handoff and incomplete eventual keep separate declared identities in the queue": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "inspection-intake.spec.ts | app | finding manual opens in the same web/app context without business requests": {
+      "status": "passed",
+      "report": "intake-browser.json"
+    },
+    "payment-electricity.spec.ts | web-desktop | reviewer identifies the original and completes the registration with visible reservation": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | web-desktop | another application cannot reuse the payment and keeps the entered review data on conflict": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | web-desktop | applicant uploads an electrical invoice, sees tariff evidence after reload and retains declared HP": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | web-desktop | the existing manual renders payment reservation and electricity evidence without changing its navigation": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | web-responsive | reviewer identifies the original and completes the registration with visible reservation": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | web-responsive | another application cannot reuse the payment and keeps the entered review data on conflict": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | web-responsive | applicant uploads an electrical invoice, sees tariff evidence after reload and retains declared HP": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | web-responsive | the existing manual renders payment reservation and electricity evidence without changing its navigation": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | app | reviewer identifies the original and completes the registration with visible reservation": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | app | another application cannot reuse the payment and keeps the entered review data on conflict": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | app | applicant uploads an electrical invoice, sees tariff evidence after reload and retains declared HP": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "payment-electricity.spec.ts | app | the existing manual renders payment reservation and electricity evidence without changing its navigation": {
+      "status": "passed",
+      "report": "browser-payments.json"
+    },
+    "registration-documents.spec.ts | web-desktop | generador: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-desktop | operador: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-desktop | transportista: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-desktop | same receipt in two real applicant accounts raises a persistent warning without disclosing the other actor": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-desktop | a photographed receipt recovers from a real busy OCR and is read in Spanish without a second upload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-desktop | administrative transport registration preserves its saved actor after a failed attachment": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-responsive | generador: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-responsive | operador: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-responsive | transportista: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-responsive | same receipt in two real applicant accounts raises a persistent warning without disclosing the other actor": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-responsive | a photographed receipt recovers from a real busy OCR and is read in Spanish without a second upload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | web-responsive | administrative transport registration preserves its saved actor after a failed attachment": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | app | generador: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | app | operador: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | app | transportista: actual registration documents, bounded PDF reading and authenticated reload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | app | same receipt in two real applicant accounts raises a persistent warning without disclosing the other actor": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | app | a photographed receipt recovers from a real busy OCR and is read in Spanish without a second upload": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-documents.spec.ts | app | administrative transport registration preserves its saved actor after a failed attachment": {
+      "status": "passed",
+      "report": "browser-receipts.json"
+    },
+    "registration-unified.spec.ts | web-desktop | public transport: original license, structured fleet, administrative correction and actual approval retain the same facts": {
+      "status": "passed",
+      "report": "fleet-final.json"
+    },
+    "registration-unified.spec.ts | web-responsive | public transport: original license, structured fleet, administrative correction and actual approval retain the same facts": {
+      "status": "passed",
+      "report": "fleet-final.json"
+    },
+    "registration-unified.spec.ts | app | public transport: original license, structured fleet, administrative correction and actual approval retain the same facts": {
+      "status": "passed",
+      "report": "fleet-final.json"
+    },
+    "registration-unified.spec.ts | web-desktop | trial: real license OCR, all actor drafts recover, and no application or account is created": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | web-desktop | provincial photo license: labelled proposals need confirmation, reverse has none, and manual data is never cleared": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | web-desktop | administrative transport uses the same driver and license controls without creating an actor during draft recovery": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | web-responsive | trial: real license OCR, all actor drafts recover, and no application or account is created": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | web-responsive | provincial photo license: labelled proposals need confirmation, reverse has none, and manual data is never cleared": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | web-responsive | administrative transport uses the same driver and license controls without creating an actor during draft recovery": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | app | trial: real license OCR, all actor drafts recover, and no application or account is created": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | app | provincial photo license: labelled proposals need confirmation, reverse has none, and manual data is never cleared": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "registration-unified.spec.ts | app | administrative transport uses the same driver and license controls without creating an actor during draft recovery": {
+      "status": "passed",
+      "report": "browser-registration-extra.json"
+    },
+    "global-operation.spec.ts | web-desktop | generador2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | web-desktop | operador2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | web-desktop | transportista2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | web-desktop | global operational pages do not load business data without a system session": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | web-responsive | generador2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | web-responsive | operador2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | web-responsive | transportista2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | web-responsive | global operational pages do not load business data without a system session": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | app | generador2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | app | operador2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | app | transportista2: global Monitor and Control data remain visible inside the authenticated system": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "global-operation.spec.ts | app | global operational pages do not load business data without a system session": {
+      "status": "passed",
+      "report": "browser-global.json"
+    },
+    "actor-certificates.spec.ts | web-desktop | generador: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-certificates.spec.ts | web-desktop | operador: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-certificates.spec.ts | web-desktop | transportista: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-certificates.spec.ts | web-responsive | generador: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-certificates.spec.ts | web-responsive | operador: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-certificates.spec.ts | web-responsive | transportista: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-certificates.spec.ts | app | generador: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-certificates.spec.ts | app | operador: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-certificates.spec.ts | app | transportista: DGFA uploads original annual PDFs and the actual owner downloads identical bytes": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-edit-history.spec.ts | web-desktop | generador: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-edit-history.spec.ts | web-desktop | operador: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-edit-history.spec.ts | web-desktop | transportista: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-edit-history.spec.ts | web-responsive | generador: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-edit-history.spec.ts | web-responsive | operador: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-edit-history.spec.ts | web-responsive | transportista: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-edit-history.spec.ts | app | generador: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-edit-history.spec.ts | app | operador: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-edit-history.spec.ts | app | transportista: edit address from the ficha and read its actual before/after history": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-uploads.spec.ts | web-desktop | generador: partial real upload stays recoverable without another registration": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-uploads.spec.ts | web-desktop | operador: partial real upload stays recoverable without another registration": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-uploads.spec.ts | web-desktop | long actor tabs reveal End/Home selection without scrolling the document": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "actor-uploads.spec.ts | web-responsive | generador: partial real upload stays recoverable without another registration": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-uploads.spec.ts | web-responsive | operador: partial real upload stays recoverable without another registration": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-uploads.spec.ts | web-responsive | long actor tabs reveal End/Home selection without scrolling the document": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-uploads.spec.ts | app | generador: partial real upload stays recoverable without another registration": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-uploads.spec.ts | app | operador: partial real upload stays recoverable without another registration": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "actor-uploads.spec.ts | app | long actor tabs reveal End/Home selection without scrolling the document": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "circuit-login.spec.ts | web-desktop | login 401 remains visible and the same form recovers into a real non-CAP session": {
+      "status": "passed",
+      "report": "browser-forms-login-final.json"
+    },
+    "circuit-login.spec.ts | web-desktop | login 429 remains visible and the same form recovers into a real non-CAP session": {
+      "status": "passed",
+      "report": "browser-forms-login-final.json"
+    },
+    "circuit-login.spec.ts | web-responsive | login 401 remains visible and the same form recovers into a real non-CAP session": {
+      "status": "passed",
+      "report": "browser-forms-login-final.json"
+    },
+    "circuit-login.spec.ts | web-responsive | login 429 remains visible and the same form recovers into a real non-CAP session": {
+      "status": "passed",
+      "report": "browser-forms-login-final.json"
+    },
+    "circuit-login.spec.ts | app | login 401 remains visible and the same form recovers into a real non-CAP session": {
+      "status": "passed",
+      "report": "browser-forms-login-final.json"
+    },
+    "circuit-login.spec.ts | app | login 429 remains visible and the same form recovers into a real non-CAP session": {
+      "status": "passed",
+      "report": "browser-forms-login-final.json"
+    },
+    "public-recovery.spec.ts | web-desktop | public recovery: framed controls, real offline failure and non-enumerating retry": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "public-recovery.spec.ts | web-responsive | public recovery: framed controls, real offline failure and non-enumerating retry": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "public-recovery.spec.ts | app | public recovery: framed controls, real offline failure and non-enumerating retry": {
+      "status": "passed",
+      "report": "browser-forms-app-rest.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | generador: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | operador: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | transportista: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | generador: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | operador: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | transportista: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-source-stop.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | generador: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-desktop-rest.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | operador: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-desktop-rest.json"
+    },
+    "registration-recovery.spec.ts | web-desktop | transportista: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-desktop-rest.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | generador: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | operador: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | transportista: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | generador: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | operador: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | transportista: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | generador: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | operador: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | web-responsive | transportista: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "registration-recovery.spec.ts | app | generador: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-app-rest.json"
+    },
+    "registration-recovery.spec.ts | app | operador: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-app-rest.json"
+    },
+    "registration-recovery.spec.ts | app | transportista: current-step recovery, incomplete draft and actual concurrent version protection": {
+      "status": "passed",
+      "report": "browser-forms-app-rest.json"
+    },
+    "registration-recovery.spec.ts | app | generador: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "registration-recovery.spec.ts | app | operador: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "registration-recovery.spec.ts | app | transportista: administrative draft recovers without secrets and exact registry row opens its populated edit form": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "registration-recovery.spec.ts | app | generador: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "registration-recovery.spec.ts | app | operador: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "registration-recovery.spec.ts | app | transportista: verified owner reuses registry instead of creating a duplicate registration": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "sessions.spec.ts | web-desktop | real impersonation survives reload and restores the original administrator": {
+      "status": "passed",
+      "report": "browser-forms-desktop-rest.json"
+    },
+    "sessions.spec.ts | web-desktop | logout in one real tab removes access in every tab and browser history": {
+      "status": "passed",
+      "report": "browser-forms-desktop-rest.json"
+    },
+    "sessions.spec.ts | web-responsive | real impersonation survives reload and restores the original administrator": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "sessions.spec.ts | web-responsive | logout in one real tab removes access in every tab and browser history": {
+      "status": "passed",
+      "report": "browser-forms-mobile.json"
+    },
+    "sessions.spec.ts | app | real impersonation survives reload and restores the original administrator": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "sessions.spec.ts | app | logout in one real tab removes access in every tab and browser history": {
+      "status": "passed",
+      "report": "browser-forms-app-final.json"
+    },
+    "alert-catalogue.spec.ts | web-desktop | inspection deadline -> configured case -> exact actor/inspector notice -> linked response reconciles only its request": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-catalogue.spec.ts | web-desktop | expiry includes operator and two vehicle owners, concurrent retries deduplicate and renewal preserves history": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-catalogue.spec.ts | web-responsive | inspection deadline -> configured case -> exact actor/inspector notice -> linked response reconciles only its request": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-catalogue.spec.ts | web-responsive | expiry includes operator and two vehicle owners, concurrent retries deduplicate and renewal preserves history": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-catalogue.spec.ts | app | inspection deadline -> configured case -> exact actor/inspector notice -> linked response reconciles only its request": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-catalogue.spec.ts | app | expiry includes operator and two vehicle owners, concurrent retries deduplicate and renewal preserves history": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-repository.spec.ts | web-desktop | configured rule -> read-only simulation -> persistent case -> operator notice -> explicit resolution": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-repository.spec.ts | web-responsive | configured rule -> read-only simulation -> persistent case -> operator notice -> explicit resolution": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "alert-repository.spec.ts | app | configured rule -> read-only simulation -> persistent case -> operator notice -> explicit resolution": {
+      "status": "passed",
+      "report": "browser-alerts.json"
+    },
+    "inbox.spec.ts | web-desktop | operator opens a persisted proactive follow-up in the existing inbox without external delivery": {
+      "status": "passed",
+      "report": "browser-inbox.json"
+    },
+    "inbox.spec.ts | web-desktop | real assignment -> bell -> paginated inbox -> keyboard -> exact dossier -> persisted read": {
+      "status": "passed",
+      "report": "browser-inbox.json"
+    },
+    "inbox.spec.ts | web-desktop | cold offline inbox stays pending instead of empty and recovers on reconnect": {
+      "status": "passed",
+      "report": "browser-inbox.json"
+    },
+    "inbox.spec.ts | web-responsive | operator opens a persisted proactive follow-up in the existing inbox without external delivery": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inbox.spec.ts | web-responsive | real assignment -> bell -> paginated inbox -> keyboard -> exact dossier -> persisted read": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inbox.spec.ts | web-responsive | cold offline inbox stays pending instead of empty and recovers on reconnect": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inbox.spec.ts | app | operator opens a persisted proactive follow-up in the existing inbox without external delivery": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inbox.spec.ts | app | real assignment -> bell -> paginated inbox -> keyboard -> exact dossier -> persisted read": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inbox.spec.ts | app | cold offline inbox stays pending instead of empty and recovers on reconnect": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inspection-exchange.spec.ts | web-desktop | real inspector, sector head and actor complete CERRADA_CONFORME through the UI": {
+      "status": "passed",
+      "report": "browser-inbox.json"
+    },
+    "inspection-exchange.spec.ts | web-desktop | real inspector, sector head and actor complete DERIVADA_LEGALES through the UI": {
+      "status": "passed",
+      "report": "browser-inbox.json"
+    },
+    "inspection-exchange.spec.ts | web-responsive | real inspector, sector head and actor complete CERRADA_CONFORME through the UI": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inspection-exchange.spec.ts | web-responsive | real inspector, sector head and actor complete DERIVADA_LEGALES through the UI": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inspection-exchange.spec.ts | app | real inspector, sector head and actor complete CERRADA_CONFORME through the UI": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inspection-exchange.spec.ts | app | real inspector, sector head and actor complete DERIVADA_LEGALES through the UI": {
+      "status": "passed",
+      "report": "browser-inbox-mobile.json"
+    },
+    "inspection-hierarchy.spec.ts | web-desktop | inspection identity, numbered sections and contextual help never displace or cover field work": {
+      "status": "passed",
+      "report": "browser-inbox-hierarchy.json"
+    },
+    "inspection-hierarchy.spec.ts | web-responsive | inspection identity, numbered sections and contextual help never displace or cover field work": {
+      "status": "passed",
+      "report": "browser-inbox-hierarchy.json"
+    },
+    "inspection-hierarchy.spec.ts | app | inspection identity, numbered sections and contextual help never displace or cover field work": {
+      "status": "passed",
+      "report": "browser-inbox-hierarchy.json"
+    },
+    "actor-onboarding-manual.spec.ts | web-desktop | onboarding help retains four steps, current correction capture and fiscal boundaries without business requests": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "actor-onboarding-manual.spec.ts | web-responsive | onboarding help retains four steps, current correction capture and fiscal boundaries without business requests": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "actor-onboarding-manual.spec.ts | app | onboarding help retains four steps, current correction capture and fiscal boundaries without business requests": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "circuit-manual.spec.ts | web-desktop | user and PSIP guides preserve navigation, current screenshots and clear delivery boundaries": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "circuit-manual.spec.ts | web-desktop | eventual guide makes the creator, registered parties and independent review explicit": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "circuit-manual.spec.ts | web-responsive | user and PSIP guides preserve navigation, current screenshots and clear delivery boundaries": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "circuit-manual.spec.ts | web-responsive | eventual guide makes the creator, registered parties and independent review explicit": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "circuit-manual.spec.ts | app | user and PSIP guides preserve navigation, current screenshots and clear delivery boundaries": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "circuit-manual.spec.ts | app | eventual guide makes the creator, registered parties and independent review explicit": {
+      "status": "passed",
+      "report": "browser-manual-last.json"
+    },
+    "circuit-manual.spec.ts | web-desktop | a selected manual step survives a preceding capture loaded after navigation": {
+      "status": "passed",
+      "report": "browser-manual-layout.json"
+    },
+    "circuit-manual.spec.ts | web-responsive | a selected manual step survives a preceding capture loaded after navigation": {
+      "status": "passed",
+      "report": "browser-manual-layout.json"
+    },
+    "circuit-manual.spec.ts | app | a selected manual step survives a preceding capture loaded after navigation": {
+      "status": "passed",
+      "report": "browser-manual-layout.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: support-owner": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: support-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: inspection-inspector": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: inspection-actor": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: application-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: application-owner": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: psip-actor": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: psip-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: agenda-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: intake-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: application-pending": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: application-pending-rejected": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: certificate-generador": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: certificate-operador": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: certificate-transportista": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | mail destination survives login: eventual-party": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | forwarded support link does not reveal another actor ticket": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | all templates and operational variants fit with institutional brand and readable actions": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | all templates retain identity and actions when email images are blocked": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | public email verification preserves a local draft through real login and recovers the owned application": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | verifying another email does not replace a signed-in account or delete its draft": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-desktop | email opened in a clean browser recovers only the server-saved application after login": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: support-owner": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: support-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: inspection-inspector": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: inspection-actor": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: application-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: application-owner": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: psip-actor": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: psip-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: agenda-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: intake-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: application-pending": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: application-pending-rejected": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: certificate-generador": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: certificate-operador": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: certificate-transportista": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | mail destination survives login: eventual-party": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | forwarded support link does not reveal another actor ticket": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | all templates and operational variants fit with institutional brand and readable actions": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | all templates retain identity and actions when email images are blocked": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | public email verification preserves a local draft through real login and recovers the owned application": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | verifying another email does not replace a signed-in account or delete its draft": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | web-responsive | email opened in a clean browser recovers only the server-saved application after login": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: support-owner": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: support-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: inspection-inspector": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: inspection-actor": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: application-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: application-owner": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: psip-actor": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: psip-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: agenda-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: intake-staff": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: application-pending": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: application-pending-rejected": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: certificate-generador": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: certificate-operador": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: certificate-transportista": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | mail destination survives login: eventual-party": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | forwarded support link does not reveal another actor ticket": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | all templates and operational variants fit with institutional brand and readable actions": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | all templates retain identity and actions when email images are blocked": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | public email verification preserves a local draft through real login and recovers the owned application": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | verifying another email does not replace a signed-in account or delete its draft": {
+      "status": "passed",
+      "report": "e2e.json"
+    },
+    "mail-e2e/mail-links.spec.ts | app | email opened in a clean browser recovers only the server-saved application after login": {
+      "status": "passed",
+      "report": "e2e.json"
+    }
+  },
+  "integrationReports": [
+    {
+      "report": "manifest-http.json",
+      "sha256": "19ee510e938084ef9909421bb12ca80828851c5b4366a4226c9faef8ea1bdaeb",
+      "groups": 5
+    },
+    {
+      "report": "addenda-http.json",
+      "sha256": "0a678a3addb7a59aa62bdfa8c515f9c52ce70fd7c148ea08b7b7a2bf40e0ec32",
+      "groups": 12
+    },
+    {
+      "report": "exceptional-http.json",
+      "sha256": "49391456c1c04bf339e033aa0d4d185390e6c8fcc1bfda155fd7af910140cd8b",
+      "groups": 11
+    },
+    {
+      "report": "handoff-http.json",
+      "sha256": "abe4076e1286de3577d4eb51441836dee27a91dbd862676a7cd080fcbc9e0e87",
+      "groups": 18
+    },
+    {
+      "report": "fleet-http.json",
+      "sha256": "bc571776c85e372f49aba8f5abdaacf157fa8c92756844400f8ed92256e729af",
+      "groups": 8
+    },
+    {
+      "report": "integration.json",
+      "sha256": "37b8b905bb2e0fc7ae12267dbad4f32672ecb2237ec1e1afbf286dc9ad7eef2b",
+      "groups": 11
+    },
+    {
+      "report": "payment-electricity-integration.json",
+      "sha256": "3c7c77bbd54517a1d14212f1d3ecb18d0a921bb5cf250591658895fa0113f5f5",
+      "groups": 11
+    },
+    {
+      "report": "expiry-identity.json",
+      "sha256": "9e159039d7b97a5d2b0a13dbe1156bbd3315d72067c49841fcf203249c027209",
+      "groups": 2
+    }
+  ],
+  "finalAudit": {
+    "at": "2026-10-21T05:44:55.213Z",
+    "passed": 8,
+    "checks": [
+      "all previous QA schemas retain every table count and row fingerprint",
+      "the original synthetic historical manifest, wastes and events remain unchanged",
+      "actual API/static processes keep CAP expired and every external delivery gate closed; relay does nothing and mail has zero attempts",
+      "compiled mail source checks against real PostgreSQL reject replaced inspectors and retain current assignments without sending",
+      "inspection intake preserves canonical evidence, source links and decisions without repeated origins or GPS secrets",
+      "retained application files match their original hashes; approved payments belong to one application and no TEF payment was fabricated",
+      "runtime sources match the tested immutable builds; QA manual matches its source snapshot and bundles do not point at production",
+      "one CPU and two GiB without swap or OOM maintained"
+    ],
+    "protectedTables": 235,
+    "suppressedEmails": 224,
+    "replacedInspectorNotices": 9,
+    "currentInspectorNotices": 34,
+    "intakes": 156,
+    "production": false,
+    "capClosed": true,
+    "externalDelivery": false
+  },
+  "note": "Reports of interrupted attempts retained. A later passing run supersedes the same file/project/title. Directed unit counts are not added to complete-suite counts. Browser profiles do not certify physical devices.",
+  "previewShutdown": {
+    "atUTC": "2026-10-21T05:46:53.588329+00:00",
+    "atMendoza": "21/10/2026 02:46:53 Mendoza",
+    "container": {
+      "name": "sitrep-qa-training-20261018",
+      "running": false,
+      "pid": 0,
+      "oomKilled": false,
+      "exitCode": 143
+    },
+    "limits": {
+      "NanoCpus": 1000000000,
+      "Memory": 2147483648,
+      "MemorySwap": 2147483648
+    },
+    "memoryEvents": {
+      "low": 0,
+      "high": 0,
+      "max": 14324,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    },
+    "swapMax": 0,
+    "preserved": [
+      "image",
+      "synthetic database",
+      "builds",
+      "traces",
+      "reports"
+    ],
+    "productionTouched": false
+  },
+  "runtimeClosedGracefully": true
+}

@@ -201,7 +201,7 @@ describe('inspection participant exchange controller', () => {
     }));
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('No se envió correo') }));
     expect(mocks.notices).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(mocks.notices.mock.calls[0][0].data[0].datos)).toMatchObject({ intercambioId: 'exchange-decision', evento: 'DERIVACION_LEGALES', destino: 'participacion', soloCampana: true });
+    expect(JSON.parse(mocks.notices.mock.calls[0][0].data[0].datos)).toMatchObject({ intercambioId: 'exchange-decision', evento: 'DERIVACION_LEGALES', destino: 'participacion', correoVersion: 1 });
   });
 
   it.each(['presentation', 'decision'])('does not duplicate bell notices on an idempotent %s retry', async operation => {

@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { canReviewAsCounterpart } from '../domain/partyReview';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
 import { recordEventualIntakes } from '../services/inspectionIntake.service';
+import { notifyEventualParties } from '../services/eventualNotice.service';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import prisma from '../lib/prisma';
@@ -129,6 +130,7 @@ export async function createExceptional(req: AuthRequest, res: Response, next: N
         impersonadoPorId: req.user.impersonatedBy?.id || null, huellaSolicitud, datos, eventos: [] },
       });
       await recordEventualIntakes(tx, created);
+      await notifyEventualParties(tx, created, 'creacion');
       return created;
     });
     // Compare the normalized request fingerprint; the original padrón snapshot remains immutable.
@@ -178,7 +180,9 @@ export async function eventExceptional(req: AuthRequest, res: Response, next: Ne
           events.find(e => e.id === command.objetivo && e.tipo === 'DIFERENCIA')?.residuos,
           '/manifiestos/baja-intensidad?registro=' + current.id, command.id, req.user.id);
       }
-      return tx.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: current.id } });
+      const committed = await tx.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: current.id } });
+      await notifyEventualParties(tx, committed, command.id);
+      return committed;
     });
     res.json({ success: true, data: { registro: present(record, req) } });
   } catch (error) { next(error); }

@@ -39,7 +39,7 @@ try {
         assert.deepEqual(notices.map(notice => notice.usuarioId).sort(), expected, 'Exact recipients, no inactive, other sector, other actor or duplicate author');
         for (const notice of notices) {
           const data = JSON.parse(notice.datos!);
-          assert.equal(data.soloCampana, true); assert.equal(data.destino, participant ? 'participacion' : 'inspeccion');
+          assert.equal(data.correoVersion, 1); assert.equal(data.destino, participant ? 'participacion' : 'inspeccion');
           assert.equal(data.inspeccionId, id); assert.equal(data.evento, exchange.tipo);
         }
         exchangeCount++; noticeCount += notices.length;
