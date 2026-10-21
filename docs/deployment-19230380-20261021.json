@@ -1,0 +1,351 @@
+{
+  "source": "192303801a3444449d2a5086e0f355f13a017e37",
+  "publishedAt": "2026-10-21T23:37:40.740Z",
+  "finalVerifiedAt": "2026-10-21T23:37:54.683Z",
+  "domain": "sitrep.ultimamilla.com.ar",
+  "components": [
+    "backend",
+    "web",
+    "app",
+    "manual"
+  ],
+  "branch": "codex/sitrep-training-20261018",
+  "mainUnchanged": "c8402190edfc36b5e5d0dee1337c24bd1689420d",
+  "backend": "/var/www/sitrep-backend-releases/20261021-certificados-19230380",
+  "frontend": "/var/www/sitrep-releases/20261021-certificados-19230380",
+  "configuration": {
+    "MANIFEST_PROPOSALS_ENABLED": "true",
+    "UPLOADS_DIR": "/var/lib/sitrep-uploads",
+    "TRAINING_DIRECT_LOGIN_UNTIL": "2000-01-01T00:00:00Z",
+    "ENTERPRISE_ENABLED": "false",
+    "MANIFEST_EXCEPTIONAL_ENABLED": "false",
+    "MANIFEST_ADDENDA_ENABLED": "false",
+    "MANIFEST_PARTY_REVIEW_ENABLED": "false",
+    "ACTOR_MULTIROLE_ENABLED": "false",
+    "MANIFEST_EXCEPTIONAL_REVIEWERS": "",
+    "MANIFEST_TRANSPORT_HANDOFF_ENABLED": "true",
+    "TRANSPORT_MULTI_GPS_ENABLED": "true",
+    "PUSH_MANIFEST_NOTICES_ENABLED": "false",
+    "DISABLE_EMAILS": "true",
+    "VAPID_PUBLIC_KEY": "",
+    "VAPID_PRIVATE_KEY": "",
+    "MANIFEST_CERTIFICATES_ENABLED": "true"
+  },
+  "envSha256": "c6ccba0f124f6048aa0f2b0d33d0aa9797a0c982a9d4a346798449cd2d72c2e6",
+  "previousEnvSha256": "97ef23d52f52f0f9b17ce26e467880670f264671c5a14acc8750feb94835d28f",
+  "onlyEnvChange": "append MANIFEST_CERTIFICATES_ENABLED=true",
+  "build": {
+    "source": "192303801a3444449d2a5086e0f355f13a017e37",
+    "resources": {
+      "platform": "linux",
+      "docker": true,
+      "root": "/work/sitrep",
+      "cpu": "100000 100000\n",
+      "memory": "2147483648\n",
+      "swap": "0\n"
+    },
+    "flags": {
+      "VITE_MANIFEST_CERTIFICATES_ENABLED": "true",
+      "VITE_MANIFEST_PROPOSALS_ENABLED": "true",
+      "VITE_MANIFEST_PARTY_REVIEW_ENABLED": "false",
+      "VITE_API_URL": "https://sitrep.ultimamilla.com.ar/api",
+      "VITE_ENTERPRISE_ENABLED": "false",
+      "VITE_MANIFEST_EXCEPTIONAL_ENABLED": "false",
+      "VITE_MANIFEST_ADDENDA_ENABLED": "false",
+      "VITE_ACTOR_MULTIROLE_ENABLED": "false",
+      "VITE_DEMO_MODE": "false",
+      "VITE_MANIFEST_TRANSPORT_HANDOFF_ENABLED": "true",
+      "VITE_TRANSPORT_MULTI_GPS_ENABLED": "true"
+    },
+    "status": "passed",
+    "startedAt": "2026-10-21T23:30:59.313Z",
+    "steps": [
+      {
+        "name": "Prisma client before compiler",
+        "seconds": 4.858
+      },
+      {
+        "name": "backend compiler",
+        "seconds": 25.884
+      },
+      {
+        "name": "pinned OCR asset",
+        "seconds": 0.072
+      },
+      {
+        "name": "Prisma client from target schema",
+        "seconds": 3.105
+      },
+      {
+        "name": "canonical schema verification",
+        "seconds": 1.087
+      },
+      {
+        "name": "frontend effective types",
+        "seconds": 36.636
+      },
+      {
+        "name": "web",
+        "seconds": 33.158
+      },
+      {
+        "name": "app",
+        "seconds": 35.037
+      }
+    ],
+    "verifiedBefore": 2366,
+    "current": "app",
+    "generatedSchemaSha256": "26043cc8f5109af38da4eb65860422884c78fe9b663369cf1001d89bd1b64b38",
+    "verifiedAfter": 2366,
+    "packages": {
+      "backend": {
+        "file": "sitrep-backend.tar.gz",
+        "sha256": "a9a5332e3051fb23e7f6d27033d09ba121e0102bb430581a2a9450c99bc6f7bc",
+        "bytes": 12845258,
+        "files": 395
+      },
+      "web": {
+        "file": "sitrep-web.tar.gz",
+        "sha256": "cee5bd6225a5b55201ca5eb4dbc7ebd44d596112fc4262fbff4a562c4e3b6821",
+        "bytes": 68260533,
+        "files": 516
+      },
+      "app": {
+        "file": "sitrep-app.tar.gz",
+        "sha256": "0dde5c1f85f7d38c7b30f9dcc0263b98456eecd3709dcf6a3a3128702cf404f7",
+        "bytes": 3632970,
+        "files": 200
+      },
+      "client": {
+        "file": "sitrep-client.tar.gz",
+        "sha256": "1440bed5f75555724e297cecbb4daded5e229eb7c6d6fb5baef8c6fed4b5522d",
+        "bytes": 15315238,
+        "files": 14
+      }
+    },
+    "artifactTransforms": [
+      {
+        "file": "web/sw.js",
+        "kind": "deployment-cache-version",
+        "from": "trazabilidad-rrpp-v127",
+        "to": "trazabilidad-rrpp-v148",
+        "sourceSha256": "28e54d5daf735ac5e545a2e7cc6edc9e8ac8d69ed8ff2e21f17fc2c567876e7b",
+        "sha256": "5a6708581170d1c0dc8cd56e42dd9cab0cff2bc4c34d0850bc6be43afda17b48"
+      }
+    ],
+    "rootCache": "trazabilidad-rrpp-v148",
+    "appVersion": "20261021233319",
+    "finishedAt": "2026-10-21T23:33:27.560Z",
+    "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+  },
+  "artifactVerification": {
+    "at": "2026-10-21T23:34:18.650Z",
+    "source": "192303801a3444449d2a5086e0f355f13a017e37",
+    "sourceFiles": 2366,
+    "surfaces": {
+      "web": {
+        "api": "https://sitrep.ultimamilla.com.ar/api",
+        "qaApiExcluded": true,
+        "criticalChunks": [
+          "InspeccionesPageV2",
+          "InspeccionExpedientePage",
+          "InspeccionadoParticipacionPage",
+          "InspectionExchangePanel",
+          "InspectionFollowUpSummary",
+          "NotificacionesPage",
+          "CargasEnCursoPage",
+          "InscripcionWizardPage",
+          "SolicitudDetallePage",
+          "GeneradorDetallePage",
+          "AdendasManifiestoPage",
+          "OperatorFindingSummary",
+          "UsuariosPage",
+          "TransportistaDetallePage",
+          "OperadorDetallePage",
+          "BajaIntensidadPage",
+          "LoginPage",
+          "NuevoManifiestoPage",
+          "ManifiestoDetallePage",
+          "ManifestProposalApprovals",
+          "TrainingTaskQueue"
+        ]
+      },
+      "app": {
+        "api": "https://sitrep.ultimamilla.com.ar/api",
+        "qaApiExcluded": true,
+        "criticalChunks": [
+          "InspeccionesPageV2",
+          "InspeccionExpedientePage",
+          "InspeccionadoParticipacionPage",
+          "InspectionExchangePanel",
+          "InspectionFollowUpSummary",
+          "NotificacionesPage",
+          "CargasEnCursoPage",
+          "InscripcionWizardPage",
+          "SolicitudDetallePage",
+          "GeneradorDetallePage",
+          "AdendasManifiestoPage",
+          "OperatorFindingSummary",
+          "UsuariosPage",
+          "TransportistaDetallePage",
+          "OperadorDetallePage",
+          "BajaIntensidadPage",
+          "LoginPage",
+          "NuevoManifiestoPage",
+          "ManifiestoDetallePage",
+          "ManifestProposalApprovals",
+          "TrainingTaskQueue"
+        ]
+      }
+    },
+    "manual": "2026.21.4",
+    "rootCache": "trazabilidad-rrpp-v148",
+    "appVersion": "20261021233319",
+    "sourceVerifiedAfterBuild": true
+  },
+  "backup": {
+    "status": "verified",
+    "finishedAt": "2026-10-21T23:36:51.732Z",
+    "dump": {
+      "path": "/var/backups/sitrep/20261021-certificados-19230380/trazabilidad_rrpp-before-19230380.dump",
+      "bytes": 23787087,
+      "sha256": "f103820b2b67f50e41ebb5c3c826789f1269a195ad0745a9608149ebf2f8cef3"
+    },
+    "verified": {
+      "customArchive": true,
+      "operationalAndCapPresent": true,
+      "fullDecodeToNull": true,
+      "sha256Repeated": true,
+      "restoreExecuted": false
+    }
+  },
+  "migration": {
+    "source": "192303801a3444449d2a5086e0f355f13a017e37",
+    "migration": "20261021200000_manifest_certificates",
+    "status": "migrated",
+    "startedAt": "2026-10-21T23:37:04.661Z",
+    "backupSha256": "f103820b2b67f50e41ebb5c3c826789f1269a195ad0745a9608149ebf2f8cef3",
+    "pendingBefore": [
+      "20261021200000_manifest_certificates"
+    ],
+    "priorSourceChecksumsVerified": 26,
+    "historicalAppliedNotInSource": [
+      "20260317000000_drop_manifiesto_fecha_creacion",
+      "20260317100000_add_roles_email_verification_reset",
+      "20260317110000_add_notif_nuevo_registro",
+      "20260626090000_add_demo_user_controls",
+      "20260626093000_create_refresh_tokens",
+      "20260801120000_clear_demo_expirations",
+      "20260808180000_add_password_changed_at",
+      "20260808180100_add_email_verification_expiry",
+      "20260810100000_add_auditor_role",
+      "20260813090000_add_document_management",
+      "20260813150000_migrate_legacy_documents",
+      "20260825090000_add_international_treatment",
+      "20260905120000_solicitud_document_face",
+      "20260905150000_new_actor_pending_documentation",
+      "20260924150000_add_inspection_exchange_receipts",
+      "20260926050000_persist_manifest_handwritten_signature"
+    ],
+    "publicStartedAt": "2026-10-21T23:37:04.839Z",
+    "publicApplied": true,
+    "publicFinishedAt": "2026-10-21T23:37:05.519Z",
+    "capApplied": true,
+    "capMethod": "exact additive SQL, transaction and existing restricted owner; no fabricated Prisma baseline",
+    "schemaChecks": {
+      "public": true,
+      "cap": true,
+      "columnsPerSchema": 13,
+      "indexesPerSchema": 4,
+      "uniqueFinal": true,
+      "restrictForeignKeys": 2,
+      "priorMigrationHistoryUnchanged": true
+    },
+    "finishedAt": "2026-10-21T23:37:06.489Z"
+  },
+  "verifiedFiles": {
+    "backend": 395,
+    "web": 516,
+    "app": 200,
+    "client": 14
+  },
+  "runtimePackages": 230,
+  "smoke": {
+    "server": 138,
+    "external": 9,
+    "pwa": 8,
+    "logins": 0,
+    "businessMutations": 0
+  },
+  "workers": [
+    {
+      "id": 1,
+      "pid": 650423,
+      "status": "online",
+      "restarts": 35,
+      "uptime": 1792625843504,
+      "cwd": "/var/www/sitrep-backend-releases/20261021-certificados-19230380"
+    },
+    {
+      "id": 2,
+      "pid": 650440,
+      "status": "online",
+      "restarts": 35,
+      "uptime": 1792625844974,
+      "cwd": "/var/www/sitrep-backend-releases/20261021-certificados-19230380"
+    }
+  ],
+  "nginxUnchanged": true,
+  "otherProcessesUnchanged": true,
+  "capClosed": true,
+  "channelsOff": true,
+  "previewClosure": {
+    "container": "sitrep-qa-training-20261018",
+    "at": "2026-10-21T23:35:00.132028+00:00",
+    "beforeProcesses": "PID                 COMMAND\n3712654             /sbin/docker-init -- docker-entrypoint.sh sleep 43200\n3712682             sleep 43200\n",
+    "limits": {
+      "cpu": 1,
+      "memoryBytes": 2147483648,
+      "swapBytes": 0
+    },
+    "after": {
+      "Status": "exited",
+      "Running": false,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 0,
+      "ExitCode": 143,
+      "Error": "",
+      "StartedAt": "2026-10-21T23:29:29.961671275Z",
+      "FinishedAt": "2026-10-21T23:34:59.983011263Z"
+    },
+    "imagePreserved": true,
+    "databasePreserved": true,
+    "apiStarted": false,
+    "staticServerStarted": false
+  },
+  "manualVersion": "2026.21.4",
+  "rollback": {
+    "backend": "/var/www/sitrep-backend-releases/20261021-certificados-19230380",
+    "frontend": "/var/www/sitrep-releases/20261021-certificados-19230380-rollback",
+    "scope": "certificate emission disabled; current UI, downloads, backend guards, schema and all other flags retained",
+    "backendDowngrade": false,
+    "rootCache": "trazabilidad-rrpp-v149",
+    "appVersion": "20261021233627",
+    "databaseRestore": false,
+    "prepared": true,
+    "executed": false,
+    "command": "ssh root@23.105.176.45 'node /var/backups/sitrep/20261021-certificados-19230380/publish-production.js rollback'"
+  },
+  "helperSha256": {
+    "publish-production.js": "97735368230a269284f7fa5c75841cade8cc699baf1adb1547f6b8fdc58fb329",
+    "backup-production.js": "d48d879ccd13d65abe6e8915c370feaaf210fc541c98edeb5191aba68f915124",
+    "migrate-production.js": "7c8919c145fccbb24de7f64b97fd1301686449b11f030cadc7061b6863d25ecc",
+    "verify-final-production.js": "0021fb43a93c96a71fa3165e29fc16cba93a00799598bca5f33d2936b0d0aa71"
+  },
+  "functionalAcceptance": "See CERTIFICADOS-OPERATIVOS-20261021.md; no authenticated production E2E",
+  "pushPerformed": false,
+  "workflowsTriggered": false
+}

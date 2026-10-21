@@ -1,16 +1,28 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Revisión vigente — certificados ordinarios, sólo preview, 21/10/2026
+## Última publicación — certificados 19230380, 21/10/2026
 
-**Candidato probado, sin publicar.** Leer [emisión, acceso, avisos, evidencia y límites](docs/CERTIFICADOS-OPERATIVOS-20261021.md). Operador vinculado firma y emite parciales/final; generador y transporte reciben el aviso en la campana y descargan el mismo PDF conservado. Se corrigió el refresco de la bandeja abierta y el acceso al documento exacto. Totales, concurrencia, adendas y expediente firmado protegidos; históricos preservados.
+**`19230380` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 20:37:40 Mendoza**. **Certificados habilitados.** Leer primero [despliegue, respaldo, pruebas y reversión vigente](docs/DESPLIEGUE-CERTIFICADOS-20261021.md). Operador firma parciales/final; partes vinculadas reciben avisos en campana y descargan el mismo PDF. No se enviaron correos ni push.
+
+**Backup verificado antes de migrar**: 23.787.087 bytes, SHA-256 `f103820b2b67f50e41ebb5c3c826789f1269a195ad0745a9608149ebf2f8cef3`, archivo privado en servidor y lectura completa sin restaurar. Única migración `20261021200000_manifest_certificates`, aplicada/verificada en public y CAP; historial anterior intacto, sin DML de negocio. No se consultaron registros reales.
+
+Única activación: `MANIFEST_CERTIFICATES_ENABLED=true` y par Vite true. Resto de bytes de `.env` conservados; nuevo SHA `c6ccba0f124f6048aa0f2b0d33d0aa9797a0c982a9d4a346798449cd2d72c2e6`. Propuestas/relevos/GPS múltiple true; adendas/revisión/eventuales false, autoridades sin asignar. **CAP cerrado, correos/push apagados**, uploads e identidades conservados; comprobado en ambos workers y PM2 guardado.
+
+Build de **2.366 blobs exactos**, API final, backend/tipos/web/app PASS; serial/un worker/1 CPU/2 GiB/swap cero. Smoke no mutante **138/138**, externo **9/9**, PWA **8/8**; dos workers estables, sin logins ni emisiones reales. Manual **2026.21.4**, renderer/CSS conservados; SW raíz **v148**, app **20261021233319**.
+
+**Reversión vigente: apagar emisión y conservar backend/interfaz/manual 19230380, documentos, descargas y guardas. No ejecutar reversiones anteriores ni restaurar una base antigua.** Preparada y verificada, sin ejecutar; SW v149/app 20261021233627. Preview detenido **20:34:59 Mendoza**, sin OOM; imagen/base/evidencias preservadas. Main `c840219` intacto; cierre documental `[skip ci]`, sin push ni workflows.
+
+## Validación previa — certificados ordinarios, 21/10/2026
+
+**Validación previa a la publicación 19230380 registrada arriba.** Leer [emisión, acceso, avisos, evidencia y límites](docs/CERTIFICADOS-OPERATIVOS-20261021.md). Operador vinculado firma y emite parciales/final; generador y transporte reciben el aviso en la campana y descargan el mismo PDF conservado. Se corrigió el refresco de la bandeja abierta y el acceso al documento exacto. Totales, concurrencia, adendas y expediente firmado protegidos; históricos preservados.
 
 Preview: suites completas **1456 backend / 1801 frontend** antes de los últimos ajustes; regresión final **95 backend / 127 frontend** PASS. **6/6 E2E únicos** en web/web angosta/app, API **6 grupos**, flag off y dos PDF PASS. Manual **2026.21.4**, **6 unit + 3 E2E** finales (subconjunto repetido), mismo renderer/CSS y capturas directas. Tipos/builds/lint sin errores; alcance de cada revisión detallado en el informe, sin GO global ni certificación física.
 
 **475 tablas previas QA intactas**, 55 sobres de correo simulados, cero cola activa/intentos/envíos; cuatro alias CAP 403, proveedores/push apagados. Preview serial/un worker/1 CPU/2 GiB/swap cero; runtime/PG/contenedor cerrados **20:09:40 Mendoza**, sin OOM/presión; base, imagen y evidencias preservadas.
 
-Nueva migración aditiva `20261021200000_manifest_certificates` y flags independientes `MANIFEST_CERTIFICATES_ENABLED` / `VITE_MANIFEST_CERTIFICATES_ENABLED`, false por defecto. Una futura publicación exige autorización, respaldo/migración, API final y SW; **no desplegar bundles QA**. Tras emitir, una reversión conserva tabla/documentos/backend con guardas; sólo se apaga emisión, manteniendo lectura. Producción no se accedió en esta tanda; último despliegue documentado **66a1c29e**, abajo. Main `c840219` intacto, sin push/workflows; commit `[skip ci]`.
+La revisión previa incorporó la migración aditiva `20261021200000_manifest_certificates` y flags independientes de certificados. La publicación autorizada y su nueva reversión están arriba; el informe conserva el alcance de las pruebas previas. Producción no se accedió durante esa revisión de QA. Main intacto, sin push/workflows.
 
-## Última publicación — autoridades 66a1c29e, 21/10/2026
+## Publicación anterior — autoridades 66a1c29e, 21/10/2026
 
 **`66a1c29e` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 15:45:25 Mendoza**. Leer primero [publicación, evidencia y reversión vigente](docs/DESPLIEGUE-AUTORIDADES-20261021.md). Soporte de cuatro funciones de autoridad incorporado, con designación explícita por ID; asignación de cuentas diferida por el dueño.
 

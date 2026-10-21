@@ -2,7 +2,7 @@
 
 ## Estado y alcance
 
-**Candidato probado, sin publicar.** Trabajo sobre `codex/sitrep-training-20261018`, desde `603d970d892dc9ac0eacf4ed700f2475216ff94f`, exclusivamente en `sitrep-production-source-20261001`. Producción no se consultó ni modificó. Última publicación documentada previamente: `66a1c29e`; este informe no vuelve a verificarla.
+**Informe de la validación previa.** El candidato fue publicado posteriormente como **19230380**; ver [despliegue, activación y reversión vigente](DESPLIEGUE-CERTIFICADOS-20261021.md). Trabajo sobre `codex/sitrep-training-20261018`, desde `603d970d892dc9ac0eacf4ed700f2475216ff94f`, exclusivamente en `sitrep-production-source-20261001`. Producción no se consultó ni modificó. Última publicación documentada previamente: `66a1c29e`; este informe no vuelve a verificarla.
 
 Pedido cubierto: el operador emite una certificación parcial o final, las partes vinculadas reciben su aviso en la campana y descargan el mismo documento, desde web y app, fuera de CAP. Datos artificiales en esquema propio del preview; CAP cerrado y correo/push apagados. No se modificaron reglas regulatorias, habilitaciones, cuentas ni históricos reales.
 
@@ -73,9 +73,9 @@ Evidencia local ignorada: `test-results-manifest-certificates-20261021/evidence/
 
 Manual **2026.21.4**, renderer **2026.20.6** y CSS **2026.20.5** conservados. Guía nueva **Certificaciones: emitir, recibir y descargar**, disponible para operador, generador, transportista y administración. Cinco pasos, dos capturas directas de QA con [procedencia](manual/certificate-capture-provenance.json). Se corrigieron las guías anteriores para no sugerir que cerrar el tratamiento publica automáticamente la final del circuito nuevo.
 
-## Futura activación y reversión
+## Condiciones de activación registradas al cerrar el preview (histórico)
 
-**No se publicó ni habilitó en producción.** Flag nuevo `MANIFEST_CERTIFICATES_ENABLED` y su par de compilación `VITE_MANIFEST_CERTIFICATES_ENABLED`, ambos false por defecto, usados true sólo en QA. CAP, correos/push y las demás habilitaciones son independientes.
+**Al cerrar esta revisión de QA aún no se había publicado ni habilitado.** La publicación posterior está registrada en el enlace inicial. Flag nuevo `MANIFEST_CERTIFICATES_ENABLED` y su par de compilación `VITE_MANIFEST_CERTIFICATES_ENABLED`, ambos false por defecto, usados true sólo en QA. CAP, correos/push y las demás habilitaciones son independientes.
 
 Migración nueva: `backend/prisma/migrations/20261021200000_manifest_certificates/migration.sql`. Crea `certificados_manifiesto`, índices, unicidad de final y relaciones con borrado restringido; no reescribe registros existentes. La futura publicación necesita autorización expresa, respaldo verificado antes de migrar, migración en los esquemas que use la aplicación, build con API del dominio final y versión de service worker. **No desplegar los bundles `/api` del preview.**
 

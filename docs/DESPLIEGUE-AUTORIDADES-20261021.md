@@ -1,5 +1,7 @@
 # Autoridades de adendas: publicación de 66a1c29e — 21/10/2026
 
+**Registro histórico, reemplazado por la publicación [19230380](DESPLIEGUE-CERTIFICADOS-20261021.md). No ejecutar la reversión de este informe:** la versión nueva conserva certificados emitidos y requiere las guardas actuales.
+
 **Backend, web, `/app` y manual `66a1c29e7d813b9338f791ace1a49ef46fb3b22f` publicados** en `sitrep.ultimamilla.com.ar` el **21/10/2026 15:45:25 Mendoza**, con autorización expresa del dueño. Publicación terminada y smoke no mutante aprobado. Main, datos de negocio y workflows sin cambios.
 
 ## Alcance y configuración
