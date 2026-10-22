@@ -11,7 +11,7 @@ async function api(page: Page, endpoint: string, method = 'GET', body?: unknown)
 for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) test(`PSIP legal ${type}: recorded derivation, administrative progress and public final result`, async ({ page, browser }, info) => {
   page.setDefaultTimeout(15_000);
   const base = prefix(info), group = fixture.cases[info.project.name], record = group[type];
-  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: page.viewportSize(), serviceWorkers: 'block' });
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: page.viewportSize(), serviceWorkers: 'allow' });
   const actor = await context.newPage(), errors: string[] = [], consoles: Array<{ level: string; text: string }> = [];
   for (const target of [page, actor]) {
     target.on('pageerror', error => errors.push(error.message));
@@ -41,7 +41,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) test(`PSIP legal 
     const denied = await api(actor, `/inspecciones/${record.id}/estado`, 'POST', { estado: 'EN_TRAMITE_LEGAL', version: before.body.data.inspeccion.version, detalle: 'Intento artificial no autorizado.' });
     expect(denied.status).toBe(403);
     if (type === 'GENERADOR') {
-      const inspectorContext = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: page.viewportSize(), serviceWorkers: 'block' });
+      const inspectorContext = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: page.viewportSize(), serviceWorkers: 'allow' });
       try {
         const inspector = await inspectorContext.newPage(); await login(inspector, info, 'inspector');
         await inspector.goto(`${base}/inspecciones/${record.id}#intercambios`);
@@ -106,7 +106,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) test(`PSIP legal 
       expect(await target.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     }
     const expectedSw = (text: string) => text === 'Service Worker registration blocked by Playwright'
-      || /^\[SW(?:-App)?\] Registration failed: TypeError: Cannot read properties of undefined \(reading 'scope'\)\n    at http:\/\/127\.0\.0\.1:4177\//.test(text);
+      || /^\[SW(?:-App)?\] Registration failed: TypeError: Cannot read properties of undefined \(reading 'scope'\)\n {4}at http:\/\/127\.0\.0\.1:4177\//.test(text);
     expect(errors).toEqual([]); expect(consoles.filter(entry => !expectedSw(entry.text))).toEqual([]);
     writeFileSync(info.outputPath('legal-journey-proof.json'), JSON.stringify({ number: record.number, project: info.project.name, actor: type,
       state: final.body.data.inspeccion.estado, publicResult: final.body.data.resultadoAdministrativo, originalRequestPreserved: true,

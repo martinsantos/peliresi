@@ -23,7 +23,7 @@ test('operator issues signed partial and final; both parties receive notices and
  const contexts=[],pages:Record<string,Page>={},errors:string[]=[],documents:unknown[]=[];
  const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
  try{
-  for(const role of ['operador','generador','transportista']){const c=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});contexts.push(c);const p=await c.newPage();pages[role]=p;p.on('pageerror',e=>errors.push(e.message));p.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text());});await login(p,info,role);await p.goto(role==='operador'?route:prefix(info)+'/notificaciones');}
+  for(const role of ['operador','generador','transportista']){const c=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'allow'});contexts.push(c);const p=await c.newPage();pages[role]=p;p.on('pageerror',e=>errors.push(e.message));p.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text());});await login(p,info,role);await p.goto(role==='operador'?route:prefix(info)+'/notificaciones');}
   const op=pages.operador;
   await expect(op.getByRole('region',{name:'Certificaciones',exact:true})).toBeVisible();
   for(const type of ['PARCIAL','FINAL']) {

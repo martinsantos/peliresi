@@ -1,5 +1,15 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Revisión web/app cerrada — sólo preview, 22/10/2026
+
+**Cerrada, no publicada.** Leer [correcciones, matriz y evidencia](docs/REVISION-WEB-APP-20261022.md). Base `891cfc86`; se corrige pérdida de texto al completar envíos/cambiar de actividad, controles pequeños, encabezados, prioridad de observaciones y contraste. Manual **2026.22.5**, mismo renderer/CSS.
+
+**316 E2E únicos PASS**, sin casos pendientes en el consolidado. Suites completas: **1542 backend / 1842 frontend** antes de los últimos ajustes; regresión final **122 unitarias PASS**. Tipos/builds PASS; lint 0 errores/43 advertencias. Representación 131 solicitudes HTTP, multirol 8 grupos, relevos 18, flota 8, seguimiento/conciliación 7+7. Las repeticiones no se suman como casos únicos.
+
+**912 tablas QA previas intactas**, cero intentos/entregas/cola activa; CAP cerrado y correos/push apagados. Preview cerrado **22/10/2026 18:32:36 Mendoza**, imagen/base/evidencias conservadas. Serial/un worker/1 CPU/2 GiB/swap cero; alcanzó el límite de memoria sin OOM. Sin producción, main, datos reales, push ni workflows; cierre `[skip ci]`.
+
+**Android físico queda al final por pedido del dueño.** No es certificación de dispositivos ni entrega externa. La publicación documentada sigue siendo `8a4d8225`; esta tanda y ABM/representación siguen sin publicar. No usar bundles QA `/api` para producción.
+
 ## Revisión ABM y representación — sólo preview, 22/10/2026
 
 Leer primero [alcance, cambios, pruebas y cierre](docs/ABM-MULTIROL-REPRESENTANTES-20261022.md). Identidad por CUIT con G/T/O aprobados; máximo **dos personas en total incluida la titular**, compartido entre roles/establecimientos; responsable explícito, invitaciones y revocaciones separadas. Altas revisadas y administrativas vinculan la entidad; no se duplican cuentas ni se cambian históricos por inferencia. Formularios conservan cambios ante avisos/conflictos. Campana y familia de correo `representacion`, sin activar entregas.

@@ -41,7 +41,7 @@ async function create(page: Page, info: TestInfo) {
   await expect(page.getByTestId('registration-wizard')).toBeVisible();
   const candidate = (await response.json()).data as { solicitudId: string };
   await assertCloudDatabase();
-  expect(new URL(process.env.DATABASE_URL!).searchParams.get('schema')).toBe('actor_representation_20261022');
+  expect(['actor_representation_20261022','web_app_audit_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
   const db = new PrismaClient(), proof = 'qa-proof-' + randomUUID();
   try {
     const user = await db.usuario.findUniqueOrThrow({ where: { email: `${uid}@night-qa.invalid` } });

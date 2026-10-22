@@ -8,7 +8,7 @@ test('one phone tracks three selected loads, delivers one and isolates a subsequ
   const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'fleet-private.json'), 'utf8'));
   const loads = fixture.cases[info.project.name], mp = prefix(info);
   const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport, deviceScaleFactor: 1,
-    isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'block',
+    isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow',
     timezoneId: 'America/Argentina/Mendoza', permissions: ['geolocation'], geolocation: { latitude: -33.2, longitude: -68.9 } });
   const page = await context.newPage(), errors: string[] = [], uploads: Record<string, number> = {};
   page.setDefaultTimeout(20000); page.on('pageerror', error => errors.push(error.message)); await isolatedMapTiles(page, info);

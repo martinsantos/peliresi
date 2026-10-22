@@ -7,7 +7,7 @@ test('external then registered handoffs keep custody, GPS, C3 and own history co
   const fixture=JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!,'handoff-private.json'),'utf8'));
   const manifest=fixture.browsers[info.project.name],mp=prefix(info),origin='http://127.0.0.1:4177';
   const errors:string[]=[];
-  const options={baseURL:origin,viewport:info.project.use.viewport,deviceScaleFactor:1,isMobile:info.project.name==='app',hasTouch:info.project.name==='app',serviceWorkers:'block' as const,timezoneId:'America/Argentina/Mendoza'};
+  const options={baseURL:origin,viewport:info.project.use.viewport,deviceScaleFactor:1,isMobile:info.project.name==='app',hasTouch:info.project.name==='app',serviceWorkers:'allow' as const,timezoneId:'America/Argentina/Mendoza'};
   const sourceContext=await browser.newContext(options);
   const externalContext=await browser.newContext({...options,geolocation:{latitude:-33.12,longitude:-68.91},permissions:['geolocation']});
   const adminContext=await browser.newContext(options);

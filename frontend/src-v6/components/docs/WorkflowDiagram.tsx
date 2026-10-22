@@ -31,7 +31,7 @@ const STATES: State[] = [
   { id: 'EN_TRATAMIENTO', label: 'En Tratamiento',  color: '#E0E7FF', textColor: '#3730A3', description: 'Proceso de tratamiento en curso' },
   { id: 'TRATADO',        label: 'Tratado',         color: '#A7F3D0', textColor: '#064E3B', description: 'Disposición final completa — certificado emitido' },
   { id: 'RECHAZADO',      label: 'Rechazado',       color: '#FEE2E2', textColor: '#991B1B', description: 'Operador rechazó la carga al recibirla' },
-  { id: 'CANCELADO',      label: 'Cancelado',       color: '#F3F4F6', textColor: '#6B7280', description: 'Manifiesto cancelado antes del cierre' },
+  { id: 'CANCELADO',      label: 'Cancelado',       color: '#F3F4F6', textColor: '#4B5563', description: 'Manifiesto cancelado antes del cierre' },
 ];
 
 const TRANSITIONS: Transition[] = [

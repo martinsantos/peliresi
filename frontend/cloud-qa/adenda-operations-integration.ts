@@ -4,7 +4,7 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {assertCloudDatabase,assertCloudEnvironment,backendRequire,externalKeys} from './safety.ts';
 await assertCloudDatabase();
-assert.ok(['adenda_operations_20261021','adenda_authorities_20261021','reactivation_20261022'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema')!));
+assert.ok(['adenda_operations_20261021','adenda_authorities_20261021','reactivation_20261022','web_app_audit_20261022'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema')!));
 const out=process.env.QA_ARTIFACTS!,f=JSON.parse(readFileSync(out+'/fixture.json','utf8'));
 const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient(),base='http://127.0.0.1:4177/api';
 const tokens=new Map<string,string>(),checks:string[]=[];

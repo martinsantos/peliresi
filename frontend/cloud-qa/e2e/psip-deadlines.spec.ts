@@ -37,7 +37,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
     page.setDefaultTimeout(15_000);
     const base = prefix(info), cases = fixture.cases[info.project.name][type];
     const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: page.viewportSize(),
-      isMobile: info.project.name !== 'web-desktop', hasTouch: info.project.name !== 'web-desktop', timezoneId: 'UTC', serviceWorkers: 'block' });
+      isMobile: info.project.name !== 'web-desktop', hasTouch: info.project.name !== 'web-desktop', timezoneId: 'UTC', serviceWorkers: 'allow' });
     const actor = await context.newPage(); actor.setDefaultTimeout(15_000);
     const errors: string[] = [], consoles: Array<{ surface: string; level: string; text: string }> = [], replies: unknown[] = [];
     for (const [surface, target] of [['authority', page], ['actor', actor]] as const) {
@@ -122,7 +122,7 @@ for (const type of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
       await page.getByTestId('inspection-next-step').scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('authority-review-response.png'), animations: 'disabled' });
       if (type === 'GENERADOR') {
-        const staffContext = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: page.viewportSize(), timezoneId: 'UTC', serviceWorkers: 'block' });
+        const staffContext = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: page.viewportSize(), timezoneId: 'UTC', serviceWorkers: 'allow' });
         try {
           const inspector = await staffContext.newPage(); await login(inspector, info, 'inspector');
           await open(inspector, cases.mixed, true);

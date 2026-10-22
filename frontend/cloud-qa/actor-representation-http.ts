@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
 import { syntheticCuit } from './synthetic-cuit.ts';
 await assertCloudDatabase();
-assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'),'actor_representation_20261022');
+assert.ok(['actor_representation_20261022', 'web_app_audit_20261022'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema')!));
 const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient(),out=process.env.QA_ARTIFACTS!;
 const fixture=JSON.parse(readFileSync(out+'/fixture.json','utf8')),base='http://127.0.0.1:3037/api',password='OnlyLocal-NightQA-2026!';
 const runId=randomUUID().slice(0,8),taxSeed=Date.now();

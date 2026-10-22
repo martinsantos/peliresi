@@ -9,7 +9,7 @@ test('operator finding, live counterpart decisions, notices and independent rect
  const contexts=[],pages:Record<string,Page>={},errors:string[]=[];
  const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
  try{
-  for(const role of ['operador','generador','transportista','adenda-authority']){const c=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});contexts.push(c);const p=await c.newPage();pages[role]=p;p.on('pageerror',e=>errors.push(e.message));p.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text());});await login(p,info,role);await p.goto(route);await expect(p.getByText('Todavía no hay adendas.')).toBeVisible();}
+  for(const role of ['operador','generador','transportista','adenda-authority']){const c=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'allow'});contexts.push(c);const p=await c.newPage();pages[role]=p;p.on('pageerror',e=>errors.push(e.message));p.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text());});await login(p,info,role);await p.goto(route);await expect(p.getByText('Todavía no hay adendas.')).toBeVisible();}
   const op=pages.operador,g=pages.generador,t=pages.transportista;
   await op.getByRole('button',{name:'Informar hallazgo',exact:true}).click();
   await expect(op.getByLabel('Corriente observada 1',{exact:true})).toHaveValue('Y1');

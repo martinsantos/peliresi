@@ -134,9 +134,10 @@ export const MobileLayout: React.FC = () => {
   const isInspector = Boolean(currentUser?.esInspector);
   const isInspectionRoute = /\/inspecciones(?:\/|$)/.test(location.pathname);
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
+  const isActorInspection = /^\/(?:(?:app|mobile)\/)?mis-inspecciones(?:\/|$)/.test(location.pathname);
   const isAddendaRoute = /\/manifiestos\/[^/]+\/adendas\/?$/.test(location.pathname);
   const boundedViewport = isInspectionCase || isAddendaRoute;
-  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
+  const inlineSupport = isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
   const inspectionShell = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const shell = inspectionShell.current, viewport = window.visualViewport;
@@ -320,6 +321,7 @@ export const MobileLayout: React.FC = () => {
   // Título según la ruta actual
   const getPageTitle = () => {
     if (isInspectionCase) return 'Inspección';
+    if (isActorInspection) return 'Mis inspecciones';
     const path = location.pathname;
     if (path.includes('/dashboard')) return 'Inicio';
     if (path.includes('/manifiestos/nuevo')) return 'Nuevo Manifiesto';
@@ -475,7 +477,7 @@ export const MobileLayout: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setIsMenuOpen(false)}
-                  className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-lg"
+                  className="flex min-h-11 min-w-11 items-center justify-center text-neutral-600 hover:bg-neutral-100 rounded-lg"
                   aria-label="Cerrar menu"
                 >
                   <X size={20} />

@@ -90,7 +90,7 @@ test('two representatives share a CUIT, receive notices and lose revoked authori
 });
 
 test('revoked selected activity returns to the personal profile with an explanation and preserves the other role',async({page},info)=>{
- await assertCloudDatabase();expect(new URL(process.env.DATABASE_URL!).searchParams.get('schema')).toBe('actor_representation_20261022');
+ await assertCloudDatabase();expect(['actor_representation_20261022', 'web_app_audit_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
  const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient();
  const owner=await db.usuario.findUniqueOrThrow({where:{email:'multirol-'+info.project.name+'@night-qa.invalid'},include:{operador:true}});
  const response=await page.request.post('/api/auth/login',{data:{email:'admin@night-qa.invalid',password:'OnlyLocal-NightQA-2026!'}});expect(response.status()).toBe(200);

@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { assertCloudDatabase, backendRequire, assertCloudEnvironment, externalKeys } from './safety.ts';
 await assertCloudDatabase();
-assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'),'manifest_certificates_20261021');
+assert.ok(['manifest_certificates_20261021','web_app_audit_20261022'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema')!));
 const out=process.env.QA_ARTIFACTS!, f=JSON.parse(readFileSync(out+'/fixture.json','utf8'));
 const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient(),base='http://127.0.0.1:4177/api',checks:string[]=[];
 const tokens=new Map<string,string>(),sha=(b:Buffer)=>createHash('sha256').update(b).digest('hex');

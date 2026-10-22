@@ -37,12 +37,12 @@ function PendingManifest({ id, numero, canViewDetail, className, children }: {
 
 const ESTADO_COLORS: Record<string, { base: string; dark: string }> = {
   BORRADOR:       { base: '#94a3b8', dark: '#64748b' },
-  APROBADO:       { base: '#22c55e', dark: '#16a34a' },
+  APROBADO:       { base: '#22c55e', dark: '#15803d' },
   EN_TRANSITO:    { base: '#3b82f6', dark: '#2563eb' },
-  ENTREGADO:      { base: '#f97316', dark: '#ea580c' },
+  ENTREGADO:      { base: '#f97316', dark: '#c2410c' },
   RECIBIDO:       { base: '#8b5cf6', dark: '#7c3aed' },
   EN_TRATAMIENTO: { base: '#a855f7', dark: '#9333ea' },
-  TRATADO:        { base: '#eab308', dark: '#ca8a04' },
+  TRATADO:        { base: '#eab308', dark: '#a16207' },
   CANCELADO:      { base: '#737373', dark: '#525252' },
   RECHAZADO:      { base: '#ef4444', dark: '#b91c1c' },
 };

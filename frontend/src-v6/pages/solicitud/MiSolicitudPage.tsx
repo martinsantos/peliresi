@@ -64,22 +64,34 @@ const MiSolicitudPage: React.FC = () => {
     finally { setEntering(false); }
   };
   const [params, setParams] = useSearchParams();
-  const [replyText, setReplyText] = useState('');
-  const [messageText, setMessageText] = useState('');
+  const [conversations, setConversations] = useState<Record<string, { reply: string; message: string }>>({});
   const messagesPanelRef = useRef<HTMLDivElement>(null);
 
   const { data: solicitudes, isLoading, isError, refetch } = useMisSolicitudes();
   const [selectedId, setSelectedId] = useState('');
   const solicitud = (solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
-  const conversations = useRef<Record<string, { reply: string; message: string }>>({});
+  const replyText = conversations[solicitud?.id || '']?.reply || '';
+  const messageText = conversations[solicitud?.id || '']?.message || '';
+  // Each callback retains its originating application, including after a
+  // pending request finishes while the person is editing another activity.
+  const updateConversation = (field: 'reply' | 'message', value: React.SetStateAction<string>) => {
+    if (!solicitud) return;
+    const id = solicitud.id;
+    setConversations(previous => {
+      const draft = previous[id] || { reply: '', message: '' };
+      const next = typeof value === 'function' ? value(draft[field]) : value;
+      if (next === draft[field]) return previous;
+      return { ...previous, [id]: { ...draft, [field]: next } };
+    });
+  };
+  const setReplyText = (value: React.SetStateAction<string>) => updateConversation('reply', value);
+  const setMessageText = (value: React.SetStateAction<string>) => updateConversation('message', value);
   useEffect(() => { if (!selectedId && solicitud) setSelectedId(solicitud.id); }, [selectedId, solicitud?.id]);
   const requestedId = params.get('solicitud');
   useEffect(() => {
     if (!requestedId || requestedId === selectedId || !solicitudes?.some(s => s.id === requestedId)) return;
-    if (solicitud) conversations.current[solicitud.id] = { reply: replyText, message: messageText };
-    const previous = conversations.current[requestedId];
-    setSelectedId(requestedId); setReplyText(previous?.reply || ''); setMessageText(previous?.message || '');
-  }, [requestedId, selectedId, solicitudes, solicitud, replyText, messageText]);
+    setSelectedId(requestedId);
+  }, [requestedId, selectedId, solicitudes]);
 
   const { data: mensajes } = useMensajesSolicitud(solicitud?.id || '');
   const enviarMensaje = useEnviarMensaje();
@@ -98,9 +110,10 @@ const MiSolicitudPage: React.FC = () => {
   const handleSendMessage = async () => {
     if (!solicitud || !messageText.trim() || sendingMessage.current) return;
     sendingMessage.current = true;
+    const submitted = messageText;
     try {
-      await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido: messageText.trim() });
-      setMessageText('');
+      await enviarMensaje.mutateAsync({ solicitudId: solicitud.id, contenido: submitted.trim() });
+      setMessageText(current => current === submitted ? '' : current);
     } catch {
       toast.error('Error', 'No se pudo enviar el mensaje');
     } finally {
@@ -112,7 +125,8 @@ const MiSolicitudPage: React.FC = () => {
   const postedReply = useRef<{ solicitudId: string; contenido: string } | null>(null);
   const handleReplyAndResend = async () => {
     if (!solicitud || !replyText.trim()) return;
-    const contenido = replyText.trim();
+    const submitted = replyText;
+    const contenido = submitted.trim();
     try {
       const alreadyPosted = postedReply.current?.solicitudId === solicitud.id && postedReply.current.contenido === contenido;
       if (!alreadyPosted) {
@@ -121,7 +135,7 @@ const MiSolicitudPage: React.FC = () => {
       }
       await enviarSolicitud.mutateAsync(solicitud.id);
       postedReply.current = null;
-      setReplyText('');
+      setReplyText(current => current === submitted ? '' : current);
       toast.success('Enviada', 'Tu solicitud fue re-enviada con la respuesta');
     } catch {
       const replySaved = postedReply.current?.solicitudId === solicitud.id && postedReply.current.contenido === contenido;
@@ -187,14 +201,11 @@ const MiSolicitudPage: React.FC = () => {
       </div>
 
       {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <>
-        <ActorActivities />
         {(solicitudes?.length || 0) > 1 && <div>
           <label htmlFor="application-activity" className="block text-sm font-medium">Solicitud por actividad</label>
           <select id="application-activity" className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base"
             value={solicitud.id} onChange={event => {
-              conversations.current[solicitud.id] = { reply: replyText, message: messageText };
-              const previous = conversations.current[event.target.value];
-              setSelectedId(event.target.value); setReplyText(previous?.reply || ''); setMessageText(previous?.message || '');
+              setSelectedId(event.target.value);
               setParams({ solicitud: event.target.value }, { replace: true });
             }}>
             {solicitudes?.map(item => <option key={item.id} value={item.id}>{item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
@@ -380,12 +391,14 @@ const MiSolicitudPage: React.FC = () => {
               value={messageText}
               onChange={e => setMessageText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-              className="flex-1 h-9 px-3 rounded-lg border border-neutral-200 text-sm focus:border-primary-500 focus:outline-none"
+              aria-label="Mensaje a administración"
+              className="min-w-0 flex-1 min-h-11 px-3 rounded-lg border border-neutral-200 text-sm focus:border-primary-500 focus:outline-none"
               placeholder="Escribe un mensaje..."
             />
             <Button
               variant="primary"
-              size="sm"
+              size="base"
+              aria-label="Enviar mensaje"
               onClick={handleSendMessage}
               disabled={!messageText.trim() || enviarMensaje.isPending}
               isLoading={enviarMensaje.isPending}
@@ -395,6 +408,7 @@ const MiSolicitudPage: React.FC = () => {
         </div>
         )}
       </Card>
+      {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities />}
     </div>
   );
 };

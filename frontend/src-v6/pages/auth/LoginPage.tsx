@@ -79,10 +79,13 @@ const LoginPage: React.FC = () => {
               id="login-identifier"
               type="text"
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder="tu@email.com o 20-12345678-9"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-10 md:h-11 pl-10 pr-4 border border-neutral-200 rounded-xl text-sm bg-neutral-50 md:bg-white focus:bg-white focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
+              className="w-full min-h-12 pl-10 pr-4 border border-neutral-200 rounded-xl text-sm bg-neutral-50 md:bg-white focus:bg-white focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
             />
           </div>
         </div>
@@ -98,13 +101,14 @@ const LoginPage: React.FC = () => {
               placeholder="********"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-10 md:h-11 pl-10 pr-10 border border-neutral-200 rounded-xl text-sm bg-neutral-50 md:bg-white focus:bg-white focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
+              className="w-full min-h-12 pl-10 pr-14 border border-neutral-200 rounded-xl text-sm bg-neutral-50 md:bg-white focus:bg-white focus:border-[#1B5E3C] focus:ring-4 focus:ring-[#1B5E3C]/15 outline-none transition-all"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
+              aria-pressed={showPassword}
               aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              className="absolute right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+              className="absolute right-0 top-1/2 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
@@ -112,7 +116,7 @@ const LoginPage: React.FC = () => {
         </div>
 
         <div className="flex justify-end">
-          <Link to="/recuperar" className="brand-link text-xs md:text-sm hover:underline">
+          <Link to="/recuperar" className="brand-link inline-flex min-h-11 items-center text-sm hover:underline">
             ¿Olvidaste tu contraseña?
           </Link>
         </div>
@@ -120,7 +124,7 @@ const LoginPage: React.FC = () => {
         <button
           type="submit"
           disabled={loading}
-          className="brand-action w-full h-10 md:h-11 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+          className="brand-action w-full min-h-12 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
         >
           {loading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -161,7 +165,7 @@ const LoginPage: React.FC = () => {
               <Link
                 to={`/inscripcion/${tipo}?modo=revision`}
                 aria-label={`Probar formulario de ${label} sin completar datos`}
-                className="flex min-h-9 items-center justify-center gap-1 border-t border-emerald-100 bg-emerald-50 px-1.5 py-1.5 text-[9px] font-semibold text-emerald-800 transition hover:bg-emerald-100 md:text-[10px]"
+                className="flex min-h-11 items-center justify-center gap-1 border-t border-emerald-100 bg-emerald-50 px-1.5 py-1.5 text-[9px] font-semibold text-emerald-800 transition hover:bg-emerald-100 md:text-[10px]"
               >
                 <PlayCircle size={12} aria-hidden="true" />
                 Probar

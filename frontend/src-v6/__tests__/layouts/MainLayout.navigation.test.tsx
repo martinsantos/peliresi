@@ -1,4 +1,4 @@
-import {render,screen,within} from '@testing-library/react';
+import {render,screen,within,fireEvent} from '@testing-library/react';
 import {MemoryRouter} from 'react-router-dom';
 import {beforeEach,describe,it,expect,vi} from 'vitest';
 import {MainLayout} from '../../layouts/MainLayout';
@@ -19,6 +19,17 @@ vi.mock('../../components/ui/UserSwitcher',()=>({UserSwitcher:()=>null}));
 function show(path:string){render(<MemoryRouter initialEntries={[path]}><MainLayout/></MemoryRouter>);}
 describe('Sidebar: one visible current destination',()=>{
   beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;authState.training=false;attention.support=0;attention.applicationPending=0;});
+  it.each(['button','Escape'])('closes the compact menu with %s and restores keyboard focus without leaving the page',method=>{
+    show('/dashboard');
+    const trigger=screen.getByRole('button',{name:'Abrir menú',exact:true});
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded','true');
+    const close=screen.getByRole('button',{name:'Cerrar menú',exact:true});close.focus();
+    if(method==='Escape')fireEvent.keyDown(document,{key:'Escape'});else fireEvent.click(close);
+    expect(trigger).toHaveAttribute('aria-expanded','false');
+    expect(trigger).toHaveFocus();
+    expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Dashboard',exact:true})).toBeVisible();
+  });
   it('identifies direct classroom sessions without an operational return or role switch',()=>{
     authState.training=true;show('/dashboard');
     expect(screen.getByRole('status',{name:'Modo capacitación'})).toHaveTextContent('Capacitación · sin validez oficial');
@@ -64,6 +75,8 @@ describe('Sidebar: one visible current destination',()=>{
   it('keeps the base role outside the inspection workspace',()=>{
     authState.rol='GENERADOR';authState.esInspector=true;
     show('/mis-inspecciones/qa-expediente');
+    expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Mis inspecciones',exact:true})).toBeVisible();
+    expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).closest('header')).toBe(screen.getByRole('banner'));
     expect(within(screen.getByRole('banner')).getByLabelText('Función actual')).toHaveTextContent(/^GENERADOR$/);
   });
   it.each([

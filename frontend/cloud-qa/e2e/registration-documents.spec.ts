@@ -1,3 +1,4 @@
+import { syntheticCuit } from '../synthetic-cuit';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
@@ -7,6 +8,7 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { isolatedMapTiles, login, prefix } from './helpers';
+import { assertCloudDatabase } from '../safety';
 test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); });
 const require = createRequire(new URL('../../package.json', import.meta.url));
 const backendRequire = createRequire(new URL('../../../backend/package.json', import.meta.url));
@@ -14,7 +16,8 @@ const { jsPDF } = require('jspdf');
 const sharp = backendRequire('sharp');
 
 // Synthetic bytes only, not a certificate or a real payment. All sessions below
-// come from real UI account creation/login; no business API interception.
+// come from real UI account creation/login. The final test explicitly aborts
+// one upload to exercise a lost connection; no business response is fabricated.
 function receipt(cuit = '30-90000001-1') {
   const id = '9' + randomUUID().replaceAll('-', '').slice(0, 12);
   const pdf = new jsPDF();
@@ -28,7 +31,7 @@ async function draft(page: Page, info: TestInfo, actor: string): Promise<Draft> 
   const id = randomUUID();
   await page.getByLabel('Nombre completo *', { exact: true }).fill(`QA ${actor} ${id}`);
   await page.getByLabel('Email *', { exact: true }).fill(`${id}@night-qa.invalid`);
-  const cuit = `30-${String(Date.now()).slice(-8)}-1`;
+  const cuit = syntheticCuit(Date.now());
   await page.getByLabel('CUIT *', { exact: true }).fill(cuit);
   await page.getByLabel('Contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await page.getByLabel('Confirmar contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
@@ -112,6 +115,22 @@ for (const actor of ['generador', 'operador', 'transportista']) test(`${actor}: 
   for (const endpoint of ['/api/solicitudes/mis-solicitudes', '/api/manifiestos']) {
     const forbidden = await page.request.get(endpoint, { headers: { Authorization: candidate.authorization } });
     expect(forbidden.status()).toBe(403);
+  }
+  if (process.env.ENTERPRISE_ENABLED === 'true') {
+    await assertCloudDatabase();
+    const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
+    const token = 'qa-document-proof-' + randomUUID();
+    try {
+      const application = await db.solicitudInscripcion.findUniqueOrThrow({ where: { id: candidate.id }, include: { usuario: true } });
+      expect(application.usuario.email).toMatch(/@night-qa\.invalid$/);
+      expect(application.usuario.emailVerified).toBe(false);
+      expect(application.usuario.activo).toBe(false);
+      // Only supply this newly created artificial account's proof. The real
+      // verification page/controller must validate it; email delivery stays off.
+      await db.usuario.update({ where: { id: application.usuarioId }, data: { emailVerificationToken: createHash('sha256').update(token).digest('hex') } });
+    } finally { await db.$disconnect(); }
+    await page.goto(`${prefix(info)}/verificar-email?token=${token}`);
+    await expect(page.getByRole('heading', { name: 'Email verificado', exact: true })).toBeVisible();
   }
   await login(page, info);
   await page.goto(`${prefix(info)}/admin/solicitudes/${candidate.id}`);
@@ -215,12 +234,26 @@ test('a photographed receipt recovers from a real busy OCR and is read in Spanis
 });
 
 test('administrative transport registration preserves its saved actor after a failed attachment', async ({ page }, info) => {
-  test.setTimeout(120000); await login(page, info);
+  test.setTimeout(120000);
+  await assertCloudDatabase();
+  expect(['actor_onboarding_20261020', 'circuit_review_20261020', 'actor_representation_20261022', 'web_app_audit_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
+  const id = randomUUID(), creations: string[] = [], administrator = 'documents-admin-' + id;
+  // Each case owns its artificial administrator, so existing recovery drafts
+  // remain untouched and cannot silently become this test's starting form.
+  const { PrismaClient } = backendRequire('@prisma/client'), db = new PrismaClient();
+  try {
+    await db.usuario.create({ data: { email: administrator + '@night-qa.invalid', nombre: 'QA Documentos ' + id,
+      password: await backendRequire('bcryptjs').hash('OnlyLocal-NightQA-2026!', 8),
+      rol: 'ADMIN_TRANSPORTISTA', activo: true, emailVerified: true, notifEmail: false } });
+  } finally { await db.$disconnect(); }
+  await login(page, info, administrator);
+  const draftRead = page.waitForResponse(response => new URL(response.url()).pathname === '/api/actores/borradores/admin%3ATRANSPORTISTA%3Anew' && response.request().method() === 'GET');
   await page.goto(`${prefix(info)}/admin/actores/transportistas/nuevo`);
-  const id = randomUUID(), creations: string[] = [];
+  const draftResponse = await draftRead; expect(draftResponse.status()).toBe(200);
+  expect((await draftResponse.json()).data.draft).toBeNull();
   page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/actores/transportistas') creations.push(request.url()); });
   await page.getByLabel('Razon Social *', { exact: true }).fill(`QA Transportista ${id}`);
-  await page.getByLabel('CUIT *', { exact: true }).fill(`30-${String(Date.now()).slice(-8)}-1`);
+  await page.getByLabel('CUIT *', { exact: true }).fill(syntheticCuit(Date.now()));
   await page.getByLabel('Email *', { exact: true }).fill(`${id}@night-qa.invalid`);
   await page.getByLabel('Contraseña inicial *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   if (info.project.name === 'web-desktop') await page.getByRole('button', { name: '5. Confirmar', exact: true }).click();
@@ -228,10 +261,32 @@ test('administrative transport registration preserves its saved actor after a fa
   const panel = page.getByRole('region', { name: 'Documentación del transportista' });
   await panel.locator('input[type=file]').setInputFiles({ name: 'false-PDF-QA.pdf', mimeType: 'application/pdf', buffer: Buffer.from('not PDF bytes') });
   await page.getByRole('button', { name: 'Crear Transportista', exact: true }).click();
-  await expect(page.getByRole('alert', { name: 'Adjuntos pendientes' })).toContainText('Transportista guardado');
+  await expect(page.getByRole('region', { name: 'Borrador del alta', exact: true }).getByRole('alert')).toHaveText('El contenido no corresponde a un PDF, JPG o PNG del tipo indicado.');
+  expect(creations).toHaveLength(0);
   await page.getByRole('button', { name: 'Quitar false-PDF-QA.pdf', exact: true }).click();
-  await panel.locator('input[type=file]').setInputFiles({ name: 'real-QA.pdf', mimeType: 'application/pdf', buffer: receipt() });
+  const bytes = receipt();
+  await panel.locator('input[type=file]').setInputFiles({ name: 'real-QA.pdf', mimeType: 'application/pdf', buffer: bytes });
+  let interrupted = 0;
+  const uploadRoute = /\/api\/actores\/transportistas\/[^/]+\/documentos$/;
+  await page.route(uploadRoute, async route => {
+    if (route.request().method() === 'POST' && interrupted === 0) { interrupted++; await route.abort('failed'); }
+    else await route.continue();
+  });
+  info.annotations.push({ type: 'network-fault', description: 'One transport-document POST is aborted before delivery; creation, draft storage, retry and document verification use the real backend.' });
+  const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/actores/transportistas' && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Crear Transportista', exact: true }).click();
+  const created = await creating; expect(created.status()).toBe(201);
+  const actorId = (await created.json()).data.transportista.id;
+  await expect(page.getByRole('alert', { name: 'Adjuntos pendientes' })).toContainText('Transportista guardado');
+  expect(interrupted).toBe(1); expect(creations).toHaveLength(1);
+  await page.screenshot({ path: info.outputPath('transport-attachment-retry.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Reintentar adjuntos', exact: true }).click();
   await expect(page).toHaveURL(new RegExp('/admin/actores/transportistas$'));
-  expect(creations).toHaveLength(1);
+  const token = await page.evaluate(() => localStorage.getItem('sitrep_access_token'));
+  const documents = await page.request.get('/api/actores/transportistas/' + actorId + '/documentos', { headers: { Authorization: 'Bearer ' + token } });
+  expect(documents.status()).toBe(200);
+  const stored = (await documents.json()).data.documentos;
+  expect(stored).toHaveLength(1);
+  expect(stored[0]).toMatchObject({ nombre: 'real-QA.pdf', sha256: createHash('sha256').update(bytes).digest('hex') });
+  expect(interrupted).toBe(1); expect(creations).toHaveLength(1);
 });

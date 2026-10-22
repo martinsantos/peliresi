@@ -289,6 +289,8 @@ describe('MobileLayout Android shell', () => {
   it('does not reinterpret the actor own inspection route as inspector work', () => {
     authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
     renderMobileLayout('/mis-inspecciones/qa-expediente');
+    expect(screen.getByRole('banner').querySelector('h1')).toHaveTextContent(/^Mis inspecciones$/);
+    expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).closest('header')).toBe(screen.getByRole('banner'));
     expect(screen.getByRole('banner').querySelector('[aria-label="Función actual"]')).toHaveTextContent(/^Generador$/);
   });
 

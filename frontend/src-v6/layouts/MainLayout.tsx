@@ -5,7 +5,7 @@ import { TrainingBanner } from '../components/TrainingBanner';
  * Layout principal con sidebar y header - Adaptado por rol
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { currentNavigationItem } from '../utils/navigationSelection';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
@@ -76,6 +76,16 @@ const UNLISTED_PAGE_TITLES: Record<string, string> = {
 
 export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const closeSidebar = () => { setSidebarOpen(false); menuTrigger.current?.focus(); };
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setSidebarOpen(false); menuTrigger.current?.focus(); }
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [sidebarOpen]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -93,7 +103,8 @@ export const MainLayout: React.FC = () => {
   }, []);
   const location = useLocation();
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
-  const inlineSupport = isInspectionCase || /^\/(?:(?:app|mobile)\/)?(?:manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
+  const isActorInspection = /^\/(?:(?:app|mobile)\/)?mis-inspecciones(?:\/|$)/.test(location.pathname);
+  const inlineSupport = isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
@@ -223,7 +234,7 @@ export const MainLayout: React.FC = () => {
   // Pages outside the side menu still name themselves in the bar (their own heading is screen-reader only).
   const sectionPath = location.pathname.replace(/^\/mobile(?=\/)/, '');
   const unlistedPage = Object.entries(UNLISTED_PAGE_TITLES).find(([path]) => sectionPath === path || sectionPath.startsWith(path + '/'))?.[1];
-  const currentPage = isInspectionCase ? 'Inspección' : location.pathname.startsWith('/empresas')?'Empresas y sedes':currentItem?.label || unlistedPage || 'SITREP';
+  const currentPage = isInspectionCase ? 'Inspección' : isActorInspection ? 'Mis inspecciones' : location.pathname.startsWith('/empresas')?'Empresas y sedes':currentItem?.label || unlistedPage || 'SITREP';
 
   return (
     <div data-app-shell className="h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden">
@@ -260,12 +271,16 @@ export const MainLayout: React.FC = () => {
         `}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-white/15">
-          <SitrepMark size={36} className="mr-3" />
-          <div>
+        <div className="min-h-16 flex items-center gap-2 px-4 lg:px-6 border-b border-white/15">
+          <SitrepMark size={36} className="shrink-0 lg:mr-1" />
+          <div className="min-w-0 flex-1">
             <span className="font-bold text-lg text-white">SITREP</span>
-            <span title={`Rol base: ${currentUser.rol}`} className="text-xs font-medium ml-1 text-white/60">{inspectionLabel ?? currentUser.rol}</span>
+            <span title={`Rol base: ${currentUser.rol}`} className="block break-words text-xs font-medium text-white/80 lg:inline lg:ml-1">{inspectionLabel ?? currentUser.rol}</span>
           </div>
+          <button type="button" aria-label="Cerrar menú" onClick={closeSidebar}
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white lg:hidden">
+            <X size={20} aria-hidden="true" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -468,8 +483,9 @@ export const MainLayout: React.FC = () => {
           <div className="flex min-w-0 flex-1 items-center gap-2 lg:gap-4">
             <Button
               variant="ghost"
-              size="sm"
+              size="base"
               className="shrink-0 lg:hidden"
+              ref={menuTrigger}
               aria-label="Abrir menú"
               aria-expanded={sidebarOpen}
               onClick={() => setSidebarOpen(true)}
@@ -525,7 +541,7 @@ export const MainLayout: React.FC = () => {
             <NotificationBell />
 
             {/* User Switcher Dropdown */}
-            <UserSwitcher variant="dropdown" onSwitch={() => navigate('/dashboard')} />
+            <div className="hidden sm:block"><UserSwitcher variant="dropdown" onSwitch={() => navigate('/dashboard')} /></div>
           </div>
         </header>
 

@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); 
 
 async function syntheticVerification(email: string) {
   await assertCloudDatabase();
-  expect(['actor_onboarding_20261020', 'circuit_review_20261020', 'actor_representation_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
+  expect(['actor_onboarding_20261020', 'circuit_review_20261020', 'actor_representation_20261022', 'web_app_audit_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
   const db = new PrismaClient(), token = 'qa-proof-' + randomUUID();
   try {
     const user = await db.usuario.findUniqueOrThrow({ where: { email } });
@@ -154,11 +154,21 @@ for (const actor of ['generador', 'transportista', 'operador']) test(`${actor}: 
     const observed=admin.waitForResponse(r=>r.url().endsWith(`/solicitudes/${application}/observar`));await modal.getByRole('button',{name:'Enviar Observaciones',exact:true}).click();expect((await observed).status()).toBe(200);
     await page.goto(prefix(info)+'/mi-solicitud');await expect(page.getByText(observation,{exact:true}).first()).toBeVisible();
     await expect(page.getByRole('button',{name:'Corregir datos y documentos',exact:true})).toBeVisible();
+    await expect(page.getByRole('button',{name:'Corregir datos y documentos',exact:true})).toBeInViewport({ratio:1});
     const alignment = await page.getByRole('button',{name:'Corregir datos y documentos',exact:true}).evaluate(button => {
       const icon = button.querySelector('svg')!.getBoundingClientRect(), text = button.lastElementChild!.getBoundingClientRect();
       return { iconPrecedesLabel: icon.right <= text.left + 1, insideViewport: icon.left >= 0 && text.right <= innerWidth + 1 };
     });
     expect(alignment).toEqual({ iconPrecedesLabel: true, insideViewport: true });
+    if(process.env.VITE_ACTOR_MULTIROLE_ENABLED==='true') {
+      const choices=page.getByRole('heading',{name:'Mis actividades',exact:true});await expect(choices).toBeVisible();
+      const correction=(await page.getByRole('button',{name:'Corregir datos y documentos',exact:true}).boundingBox())!;
+      expect(correction.y+correction.height).toBeLessThan((await choices.boundingBox())!.y);
+    }
+    const composer=page.getByRole('textbox',{name:'Mensaje a administración',exact:true});
+    expect((await composer.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const sendMessage=page.getByRole('button',{name:'Enviar mensaje',exact:true});await expect(sendMessage).toBeDisabled();
+    expect((await sendMessage.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await clean(page); await page.screenshot({path:info.outputPath(actor+'-observed-entry.png'),animations:'disabled'});
     await page.getByRole('button',{name:'Corregir datos y documentos',exact:true}).click();await expect(page.getByTestId('registration-wizard')).toBeVisible();
     await expect(page.getByText(observation,{exact:true})).toBeVisible();

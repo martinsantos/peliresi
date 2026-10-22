@@ -181,6 +181,15 @@ export async function isolatedMapTiles(page: Page, info: TestInfo) {
     expect(createHash('sha256').update(body).digest('hex')).toBe(asset.sha256);
     await route.fulfill({body,contentType:asset.contentType,headers:{'access-control-allow-origin':'*'}});
   });
+  info.annotations.push({ type: 'provider-fixture', description: 'Artificial addresses receive an explicit empty geocoder result; no address is sent outside the isolated preview. Real geocoding availability is not certified.' });
+  await page.route(/^https:\/\/nominatim\.openstreetmap\.org\/search\?/, async route => {
+    expect(route.request().method()).toBe('GET');
+    const query = new URL(route.request().url()).searchParams;
+    expect(query.get('q')).toBeTruthy();
+    expect(query.get('format')).toBe('json');
+    expect(query.get('countrycodes')).toBe('ar');
+    await route.fulfill({ contentType: 'application/json', body: '[]', headers: { 'access-control-allow-origin': '*' } });
+  });
   info.annotations.push({ type: 'provider-fixture', description: 'OpenStreetMap tiles use labeled QA SVGs in the air-gapped preview. Real basemap imagery/network is not certified.' });
   await page.route('https://tile.openstreetmap.org/**', async route => {
     expect(route.request().method()).toBe('GET');

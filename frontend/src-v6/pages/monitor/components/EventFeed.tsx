@@ -113,7 +113,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                 </div>
                 <p className="text-[11px] leading-tight truncate">
                   <span className="font-black text-neutral-800 font-mono tracking-tight">{ev.manifiestoNumero}</span>
-                  <span className="text-neutral-300 mx-1">·</span>
+                  <span aria-hidden="true" className="text-neutral-600 mx-1">·</span>
                   <span className="text-neutral-500 text-[10px]">{ev.descripcion}</span>
                 </p>
                 {ev.tipo === 'CREACION' && ev.generador && (
