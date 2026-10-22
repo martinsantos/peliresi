@@ -1,0 +1,119 @@
+{
+  "source": "86a9b790abc9a7b5a7aea00185bbfe83a10c233b",
+  "publishedAt": "2026-10-22T10:01:00.628Z",
+  "publishedAtMendoza": "2026-10-22T07:01:00.628000-03:00",
+  "components": [
+    "backend",
+    "web",
+    "app",
+    "manual"
+  ],
+  "sourceFiles": 2371,
+  "packages": {
+    "backend": {
+      "file": "sitrep-backend.tar.gz",
+      "sha256": "84ab5a00ab1377b61ece293fbc0d3d06c5f9267f63bc0735ee7130443c07d7f7",
+      "bytes": 12845506,
+      "files": 395
+    },
+    "web": {
+      "file": "sitrep-web.tar.gz",
+      "sha256": "a45dd6178694ba247d63bd4094e94fb9c03361dc3d6040e7290528b8f511ea1e",
+      "bytes": 68260901,
+      "files": 516
+    },
+    "app": {
+      "file": "sitrep-app.tar.gz",
+      "sha256": "94077813d32e60444af1eb1e0300fd08af51645fe4b3c48b27e065ea54d89bee",
+      "bytes": 3632995,
+      "files": 200
+    },
+    "client": {
+      "file": "sitrep-client.tar.gz",
+      "sha256": "0f7cd9ce32d6be3feaabe6cd6e4370ed61decea67d8780ca286cca3b165ce3d7",
+      "bytes": 15315259,
+      "files": 14
+    }
+  },
+  "flags": {
+    "MANIFEST_CERTIFICATES_ENABLED": "true",
+    "MANIFEST_PROPOSALS_ENABLED": "true",
+    "UPLOADS_DIR": "/var/lib/sitrep-uploads",
+    "TRAINING_DIRECT_LOGIN_UNTIL": "2000-01-01T00:00:00Z",
+    "ENTERPRISE_ENABLED": "false",
+    "MANIFEST_EXCEPTIONAL_ENABLED": "false",
+    "MANIFEST_ADDENDA_ENABLED": "false",
+    "MANIFEST_PARTY_REVIEW_ENABLED": "false",
+    "ACTOR_MULTIROLE_ENABLED": "false",
+    "MANIFEST_EXCEPTIONAL_REVIEWERS": "",
+    "MANIFEST_TRANSPORT_HANDOFF_ENABLED": "true",
+    "TRANSPORT_MULTI_GPS_ENABLED": "true",
+    "PUSH_MANIFEST_NOTICES_ENABLED": "false",
+    "DISABLE_EMAILS": "true",
+    "VAPID_PUBLIC_KEY": "",
+    "VAPID_PRIVATE_KEY": ""
+  },
+  "envSha256": "c6ccba0f124f6048aa0f2b0d33d0aa9797a0c982a9d4a346798449cd2d72c2e6",
+  "manualVersion": "2026.21.5",
+  "rootCache": "trazabilidad-rrpp-v150",
+  "appVersion": "20261022095612",
+  "smoke": {
+    "smoke": 139,
+    "external-smoke": 9,
+    "pwa-smoke": 8
+  },
+  "businessMutations": 0,
+  "logins": 0,
+  "databaseMigration": false,
+  "configBackup": {
+    "environmentSha256": "c6ccba0f124f6048aa0f2b0d33d0aa9797a0c982a9d4a346798449cd2d72c2e6",
+    "pm2Sha256": "393d213fb7507fd04e3a11b27fe92984d25d427dda3f3717e06ed040215f3587",
+    "databaseBackedUp": false,
+    "databaseMigration": false
+  },
+  "rollback": {
+    "backend": "/var/www/sitrep-backend-releases/20261021-certificados-19230380",
+    "frontend": "/var/www/sitrep-releases/20261022-correos-86a9b790-rollback",
+    "scope": "compatible 19230380 backend/web/app/manual; same certificates, safeguards, schema and flags",
+    "backendDowngrade": true,
+    "rootCache": "trazabilidad-rrpp-v151",
+    "appVersion": "20261022095932",
+    "databaseRestore": false
+  },
+  "rollbackExecuted": false,
+  "previewClosed": {
+    "running": false,
+    "OOMKilled": false,
+    "exitCode": 143,
+    "finishedAt": "2026-10-22T09:56:51.598845654Z",
+    "resourceLimits": {
+      "platform": "linux",
+      "docker": true,
+      "root": "/work/sitrep",
+      "cpu": "100000 100000\n",
+      "memory": "2147483648\n",
+      "swap": "0\n"
+    },
+    "memoryEvents": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+  },
+  "main": "c8402190edfc36b5e5d0dee1337c24bd1689420d",
+  "workers": [
+    {
+      "id": 1,
+      "pid": 678964,
+      "status": "online",
+      "restarts": 36,
+      "uptime": 1792663243499,
+      "cwd": "/var/www/sitrep-backend-releases/20261022-correos-86a9b790"
+    },
+    {
+      "id": 2,
+      "pid": 678979,
+      "status": "online",
+      "restarts": 36,
+      "uptime": 1792663244874,
+      "cwd": "/var/www/sitrep-backend-releases/20261022-correos-86a9b790"
+    }
+  ],
+  "validatedAt": "2026-10-22T10:01:45.467Z"
+}

@@ -1,12 +1,22 @@
 # SITREP — traspaso vigente de operación
 
-## Correos — tres correcciones probadas, sólo preview, 21/10/2026
+## Última publicación — correos 86a9b790, 22/10/2026
 
-**Candidato `86a9b790`, sin publicar.** Leer [correcciones, galería, manual y evidencia](CORREOS-CLARIDAD-20261021.md). Se aclaran aprobación individual de adenda, comprobante repetido y cierre de tratamiento separado de emisión de certificados. Destinatarios, permisos, enlaces, controles y circuitos conservados. Manual **2026.21.5**, mismo renderer/CSS.
+**`86a9b790` publicado en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el 22/10/2026 07:01:00 Mendoza.** Leer primero [despliegue, comprobaciones y reversión vigente](DESPLIEGUE-CORREOS-20261022.md). Se aclaran aprobación individual de adenda, comprobante repetido y cierre de tratamiento separado de emisión. Manual **2026.21.5**, renderer/CSS conservados.
+
+**Configuración íntegra conservada**: `.env` SHA `c6ccba0f124f6048aa0f2b0d33d0aa9797a0c982a9d4a346798449cd2d72c2e6`, uploads/identidades y todos los flags actuales. **CAP cerrado, correos/push apagados**; sin envíos. Respaldo de configuración y releases anteriores verificado; sin migraciones, instalaciones productivas, consultas o cambios de datos de negocio.
+
+Build exacto de **2.371 blobs**, API final, backend/tipos/web/app PASS; serial/un worker/1 CPU/2 GiB/swap cero. Smoke no mutante **139/139**, externo **9/9**, PWA **8/8**. Dos workers estables, SW raíz **v150** y app **20261022095612**. Preview detenido **06:56:51 Mendoza**, sin OOM; base/imagen/evidencias conservadas.
+
+**Reversión vigente: backend/web/app/manual 19230380, todos los flags actuales y guardas de certificados conservados**, SW v151/app 20261022095932; preparada, no ejecutada. No restaurar una base ni usar la reversión anterior que apagaba certificados. Main `c840219` intacto; cierre `[skip ci]`, sin push/workflows.
+
+## Validación previa — tres correcciones de correos, 21/10/2026
+
+**Validación previa de `86a9b790`, publicado según el cierre de arriba.** Leer [correcciones, galería, manual y evidencia](CORREOS-CLARIDAD-20261021.md). Se aclaran aprobación individual de adenda, comprobante repetido y cierre de tratamiento separado de emisión de certificados. Destinatarios, permisos, enlaces, controles y circuitos conservados. Manual **2026.21.5**, mismo renderer/CSS.
 
 Preview: **160 backend / 37 interfaz y manual / 15 E2E** PASS; backend y builds web/app PASS. Galería actualizada: **180 escenarios, 9/9 grupos**, cero desbordes/errores/solicitudes externas. **536 tablas QA previas intactas**, cero intentos/envíos/cola activa, cuatro alias CAP 403. Serial/un worker/1 CPU/2 GiB/swap cero; contenedor detenido **21:34:23 Mendoza**, sin OOM; base/imagen/evidencias conservadas.
 
-**Producción no se accedió; sigue vigente el despliegue documentado 19230380 de abajo.** CAP cerrado y correos/push apagados. Main `c840219` intacto; commits `[skip ci]`, sin push/workflows. No certifica entrega externa ni dispositivos físicos. Galería local: `test-results-communications-20261021/index.html`.
+**En esa revisión no se accedió a producción. La publicación posterior figura arriba.** CAP cerrado y correos/push apagados. Main `c840219` intacto; commits `[skip ci]`, sin push/workflows. No certifica entrega externa ni dispositivos físicos. Galería local: `test-results-communications-20261021/index.html`.
 
 ## Última publicación — certificados 19230380, 21/10/2026
 

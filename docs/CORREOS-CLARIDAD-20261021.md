@@ -1,6 +1,6 @@
 # Correos: decisiones, comprobantes y certificados — 21/10/2026
 
-**Candidato `86a9b790`, probado sólo en preview. Sin publicación.** Rama `codex/sitrep-training-20261018`, único checkout `sitrep-production-source-20261001`. Última publicación documentada: `19230380`; su configuración y reversión siguen vigentes.
+**Validación previa de `86a9b790`, realizada sólo en preview.** Rama `codex/sitrep-training-20261018`, único checkout `sitrep-production-source-20261001`. **Publicado el 22/10/2026**: ver [despliegue y reversión vigente](DESPLIEGUE-CORREOS-20261022.md). El resto de este informe conserva la evidencia de QA del 21/10.
 
 ## Tres correcciones
 
