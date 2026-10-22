@@ -1,5 +1,7 @@
 # Revisión de web y app — 22/10/2026
 
+**Estado actual: esta tanda está incluida en la publicación `712de167` del 22/10/2026 20:15:03 Mendoza. Empresa y multirol siguen apagados.** La evidencia y los estados siguientes describen el cierre anterior. Consultar [publicación y reversión vigentes](ENLACES-AVISOS-CORREOS-20261022.md); no ejecutar la reversión histórica de este documento.
+
 **Cerrada en preview; no publicada.** Base `891cfc86`, rama `codex/sitrep-training-20261018`, único checkout `sitrep-production-source-20261001`. Android físico queda diferido por indicación del dueño. No se accedió a producción ni se modificaron main, datos reales, permisos regulatorios o históricos. CAP cerrado; correos y push apagados. Sin push ni workflows; cierre con `[skip ci]`.
 
 ## Qué se corrigió

@@ -1,5 +1,7 @@
 # Altas, modificaciones, bajas, actividades y representación
 
+**Estado actual: esta tanda está incluida en la publicación `712de167` del 22/10/2026 20:15:03 Mendoza. Empresa y multirol siguen apagados.** La evidencia y los estados siguientes describen el cierre anterior. Consultar [publicación y reversión vigentes](ENLACES-AVISOS-CORREOS-20261022.md); no ejecutar la reversión histórica de este documento.
+
 Estado: **validado y cerrado sólo en preview el 22/10/2026 a las 15:11:38 Mendoza**. Desde producto publicado `8a4d8225` y cierre `706742ea`. Sólo fuentes del checkout activo y QA sintética en preview. Producción conserva flags actuales (enterprise/multirol apagados), CAP cerrado y correos/push apagados. No consultar ni modificar cuentas o datos reales, main o workflows.
 
 ## Regla recibida el 22/10

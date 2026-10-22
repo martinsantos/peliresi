@@ -1,5 +1,7 @@
 # Eventuales: búsqueda y continuidad entre participantes
 
+**Publicación anterior: `8a4d8225` fue reemplazado por `712de167` el 22/10/2026 20:15:03 Mendoza.** La evidencia y los estados siguientes describen el cierre anterior. Consultar [publicación y reversión vigentes](ENLACES-AVISOS-CORREOS-20261022.md); no ejecutar la reversión histórica de este documento.
+
 Estado: **8a4d8225 publicado** en backend, web, app y manual el **22/10/2026 12:18:43 Mendoza**; base anterior 45c79bb9, rama codex/sitrep-training-20261018. Autorización del dueño: continuar el plan y publicar las correcciones comprobadas, sin main ni datos reales; CAP cerrado y correos/push apagados.
 
 ## Brechas reproducidas

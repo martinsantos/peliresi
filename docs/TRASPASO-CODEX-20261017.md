@@ -1,5 +1,17 @@
 # SITREP — traspaso vigente de operación
 
+## Publicación vigente — comunicaciones, 22/10/2026
+
+**`712de167` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 22/10/2026 20:15:03 Mendoza.** Leer [evidencia y reversión vigente](ENLACES-AVISOS-CORREOS-20261022.md). Incluye enlaces exactos de correos/campana, plazo PSIP, recordatorios desde la firma y las revisiones previas de formularios/representación. Manual **2026.22.6**, estilos y renderer conservados.
+
+Build serial remoto de **2.439 archivos Git exactos**, API final, 1 CPU/2 GiB/swap cero; backend, tipos, web y app PASS, sin OOM. Smoke no mutante **150/150 + externo 9/9 + PWA 8/8**, sin logins, consultas a datos de negocio ni mutaciones. Dos workers estables. `.env` idéntico; **CAP cerrado, correos/push apagados y flags actuales**. Empresa y multirol continúan apagados. Sin migraciones ni instalación de dependencias; archivos, cuentas y uploads conservados.
+
+**Reversión vigente a 8a4d8225 en los cuatro componentes**, sin restaurar la base. Respaldo privado de configuración verificado. SW raíz **v156**, app **20261022230746**. Un control detuvo la activación de frontend al observar reinicios concurrentes de SGI; PM2 confirma que nuestro comando sólo recargó SITREP (IDs 1/2). Se verificó estabilidad de SITREP y se completó frontend; incidencia y evidencias conservadas, sin administrar servicios ajenos.
+
+Preview detenido **20:16:27 Mendoza**; imagen/base/evidencia conservadas. Main intacto, sin push ni workflows, cierre documental `[skip ci]`. QA previa: **1.579 backend / 1.854 frontend / 45 E2E únicos**, no se vuelve a contar como prueba de producción. Android físico, captura del enlace por PWA instalada y entrega externa siguen sin certificar.
+
+Las secciones de QA que siguen son antecedentes; esta publicación las incorpora sin habilitar empresa/multirol.
+
 ## Enlaces y comunicaciones verificados — sólo preview, 22/10/2026
 
 **Cerrado, no publicado.** Leer [contrato de enlaces, eventos, plazos y evidencia](ENLACES-AVISOS-CORREOS-20261022.md). Base `443cafe9`. Acceso principal `/app/` y alternativa web al mismo registro; destino conservado tras login, adenda exacta y ficha privada de aviso. Resúmenes con acceso por aviso; plazo PSIP conservado. **Los 30 días se cuentan desde la firma**, por decisión del dueño: fases idempotentes a los 23 y 30 días, con supresión al cerrar/cancelar/rechazar y revalidación antes de una entrega futura.

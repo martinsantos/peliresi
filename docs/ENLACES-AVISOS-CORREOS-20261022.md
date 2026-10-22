@@ -1,6 +1,6 @@
 # Correos, avisos y destinos — revisión del 22/10/2026
 
-**Verificado y cerrado en preview; no publicado.** Base `443cafe9`, rama `codex/sitrep-training-20261018`, único checkout autorizado `sitrep-production-source-20261001`. Sin producción, main ni datos reales; CAP cerrado, correos/push apagados. No se disparan workflows ni se envía correo a nadie.
+**Publicado como `712de167` el 22/10/2026 20:15:03 Mendoza.** La evidencia de preview de abajo precede a la publicación documentada al final. Revisión previa: base `443cafe9`, rama `codex/sitrep-training-20261018`, único checkout autorizado `sitrep-production-source-20261001`. Sin producción, main ni datos reales; CAP cerrado, correos/push apagados. No se disparan workflows ni se envía correo a nadie.
 
 ## Contrato de navegación
 
@@ -29,7 +29,7 @@ La preferencia por app se expresa con un enlace HTTPS dentro de su alcance `/app
 
 **Decisión del dueño: los 30 días se cuentan desde la firma del manifiesto.** El recordatorio genera una fase a partir del día 23 y otra a partir del día 30, para las partes titulares activas vinculadas. Cada fase es idempotente por manifiesto, firma y destinatario; un reintento no la duplica. Se detiene para tratado/cancelado/rechazado y no inventa una firma faltante. Antes de cualquier entrega futura se revalida la firma, fase y estado; una fase semanal obsoleta no se entrega al superar los 30 días. El correo muestra la fecha de firma y la referencia de 30 días. Esto es seguimiento operativo, no calificación automática de infracción.
 
-El job diario corre a las 08:15 de Mendoza en el worker principal. En preview se invoca explícitamente con reloj controlado y datos artificiales; el arranque automático queda inhibido por `NODE_APP_INSTANCE=qa`. No hay migración nueva para esta tanda. Si se publica en el futuro, un manifiesto abierto que ya supera 30 días recibe como máximo su fase vigente, no ambas fases retroactivas.
+El job diario corre a las 08:15 de Mendoza en el worker principal. En preview se invoca explícitamente con reloj controlado y datos artificiales; el arranque automático queda inhibido por `NODE_APP_INSTANCE=qa`. No hay migración nueva para esta tanda. Al publicarse, un manifiesto abierto que ya supera 30 días recibe como máximo su fase vigente, no ambas fases retroactivas.
 
 ## Manual y galería
 
@@ -59,4 +59,33 @@ Procedencia verificada: **1781 archivos**, **1114 entradas de producto/manual**;
 
 Evidencia en `test-results-communication-links-20261022/` y su contraparte remota `.qa-communication-links-20261022`.
 
-No hay autorización de publicación en esta tanda. La última publicación documentada permanece en `8a4d8225`; no se accedió al servidor para cambiarla ni verificarla. No usar los bundles QA `/api` como build de producción. Android físico, captura del enlace por una PWA instalada y entrega en clientes externos de correo/push siguen diferidos; no se certifican con un viewport.
+La validación de preview terminó antes de recibir autorización de publicación. Luego el dueño autorizó expresamente `712de167` en los cuatro componentes con flags actuales; el despliegue se detalla abajo. No se usaron los bundles QA `/api` en producción. Android físico, captura del enlace por una PWA instalada y entrega en clientes externos de correo/push siguen diferidos; no se certifican con un viewport.
+
+
+## Publicación y verificación final
+
+Fuente **712de167d53e1dea04296f45f4aaf98f17d4d2e6**, publicada el **22/10/2026 20:15:03 Mendoza**, sin push ni workflows. Se incluyen las tandas anteriores de ABM/representación y revisión web/app; **ENTERPRISE_ENABLED / ACTOR_MULTIROLE_ENABLED y sus pares VITE siguen en false**, conforme a la orden de conservar flags actuales. No se activan cuentas ni se regularizan históricos.
+
+Compilación nueva y serial en preview (1 CPU/2 GiB/swap 0): backend, cliente Prisma compatible, tipos efectivos, web y app. **2.439 archivos Git idénticos antes y después**, API `https://sitrep.ultimamilla.com.ar/api`, manual **2026.22.6** exacto; estilos y renderer iguales a la versión previa. Cuatro paquetes y archivos comprobados por SHA-256 en origen, descarga y servidor. Pico **1.630.208.000 bytes**, cero eventos max/OOM. El verificador inicialmente esperaba un chunk separado de AvisoPage; se comprobó que su import es estático y se verificaron pantalla/ruta en el bundle principal, sin cambiar producto ni artefactos.
+
+Backend `/var/www/sitrep-backend-releases/20261022-comunicaciones-712de167`; web/app/manual `/var/www/sitrep-releases/20261022-comunicaciones-712de167`. SW raíz **v156**, app **20261022230746**; la versión de caché raíz es una transformación declarada del artefacto, sin modificar la fuente del commit. Smoke **150/150 + 9/9 externo + 8/8 PWA**: GET públicos, integridad de bundles/manual/SW, salud y guardas sin token. Cero logins, decisiones o escrituras de prueba. La ficha privada y la adenda seleccionada resuelven en ambas superficies; sus APIs sin sesión rechazan acceso. El smoke no sustituye los E2E autenticados del preview ni certifica Android.
+
+**Sin migraciones**: paquete, lock, esquema y migraciones idénticos a producción anterior `8a4d8225`. Se respaldó y comprobó configuración `.env`/PM2 antes de activar; no se copió ni restauró base. `.env` SHA-256 **988d42eebd8fde9ad163db25f124a6680f6054849c6ce7c346f03ce284536872**, exactamente conservado. Ambos workers y configuración persistida mantienen identidades, uploads, flags, CAP cerrado y correos/push apagados. El dominio de enlaces es `https://sitrep.ultimamilla.com.ar`. No se consultaron ni modificaron datos de negocio.
+
+El recordatorio desde la firma queda programado a las **08:15 Mendoza**, sólo en el worker principal; no se invocó durante el despliegue. Genera avisos internos en su horario según las reglas verificadas, sin habilitar entregas externas.
+
+### Incidencia operativa resuelta
+
+Después de recargar el backend, el control de igualdad de procesos ajenos observó el cambio de PID/reinicio de SGI y detuvo la activación de frontend. El registro de nuestro comando PM2 confirma sólo IDs **1 y 2**; los registros del gestor muestran además reinicios posteriores de SGI y su sincronizador. Se conservaron intento, salida del comando y eventos. El backend SITREP permaneció listo y con ambos workers estables; se verificaron otra vez paquetes, configuración y reversión, y se completó sólo el cambio de frontend. Para servicios ajenos se verifica identidad/ruta/estado, registrando sus cambios transitorios de PID sin administrarlos. El smoke final pasó y los procesos SITREP no volvieron a reiniciarse.
+
+Evidencia local ignorada: `test-results-deploy-712de167/`. Respaldo operativo privado: `/var/backups/sitrep/20261022-comunicaciones-712de167/`. No copiar secretos de ese directorio al repositorio. Preview detenido **22/10/2026 20:16:27 Mendoza**; no se inició su base en esta publicación. Imagen, base y evidencias preservadas.
+
+## Reversión vigente preparada — no ejecutada
+
+Volver a **8a4d8225 en backend/web/app/manual**, conservando esquema, flags, cuentas, archivos e históricos. Los avisos ya generados se conservan; no se restauran ni borran datos. No ejecutar las reversiones históricas de tandas anteriores.
+
+```bash
+ssh root@23.105.176.45 'node /var/backups/sitrep/20261022-comunicaciones-712de167/publish-production.js rollback'
+```
+
+El comando valida huellas, esquema, configuración y salud; recupera backend `/var/www/sitrep-backend-releases/20261022-eventuales-8a4d8225`, recarga sólo SITREP y activa `/var/www/sitrep-releases/20261022-comunicaciones-712de167-rollback`. Cachés de recuperación **v157 / 20261022231123**, con assets nuevos conservados para clientes abiertos. Guarda configuración de PM2 y mantiene Nginx. Los cambios de PID ajenos no impiden la reversión, pero se conservan controles de identidad y estado de esos servicios. Después verificar versión `8a4d8225`, salud y gates; registrar la ejecución si se usa. La reversión está preparada y verificada por archivos, **no ejecutada**.
