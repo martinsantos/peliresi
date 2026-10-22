@@ -15,7 +15,7 @@ for (const port of [3037, 4177]) {
     probe.listen(port,'127.0.0.1',()=>probe.close(error=>error?reject(error):resolve()));
   });
 }
-if (process.env.MANIFEST_EXCEPTIONAL_ENABLED === 'true') {
+if (process.env.MANIFEST_EXCEPTIONAL_ENABLED === 'true' && process.env.MANIFEST_REVIEW_AUTHORITY_BY_ROLE !== 'true') {
   const fixture = JSON.parse(await readFile(path.join(output, 'fixture.json'), 'utf8'));
   // Authority assignment exists only in this isolated QA process environment.
   process.env.MANIFEST_EXCEPTIONAL_REVIEWERS = fixture.users.admin;

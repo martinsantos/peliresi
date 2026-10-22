@@ -1,5 +1,9 @@
 # SITREP — traspaso vigente de operación
 
+## Plan retomado con autorización de publicación — 22/10/2026
+
+**En ejecución.** El dueño autorizó continuar el refactor y publicar las tandas validadas, incluyendo eventuales y adendas. Confirmó autoridades por los cuatro roles, sin cambiar cuentas. Leer [inventario, política y avance](REACTIVACION-CIRCUITOS-20261022.md). La agenda/continuidad de `5080ee82` se incluye en el candidato. CAP cerrado, correos/push apagados; sin main ni datos reales. La última producción verificada sigue siendo **86a9b790** hasta documentar la nueva activación.
+
 ## Revisión de agenda, certificados y continuidad — sólo preview, 22/10/2026
 
 **Primera tanda terminada y probada, sin publicar.** Leer [cambios, manual, evidencia y condiciones de publicación](AGENDA-CERTIFICADOS-CONTINUIDAD-20261022.md). Agenda de manifiestos paginada sin corte de cien, búsqueda/filtros completos y tareas de certificación final; recuperación de altas de G/T/O con datos, paso y adjuntos privados, guardado automático y conflictos explícitos. Históricos y permisos conservados. Manual **2026.22.1**, mismo renderer/CSS.

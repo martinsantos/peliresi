@@ -5,7 +5,8 @@ import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 import { loadSeed } from './load-seed.ts';
 
 await assertCloudDatabase();
-const schema = 'continuity_final_20261022';
+const schema = new URL(process.env.DATABASE_URL!).searchParams.get('schema')!;
+assert.ok(['continuity_final_20261022', 'reactivation_20261022'].includes(schema));
 assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), schema);
 assert.equal(process.env.TRAINING_DATABASE_URL, '');
 assert.equal(process.env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z');

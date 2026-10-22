@@ -3,6 +3,7 @@ import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
 import { Prisma } from '@prisma/client';
 import { ADDENDUM_AUTHORITY_ROLES } from '../domain/addendumAuthority';
+import { reviewAuthorityAccountFilter } from '../domain/manifestReviewAuthority';
 
 function currents(value: unknown): string[] {
   return Array.isArray(value) ? value.flatMap(row => row && typeof row === 'object' && typeof row.corriente === 'string' ? [row.corriente] : []) : [];
@@ -15,13 +16,13 @@ export async function noticeNewCurrents(tx: Prisma.TransactionClient, original: 
   // The classroom uses its own team's synthetic authority inbox. This grants
   // no regulatory review permission and never notifies an operational user.
   const school = isTrainingSession() && /^(cap-\d{8})-(?:generador|transportista|operador)-([1-5])$/.exec(reviewerId || '');
-  const designated = isTrainingSession()
-    ? school ? [school[1] + '-admin-' + school[2]] : []
-    : (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').filter(Boolean);
+  const accountFilter = isTrainingSession()
+    ? { id: { in: school ? [school[1] + '-admin-' + school[2]] : [] } }
+    : reviewAuthorityAccountFilter();
   // Sector administrators are eligible only for ordinary addenda. Eventual and
   // classroom authority boundaries remain unchanged.
   const rol = adenda && !isTrainingSession() ? { in: ADDENDUM_AUTHORITY_ROLES } : 'ADMIN' as const;
-  const recipients = await tx.usuario.findMany({ where: { id: { in: designated }, rol, activo: true }, select: { id: true } });
+  const recipients = await tx.usuario.findMany({ where: { ...accountFilter, rol, activo: true }, select: { id: true } });
   if (!recipients.length) throw new AppError('No se pudo registrar la aprobación: falta una autoridad activa designada para recibir las corrientes nuevas. Pedí a Administración que revise la configuración; tu motivo se conserva para reintentar.', 409);
   await tx.notificacion.createMany({ data: recipients.map(user => ({
     usuarioId: user.id, tipo: 'INFO_GENERAL', titulo: 'Nueva corriente aprobada post facto',

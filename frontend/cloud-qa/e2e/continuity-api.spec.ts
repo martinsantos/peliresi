@@ -26,7 +26,7 @@ test('complete agenda: counts, every page, dates, ownership and malformed filter
 });
 test('private drafts: permissions, idempotency, concurrent changes, file integrity, expiration and no actor creation',async({request})=>{
  await assertCloudDatabase();const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient();
- expect(new URL(process.env.DATABASE_URL!).searchParams.get('schema')).toBe('continuity_final_20261022');
+ expect(['continuity_final_20261022','reactivation_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
  const headers=await auth(request,'admin'),other=await auth(request,'lector-generadores'),actor=await auth(request,'generador'),wrongSector=await auth(request,'lector-transporte');
  const url='/api/actores/borradores/'+encodeURIComponent('admin:GENERADOR:qa-contract');
  const counts=async()=>[await db.generador.count(),await db.transportista.count(),await db.operador.count()];

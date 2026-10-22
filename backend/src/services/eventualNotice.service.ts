@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Prisma, RegistroManifiestoExcepcional } from '@prisma/client';
 import { exceptionalApproval, type ExceptionalApprover, type ExceptionalEvent } from '../domain/manifiestoExcepcional';
+import { reviewAuthorityByRole } from '../domain/manifestReviewAuthority';
 
 export const EVENTUAL_NOTICE_LABELS = {
   CREADO: ['Nuevo eventual: revisá tu participación', 'Te vincularon a un eventual. Abrilo para revisar los datos y la aprobación que corresponde a tu perfil.'],
@@ -47,7 +48,8 @@ export async function eventualNoticeAudience(tx: Prisma.TransactionClient, recor
   if (record.operadorId) or.push({ rol: 'OPERADOR', operador: { is: { id: record.operadorId } } });
   if (kind === 'SOLICITAR_REVISION') {
     const reviewers = (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').filter(id => id && id !== record.creadoPorId && id !== record.impersonadoPorId);
-    if (reviewers.length) or.push({ rol: 'ADMIN', id: { in: reviewers } });
+    if (reviewAuthorityByRole()) or.push({ rol: 'ADMIN', id: { notIn: [record.creadoPorId, record.impersonadoPorId].filter((id): id is string => Boolean(id)) } });
+    else if (reviewers.length) or.push({ rol: 'ADMIN', id: { in: reviewers } });
   }
   return tx.usuario.findMany({ where: { activo: true, id: { not: authorId }, OR: or }, select: { id: true } });
 }

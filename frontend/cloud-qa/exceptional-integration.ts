@@ -4,6 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertCloudDatabase, backendRequire, root } from './safety.ts';
 await assertCloudDatabase();
+assert.ok(['circuit_review_20261020', 'reactivation_20261022'].includes(new URL(process.env.DATABASE_URL!).searchParams.get('schema')!));
 const { PrismaClient } = backendRequire('@prisma/client');
 const db = new PrismaClient();
 const url = 'http://127.0.0.1:3037/api';
@@ -168,7 +169,6 @@ try {
 
   // Spec v2 §7: a row written before this change (manifest-migration) keeps advancing without approvals.
   // A fresh compatibility fixture makes repeated verification preserve every prior row.
-  assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'circuit_review_20261020');
   const legacyId = 'qa-legacy-' + randomUUID();
   const template = await db.registroManifiestoExcepcional.findUniqueOrThrow({ where: { id: 'qa-legacy-exceptional' } });
   await db.registroManifiestoExcepcional.create({ data: { id: legacyId, operadorId: template.operadorId,
@@ -205,8 +205,10 @@ try {
       for (const role of ['generador', 'transportista']) if (source.datos[role]?.padronId)
         or.push({ rol: role.toUpperCase(), [role]: { is: { id: source.datos[role].padronId } } });
       if (source.operadorId) or.push({ rol: 'OPERADOR', operador: { is: { id: source.operadorId } } });
-      if (event?.tipo === 'SOLICITAR_REVISION' && source.creadoPorId !== fixture.users.admin && source.impersonadoPorId !== fixture.users.admin)
-        or.push({ id: fixture.users.admin, rol: 'ADMIN' });
+      if (event?.tipo === 'SOLICITAR_REVISION') {
+        if (process.env.MANIFEST_REVIEW_AUTHORITY_BY_ROLE === 'true') or.push({ rol: 'ADMIN', id: { notIn: [source.creadoPorId, source.impersonadoPorId].filter(Boolean) } });
+        else if (source.creadoPorId !== fixture.users.admin && source.impersonadoPorId !== fixture.users.admin) or.push({ id: fixture.users.admin, rol: 'ADMIN' });
+      }
       const expected = await db.usuario.findMany({ where: { activo: true, id: { not: author }, OR: or }, select: { id: true } });
       assert.deepEqual(newNotices.filter(row => { const d=JSON.parse(row.datos!); return d.tipo === 'manifiesto_eventual' && d.registroId === source.id && d.eventoId === metadata.eventoId; }).map(row => row.usuarioId).sort(), expected.map(row => row.id).sort());
       assert.equal(metadata.correoVersion, 1); assert.equal(metadata.version, 1);

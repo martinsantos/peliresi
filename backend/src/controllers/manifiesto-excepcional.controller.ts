@@ -1,4 +1,5 @@
 import { manifestFeatureEnabled, manifestPracticeIdentity } from '../lib/manifestTraining';
+import { designatedReviewAccount } from '../domain/manifestReviewAuthority';
 import { NextFunction, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
@@ -18,10 +19,9 @@ export function exceptionalEnabled(_req: AuthRequest, _res: Response, next: Next
   if (!manifestFeatureEnabled('MANIFEST_EXCEPTIONAL_ENABLED')) return next(new AppError('Circuito no habilitado', 404));
   next();
 }
-/** Existing designated-reviewer boundary, not every administrator. */
+/** Sector administrators never gain eventual authority from the addendum policy. */
 export function exceptionalDesignatedReviewer(user: AuthRequest['user']) {
-  return user?.rol === 'ADMIN' && !user.impersonatedBy &&
-    (process.env.MANIFEST_EXCEPTIONAL_REVIEWERS || '').split(',').filter(Boolean).includes(user.id);
+  return user?.rol === 'ADMIN' && user.activo !== false && !user.restricted && !user.impersonatedBy && designatedReviewAccount(user.id);
 }
 function reviewer(req: AuthRequest) { return exceptionalDesignatedReviewer(req.user); }
 export function exceptionalCanReview(req: AuthRequest, record: { creadoPorId: string; impersonadoPorId?: unknown; datos?: unknown; operadorId?: unknown }) {
