@@ -1,4 +1,5 @@
 import type { Notificacion } from '../types/models';
+import { safeLocalRedirect } from './authRedirect';
 import { cataloguePath } from './alertCatalogue';
 import type { QueryClient } from '@tanstack/react-query';
 
@@ -13,7 +14,7 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
 }
 
 function withBasePath(path: string, basePath: string): string {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const normalizedPath = safeLocalRedirect(path === '/perfil' ? '/mi-perfil' : path, '/notificaciones').replace(/^\/(?:app|mobile)(?=\/|$)/, '') || '/';
   const normalizedBase = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
   if (!normalizedBase || normalizedPath === normalizedBase || normalizedPath.startsWith(`${normalizedBase}/`)) {
     return normalizedPath;
@@ -65,6 +66,9 @@ export function notificationActionLabel(path: string): string {
 
 export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string): string {
   const data = parseNotificationData(notificacion.datos);
+  const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+  if (['adenda_manifiesto', 'ADENDA_POST_FACTO'].includes(String(data.tipo)) && safeId(notificacion.manifiestoId) && safeId(data.adendaId)) return withBasePath(`/manifiestos/${notificacion.manifiestoId}/adendas?adenda=${data.adendaId}`, basePath);
+  if (data.tipo === 'soporte' && safeId(data.ticketId)) return withBasePath('/soporte/' + data.ticketId, basePath);
   if(data.tipo === 'certificado_manifiesto') {
     const safe=(v:unknown):v is string=>typeof v==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v);
     return withBasePath(data.version===1&&safe(notificacion.manifiestoId)&&safe(data.documentoId)&&['PARCIAL','FINAL'].includes(String(data.tipoCertificado)) ? '/manifiestos/'+notificacion.manifiestoId+'?certificado='+data.documentoId+'#certificaciones' : '/notificaciones',basePath);
@@ -102,8 +106,8 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
       || ['solicitud_observada', 'solicitud_aprobada', 'solicitud_rechazada'].includes(String(data.tipo));
     return withBasePath(applicant ? `/mi-solicitud?solicitud=${data.solicitudId}` : `/admin/solicitudes/${data.solicitudId}`, basePath);
   }
-  if (typeof data.inspeccionId === 'string') return withBasePath(`/inspecciones/${data.inspeccionId}`, basePath);
-  if (notificacion.manifiestoId) return withBasePath(`/manifiestos/${notificacion.manifiestoId}`, basePath);
+  if (safeId(data.inspeccionId)) return withBasePath(`/${['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(recipientRole || '') ? 'mis-inspecciones' : 'inspecciones'}/${data.inspeccionId}`, basePath);
+  if (safeId(notificacion.manifiestoId)) return withBasePath(`/manifiestos/${notificacion.manifiestoId}`, basePath);
   if (typeof data.alertaId === 'string') return withBasePath('/alertas', basePath);
   return withBasePath('/notificaciones', basePath);
 }

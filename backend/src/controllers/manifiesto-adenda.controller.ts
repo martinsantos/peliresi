@@ -48,9 +48,11 @@ export async function listAddenda(req: AuthRequest, res: Response, next: NextFun
   try {
     const manifest = await accessibleManifest(req);
     const page = Math.max(1, Math.min(100000, Math.floor(Number(req.query.page) || 1)));
-    const where = { manifiestoId: manifest.id };
+    const selected = req.query.adenda;
+    if (selected !== undefined && (typeof selected !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(selected))) throw new AppError('Adenda inválida', 400);
+    const where = { manifiestoId: manifest.id, ...(selected ? { id: selected as string } : {}) };
     const [items, counts] = await Promise.all([
-      prisma.adendaManifiesto.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (page - 1) * 20 }),
+      prisma.adendaManifiesto.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: selected ? 0 : (page - 1) * 20 }),
       // Counts span all pages. Authorization was checked against the parent above.
       prisma.$queryRaw<DocumentaryCounts[]>(Prisma.sql`
         SELECT COUNT(*)::int AS total,
@@ -61,7 +63,7 @@ export async function listAddenda(req: AuthRequest, res: Response, next: NextFun
     ]);
     const summary = counts[0];
     const finalLiberado = await hasFinalTrainingCertificate(prisma, manifest.id);
-    res.json({ success: true, data: { adendas: (await presentRecords(items, req)).map(r => ({...r, ...(finalLiberado ? {puedeResolver:false} : {})})), total: summary.total, finalLiberado,
+    res.json({ success: true, data: { adendas: (await presentRecords(items, req)).map(r => ({...r, ...(finalLiberado ? {puedeResolver:false} : {})})), total: selected ? items.length : summary.total, finalLiberado,
       documental: { ...summary, estado: documentaryStatus(summary), cierreAcreditado: false },
       manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado,
         residuos: manifest.residuos.map(row => ({ corriente: row.tipoResiduo.codigo, cantidad: row.cantidad, unidad: row.unidad })) },

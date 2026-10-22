@@ -1,3 +1,4 @@
+import AvisoPage from './pages/notificaciones/AvisoPage';
 /**
  * SITREP v6 - Mobile App Router
  * ==============================
@@ -189,6 +190,7 @@ function AppMobile() {
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/alertas" element={<AlertasPage />} />
             <Route path="/notificaciones" element={<NotificacionesPage />} />
+            <Route path="/notificaciones/:id" element={<AvisoPage />} />
             <Route path="/configuracion" element={<ConfiguracionPage />} />
             <Route path="/mi-perfil" element={<PerfilPage />} />
             <Route path="/mi-perfil/solicitar-cambios" element={<SolicitarCambiosPage />} />

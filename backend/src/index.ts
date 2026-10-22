@@ -1,3 +1,4 @@
+import { iniciarRecordatorioFirmaJob } from './jobs/manifestSignatureReminder.job';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -259,6 +260,7 @@ iniciarVencimientoJob();
 iniciarBlockchainJob();
 iniciarRecordatorioJob();
 iniciarSeguimientoCierreJob();
+iniciarRecordatorioFirmaJob();
 iniciarAlertCatalogueJob();
 
 // Iniciar el servidor

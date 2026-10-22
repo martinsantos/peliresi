@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier } } }));
-import { notificationMailContent, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
+import { notificationMailContent, notificationSourceEligible, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 import { mailText } from '../../services/email-templates';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
@@ -34,7 +34,7 @@ describe('committed notice mail relay', () => {
     expect(repeated.family).toBe('alertas');
     expect(mailText(repeated.html)).toContain('no acredita un pago nuevo');
     expect(mailText(repeated.html)).toContain('huella del archivo');
-    expect(repeated.html).toContain('/notificaciones');
+    expect(repeated.html).toContain('solicitudId' in origin ? '/app/mi-solicitud?solicitud=application' : '/app/notificaciones/qa-notice');
     expect(repeated.html).not.toMatch(/PRIVATE|untrusted|fraude/);
     expect(notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', datos: '{}' })?.subject).toBe('[SITREP] Alerta para revisar');
   });
@@ -260,5 +260,15 @@ describe('committed notice mail relay', () => {
     if (scenario === 'no-cutoff') vi.stubEnv('EMAIL_DELIVERY_NOT_BEFORE', '');
     expect(await queueCommittedNotificationEmails()).toBe(0);
     expect(mocks.query).not.toHaveBeenCalled();
+  });
+});
+
+describe('signature reminder mail freshness',()=>{
+  it.each([['SEMANA',24,'RECIBIDO',true],['SEMANA',31,'RECIBIDO',false],['TREINTA_DIAS',31,'RECIBIDO',true],['TREINTA_DIAS',31,'TRATADO',false],['SEMANA',22,'RECIBIDO',false]])('phase %s at day %s in %s -> %s',async(fase,days,estado,expected)=>{
+    const fechaFirma=new Date(Date.now()-Number(days)*86400000);
+    mocks.manifest.mockResolvedValue({isDemoData:false,fechaFirma,estado,generador:{usuarioId:'actor'}});
+    const n={...notice,rol:'GENERADOR',usuarioId:'actor',manifiestoId:'m',tipo:'VENCIMIENTO_PROXIMO',datos:JSON.stringify({tipo:'recordatorio_firma',version:1,fase,fechaFirma:fechaFirma.toISOString()})};
+    expect(await notificationSourceEligible(n,'alertas')).toBe(expected);
+    expect(notificationMailContent(n)?.html).toContain('30 días desde la firma:</strong>');
   });
 });

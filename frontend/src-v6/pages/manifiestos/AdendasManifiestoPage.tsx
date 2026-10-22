@@ -2,7 +2,7 @@ import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import React, { useRef, useState } from 'react';
 import { FileSearch, ClipboardCheck, UserRound } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
@@ -32,11 +32,13 @@ function Load({ rows }: { rows: Waste[] }) {
 export default function AdendasManifiestoPage() {
   const { id } = useParams(); const { currentUser } = useAuth(); const mp = useMobilePrefix();
   const enabled = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser);
+  const [params, setParams] = useSearchParams();
+  const selected = params.get('adenda');
   const [page, setPage] = useState(1); const qc = useQueryClient();
   const key = ['manifiesto-adendas', currentUser?.id, id];
   const endpoint = `/manifiestos/${encodeURIComponent(id || '')}/adendas`;
-  const query = useQuery({ queryKey: [...key, page], enabled: enabled && !!id && !!currentUser,
-    queryFn: async () => (await api.get(endpoint, { params: { page } })).data.data as Data, retry: false, refetchInterval: 5000 });
+  const query = useQuery({ queryKey: [...key, page, selected], enabled: enabled && !!id && !!currentUser,
+    queryFn: async () => (await api.get(endpoint, { params: { page, ...(selected ? { adenda: selected } : {}) } })).data.data as Data, retry: false, refetchInterval: 5000 });
   const [creating, setCreating] = useState(false); const [rectificaId, setRectificaId] = useState<string | undefined>();
   const [wastes, setWastes] = useState<Waste[]>([emptyWaste()]); const [motivo, setMotivo] = useState('');
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -79,6 +81,7 @@ export default function AdendasManifiestoPage() {
     <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-xl font-bold">Adendas · {data?.manifiesto.numero || 'Manifiesto'}</h1>
       {data?.puedeRegistrar && !creating && <Button onClick={() => { setRectificaId(undefined); pending.current = undefined; setMotivo(''); setCreating(true); setSaved(''); setWastes(data.manifiesto.residuos?.map(row => ({ ...row })) || [emptyWaste()]); }}>{data.puedeInformarHallazgo ? 'Informar hallazgo' : 'Registrar diferencia'}</Button>}
     </div>
+    {selected && <div role="status" className="flex flex-wrap items-center gap-3 text-sm"><span>Adenda del aviso</span><Button variant="outline" onClick={() => { setPage(1); setParams({}); }}>Ver todas las adendas</Button></div>}
     {data && <p className="text-sm text-neutral-600">Operación: {data.manifiesto.estado}. La revisión de adendas no detiene el circuito.</p>}
     {data?.finalLiberado && <p role="status" className="rounded border border-neutral-200 p-3">El operador ya liberó la disposición final{currentUser?.training ? ' CAP' : ''}. Se conservan el certificado y las adendas revisadas; este expediente queda en consulta.</p>}
     {data?.documental && <Card className="p-4 space-y-1" role="region" aria-label="Control documental">
@@ -110,9 +113,9 @@ export default function AdendasManifiestoPage() {
     </form></Card>}
     {currentUser?.training && <p className="text-sm text-neutral-600">Capacitación: sin anexos ni documentos oficiales.</p>}
     {data && <>
-      {data.total === 0 && <p>Todavía no hay adendas.</p>}
+      {data.total === 0 && <p>{selected ? 'La adenda del aviso ya no está disponible o no corresponde a este manifiesto.' : 'Todavía no hay adendas.'}</p>}
       {data.adendas.map((item, i) => <Card key={item.id} className="p-4 space-y-3" role="region" aria-label={`Adenda ${item.id}`}>
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Adenda {data.total - (page - 1) * 20 - i}</h2><span role="status" aria-label="Estado de revisión">{labels[item.estadoRevision]}</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{selected ? 'Adenda del aviso' : `Adenda ${data.total - (page - 1) * 20 - i}`}</h2><span role="status" aria-label="Estado de revisión">{labels[item.estadoRevision]}</span></div>
         <p className="flex items-center gap-2 text-sm text-neutral-600"><UserRound size={16} className="shrink-0" aria-hidden="true" />{authorLabel(item.autor, item.creadoPorId)}</p>
         <p className="break-words">{item.motivo}</p>
         {item.revisiones.length > 0 && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm" aria-label="Última revisión">

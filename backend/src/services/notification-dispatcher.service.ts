@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Rol, TipoNotificacion, PrioridadNotificacion } from '@prisma/client';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
@@ -64,7 +65,7 @@ class NotificationService {
                 await enviarPushAlUsuario(data.usuarioId, {
                     title:     data.titulo,
                     body:      data.mensaje,
-                    url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    url:       `/notificaciones/${notif.id}`,
                     tag:       data.manifiestoId ?? data.tipo,
                     prioridad: (data.prioridad ?? 'NORMAL') as any,
                 }).catch(() => {});
@@ -91,9 +92,11 @@ class NotificationService {
         });
 
         const prioridad = data.prioridad || 'NORMAL';
+        const recipients = usuarios.map(user => ({ ...user, noticeId: randomUUID() }));
 
         await prisma.notificacion.createMany({
-            data: usuarios.map(u => ({
+            data: recipients.map(u => ({
+                id: u.noticeId,
                 usuarioId:    u.id,
                 tipo:         data.tipo,
                 titulo:       data.titulo,
@@ -106,11 +109,11 @@ class NotificationService {
 
         // Push a cada usuario del rol (fire-and-forget)
         setImmediate(() => {
-            Promise.all(usuarios.map(u =>
+            Promise.all(recipients.map(u =>
                 enviarPushAlUsuario(u.id, {
                     title:     data.titulo,
                     body:      data.mensaje,
-                    url:       data.manifiestoId ? `/manifiestos/${data.manifiestoId}` : '/',
+                    url:       `/notificaciones/${u.noticeId}`,
                     tag:       data.manifiestoId ?? data.tipo,
                     prioridad: prioridad as any,
                 }).catch(() => {})
@@ -254,6 +257,7 @@ class NotificationService {
                 mensaje: `La carga del manifiesto ${num} ha sido rechazada`,
                 tipo: 'MANIFIESTO_RECHAZADO'
             },
+            'CANCELADO': { titulo: 'Manifiesto cancelado', mensaje: `El manifiesto ${num} fue cancelado. Consultá el motivo y el historial.`, tipo: 'INFO_GENERAL' },
             'EN_TRATAMIENTO': {
                 titulo: 'Tratamiento Iniciado',
                 mensaje: `El manifiesto ${num} ha iniciado el proceso de tratamiento`,
@@ -271,6 +275,7 @@ class NotificationService {
         await Promise.all(destinatarios.map(usuarioId =>
             this.crearNotificacion({
                 usuarioId, ...info, manifiestoId,
+                datos: { tipo: 'estado_manifiesto', version: 1, estado: nuevoEstado },
                 prioridad: nuevoEstado === 'RECHAZADO' ? 'ALTA' : 'NORMAL'
             })
         ));

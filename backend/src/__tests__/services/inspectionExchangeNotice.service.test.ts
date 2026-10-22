@@ -48,3 +48,11 @@ describe('PSIP transactional notices without direct delivery', () => {
     await expect(createInspectionExchangeNotices(tx as any, inspection, exchange)).rejects.toThrow('notice transaction failed');
   });
 });
+
+it('preserves the committed requirement deadline in the bell metadata', async () => {
+  const tx = transaction(); const deadline = new Date('2026-10-25T15:00:00Z');
+  await createInspectionExchangeNotices(tx as any, inspection, { ...exchange, plazoRespuestaAt: deadline });
+  const row = tx.notificacion.createMany.mock.calls[0][0].data[0];
+  expect(JSON.parse(row.datos).plazoRespuestaAt).toBe(deadline.toISOString());
+  expect(row.mensaje).toContain('25/10/2026');
+});

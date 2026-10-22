@@ -1,5 +1,15 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Enlaces y comunicaciones verificados — sólo preview, 22/10/2026
+
+**Cerrado, no publicado.** Leer [contrato de enlaces, eventos, plazos y evidencia](docs/ENLACES-AVISOS-CORREOS-20261022.md). Base `443cafe9`. Acceso principal `/app/` y alternativa web al mismo registro; destino conservado tras login, adenda exacta y ficha privada de aviso. Resúmenes con acceso por aviso; plazo PSIP conservado. **Los 30 días se cuentan desde la firma**, por decisión del dueño: fases idempotentes a los 23 y 30 días, con supresión al cerrar/cancelar/rechazar y revalidación antes de una entrega futura.
+
+**1579 backend / 1854 frontend / 45 E2E únicos PASS**, 75 capturas; tipos/builds y galería 198 escenarios PASS. Lint 0 errores/66 advertencias. Manual **2026.22.6**, renderer/CSS conservados. Galería en `test-results-communication-links-20261022/gallery/index.html`; 197 muestras de correo, 167 de campana, ocho perfiles; control de emisores nuevos sin catalogar.
+
+**975 tablas QA previas intactas**, cero intentos/entregas/cola activa; CAP cerrado y correos/push apagados. Preview detenido **22/10/2026 19:40:52 Mendoza**, imagen/base/evidencias conservadas. Serial/un worker/1 CPU/2 GiB/swap cero, sin OOM. Sin producción, main, datos reales, push ni workflows. Cierre `[skip ci]`.
+
+La publicación documentada permanece en **8a4d8225**. Esta tanda, ABM/representación y la revisión previa continúan sin publicar. No usar bundles QA `/api` en producción. **Android físico y apertura automática en PWA instalada siguen pendientes**; correo externo y push no se enviaron ni certificaron.
+
 ## Revisión web/app cerrada — sólo preview, 22/10/2026
 
 **Cerrada, no publicada.** Leer [correcciones, matriz y evidencia](docs/REVISION-WEB-APP-20261022.md). Base `891cfc86`; se corrige pérdida de texto al completar envíos/cambiar de actividad, controles pequeños, encabezados, prioridad de observaciones y contraste. Manual **2026.22.5**, mismo renderer/CSS.

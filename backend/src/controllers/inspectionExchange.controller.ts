@@ -377,7 +377,7 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
           },
         },
       });
-      await createInspectionExchangeNotices(tx, inspection, { id: exchange.id, secuencia, tipo: input.tipo, parte: party, autorId: req.user.id });
+      await createInspectionExchangeNotices(tx, inspection, { id: exchange.id, secuencia, tipo: input.tipo, parte: party, autorId: req.user.id, plazoRespuestaAt: exchange.plazoRespuestaAt });
       return exchange;
     });
 

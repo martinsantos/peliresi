@@ -8,7 +8,7 @@ import { reviewAuthorityAccountFilter } from '../domain/manifestReviewAuthority'
 function currents(value: unknown): string[] {
   return Array.isArray(value) ? value.flatMap(row => row && typeof row === 'object' && typeof row.corriente === 'string' ? [row.corriente] : []) : [];
 }
-/** Internal authority notice only; no email/push dispatcher and no permit mutation. */
+/** Durable authority notice. Mail is opt-in after commit; no delivery or permit mutation here. */
 export async function noticeNewCurrents(tx: Prisma.TransactionClient, original: unknown, observed: unknown, url: string, reviewId: string, reviewerId?: string, adenda?: { id: string; version: number; manifiestoId: string; numero: string }) {
   if (!manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED')) return;
   const added = [...new Set(currents(observed).filter(y => !currents(original).includes(y)))];
@@ -28,6 +28,6 @@ export async function noticeNewCurrents(tx: Prisma.TransactionClient, original: 
     usuarioId: user.id, tipo: 'INFO_GENERAL', titulo: 'Nueva corriente aprobada post facto',
     mensaje: (adenda ? `${adenda.numero} · adenda v${adenda.version}. ` : '') + added.join(', ') + '. Aprobación individual registrada; no modifica habilitaciones ni acredita unanimidad.',
     ...(adenda ? { manifiestoId: adenda.manifiestoId } : {}),
-    prioridad: 'ALTA', datos: JSON.stringify({ tipo: 'ADENDA_POST_FACTO', url, reviewId, reviewerId, corrientes: added, ...(adenda ? { adendaId: adenda.id, versionAdenda: adenda.version, manifiestoId: adenda.manifiestoId } : {}) }),
+    prioridad: 'ALTA', datos: JSON.stringify({ tipo: 'ADENDA_POST_FACTO', ...(adenda ? { correoVersion: 1 } : {}), url, reviewId, reviewerId, corrientes: added, ...(adenda ? { adendaId: adenda.id, versionAdenda: adenda.version, manifiestoId: adenda.manifiestoId } : {}) }),
   })) });
 }

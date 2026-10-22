@@ -17,6 +17,17 @@
 
     guides: [
       {
+        id: 'avisos-enlaces-plazos', profile: 'generador', audiences: ['transportista', 'operador', 'administrador', 'inspector'],
+        title: 'Abrir un correo o aviso y continuar el trámite', summary: 'Mismo destino en app y web, con el contexto del aviso.',
+        duration: '3 min', icon: 'notifications_active', keywords: ['correo', 'enlace', 'campana', '30 días', 'firma', 'adenda', 'ticket', 'plazo'],
+        safety: 'Candidato en preview. CAP cerrado; correos y push permanecen apagados. Las muestras no envían mensajes. Apertura automática de la app pendiente de prueba en dispositivo físico.',
+        steps: [
+          { title: 'Elegir app o web', body: ['El botón principal del correo apunta a la app. Si el equipo tiene instalada y asociada la app, puede abrirla; de lo contrario continúa en el navegador. Abrir en la web lleva al mismo registro desde la versión web. El sistema operativo y el programa de correo deciden si abren una app instalada.', 'Ingresá con la cuenta destinataria. Después del login se conserva el manifiesto, solicitud, adenda o certificado solicitado. El correo no concede permisos ni cambia de cuenta.'], expected: 'No volvés a buscar desde el inicio. Con otra cuenta, el contenido privado no se muestra.' },
+          { title: 'Abrir el evento preciso', body: ['La campana conserva las propuestas y aprobaciones, adendas creadas/observadas/aprobadas/rechazadas, emisiones de certificados, cambios de transporte, tickets y actuaciones de inspección. Abrí el aviso para consultar su resultado actual.', 'Un correo de adenda abre esa adenda, aunque existan varias páginas. Ver todas las adendas vuelve al historial completo. Una inscripción conserva su actividad. Un aviso general abre su ficha individual aunque sea antiguo; desde allí podés continuar al trámite.', 'La apertura de un enlace individual no aprueba, responde ni marca automáticamente el trabajo como completado. Si el aviso fue eliminado, el mensaje lo informa sin mostrar datos de otra cuenta.'], expected: 'Distinguís el hecho comunicado del estado actual y de la acción que todavía debés realizar.' },
+          { title: 'Leer los plazos y el seguimiento', body: ['Un requerimiento PSIP informa su plazo para responder en hora de Mendoza cuando fue registrado. El expediente conserva las respuestas y las decisiones posteriores; un correo antiguo no reemplaza ese estado actualizado.', 'El recordatorio del manifiesto cuenta desde la fecha de firma: comienza al cumplir 23 días y registra otro aviso al alcanzar 30, para las partes activas vinculadas. Cada fase se avisa una sola vez; no se repite con cada evaluación. Si se cerró, canceló o rechazó, deja de generar recordatorios.', 'Es seguimiento operativo, no una declaración automática de infracción ni un cambio de plazo reglamentario. Leer el aviso no cierra el manifiesto. Los resúmenes conservan un enlace por aviso.'], expected: 'Sabés desde qué fecha se cuenta, dónde consultar el estado y quién debe continuar el trámite.' }
+        ]
+      },
+      {
         id: 'acceso-controles-pantalla', profile: 'generador', audiences: ['administrador', 'transportista', 'operador', 'inspector', 'auditor'],
         title: 'Entrar y moverse en una pantalla pequeña', summary: 'Acceso, menú y avisos sin perder el lugar.',
         duration: '2 min', icon: 'touch_app', keywords: ['acceso', 'contraseña', 'menú', 'campana', 'pantalla', 'teléfono'],

@@ -1,7 +1,7 @@
 /** Account/security outbox. Called inside the account transaction, never SMTP. */
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
-import { escapeMail, mailLink, mailShell } from './email-templates';
+import { mailAction, mailShell } from './email-templates';
 import { mailPolicy } from './email-policy';
 
 export type AccountMailEvent = 'created' | 'enabled' | 'disabled' | 'deleted' | 'roleChanged' | 'emailChanged' | 'passwordChanged';
@@ -18,7 +18,8 @@ const labels: Record<AccountMailEvent, [string, string]> = {
 export function renderAccountMail(event: AccountMailEvent): { subject: string; html: string } {
   const [title, body] = labels[event];
   const action = ['created', 'enabled', 'roleChanged', 'passwordChanged'].includes(event)
-    ? `<p><a href="${escapeMail(mailLink('/login'))}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#fff;border-radius:8px;text-decoration:none">Ingresar a SITREP</a></p>` : '';
+    ? mailAction('/login', 'Ingresar a SITREP')
+    : mailAction('/recuperar', 'Consultar acceso a mi cuenta');
   return { subject: '[SITREP] ' + title, html: mailShell(`<h1 style="font-size:22px;color:#1B5E3C">${title}</h1><p>${body}</p><p>Si no reconocés este cambio, contactá a la administración de SITREP por tu canal habitual.</p>${action}`) };
 }
 export async function recordAccountMail(tx: Prisma.TransactionClient, recipient: Recipient, event: AccountMailEvent): Promise<void> {

@@ -91,6 +91,18 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
     }
 };
 
+// Stable, read-only permalink: even administrators may only read their own notice.
+export const getNotificacion = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const user = (req as AuthRequest).user!;
+        const notice = await prisma.notificacion.findFirst({ where: { id: req.params.id, usuarioId: user.id },
+            include: { manifiesto: { select: { numero: true, estado: true } } } });
+        if (!notice) throw new AppError('Aviso no disponible para esta cuenta', 404);
+        res.setHeader('Cache-Control', 'private, no-store');
+        res.json({ success: true, data: notice });
+    } catch (error) { next(error); }
+};
+
 // Marcar notificacion como leida
 export const marcarLeida = async (req: Request, res: Response, next: NextFunction) => {
     try {

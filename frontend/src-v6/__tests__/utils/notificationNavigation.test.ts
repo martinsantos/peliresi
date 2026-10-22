@@ -144,3 +144,10 @@ it('refreshes adendas when a notice arrives and describes the web/app destinatio
   }
   client.clear();
 });
+
+it.each(['//other.invalid', '/\\other.invalid', '/x/%2f../other', '/\nother'])('rejects unsafe legacy notice link %s', url => {
+  expect(resolveNotificationPath({ ...base, datos: JSON.stringify({url}) })).toBe('/notificaciones');
+});
+it('selects the exact addendum even when the legacy URL omits it',()=>{
+  expect(resolveNotificationPath({...base,manifiestoId:'m',datos:'{"tipo":"adenda_manifiesto","adendaId":"a","url":"/manifiestos/m/adendas"}'},'/app')).toBe('/app/manifiestos/m/adendas?adenda=a');
+});

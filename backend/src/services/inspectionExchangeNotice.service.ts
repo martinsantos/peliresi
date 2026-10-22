@@ -2,7 +2,7 @@ import { ParteIntercambioInspeccion, Prisma, Rol, TipoIntercambioInspeccion } fr
 import type { InspectionExchangeAccessTarget } from './inspectionExchange.service';
 
 type NoticeInspection = InspectionExchangeAccessTarget & { id: string; numero: string };
-type NoticeExchange = { id: string; secuencia: number; tipo: TipoIntercambioInspeccion; parte: ParteIntercambioInspeccion; autorId: string };
+type NoticeExchange = { id: string; secuencia: number; tipo: TipoIntercambioInspeccion; parte: ParteIntercambioInspeccion; autorId: string; plazoRespuestaAt?: Date | null };
 
 export const INSPECTION_EXCHANGE_LABELS: Record<TipoIntercambioInspeccion, [string, string]> = {
   REQUERIMIENTO: ['Nuevo requerimiento', 'Revisá el pedido y su plazo para responder desde el expediente.'],
@@ -49,7 +49,7 @@ export async function createInspectionExchangeNotices(
   await tx.notificacion.createMany({ data: ids.map(usuarioId => ({
     usuarioId, tipo: 'INFO_GENERAL', prioridad: 'NORMAL',
     titulo: `PSIP · ${title}`,
-    mensaje: `${inspection.numero} · Actuación #${exchange.secuencia}. ${action}`,
+    mensaje: `${inspection.numero} · Actuación #${exchange.secuencia}. ${action}${exchange.plazoRespuestaAt ? ' Plazo para responder: ' + exchange.plazoRespuestaAt.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) + '.' : ''}`,
     datos: JSON.stringify({
       tipo: 'intercambio_inspeccion', version: 1,
       inspeccionId: inspection.id, numero: inspection.numero,
@@ -58,6 +58,7 @@ export async function createInspectionExchangeNotices(
       // New notices explicitly support the opt-in relay. Historic soloCampana
       // rows remain excluded; provider/family/cutoff/recipient gates still apply.
       correoVersion: 1,
+      ...(exchange.plazoRespuestaAt ? { plazoRespuestaAt: exchange.plazoRespuestaAt.toISOString() } : {}),
     }),
   })) });
 }

@@ -5,6 +5,7 @@ import { AppError } from '../middlewares/errorHandler';
 import { getVapidPublicKey, subscribe, unsubscribe } from '../controllers/push.controller';
 import {
     getNotificaciones,
+    getNotificacion,
     marcarLeida,
     marcarTodasLeidas,
     eliminarNotificacion,
@@ -78,6 +79,7 @@ router.use(requireFullAccess);
  *                   createdAt: { type: string, format: date-time }
  */
 router.get('/notificaciones', getNotificaciones);
+router.get('/notificaciones/:id', getNotificacion);
 
 /**
  * @openapi

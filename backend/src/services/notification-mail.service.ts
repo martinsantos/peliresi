@@ -1,3 +1,5 @@
+import { ADDENDUM_AUTHORITY_ROLES } from '../domain/addendumAuthority';
+import { designatedReviewAccount } from '../domain/manifestReviewAuthority';
 import { COMPANY_NOTICE_LABELS, validCompanyNotice, companyNoticeEligible } from './companyNotice.service';
 /** Relay committed in-app notices, never send from inside a business transaction.
  * Separate opt-in per family; SMTP still requires its own explicit activation.
@@ -60,10 +62,16 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
   }
   if (notice.manifiestoId) {
     const manifest = await prisma.manifiesto.findUnique({ where: { id: notice.manifiestoId }, select: {
-      isDemoData: true, generador: { select: { usuarioId: true } },
+      isDemoData: true, estado: true, fechaFirma: true, generador: { select: { usuarioId: true } },
       transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
     } });
     if (!manifest || manifest.isDemoData) return false;
+    if (data.tipo === 'recordatorio_firma') {
+      const days = manifest.fechaFirma ? (Date.now() - manifest.fechaFirma.getTime()) / 86400000 : -1;
+      const currentPhase = days >= 30 ? 'TREINTA_DIAS' : days >= 23 ? 'SEMANA' : null;
+      if (data.version !== 1 || !currentPhase || data.fase !== currentPhase || manifest.fechaFirma?.toISOString() !== data.fechaFirma
+        || !['APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'].includes(manifest.estado)) return false;
+    }
     const owner = notice.rol === 'GENERADOR' ? manifest.generador : notice.rol === 'TRANSPORTISTA' ? manifest.transportista : notice.rol === 'OPERADOR' ? manifest.operador : null;
     if (!isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) {
       // A registered replacement can see its own leg history in the carrier
@@ -76,6 +84,11 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
       }, select: { id: true } });
       if (!ownLeg) return false;
     }
+  }
+  if (data.tipo === 'ADENDA_POST_FACTO') {
+    if (data.correoVersion !== 1 || !notice.usuarioId || !notice.manifiestoId || typeof data.adendaId !== 'string'
+      || !ADDENDUM_AUTHORITY_ROLES.includes(notice.rol as any) || !designatedReviewAccount(notice.usuarioId)) return false;
+    return Boolean(await prisma.adendaManifiesto.findFirst({ where: { id: data.adendaId, manifiestoId: notice.manifiestoId }, select: { id: true } }));
   }
   if (family === 'manifiestos' && data.tipo === 'certificado_manifiesto') {
     if(data.version!==1 || !notice.manifiestoId || typeof data.documentoId!=='string' || !['PARCIAL','FINAL'].includes(data.tipoCertificado)) return false;
@@ -213,32 +226,36 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   if (data.tipo === 'antecedente_fiscalizacion' && !validIntakeMail(data)) return null;
   if (data.tipo === 'manifiesto_eventual' && !validEventualMail(data)) return null;
   if (data.tipo === 'representacion_empresa' && !validCompanyNotice(data)) return null;
+  if (data.tipo === 'ADENDA_POST_FACTO' && (data.correoVersion !== 1 || typeof data.adendaId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.adendaId))) return null;
   let family: string, path: string, title: string;
   if (notice.tipo === 'INFO_GENERAL' && validCompanyNotice(data)) {
-    family = 'representacion'; title = 'Novedad en tu representación'; path = String(data.evento).includes('REVOCAD') ? '/notificaciones' : '/empresas?empresa=' + encodeURIComponent(String(data.empresaId));
+    family = 'representacion'; title = 'Novedad en tu representación'; path = String(data.evento).includes('REVOCAD') ? '/notificaciones/' + encodeURIComponent(notice.id) : '/empresas?empresa=' + encodeURIComponent(String(data.empresaId));
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     family = 'certificados'; title = 'Certificado ambiental disponible';
     path = '/mi-perfil';
   } else if (['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(notice.tipo) && typeof data.renovacionId === 'string' && data.renovacionId) {
     family = 'padron'; title = 'Novedad en una solicitud de padrón';
-    path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones' : '/notificaciones';
+    path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones' : '/notificaciones/' + encodeURIComponent(notice.id);
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && validEventualMail(data)) {
     family = 'manifiestos'; title = 'Novedad en un eventual'; path = '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(String(data.registroId));
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && data.tipo === 'certificado_manifiesto' && data.version === 1 && typeof data.documentoId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.documentoId) && ['PARCIAL','FINAL'].includes(String(data.tipoCertificado))) {
     family='manifiestos'; title='Certificación disponible'; path='/manifiestos/'+encodeURIComponent(notice.manifiestoId)+'?certificado='+encodeURIComponent(data.documentoId)+'#certificaciones';
   } else if (MANIFEST_TYPES.includes(notice.tipo) && notice.manifiestoId) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto'; path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
-  } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto')) {
+  } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && (data.tipo === 'propuesta_partes' || data.tipo === 'adenda_manifiesto' || data.tipo === 'ADENDA_POST_FACTO' || data.tipo === 'estado_manifiesto')) {
     family = 'manifiestos'; title = 'Novedad en un manifiesto';
-    path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId) + (data.tipo === 'adenda_manifiesto' ? '/adendas' : '');
+    path = '/manifiestos/' + encodeURIComponent(notice.manifiestoId) + (['adenda_manifiesto', 'ADENDA_POST_FACTO'].includes(String(data.tipo)) ? '/adendas' + (typeof data.adendaId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.adendaId) ? '?adenda=' + data.adendaId : '') : '');
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && data.tipo === 'relevo_transporte' && typeof data.tramoId === 'string') {
     family = 'manifiestos'; title = 'Cambio de transporte en tránsito';
     path = notice.rol === 'TRANSPORTISTA' ? '/transporte/perfil' : '/manifiestos/' + encodeURIComponent(notice.manifiestoId);
+  } else if (notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' && typeof data.solicitudId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) {
+    family = 'alertas'; title = 'Comprobante repetido';
+    path = notice.rol.startsWith('ADMIN') ? '/admin/solicitudes/' + data.solicitudId : '/mi-solicitud?solicitud=' + data.solicitudId;
   } else if (ALERT_TYPES.includes(notice.tipo) || (notice.tipo === 'INFO_GENERAL' && (data.familia === 'catalogo_verificable' || (data.tipo === 'seguimiento_cierre' && notice.manifiestoId)) && typeof data.casoId === 'string')) {
-    family = 'alertas'; title = 'Aviso de seguimiento'; path = '/notificaciones';
+    family = 'alertas'; title = 'Aviso de seguimiento'; path = notice.manifiestoId ? '/manifiestos/' + encodeURIComponent(notice.manifiestoId) : '/notificaciones/' + encodeURIComponent(notice.id);
   } else if (notice.tipo.startsWith('SOLICITUD_') && typeof data.solicitudId === 'string' && data.solicitudId) {
     family = 'solicitudes'; title = 'Novedad en una solicitud';
-    path = notice.rol.startsWith('ADMIN') ? '/admin/solicitudes/' + encodeURIComponent(data.solicitudId) : '/mi-solicitud';
+    path = notice.rol.startsWith('ADMIN') ? '/admin/solicitudes/' + encodeURIComponent(data.solicitudId) : '/mi-solicitud?solicitud=' + encodeURIComponent(data.solicitudId);
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'soporte' && typeof data.ticketId === 'string' && data.ticketId) {
     family = 'soporte'; title = 'Novedad en Soporte'; path = '/soporte/' + encodeURIComponent(data.ticketId);
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data)) {
@@ -308,12 +325,16 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
   const message = validCompanyNotice(data) ? COMPANY_NOTICE_LABELS[String(data.evento)]
     : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
+    : data.tipo === 'recordatorio_firma' && data.version === 1 ? [data.fase === 'SEMANA' ? 'Se acercan los 30 días desde la firma' : '30 días desde la firma del manifiesto', 'Revisá el estado actual y coordiná las acciones pendientes con las partes. El aviso conserva la fecha de firma; no determina una infracción.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
     : data.tipo === 'manifiesto_eventual' && validEventualMail(data) ? EVENTUAL_NOTICE_LABELS[String(data.evento) as keyof typeof EVENTUAL_NOTICE_LABELS]
     : data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) ? INSPECTION_EXCHANGE_LABELS[String(data.evento) as keyof typeof INSPECTION_EXCHANGE_LABELS]
     : data.tipo === 'agenda_inspeccion' && validAgendaMail(data) ? INSPECTION_AGENDA_LABELS[String(data.evento) as keyof typeof INSPECTION_AGENDA_LABELS]
     : data.tipo === 'propuesta_partes' && Object.prototype.hasOwnProperty.call(proposalEvents, proposalPhase) ? proposalEvents[proposalPhase]
     : data.tipo === 'propuesta_partes' && proposalPhase.startsWith('aprobacion-') ? ['Una parte aprobó el manifiesto', 'Revisá qué aprobaciones faltan para iniciar la coordinación.']
+    : data.tipo === 'ADENDA_POST_FACTO' ? ['Nueva corriente en adenda para la autoridad', 'Se registró una aprobación individual sobre una corriente nueva. Revisá el informe y su seguimiento; no modifica habilitaciones ni acredita unanimidad.']
+    : data.tipo === 'estado_manifiesto' && data.estado === 'EN_TRATAMIENTO' ? ['Tratamiento iniciado', 'El operador inició el tratamiento. Consultá el manifiesto y las acciones disponibles.']
+    : data.tipo === 'estado_manifiesto' && data.estado === 'CANCELADO' ? ['Manifiesto cancelado', 'Consultá el motivo y el historial del manifiesto.']
     : data.tipo === 'adenda_manifiesto' && Object.prototype.hasOwnProperty.call(addendumEvents, event) ? addendumEvents[event]
     : data.tipo === 'certificado_manifiesto' ? [data.tipoCertificado === 'FINAL' ? 'Certificación final total disponible' : 'Certificación parcial disponible', 'El operador emitió el documento firmado. Ingresá al manifiesto para consultarlo y descargarlo.']
     : data.tipo === 'relevo_transporte' ? ['Cambio de transporte en tránsito', 'La transportista de origen registró un relevo. Revisá el tramo y su seguimiento en SITREP.']
@@ -321,7 +342,12 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     : family === 'inspecciones' && event === 'ASIGNADA' ? ['Tenés una inspección asignada', 'Revisá la ubicación, la agenda y los controles antes de iniciar la visita.']
     : labels[notice.tipo] || fallback;
   title = message[0];
-  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">${escapeMail(title)}</h1><p>${escapeMail(message[1])}</p>${mailAction(path, fallback[2])}<p style="font-size:13px;color:#526359;margin-top:20px">Ingresá con tu cuenta para ver los detalles.</p>`) };
+  const deadline = data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) && typeof data.plazoRespuestaAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(data.plazoRespuestaAt) && Number.isFinite(Date.parse(data.plazoRespuestaAt))
+    ? '<p><strong>Plazo para responder:</strong> ' + escapeMail(new Date(data.plazoRespuestaAt).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' })) + ' (hora de Mendoza). Consultá el expediente por respuestas o cambios posteriores.</p>' : '';
+  const reference = data.tipo === 'recordatorio_firma' && data.version === 1 && typeof data.fechaFirma === 'string' && Number.isFinite(Date.parse(data.fechaFirma))
+    ? '<p><strong>Firma:</strong> ' + escapeMail(new Date(data.fechaFirma).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }))
+      + '<br><strong>30 días desde la firma:</strong> ' + escapeMail(new Date(Date.parse(data.fechaFirma) + 30 * 86400000).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' })) + '.</p>' : '';
+  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">${escapeMail(title)}</h1><p>${escapeMail(message[1])}</p>${deadline}${reference}${mailAction(path, fallback[2])}<p style="font-size:13px;color:#526359;margin-top:20px">Ingresá con tu cuenta para ver los detalles.</p>`) };
 }
 
 export async function queueCommittedNotificationEmails(): Promise<number> {
@@ -336,7 +362,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%' OR n.datos LIKE '%"estado_manifiesto"%' OR n.datos LIKE '%"ADENDA_POST_FACTO"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;

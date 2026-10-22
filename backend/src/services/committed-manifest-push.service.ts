@@ -17,7 +17,7 @@ export function manifestPushContent(notice: Pick<NoticeForMail, 'tipo' | 'datos'
   };
   const addenda: Record<string, string> = { CREADA: 'Nueva adenda para revisar', APROBADA: 'Adenda aprobada', OBSERVADA: 'Adenda observada', RECHAZADA: 'Adenda rechazada' };
   if (data.tipo === 'adenda_manifiesto' && typeof data.evento === 'string' && Object.prototype.hasOwnProperty.call(addenda, data.evento)) return {
-    title: addenda[data.evento], body: 'Revisá el anexo y las acciones pendientes de tu perfil.', url: url + '/adendas', prioridad: 'ALTA',
+    title: addenda[data.evento], body: 'Revisá el anexo y las acciones pendientes de tu perfil.', url: url + '/adendas' + (typeof data.adendaId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.adendaId) ? '?adenda=' + data.adendaId : ''), prioridad: 'ALTA',
   };
   const proposals: Record<string, string> = { creada: 'Manifiesto pendiente de aprobación', aprobada: 'Tres aprobaciones: listo para iniciar', iniciada: 'Coordinación iniciada', rechazada: 'Propuesta rechazada' };
   if (data.tipo === 'propuesta_partes' && typeof data.fase === 'string') {
