@@ -1,5 +1,5 @@
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -10,7 +10,7 @@ import { Card } from '../../components/ui/CardV2';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import SeguimientoExterno from './SeguimientoExterno';
-import { Factory, Truck, FlaskConical, Shield, ClipboardList, ClipboardCheck } from 'lucide-react';
+import { Factory, Truck, FlaskConical, Shield, ClipboardList, ClipboardCheck, ChevronRight, RefreshCw } from 'lucide-react';
 
 type Waste = { corriente: string; cantidad: number; unidad: string };
 type Participant = { nombre: string; identificacion: string; domicilio: string; nombreFantasia?: string; telefono?: string; padronId?: string };
@@ -86,37 +86,47 @@ export default function BajaIntensidadPage() {
   const [params, setParams] = useSearchParams();
   const id = params.get('registro');
   const tracking = !id && params.get('vista') === 'seguimiento';
+  const search = params.get('buscar') || '', stage = params.get('etapa') || '';
+  function changeParams(changes: Record<string, string | null>) {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) { if (value) next.set(key, value); else next.delete(key); }
+    setParams(next, { replace: !('registro' in changes) && !('vista' in changes) });
+  }
   const listPage = Math.max(1, Math.floor(Number(params.get('pagina')) || 1));
   const enabled = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_EXCEPTIONAL_ENABLED, currentUser);
   const qc = useQueryClient();
-  const queryKey = id ? ['baja-intensidad', currentUser?.id, id] : ['baja-intensidad', currentUser?.id, null, listPage];
+  const queryKey = id ? ['baja-intensidad', currentUser?.id, id] : ['baja-intensidad', currentUser?.id, null, listPage, search, stage];
   const query = useQuery({ queryKey, enabled: enabled && !!currentUser && !tracking,
-    queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint + '?page=' + listPage)).data.data as { registro?: Entry; registros?: Entry[]; total?: number },
-    retry: false });
+    queryFn: async () => (await api.get(id ? endpoint + '/' + id : endpoint, id ? undefined : { params: { page: listPage, search, etapa: stage } })).data.data as { registro?: Entry; registros?: Entry[]; total?: number; page?: number; pageSize?: number },
+    retry: false, staleTime: 0, refetchInterval: 5000, refetchIntervalInBackground: false });
   const [creating, setCreating] = useState(false);
   const [declared, setDeclared] = useState<Record<Slot, Participant>>(() => ({ generador: emptyActor(), transportista: emptyActor(), operador: emptyActor() }));
   const [patente, setPatente] = useState('');
   const [motivo, setMotivo] = useState('');
   const [wastes, setWastes] = useState<Waste[]>([{ corriente: '', cantidad: 0, unidad: 'kg' }]);
   const [nota, setNota] = useState('');
+  const [draftVersion, setDraftVersion] = useState<number | undefined>();
   const [difference, setDifference] = useState(false);
   const [error, setError] = useState('');
+  const [recovered, setRecovered] = useState('');
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
+  useEffect(() => { setNota(''); setDraftVersion(undefined); setDifference(false); setError(''); setRecovered(''); }, [id]);
   // Retained on failed requests. Repeating the same command cannot duplicate facts.
   const request = useRef<{ signature: string; id: string } | undefined>(undefined);
   const creationId = useRef(crypto.randomUUID());
   async function send(path: string, body: Record<string, unknown>, created = false) {
     if (lock.current) return;
-    lock.current = true; setBusy(true); setError('');
+    lock.current = true; setBusy(true); setError(''); setRecovered('');
     const signature = JSON.stringify({ path, body });
     if (request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
     try {
       const result: Entry = (await api.post(path, { ...body, id: created ? creationId.current : request.current.id })).data.data.registro;
+      await qc.cancelQueries({ queryKey: ['baja-intensidad', currentUser?.id] });
       // Lists must not retain the shared 60-second cache after an operation or resolution.
       void qc.invalidateQueries({ queryKey: ['baja-intensidad', currentUser?.id], refetchType: 'none' });
       qc.setQueryData(['baja-intensidad', currentUser?.id, result.id], { registro: result });
-      setParams({ registro: result.id }); setCreating(false); setDifference(false); setNota('');
+      changeParams({ registro: result.id }); setCreating(false); setDifference(false); setNota(''); setDraftVersion(undefined);
       if (created) creationId.current = crypto.randomUUID();
       request.current = undefined;
     } catch (caught) {
@@ -125,10 +135,29 @@ export default function BajaIntensidadPage() {
     } finally { lock.current = false; setBusy(false); }
   }
   const entry = query.data?.registro;
+  useEffect(() => {
+    const sent = request.current;
+    if (busy || !sent || !entry?.eventos.some(item => item.id === sent.id)) return;
+    // A lost HTTP response is not a failed transaction. Match the exact command ID
+    // before acknowledging it; preserve any edits made after the failed response.
+    const command = JSON.parse(sent.signature).body as { nota?: string; tipo?: string; residuos?: Waste[] };
+    const changedNote = nota !== (command.nota || '');
+    const changedLoad = command.tipo === 'DIFERENCIA' && JSON.stringify(wastes) !== JSON.stringify(command.residuos);
+    if (!changedNote) setNota('');
+    if (command.tipo === 'DIFERENCIA' && !changedLoad) setDifference(false);
+    if (!changedNote && !changedLoad) setDraftVersion(undefined); request.current = undefined; setError('');
+    setRecovered('La acción ya estaba guardada. Recuperamos la confirmación sin duplicarla.');
+  }, [entry, busy, nota, wastes]);
+  const staleDraft = draftVersion !== undefined && !!entry && draftVersion !== entry.version;
+  const beginEdit = () => setDraftVersion(previous => previous ?? entry?.version);
+  const actualPage = query.data?.page ?? listPage;
   const formSlots = (['generador', 'transportista', 'operador'] as Slot[]).filter(slot => slot !== ownSlot[currentUser?.rol || '']);
   const approval = entry?.aprobacion && entry.aprobacion.estado !== 'NO_REQUIERE' ? entry.aprobacion : undefined;
   const factsBlocked = approval?.estado === 'PENDIENTE' || approval?.estado === 'RECHAZADO';
-  const event = (body: Record<string, unknown>) => entry && send(endpoint + '/' + entry.id + '/eventos', { ...body, version: entry.version });
+  const event = (body: Record<string, unknown>) => {
+    if (!entry || staleDraft) return;
+    return send(endpoint + '/' + entry.id + '/eventos', { ...body, version: draftVersion ?? entry.version });
+  };
   const wasteInputs = <div className="space-y-3">{wastes.map((waste, index) => <fieldset key={index} className="space-y-2">
     <legend className="text-sm font-semibold mb-2">Residuo {index + 1}</legend>
     <WasteFields value={waste} onChange={value => setWastes(rows => rows.map((row, i) => i === index ? value : row))} />
@@ -142,11 +171,12 @@ export default function BajaIntensidadPage() {
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-xl font-bold text-neutral-900">Manifiestos eventuales</h1>
       {!id && !tracking && creators.includes(currentUser?.rol || '') && <Button onClick={() => setCreating(v => !v)} variant="outline">{creating ? 'Volver a registros' : 'Registrar operación'}</Button>}
-      {id && <Button variant="outline" onClick={() => setParams({})}>Ver registros</Button>}
+      {id && <Button variant="outline" onClick={() => changeParams({ registro: null })}>Ver registros</Button>}
     </div>
-    {!id && !creating && creators.includes(currentUser?.rol || '') && <Button variant="outline" onClick={() => setParams(tracking ? {} : { vista: 'seguimiento' })}>{tracking ? 'Volver a registros' : 'Seguimiento de participantes'}</Button>}
+    {!id && !creating && creators.includes(currentUser?.rol || '') && <Button variant="outline" onClick={() => changeParams({ vista: tracking ? null : 'seguimiento' })}>{tracking ? 'Volver a registros' : 'Seguimiento de participantes'}</Button>}
     {tracking && <SeguimientoExterno />}
     <p className="text-sm text-neutral-600">Referencia interna · Sin número oficial. Registrar no implica aprobación ni habilitación.</p>
+    {recovered && <p role="status" className="rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm text-primary-900">{recovered}</p>}
     {error && <div role="alert" className="p-3 bg-error-50 text-error-800 rounded-lg">{error} <Button variant="outline" size="sm" onClick={() => void query.refetch()}>Recargar registro</Button></div>}
     {!tracking && query.isError && <div role="alert">No se pudo cargar el registro. <Button onClick={() => void query.refetch()}>Reintentar</Button></div>}
     {!tracking && query.isLoading && <p role="status">Cargando registros…</p>}
@@ -158,18 +188,42 @@ export default function BajaIntensidadPage() {
       <Input label="Motivo del registro excepcional" required maxLength={500} value={motivo} onChange={e => setMotivo(e.target.value)} />
       <Button type="submit" disabled={busy}>Guardar operación</Button>
     </form></Card>}
-    {!id && !creating && !tracking && <div className="space-y-3">
-      <p className="text-sm text-neutral-600">{query.data?.total ?? '—'} registros · Página {listPage}</p>
-      {query.data?.registros?.map(row => <Card key={row.id}><button className="text-left w-full min-h-11 space-y-1" onClick={() => setParams({ registro: row.id })}>
-        <span className="block font-semibold">{row.datos.generador.nombre || 'Generador por identificar'}</span><span className="block text-sm">{stageLabels[row.etapa]} · {row.revisiones.filter(r => r.estado !== 'APROBADA').length} revisiones pendientes</span>
-        <span className="block text-xs text-neutral-600 break-all">{row.referencia}</span>
-      </button></Card>)}
-      <div className="flex flex-wrap gap-3">
-        <Button variant="outline" disabled={listPage <= 1 || query.isFetching} onClick={() => setParams({ pagina: String(listPage - 1) })}>Anterior</Button>
-        <Button variant="outline" disabled={listPage * 20 >= (query.data?.total ?? 0) || query.isFetching} onClick={() => setParams({ pagina: String(listPage + 1) })}>Siguiente</Button>
+    {!id && !creating && !tracking && <Card padding="none" className="overflow-hidden">
+      <div className="space-y-3 p-4 border-b border-neutral-200">
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Input label="Buscar eventual" type="search" maxLength={100} placeholder="Referencia, participante, CUIT o patente" value={search} onChange={e => changeParams({ buscar: e.target.value, pagina: null })} />
+          <label className="text-sm font-medium">Etapa del eventual<select className="mt-1 block h-11 w-full rounded-lg border border-neutral-300 bg-white px-3 text-base" value={stage} onChange={e => changeParams({ etapa: e.target.value, pagina: null })}>
+            <option value="">Todas las etapas</option>{Object.entries(stageLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select></label>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><span role="status" className="text-sm text-neutral-600">{query.data?.total ?? '—'} registros · Página {actualPage}</span>
+          <Button variant="ghost" size="sm" leftIcon={<RefreshCw size={16} aria-hidden="true" />} disabled={query.isFetching} onClick={() => void query.refetch()}>Actualizar</Button></div>
       </div>
-    </div>}
+      <ul className="divide-y divide-neutral-200">{query.data?.registros?.map(row => {
+        const pending = row.revisiones.filter(r => r.estado !== 'APROBADA').length;
+        const task = row.aprobacion?.estado === 'RECHAZADO' ? 'Operación detenida' : row.puedeAprobar?.length ? 'Te toca aprobar'
+          : row.aprobacion?.estado === 'PENDIENTE' ? 'En espera de las partes'
+          : row.etapa === 'REGISTRADO' ? 'Listo para registrar el retiro' : stageLabels[row.etapa];
+        return <li key={row.id} className="agenda-row-enter"><button aria-label={'Abrir eventual ' + row.referencia} className="flex items-center gap-3 text-left w-full min-h-11 px-4 py-3 hover:bg-primary-50" onClick={() => changeParams({ registro: row.id })}>
+          <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold" title={row.datos.generador.nombre}>{row.datos.generador.nombre || 'Generador por identificar'}</span>
+            <span className={`block text-sm ${row.puedeAprobar?.length ? 'font-semibold text-primary-800' : 'text-neutral-700'}`}>{task}</span>
+            <span className="block text-xs text-neutral-600">{pending} {pending === 1 ? 'revisión posterior pendiente' : 'revisiones posteriores pendientes'}</span>
+            <span className="block truncate text-xs text-neutral-600" title={row.referencia}>{row.referencia}</span></span>
+          {row.aprobacion && row.aprobacion.estado !== 'NO_REQUIERE' && <span role="group" aria-label="Aprobaciones del eventual" className="flex shrink-0 gap-1">{row.aprobacion.partes.map(part => {
+            const { title, Icon } = approvalRoles[part.rol] || { title: partLabels[part.parte], Icon: Shield };
+            const text = title + ' · ' + (decisionLabels[part.estado] || part.estado);
+            return <span key={part.parte} aria-label={text} title={text} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border ${part.estado === 'APROBADA' ? 'bg-primary-50 border-primary-200 text-primary-800' : part.estado === 'RECHAZADA' ? 'bg-error-50 border-error-200 text-error-800' : 'bg-neutral-100 border-neutral-200 text-neutral-500'}`}><Icon size={18} aria-hidden="true" /></span>;
+          })}</span>}<ChevronRight size={16} aria-hidden="true" className="shrink-0 text-primary-700" />
+        </button></li>;
+      })}</ul>
+      {!query.isError && !query.isLoading && query.data?.total === 0 && <p className="p-4 text-sm text-neutral-600">No hay eventuales para estos filtros.</p>}
+      <div className="flex flex-wrap justify-between gap-3 border-t border-neutral-200 p-3">
+        <Button variant="outline" disabled={actualPage <= 1 || query.isFetching} onClick={() => changeParams({ pagina: String(actualPage - 1) })}>Anterior</Button>
+        <Button variant="outline" disabled={actualPage * 20 >= (query.data?.total ?? 0) || query.isFetching} onClick={() => changeParams({ pagina: String(actualPage + 1) })}>Siguiente</Button>
+      </div>
+    </Card>}
     {entry && <div className="space-y-4">
+      {staleDraft && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">El registro cambió mientras escribías. Revisá las novedades; conservamos tu nota y la carga observada. <Button variant="outline" disabled={busy} onClick={() => { setDraftVersion(entry.version); request.current = undefined; setError(''); }}>Usar versión actual</Button></div>}
       <Card><p className="text-xs break-all text-neutral-600">{entry.referencia}</p><h2 className="font-bold text-lg mt-2">{entry.datos.generador.nombre || 'Generador por identificar'}</h2>
         <p>{entry.datos.transportista.nombre || 'Transportista por identificar'} · {entry.datos.patente || 'Patente pendiente'}</p>
         {entry.datos.operador && <p>{entry.datos.operador.nombre || 'Operador por identificar'}</p>}
@@ -193,30 +247,30 @@ export default function BajaIntensidadPage() {
         {approval.estado === 'PENDIENTE' && <div className="text-sm text-amber-900 mt-3"><p className="font-semibold">{entry.puedeAprobar?.length ? 'Te toca aprobar' : 'Esperando aprobaciones'}</p><p>Faltan aprobaciones de las partes para avanzar.</p></div>}
         {approval.estado === 'APROBADO' && entry.etapa === 'REGISTRADO' && entry.puedeRegistrar && <p className="text-sm font-semibold text-primary-800 mt-3">Listo para registrar el retiro</p>}
         {approval.estado === 'RECHAZADO' && <div className="text-sm text-error-800 mt-3"><p className="font-semibold">Operación detenida</p><p>Rechazado por una parte: se conserva como antecedente y no avanza.</p></div>}
-        {!!entry.puedeAprobar?.length && <div className="flex flex-wrap gap-2 mt-3">{entry.puedeAprobar.map(parte => <React.Fragment key={parte}>
-          <Button disabled={busy} onClick={() => void event({ tipo: 'APROBAR_PARTE', parte, nota })}>Aprobar como {partLabels[parte].toLowerCase()}</Button>
-          <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RECHAZAR_PARTE', parte, nota })}>Rechazar como {partLabels[parte].toLowerCase()}</Button>
+        {approval.estado === 'PENDIENTE' && !!entry.puedeAprobar?.length && <div className="flex flex-wrap gap-2 mt-3">{entry.puedeAprobar.map(parte => <React.Fragment key={parte}>
+          <Button disabled={busy || staleDraft} onClick={() => void event({ tipo: 'APROBAR_PARTE', parte, nota })}>Aprobar como {partLabels[parte].toLowerCase()}</Button>
+          <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RECHAZAR_PARTE', parte, nota })}>Rechazar como {partLabels[parte].toLowerCase()}</Button>
         </React.Fragment>)}</div>}
       </Card>}
-      {(entry.puedeRegistrar || entry.puedeResolver || !!entry.puedeAprobar?.length) && <Input label="Nota de la acción" helperText="Opcional para movimientos; requerida para diferencias y revisiones." maxLength={500} value={nota} onChange={e => setNota(e.target.value)} />}
+      {(entry.puedeRegistrar || entry.puedeResolver || !!entry.puedeAprobar?.length) && <Input label="Nota de la acción" helperText="Opcional para movimientos; requerida para diferencias y revisiones." maxLength={500} value={nota} onChange={e => { beginEdit(); setNota(e.target.value); }} />}
       {entry.puedeRegistrar && <Card><div className="flex flex-wrap gap-3">
-        {nextStages[entry.etapa] && <Button disabled={busy || factsBlocked} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
-        <Button variant="outline" disabled={factsBlocked} onClick={() => setDifference(v => !v)}>{difference ? 'Cerrar diferencia' : 'Registrar diferencia'}</Button>
+        {nextStages[entry.etapa] && <Button disabled={busy || staleDraft || factsBlocked} onClick={() => void event({ tipo: 'AVANCE', etapa: nextStages[entry.etapa], nota })}>Registrar {stageLabels[nextStages[entry.etapa]].toLowerCase()}</Button>}
+        <Button variant="outline" disabled={factsBlocked} onClick={() => { beginEdit(); setDifference(v => !v); }}>{difference ? 'Cerrar diferencia' : 'Registrar diferencia'}</Button>
       </div>
       {difference && <form className="space-y-3 mt-4" onSubmit={e => { e.preventDefault(); void event({ tipo: 'DIFERENCIA', nota, residuos: wastes }); }}>
         <p className="text-sm">Carga observada completa; no se suma automáticamente al original.</p>
-        {wasteInputs}<Button type="submit" disabled={busy || !nota.trim()}>Guardar diferencia</Button>
+        {wasteInputs}<Button type="submit" disabled={busy || staleDraft || !nota.trim()}>Guardar diferencia</Button>
       </form>}</Card>}
       <Card><h2 className="flex items-center gap-2 text-base font-semibold mb-3"><ClipboardCheck size={20} aria-hidden="true" className="shrink-0 text-primary-700" />Revisión posterior</h2><div className="space-y-4">
         {entry.revisiones.map((review, i) => <section key={review.objetivo} aria-label={i === 0 ? 'Revisión original' : 'Revisión diferencia ' + i} className="border-b border-neutral-200 pb-3 last:border-0">
           <h3 className="font-medium">{i === 0 ? 'Registro original' : 'Diferencia ' + i}</h3>
           <p className="text-sm mb-2">{review.estado === 'APROBADA' ? 'Conformidad aprobada' : review.estado === 'OBSERVADA' ? 'Observada · requiere atención' : review.estado === 'RECHAZADA' ? 'Conformidad rechazada · hechos conservados' : 'Pendiente de conformidad'}{review.solicitada ? ' · Revisión solicitada' : ''}</p>
           <div className="flex flex-wrap gap-2">
-            {entry.puedeRegistrar && !factsBlocked && <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'SOLICITAR_REVISION', objetivo: review.objetivo, nota })}>Solicitar revisión</Button>}
+            {entry.puedeRegistrar && !factsBlocked && <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'SOLICITAR_REVISION', objetivo: review.objetivo, nota })}>Solicitar revisión</Button>}
             {entry.puedeResolver && review.solicitada && <>
-              <Button disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'APROBADA', nota })}>Aprobar post facto</Button>
-              <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'OBSERVADA', nota })}>Observar</Button>
-              <Button variant="outline" disabled={busy || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'RECHAZADA', nota })}>Rechazar conformidad</Button>
+              <Button disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'APROBADA', nota })}>Aprobar post facto</Button>
+              <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'OBSERVADA', nota })}>Observar</Button>
+              <Button variant="outline" disabled={busy || staleDraft || !nota.trim()} onClick={() => void event({ tipo: 'RESOLVER', objetivo: review.objetivo, decision: 'RECHAZADA', nota })}>Rechazar conformidad</Button>
             </>}
           </div>
         </section>)}

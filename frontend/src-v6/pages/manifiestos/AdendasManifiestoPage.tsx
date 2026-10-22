@@ -80,7 +80,7 @@ export default function AdendasManifiestoPage() {
       {data?.puedeRegistrar && !creating && <Button onClick={() => { setRectificaId(undefined); pending.current = undefined; setMotivo(''); setCreating(true); setSaved(''); setWastes(data.manifiesto.residuos?.map(row => ({ ...row })) || [emptyWaste()]); }}>{data.puedeInformarHallazgo ? 'Informar hallazgo' : 'Registrar diferencia'}</Button>}
     </div>
     {data && <p className="text-sm text-neutral-600">Operación: {data.manifiesto.estado}. La revisión de adendas no detiene el circuito.</p>}
-    {data?.finalLiberado && <p role="status" className="rounded border border-neutral-200 p-3">El operador ya liberó la disposición final CAP. Se conservan el certificado y las adendas revisadas; este expediente queda en consulta.</p>}
+    {data?.finalLiberado && <p role="status" className="rounded border border-neutral-200 p-3">El operador ya liberó la disposición final{currentUser?.training ? ' CAP' : ''}. Se conservan el certificado y las adendas revisadas; este expediente queda en consulta.</p>}
     {data?.documental && <Card className="p-4 space-y-1" role="region" aria-label="Control documental">
       <h2 className="flex items-center gap-2 font-semibold"><ClipboardCheck size={20} className="text-primary-700" aria-hidden="true" />Control documental</h2>
       <p>{data.documental.pendientes} {data.documental.pendientes === 1 ? 'pendiente' : 'pendientes'} · {data.documental.observadas} {data.documental.observadas === 1 ? 'observada' : 'observadas'} · {data.documental.rechazadas} {data.documental.rechazadas === 1 ? 'rechazada' : 'rechazadas'}</p>

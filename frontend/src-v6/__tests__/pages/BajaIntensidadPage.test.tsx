@@ -150,3 +150,59 @@ it.each([
   const action = screen.getByRole('button', { name: 'Registrar retirado' });
   if (blocked) expect(action).toBeDisabled(); else expect(action).toBeEnabled();
 });
+
+
+it('filters eventuals on the server and retains search when returning from a record', async () => {
+  mock.get.mockImplementation(url => Promise.resolve({ data: { data: url.includes('/' + id) ? { registro: entry } : { registros: [entry], total: 1, page: 1, pageSize: 20 } } }));
+  view();
+  fireEvent.change(await screen.findByLabelText('Buscar eventual'), { target: { value: 'QA externo' } });
+  fireEvent.change(screen.getByLabelText('Etapa del eventual'), { target: { value: 'RECIBIDO' } });
+  await waitFor(() => expect(mock.get.mock.calls.some(([url, config]) => url === '/manifiestos/baja-intensidad' && config?.params?.search === 'QA externo' && config?.params?.etapa === 'RECIBIDO')).toBe(true));
+  fireEvent.click(screen.getByRole('button', { name: /Abrir eventual/ }));
+  await screen.findByText('Operación: Recibido');
+  fireEvent.click(screen.getByRole('button', { name: 'Ver registros' }));
+  expect(await screen.findByLabelText('Buscar eventual')).toHaveValue('QA externo');
+  expect(screen.getByLabelText('Etapa del eventual')).toHaveValue('RECIBIDO');
+});
+it('shows a compact approval task in the list without claiming external parties approved', async () => {
+  mock.get.mockResolvedValue({ data: { data: { registros: [pending], total: 1, page: 1 } } });
+  view();
+  expect(await screen.findByText('Te toca aprobar', { exact: true })).toBeVisible();
+  expect(screen.getByRole('group', { name: 'Aprobaciones del eventual' }).children).toHaveLength(2);
+});
+it('refreshes an open eventual and protects a note against a concurrent revision until explicitly acknowledged', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  mock.get.mockResolvedValue({ data: { data: { registro: entry } } });
+  view(true, client); fireEvent.change(await screen.findByLabelText('Nota de la acción'), { target: { value: 'Mi evidencia sigue aquí' } });
+  mock.get.mockResolvedValue({ data: { data: { registro: { ...entry, version: 1 } } } });
+  await client.invalidateQueries({ queryKey: ['baja-intensidad'] });
+  expect(await screen.findByText(/El registro cambió mientras escribías/)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Registrar tratado' })).toBeDisabled();
+  expect(screen.getByLabelText('Nota de la acción')).toHaveValue('Mi evidencia sigue aquí');
+  fireEvent.click(screen.getByRole('button', { name: 'Usar versión actual' }));
+  mock.post.mockRejectedValue(new Error('offline'));
+  fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' }));
+  await waitFor(() => expect(mock.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ version: 1, nota: 'Mi evidencia sigue aquí' })));
+  expect(client.getQueryCache().getAll().find(q => q.queryKey[0] === 'baja-intensidad')?.observers[0].options.refetchInterval).toBe(5000);
+});
+
+it('a rejected eventual never offers another pending party an impossible approval', async () => {
+ mock.get.mockResolvedValue({ data: { data: { registro: { ...pending, aprobacion: { ...pending.aprobacion, estado: 'RECHAZADO' } } } } });
+ view(true); await screen.findByText('Operación detenida', { exact: true });
+ expect(screen.queryByRole('button', { name: /Aprobar como/ })).not.toBeInTheDocument();
+ expect(screen.getByRole('button', { name: 'Registrar retirado' })).toBeDisabled();
+});
+
+it('recovers a committed command after a lost response without resubmitting or erasing newer edits', async () => {
+ const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+ mock.post.mockRejectedValue(new Error('response lost')); view(true, client);
+ fireEvent.change(await screen.findByLabelText('Nota de la acción'), { target: { value: 'Nota enviada' } });
+ fireEvent.click(screen.getByRole('button', { name: 'Registrar tratado' })); await screen.findByRole('alert');
+ const commandId = mock.post.mock.calls[0][1].id;
+ fireEvent.change(screen.getByLabelText('Nota de la acción'), { target: { value: 'Otra nota todavía sin enviar' } });
+ mock.get.mockResolvedValue({ data: { data: { registro: { ...entry, version: 1, etapa: 'TRATADO', eventos: [{ id: commandId, tipo: 'AVANCE', etapa: 'TRATADO', fecha: '2026-10-22T15:00:00Z', nota: 'Nota enviada' }] } } } });
+ await client.invalidateQueries({ queryKey: ['baja-intensidad'] });
+ expect(await screen.findByText('La acción ya estaba guardada. Recuperamos la confirmación sin duplicarla.')).toBeVisible();
+ expect(screen.getByLabelText('Nota de la acción')).toHaveValue('Otra nota todavía sin enviar');
+ expect(mock.post).toHaveBeenCalledTimes(1);
+});

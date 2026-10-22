@@ -82,7 +82,7 @@ describe('manual documentation stays usable and truthful', () => {
       const html = readFileSync(manual + file, 'utf8');
       // Guide content uses its own current cache key; the corrected renderer has its own key; CSS retains its version.
       // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.22.2');
+      expect(html).toContain('help-data.js?v=2026.22.3');
       expect(html).toContain('manual.js?v=2026.20.6');
       expect(html).toContain('manual.css?v=2026.20.5');
     }
@@ -99,4 +99,13 @@ it('documents operational proposals separately from CAP and keeps the old manife
  for(const value of ['Crear no aprueba','Generador firma','3 de 3','Iniciar coordinación','Leer un aviso no aprueba'])expect(text).toContain(value);
  expect(guide.safety).toContain('CAP cerrado y correo/push apagados');
  expect(data.guides.find(g=>g.id==='generador-crear-manifiesto')!.safety).toContain('modo de borrador anterior');
+});
+
+it('explains eventual search, live updates and explicit conflict recovery', () => {
+ const guide = data.guides.find(item => item.id === 'eventuales-aprobaciones-avisos');
+ const content = JSON.stringify(guide);
+ for (const text of ['Buscar eventual', 'Etapa del eventual', 'Usar versión actual', 'no envía ni aprueba', 'sin duplicarla']) expect(content).toContain(text);
+ expect(guide?.safety).toContain('La referencia BI- es interna');
+ expect(content).toContain('Correo y push permanecen apagados');
+ expect(content).not.toContain('en este ensayo');
 });

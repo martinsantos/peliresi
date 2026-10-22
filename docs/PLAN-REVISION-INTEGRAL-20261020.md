@@ -1,5 +1,14 @@
 # Revisión integral de circuitos y experiencia por rol
 
+## Continuación vigente — 22/10/2026
+
+La matriz original de abajo conserva su corte de validación. La publicación posterior se consolidó en **45c79bb9**: propuestas ordinarias de tres partes, eventuales v2, adendas y hallazgos, autoridades por cuatro roles, certificados parciales/finales, relevos y GPS múltiple, PSIP, controles ATM/OCR, agenda completa y continuidad de altas. Ver [inventario y publicación](REACTIVACION-CIRCUITOS-20261022.md). No interpretar sus antiguos «flag apagado» como estado productivo actual.
+
+La continuación autorizada por el dueño es analizar, corregir, validar y publicar tandas concretas, conservando main, cuentas, datos reales y canales cerrados. Siguiente tanda en curso: **búsqueda y continuidad de eventuales**. Se reproduce listado sin filtros ni actualización en otra sesión; se incorpora búsqueda completa con permisos, etapas, retorno al filtro, aprobación visual compacta, actualización en vivo y protección de notas/carga ante revisión concurrente. Se corrige la mención CAP en el cierre de adendas operativas. Manual conserva su diseño. [Seguimiento de la tanda](EVENTUALES-CONTINUIDAD-20261022.md).
+
+Pendientes separados de esta publicación: decisiones aún no fijadas de numeración oficial excepcional y cómputo/reglas de acopio; compatibilidad contra fuente administrativa autorizada; política de purga física de adjuntos de borradores; validación en teléfonos físicos/segundo plano; acreditación externa ATM y formatos eléctricos reales. No se convierten por inferencia en permisos, caducidades o habilitaciones. Enterprise/multirol permanecen apagados. Correo/push requieren habilitación expresa posterior; ninguna cola histórica se libera en esta continuidad.
+
+
 Estado: **revisión completada en preview, candidato `13af2fb0`, cierre 21/10/2026**, desde `7e8ffe0c` / producto previo `4b5c8bdd`. Resultado: backend **1430/1430**, frontend **1781/1781**, **369 casos E2E únicos**, **78 grupos HTTP**. Ver [evidencia y límites](REVISION-INTEGRAL-CIRCUITOS-20261020.md). Sólo preview, datos artificiales, CAP cerrado y correo/push externos apagados. Producción y `main` fuera del alcance; commits `[skip ci]`, sin push ni workflows.
 
 ## Resultado buscado

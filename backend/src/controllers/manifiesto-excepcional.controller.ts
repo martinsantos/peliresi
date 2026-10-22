@@ -76,13 +76,41 @@ function present(record: StoredRecord, req: AuthRequest) {
 }
 export async function listExceptional(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const where = scope(req);
-    const page = Math.max(1, Math.min(100000, Number(req.query.page) || 1));
-    const [records, total] = await Promise.all([
-      prisma.registroManifiestoExcepcional.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: (Math.floor(page) - 1) * 20 }),
-      prisma.registroManifiestoExcepcional.count({ where }),
-    ]);
-    res.json({ success: true, data: { registros: records.map(r => present(r, req)), total } });
+    const access = scope(req); // Same permission gate as detail, before evaluating any filter.
+    const requestedPage = Number(req.query.page ?? 1), search = req.query.search ?? '', stage = req.query.etapa ?? '';
+    if ((req.query.page !== undefined && typeof req.query.page !== 'string' && typeof req.query.page !== 'number') || !Number.isInteger(requestedPage) || requestedPage < 1 || requestedPage > 100000
+      || typeof search !== 'string' || search.length > 100 || typeof stage !== 'string'
+      || !['', 'REGISTRADO', 'RETIRADO', 'RECIBIDO', 'TRATADO'].includes(stage)) {
+      throw new AppError('Filtros de eventuales inválidos', 400);
+    }
+    // Parameterized JSON search: Prisma 5 cannot search JSON strings case-insensitively.
+    // SQL pagination uses the same actor scope; the final read rechecks access with Prisma.
+    const user = req.user;
+    let visibility = Prisma.sql`"creadoPorId" = ${user.id}`;
+    if (reviewer(req)) visibility = Prisma.sql`TRUE`;
+    else if (user.rol === 'OPERADOR' && user.operador?.id) visibility = Prisma.sql`(${visibility} OR "operadorId" = ${user.operador.id})`;
+    else if (user.rol === 'GENERADOR' && user.generador?.id) visibility = Prisma.sql`(${visibility} OR datos->'generador'->>'padronId' = ${user.generador.id})`;
+    else if (user.rol === 'TRANSPORTISTA' && user.transportista?.id) visibility = Prisma.sql`(${visibility} OR datos->'transportista'->>'padronId' = ${user.transportista.id})`;
+    const term = search.trim();
+    const pattern = '%' + term.replace(/[\\%_]/g, '\\$&') + '%';
+    const condition = Prisma.sql`${visibility}
+      ${stage ? Prisma.sql`AND etapa = ${stage}` : Prisma.empty}
+      ${term ? Prisma.sql`AND (('BI-' || id) ILIKE ${pattern}
+        OR datos->>'patente' ILIKE ${pattern}
+        OR datos->'generador'->>'nombre' ILIKE ${pattern}
+        OR datos->'generador'->>'identificacion' ILIKE ${pattern}
+        OR datos->'transportista'->>'nombre' ILIKE ${pattern}
+        OR datos->'transportista'->>'identificacion' ILIKE ${pattern}
+        OR datos->'operador'->>'nombre' ILIKE ${pattern}
+        OR datos->'operador'->>'identificacion' ILIKE ${pattern})` : Prisma.empty}`;
+    const result = await prisma.$transaction(async tx => {
+      const [{ total }] = await tx.$queryRaw<{ total: number }[]>(Prisma.sql`SELECT COUNT(*)::int AS total FROM registros_manifiesto_excepcional WHERE ${condition}`);
+      const page = Math.min(requestedPage, Math.max(1, Math.ceil(total / 20)));
+      const ids = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT id FROM registros_manifiesto_excepcional WHERE ${condition} ORDER BY "createdAt" DESC, id DESC LIMIT 20 OFFSET ${(page - 1) * 20}`);
+      const records = await tx.registroManifiestoExcepcional.findMany({ where: { AND: [access, { id: { in: ids.map(row => row.id) } }] }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
+      return { registros: records.map(r => present(r, req)), total, page, pageSize: 20 };
+    }, { isolationLevel: 'RepeatableRead' });
+    res.json({ success: true, data: result });
   } catch (error) { next(error); }
 }
 export async function getExceptional(req: AuthRequest, res: Response, next: NextFunction) {

@@ -171,3 +171,9 @@ it('a remote revision cannot silently rebase a decision already being written', 
   await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2));
   expect(mock.post.mock.calls[0][1].version).toBe(0); expect(mock.post.mock.calls[1][1].version).toBe(1);
 });
+
+it('operational final certificate never labels the closed record as CAP', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, finalLiberado: true } } }); view();
+  expect(await screen.findByText(/El operador ya liberó la disposición final\./)).toBeVisible();
+  expect(screen.queryByText(/disposición final CAP/)).not.toBeInTheDocument();
+});

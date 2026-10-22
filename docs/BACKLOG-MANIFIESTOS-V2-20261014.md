@@ -1,6 +1,6 @@
 # Manifiestos V2 — backlog de la reunión del 14/10/2026
 
-Estado: definición y candidato de desarrollo. **No autorizado para producción.**
+**Estado histórico del relevamiento del 14–16/10.** Para ejecución actual leer primero [continuación del plan](PLAN-REVISION-INTEGRAL-20261020.md#continuación-vigente--22102026) y [publicación 45c79bb9](REACTIVACION-CIRCUITOS-20261022.md). Eventuales v2, adendas, autoridades por rol, propuestas, certificados, relevos/GPS múltiple y continuidad están publicados y habilitados según esos cierres. Las restricciones de numeración oficial, habilitación/compatibilidad y otras decisiones aún abiertas no quedan resueltas por esa publicación. Los estados de las corridas que siguen son históricos: no reactivar Actions ni aplicar revisores QA en producción.
 
 ## Corte probado — 16/10, exportación y conciliación MV2-112/113
 
