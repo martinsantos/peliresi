@@ -1,5 +1,13 @@
 # SITREP — traspaso vigente de operación
 
+## Correos — tres correcciones probadas, sólo preview, 21/10/2026
+
+**Candidato `86a9b790`, sin publicar.** Leer [correcciones, galería, manual y evidencia](CORREOS-CLARIDAD-20261021.md). Se aclaran aprobación individual de adenda, comprobante repetido y cierre de tratamiento separado de emisión de certificados. Destinatarios, permisos, enlaces, controles y circuitos conservados. Manual **2026.21.5**, mismo renderer/CSS.
+
+Preview: **160 backend / 37 interfaz y manual / 15 E2E** PASS; backend y builds web/app PASS. Galería actualizada: **180 escenarios, 9/9 grupos**, cero desbordes/errores/solicitudes externas. **536 tablas QA previas intactas**, cero intentos/envíos/cola activa, cuatro alias CAP 403. Serial/un worker/1 CPU/2 GiB/swap cero; contenedor detenido **21:34:23 Mendoza**, sin OOM; base/imagen/evidencias conservadas.
+
+**Producción no se accedió; sigue vigente el despliegue documentado 19230380 de abajo.** CAP cerrado y correos/push apagados. Main `c840219` intacto; commits `[skip ci]`, sin push/workflows. No certifica entrega externa ni dispositivos físicos. Galería local: `test-results-communications-20261021/index.html`.
+
 ## Última publicación — certificados 19230380, 21/10/2026
 
 **`19230380` publicado** en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el **21/10/2026 20:37:40 Mendoza**. **Certificados habilitados.** Leer primero [despliegue, respaldo, pruebas y reversión vigente](DESPLIEGUE-CERTIFICADOS-20261021.md). Operador firma parciales/final; partes vinculadas reciben avisos en campana y descargan el mismo PDF. No se enviaron correos ni push.
