@@ -1,20 +1,24 @@
 # SITREP — traspaso vigente de operación
 
-## Plan retomado con autorización de publicación — 22/10/2026
+## Publicación vigente — circuitos y continuidad, 22/10/2026
 
-**En ejecución.** El dueño autorizó continuar el refactor y publicar las tandas validadas, incluyendo eventuales y adendas. Confirmó autoridades por los cuatro roles, sin cambiar cuentas. Leer [inventario, política y avance](REACTIVACION-CIRCUITOS-20261022.md). La agenda/continuidad de `5080ee82` se incluye en el candidato. CAP cerrado, correos/push apagados; sin main ni datos reales. La última producción verificada sigue siendo **86a9b790** hasta documentar la nueva activación.
+**`45c79bb9` publicado en backend, web, app y manual el 22/10/2026 10:34:40 Mendoza.** Leer primero [cambios, evidencia, respaldo y reversión vigente](REACTIVACION-CIRCUITOS-20261022.md). Incluye agenda completa, certificados pendientes y continuidad de formularios (`5080ee82`); **eventuales/adendas/revisión habilitados**. Autoridades de adendas por los cuatro roles activos, sin cambiar cuentas; eventuales conservan autoridad ADMIN.
+
+**1.481 backend / 1.811 frontend / 62 E2E únicos / 27 grupos HTTP PASS**, 171 capturas; manual 2026.22.2. Backup completo verificado antes de la única migración aditiva de borradores; public/CAP compatibles, CAP cerrado. Smoke no mutante **144/144 + externo 9/9 + PWA 8/8**. Dos workers estables, correos/push apagados, uploads y cuentas conservados. SW v152/app 20261022132606.
+
+**Reversión vigente sólo de interfaz a 86a9b790**, conservando backend 45c79bb9, todos los flags y registros; preparada, no ejecutada. No usar reversiones antiguas ni restaurar base. Preview detenido 22/10/2026 10:28:46 Mendoza, sin OOM/presión; imagen/base/evidencias conservadas. Main intacto, cierre `[skip ci]`, sin push/workflows. No es certificación de dispositivos físicos ni entrega externa.
 
 ## Revisión de agenda, certificados y continuidad — sólo preview, 22/10/2026
 
-**Primera tanda terminada y probada, sin publicar.** Leer [cambios, manual, evidencia y condiciones de publicación](AGENDA-CERTIFICADOS-CONTINUIDAD-20261022.md). Agenda de manifiestos paginada sin corte de cien, búsqueda/filtros completos y tareas de certificación final; recuperación de altas de G/T/O con datos, paso y adjuntos privados, guardado automático y conflictos explícitos. Históricos y permisos conservados. Manual **2026.22.1**, mismo renderer/CSS.
+**Validación previa de la primera tanda, incorporada en la publicación 45c79bb9 de arriba.** Leer [cambios, manual, evidencia y condiciones de publicación](AGENDA-CERTIFICADOS-CONTINUIDAD-20261022.md). Agenda de manifiestos paginada sin corte de cien, búsqueda/filtros completos y tareas de certificación final; recuperación de altas de G/T/O con datos, paso y adjuntos privados, guardado automático y conflictos explícitos. Históricos y permisos conservados. Manual **2026.22.1**, mismo renderer/CSS.
 
 **1.473/1.473 backend, 1.811/1.811 frontend y 32/32 navegador**, sin omitidos ni reintentos, en escritorio/web angosta/app; **99 capturas E2E**. Migración aditiva de dos tablas en esquema artificial y builds/tipos PASS; lint dirigido sin errores (47 advertencias). **660 tablas QA previas intactas**, cero intentos/cola activa de correo, cuatro alias CAP 403; canales apagados en ambos procesos.
 
 Preview serial/un worker/1 CPU/2 GiB/swap cero; runtime/PG cerrados y contenedor detenido **09:06:57 Mendoza**. El cgroup tocó el límite de memoria sin OOM; imagen/base/evidencias preservadas. No se accedió a producción; `main` `c840219` intacto, sin push/workflows; cierre `[skip ci]`. No certifica teléfonos físicos ni entrega externa.
 
-**Publicación futura:** requiere autorización y respaldo antes de la migración `20261022130000_actor_form_drafts`. Adjuntos recuperables en el directorio privado hermano `${UPLOADS_DIR}-private-drafts`, que también debe conservarse y respaldarse. No usar bundles QA `/api` ni revertir borradores borrando tablas/archivos. Producción y su reversión vigente siguen en el cierre siguiente.
+**Condiciones de aquella validación, cumplidas en 45c79bb9:** autorización y respaldo antes de la migración `20261022130000_actor_form_drafts`. Adjuntos recuperables en el directorio privado hermano `${UPLOADS_DIR}-private-drafts`, que también debe conservarse y respaldarse. No usar bundles QA `/api` ni revertir borradores borrando tablas/archivos. La publicación y la reversión vigentes figuran en el cierre 45c79bb9 de arriba.
 
-## Última publicación — correos 86a9b790, 22/10/2026
+## Publicación anterior — correos 86a9b790, 22/10/2026
 
 **`86a9b790` publicado en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el 22/10/2026 07:01:00 Mendoza.** Leer primero [despliegue, comprobaciones y reversión vigente](DESPLIEGUE-CORREOS-20261022.md). Se aclaran aprobación individual de adenda, comprobante repetido y cierre de tratamiento separado de emisión. Manual **2026.21.5**, renderer/CSS conservados.
 

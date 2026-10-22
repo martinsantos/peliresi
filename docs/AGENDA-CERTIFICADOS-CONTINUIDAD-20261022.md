@@ -1,5 +1,7 @@
 # Agenda completa, certificados pendientes y continuidad de altas
 
+**Actualización:** esta tanda se publicó dentro de `45c79bb9`; ver [cierre, activación de circuitos y reversión vigente](REACTIVACION-CIRCUITOS-20261022.md). Lo siguiente conserva la evidencia de su validación previa.
+
 Revisión del 22/10/2026, exclusivamente en el preview aislado. No se accedió a producción; `main` permanece intacto. Base de trabajo: `b5a17b3e`, rama `codex/sitrep-training-20261018`, checkout activo `sitrep-production-source-20261001`.
 
 ## Resultado funcional
