@@ -1,12 +1,20 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Publicación vigente — circuitos y continuidad, 22/10/2026
+## Publicación vigente — eventuales, 22/10/2026
+
+**`8a4d8225` publicado en backend, web, app y manual el 22/10/2026 12:18:43 Mendoza.** Búsqueda completa y etapas, retorno al filtro, actualización entre participantes y recuperación de acciones/notas sin pérdida ni duplicación. Leer primero [cambios, evidencia y reversión vigente](docs/EVENTUALES-CONTINUIDAD-20261022.md).
+
+**1.497 backend / 1.818 frontend / 30 E2E únicos / 6 grupos HTTP PASS**; comprobaciones finales dirigidas y del manual detalladas en el informe. Manual **2026.22.3**, renderer/CSS conservados. Build de **2.397 blobs exactos**, API final y flags actuales. Smoke no mutante **144/144 + externo 9/9 + PWA 8/8**; dos workers estables. Sin migraciones ni cambios de configuración/datos de negocio. **CAP cerrado, correos/push apagados**, cuentas/uploads conservados. SW v154/app 20261022151220.
+
+**Reversión vigente a backend/web/app/manual 45c79bb9**, con idéntico esquema, flags y contratos de escritura; preparada, no ejecutada. No restaurar base ni usar reversiones anteriores. Preview detenido 22/10/2026 12:15:02 Mendoza; imagen/base/evidencias conservadas, sin OOM (el build alcanzó el límite de memoria y recuperó caché). Main intacto, commits `[skip ci]`, sin push/workflows. No certifica dispositivos físicos ni entrega externa.
+
+## Publicación anterior — circuitos y continuidad, 22/10/2026
 
 **`45c79bb9` publicado en backend, web, app y manual el 22/10/2026 10:34:40 Mendoza.** Leer primero [cambios, evidencia, respaldo y reversión vigente](docs/REACTIVACION-CIRCUITOS-20261022.md). Incluye agenda completa, certificados pendientes y continuidad de formularios (`5080ee82`); **eventuales/adendas/revisión habilitados**. Autoridades de adendas por los cuatro roles activos, sin cambiar cuentas; eventuales conservan autoridad ADMIN.
 
 **1.481 backend / 1.811 frontend / 62 E2E únicos / 27 grupos HTTP PASS**, 171 capturas; manual 2026.22.2. Backup completo verificado antes de la única migración aditiva de borradores; public/CAP compatibles, CAP cerrado. Smoke no mutante **144/144 + externo 9/9 + PWA 8/8**. Dos workers estables, correos/push apagados, uploads y cuentas conservados. SW v152/app 20261022132606.
 
-**Reversión vigente sólo de interfaz a 86a9b790**, conservando backend 45c79bb9, todos los flags y registros; preparada, no ejecutada. No usar reversiones antiguas ni restaurar base. Preview detenido 22/10/2026 10:28:46 Mendoza, sin OOM/presión; imagen/base/evidencias conservadas. Main intacto, cierre `[skip ci]`, sin push/workflows. No es certificación de dispositivos físicos ni entrega externa.
+**Reversión histórica de aquella publicación, sustituida por la de 8a4d8225: sólo de interfaz a 86a9b790**, conservando backend 45c79bb9, todos los flags y registros; preparada, no ejecutada. No usar reversiones antiguas ni restaurar base. Preview detenido 22/10/2026 10:28:46 Mendoza, sin OOM/presión; imagen/base/evidencias conservadas. Main intacto, cierre `[skip ci]`, sin push/workflows. No es certificación de dispositivos físicos ni entrega externa.
 
 ## Revisión de agenda, certificados y continuidad — sólo preview, 22/10/2026
 
