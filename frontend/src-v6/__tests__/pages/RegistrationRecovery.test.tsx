@@ -5,9 +5,9 @@ import InscripcionWizardPage from '../../pages/public/InscripcionWizardPage';
 import { readRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
 import { queryClient } from '../../lib/queryClient';
 
-const mock = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn(), requirements: vi.fn(), canWrite: vi.fn(), token: '' }));
+const mock = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn(), upload: vi.fn(), requirements: vi.fn(), canWrite: vi.fn(), token: '' }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get, put: mock.put, post: mock.post }, getAccessToken: () => mock.token, setTokensDurably: vi.fn() }));
-vi.mock('../../services/solicitud.service', () => ({ solicitudService: { getRequirements: mock.requirements } }));
+vi.mock('../../services/solicitud.service', () => ({ solicitudService: { getRequirements: mock.requirements, uploadDocumento: mock.upload } }));
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: mock.canWrite, retry: vi.fn() }) }));
 const revision = '2026-10-09T10:00:00.000Z';
 function session(owner: string) { return `qa.${btoa(JSON.stringify({ id: owner, restricted: true, registrationDraft: 'draft' }))}.qa`; }
@@ -24,9 +24,29 @@ beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
 });
-afterEach(() => { cleanup(); queryClient.clear(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); queryClient.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('a real registration UI protects the current step and account boundary', () => {
+  it('automatically saves typing paused by an in-flight licence upload once the upload finishes', async () => {
+    const response = request(); response.data.data.solicitud.tipoActor = 'TRANSPORTISTA';
+    response.data.data.solicitud.datosActor = JSON.stringify({ _sitrepDraftStep: 3, razonSocial: 'QA transporte', domicilio: 'QA 123', choferesJson: [{ key: 'driver-qa', nombre: 'QA inicial', dni: '000001', vencimiento: '2027-12-31' }] });
+    mock.get.mockResolvedValue(response);
+    let finish!: (value: unknown) => void;
+    mock.upload.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    await open('transportista');
+    fireEvent.change(screen.getByLabelText('Archivo de licencia del chofer 1'), { target: { files: [new File(['QA'], 'licencia.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(mock.upload).toHaveBeenCalledOnce());
+    mock.put.mockClear(); vi.useFakeTimers();
+    fireEvent.change(screen.getByLabelText('Nombre *'), { target: { value: 'QA escrito durante la lectura' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(mock.put).not.toHaveBeenCalled();
+    await act(async () => finish({ id: 'qa-file', tipo: 'LICENCIA_CHOFER_driver-qa', nombre: 'licencia.png', estado: 'PENDIENTE', analisis: { version: 1, lectura: 'LEIDO', campos: {}, texto: 'QA' } }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+    expect(mock.put).toHaveBeenCalledOnce();
+    expect(mock.put.mock.calls[0][1].datosActor).toMatchObject({ _sitrepDraftStep: 3 });
+    expect(JSON.parse(mock.put.mock.calls[0][1].datosActor.choferesJson)[0].nombre).toBe('QA escrito durante la lectura');
+    expect(screen.getByLabelText('Nombre *')).toHaveValue('QA escrito durante la lectura');
+  });
   it.each(['generador', 'operador', 'transportista'])('%s points to the missing field, not session recovery, and keeps typing in place', async type => {
     const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase(); mock.get.mockResolvedValue(response);
     await open(type);

@@ -15,7 +15,7 @@ beforeEach(()=>{
  vi.unstubAllEnvs();
  mock.manifest={id:'m',numero:'CAP-TEST',estado:'PENDIENTE_APROBACION',...p,generador:{cuit:'QA-G'},transportista:{cuit:'QA-T'},operador:{cuit:'QA-O'},residuos:[],fechaEstimadaRetiro:new Date('2026-10-19T15:00:00Z')};
  mock.events=[{id:'marker',tipo:MANIFEST_PROPOSAL,descripcion:JSON.stringify(p)}];
- mock.tx={$queryRaw:vi.fn(),manifiesto:{findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{
+ mock.tx={$queryRaw:vi.fn(),manifiesto:{count:vi.fn(async()=>3),findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{
  count:vi.fn(async()=>mock.events.length),update:vi.fn(async({where,data}:any)=>Object.assign(mock.events.find(e=>e.id===where.id),data)),
  findFirst:vi.fn(async()=>mock.events.find(e=>e.tipo===MANIFEST_PROPOSAL)),findMany:vi.fn(async()=>mock.events.filter(e=>e.tipo!==MANIFEST_PROPOSAL)),create:vi.fn(async({data}:any)=>{const e={...data,id:String(mock.events.length),createdAt:new Date()};mock.events.push(e);return e;})},
  generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn(async({data}:any)=>({count:data.length}))}};
@@ -104,7 +104,7 @@ describe('training agenda metadata',()=>{
   const json=vi.fn(),next=vi.fn();await inTrainingSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
   expect(next).not.toHaveBeenCalled();const result=json.mock.calls[0][0].data.items[0];
   expect(result.requiereMiAprobacion).toBe(true);expect(result.inicio).toBeNull();expect(result.partes).toHaveLength(3);expect(result.partes.every((p:any)=>p.aprobada===false)).toBe(true);
-  expect(mock.tx.manifiesto.findMany.mock.calls[0][0].where.operadorId).toBe('o');
+  expect(JSON.stringify(mock.tx.manifiesto.findMany.mock.calls[0][0].where)).toContain('"operadorId":"o"');
  });
  it('includes ongoing reception and treatment for the CAP administrator, never in the operational scope',async()=>{
   const {getTrainingTasks}=await import('../controllers/manifest-proposal.controller');

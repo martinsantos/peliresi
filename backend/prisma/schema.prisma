@@ -47,6 +47,7 @@ model Usuario {
   refreshTokens                RefreshToken[]
   manifiestosCreados           Manifiesto[]            @relation("UsuarioManifiestos")
   certificadosEmitidos         CertificadoManifiesto[]
+  borradoresActor              ActorFormDraft[]
   eventos                      EventoManifiesto[]
   auditorias                   Auditoria[]             @relation("UsuarioAuditorias")
   notificaciones               Notificacion[]
@@ -1502,6 +1503,38 @@ model EmailQueue {
 
 // Additive enterprise boundary. Legacy actor/account links are retained.
 // Immutable issued PDF and signed declaration; no editing endpoint.
+model ActorFormDraft {
+  id String @id
+  ownerId String
+  scope String
+  version Int @default(1)
+  data Json
+  requestId String
+  requestHash String
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime
+  owner Usuario @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  files ActorFormDraftFile[]
+  @@unique([ownerId, scope])
+  @@index([expiresAt])
+  @@map("actor_form_drafts")
+}
+
+model ActorFormDraftFile {
+  id String @id
+  draftId String
+  kind String
+  name String
+  mime String
+  path String
+  sha256 String
+  size Int
+  year Int?
+  draft ActorFormDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  @@unique([draftId, kind])
+  @@map("actor_form_draft_files")
+}
+
 model CertificadoManifiesto {
   id String @id
   manifiestoId String

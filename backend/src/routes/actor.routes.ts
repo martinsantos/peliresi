@@ -11,10 +11,17 @@ import {
 import { getPagosTEF, createPagoTEF, updatePagoTEF, deletePagoTEF, getDDJJ, createDDJJ, updateDDJJ, deleteDDJJ } from '../controllers/generador-fiscal.controller';
 import { getPagosTEFOperador, createPagoTEFOperador, updatePagoTEFOperador, deletePagoTEFOperador, getDDJJOperador, createDDJJOperador, updateDDJJOperador, deleteDDJJOperador } from '../controllers/operador-fiscal.controller';
 import { upload, uploadDocumento, getDocumentos, downloadDocumento, revisarDocumento, deleteDocumento, confirmarIdentidadPagoActor } from '../controllers/documento.controller';
+import { readActorDraft, saveActorDraft, deleteActorDraft, authorizeActorDraft, uploadActorDraft, saveActorDraftFile, readActorDraftFile, deleteActorDraftFile } from '../controllers/actorFormDraft.controller';
 
 const router = Router();
 router.use(isAuthenticated);
 router.use(requireFullAccess);
+router.get('/borradores/:scope', readActorDraft);
+router.put('/borradores/:scope', saveActorDraft);
+router.delete('/borradores/:scope', deleteActorDraft);
+router.put('/borradores/:scope/archivos/:kind', authorizeActorDraft, uploadActorDraft, saveActorDraftFile);
+router.get('/borradores/:scope/archivos/:kind', readActorDraftFile);
+router.delete('/borradores/:scope/archivos/:kind', deleteActorDraftFile);
 
 // ===== GENERADORES =====
 

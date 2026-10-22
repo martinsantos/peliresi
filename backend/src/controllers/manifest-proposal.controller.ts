@@ -11,6 +11,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
 import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, parseProposal, proposalRole, ProposalRole } from '../domain/manifestProposal';
+import { agendaQuery } from '../domain/manifestAgenda';
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 async function load(tx: Tx, id: string) {
@@ -155,8 +156,18 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
 export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFunction){
  try{
   if(!manifestProposalsEnabled())throw new AppError('Función no habilitada',404);
-  const where:any={estado:{in:['PENDIENTE_APROBACION','APROBADO','EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO',...(isTrainingSession()?['TRATADO']:[])]}};applyRoleFilter(where,req.user);
-  const rows=await prisma.manifiesto.findMany({where,orderBy:{createdAt:'desc'},take:100,include:{eventos:{where:{tipo:{in:[MANIFEST_PROPOSAL,...Object.values(APPROVAL_EVENTS),...COORDINATION_EVENTS,'CERTIFICADO_CAP_V1']}}},residuos:{select:{cantidadRecibida:true}}}});
+  const agenda = agendaQuery(req.query || {}, req.user.rol, process.env.MANIFEST_CERTIFICATES_ENABLED === 'true', isTrainingSession());
+  applyRoleFilter(agenda.base, req.user);
+  const { rows, counts, total, page } = await prisma.$transaction(async tx => {
+    const counts: Record<string, number> = {};
+    for (const [key, category] of Object.entries(agenda.categories)) counts[key] = await tx.manifiesto.count({ where: { AND: [agenda.base, category] } });
+    const total = counts[agenda.filter], page = Math.min(agenda.page, Math.max(1, Math.ceil(total / agenda.limit)));
+    const rows = await tx.manifiesto.findMany({ where: { AND: [agenda.base, agenda.categories[agenda.filter]] }, orderBy: agenda.orderBy,
+      skip: (page - 1) * agenda.limit, take: agenda.limit,
+      include: { eventos: { where: { tipo: { in: [MANIFEST_PROPOSAL, ...Object.values(APPROVAL_EVENTS), ...COORDINATION_EVENTS, 'CERTIFICADO_CAP_V1'] } } }, residuos: { select: { cantidadRecibida: true } } },
+    });
+    return { rows, counts, total, page };
+  }, { isolationLevel: 'RepeatableRead' });
   const labels:Record<string,string>={GENERADOR:'generador',TRANSPORTISTA:'transporte',OPERADOR:'operador'};
   const items=rows.flatMap(m=>{
    const marker=m.eventos.find(e=>e.tipo===MANIFEST_PROPOSAL),proposal=marker?parseProposal(marker.descripcion):null;
@@ -173,12 +184,13 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='ENTREGADO'){action='Confirmá la recepción de esta carga';detail='Después registrá el peso realmente recibido.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='RECIBIDO'){action=m.residuos.some(r=>!r.cantidadRecibida)?'Registrá el pesaje recibido':'Registrá el tratamiento';detail='El pesaje y el tratamiento permiten emitir la certificación parcial.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='EN_TRATAMIENTO'){action=isTrainingSession()?'Emití un parcial o cerrá el tratamiento':'Cerrá el tratamiento cuando corresponda';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
-   else if(isTrainingSession()&&m.estado==='TRATADO'&&!m.eventos.some(e=>e.tipo==='CERTIFICADO_CAP_V1'&&JSON.parse(e.descripcion).tipo==='FINAL')){action=role==='OPERADOR'?'Revisá adendas y emití la certificación final total':'Tratamiento cerrado: esperando la certificación final';detail='El operador decide cuándo firmarla y liberarla.';}
+   else if(m.estado==='TRATADO'){action=role==='OPERADOR'?'Revisá y emití la certificación final total':'Esperando la certificación final del operador';detail='El operador decide cuándo firmarla y liberarla. El cierre no la emite automáticamente.';}
+   if (!action) { action = 'Esperando al operador'; detail = 'El operador continúa la recepción y el tratamiento.'; }
    const partes=proposal?(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
    const inicio=m.eventos.find(e=>COORDINATION_EVENTS.includes(e.tipo))?.createdAt||null;
    const requiereMiAprobacion=!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
-   return action?[{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida)}]:[];
+   return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];
   });
-  res.json({success:true,data:{items,total:items.length,limited:rows.length===100}});
+  res.json({success:true,data:{items,total,page,limit:agenda.limit,counts,limited:false}});
  }catch(e){next(e);}
 }

@@ -1,0 +1,18 @@
+import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
+import { assertCloudEnvironment } from './safety';
+
+assertCloudEnvironment();
+export default defineConfig({
+  testDir: './e2e', testMatch: ['continuity.spec.ts','continuity-api.spec.ts'],
+  fullyParallel: false, forbidOnly: true, retries: 0, workers: 1, maxFailures: 1, timeout: 150000,
+  outputDir: path.join(process.env.QA_ARTIFACTS!, 'continuity-e2e-' + (process.env.QA_BROWSER_ATTEMPT || 'initial')),
+  reporter: [['line'], ['json', { outputFile: path.join(process.env.QA_ARTIFACTS!, 'continuity-e2e-' + (process.env.QA_BROWSER_ATTEMPT || 'initial') + '.json') }]],
+  use: { baseURL: 'http://127.0.0.1:4177', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  projects: [
+    { name: 'api', testMatch: 'continuity-api.spec.ts', use: { ...devices['Desktop Chrome'] } },
+    { name: 'web-desktop', testMatch: 'continuity.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'web-responsive', testMatch: 'continuity.spec.ts', use: { ...devices['Pixel 7'], viewport: { width: 360, height: 800 } } },
+    { name: 'app', testMatch: 'continuity.spec.ts', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
+  ],
+});

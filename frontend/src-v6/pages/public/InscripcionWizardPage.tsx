@@ -275,7 +275,7 @@ const InscripcionWizardPage: React.FC = () => {
       ));
       setReg(previous => ({ ...previous, nombre: solicitud.usuario?.nombre || '', email: solicitud.usuario?.email || '', cuit: solicitud.usuario?.cuit || '' }));
       setSolicitudId(pending.id!);
-      setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step ?? pending.step) || 1)));
+      setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step ?? serverExtraFields.current._sitrepDraftStep ?? pending.step) || 1)));
       setPhase(2);
       setResumeStatus('loaded');
     }).catch(() => {
@@ -369,7 +369,7 @@ const InscripcionWizardPage: React.FC = () => {
     try {
       assertDraftSession();
       const response = await api.put(`/solicitudes/${solicitudId}`, {
-        datosActor: { ...serverExtraFields.current, ...form, nombre: reg.nombre, cuit: reg.cuit, email: reg.email }, expectedUpdatedAt: serverRevisionRef.current,
+        datosActor: { ...serverExtraFields.current, ...form, _sitrepDraftStep: target, nombre: reg.nombre, cuit: reg.cuit, email: reg.email }, expectedUpdatedAt: serverRevisionRef.current,
       });
       assertDraftSession();
       const updated = response.data?.data?.solicitud?.updatedAt;
@@ -383,6 +383,15 @@ const InscripcionWizardPage: React.FC = () => {
       return false;
     } finally { saveInFlight.current = false; setSaving(false); }
   };
+
+  // An interrupted current step must be recoverable on another authenticated device.
+  // A rejected/conflicting save stops automatic retries and keeps the visible form.
+  const persistCurrent = useRef(persistDraft); persistCurrent.current = persistDraft;
+  useEffect(() => {
+    if (isReviewMode || submitSuccess || !solicitudId || !owner || !dirty || saving || submitting || localConflict || saveError || !ownership.canWrite()) return;
+    const timer = setTimeout(() => { if (!uploadsInFlight.current.size) void persistCurrent.current(step); }, 1000);
+    return () => clearTimeout(timer);
+  }, [isReviewMode, submitSuccess, solicitudId, owner, dirty, form, step, saving, submitting, localConflict, saveError, ownership.status, uploadStates]);
 
   const goStep = async (target: number) => {
     if (target === step || saveInFlight.current || submitting) return;

@@ -35,7 +35,7 @@ export function TrainingCertificates({manifest}:{manifest:Partial<Manifiesto>}){
   e.preventDefault();if(lock.current||!kind||!signature)return;lock.current=true;setBusy(true);setError('');
   const body={tipo:kind,firma:signature,metodo:method,nota:note,cantidades:Object.entries(amounts).filter(([,v])=>v!=='').map(([residuoId,v])=>({residuoId,cantidad:Number(v)}))};
   const content=JSON.stringify(body);if(request.current?.body!==content)request.current={id:crypto.randomUUID(),body:content};
-  try{await api.post(endpoint,{id:request.current.id,...body});setKind(null);setSignature('');request.current=null;await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});}
+  try{await api.post(endpoint,{id:request.current.id,...body});setKind(null);setSignature('');request.current=null;await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});await qc.invalidateQueries({queryKey:['training-tasks']});}
   catch(e:any){setError(e.response?.data?.message||'No se pudo liberar. Se conserva la carga para reintentar.');}
   finally{lock.current=false;setBusy(false);}
  }

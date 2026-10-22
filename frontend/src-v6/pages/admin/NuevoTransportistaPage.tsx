@@ -73,8 +73,8 @@ const NuevoTransportistaPage: React.FC = () => {
   const [documentError, setDocumentError] = useState<string | null>(null);
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
   const draftData = { form, step, vehiculos, choferes, savedActorId, files: [...missingFiles, ...Object.values(pendingDocuments).map(value => value.file.name)] };
-  const draft = useActorRegistrationDraft('TRANSPORTISTA', id, draftData, data => {
-    setPendingDocuments({}); setDocumentError(null);
+  const draft = useActorRegistrationDraft('TRANSPORTISTA', id, draftData, (data, restoredFiles = {}) => {
+    setPendingDocuments(restoredFiles); setDocumentError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
     setVehiculos(fleetRows(data.vehiculos, EMPTY_VEHICULO));
     setChoferes(fleetRows(data.choferes, EMPTY_CHOFER));
@@ -82,7 +82,7 @@ const NuevoTransportistaPage: React.FC = () => {
     setSavedDocuments(Array.isArray(data.savedDocuments) ? data.savedDocuments : []);
     setStep(data.savedActorId ? STEPS.length : Math.min(STEPS.length, Math.max(1, Number(data.step) || 1)));
     setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
-  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || vehiculos.length > 0 || choferes.length > 0 || Boolean(savedActorId));
+  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || vehiculos.length > 0 || choferes.length > 0 || Boolean(savedActorId), pendingDocuments);
 
   useEffect(() => {
     initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setVehiculos([]); setChoferes([]);
@@ -214,6 +214,7 @@ const NuevoTransportistaPage: React.FC = () => {
     setDocumentError(null);
     try {
       draft.assertSession();
+      if (!await draft.checkpoint()) return;
       let actorId = savedActorId || id;
       if (!savedActorId && isEdit && id) {
         await updateMutation.mutateAsync({ id, data: payload });
@@ -226,7 +227,7 @@ const NuevoTransportistaPage: React.FC = () => {
       if (!actorId) throw new Error('El servidor no devolvió el identificador del transportista.');
       draft.assertSession();
       setSavedActorId(actorId);
-      draft.checkpoint({ ...draftData, savedActorId: actorId });
+      if (!await draft.checkpoint({ ...draftData, savedActorId: actorId })) return;
       const failed: string[] = [];
       for (const [tipo, selection] of Object.entries(pendingDocuments)) {
         try {
@@ -242,7 +243,7 @@ const NuevoTransportistaPage: React.FC = () => {
         setDocumentError(`Transportista guardado. Quedan adjuntos pendientes: ${failed.join(', ')}. Reintentá sin repetir el alta.`);
         return;
       }
-      draft.clear(); navigate(mp('/admin/actores/transportistas'));
+      if (!await draft.clear()) return; navigate(mp('/admin/actores/transportistas'));
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
     } finally {

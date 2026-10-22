@@ -118,8 +118,8 @@ const NuevoOperadorPage: React.FC = () => {
   const [tefInputs, setTefInputs] = useState<TEFInputs | null>(null);
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
   const draftData = { form, step, selectedY: [...selectedY], tefInputs, savedActorId, uploadedDocs, files: [...missingFiles, ...Object.values(adjuntos).map(file => file.name)] };
-  const draft = useActorRegistrationDraft('OPERADOR', id, draftData, data => {
-    setAdjuntos({}); setSubmitError(null);
+  const draft = useActorRegistrationDraft('OPERADOR', id, draftData, (data, restoredFiles = {}) => {
+    setAdjuntos(Object.fromEntries(Object.entries(restoredFiles).map(([kind, item]) => [kind, item.file]))); setSubmitError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
     setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
     setTefInputs(data.tefInputs ? tefDeclaredInputs({ tefInputs: data.tefInputs }).inputs : null);
@@ -127,7 +127,7 @@ const NuevoOperadorPage: React.FC = () => {
     setUploadedDocs(data.uploadedDocs && typeof data.uploadedDocs === 'object' ? data.uploadedDocs as Record<string, string> : {});
     setStep(data.savedActorId ? TOTAL_STEPS : Math.min(TOTAL_STEPS, Math.max(1, Number(data.step) || 1)));
     setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
-  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || Boolean(savedActorId));
+  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || Boolean(savedActorId), Object.fromEntries(Object.entries(adjuntos).map(([kind, file]) => [kind, { file }])));
 
   const { data: existing, isLoading: loadingExisting, refetch: reloadExisting } = useOperador(id || '');
   const initializedActor = useRef<string | null>(null);
@@ -314,6 +314,7 @@ const NuevoOperadorPage: React.FC = () => {
     setSubmitError(null);
     try {
       draft.assertSession();
+      if (!await draft.checkpoint()) return;
       let operadorId: string | undefined = savedActorId || undefined;
 
       if (!operadorId && isEdit && id) {
@@ -349,7 +350,7 @@ const NuevoOperadorPage: React.FC = () => {
       if (!operadorId) throw new Error('El servidor no devolvió el identificador del operador.');
       draft.assertSession();
       setSavedActorId(operadorId);
-      draft.checkpoint({ ...draftData, savedActorId: operadorId });
+      if (!await draft.checkpoint({ ...draftData, savedActorId: operadorId })) return;
       const filesToUpload = Object.entries(adjuntos);
       const failed: string[] = [];
       if (operadorId && filesToUpload.length > 0) {
@@ -380,7 +381,7 @@ const NuevoOperadorPage: React.FC = () => {
         setSubmitError(`Operador guardado. No se subieron: ${failed.join(', ')}. Reintentá los adjuntos pendientes; no se repetirá el alta.`);
         return;
       }
-      draft.clear(); navigate(backPath);
+      if (!await draft.clear()) return; navigate(backPath);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Error desconocido al guardar';
       console.error('Submit error:', err);

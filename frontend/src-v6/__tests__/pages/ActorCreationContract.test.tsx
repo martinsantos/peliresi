@@ -6,7 +6,7 @@ import NuevoGeneradorPage from '../../pages/admin/NuevoGeneradorPage';
 import NuevoOperadorPage from '../../pages/admin/NuevoOperadorPage';
 
 const mock = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), uploadDoc: vi.fn(), success: vi.fn(), error: vi.fn(), existing: undefined as unknown }));
-vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn(), clear: vi.fn(), assertSession: vi.fn() }) }));
+vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn().mockResolvedValue(true), clear: vi.fn().mockResolvedValue(true), assertSession: vi.fn() }) }));
 vi.mock('../../services/generador-fiscal.service', () => ({ transportistaDocumentoService: { upload: mock.uploadDoc }, generadorFiscalService: { downloadDocumento: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: mock.success, error: mock.error } }));
 vi.mock('../../hooks/useActores', () => {
@@ -107,7 +107,8 @@ describe('actor creation contract', () => {
     open(); basics(); fill(/Password inicial|Contraseña inicial/, 'OnlyLocal-QA-secret!'); step('Confirmar');
     const button = screen.getByRole('button', { name: 'Crear Transportista' });
     act(() => { fireEvent.click(button); fireEvent.click(button); });
-    expect(mock.create).toHaveBeenCalledOnce();
+    // The synchronous submit guard covers both clicks while the draft checkpoint is awaited.
+    await waitFor(() => expect(mock.create).toHaveBeenCalledOnce());
     await act(async () => reject(new Error('QA failure')));
     fireEvent.click(button); await waitFor(() => expect(mock.create).toHaveBeenCalledTimes(2));
     expect(mock.create.mock.calls[1][0].razonSocial).toBe('QA Transporte');
