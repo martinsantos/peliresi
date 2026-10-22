@@ -258,7 +258,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     MANIFIESTO_EN_TRANSITO: ['Manifiesto en tránsito', 'El retiro fue confirmado. Podés consultar el seguimiento del viaje.'],
     MANIFIESTO_ENTREGADO: ['Carga entregada', 'La entrega fue registrada. Revisá la recepción y las acciones disponibles en el manifiesto.'],
     MANIFIESTO_RECIBIDO: ['Carga recibida', 'La recepción fue registrada. Consultá el manifiesto para seguir el tratamiento.'],
-    MANIFIESTO_TRATADO: ['Tratamiento finalizado', 'El manifiesto fue cerrado como tratado. Podés consultar su certificado de disposición.'],
+    MANIFIESTO_TRATADO: ['Tratamiento finalizado', 'El manifiesto fue cerrado como tratado. Esto no confirma que se haya emitido una certificación. Las nuevas certificaciones requieren firma y emisión expresa del operador. Consultá los documentos disponibles en el manifiesto.'],
     MANIFIESTO_RECHAZADO: ['Carga rechazada', 'Se registró un rechazo de carga. Revisá el motivo y su seguimiento en el manifiesto.'],
     INCIDENTE_REPORTADO: ['Incidente reportado', 'Revisá el incidente y su seguimiento en SITREP.'],
     ANOMALIA_DETECTADA: ['Anomalía detectada', 'Hay una anomalía para revisar. Consultá los datos antes de tomar una decisión.'],
@@ -295,12 +295,13 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   };
   const addendumEvents: Record<string, [string, string]> = {
     CREADA: ['Nueva adenda para revisar', 'Se registró una diferencia en el manifiesto. Revisá el anexo y las acciones de tu perfil.'],
-    APROBADA: ['Adenda aprobada', 'La resolución quedó registrada en el manifiesto.'],
+    APROBADA: ['Una parte aprobó la adenda', 'Se registró una aprobación individual. No representa la decisión de las otras partes ni el cierre documental. Abrí la adenda para consultar quién decidió y su estado actual.'],
     OBSERVADA: ['Adenda observada', 'Hay una observación sobre la adenda. Abrí el manifiesto para consultarla.'],
     RECHAZADA: ['Adenda rechazada', 'La resolución y el anexo original siguen disponibles en el manifiesto.'],
   };
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
   const message = data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
+    : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
     : data.tipo === 'manifiesto_eventual' && validEventualMail(data) ? EVENTUAL_NOTICE_LABELS[String(data.evento) as keyof typeof EVENTUAL_NOTICE_LABELS]
     : data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) ? INSPECTION_EXCHANGE_LABELS[String(data.evento) as keyof typeof INSPECTION_EXCHANGE_LABELS]
     : data.tipo === 'agenda_inspeccion' && validAgendaMail(data) ? INSPECTION_AGENDA_LABELS[String(data.evento) as keyof typeof INSPECTION_AGENDA_LABELS]

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier } } }));
 import { notificationMailContent, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
+import { mailText } from '../../services/email-templates';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
   vi.resetAllMocks();
@@ -12,6 +13,31 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN'])('explains individual approval and separate certificate issuance for %s', rol => {
+    const common = { ...notice, rol, manifiestoId: 'manifest' };
+    const approved = notificationMailContent({ ...common, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'adenda_manifiesto', evento: 'APROBADA', nota: 'PRIVATE', autorRol: '<PRIVATE>' }) })!;
+    expect(approved.subject).toBe('[SITREP] Una parte aprobó la adenda');
+    expect(mailText(approved.html)).toContain('aprobación individual');
+    expect(mailText(approved.html)).toContain('No representa la decisión de las otras partes ni el cierre documental');
+    expect(approved.html).toContain('/manifiestos/manifest/adendas');
+    expect(approved.html).not.toContain('PRIVATE');
+    const closed = notificationMailContent({ ...common, tipo: 'MANIFIESTO_TRATADO', datos: '{}' })!;
+    expect(closed.subject).toBe('[SITREP] Tratamiento finalizado');
+    expect(mailText(closed.html)).toContain('no confirma que se haya emitido una certificación');
+    expect(mailText(closed.html)).toContain('firma y emisión expresa del operador');
+    expect(closed.html).not.toContain('Podés consultar su certificado de disposición');
+    expect(closed.html).toContain('/manifiestos/manifest');
+  });
+  it.each([{ solicitudId: 'application' }, { documentoId: 'document' }])('names the repeated receipt without leaking receipt or actor data: %j', origin => {
+    const repeated = notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', rol: 'GENERADOR', datos: JSON.stringify({ tipo: 'comprobante_repetido', ...origin, ruta: 'https://untrusted.invalid', texto: 'PRIVATE', cuit: 'PRIVATE', importe: 'PRIVATE' }) })!;
+    expect(repeated.subject).toBe('[SITREP] Comprobante repetido: revisá el documento');
+    expect(repeated.family).toBe('alertas');
+    expect(mailText(repeated.html)).toContain('no acredita un pago nuevo');
+    expect(mailText(repeated.html)).toContain('huella del archivo');
+    expect(repeated.html).toContain('/notificaciones');
+    expect(repeated.html).not.toMatch(/PRIVATE|untrusted|fraude/);
+    expect(notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', datos: '{}' })?.subject).toBe('[SITREP] Alerta para revisar');
+  });
   it.each([{ tipo: 'intercambio_inspeccion' }, { tipo: 'intercambio_inspeccion', soloCampana: true }, { soloCampana: true }])('never relays a PSIP or bell-only notice even with SMTP/family enabled: %j', async metadata => {
     const internal = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ inspeccionId: 'inspection', ...metadata }) };
     expect(notificationMailContent(internal)).toBeNull();

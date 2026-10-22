@@ -17,6 +17,17 @@
 
     guides: [
       {
+        id: 'correos-decisiones-documentos', profile: 'generador', audiences: ['transportista', 'operador', 'administrador', 'inspector'],
+        title: 'Correos: decisiones, comprobantes y certificados', summary: 'Qué significa cada aviso y dónde seguirlo, en web y app.',
+        duration: '2 min', icon: 'mark_email_read', keywords: ['correo', 'campana', 'adenda', 'aprobación individual', 'ATM', 'comprobante repetido', 'certificación'],
+        safety: 'Correo y push permanecen apagados. Las muestras se prueban sólo en preview con datos artificiales, sin enviar nada. La campana conserva los avisos; leer un correo no aprueba ni modifica un trámite.',
+        steps: [
+          { title: 'Una parte aprobó la adenda', body: ['Este asunto indica una aprobación individual. No representa la decisión de las otras partes ni el cierre documental.', 'Elegí Abrir manifiesto para llegar a Adendas y revisión posterior. Consultá quién decidió, el motivo y el estado actual. La campana mantiene el autor de cada decisión; las revisiones anteriores se conservan.'], expected: 'Se distingue la aprobación de una parte de la unanimidad del manifiesto y del cierre documental.', resources: [{ label: 'Revisar una adenda', href: '/manual/tutorial.html?guide=adendas-hallazgos-partes' }] },
+          { title: 'Comprobante repetido: revisá el documento', body: ['El correo indica que la huella del archivo coincide con un comprobante ya cargado. Ese archivo no acredita un pago nuevo; el aviso no afirma que haya fraude ni identifica a otro contribuyente.', 'Abrí tus avisos y elegí Comprobante repetido. Desde ahí seguí a tu inscripción o perfil para revisar el documento y las observaciones. No reutilices otra foto del mismo pago: el control de identidad del pago sigue vigente.'], expected: 'La persona conoce la causa y el siguiente paso sin exponer documentos o datos de otras personas.', resources: [{ label: 'Abrir avisos', path: '/notificaciones' }] },
+          { title: 'Tratamiento finalizado no confirma una certificación emitida', body: ['Tratamiento finalizado informa el cierre operativo. No confirma que se haya emitido una certificación. Las nuevas certificaciones requieren firma y emisión expresa del operador.', 'Abrí el manifiesto y revisá Certificaciones. Cuando el operador emite, las otras partes vinculadas reciben un aviso independiente: Certificación parcial disponible o Certificación final total disponible. Ese aviso permite consultar y descargar el documento firmado.', 'Los documentos históricos conservan su acceso anterior. No hace falta volver a emitirlos por este cambio de texto.'], expected: 'Se distingue el cierre del tratamiento de la emisión del documento, en web y app.', resources: [{ label: 'Emitir y recibir certificaciones', href: '/manual/tutorial.html?guide=certificados-operador-partes' }] }
+        ]
+      },
+      {
         id: 'certificados-operador-partes', profile: 'operador', audiences: ['generador', 'transportista', 'administrador'],
         title: 'Certificaciones: emitir, recibir y descargar', summary: 'El operador firma una parcial o final. Cada parte recibe el aviso y descarga el mismo PDF.',
         duration: '3 min', icon: 'workspace_premium', keywords: ['certificado', 'certificación', 'parcial', 'final', 'firma', 'campana', 'descarga'],

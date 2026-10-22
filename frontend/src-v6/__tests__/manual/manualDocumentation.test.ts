@@ -14,6 +14,13 @@ const data = context.window.SITREP_HELP!;
 const catalogue = data.guides.find(guide => guide.id === 'administrador-alertas-proactivas')!;
 
 describe('manual documentation stays usable and truthful', () => {
+  it('distinguishes individual approval, repeated receipts and certificate issuance', () => {
+    const guide = data.guides.find(item => item.id === 'correos-decisiones-documentos');
+    expect(guide).toBeDefined();
+    const content = JSON.stringify(guide);
+    for (const term of ['aprobación individual', 'no acredita un pago nuevo', 'emisión expresa del operador', 'permanecen apagados', 'históricos']) expect(content).toContain(term);
+    expect(guide?.steps).toHaveLength(3);
+  });
   it('keeps unique guides, recognized roles, useful steps and existing captures for every tutorial', () => {
     expect(new Set(data.guides.map(guide => guide.id)).size).toBe(data.guides.length);
     for (const guide of data.guides) {
@@ -75,7 +82,7 @@ describe('manual documentation stays usable and truthful', () => {
       const html = readFileSync(manual + file, 'utf8');
       // Guide content uses its own current cache key; the corrected renderer has its own key; CSS retains its version.
       // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.21.4');
+      expect(html).toContain('help-data.js?v=2026.21.5');
       expect(html).toContain('manual.js?v=2026.20.6');
       expect(html).toContain('manual.css?v=2026.20.5');
     }
