@@ -1,3 +1,4 @@
+import { companyEventNotices } from './companyNotice.service';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { empresaEnabled, type EnterpriseContext } from '../domain/empresa';
@@ -17,6 +18,8 @@ export async function requireCompanyManager(db:any,user:any,empresaId:string) {
 export async function checkCompanyScope(db:any,empresaId:string,scope:{actividadId:string;todosEstablecimientos:boolean;establecimientoIds:string[]}) {
  const activity=await db.empresaActividad.findFirst({where:{id:scope.actividadId,empresaId,activa:true}});
  if(!activity||!isActorActivity(activity.rol))throw new AppError('Actividad no aprobada para esta empresa',400);
+ const actor=await db[activity.rol.toLowerCase()].findUnique({where:{id:activity.actorId},select:{activo:true}});
+ if(!actor?.activo)throw new AppError('La ficha de esta actividad está inactiva. Revisala antes de autorizar personas.',400);
  if(activity.rol!=='GENERADOR'&&!scope.todosEstablecimientos)throw new AppError('El alcance por sede requiere origen de generador identificado. Para esta actividad elegí alcance completo de empresa.',400);
  if(scope.todosEstablecimientos&&scope.establecimientoIds.length||!scope.todosEstablecimientos&&!scope.establecimientoIds.length||new Set(scope.establecimientoIds).size!==scope.establecimientoIds.length)throw new AppError('Alcance de establecimientos inválido',400);
  if(scope.establecimientoIds.length&&await db.establecimientoEmpresa.count({where:{empresaId,activo:true,id:{in:scope.establecimientoIds}}})!==scope.establecimientoIds.length)throw new AppError('Establecimiento ajeno o inactivo',400);
@@ -43,7 +46,13 @@ export async function companyContexts(user:any,empresaIds?:string[]) {
   prisma.empresaActividad.findMany({where:{empresaId:{in:companyIds},activa:true}}),
   prisma.establecimientoEmpresa.findMany({where:{empresaId:{in:companyIds},activo:true},orderBy:{codigo:'asc'}}),
  ]);
- const companiesById=new Map(companies.map(c=>[c.id,c])),activitiesById=new Map(activities.map(a=>[a.id,a]));
+ const activeActors=(await Promise.all(['GENERADOR','TRANSPORTISTA','OPERADOR'].map(async rol=>{
+  const ids=activities.filter(a=>a.rol===rol).map(a=>a.actorId);
+  const rows=ids.length?await (prisma[rol.toLowerCase() as 'generador'|'transportista'|'operador'] as any).findMany({where:{id:{in:ids},activo:true},select:{id:true}}):[];
+  return rows.map((a:{id:string})=>rol+':'+a.id);
+ }))).flat();
+ const activeSet=new Set(activeActors);
+ const companiesById=new Map(companies.map(c=>[c.id,c])),activitiesById=new Map(activities.filter(a=>activeSet.has(a.rol+':'+a.actorId)).map(a=>[a.id,a]));
  const sitesByCompany=new Map<string,typeof sites>();
  for(const site of sites){const list=sitesByCompany.get(site.empresaId)||[];list.push(site);sitesByCompany.set(site.empresaId,list);}
  return grants.flatMap(g=>{
@@ -76,5 +85,6 @@ export async function resolveCompanyContext(user:any,headers:Record<string,unkno
  return {context,actor,key};
 }
 export async function enterpriseEvent(db:any,user:any,empresaId:string,tipo:string,datos:unknown) {
- await db.eventoEmpresa.create({data:{empresaId,usuarioId:user.id,tipo,datos}});
+ const event=await db.eventoEmpresa.create({data:{empresaId,usuarioId:user.id,tipo,datos}});
+ await companyEventNotices(db,event);
 }

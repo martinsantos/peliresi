@@ -1,3 +1,4 @@
+import { syntheticCuit } from '../synthetic-cuit';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
@@ -13,7 +14,7 @@ test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); 
 
 async function syntheticVerification(email: string) {
   await assertCloudDatabase();
-  expect(['actor_onboarding_20261020', 'circuit_review_20261020']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
+  expect(['actor_onboarding_20261020', 'circuit_review_20261020', 'actor_representation_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
   const db = new PrismaClient(), token = 'qa-proof-' + randomUUID();
   try {
     const user = await db.usuario.findUniqueOrThrow({ where: { email } });
@@ -62,7 +63,7 @@ async function clean(page: Page) {
 }
 
 for (const actor of ['generador', 'transportista', 'operador']) test(`${actor}: verified draft, full declaration, ATM, correction and approved account`, async ({ page, browser }, info) => {
-  const id = randomUUID(), email = id + '@night-qa.invalid', cuit = `99-${String(Date.now()).slice(-8)}-0`, errors: string[] = [];
+  const id = randomUUID(), email = id + '@night-qa.invalid', cuit = syntheticCuit(Date.now()), errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.context().addCookies([{ name: 'sitrep_qa_client', value: '127.13.' + Math.floor(Math.random()*240) + '.12', url: 'http://127.0.0.1:4177' }]);
   await page.goto(`${prefix(info)}/inscripcion/${actor}`); await expect(page).toHaveTitle(/SITREP/);
@@ -209,7 +210,7 @@ for (const actor of ['generador', 'transportista', 'operador']) test(`${actor}: 
 });
 
 for (const actor of ['generador', 'transportista', 'operador']) test(`${actor}: rejected result remains readable without offering forbidden actions`, async ({ page, browser }, info) => {
-  const id = randomUUID(), email = id + '@night-qa.invalid', cuit = `99-${String(Date.now()).slice(-8)}-0`;
+  const id = randomUUID(), email = id + '@night-qa.invalid', cuit = syntheticCuit(Date.now());
   // Preparation creates only this test's complete artificial declaration. The
   // verification, administrator decision and return to the result use real UI.
   const started = await page.request.post('/api/solicitudes/iniciar', { data: { email, cuit, nombre: 'QA rechazo ' + id, password, tipoActor: actor.toUpperCase() } });

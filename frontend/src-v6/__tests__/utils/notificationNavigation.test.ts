@@ -18,6 +18,24 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it('opens the exact entity on web and app and refreshes the open company record', () => {
+    const notice={...base,datos:JSON.stringify({tipo:'representacion_empresa',version:1,empresaId:'entity-1',evento:'PERSONA_AUTORIZADA',url:'/wrong'})};
+    expect(resolveNotificationPath(notice)).toBe('/empresas?empresa=entity-1');
+    expect(resolveNotificationPath(notice,'/app')).toBe('/app/empresas?empresa=entity-1');
+    expect(notificationActionLabel(resolveNotificationPath(notice))).toBe('Revisar entidad y personas →');
+    const invalidateQueries=vi.fn();refreshInspectionNotification(notice,{invalidateQueries} as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({queryKey:['empresa']});
+    expect(invalidateQueries).toHaveBeenCalledWith({queryKey:['empresas']});
+  });
+  it.each(['PERSONA_REVOCADA','RESPONSABLE_REVOCADO','INVITACION_REVOCADA'])('keeps %s in the inbox without offering a revoked company context',evento=>{
+    const notice={...base,datos:JSON.stringify({tipo:'representacion_empresa',version:1,empresaId:'entity-1',evento})};
+    expect(resolveNotificationPath(notice)).toBe('/notificaciones');
+    expect(resolveNotificationPath(notice,'/app')).toBe('/app/notificaciones');
+  });
+  it.each([{version:2},{empresaId:'../outside'}])('does not follow a malformed company link %j',invalid=>{
+    const notice={...base,datos:JSON.stringify({tipo:'representacion_empresa',version:1,empresaId:'entity-1',evento:'PERSONA_AUTORIZADA',url:'/wrong',...invalid})};
+    expect(resolveNotificationPath(notice)).toBe('/notificaciones');
+  });
   it('opens the exact released certificate on both surfaces and refreshes its documents', () => {
     const notice={...base,manifiestoId:'m',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'d',tipoCertificado:'FINAL',url:'/wrong'})};
     expect(resolveNotificationPath(notice)).toBe('/manifiestos/m?certificado=d#certificaciones');

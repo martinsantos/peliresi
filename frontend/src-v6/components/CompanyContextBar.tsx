@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 export default function CompanyContextBar() {
  const {currentUser,isRestricted}=useAuth(),mp=useMobilePrefix();
+ if(currentUser?.actividadContextoError&&!isRestricted)return <div role="status" className="flex flex-wrap items-center justify-between gap-2 border-b border-warning-200 bg-warning-50 px-4 py-2 text-sm text-neutral-800"><span>{currentUser.actividadContextoError}</span><Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Elegir actividad</Link></div>;
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true'||!currentUser||isRestricted)return null;
  const c=currentUser.empresaContexto;
  if(!c&&!currentUser.contextosEmpresa?.length&&!currentUser.empresaContextoError)return null;

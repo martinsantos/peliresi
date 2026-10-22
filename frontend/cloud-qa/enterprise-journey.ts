@@ -26,7 +26,8 @@ export async function enterpriseJourney(page:Page,prefix:string,surface:string,o
  await hide();
  const granted=page.waitForResponse(r=>r.url().endsWith('/personas')&&r.request().method()==='POST');
  await page.getByRole('button',{name:'Autorizar cuenta verificada',exact:true}).click();expect((await granted).status()).toBe(201);
- const member=page.getByText('QA '+surface+' member',{exact:true}).locator('..').locator('..');
+ const accessCard=page.getByRole('heading',{name:'Accesos e invitaciones',exact:true}).locator('..');
+ const member=accessCard.getByText('QA '+surface+' member',{exact:true}).locator('..').locator('..');
  await expect(member.getByText('Todos los establecimientos',{exact:true})).toBeVisible();
  await page.getByLabel('Motivo de revocación',{exact:true}).fill('QA revocación '+surface);await hide();
  const revoked=page.waitForResponse(r=>r.url().includes('/revocar')&&r.request().method()==='POST');
@@ -41,6 +42,10 @@ export async function enterpriseJourney(page:Page,prefix:string,surface:string,o
  // Accept another person's invitation without replacing the owner's open session.
  const ownerBefore=await page.evaluate(()=>localStorage.getItem('sitrep_access_token'));
  await page.getByLabel('Correo de la persona',{exact:true}).fill('empresa-'+surface+'-other@night-qa.invalid');await hide();
+ await expect(page.getByRole('button',{name:'Preparar invitación',exact:true})).toBeDisabled();
+ await expect(page.getByText(/El cupo está completo/)).toBeVisible();
+ await member.getByRole('button',{name:'Revocar acceso',exact:true}).click();
+ await expect(member.getByText(/Revocada/)).toBeVisible();
  await page.getByRole('button',{name:'Preparar invitación',exact:true}).click();
  const invitation=await page.getByLabel('Enlace de invitación',{exact:true}).inputValue();
  expect(invitation).toMatch(/\/empresa-invitacion\/\w{64}$/);
@@ -51,8 +56,16 @@ export async function enterpriseJourney(page:Page,prefix:string,surface:string,o
  expect(await page.evaluate(()=>localStorage.getItem('sitrep_access_token'))).toBe(ownerBefore);
  await options.evidence?.('enterprise-invitation');
  await page.goto('http://127.0.0.1:4177'+prefix+'/empresas');
+ await page.getByRole('button',{name:'Personas autorizadas',exact:true}).click();
+ await page.getByLabel('Motivo de revocación',{exact:true}).fill('QA regreso del representante original');
+ const other=accessCard.getByText('QA '+surface+' other',{exact:true}).locator('..').locator('..');
+ await other.getByRole('button',{name:'Revocar acceso',exact:true}).click();await expect(other.getByText(/Revocada/)).toBeVisible();
+ await page.getByLabel('Correo de la persona',{exact:true}).fill('empresa-'+surface+'-member@night-qa.invalid');
+ await page.getByRole('checkbox',{name:'Todos los establecimientos',exact:true}).uncheck();
+ await page.getByRole('checkbox',{name:'Planta Norte',exact:true}).check();
+ await page.getByRole('button',{name:'Autorizar cuenta verificada',exact:true}).click();await expect(member.getByText(/Autorizada/)).toBeVisible();
  await page.getByRole('button',{name:'Historial',exact:true}).click();
- await expect(page.getByText('PERSONA REVOCADA',{exact:true})).toBeVisible();
+ await expect(page.getByText('PERSONA REVOCADA',{exact:true}).first()).toBeVisible();
  await expect(page.getByText('DOMICILIO LEGAL ACTUALIZADO',{exact:true})).toBeVisible();
  await options.evidence?.('enterprise-audit');
  await page.getByLabel('Establecimiento para operar',{exact:true}).selectOption({label:'Planta Norte · NORTE'});

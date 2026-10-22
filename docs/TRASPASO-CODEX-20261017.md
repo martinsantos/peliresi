@@ -1,5 +1,15 @@
 # SITREP — traspaso vigente de operación
 
+## Revisión ABM y representación — sólo preview, 22/10/2026
+
+Leer primero [alcance, cambios, pruebas y cierre](ABM-MULTIROL-REPRESENTANTES-20261022.md). Identidad por CUIT con G/T/O aprobados; máximo **dos personas en total incluida la titular**, compartido entre roles/establecimientos; responsable explícito, invitaciones y revocaciones separadas. Altas revisadas y administrativas vinculan la entidad; no se duplican cuentas ni se cambian históricos por inferencia. Formularios conservan cambios ante avisos/conflictos. Campana y familia de correo `representacion`, sin activar entregas.
+
+**1.542 backend / 1.842 frontend / 105 E2E únicos PASS**; regresión final 68 backend, 26 frontend y 15 E2E, manual final 8 unit + 3 E2E (repeticiones). HTTP 7 grupos empresa + 8 multirol + 131 solicitudes. Manual **2026.22.4**, mismo renderer/CSS y dos capturas directas. Galería 20 plantillas / 40 vistas con logos locales, sin red ni envíos. Lint 0 errores/49 advertencias; builds/tipos PASS.
+
+**849 tablas QA previas intactas**, cero cola activa/intentos/entregas; CAP cerrado, proveedores/correos/push apagados. Preview cerrado **15:11:38 Mendoza**, 1 CPU/2 GiB/swap cero, sin OOM; alcanzó el límite de memoria en el bloque completo. Imagen/base/evidencias conservadas. No se accedió a producción ni se modificó main; sin push/workflows, commit `[skip ci]`.
+
+**No publicado.** Producción sigue en **8a4d8225** y su reversión vigente de abajo. Empresas y multirol permanecen apagados allí; publicar/activar esta tanda requiere autorización expresa. No usar bundles QA `/api` para producción. No certifica dispositivos físicos, documentos fiscales ni entrega externa de correo.
+
 ## Publicación vigente — eventuales, 22/10/2026
 
 **`8a4d8225` publicado en backend, web, app y manual el 22/10/2026 12:18:43 Mendoza.** Búsqueda completa y etapas, retorno al filtro, actualización entre participantes y recuperación de acciones/notas sin pérdida ni duplicación. Leer primero [cambios, evidencia y reversión vigente](EVENTUALES-CONTINUIDAD-20261022.md).

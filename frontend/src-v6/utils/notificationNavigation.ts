@@ -32,6 +32,9 @@ export function refreshInspectionNotification(notificacion: Notificacion, queryC
     for (const key of ['manifiestos','manifest-proposal','training-tasks','manifest-agenda']) void queryClient.invalidateQueries({ queryKey: [key] });
   }
   if (data.tipo === 'manifiesto_eventual' && data.version === 1) void queryClient.invalidateQueries({ queryKey: ['baja-intensidad'] });
+  if (data.tipo === 'representacion_empresa' && data.version === 1) {
+    for (const key of ['empresas', 'empresa']) void queryClient.invalidateQueries({ queryKey: [key] });
+  }
   if (data.tipo === 'antecedente_fiscalizacion' && data.version === 1) void queryClient.invalidateQueries({ queryKey: ['inspection-intakes'] });
   if (typeof data.solicitudId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) {
     void queryClient.invalidateQueries({ queryKey: ['solicitudes'] });
@@ -49,6 +52,7 @@ export function notificationActionLabel(path: string): string {
   if (/^\/(?:mis-)?inspecciones\//.test(pathname)) return 'Abrir expediente y ver el intercambio →';
   if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';
   if (/^\/soporte(?:\/|$)/.test(pathname)) return 'Abrir consulta de soporte →';
+  if (pathname === '/empresas') return 'Revisar entidad y personas →';
   if (pathname === '/mi-perfil') return 'Abrir mi ficha y documentos →';
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
   if (pathname === '/admin/renovaciones') return 'Revisar solicitud de cambio →';
@@ -64,6 +68,10 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   if(data.tipo === 'certificado_manifiesto') {
     const safe=(v:unknown):v is string=>typeof v==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v);
     return withBasePath(data.version===1&&safe(notificacion.manifiestoId)&&safe(data.documentoId)&&['PARCIAL','FINAL'].includes(String(data.tipoCertificado)) ? '/manifiestos/'+notificacion.manifiestoId+'?certificado='+data.documentoId+'#certificaciones' : '/notificaciones',basePath);
+  }
+  if (data.tipo === 'representacion_empresa') {
+    return withBasePath(data.version === 1 && typeof data.empresaId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.empresaId) && !String(data.evento).includes('REVOCAD')
+      ? '/empresas?empresa=' + encodeURIComponent(data.empresaId) : '/notificaciones', basePath);
   }
   if (data.tipo === 'manifiesto_eventual') {
     return withBasePath(data.version === 1 && typeof data.registroId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.registroId)

@@ -1,3 +1,4 @@
+import { syntheticCuit } from './synthetic-cuit.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -25,7 +26,7 @@ try {
     const name = 'multirol-pending-' + surface;
     const user = await db.usuario.create({ data: { email: name + '@night-qa.invalid', password: template.password,
       nombre: 'QA Multirol pendiente ' + surface, rol: 'GENERADOR', activo: false, emailVerified: true,
-      motivoInactividad: 'PENDIENTE_APROBACION', cuit: '30-0000020' + index + '-0' } });
+      motivoInactividad: 'PENDIENTE_APROBACION', cuit: syntheticCuit(70002000 + index*10) } });
     const first = await db.solicitudInscripcion.create({ data: { usuarioId: user.id, tipoActor: 'GENERADOR', datosActor: JSON.stringify({ razonSocial: user.nombre, cuit: user.cuit }) } });
     if (surface !== 'http') continue;
     const token = await login(name);
@@ -46,7 +47,7 @@ try {
   for (const [index, surface] of ['web-desktop', 'web-responsive', 'app', 'apk', 'http'].entries()) {
     const name = 'multirol-' + surface;
     const user = await db.usuario.create({ data: { email: name + '@night-qa.invalid', password: template.password,
-      nombre: 'QA Multirol ' + surface, rol: 'GENERADOR', activo: true, emailVerified: true, cuit: '30-0000010' + index + '-0' } });
+      nombre: 'QA Multirol ' + surface, rol: 'GENERADOR', activo: true, emailVerified: true, cuit: syntheticCuit(70001000 + index*10) } });
     await db.generador.create({ data: { usuarioId: user.id, razonSocial: user.nombre, cuit: user.cuit,
       domicilio: 'QA sin domicilio real', telefono: '', email: user.email, numeroInscripcion: 'QA', categoria: 'QA' } });
     const token = await login(name);

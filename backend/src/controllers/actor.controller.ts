@@ -1,3 +1,4 @@
+import { actorRegistrationIdentity, linkApprovedRegistration, notifyCompanyActorChange } from '../services/companyRegistration.service';
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import bcrypt from 'bcryptjs';
@@ -289,12 +290,13 @@ export const getGeneradorById = async (req: AuthRequest, res: Response, next: Ne
 export const createGenerador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const {
-            razonSocial, cuit, domicilio, telefono, email, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
+            razonSocial, cuit: declaredCuit, domicilio, telefono, email: declaredEmail, password, nombre, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
             expedienteInscripcion, domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
             domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
             certificacionISO, resolucionInscripcion, factorR, montoMxR, categoriaIndividual, libroOperatoria,
             latitud, longitud, tefInputs,
         } = req.body;
+        const { cuit, email } = actorRegistrationIdentity(declaredCuit, declaredEmail) as { cuit: string; email: string };
         const coordinates = actorCoordinates(latitud, longitud);
         const numericFactor = actorNumber(factorR, 'Factor R'), numericAmount = actorNumber(montoMxR, 'Monto M×R');
 
@@ -311,9 +313,15 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
         // Verificar email único en usuarios
         const existeEmail = await prisma.usuario.findUnique({ where: { email } });
         if (existeEmail) {
-            throw new AppError('Ya existe un usuario con ese email', 400);
+            throw new AppError(process.env.ACTOR_MULTIROLE_ENABLED === 'true' ? 'Ya existe un usuario con ese email. Para otro rol usá Mi perfil → Mis actividades; no crees otra cuenta.' : 'Ya existe un usuario con ese email', 400);
         }
 
+        if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
+            const digits = String(cuit).replace(/\D/g, '');
+            const formatted = digits.slice(0,2)+'-'+digits.slice(2,10)+'-'+digits.slice(10);
+            const account = await prisma.usuario.findFirst({ where: { OR: [{ email: { equals: String(email).trim(), mode: 'insensitive' } }, { cuit: { in: [digits, formatted] } }] } });
+            if (account) throw new AppError('La cuenta o el CUIT ya están registrados. Para sumar un rol, la persona debe usar Mi perfil → Mis actividades y presentar la actividad adicional. Conserva su cuenta y contraseña.', 409);
+        }
         validateInitialPassword(password, cuit);
         const passwordHash = await bcrypt.hash(password, 10);
 
@@ -332,7 +340,7 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
             });
 
             // Crear generador
-            return tx.generador.create({
+            const approvedActor = await tx.generador.create({
                 data: {
                     usuarioId: usuario.id,
                     razonSocial, cuit, domicilio, telefono, email, numeroInscripcion, categoria, actividad, rubro, corrientesControl,
@@ -350,6 +358,8 @@ export const createGenerador = async (req: AuthRequest, res: Response, next: Nex
                     usuario: { select: { email: true, nombre: true } }
                 }
             });
+            await linkApprovedRegistration(tx, { id: 'alta-administrativa:' + approvedActor.id, usuarioId: usuario.id, tipoActor: 'GENERADOR' }, approvedActor.id, req.user!);
+            return approvedActor;
         });
 
         await auditarActor({ accion: 'CREATE', modulo: 'GENERADOR', datosDespues: generador, usuarioId: req.user!.id, generadorId: generador.id, ip: req.ip, userAgent: req.headers['user-agent'] });
@@ -397,6 +407,7 @@ export const updateGenerador = async (req: AuthRequest, res: Response, next: Nex
             }
         });
 
+        await notifyCompanyActorChange(transaction, 'GENERADOR', antes, actualizado, req.user!);
         await auditarActor({ accion: 'UPDATE', modulo: 'GENERADOR', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, generadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
             return actualizado;
         });
@@ -537,12 +548,13 @@ export const getTransportistaById = async (req: AuthRequest, res: Response, next
 export const createTransportista = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const {
-            razonSocial, cuit, domicilio, numeroHabilitacion, telefono, email, password, vehiculos, choferes,
+            razonSocial, cuit: declaredCuit, domicilio, numeroHabilitacion, telefono, email: declaredEmail, password, vehiculos, choferes,
             // Campos regulatorios DPA
             localidad, vencimientoHabilitacion, corrientesAutorizadas,
             expedienteDPA, resolucionDPA, resolucionSSP, actaInspeccion, actaInspeccion2,
             latitud, longitud,
         } = req.body;
+        const { cuit, email } = actorRegistrationIdentity(declaredCuit, declaredEmail) as { cuit: string; email: string };
         const coordinates = actorCoordinates(latitud, longitud);
 
         if (!razonSocial || !cuit || !email) {
@@ -579,6 +591,12 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
             throw new AppError('Ya existe un transportista con ese CUIT', 400);
         }
 
+        if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
+            const digits = String(cuit).replace(/\D/g, '');
+            const formatted = digits.slice(0,2)+'-'+digits.slice(2,10)+'-'+digits.slice(10);
+            const account = await prisma.usuario.findFirst({ where: { OR: [{ email: { equals: String(email).trim(), mode: 'insensitive' } }, { cuit: { in: [digits, formatted] } }] } });
+            if (account) throw new AppError('La cuenta o el CUIT ya están registrados. Para sumar un rol, la persona debe usar Mi perfil → Mis actividades y presentar la actividad adicional. Conserva su cuenta y contraseña.', 409);
+        }
         validateInitialPassword(password, cuit);
         const passwordHash = await bcrypt.hash(password, 10);
         const transportista = await prisma.$transaction(async tx => {
@@ -595,7 +613,7 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
                 }
             });
 
-            return tx.transportista.create({
+            const approvedActor = await tx.transportista.create({
                 data: {
                     usuarioId: usuario.id,
                     razonSocial,
@@ -637,6 +655,8 @@ export const createTransportista = async (req: AuthRequest, res: Response, next:
                 },
                 include: { vehiculos: true, choferes: true }
             });
+            await linkApprovedRegistration(tx, { id: 'alta-administrativa:' + approvedActor.id, usuarioId: usuario.id, tipoActor: 'TRANSPORTISTA' }, approvedActor.id, req.user!);
+            return approvedActor;
         });
 
         await auditarActor({ accion: 'CREATE', modulo: 'TRANSPORTISTA', datosDespues: transportista, usuarioId: req.user!.id, transportistaId: transportista.id, ip: req.ip, userAgent: req.headers['user-agent'] });
@@ -685,6 +705,7 @@ export const updateTransportista = async (req: AuthRequest, res: Response, next:
             }
         });
 
+        await notifyCompanyActorChange(transaction, 'TRANSPORTISTA', antes, actualizado, req.user!);
         await auditarActor({ accion: 'UPDATE', modulo: 'TRANSPORTISTA', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, transportistaId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
             return actualizado;
         });
@@ -1090,7 +1111,7 @@ export const getOperadorById = async (req: AuthRequest, res: Response, next: Nex
 export const createOperador = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const {
-            razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, password, nombre, categoria, tipoOperador, tecnologia, corrientesY,
+            razonSocial, cuit: declaredCuit, numeroHabilitacion, domicilio, telefono, email: declaredEmail, password, nombre, categoria, tipoOperador, tecnologia, corrientesY,
             expedienteInscripcion, certificadoNumero,
             domicilioLegalCalle, domicilioLegalLocalidad, domicilioLegalDepto,
             domicilioRealCalle, domicilioRealLocalidad, domicilioRealDepto,
@@ -1098,6 +1119,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
             representanteTecnicoNombre, representanteTecnicoMatricula, representanteTecnicoTelefono,
             vencimientoHabilitacion, resolucionDPA, latitud, longitud, tefInputs,
         } = req.body;
+        const { cuit, email } = actorRegistrationIdentity(declaredCuit, declaredEmail) as { cuit: string; email: string };
         const coordinates = actorCoordinates(latitud, longitud);
 
         if (!razonSocial || !cuit || !email) {
@@ -1111,9 +1133,15 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
 
         const existeEmail = await prisma.usuario.findUnique({ where: { email } });
         if (existeEmail) {
-            throw new AppError('Ya existe un usuario con ese email', 400);
+            throw new AppError(process.env.ACTOR_MULTIROLE_ENABLED === 'true' ? 'Ya existe un usuario con ese email. Para otro rol usá Mi perfil → Mis actividades; no crees otra cuenta.' : 'Ya existe un usuario con ese email', 400);
         }
 
+        if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
+            const digits = String(cuit).replace(/\D/g, '');
+            const formatted = digits.slice(0,2)+'-'+digits.slice(2,10)+'-'+digits.slice(10);
+            const account = await prisma.usuario.findFirst({ where: { OR: [{ email: { equals: String(email).trim(), mode: 'insensitive' } }, { cuit: { in: [digits, formatted] } }] } });
+            if (account) throw new AppError('La cuenta o el CUIT ya están registrados. Para sumar un rol, la persona debe usar Mi perfil → Mis actividades y presentar la actividad adicional. Conserva su cuenta y contraseña.', 409);
+        }
         validateInitialPassword(password, cuit);
         const passwordHash = await bcrypt.hash(password, 10);
         const modalidades = ['ADMIN', 'ADMIN_OPERADOR'].includes(req.user!.rol) ? operatorModalitiesForType(tipoOperador) : undefined;
@@ -1130,7 +1158,7 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                 }
             });
 
-            return tx.operador.create({
+            const approvedActor = await tx.operador.create({
                 data: {
                     usuarioId: usuario.id,
                     razonSocial, cuit, numeroHabilitacion, domicilio, telefono, email, categoria, tipoOperador, tecnologia, corrientesY,
@@ -1147,6 +1175,8 @@ export const createOperador = async (req: AuthRequest, res: Response, next: Next
                 },
                 include: { usuario: { select: { email: true, nombre: true } } }
             });
+            await linkApprovedRegistration(tx, { id: 'alta-administrativa:' + approvedActor.id, usuarioId: usuario.id, tipoActor: 'OPERADOR' }, approvedActor.id, req.user!);
+            return approvedActor;
         });
 
         await auditarActor({ accion: 'CREATE', modulo: 'OPERADOR', datosDespues: operador, usuarioId: req.user!.id, operadorId: operador.id, ip: req.ip, userAgent: req.headers['user-agent'] });
@@ -1197,6 +1227,7 @@ export const updateOperador = async (req: AuthRequest, res: Response, next: Next
             }
         });
 
+        await notifyCompanyActorChange(transaction, 'OPERADOR', antes, actualizado, req.user!);
         await auditarActor({ accion: 'UPDATE', modulo: 'OPERADOR', datosAntes: antes, datosDespues: actualizado, usuarioId: req.user!.id, operadorId: id, ip: req.ip, userAgent: req.headers['user-agent'] }, transaction);
             return actualizado;
         });

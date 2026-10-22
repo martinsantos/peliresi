@@ -2,6 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { isolatedMapTiles, login, prefix } from './helpers';
+import { syntheticCuit } from '../synthetic-cuit';
 test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); });
 import { assertCloudDatabase } from '../safety';
 const require = createRequire(new URL('../../package.json', import.meta.url));
@@ -31,14 +32,29 @@ async function create(page: Page, info: TestInfo) {
   const uid = randomUUID();
   await page.getByLabel('Nombre completo *', { exact: true }).fill('QA alta integral');
   await page.getByLabel('Email *', { exact: true }).fill(`${uid}@night-qa.invalid`);
-  await page.getByLabel('CUIT *', { exact: true }).fill(`30-${String(Date.now()).slice(-8)}-1`);
+  await page.getByLabel('CUIT *', { exact: true }).fill(syntheticCuit(Date.now()));
   await page.getByLabel('Contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await page.getByLabel('Confirmar contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   const posted = page.waitForResponse(response => response.url().endsWith('/api/solicitudes/iniciar') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Crear cuenta y continuar', exact: true }).click();
   const response = await posted; expect(response.status()).toBe(201);
   await expect(page.getByTestId('registration-wizard')).toBeVisible();
-  return (await response.json()).data as { solicitudId: string };
+  const candidate = (await response.json()).data as { solicitudId: string };
+  await assertCloudDatabase();
+  expect(new URL(process.env.DATABASE_URL!).searchParams.get('schema')).toBe('actor_representation_20261022');
+  const db = new PrismaClient(), proof = 'qa-proof-' + randomUUID();
+  try {
+    const user = await db.usuario.findUniqueOrThrow({ where: { email: `${uid}@night-qa.invalid` } });
+    expect(user.emailVerified).toBe(false);
+    // Substitute only the proof for this newly created artificial identity.
+    // Verification itself still runs through the shipped UI/controller.
+    await db.usuario.update({ where: { id: user.id }, data: { emailVerificationToken: createHash('sha256').update(proof).digest('hex') } });
+  } finally { await db.$disconnect(); }
+  await page.goto(`${prefix(info)}/verificar-email?token=${proof}`);
+  await expect(page.getByRole('heading', { name: 'Email verificado', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Continuar en SITREP', exact: true }).click();
+  await expect(page.getByTestId('registration-wizard')).toBeVisible();
+  return candidate;
 }
 async function cleanLayout(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
@@ -175,12 +191,17 @@ test('public transport: original license, structured fleet, administrative corre
 test('administrative transport uses the same driver and license controls without creating an actor during draft recovery', async ({ page }, info) => {
   test.setTimeout(90000); await login(page, info);
   const creates: string[] = []; page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/api/actores/transportistas')) creates.push(request.url()); });
+  const draftRead = page.waitForResponse(r => r.request().method() === 'GET' && r.url().includes('/actores/borradores/'));
   await page.goto(`${prefix(info)}/admin/actores/transportistas/nuevo`);
+  const priorDraft = await draftRead; expect(priorDraft.status()).toBe(200);
+  if ((await priorDraft.json()).data.draft) await page.getByRole('button', { name: 'Continuar sin recuperar', exact: true }).click();
   await page.getByLabel('Razon Social *', { exact: true }).fill('QA borrador compartido'); await page.getByLabel('CUIT *', { exact: true }).fill('30-70000001-1'); await page.getByLabel('Email *', { exact: true }).fill('qa-shared-driver@night-qa.invalid'); await page.getByLabel('Contraseña inicial *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await administrativeStep(page, 4, 'Choferes'); await page.getByRole('button', { name: 'Agregar', exact: true }).click();
   const driver = page.getByRole('group', { name: 'Chofer 1', exact: true }); await driver.getByLabel('Archivo de licencia del chofer 1').setInputFiles({ name: 'LICENCIA-QA.png', mimeType: 'image/png', buffer: await license() });
   await driver.getByRole('button', { name: 'Usar datos seleccionados', exact: true }).click();
-  await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click(); await page.reload(); await page.getByRole('button', { name: 'Recuperar borrador', exact: true }).click();
+  await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Borrador del alta' }).getByRole('status')).toHaveText('Guardado en SITREP · podés continuar en otro dispositivo');
+  await page.reload(); await page.getByRole('button', { name: 'Recuperar borrador', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Chofer 1', exact: true }).getByLabel('DNI *', { exact: true })).toHaveValue('90000000');
   const recoveredDriver = page.getByRole('group', { name: 'Chofer 1', exact: true });
   const reader = await recoveredDriver.getByRole('button', { name: 'Adjuntar licencia y leer', exact: true }).boundingBox();

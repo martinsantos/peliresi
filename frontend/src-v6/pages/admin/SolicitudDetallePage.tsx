@@ -486,6 +486,7 @@ const SolicitudDetallePage: React.FC = () => {
               Vas a aprobar la solicitud de <strong>{solicitud.usuario?.nombre}</strong> como{' '}
               <strong>{solicitud.tipoActor}</strong>. Esto creara el actor y habilitara la cuenta.
             </p>
+            {import.meta.env.VITE_ENTERPRISE_ENABLED === 'true' && <p className="text-sm text-neutral-700">La cuenta titular, con correo verificado, quedará vinculada al CUIT como responsable ante SITREP. Podrá autorizar a una segunda persona. Los demás roles conservan su revisión y no agregan cupos.</p>}
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setConfirmarAprobar(false)}>
                 Cancelar

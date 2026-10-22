@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { login, prefix } from './helpers';
+import { syntheticCuit } from '../synthetic-cuit';
 
 const actors = [
   { type: 'generador', plural: 'generadores', label: 'Generador', cuit: '99-00000001-0', total: 7 },
@@ -15,7 +16,7 @@ async function create(page: Page, info: TestInfo, type: string) {
   const id = randomUUID();
   await page.getByLabel('Nombre completo *', { exact: true }).fill(`QA ${id}`);
   await page.getByLabel('Email *', { exact: true }).fill(`${id}@night-qa.invalid`);
-  await page.getByLabel('CUIT *', { exact: true }).fill(`30-${String(Date.now()).slice(-8)}-1`);
+  await page.getByLabel('CUIT *', { exact: true }).fill(syntheticCuit(Date.now()));
   await page.getByLabel('Contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   await page.getByLabel('Confirmar contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
   const posted = page.waitForResponse(response => new URL(response.url()).pathname === '/api/solicitudes/iniciar' && response.request().method() === 'POST');
@@ -110,13 +111,16 @@ for (const actor of actors) test(`${actor.type}: administrative draft recovers w
   const creations: string[] = [], errors: string[] = [];
   page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === `/api/actores/${actor.plural}`) creations.push(request.url()); });
   page.on('pageerror', error => errors.push(error.message));
+  const draftRead = page.waitForResponse(r => r.request().method() === 'GET' && r.url().includes('/actores/borradores/'));
   await page.goto(`${prefix(info)}/admin/actores/${actor.plural}/nuevo`);
+  const priorDraft = await draftRead; expect(priorDraft.status()).toBe(200);
+  if ((await priorDraft.json()).data.draft) await page.getByRole('button', { name: 'Continuar sin recuperar', exact: true }).click();
   await page.getByRole('button', { name: actor.type === 'transportista' ? 'Siguiente' : 'Continuar', exact: true }).click();
   await expect(page.getByLabel('Razon Social *', { exact: true })).toBeFocused();
   await page.getByLabel('Razon Social *', { exact: true }).fill(`QA borrador administrativo ${actor.type}`);
   await page.getByLabel('CUIT *', { exact: true }).fill('30-70876543-1');
   await page.getByLabel('Email *', { exact: true }).fill(`${actor.type}-draft@night-qa.invalid`);
-  await expect(page.getByRole('region', { name: 'Borrador del alta' }).getByRole('status')).toContainText('Borrador guardado en este dispositivo');
+  await expect(page.getByRole('region', { name: 'Borrador del alta' }).getByRole('status')).toHaveText('Guardado en SITREP · podés continuar en otro dispositivo');
   await page.reload();
   await page.getByRole('button', { name: 'Recuperar borrador', exact: true }).click();
   await expect(page.getByLabel('Razon Social *', { exact: true })).toHaveValue(`QA borrador administrativo ${actor.type}`);

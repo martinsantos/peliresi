@@ -14,3 +14,9 @@ describe('additional actor activities', () => {
     expect(isActorActivity(value)).toBe(false);
   });
 });
+
+it('an inactive activity is denied even with its earlier approval; other active roles remain available', () => {
+  const account = { rol: 'GENERADOR', generador: { id: 'g', activo: true }, operador: { id: 'o', activo: false } };
+  expect(approvedActivities(account, [{ tipoActor: 'OPERADOR', operadorId: 'o' }])).toEqual(['GENERADOR']);
+  expect(approvedActivities({ ...account, generador: { id: 'g', activo: false } }, [])).toEqual([]);
+});

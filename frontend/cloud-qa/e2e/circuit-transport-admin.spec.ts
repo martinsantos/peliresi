@@ -1,3 +1,4 @@
+import { syntheticCuit } from '../synthetic-cuit';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { expect, test } from '@playwright/test';
@@ -9,12 +10,15 @@ const pdf = (lines: string[]) => { const doc = new jsPDF(); doc.text(['ARTIFICIA
 
 test('administrative transport preserves fleet and partial uploads, then reviews ATM from its own dossier', async ({ page, browser }, info) => {
   test.setTimeout(120_000); await assertCloudDatabase();
-  const uid = randomUUID(), payment = String(Date.now()), cuit = '99-' + payment.slice(-8) + '-0', plate = 'QA' + payment.slice(-5);
+  const uid = randomUUID(), payment = String(Date.now()), cuit = syntheticCuit(Number(payment)), plate = 'QA' + payment.slice(-5);
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   let creates = 0;
   page.on('request', r => { if (r.method() === 'POST' && new URL(r.url()).pathname === '/api/actores/transportistas') creates++; });
   await login(page, info, 'admin-transporte');
+  const draftRead = page.waitForResponse(r => r.request().method()==='GET' && r.url().includes('/actores/borradores/'));
   await page.goto(prefix(info) + '/admin/actores/transportistas/nuevo');
+  const priorDraft = await draftRead;expect(priorDraft.status()).toBe(200);
+  if ((await priorDraft.json()).data.draft) await page.getByRole('button',{name:'Continuar sin recuperar',exact:true}).click();
   for (const [label, value] of [['Razon Social *', 'QA transporte directo ' + uid], ['CUIT *', cuit], ['Email *', uid + '@night-qa.invalid'], ['Contraseña inicial *', 'OnlyLocal-NightQA-2026!']]) await page.getByLabel(label, { exact: true }).fill(value);
   const step = async (number: number, name: string) => {
     if (info.project.name === 'web-desktop') await page.getByRole('button', { name: `${number}. ${name}`, exact: true }).click();
@@ -31,16 +35,26 @@ test('administrative transport preserves fleet and partial uploads, then reviews
   await documents.locator('input[type=file]').setInputFiles({ name: 'ATM-transporte-QA.pdf', mimeType: 'application/pdf', buffer: receipt });
   await documents.getByLabel('Tipo documento', { exact: true }).selectOption('OTRO');
   await documents.locator('input[type=file]').setInputFiles({ name: 'Adjunto-reintento-QA.pdf', mimeType: 'application/pdf', buffer: Buffer.from('QA invalid PDF signature') });
+  await page.getByRole('button', { name: 'Crear Transportista', exact: true }).click();
+  await expect(page.getByRole('region', {name:'Borrador del alta'}).getByRole('alert')).toContainText('El contenido no corresponde a un PDF');
+  expect(creates).toBe(0);
+  await documents.getByRole('button', {name:'Quitar Adjunto-reintento-QA.pdf',exact:true}).click();
+  const other = pdf(['QA documento recuperado', uid]);
+  await documents.locator('input[type=file]').setInputFiles({ name: 'Adjunto-reintento-QA.pdf', mimeType: 'application/pdf', buffer: other });
+  let interrupted = 0;
+  await page.route(/\/api\/actores\/transportistas\/[^/]+\/documentos$/, async route => {
+    if (route.request().method()==='POST' && route.request().postDataBuffer()?.includes(Buffer.from('Adjunto-reintento-QA.pdf')) && interrupted===0) {
+      interrupted++;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({success:false,message:'Falla temporal artificial de carga'})});
+    } else await route.continue();
+  });
   const created = page.waitForResponse(r => new URL(r.url()).pathname === '/api/actores/transportistas' && r.request().method() === 'POST');
   await page.getByRole('button', { name: 'Crear Transportista', exact: true }).click();
   const result = await created; expect(result.status()).toBe(201); const actorId = (await result.json()).data.transportista.id;
   await expect(page.getByRole('alert', { name: 'Adjuntos pendientes' })).toContainText('Transportista guardado');
   await expect(page.getByRole('button', { name: 'Reintentar adjuntos', exact: true })).toBeEnabled();
   await page.screenshot({ path: info.outputPath('transport-partial-upload.png'), animations: 'disabled' });
-  const other = pdf(['QA documento recuperado', uid]);
-  await documents.locator('input[type=file]').setInputFiles({ name: 'Adjunto-reintento-QA.pdf', mimeType: 'application/pdf', buffer: other });
   await page.getByRole('button', { name: 'Reintentar adjuntos', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp('/admin/actores/transportistas$')); expect(creates).toBe(1);
+  await expect(page).toHaveURL(new RegExp('/admin/actores/transportistas$')); expect(creates).toBe(1);expect(interrupted).toBe(1);
   await page.goto(prefix(info) + '/admin/actores/transportistas/' + actorId);
   await expect(page.getByRole('tab', { name: 'Documentos', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Documentos', exact: true }).click();

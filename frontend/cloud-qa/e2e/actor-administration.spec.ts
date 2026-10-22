@@ -1,3 +1,4 @@
+import { syntheticCuit } from '../synthetic-cuit';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
@@ -9,9 +10,9 @@ const { jsPDF } = createRequire(new URL('../../package.json', import.meta.url))(
 test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); });
 
 for (const actor of ['generador', 'operador'] as const) test(`${actor}: administrative alta retains electrical evidence and reserves ATM before review`, async ({ page }, info) => {
-  await assertCloudDatabase(); expect(['actor_onboarding_20261020', 'circuit_review_20261020']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
+  await assertCloudDatabase(); expect(['actor_onboarding_20261020', 'circuit_review_20261020', 'actor_representation_20261022']).toContain(new URL(process.env.DATABASE_URL!).searchParams.get('schema'));
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
-  const id = randomUUID(), cuit = `99-${String(Date.now()).slice(-8)}-0`, route = actor === 'generador' ? 'generadores' : 'operadores', payment = String(Date.now());
+  const id = randomUUID(), cuit = syntheticCuit(Date.now()), route = actor === 'generador' ? 'generadores' : 'operadores', payment = String(Date.now());
   await login(page, info, 'admin-' + actor); await page.goto(`${prefix(info)}/admin/actores/${route}/nuevo`);
   for (const [label, value] of [['Razon Social *', 'QA directa ' + actor + ' ' + id], ['CUIT *', cuit], ['Email *', id + '@night-qa.invalid']]) await page.getByLabel(label, { exact: true }).fill(value);
   const step = async (number: number, name: string) => {

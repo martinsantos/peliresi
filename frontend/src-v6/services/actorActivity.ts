@@ -17,3 +17,5 @@ export function saveActorActivity(owner: string, activity: string) {
   sessionStorage.removeItem('sitrep_company:' + owner);
   sessionStorage.setItem('sitrep_activity:' + owner, activity);
 }
+
+export function clearActorActivity(owner: string) { sessionStorage.removeItem('sitrep_activity:' + owner); }

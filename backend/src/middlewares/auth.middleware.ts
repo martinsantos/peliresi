@@ -124,6 +124,10 @@ export const isAuthenticated = async (
       req.user.rolBase = user.rol;
       req.user.rol = activity;
     }
+    const operational = isActorActivity(req.user.rol) ? req.user[req.user.rol.toLowerCase() as 'generador'|'transportista'|'operador'] : null;
+    if (operational?.activo === false && !['GET','HEAD','OPTIONS'].includes(req.method) && !/^\/api\/(?:auth|solicitudes|empresas|notificaciones|soporte)(?:[/?]|$)/.test(req.originalUrl)) {
+      throw new AppError('Esta actividad está inactiva. Podés consultar el historial o elegir otra actividad aprobada desde Mi perfil.', 403);
+    }
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {

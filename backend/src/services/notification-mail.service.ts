@@ -1,3 +1,4 @@
+import { COMPANY_NOTICE_LABELS, validCompanyNotice, companyNoticeEligible } from './companyNotice.service';
 /** Relay committed in-app notices, never send from inside a business transaction.
  * Separate opt-in per family; SMTP still requires its own explicit activation.
  * No historic backfill: both source notices and queue are fenced by the cutoff.
@@ -22,7 +23,7 @@ export type NoticeForMail = {
 const MANIFEST_TYPES = ['MANIFIESTO_FIRMADO', 'MANIFIESTO_EN_TRANSITO', 'MANIFIESTO_ENTREGADO', 'MANIFIESTO_RECIBIDO', 'MANIFIESTO_TRATADO', 'MANIFIESTO_RECHAZADO'];
 const ALERT_TYPES = ['INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA'];
 function enabledFamilies(): string[] {
-  return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').map(item => item.trim()).filter(item => ['solicitudes', 'soporte', 'inspecciones', 'certificados', 'manifiestos', 'alertas', 'padron'].includes(item));
+  return (process.env.EMAIL_NOTIFICATION_FAMILIES || '').split(',').map(item => item.trim()).filter(item => ['solicitudes', 'soporte', 'inspecciones', 'certificados', 'manifiestos', 'alertas', 'padron', 'representacion'].includes(item));
 }
 
 type InspectionMailScope = { inspectorId: string; tipoActor: string | null; estado: string;
@@ -38,6 +39,7 @@ function inspectionAudience(notice: NoticeForMail, inspection: InspectionMailSco
 /** Recheck the source at enqueue AND delivery, including reassignment/revocation. */
 export async function notificationSourceEligible(notice: NoticeForMail, family: string): Promise<boolean> {
   const data = JSON.parse(notice.datos || '{}');
+  if (family === 'representacion') return process.env.ENTERPRISE_ENABLED === 'true' && companyNoticeEligible(prisma, notice.usuarioId, data);
   if (family === 'manifiestos' && data.tipo === 'manifiesto_eventual') {
     if (!manifestFeatureEnabled('MANIFEST_EXCEPTIONAL_ENABLED') || !validEventualMail(data) || !notice.usuarioId) return false;
     const record = await prisma.registroManifiestoExcepcional.findUnique({ where: { id: data.registroId as string } });
@@ -210,8 +212,11 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   if (data.tipo === 'agenda_inspeccion' && !validAgendaMail(data)) return null;
   if (data.tipo === 'antecedente_fiscalizacion' && !validIntakeMail(data)) return null;
   if (data.tipo === 'manifiesto_eventual' && !validEventualMail(data)) return null;
+  if (data.tipo === 'representacion_empresa' && !validCompanyNotice(data)) return null;
   let family: string, path: string, title: string;
-  if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
+  if (notice.tipo === 'INFO_GENERAL' && validCompanyNotice(data)) {
+    family = 'representacion'; title = 'Novedad en tu representación'; path = String(data.evento).includes('REVOCAD') ? '/notificaciones' : '/empresas?empresa=' + encodeURIComponent(String(data.empresaId));
+  } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     family = 'certificados'; title = 'Certificado ambiental disponible';
     path = '/mi-perfil';
   } else if (['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(notice.tipo) && typeof data.renovacionId === 'string' && data.renovacionId) {
@@ -272,6 +277,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     certificados: ['Certificado ambiental disponible', 'El certificado oficial está disponible en tu perfil. Ingresá para consultarlo o descargarlo.', 'Ver certificado'],
     manifiestos: ['Novedad en el manifiesto', 'Revisá el estado y las acciones disponibles para tu perfil.', 'Abrir manifiesto'],
     alertas: ['Aviso de seguimiento', 'Revisá la causa del aviso y su seguimiento en SITREP.', 'Revisar aviso'],
+    representacion: ['Novedad en tu representación', 'Revisá tus accesos y los de tu entidad.', 'Revisar acceso'],
     padron: ['Novedad en el padrón', 'Revisá la resolución de la modificación de datos.', 'Revisar modificación'],
   };
   const fallback = families[family];
@@ -300,7 +306,8 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     RECHAZADA: ['Adenda rechazada', 'La resolución y el anexo original siguen disponibles en el manifiesto.'],
   };
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
-  const message = data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
+  const message = validCompanyNotice(data) ? COMPANY_NOTICE_LABELS[String(data.evento)]
+    : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
     : data.tipo === 'manifiesto_eventual' && validEventualMail(data) ? EVENTUAL_NOTICE_LABELS[String(data.evento) as keyof typeof EVENTUAL_NOTICE_LABELS]
     : data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) ? INSPECTION_EXCHANGE_LABELS[String(data.evento) as keyof typeof INSPECTION_EXCHANGE_LABELS]
@@ -329,7 +336,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     WHERE q.id IS NULL AND n."createdAt" >= $1
       AND (n.tipo::text LIKE 'SOLICITUD_%' OR n.tipo::text LIKE 'MANIFIESTO_%' OR n.tipo::text LIKE 'MODIFICACION_%'
         OR n.tipo::text IN ('INCIDENTE_REPORTADO', 'ANOMALIA_DETECTADA', 'VENCIMIENTO_PROXIMO', 'ALERTA_SISTEMA')
-        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
+        OR (n.tipo::text = 'INFO_GENERAL' AND (n.datos LIKE '%"representacion_empresa"%' OR n.datos LIKE '%"manifiesto_eventual"%' OR n.datos LIKE '%"antecedente_fiscalizacion"%' OR n.datos LIKE '%"soporte"%' OR n.datos LIKE '%"inspeccionId"%' OR n.datos LIKE '%"certificado_manifiesto"%' OR n.datos LIKE '%"certificado_ambiental"%' OR n.datos LIKE '%"catalogo_verificable"%' OR n.datos LIKE '%"seguimiento_cierre"%' OR n.datos LIKE '%"propuesta_partes"%' OR n.datos LIKE '%"adenda_manifiesto"%' OR n.datos LIKE '%"relevo_transporte"%')))
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;

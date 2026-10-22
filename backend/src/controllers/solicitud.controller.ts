@@ -1,3 +1,5 @@
+import { verifiedCuit } from '../domain/conciliacionExterna';
+import { linkApprovedRegistration } from '../services/companyRegistration.service';
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -26,7 +28,8 @@ import {
 } from '../services/solicitudRequirements.service';
 
 // ── CUIT normalization (same pattern as auth.controller) ────────────
-function normalizeCuit(raw: string): string | null {
+function normalizeCuit(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !/^[\d\s-]+$/.test(raw)) return null;
   const digits = raw.replace(/[^0-9]/g, '');
   if (digits.length !== 11) return null;
   return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
@@ -114,10 +117,11 @@ export const getRequisitosSolicitud = async (req: Request, res: Response, next: 
  */
 export const iniciarSolicitud = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, nombre, tipoActor, cuit } = req.body;
+    const { email: rawEmail, password, nombre, tipoActor, cuit } = req.body;
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
 
     // Validate required fields
-    if (!email || !password || !nombre || !tipoActor || !cuit) {
+    if (!email || typeof password !== 'string' || !password || typeof nombre !== 'string' || !nombre.trim() || !tipoActor || !cuit) {
       throw new AppError('email, password, nombre, tipoActor y cuit son obligatorios', 400);
     }
 
@@ -137,6 +141,7 @@ export const iniciarSolicitud = async (req: Request, res: Response, next: NextFu
     // CUIT normalization
     const normalizedCuit = normalizeCuit(cuit);
     if (!normalizedCuit) throw new AppError('CUIT invalido (debe tener 11 digitos)', 400);
+    if (process.env.ENTERPRISE_ENABLED === 'true' && !verifiedCuit(normalizedCuit)) throw new AppError('Revisá el CUIT: el prefijo o el dígito verificador no coinciden. Corregilo antes de crear la cuenta.', 400);
 
     // Check email uniqueness
     const existingByEmail = await prisma.usuario.findUnique({ where: { email } });
@@ -884,7 +889,7 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
 
     const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
-      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true') {
+      if (process.env.ACTOR_MULTIROLE_ENABLED === 'true' || process.env.ENTERPRISE_ENABLED === 'true') {
         await tx.$queryRaw`SELECT id FROM usuarios WHERE id = ${solicitud.usuarioId} FOR UPDATE`;
       }
       const current = await tx.solicitudInscripcion.findUnique({ where: { id } });
@@ -972,6 +977,8 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
           rol: account?.activo ? account.rol : solicitud.tipoActor as Rol,
         },
       });
+
+      await linkApprovedRegistration(tx, solicitud, (generadorId || operadorId || transportistaId)!, req.user!);
 
       // Same transaction: a failed internal notice must not leave a committed
       // approval reported as failed to the administrator.

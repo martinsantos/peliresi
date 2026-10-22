@@ -1,3 +1,4 @@
+import { identityCuit } from '../../../../utils/identityCuit';
 /**
  * Step Cuenta — Phase 1 account creation form
  */
@@ -52,9 +53,10 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
     const e: Record<string, string> = {};
     if (!reg.nombre.trim()) e.nombre = 'Nombre es obligatorio';
     if (!reg.email.trim()) e.email = 'Email es obligatorio';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reg.email)) e.email = 'Email invalido';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reg.email.trim())) e.email = 'Email invalido';
     if (!reg.cuit.trim()) e.cuit = 'CUIT es obligatorio';
     else if (!validateCuit(reg.cuit)) e.cuit = 'CUIT debe tener 11 digitos';
+    else if(import.meta.env.VITE_ENTERPRISE_ENABLED==='true'&&!identityCuit(reg.cuit)) e.cuit='Revisá el prefijo y el dígito verificador del CUIT';
     if (!reg.password) e.password = 'La contraseña es obligatoria';
     else {
       const pw = validatePassword(reg.password);
@@ -79,7 +81,7 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
     try {
       const res = await axios.post(`${API_BASE}/solicitudes/iniciar`, {
         nombre: reg.nombre,
-        email: reg.email,
+        email: reg.email.trim().toLowerCase(),
         password: reg.password,
         cuit: reg.cuit.replace(/\D/g, ''),
         tipoActor,

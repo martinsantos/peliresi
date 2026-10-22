@@ -56,7 +56,7 @@ function ActivityChoices() {
       setError(failure.response?.data?.message || 'No se pudo confirmar la actividad. Tu sesión sigue igual.');
     } finally { lock.current = false; setBusy(false); }
   }
-  return <Card><h2 className="font-semibold mb-3">Mis actividades</h2>
+  return <Card><h2 className="font-semibold mb-3">Mis actividades</h2><p className="mb-3 text-sm text-neutral-600">Una cuenta y un CUIT para tus actividades. Cada rol requiere su aprobación; agregar roles no crea personas ni aumenta el cupo de representantes.</p>
     <div className="flex flex-wrap gap-2">{(Object.keys(labels) as Array<keyof typeof labels>).map(type => {
       const approved = activities.includes(type);
       const inUse = !isRestricted && currentUser.rol === type;
