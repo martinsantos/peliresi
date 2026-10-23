@@ -27,6 +27,8 @@ interface Toast {
   actionLabel?: string;
   onAction?: () => void;
   compact?: boolean;
+  /** Linked inbox notices retain the full message in the inbox. */
+  messagePreview?: boolean;
 }
 
 interface ToastItemProps extends Toast {
@@ -133,6 +135,7 @@ const ToastItem: React.FC<ToastItemProps> = ({
   actionLabel,
   onAction,
   compact,
+  messagePreview,
 }) => {
   // Only the unread summary uses the compact row. Full warnings/errors keep
   // their explanation and actions; never truncate critical information.
@@ -159,7 +162,7 @@ const ToastItem: React.FC<ToastItemProps> = ({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-neutral-900 sm:text-base">{title}</p>
           {message && (
-            <p className="mt-1 break-words text-sm leading-relaxed text-neutral-700">{message}</p>
+            <p className={cn('mt-1 break-words text-sm leading-relaxed text-neutral-700', messagePreview && onAction && 'line-clamp-2')}>{message}</p>
           )}
           {onAction && <button type="button" className="mt-1 min-h-11 rounded-lg px-2 text-sm font-semibold text-primary-800 underline focus-visible:outline-primary-700"
             onClick={() => { onAction(); onRemove(id); }}>{actionLabel || 'Abrir'}</button>}

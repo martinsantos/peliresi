@@ -62,6 +62,7 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
         type:    n.prioridad === 'ALTA' || n.prioridad === 'URGENTE' ? 'warning' : 'info',
         title:   n.titulo,
         message: n.mensaje,
+        messagePreview: true,
         duration: n.prioridad === 'URGENTE' ? 12_000 : 10_000,
         actionLabel: notificationActionLabel(resolveNotificationPath(n, '', userRole)), onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole))); },
       }));

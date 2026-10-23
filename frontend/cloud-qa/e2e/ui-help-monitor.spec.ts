@@ -103,12 +103,14 @@ test('a real generator proposal reaches the other parties, the bell and the admi
   await expect(live).toBeVisible({timeout:25000});
   await expect(live).toContainText('Manifiesto pendiente de tu aprobación');
   await expect(live).toContainText('QA Generador 1');
+  await readableFixedAction(live.getByRole('button',{name:'Abrir manifiesto y ver qué sigue →',exact:true}),live);
   await proof(operator,info,'operator-live-proposal-notice');
   const queue=operator.getByRole('region',{name:'Agenda de manifiestos'});
   const row=queue.getByRole('link',{name:new RegExp(manifest.numero)});
   await expect(row).toContainText('Te toca aprobar');
   await expect(row).toContainText('QA Generador 1 → QA Operador 1');
   await expect(row).toContainText('Falta aprobar: Generador, Transporte, Operador');
+  await readableWholeWords(row.getByText(manifest.numero,{exact:true}));
   await operator.getByRole('button',{name:/^Notificaciones(?: \(|$)/}).click();
   const bell=operator.getByRole('region',{name:'Notificaciones recientes'});
   const notice=bell.getByRole('button').filter({hasText:manifest.numero});
@@ -131,6 +133,7 @@ test('a real generator proposal reaches the other parties, the bell and the admi
     await expect(task).toContainText('QA Generador 1 → QA Operador 1');
     await expect(task).toContainText('Falta aprobar: Generador, Transporte, Operador');
     await expect(task).toHaveAttribute('title',/Transporte: QA Transporte 1/);
+    await readableWholeWords(task.getByText(manifest.numero,{exact:true}));
     await proof(reader,info,role+'-pending-agenda');
    }finally{await context.close();}
   }
