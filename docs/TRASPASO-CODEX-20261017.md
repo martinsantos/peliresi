@@ -1,10 +1,14 @@
 # SITREP — traspaso vigente de operación
 
-> **Aprobaciones y avisos — 23/10, sin publicar:** criterio: todas las partes vinculadas deben decidir explícitamente, recibir avisos y ver su ícono real. Corregidos cambio de modalidad que quitaba transporte sin confirmación e inicio ofrecido sólo por estado. Nuevas propuestas en origen también requieren acuerdo y coordinación. **119 unitarias dirigidas PASS (50 backend / 69 frontend y manual)**, aisladas; E2E, tipos/builds y revisión visual pendientes por SSH inaccesible al preview. Caso real 2026-000197 intacto; no se inventan decisiones históricas. Leer [diagnóstico, alcance y reanudación](APROBACIONES-AGENDA-AVISOS-20261023.md). Producción sigue 6580c1ca; CAP cerrado, correos/push apagados; sin main, datos reales, push Git ni workflows.
+## Publicación vigente — aprobaciones y avisos, 23/10/2026
 
-> **Tanda pendiente de validación y publicación — 23/10:** Vista temporal, Ayuda, Monitor y la integración de Antecedentes dentro de Inspecciones están preparados en esta rama. El preview no responde por SSH; no dar por finalizadas las pruebas ni publicar sin recuperarlo. Producción sigue en `6580c1ca`. Ver [alcance, evidencia parcial y pendientes](CORRECCIONES-VISTA-TEMPORAL-AYUDA-MONITOR-20261023.md). CAP cerrado, correos/push apagados; sin main ni datos reales.
+**`bc0e103b` publicado en backend, web, app y manual a las 18:46:58 Mendoza.** Incluye `81c36219`, guardas de aprobaciones explícitas, avisos/campana, contexto de agenda, vista temporal, Ayuda, Monitor y Antecedentes integrado. [Cierre, evidencia, límites y reversión](DESPLIEGUE-APROBACIONES-20261023.md).
 
-## Publicación vigente — identidad, experiencia y concurrencia, 23/10/2026
+**293 backend + 191 frontend/manual, 42 E2E únicos PASS**; ajuste visual final: 33 unitarias y 3 E2E repetidos. Smoke producción **182/182**, externo **9/9**, PWA **8/8**, agendas web/app y Monitor real verificados en lectura. Manual **2026.23.4**, SW **v162**, app **20261023214321**. `.env` y flags idénticos, CAP cerrado, correos/push apagados, sin main, datos reales, migración ni workflows.
+
+**Caso 2026-000197 histórico intacto, sin conversión ni aprobaciones retroactivas.** La regla nueva cubre nuevas propuestas; no declarar migrados los documentos anteriores. Pruebas de transiciones sólo en preview artificial; producción sólo lectura, Android físico pendiente. Reversión vigente a `6580c1ca` preparada en `/var/backups/sitrep/20261023-producto-bc0e103b`; frontend rollback específico con SW v163. Runtime QA cerrado. Las secciones inferiores son antecedentes, no reemplazan este cierre.
+
+## Publicación anterior — identidad, experiencia y concurrencia, 23/10/2026
 
 **`6580c1ca` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 23/10/2026 14:21:27 Mendoza.** Incluye toda la tanda acumulada desde `a7f20d2f`: identidad/PDF/correos/iconos, bienvenida por rol, preferencia web/app, ayuda contextual y cuatro correcciones de concurrencia. Leer [publicación, respaldo y reversión vigente](DESPLIEGUE-PRODUCTO-CONCURRENCIA-20261023.md).
 

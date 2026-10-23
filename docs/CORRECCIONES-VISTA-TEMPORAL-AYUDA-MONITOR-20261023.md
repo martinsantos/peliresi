@@ -1,5 +1,7 @@
 # Vista temporal, Ayuda y Monitor — 23/10/2026
 
+**Incluido en la publicación `bc0e103b`, 23/10/2026 18:46:58 Mendoza.** [Cierre vigente](DESPLIEGUE-APROBACIONES-20261023.md). Las pruebas y bloqueos descritos abajo son el historial previo; la tanda pasó la aceptación remota y quedó publicada con CAP/correos/push apagados.
+
 ## Alcance de esta tanda
 
 Corrección de interfaz compartida por web y `/app`. Publicación solicitada por el dueño. No modifica permisos de backend, reglas, históricos, cuentas ni datos reales. CAP permanece cerrado; correos y push apagados; flags actuales conservados. Sin main, push ni workflows.

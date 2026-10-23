@@ -1,5 +1,9 @@
 # Manifiestos: diagnóstico y visibilidad de las aprobaciones
 
+**Publicado y verificado: `bc0e103b`, 23/10/2026 18:46:58 Mendoza.** [Evidencia final, alcance y reversión](DESPLIEGUE-APROBACIONES-20261023.md). 293 backend + 191 frontend/manual, 42 E2E únicos; regresión visual final 33 unitarias/3 E2E repetidos. Smoke 182/182, externo 9/9, PWA 8/8. Caso real 2026-000197 intacto, sin conversión.
+
+## Historial del diagnóstico y aceptación previa
+
 Estado: **119 unitarias dirigidas PASS; E2E, tipos/builds y publicación pendientes**. Producción sigue en 6580c1ca. No confundir las unitarias locales aisladas con el recorrido completo sobre preview.
 
 ## Caso informado
