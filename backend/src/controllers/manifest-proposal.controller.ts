@@ -10,7 +10,7 @@ import { isTrainingSession } from '../lib/trainingScope';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import { AppError } from '../middlewares/errorHandler';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
-import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, parseProposal, proposalRole, ProposalRole } from '../domain/manifestProposal';
+import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINATION_EVENTS, parseProposal, proposalRole, proposalRoles, ProposalRole } from '../domain/manifestProposal';
 import { agendaQuery } from '../domain/manifestAgenda';
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -19,6 +19,7 @@ async function load(tx: Tx, id: string) {
   if (!marker) return null;
   const proposal = parseProposal(marker.descripcion);
   const manifest = await tx.manifiesto.findUniqueOrThrow({ where: { id } });
+  if ((manifest.modalidad || 'FIJO') !== (proposal.modalidad || 'FIJO')) throw new AppError('La modalidad no coincide con la propuesta original', 409);
   if (manifest.generadorId !== proposal.generadorId || manifest.transportistaId !== proposal.transportistaId || manifest.operadorId !== proposal.operadorId || manifest.creadoPorId !== proposal.creadoPorId) throw new AppError('Las partes no coinciden con la propuesta original', 409);
   const events = await tx.eventoManifiesto.findMany({ where: { manifiestoId: id, tipo: { in: [...Object.values(APPROVAL_EVENTS), 'RECHAZO_PARTE', ...COORDINATION_EVENTS] } }, orderBy: { createdAt: 'asc' } });
   return { proposal, manifest, events };
@@ -29,14 +30,16 @@ export async function getManifestProposal(req: AuthRequest, res: Response, next:
     await assertCanAccessManifiesto(prisma, req.user, req.params.id);
     const value = await prisma.$transaction(tx => load(tx, req.params.id));
     const role = value ? proposalRole(req.user, value.proposal) : null;
+    const unanimous = !!value && !value.events.some(e => e.tipo === 'RECHAZO_PARTE')
+      && proposalRoles(value.proposal).every(rol => value.events.some(e => e.tipo === APPROVAL_EVENTS[rol]));
     res.json({ success: true, data: value ? {
-      version: 1, autorRol: value.proposal.autorRol, estado: value.manifest.estado, rechazo: value.events.find(e => e.tipo === 'RECHAZO_PARTE')?.descripcion,
-      partes: (Object.keys(APPROVAL_EVENTS) as ProposalRole[]).map(rol => {
+      version: 1, modalidad: value.proposal.modalidad || 'FIJO', autorRol: value.proposal.autorRol, estado: value.manifest.estado, rechazo: value.events.find(e => e.tipo === 'RECHAZO_PARTE')?.descripcion,
+      partes: proposalRoles(value.proposal).map(rol => {
         const event = value.events.find(e => e.tipo === APPROVAL_EVENTS[rol]);
         return { rol, aprobada: !!event, usuarioId: event?.usuarioId, fecha: event?.createdAt };
       }),
       inicio: value.events.find(e => COORDINATION_EVENTS.includes(e.tipo))?.createdAt || null,
-      puedeIniciar: !!role && value.manifest.estado === 'APROBADO' && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)),
+      puedeIniciar: !!role && unanimous && value.manifest.estado === 'APROBADO' && !value.events.some(e => COORDINATION_EVENTS.includes(e.tipo)),
       puedeAprobar: value.manifest.estado === 'PENDIENTE_APROBACION' && role && !value.events.some(e => e.tipo === APPROVAL_EVENTS[role]) ? role : null,
     } : null });
   } catch (error) { next(error); }
@@ -76,7 +79,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
       pushIds=await notifyManifestParties(tx,rejected,'rechazada',req.user.id);
       return rejected;
     }
-    const complete = Object.values(APPROVAL_EVENTS).every(type => type === event.tipo || value.events.some(e => e.tipo === type));
+    const complete = proposalRoles(value.proposal).every(role => APPROVAL_EVENTS[role] === event.tipo || value.events.some(e => e.tipo === APPROVAL_EVENTS[role]));
     const updated = await tx.manifiesto.update({ where: { id, estado: 'PENDIENTE_APROBACION' }, data: {
       ...(rol === 'GENERADOR' ? { fechaFirma: event.createdAt } : {}),
       ...(complete ? { estado: 'APROBADO', qrCode } : {}),
@@ -106,8 +109,8 @@ export async function approveManifestParty(req: AuthRequest, res: Response, next
 /** Also guards direct HTTP pickup and any later administrative state reversal. */
 export async function assertManifestProposalApproved(tx: Tx, id: string) {
   const value = await load(tx, id);
-  if (value && (value.events.some(e => e.tipo === 'RECHAZO_PARTE') || !Object.values(APPROVAL_EVENTS).every(type => value.events.some(e => e.tipo === type)))) throw new AppError('Falta la aprobación del generador, transporte u operador; no se puede retirar', 409);
-  if(value && !value.events.some(e=>COORDINATION_EVENTS.includes(e.tipo))) throw new AppError('Las partes aprobaron: falta iniciar la coordinación antes del retiro',409);
+  if (value && (value.events.some(e => e.tipo === 'RECHAZO_PARTE') || !proposalRoles(value.proposal).every(role => value.events.some(e => e.tipo === APPROVAL_EVENTS[role])))) throw new AppError('Falta la aprobación de una de las partes vinculadas; no se puede comenzar', 409);
+  if(value && !value.events.some(e=>COORDINATION_EVENTS.includes(e.tipo))) throw new AppError('Las partes aprobaron: falta iniciar la coordinación antes de continuar',409);
 }
 
 export async function getProposalAgenda(req: AuthRequest, res: Response, next: NextFunction) {
@@ -139,10 +142,11 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    const value=await load(tx,req.params.id);
    if(!value)throw new AppError('No es una propuesta de las partes',404);
    const rol=proposalRole(req.user,value.proposal);
-   if(!rol)throw new AppError('Sólo una de las tres partes vinculadas puede iniciar',403);
+   if(!rol)throw new AppError('Sólo una de las partes vinculadas puede iniciar',403);
    const existing=value.events.find(e=>COORDINATION_EVENTS.includes(e.tipo));if(existing)return existing;
-   if(value.manifest.estado!=='APROBADO'||value.events.some(e=>e.tipo==='RECHAZO_PARTE')||!Object.values(APPROVAL_EVENTS).every(t=>value.events.some(e=>e.tipo===t)))throw new AppError('Se necesitan las tres aprobaciones para iniciar',409);
-   const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:isTrainingSession()?'INICIO_COORDINACION_CAP':'INICIO_COORDINACION',descripcion:`Coordinación iniciada por ${rol}. Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.`}});
+   if(value.manifest.estado!=='APROBADO'||value.events.some(e=>e.tipo==='RECHAZO_PARTE')||!proposalRoles(value.proposal).every(role=>value.events.some(e=>e.tipo===APPROVAL_EVENTS[role])))throw new AppError('Se necesitan las aprobaciones de todas las partes vinculadas para iniciar',409);
+   const preparation=value.proposal.modalidad==='IN_SITU'?'Generador y operador coordinan la recepción en origen, sin retiro ni viaje.':'Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.';
+   const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:isTrainingSession()?'INICIO_COORDINACION_CAP':'INICIO_COORDINACION',descripcion:`Coordinación iniciada por ${rol}. ${preparation}`}});
    if (!isTrainingSession()) await updateRollingHash(tx,req.params.id,value.manifest.estado,event.createdAt,event.descripcion,event.id);
    pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id);
    return event;
@@ -177,19 +181,23 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
     action='Firma del generador pendiente';
     detail=m.modalidad==='IN_SITU'?'Tratamiento en origen, sin transporte. El generador debe revisar y firmar antes de la recepción del operador.':'Borrador del circuito anterior. Todavía no fue enviado a las tres partes para su aprobación.';
    }else if(m.estado==='PENDIENTE_APROBACION'&&proposal){
-    const missing=(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).filter(r=>!m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[r]));
+    const missing=proposalRoles(proposal).filter(r=>!m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[r]));
     action=role&&missing.includes(role as ProposalRole)?'Revisá y aprobá tu participación':'Esperando a las otras partes';detail='Falta aprobar: '+missing.map(r=>labels[r]).join(', ')+'.';
    }else if(m.estado==='APROBADO'&&proposal){
     const started=m.eventos.some(e=>COORDINATION_EVENTS.includes(e.tipo));
-    action=!started?'Las tres partes aprobaron: iniciar coordinación':role==='TRANSPORTISTA'?'Confirmá el retiro cuando recibas la carga':'Coordinación iniciada: preparando el retiro';
-    detail=!started?'Generador, transporte u operador pueden dar inicio.':'Generador prepara la carga; operador prepara la recepción. El viaje empieza con el retiro.';
+    action=!started?'Todas las partes aprobaron: iniciar coordinación':m.modalidad==='IN_SITU'?'Coordinación iniciada: recepción en origen pendiente':role==='TRANSPORTISTA'?'Confirmá el retiro cuando recibas la carga':'Coordinación iniciada: preparando el retiro';
+    detail=m.modalidad==='IN_SITU'?(started?'El operador debe confirmar la recepción en origen, sin transporte ni GPS.':'Generador u operador pueden dar inicio.'):!started?'Generador, transporte u operador pueden dar inicio.':'Generador prepara la carga; operador prepara la recepción. El viaje empieza con el retiro.';
    }else if(m.estado==='APROBADO'){action=m.modalidad==='IN_SITU'?'Recepción in situ pendiente':'Retiro pendiente';detail='Conserva el recorrido anterior, sin nuevas aprobaciones de partes.';}else if(m.estado==='EN_TRANSITO'){action=role==='TRANSPORTISTA'?'Continuá el viaje y compartí GPS':'El transporte está en viaje';detail='La entrega se confirma al llegar al destino.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='ENTREGADO'){action='Confirmá la recepción de esta carga';detail='Después registrá el peso realmente recibido.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='RECIBIDO'){action=m.residuos.some(r=>!r.cantidadRecibida)?'Registrá el pesaje recibido':'Registrá el tratamiento';detail='El pesaje y el tratamiento permiten emitir la certificación parcial.';}
    else if(['OPERADOR','ADMIN'].includes(role||'')&&m.estado==='EN_TRATAMIENTO'){action=isTrainingSession()?'Emití un parcial o cerrá el tratamiento':'Cerrá el tratamiento cuando corresponda';detail='El cierre habilita la certificación final total, después de resolver adendas.';}
    else if(m.estado==='TRATADO'){action=role==='OPERADOR'?'Revisá y emití la certificación final total':'Esperando la certificación final del operador';detail='El operador decide cuándo firmarla y liberarla. El cierre no la emite automáticamente.';}
    if (!action) { action = 'Esperando al operador'; detail = 'El operador continúa la recepción y el tratamiento.'; }
-   const partes=proposal?(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
+   const partes=proposal?proposalRoles(proposal).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
+   if(m.estado==='APROBADO'&&partes?.some(p=>!p.aprobada)){
+    action='Revisar aprobaciones';
+    detail='Falta aprobar: '+partes.filter(p=>!p.aprobada).map(p=>labels[p.rol]).join(', ')+'. No se puede iniciar.';
+   }
    const inicio=m.eventos.find(e=>COORDINATION_EVENTS.includes(e.tipo))?.createdAt||null;
    const requiereMiAprobacion=!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
    return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,actores:{generador:m.generador?.razonSocial||'',transportista:m.transportista?.razonSocial||null,operador:m.operador?.razonSocial||''},fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];

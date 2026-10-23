@@ -117,8 +117,9 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
-    const partyProposal = canCreateManifestProposal(req.user) && modalidad === 'FIJO';
-    if (manifestProposalsEnabled() && modalidad === 'FIJO' && !partyProposal) throw new AppError('Se requiere una cuenta propia de una parte vinculada para proponer', 403);
+    const partyProposal = canCreateManifestProposal(req.user);
+    if (manifestProposalsEnabled() && !partyProposal) throw new AppError('Se requiere una cuenta propia de una parte vinculada para proponer', 403);
+    if (modalidad === 'IN_SITU' && req.user.rol === 'TRANSPORTISTA') throw new AppError('El tratamiento en origen sólo involucra a generador y operador', 400);
     if (partyProposal && req.user.rol === 'GENERADOR' && bodyGeneradorId && bodyGeneradorId !== req.user.generador?.id) throw new AppError('El generador debe ser tu propia empresa', 403);
     if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN' && !partyProposal) {
       throw new AppError('Solo los generadores pueden crear manifiestos', 403);
@@ -127,7 +128,6 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     // ADMIN can specify generadorId in body; GENERADOR uses their own
     if (partyProposal && req.user.rol === 'OPERADOR' && operadorId !== req.user.operador.id) throw new AppError('El operador de destino debe ser tu propia empresa', 403);
     if (partyProposal && req.user.rol === 'TRANSPORTISTA' && transportistaId !== req.user.transportista.id) throw new AppError('El transporte debe ser tu propia empresa', 403);
-    if (canCreateManifestProposal(req.user) && modalidad !== 'FIJO' && (isTrainingSession() || !['GENERADOR','ADMIN'].includes(req.user.rol))) throw new AppError('El circuito de tres partes requiere transporte y destino fijo', 400);
     const generadorId = req.user.rol !== 'GENERADOR'
       ? (bodyGeneradorId || (req.user.generador && req.user.generador.id))
       : req.user.generador?.id;
@@ -136,7 +136,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError('Se requiere un generador para crear el manifiesto', 400);
     }
 
-    if (partyProposal && (!fechaEstimadaRetiro || !/^\d{4}-\d{2}-\d{2}$/.test(fechaEstimadaRetiro) || !Number.isFinite(Date.parse(fechaEstimadaRetiro)) || new Date(fechaEstimadaRetiro).toISOString().slice(0,10) !== fechaEstimadaRetiro)) throw new AppError('Indicá la fecha prevista del retiro', 400);
+    if (partyProposal && (!fechaEstimadaRetiro || !/^\d{4}-\d{2}-\d{2}$/.test(fechaEstimadaRetiro) || !Number.isFinite(Date.parse(fechaEstimadaRetiro)) || new Date(fechaEstimadaRetiro).toISOString().slice(0,10) !== fechaEstimadaRetiro)) throw new AppError(modalidad === 'IN_SITU' ? 'Indicá la fecha prevista de inicio' : 'Indicá la fecha prevista del retiro', 400);
 
     // Modalidad validation
     if (modalidad === 'FIJO' && !transportistaId) {
@@ -172,7 +172,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     // A process-local mutex would not protect both production PM2 workers.
     let pushIds:string[]=[];
     const manifiesto = await prisma.$transaction(async (tx) => {
-      if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: transportistaId!, operadorId });
+      if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: modalidad === 'IN_SITU' ? null : transportistaId!, operadorId });
       const asignacionTransporte = await prepareTransportAssignment(tx, { modalidad, transportistaId, vehiculoId, choferId });
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(836272)::text AS "lock"`;
       const numero = await generarNumeroManifiesto(tx);
@@ -232,7 +232,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
 
       if (partyProposal) await tx.eventoManifiesto.create({ data: {
         manifiestoId: created.id, tipo: MANIFEST_PROPOSAL, usuarioId: userId,
-        descripcion: JSON.stringify({ version: 1, generadorId, transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
+        descripcion: JSON.stringify({ version: 1, modalidad, generadorId, transportistaId: modalidad === 'IN_SITU' ? null : transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
       } });
       if (partyProposal) pushIds=await notifyManifestParties(tx, created, 'creada', userId);
       return created;

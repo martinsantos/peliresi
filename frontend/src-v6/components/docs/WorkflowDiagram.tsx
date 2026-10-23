@@ -25,7 +25,7 @@ interface Transition {
 const STATES: State[] = [
   { id: 'BORRADOR',       label: 'Borrador',       color: '#F3F4F6', textColor: '#374151', description: 'Manifiesto creado, pendiente de firma' },
   { id: 'PENDIENTE_APROBACION', label: 'Pendiente de aprobación', color: '#FEF3C7', textColor: '#92400E', description: 'Propuesta presentada: cada parte confirma desde su propia cuenta' },
-  { id: 'APROBADO',       label: 'Aprobado',        color: '#DBEAFE', textColor: '#1E40AF', description: 'Aprobaciones completas. En propuestas con traslado, las tres partes confirmaron; la coordinación y el retiro son acciones distintas' },
+  { id: 'APROBADO',       label: 'Aprobado',        color: '#DBEAFE', textColor: '#1E40AF', description: 'Aprobaciones completas: tres con traslado; generador y operador en origen. Después se inicia la coordinación, antes del retiro o la recepción en origen' },
   { id: 'EN_TRANSITO',    label: 'En Tránsito',     color: '#FFF7ED', textColor: '#9A3412', description: 'Transportista confirmó el retiro. Revisá el permiso de ubicación y el último punto recibido para comprobar el GPS' },
   { id: 'ENTREGADO',      label: 'Entregado',       color: '#FEF3C7', textColor: '#92400E', description: 'Llegó a la planta del operador' },
   { id: 'RECIBIDO',       label: 'Recibido',        color: '#D1FAE5', textColor: '#065F46', description: 'Operador confirmó la recepción; el pesaje se registra por separado' },
@@ -62,7 +62,7 @@ const WorkflowDiagram: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-neutral-700">Propuestas con traslado: tres partes aprueban desde sus cuentas. Los borradores anteriores y la modalidad in situ conservan sus acciones específicas.</p>
+      <p className="text-sm text-neutral-700">Recorrido con traslado: tres partes aprueban desde sus cuentas. En origen: generador y operador aprueban, inician la coordinación y el operador confirma la recepción; se omiten viaje y entrega. Los registros anteriores sin propuesta conservan su circuito.</p>
       {/* Main flow */}
       <div className="flex flex-wrap items-center gap-2">
         {mainFlow.map((stateId, idx) => {

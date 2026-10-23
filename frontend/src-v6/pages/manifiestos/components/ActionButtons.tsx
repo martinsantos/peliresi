@@ -120,7 +120,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           fullWidth
           leftIcon={mutations.confirmarRecepcionInSitu.isPending ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
           onClick={onConfirmarRecepcionInSitu}
-          disabled={isActionPending}
+          disabled={isActionPending || pickupBlocked}
           className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900"
         >
           Confirmar Recepcion In Situ

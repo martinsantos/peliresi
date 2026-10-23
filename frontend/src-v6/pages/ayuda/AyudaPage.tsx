@@ -32,11 +32,11 @@ const faqs = [
     questions: [
       {
         q: '¿Cómo creo un nuevo manifiesto?',
-        a: 'Ingresá con tu propia cuenta y el rol correcto. Con las propuestas habilitadas, generador, transportista u operador pueden iniciar un manifiesto con traslado: elegí las partes, declará los residuos y revisá el resumen. Queda Pendiente de aprobación hasta que las tres partes confirmen. Los borradores del circuito anterior y la modalidad in situ mantienen sus acciones específicas.'
+        a: 'Ingresá con tu propia cuenta y el rol correcto. Con las propuestas habilitadas, generador, transportista u operador pueden iniciar un manifiesto con traslado: elegí las partes, declará los residuos y revisá el resumen. Queda Pendiente de aprobación hasta que las tres partes confirmen. Para En origen, generador y operador aprueban expresamente: son dos partes, sin transporte. Los registros anteriores sin propuesta conservan su circuito.'
       },
       {
         q: '¿Qué estados puede tener un manifiesto?',
-        a: 'Una propuesta pasa de Pendiente de aprobación a Aprobado cuando confirman las tres partes. Luego siguen el retiro, En tránsito, Entregado, Recibido, En tratamiento y Tratado. Iniciar la coordinación no confirma el retiro físico. El detalle indica quién debe actuar; los borradores anteriores conservan su circuito de firma.'
+        a: 'Una propuesta pasa de Pendiente de aprobación a Aprobado cuando confirman todas las partes: tres con traslado, dos en origen. Después inician la coordinación. Con traslado siguen retiro, En tránsito, Entregado, Recibido, En tratamiento y Tratado. En origen el operador confirma directamente la recepción: no hay viaje ni GPS. El detalle indica quién debe actuar; los borradores anteriores conservan su circuito de firma.'
       },
       {
         q: '¿Cómo descargo el certificado de disposición final?',

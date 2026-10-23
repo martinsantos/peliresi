@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NuevoManifiestoPage from '../../pages/manifiestos/NuevoManifiestoPage';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn() }));
@@ -57,6 +57,7 @@ function changeResidue() {
 }
 
 describe('manifest transport compatibility after changing residues', () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.create.mockResolvedValue({ id: 'manifest-1', numero: 'QA-1' });
@@ -77,6 +78,8 @@ describe('manifest transport compatibility after changing residues', () => {
     prepareDestination(/^Transporte Y8$/);
     expect(screen.getByRole('button', { name: /^Con traslado/ })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Ya asignaste un transporte');
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar sin transporte' }));
     expect(screen.getByText(/Se guardará un borrador pendiente de la firma del generador/)).toBeVisible();
     expect(screen.queryByLabelText('Transportista *')).not.toBeInTheDocument();
     choose('Operador / Destino *', /Operador QA/);
@@ -84,6 +87,29 @@ describe('manifest transport compatibility after changing residues', () => {
     await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
     expect(mocks.create.mock.calls[0][0].modalidad).toBe('IN_SITU');
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('transportistaId');
+  });
+
+  it('preserves the three assigned parties when cancelling a change to in-situ', async () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+    prepareDestination(/^Transporte Y8$/);
+    choose('Vehículo (opcional)', /QA002/); choose('Chofer (opcional)', /QA Dos/);
+    fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
+    expect(screen.getByRole('alert')).toHaveTextContent('solicitar las tres aprobaciones');
+    fireEvent.click(screen.getByRole('button', { name: 'Mantener transporte' }));
+    expect(screen.getByRole('button', { name: /^Con traslado/ })).toHaveAttribute('aria-pressed','true');
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][0]).toMatchObject({ modalidad:'FIJO', transportistaId:'trans-y8', operadorId:'operador-1', vehiculoId:'v2', choferId:'c2' });
+  });
+
+  it('explains that in-situ still requires explicit decisions when proposals are enabled', () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+    prepareDestination(/^Transporte Y8$/);
+    fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar sin transporte' }));
+    expect(screen.getByText(/Ambos reciben un aviso y deben aprobar/)).toBeVisible();
+    expect(screen.getByLabelText('Fecha prevista de inicio')).toBeVisible();
+    expect(screen.queryByText(/Se guardará un borrador/)).not.toBeInTheDocument();
   });
 
   it('submits explicit second resources, not list order, and excludes inactive options', async () => {

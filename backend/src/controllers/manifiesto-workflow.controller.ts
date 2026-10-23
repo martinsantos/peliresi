@@ -394,6 +394,10 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
 
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
       // Validate manifiesto exists, is APROBADO, and is IN_SITU
+      await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
+      // New in-situ proposals need both decisions and an explicit start.
+      // Historical records without a proposal marker retain their contract.
+      await assertManifestProposalApproved(tx, id);
       const current = await tx.manifiesto.findUnique({
         where: { id },
         select: { estado: true, modalidad: true },

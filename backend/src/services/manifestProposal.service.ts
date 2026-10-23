@@ -18,11 +18,12 @@ async function parties(tx: Tx, p: Parties) {
 }
 export async function validateProposalParties(tx: Tx, p: Parties) {
   const users=await parties(tx,p);
-  if(users.some(p=>!p.usuario?.activo))throw new AppError('Las tres partes y sus cuentas deben estar activas para aprobar. Si falta un alta, usá Eventuales.',400);
+  const required = p.transportistaId ? users : [users[0], users[2]];
+  if(required.some(p=>!p.usuario?.activo))throw new AppError('Las partes vinculadas y sus cuentas deben estar activas para aprobar. Si falta un alta, usá Eventuales.',400);
 }
 /** Creation and inbox commit together. Return only fresh IDs for a caller's
  * post-commit dispatch; CAP never sends external notifications. */
-export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:string;numero:string;creadoPorId:string;fechaEstimadaRetiro:Date|null}, phase:string, author:string) {
+export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:string;numero:string;creadoPorId:string;fechaEstimadaRetiro:Date|null;modalidad?:string}, phase:string, author:string) {
   const users=await parties(tx,manifest);
   const partyUsers=users.filter(p=>p.usuario?.activo).map(p=>p.usuario!.id);
   const origin=users.find(p=>p.usuario?.id===author);
@@ -31,10 +32,12 @@ export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:stri
   const recipients=[...new Set([...partyUsers,manifest.creadoPorId])];
   const date=manifest.fechaEstimadaRetiro?.toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza'})||'sin fecha';
   const approvedRole=phase.startsWith('aprobacion-')?({GENERADOR:'Generador',TRANSPORTISTA:'Transporte',OPERADOR:'Operador'} as Record<string,string>)[phase.slice(11)]:null;
-  const title=phase==='creada'?'Manifiesto pendiente de tu aprobación':phase==='aprobada'?'¡Tres aprobaciones! Listos para iniciar':phase==='iniciada'?'¡Coordinación iniciada! Preparar el retiro':phase==='rechazada'?'Manifiesto detenido: una parte rechazó':approvedRole?`${approvedRole} aprobó su participación`:'Certificación disponible para descargar';
-  const next=phase==='creada'?'Abrí el manifiesto para aprobar o rechazar.':phase==='aprobada'?'Una de las tres partes debe pulsar Iniciar coordinación.':phase==='iniciada'?'Generador: prepará la carga. Operador: coordiná la recepción. Transporte: confirmá el retiro cuando ocurra.':phase==='rechazada'?'No se puede iniciar ni retirar. Revisá el motivo.':approvedRole?'Revisá qué aprobaciones faltan.':'El operador la firmó. Abrí Certificaciones para descargarla.';
+  const inSitu=manifest.modalidad==='IN_SITU';
+  const title=phase==='creada'?'Manifiesto pendiente de tu aprobación':phase==='aprobada'?(inSitu?'Generador y operador aprobaron: listos para iniciar':'¡Tres aprobaciones! Listos para iniciar'):phase==='iniciada'?(inSitu?'Coordinación iniciada: tratamiento en origen':'¡Coordinación iniciada! Preparar el retiro'):phase==='rechazada'?'Manifiesto detenido: una parte rechazó':approvedRole?`${approvedRole} aprobó su participación`:'Certificación disponible para descargar';
+  const next=phase==='creada'?'Abrí el manifiesto para aprobar o rechazar.':phase==='aprobada'?(inSitu?'Generador u operador debe pulsar Iniciar coordinación.':'Una de las tres partes debe pulsar Iniciar coordinación.'):phase==='iniciada'?(inSitu?'El operador debe confirmar la recepción en el domicilio del generador. No hay retiro, viaje ni GPS.':'Generador: prepará la carga. Operador: coordiná la recepción. Transporte: confirmá el retiro cuando ocurra.'):phase==='rechazada'?'No se puede iniciar la operación. Revisá el motivo.':approvedRole?'Revisá qué aprobaciones faltan.':'El operador la firmó. Abrí Certificaciones para descargarla.';
   const data=recipients.map(usuarioId=>({
     id:createHash('sha256').update(`${manifest.id}:${phase}:${usuarioId}`).digest('hex'),usuarioId,tipo:'INFO_GENERAL' as const,
+    prioridad: (['creada','aprobada','rechazada'].includes(phase) ? 'ALTA' : 'NORMAL') as 'ALTA' | 'NORMAL',
     titulo:phase==='creada'&&!partyUsers.includes(usuarioId)?'Manifiesto enviado a las partes':title,mensaje:`${manifest.numero}. ${sender}${context ? context + '. ' : ''}Fecha prevista: ${date}. ${next}`,
     manifiestoId:manifest.id,datos:JSON.stringify({tipo:'propuesta_partes',fase:phase,autorId:author,url:`/manifiestos/${manifest.id}`}),
   }));

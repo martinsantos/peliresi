@@ -103,6 +103,7 @@ const NuevoManifiestoForm: React.FC = () => {
   const operatorProposal = proposalsAvailable && currentUser?.rol === 'OPERADOR';
   const ownOperatorId = operatorProposal ? currentUser?.actorId || '' : '';
   const [step, setStep] = useState(1);
+  const [confirmWithoutTransport, setConfirmWithoutTransport] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const formRef = useRef<HTMLDivElement>(null);
   const focusError = useRef(false);
@@ -143,7 +144,12 @@ const NuevoManifiestoForm: React.FC = () => {
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
   });
 
-  const partyProposal = proposalsAvailable && formData.modalidad === 'FIJO';
+  const partyProposal = proposalsAvailable;
+  const useInSitu = () => {
+    setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', vehiculoId: '', choferId: '', operador: ownOperatorId }));
+    setConfirmWithoutTransport(false);
+    setValidationErrors(prev => { const next = { ...prev }; delete next.transportista; return next; });
+  };
 
   // Selected actor details (auto-populated from catalogs)
   const selectedGenerador = companyGeneratorView(generadoresList.find((g) => g.id === formData.generadorId),currentUser?.empresaContexto);
@@ -285,7 +291,7 @@ const NuevoManifiestoForm: React.FC = () => {
         })),
       });
 
-      toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? 'Generador, transporte y operador deben aprobar desde sus cuentas.' : 'Todavía falta la firma del generador para continuar.'}`);
+      toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? (formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas.':'Generador, transporte y operador deben aprobar desde sus cuentas.') : 'Todavía falta la firma del generador para continuar.'}`);
       navigate(mp(`/manifiestos/${result.id}`));
     } catch (err: any) {
       // The API client explains 429 with its retry time. Keep all fields and
@@ -363,7 +369,7 @@ const NuevoManifiestoForm: React.FC = () => {
         </div>
       </header>
 
-      {partyProposal && <p className="mb-3 rounded-lg bg-primary-50 p-3 text-sm">Cualquiera de las partes puede iniciar. Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro. Tu empresa queda vinculada a tu rol.</p>}
+      {partyProposal && <p className="mb-3 rounded-lg bg-primary-50 p-3 text-sm">{formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas antes de comenzar el tratamiento en origen.':'Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro.'} Tu empresa queda vinculada a tu rol.</p>}
       <ol aria-label="Etapas del formulario" className="flex gap-4 py-3 text-sm text-neutral-600">
         {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={step === index + 1 ? 'font-semibold text-primary-800' : ''}>{index + 1}. {label}</li>)}
       </ol>
@@ -595,6 +601,7 @@ const NuevoManifiestoForm: React.FC = () => {
                     type="button"
                     aria-pressed={formData.modalidad === 'FIJO'}
                     onClick={() => {
+                      setConfirmWithoutTransport(false);
                       if (formData.modalidad === 'FIJO') return;
                       setFormData(prev => ({ ...prev, modalidad: 'FIJO', operador: ownOperatorId }));
                       setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
@@ -614,12 +621,12 @@ const NuevoManifiestoForm: React.FC = () => {
                   <button
                     type="button"
                     aria-pressed={formData.modalidad === 'IN_SITU'}
-                    disabled={carrierProposal || operatorProposal || !!currentUser?.training}
-                    title={carrierProposal || operatorProposal ? 'La propuesta de tres partes requiere transporte y destino fijo' : undefined}
+                    disabled={carrierProposal}
+                    title={carrierProposal ? 'El transporte participa sólo cuando hay traslado' : undefined}
                     onClick={() => {
                       if (formData.modalidad === 'IN_SITU') return;
-                      setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: ownCarrierId, vehiculoId: '', choferId: '', operador: ownOperatorId }));
-                      setValidationErrors(prev => { const n = {...prev}; delete n.transportista; return n; });
+                      if (formData.transportista) setConfirmWithoutTransport(true);
+                      else useInSitu();
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
                       formData.modalidad === 'IN_SITU'
@@ -636,11 +643,19 @@ const NuevoManifiestoForm: React.FC = () => {
                 </div>
               </div>
 
+              {confirmWithoutTransport && <div role="alert" className="space-y-3 rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+                <p><strong>Ya asignaste un transporte.</strong> Pasar a tratamiento en origen lo quita de esta propuesta, junto con su vehículo y chofer. Si participa, mantené el traslado para solicitar las tres aprobaciones.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setConfirmWithoutTransport(false)}>Mantener transporte</Button>
+                  <Button onClick={useInSitu}>Continuar sin transporte</Button>
+                </div>
+              </div>}
+
               {/* In Situ note */}
               {formData.modalidad === 'IN_SITU' && (
                 <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 animate-fade-in">
                   <MapPin size={16} className="shrink-0 mt-0.5" />
-                  <span><strong>Sin transporte.</strong> El operador trabajará en el domicilio del generador. Se guardará un borrador pendiente de la firma del generador; no se enviará una propuesta de tres partes.</span>
+                  <span><strong>Sin transporte.</strong> El operador trabajará en el domicilio del generador. {partyProposal?'Ambos reciben un aviso y deben aprobar antes de iniciar la coordinación.':'Se guardará un borrador pendiente de la firma del generador.'}</span>
                 </div>
               )}
 
@@ -720,7 +735,7 @@ const NuevoManifiestoForm: React.FC = () => {
 
               <div>
                 <Input
-                  label="Fecha estimada de retiro"
+                  label={formData.modalidad==='IN_SITU'?'Fecha prevista de inicio':'Fecha estimada de retiro'}
                   type="date"
                   value={formData.fechaRetiro}
                   onChange={(e) => setFormData({ ...formData, fechaRetiro: e.target.value })}

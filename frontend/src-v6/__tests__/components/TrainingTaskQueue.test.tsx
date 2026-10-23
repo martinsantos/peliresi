@@ -103,6 +103,16 @@ it('shows administrator approval tasks with actor names and the missing parties'
  client.clear();
 });
 
+it('does not advertise a start in the agenda when an approval is missing despite the stored status',async()=>{
+ mock.get.mockImplementation(async(_url,options)=>reply([{...items[0],estado:'APROBADO',requiereMiAprobacion:false}],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ expect(await screen.findByText('Revisar aprobaciones')).toBeVisible();
+ expect(screen.queryByText('Listo para iniciar')).not.toBeInTheDocument();
+ expect(screen.getByText('Falta aprobar: Generador')).toBeVisible();
+ client.clear();
+});
+
 it('includes a draft with its next responsible party without inventing three approvals',async()=>{
  mock.get.mockImplementation(async(_url,options)=>reply([{id:'draft',numero:'QA-DRAFT',estado:'BORRADOR',modalidad:'IN_SITU',partes:null,actores:{generador:'Origen artificial',transportista:null,operador:'Destino artificial'}}],options));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});

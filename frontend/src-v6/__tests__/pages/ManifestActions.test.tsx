@@ -24,6 +24,15 @@ const workflows = [
   [EstadoManifiesto.TRATADO, 'OPERADOR', 'Descargar Certificado', 'onDescargarCertificado', false],
 ] as const;
 describe('manifest workflow actions', () => {
+  it('keeps in-situ reception blocked until the approved parties start coordination', () => {
+    const props = input(EstadoManifiesto.APROBADO, 'OPERADOR', true);
+    const view = render(<ActionButtons {...props} pickupBlocked />);
+    const receipt = screen.getByRole('button', { name: 'Confirmar Recepcion In Situ' });
+    expect(receipt).toBeDisabled(); fireEvent.click(receipt);
+    expect(props.onConfirmarRecepcionInSitu).not.toHaveBeenCalled();
+    view.rerender(<ActionButtons {...props} pickupBlocked={false} />);
+    expect(receipt).toBeEnabled();
+  });
   it('directs training to its actual certifications without dead official download controls', () => {
     const props = input(EstadoManifiesto.TRATADO, 'OPERADOR');
     render(<ActionButtons {...props} training />);

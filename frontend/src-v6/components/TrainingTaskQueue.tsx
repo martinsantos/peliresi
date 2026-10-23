@@ -10,12 +10,13 @@ import { Card, CardHeader } from './ui/CardV2';
 import { PartyApprovalStatus, type PartyApproval } from './PartyApprovalStatus';
 type Task={id:string;numero:string;estado:string;modalidad?:string;fechaEstimadaRetiro:string|null;partes:PartyApproval[]|null;inicio:string|null;requiereMiAprobacion:boolean;pesajePendiente:boolean;certificatePending?:boolean;detail?:string;actores?:{generador:string;transportista:string|null;operador:string}};
 const roleNames: Record<string,string> = { GENERADOR:'Generador', TRANSPORTISTA:'Transporte', OPERADOR:'Operador' };
-function missingApprovals(m:Task){return m.estado==='PENDIENTE_APROBACION' ? m.partes?.filter(p=>!p.aprobada).map(p=>roleNames[p.rol]||p.rol).join(', ') : '';}
+function missingApprovals(m:Task){return ['PENDIENTE_APROBACION','APROBADO'].includes(m.estado) ? m.partes?.filter(p=>!p.aprobada).map(p=>roleNames[p.rol]||p.rol).join(', ') : '';}
 function label(m:Task,role:string){
+ if(m.estado==='APROBADO'&&m.partes?.some(p=>!p.aprobada))return 'Revisar aprobaciones';
  switch(m.estado){
  case 'BORRADOR':return 'Borrador · firma del generador pendiente';
  case 'PENDIENTE_APROBACION':return m.requiereMiAprobacion?'Te toca aprobar':'En espera';
- case 'APROBADO':return !m.partes?(m.modalidad==='IN_SITU'?'Recepción in situ':'Retiro pendiente'):!m.inicio?'Listo para iniciar':role==='TRANSPORTISTA'?'Confirmar retiro':'Preparando retiro';
+ case 'APROBADO':return !m.partes?(m.modalidad==='IN_SITU'?'Recepción in situ':'Retiro pendiente'):!m.inicio?'Listo para iniciar':m.modalidad==='IN_SITU'?(role==='OPERADOR'?'Confirmar recepción en origen':'Esperando recepción en origen'):role==='TRANSPORTISTA'?'Confirmar retiro':'Preparando retiro';
  case 'EN_TRANSITO':return 'En viaje · GPS';
  case 'ENTREGADO':return role==='OPERADOR'?'Confirmar recepción':'Esperando recepción';
  case 'RECIBIDO':return role==='OPERADOR'?(m.pesajePendiente?'Registrar pesaje':'Registrar tratamiento'):'En recepción';

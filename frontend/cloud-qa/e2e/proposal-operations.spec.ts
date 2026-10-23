@@ -40,6 +40,55 @@ async function create(page:Page,info:TestInfo,role:Role){
  const result=await post(page,'/api/manifiestos',()=>page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201);
  expect(result.manifiesto.estado).toBe('PENDIENTE_APROBACION');return result.manifiesto;
 }
+for(const creator of ['generador','operador'] as const)test('in-situ proposal: '+creator+' creates; both parties approve before receipt',async({browser},info)=>{
+ test.setTimeout(150000);
+ const contexts=[],pages={} as Record<'generador'|'operador',Page>,errors:string[]=[];
+ const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
+ try{
+  for(const role of ['generador','operador'] as const){
+   const context=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});contexts.push(context);
+   pages[role]=await context.newPage();pages[role].on('pageerror',e=>errors.push(e.message));await login(pages[role],info,role);
+  }
+  const page=pages[creator];await page.goto(prefix(info)+'/manifiestos/nuevo');
+  if(creator!=='generador')await choose(page,'Generador *',/^QA Generador 1 /);
+  await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+  await choose(page,'Tipo de Residuo *',/^Y1 - /);await page.getByLabel('Cantidad *',{exact:true}).fill('11');
+  await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+  await page.getByRole('button',{name:/^En origen/}).click();
+  await expect(page.getByRole('button',{name:'Transportista *',exact:true})).toHaveCount(0);
+  await expect(page.getByText(/Ambos reciben un aviso y deben aprobar/)).toBeVisible();
+  if(creator!=='operador')await choose(page,'Operador / Destino *',/^QA Operador 1 /);
+  await page.getByLabel('Fecha prevista de inicio',{exact:true}).fill('2099-12-25');
+  const result=await post(page,'/api/manifiestos',()=>page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201),m=result.manifiesto;
+  expect(m).toMatchObject({modalidad:'IN_SITU',transportistaId:null,estado:'PENDIENTE_APROBACION'});
+  const panel=page.getByRole('region',{name:'Aprobaciones de las partes'});
+  await expect(panel).toContainText('0 de 2 aprobaciones');
+  await expect(panel.getByLabel(/^Transporte:/)).toHaveCount(0);
+  await proof(page,info,'in-situ-created-'+creator);
+  await approve(page,m.id,creator);
+  await expect(panel).toContainText('1 de 2 aprobaciones');
+  await expect(page.getByRole('button',{name:'Confirmar Recepcion In Situ',exact:true})).toHaveCount(0);
+  const other=creator==='generador'?'operador':'generador',counterpart=pages[other];
+  await counterpart.goto(prefix(info)+'/notificaciones');
+  const notice=counterpart.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:m.numero}).filter({hasText:'Manifiesto pendiente de tu aprobación'});
+  await expect(notice).toBeVisible();
+  await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
+  await expect(counterpart).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
+  await approve(counterpart,m.id,other);
+  const operator=pages.operador,operatorPanel=operator.getByRole('region',{name:'Aprobaciones de las partes'});
+  await expect(operatorPanel).toContainText('2 de 2 · Aprobado',{timeout:12000});
+  const receipt=operator.getByRole('button',{name:'Confirmar Recepcion In Situ',exact:true});
+  await expect(receipt).toBeDisabled();
+  await post(operator,'/'+m.id+'/iniciar-coordinacion',()=>operatorPanel.getByRole('button',{name:'Iniciar coordinación',exact:true}).click());
+  await expect(receipt).toBeEnabled({timeout:12000});
+  await proof(operator,info,'in-situ-approved-'+creator);
+  const received=await post(operator,'/'+m.id+'/recepcion-insitu',()=>receipt.click());
+  expect(received.manifiesto.estado).toBe('RECIBIDO');
+  expect(received.manifiesto.fechaRetiro).toBeNull();
+  await expect(operator.getByRole('button',{name:'Registrar Tratamiento',exact:true})).toBeVisible();
+  expect(errors).toEqual([]);
+ }finally{for(const context of contexts)await context.close();}
+});
 for(const creator of roles)test('ordinary proposal: '+creator+' creates; each party approves, inbox updates, transport starts',async({browser},info)=>{
  const contexts=[],pages={} as Record<Role,Page>,homes={} as Record<Role,string>,errors:string[]=[];
  const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
@@ -54,16 +103,38 @@ for(const creator of roles)test('ordinary proposal: '+creator+' creates; each pa
   const live=pages[other].getByRole('region',{name:'Agenda de manifiestos'});
   await expect(live.locator('[data-agenda-row]').first()).toContainText(m.numero,{timeout:12000});
   await expect(live.locator('[data-agenda-row]').first()).toContainText('Te toca aprobar');
+  for(const role of roles){
+   const reader=pages[role];await reader.bringToFront();
+   await reader.getByRole('button',{name:/^Notificaciones(?: \(|$)/}).click();
+   const notice=reader.getByRole('region',{name:'Notificaciones recientes'}).getByRole('button').filter({hasText:m.numero});
+   await expect(notice).toHaveCount(1,{timeout:12000});
+   await expect(notice).toContainText('Manifiesto pendiente de tu aprobación');
+   await notice.click();await expect(reader).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
+   const approval=reader.getByRole('region',{name:'Aprobaciones de las partes'});
+   await expect(approval).toContainText('0 de 3 aprobaciones');
+   for(const name of ['Generador','Transporte','Operador'])await expect(approval.getByLabel(name+': Pendiente',{exact:true})).toHaveClass(/text-neutral-600/);
+   await expect(approval.getByRole('button',{name:'Iniciar coordinación',exact:true})).toHaveCount(0);
+   await proof(reader,info,'bell-and-three-pending-'+creator+'-'+role);
+  }
   await approve(page,m.id,creator);await page.goto(homes[creator]);
   const agenda=page.getByRole('region',{name:'Agenda de manifiestos'});
   await expect(agenda.locator('[data-agenda-row]').first()).toContainText(m.numero);
   await expect(agenda.locator('[data-agenda-row]').first()).toContainText('En espera');
   await agenda.getByRole('button',{name:'En espera',exact:true}).click();await proof(page,info,'waiting-'+creator);
+  const approvedRoles:Role[]=[creator];
   for(const role of roles.filter(r=>r!==creator)){
-   await pages[role].getByRole('region',{name:'Agenda de manifiestos'}).getByRole('link',{name:new RegExp(m.numero)}).click();
    const panel=pages[role].getByRole('region',{name:'Aprobaciones de las partes'});
    await expect(panel.getByRole('button',{name:'Iniciar coordinación',exact:true})).toHaveCount(0);
    await approve(pages[role],m.id,role);
+   approvedRoles.push(role);
+   for(const observer of roles.filter(r=>r!==creator)){
+    const reflected=pages[observer].getByRole('region',{name:'Aprobaciones de las partes'});
+    for(const actor of roles){
+     const label={generador:'Generador',transportista:'Transporte',operador:'Operador'}[actor];
+     await expect(reflected.getByLabel(label+': '+(approvedRoles.includes(actor)?'Aprobado':'Pendiente'),{exact:true})).toHaveClass(approvedRoles.includes(actor)?/text-emerald-900/:/text-neutral-600/,{timeout:12000});
+    }
+    if(approvedRoles.length<3)await expect(reflected.getByRole('button',{name:'Iniciar coordinación',exact:true})).toHaveCount(0);
+   }
   }
   await agenda.getByRole('button',{name:'Todos',exact:true}).click();
   await expect(agenda.locator('[data-agenda-row]').first()).toContainText('Listo para iniciar',{timeout:12000});
