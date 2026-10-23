@@ -15,7 +15,7 @@ function reply(records:any[], options:any={params:{}}){
  const {filter='all',period='all',search='',page=1,limit=6}=options.params||{};
  const day=(value:any)=>new Date(value).toLocaleDateString('sv-SE',{timeZone:'America/Argentina/Mendoza'}),today=day(new Date());
  const base=records.filter(m=>(!search||m.numero.toLowerCase().includes(search.toLowerCase()))&&(period==='all'||period==='today'&&day(m.fechaEstimadaRetiro)===today||period==='future'&&day(m.fechaEstimadaRetiro)>today));
- const groups:any={all:base,mine:base.filter(m=>m.requiereMiAprobacion),waiting:base.filter(m=>m.estado==='PENDIENTE_APROBACION'&&!m.requiereMiAprobacion),progress:base.filter(m=>m.estado==='EN_TRANSITO'),certificates:base.filter(m=>m.certificatePending)};
+ const groups:any={all:base,mine:base.filter(m=>m.requiereMiAprobacion),waiting:base.filter(m=>m.estado==='PENDIENTE_APROBACION'&&(mock.rol==='ADMIN'||!m.requiereMiAprobacion)),progress:base.filter(m=>m.estado==='EN_TRANSITO'),certificates:base.filter(m=>m.certificatePending),drafts:base.filter(m=>m.estado==='BORRADOR')};
  const matches=groups[filter];return {data:{data:{items:matches.slice((page-1)*limit,page*limit),total:matches.length,page,limit,counts:Object.fromEntries(Object.entries(groups).map(([k,v])=>[k,(v as any[]).length]))}}};
 }
 function mount(){mock.get.mockImplementation(async(_url,options)=>reply(items,options));render(<MemoryRouter><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);}
@@ -67,7 +67,7 @@ it.each(['OPERADOR','GENERADOR','TRANSPORTISTA','ADMIN'])('shows a newly created
  await waitFor(()=>expect(screen.getAllByRole('link')[0]).toHaveTextContent('CAP-LATEST'),{timeout:1000});
  expect(within(screen.getAllByRole('link')[0]).getByText('En espera')).toBeVisible();
  expect(screen.getByRole('link',{name:/CAP-OLD-0/})).toBe(oldRow);
- fireEvent.click(screen.getByRole('button',{name:'En espera',exact:true}));await screen.findByText('CAP-LATEST');expect(screen.getByRole('link',{name:/CAP-LATEST/})).toBeVisible();expect(screen.queryByText('CAP-OLD-0')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:role==='ADMIN'?'Por aprobar':'En espera',exact:true}));await screen.findByText('CAP-LATEST');expect(screen.getByRole('link',{name:/CAP-LATEST/})).toBeVisible();expect(screen.queryByText('CAP-OLD-0')).not.toBeInTheDocument();
  client.clear();
 });
 
@@ -83,4 +83,35 @@ it('uses server totals and opens certificates after treatment without asking ano
  expect(await screen.findByText('Esperando certificado final')).toBeVisible();expect(screen.getByRole('link',{name:/QA-FINAL/})).toHaveAttribute('href','/manifiestos/closed#certificaciones');
  expect(screen.getByText('121 pendientes · Página 1 de 21')).toBeVisible();fireEvent.click(screen.getByRole('button',{name:'Siguiente'}));
  await waitFor(()=>expect(mock.get).toHaveBeenLastCalledWith('/manifiestos/tareas-partes',expect.objectContaining({params:expect.objectContaining({page:2})})));client.clear();
+});
+
+it('shows administrator approval tasks with actor names and the missing parties',async()=>{
+ mock.training=false;mock.rol='ADMIN';vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ const record={...items[0],requiereMiAprobacion:false,actores:{generador:'Origen artificial',transportista:'Transporte artificial',operador:'Destino artificial'}};
+ mock.get.mockImplementation(async(_url,options)=>reply([record],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ const pending=await screen.findByRole('region',{name:'Aprobaciones pendientes'});
+ expect(pending).toHaveTextContent('1 manifiesto por aprobar por las partes');
+ fireEvent.click(within(pending).getByRole('button',{name:'Revisar pendientes'}));
+ await waitFor(()=>expect(mock.get).toHaveBeenLastCalledWith('/manifiestos/tareas-partes',expect.objectContaining({params:expect.objectContaining({filter:'waiting'})})));
+ const row=await screen.findByRole('link',{name:/CAP-NEW/});
+ expect(row).toHaveTextContent('Origen artificial → Destino artificial');
+ expect(row).toHaveTextContent('Falta aprobar: Generador');
+ expect(row).toHaveAttribute('title',expect.stringContaining('Falta aprobar: Generador'));
+ expect(screen.queryByRole('button',{name:'En espera'})).not.toBeInTheDocument();
+ client.clear();
+});
+
+it('includes a draft with its next responsible party without inventing three approvals',async()=>{
+ mock.get.mockImplementation(async(_url,options)=>reply([{id:'draft',numero:'QA-DRAFT',estado:'BORRADOR',modalidad:'IN_SITU',partes:null,actores:{generador:'Origen artificial',transportista:null,operador:'Destino artificial'}}],options));
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ await screen.findByText('QA-DRAFT');
+ fireEvent.click(screen.getByRole('button',{name:'Borradores'}));
+ const row=await screen.findByRole('link',{name:/QA-DRAFT/});
+ expect(row).toHaveTextContent('firma del generador pendiente');
+ expect(row).toHaveTextContent('Tratamiento en origen · sin transporte');
+ expect(within(row).queryByLabelText('Transporte: Aprobado')).not.toBeInTheDocument();
+ client.clear();
 });

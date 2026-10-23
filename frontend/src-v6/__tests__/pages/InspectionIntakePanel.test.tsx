@@ -54,10 +54,10 @@ it('sends pagination/filter criteria to the server, instead of filtering only a 
   fireEvent.change(screen.getByLabelText('Estado del antecedente'), { target: { value: 'EN_EVALUACION' } });
   await waitFor(() => expect(mock.get).toHaveBeenLastCalledWith('/inspecciones/antecedentes', { params: { estado: 'EN_EVALUACION', tipoActor: '', search: '', page: 1 } }));
   expect(screen.getByRole('heading', { name: 'Antecedentes para inspección' })).toBeVisible();
-  expect(screen.getByRole('status')).toHaveTextContent('1 antecedente · En evaluación');
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 antecedente · En evaluación'));
   fireEvent.change(screen.getByLabelText('Estado del antecedente'), { target: { value: 'VINCULADA' } });
   await waitFor(() => expect(mock.get).toHaveBeenLastCalledWith('/inspecciones/antecedentes', { params: { estado: 'VINCULADA', tipoActor: '', search: '', page: 1 } }));
-  expect(screen.getByRole('status')).toHaveTextContent('1 antecedente · Con inspección');
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 antecedente · Con inspección'));
 });
 it('does not silently apply a draft reason to a newer server version', async () => {
   const { client } = view(); await screen.findByRole('button', { name: /BI-qa-record/ });

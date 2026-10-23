@@ -17,7 +17,8 @@ it('a newly received certificate refreshes an open inbox and unread badge withou
  client.setQueryData(['notificaciones','poll','g'],{items:[{id:'new',titulo:'Certificación parcial disponible',mensaje:'M-P01',prioridad:'NORMAL',manifiestoId:'m',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'c',tipoCertificado:'PARCIAL'})}],noLeidas:1});
  await waitFor(()=>expect(spy).toHaveBeenCalledWith({queryKey:['notificaciones','list']}));
  expect(spy).toHaveBeenCalledWith({queryKey:['notificaciones','no-leidas']});expect(spy).toHaveBeenCalledWith({queryKey:['manifest-certificates']});
+ expect(spy).toHaveBeenCalledWith({queryKey:['notificaciones','bell']});
  expect(spy).not.toHaveBeenCalledWith({queryKey:['notificaciones','poll','g']});
- expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({title:'Certificación parcial disponible'}));
+ expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({title:'Certificación parcial disponible',actionLabel:'Ver certificación y descargar →'}));
  view.unmount();client.clear();
 });

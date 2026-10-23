@@ -95,6 +95,11 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
       <Card>
         <CardHeader title="Acciones" icon={<ClipboardCheck size={22}/>} />
         <CardContent>
+          {m.estado === 'BORRADOR' && !m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <section aria-label="Estado del borrador" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <h3 className="font-bold">{isInSitu ? 'Tratamiento en origen · sin transporte' : 'Borrador pendiente de firma'}</h3>
+            <p className="mt-1">El generador debe revisar y firmar para continuar. Todavía no se inició la operación.</p>
+            <p className="mt-1">{isInSitu ? 'Después de la firma, el operador podrá registrar la recepción in situ.' : 'Este borrador conserva el circuito anterior; no es una propuesta enviada para tres aprobaciones.'}</p>
+          </section>}
           {m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           <ActionButtons
             estado={m.estado}

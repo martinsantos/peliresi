@@ -29,6 +29,30 @@ it('rejects malformed pagination rather than silently losing tasks', async () =>
   const { next } = await query({ page: '0' });
   expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 })); expect(mock.findMany).not.toHaveBeenCalled();
 });
+it.each(['GENERADOR', 'OPERADOR'])('keeps an in-situ draft visible and explains the missing signature to %s', async rol => {
+  mock.findMany.mockResolvedValue([{
+    id: 'draft', numero: 'QA-IN-SITU', estado: 'BORRADOR', modalidad: 'IN_SITU',
+    generador: { razonSocial: 'Generador artificial' }, transportista: null,
+    operador: { razonSocial: 'Operador artificial' }, eventos: [], residuos: [],
+  }]);
+  const { json, next } = await query({ filter: 'drafts' }, rol);
+  expect(next).not.toHaveBeenCalled();
+  const args = mock.findMany.mock.calls[0][0];
+  expect(JSON.stringify(args.where)).toContain(rol.toLowerCase() + 'Id');
+  expect(JSON.stringify(args.where)).toContain('BORRADOR');
+  expect(json.mock.calls[0][0].data.items[0]).toMatchObject({
+    estado: 'BORRADOR', partes: null, requiereMiAprobacion: false,
+    action: 'Firma del generador pendiente',
+    detail: expect.stringContaining('sin transporte'),
+    actores: { generador: 'Generador artificial', transportista: null, operador: 'Operador artificial' },
+  });
+});
+it('lets administration review pending parties without impersonating a missing approval', async () => {
+  const { next } = await query({ filter: 'waiting' }, 'ADMIN');
+  expect(next).not.toHaveBeenCalled();
+  const where = mock.findMany.mock.calls[0][0].where;
+  expect(where.AND[1]).toEqual({ estado: 'PENDIENTE_APROBACION', NOT: { id: { in: [] } } });
+});
 it('keeps Mendoza day boundaries and deterministic order in the server query', async () => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-20T01:30:00Z'));
   try { await query({ period: 'today' });

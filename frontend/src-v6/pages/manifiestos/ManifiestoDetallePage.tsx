@@ -384,6 +384,7 @@ const ManifiestoDetailPage: React.FC = () => {
           <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
             {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
           </Badge>
+          {m.modalidad === 'IN_SITU' && <Badge variant="soft" color="info">En origen · sin transporte</Badge>}
           {isError && (
             <Badge variant="soft" color="warning" className="shrink-0">
               <AlertCircle size={12} className="mr-1" />

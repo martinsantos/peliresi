@@ -9,17 +9,25 @@ async function parties(tx: Tx, p: Parties) {
     p.transportistaId ? tx.transportista.findUnique({where:{id:p.transportistaId},include:{usuario:{select:{id:true,activo:true}}}}) : null,
     tx.operador.findUnique({where:{id:p.operadorId},include:{usuario:{select:{id:true,activo:true}}}}),
   ]);
-  return [g,t,o].map(actor => actor?.activo === false ? undefined : actor?.usuario);
+  const roles = ['Generador', 'Transporte', 'Operador'];
+  return [g,t,o].map((actor, index) => ({
+    usuario: actor?.activo === false ? undefined : actor?.usuario,
+    nombre: actor?.razonSocial,
+    rol: roles[index],
+  }));
 }
 export async function validateProposalParties(tx: Tx, p: Parties) {
   const users=await parties(tx,p);
-  if(users.some(u=>!u?.activo))throw new AppError('Las tres partes y sus cuentas deben estar activas para aprobar. Si falta un alta, usá Eventuales.',400);
+  if(users.some(p=>!p.usuario?.activo))throw new AppError('Las tres partes y sus cuentas deben estar activas para aprobar. Si falta un alta, usá Eventuales.',400);
 }
 /** Creation and inbox commit together. Return only fresh IDs for a caller's
  * post-commit dispatch; CAP never sends external notifications. */
 export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:string;numero:string;creadoPorId:string;fechaEstimadaRetiro:Date|null}, phase:string, author:string) {
   const users=await parties(tx,manifest);
-  const partyUsers=users.filter(u=>u?.activo).map(u=>u!.id);
+  const partyUsers=users.filter(p=>p.usuario?.activo).map(p=>p.usuario!.id);
+  const origin=users.find(p=>p.usuario?.id===author);
+  const sender=phase==='creada'&&origin?.nombre ? `${origin.nombre} (${origin.rol}) propuso este manifiesto. ` : '';
+  const context=users.filter(p=>p.nombre).map(p=>`${p.rol}: ${p.nombre}`).join(' · ');
   const recipients=[...new Set([...partyUsers,manifest.creadoPorId])];
   const date=manifest.fechaEstimadaRetiro?.toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza'})||'sin fecha';
   const approvedRole=phase.startsWith('aprobacion-')?({GENERADOR:'Generador',TRANSPORTISTA:'Transporte',OPERADOR:'Operador'} as Record<string,string>)[phase.slice(11)]:null;
@@ -27,7 +35,7 @@ export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:stri
   const next=phase==='creada'?'Abrí el manifiesto para aprobar o rechazar.':phase==='aprobada'?'Una de las tres partes debe pulsar Iniciar coordinación.':phase==='iniciada'?'Generador: prepará la carga. Operador: coordiná la recepción. Transporte: confirmá el retiro cuando ocurra.':phase==='rechazada'?'No se puede iniciar ni retirar. Revisá el motivo.':approvedRole?'Revisá qué aprobaciones faltan.':'El operador la firmó. Abrí Certificaciones para descargarla.';
   const data=recipients.map(usuarioId=>({
     id:createHash('sha256').update(`${manifest.id}:${phase}:${usuarioId}`).digest('hex'),usuarioId,tipo:'INFO_GENERAL' as const,
-    titulo:phase==='creada'&&!partyUsers.includes(usuarioId)?'Manifiesto enviado a las partes':title,mensaje:`${manifest.numero}. Fecha prevista: ${date}. ${next}`,
+    titulo:phase==='creada'&&!partyUsers.includes(usuarioId)?'Manifiesto enviado a las partes':title,mensaje:`${manifest.numero}. ${sender}${context ? context + '. ' : ''}Fecha prevista: ${date}. ${next}`,
     manifiestoId:manifest.id,datos:JSON.stringify({tipo:'propuesta_partes',fase:phase,autorId:author,url:`/manifiestos/${manifest.id}`}),
   }));
   const inserted=await tx.notificacion.createMany({skipDuplicates:true,data});

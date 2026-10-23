@@ -28,7 +28,7 @@ vi.mock('../../hooks/useCatalogos', () => ({
     { id: 'trans-unknown', razonSocial: 'Transporte sin corrientes' },
   ] }),
   useCatalogoOperadores: () => ({ data: [{
-    id: 'operador-1', razonSocial: 'Operador QA', modalidades: ['FIJO'],
+    id: 'operador-1', razonSocial: 'Operador QA', modalidades: ['FIJO', 'IN_SITU'],
     tratamientos: [{ tipoResiduoId: 'y8', activo: true }, { tipoResiduoId: 'y9', activo: true }],
   }] }),
 }));
@@ -71,6 +71,19 @@ describe('manifest transport compatibility after changing residues', () => {
     await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('vehiculoId');
     expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('choferId');
+  });
+
+  it('explains in-situ as a draft without transport before submitting it', async () => {
+    prepareDestination(/^Transporte Y8$/);
+    expect(screen.getByRole('button', { name: /^Con traslado/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /^En origen/ }));
+    expect(screen.getByText(/Se guardará un borrador pendiente de la firma del generador/)).toBeVisible();
+    expect(screen.queryByLabelText('Transportista *')).not.toBeInTheDocument();
+    choose('Operador / Destino *', /Operador QA/);
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create.mock.calls[0][0].modalidad).toBe('IN_SITU');
+    expect(mocks.create.mock.calls[0][0]).not.toHaveProperty('transportistaId');
   });
 
   it('submits explicit second resources, not list order, and excludes inactive options', async () => {

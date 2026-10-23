@@ -76,6 +76,67 @@ for (const [account, group] of [['operador','Operadores'],['generador','Generado
  });
 }
 async function choose(page:Page,name:string,value:RegExp){await page.getByRole('button',{name,exact:true}).click();await page.getByRole('option',{name:value}).click();}
+test('a real generator proposal reaches the other parties, the bell and the administrator agenda',async({page},info)=>{
+ test.setTimeout(150000);
+ const browser=page.context().browser()!;
+ const observer=await browser.newContext({viewport:info.project.use.viewport});
+ const errors:string[]=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ try{
+  const operator=await observer.newPage();operator.on('pageerror',error=>errors.push(error.message));
+  const initialNotices=operator.waitForResponse(r=>r.url().includes('/api/notificaciones?')&&new URL(r.url()).searchParams.get('limit')==='20'&&r.status()===200);
+  await login(operator,info,'operador');await initialNotices;
+  await expect(operator.getByRole('region',{name:'Agenda de manifiestos'})).toBeVisible();
+  // The operator is already online when a different account creates.
+  await login(page,info,'generador');await page.goto(prefix(info)+'/manifiestos/nuevo');
+  await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+  await choose(page,'Tipo de Residuo *',/^Y1 - /);await page.getByLabel('Cantidad *',{exact:true}).fill('9');
+  await page.getByRole('button',{name:'Siguiente',exact:true}).click();
+  await expect(page.getByRole('button',{name:/^Con traslado/})).toHaveAttribute('aria-pressed','true');
+  await choose(page,'Transportista *',/^QA Transporte 1 /);await choose(page,'Operador / Destino *',/^QA Operador 1 /);
+  const saved=page.waitForResponse(r=>r.url().endsWith('/api/manifiestos')&&r.request().method()==='POST');
+  await page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click();
+  const response=await saved;expect(response.status()).toBe(201);const manifest=(await response.json()).data.manifiesto;
+  expect(manifest).toMatchObject({estado:'PENDIENTE_APROBACION',modalidad:'FIJO'});
+  await operator.bringToFront();
+  const live=operator.getByRole('region',{name:'Avisos del sistema'}).filter({hasText:manifest.numero});
+  await expect(live).toBeVisible({timeout:25000});
+  await expect(live).toContainText('Manifiesto pendiente de tu aprobación');
+  await expect(live).toContainText('QA Generador 1');
+  await proof(operator,info,'operator-live-proposal-notice');
+  const queue=operator.getByRole('region',{name:'Agenda de manifiestos'});
+  const row=queue.getByRole('link',{name:new RegExp(manifest.numero)});
+  await expect(row).toContainText('Te toca aprobar');
+  await expect(row).toContainText('QA Generador 1 → QA Operador 1');
+  await expect(row).toContainText('Falta aprobar: Generador, Transporte, Operador');
+  await operator.getByRole('button',{name:/^Notificaciones(?: \(|$)/}).click();
+  const bell=operator.getByRole('region',{name:'Notificaciones recientes'});
+  const notice=bell.getByRole('button').filter({hasText:manifest.numero});
+  await expect(notice).toHaveCount(1);
+  await notice.click();await expect(operator).toHaveURL(new RegExp('/manifiestos/'+manifest.id+'$'));
+  await expect(operator.getByRole('region',{name:'Aprobaciones de las partes'})).toBeVisible();
+  await expect(operator.getByRole('button',{name:'Iniciar coordinación',exact:true})).toHaveCount(0);
+  await expect(operator.getByRole('button',{name:'Confirmar Retiro',exact:true})).toHaveCount(0);
+  await proof(operator,info,'operator-pending-approval');
+  await observer.close();
+  for(const role of ['transportista','admin']){
+   const context=await browser.newContext({viewport:info.project.use.viewport});
+   try{
+    const reader=await context.newPage();reader.on('pageerror',error=>errors.push(error.message));await login(reader,info,role);
+    const agenda=reader.getByRole('region',{name:'Agenda de manifiestos'});
+    const pending=agenda.getByRole('region',{name:'Aprobaciones pendientes'});
+    await expect(pending).toBeVisible();await pending.getByRole('button',{name:'Revisar pendientes'}).click();
+    await agenda.getByLabel('Buscar manifiesto en agenda').fill(manifest.numero);
+    const task=agenda.getByRole('link',{name:new RegExp(manifest.numero)});
+    await expect(task).toContainText('QA Generador 1 → QA Operador 1');
+    await expect(task).toContainText('Falta aprobar: Generador, Transporte, Operador');
+    await expect(task).toHaveAttribute('title',/Transporte: QA Transporte 1/);
+    await proof(reader,info,role+'-pending-agenda');
+   }finally{await context.close();}
+  }
+  expect(errors).toEqual([]);
+ }finally{await observer.close();}
+});
 test('actual operator can create a proposal and Monitor shows its readable persisted events',async({page},info)=>{
  await login(page,info,'operador');await page.goto(prefix(info)+'/manifiestos/nuevo');
  await choose(page,'Generador *',/^QA Generador 1 /);await page.getByRole('button',{name:'Siguiente',exact:true}).click();

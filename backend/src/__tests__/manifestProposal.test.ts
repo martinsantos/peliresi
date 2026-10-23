@@ -4,6 +4,7 @@ vi.mock('../lib/prisma',()=>({default:new Proxy({}, {get:(_,key)=>key==='$transa
 vi.mock('qrcode',()=>({default:{toDataURL:vi.fn().mockResolvedValue('data:qr')}}));
 vi.mock('../services/blockchain.service', async importOriginal => ({...await importOriginal<typeof import('../services/blockchain.service')>(),registrarSello:vi.fn().mockResolvedValue(null)}));
 import QRCode from 'qrcode';
+import {notifyManifestParties} from '../services/manifestProposal.service';
 import {inTrainingSession,inOperationalSession} from '../lib/trainingScope';
 import {canCreateManifestProposal,MANIFEST_PROPOSAL,proposalRole,parseProposal} from '../domain/manifestProposal';
 import {approveManifestProposal,assertManifestProposalApproved,startManifestCoordination} from '../controllers/manifest-proposal.controller';
@@ -21,6 +22,22 @@ beforeEach(()=>{
  generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn(async({data}:any)=>({count:data.length}))}};
 });
 describe('three independently authenticated parties',()=>{
+ it('gives all linked parties an actionable notice with the proposing company and the same manifest link',async()=>{
+  for(const [actor,id,name] of [['generador','ug','Origen artificial'],['transportista','ut','Transporte artificial'],['operador','uo','Destino artificial']]){
+   mock.tx[actor].findUnique.mockResolvedValue({razonSocial:name,usuario:{id,activo:true}});
+  }
+  await notifyManifestParties(mock.tx,mock.manifest,'creada','ug');
+  const notices=mock.tx.notificacion.createMany.mock.calls[0][0].data;
+  expect(notices.map((n:any)=>n.usuarioId).sort()).toEqual(['ug','uo','ut']);
+  for(const notice of notices){
+   expect(notice.titulo).toBe('Manifiesto pendiente de tu aprobación');
+   expect(notice.mensaje).toContain('Origen artificial (Generador) propuso este manifiesto');
+   expect(notice.mensaje).toContain('Transporte: Transporte artificial');
+   expect(notice.mensaje).toContain('Operador: Destino artificial');
+   expect(notice.mensaje).toContain('Abrí el manifiesto para aprobar o rechazar.');
+   expect(JSON.parse(notice.datos).url).toBe('/manifiestos/m');
+  }
+ });
  it.each(Object.keys(users) as (keyof typeof users)[])('allows %s creation only in the signed school scope',rol=>{
   expect(inOperationalSession(()=>canCreateManifestProposal(users[rol]))).toBe(false);
   expect(inTrainingSession(()=>canCreateManifestProposal(users[rol]))).toBe(true);

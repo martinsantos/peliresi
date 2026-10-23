@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { notificacionService } from '../services/notificacion.service';
-import { resolveNotificationPath, refreshInspectionNotification } from '../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel } from '../utils/notificationNavigation';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { toast } from './ui/Toast';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -29,9 +29,9 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
   const { data } = useQuery({
     queryKey: ['notificaciones', 'poll', userId],
     queryFn: () => notificacionService.list({ limit: 20, leida: false }),
-    refetchInterval: 30_000,   // cada 30 segundos
+    refetchInterval: 10_000,
     refetchIntervalInBackground: false,
-    staleTime: 25_000,
+    staleTime: 5_000,
   });
 
   useEffect(() => {
@@ -53,6 +53,7 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
       // creating a request loop. Receiving a notice never marks it as read.
       void qc.invalidateQueries({ queryKey: ['notificaciones', 'list'] });
       void qc.invalidateQueries({ queryKey: ['notificaciones', 'no-leidas'] });
+      void qc.invalidateQueries({ queryKey: ['notificaciones', 'bell'] });
     }
     nuevas.forEach((n) => {
       seen.current.add(n.id);
@@ -61,8 +62,8 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
         type:    n.prioridad === 'ALTA' || n.prioridad === 'URGENTE' ? 'warning' : 'info',
         title:   n.titulo,
         message: n.mensaje,
-        duration: n.prioridad === 'URGENTE' ? 12_000 : 6_000,
-        actionLabel: 'Abrir', onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole))); },
+        duration: n.prioridad === 'URGENTE' ? 12_000 : 10_000,
+        actionLabel: notificationActionLabel(resolveNotificationPath(n, '', userRole)), onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole))); },
       }));
     });
     if (seen.current.size > 200) seen.current = new Set(data.items.map(n => n.id));

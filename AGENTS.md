@@ -1,5 +1,7 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+> **Revisión de aprobaciones y avisos — 23/10, pendiente:** el caso 2026-000197 fue guardado IN_SITU/BORRADOR, sin propuesta de tres partes. Se preparó claridad de modalidad, agenda con borradores/empresas/pendientes y refresco de campana. El preview se recuperó brevemente, dio 138/139 unitarias sobre 185db0e2 y volvió a perder SSH. Los cambios nuevos aún no tienen QA funcional. Leer [diagnóstico, cambios y reanudación](docs/APROBACIONES-AGENDA-AVISOS-20261023.md). Producción sigue 6580c1ca; sin datos reales, main ni envíos.
+
 > **Tanda pendiente de validación y publicación — 23/10:** Vista temporal, Ayuda, Monitor y la integración de Antecedentes dentro de Inspecciones están preparados en esta rama. El preview no responde por SSH; no dar por finalizadas las pruebas ni publicar sin recuperarlo. Producción sigue en `6580c1ca`. Ver [alcance, evidencia parcial y pendientes](docs/CORRECCIONES-VISTA-TEMPORAL-AYUDA-MONITOR-20261023.md). CAP cerrado, correos/push apagados; sin main ni datos reales.
 
 ## Publicación vigente — identidad, experiencia y concurrencia, 23/10/2026

@@ -285,7 +285,7 @@ const NuevoManifiestoForm: React.FC = () => {
         })),
       });
 
-      toast.success('Manifiesto creado', `El manifiesto ${result.numero || result.id} fue creado exitosamente`);
+      toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? 'Generador, transporte y operador deben aprobar desde sus cuentas.' : 'Todavía falta la firma del generador para continuar.'}`);
       navigate(mp(`/manifiestos/${result.id}`));
     } catch (err: any) {
       // The API client explains 429 with its retry time. Keep all fields and
@@ -588,7 +588,7 @@ const NuevoManifiestoForm: React.FC = () => {
               {/* Modalidad selector */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Modalidad de operacion *
+                  ¿Dónde se realizará el tratamiento? *
                 </label>
                 <div role="group" aria-label="Modalidad de operación" className="grid grid-cols-2 gap-2">
                   <button
@@ -607,8 +607,8 @@ const NuevoManifiestoForm: React.FC = () => {
                   >
                     <Truck size={20} className={formData.modalidad === 'FIJO' ? 'text-primary-600' : 'text-neutral-400'} />
                     <div>
-                      <p className={`text-sm font-semibold ${formData.modalidad === 'FIJO' ? 'text-primary-700' : 'text-neutral-700'}`}>Fijo</p>
-                      <p className="text-xs text-neutral-500">Requiere transporte</p>
+                      <p className={`text-sm font-semibold ${formData.modalidad === 'FIJO' ? 'text-primary-700' : 'text-neutral-700'}`}>Con traslado</p>
+                      <p className="text-xs text-neutral-600">En la planta del operador · Fijo</p>
                     </div>
                   </button>
                   <button
@@ -629,8 +629,8 @@ const NuevoManifiestoForm: React.FC = () => {
                   >
                     <MapPin size={20} className={formData.modalidad === 'IN_SITU' ? 'text-emerald-600' : 'text-neutral-400'} />
                     <div>
-                      <p className={`text-sm font-semibold ${formData.modalidad === 'IN_SITU' ? 'text-emerald-700' : 'text-neutral-700'}`}>In Situ</p>
-                      <p className="text-xs text-neutral-500">Operador en sitio</p>
+                      <p className={`text-sm font-semibold ${formData.modalidad === 'IN_SITU' ? 'text-emerald-700' : 'text-neutral-700'}`}>En origen</p>
+                      <p className="text-xs text-neutral-600">El operador va al generador · In situ</p>
                     </div>
                   </button>
                 </div>
@@ -640,7 +640,7 @@ const NuevoManifiestoForm: React.FC = () => {
               {formData.modalidad === 'IN_SITU' && (
                 <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 animate-fade-in">
                   <MapPin size={16} className="shrink-0 mt-0.5" />
-                  <span>El operador trabajara directamente en el domicilio del generador. No se requiere transporte.</span>
+                  <span><strong>Sin transporte.</strong> El operador trabajará en el domicilio del generador. Se guardará un borrador pendiente de la firma del generador; no se enviará una propuesta de tres partes.</span>
                 </div>
               )}
 

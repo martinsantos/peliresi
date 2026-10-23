@@ -164,7 +164,7 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
     const total = counts[agenda.filter], page = Math.min(agenda.page, Math.max(1, Math.ceil(total / agenda.limit)));
     const rows = await tx.manifiesto.findMany({ where: { AND: [agenda.base, agenda.categories[agenda.filter]] }, orderBy: agenda.orderBy,
       skip: (page - 1) * agenda.limit, take: agenda.limit,
-      include: { eventos: { where: { tipo: { in: [MANIFEST_PROPOSAL, ...Object.values(APPROVAL_EVENTS), ...COORDINATION_EVENTS, 'CERTIFICADO_CAP_V1'] } } }, residuos: { select: { cantidadRecibida: true } } },
+      include: { generador: { select: { razonSocial: true } }, transportista: { select: { razonSocial: true } }, operador: { select: { razonSocial: true } }, eventos: { where: { tipo: { in: [MANIFEST_PROPOSAL, ...Object.values(APPROVAL_EVENTS), ...COORDINATION_EVENTS, 'CERTIFICADO_CAP_V1'] } } }, residuos: { select: { cantidadRecibida: true } } },
     });
     return { rows, counts, total, page };
   }, { isolationLevel: 'RepeatableRead' });
@@ -173,7 +173,10 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    const marker=m.eventos.find(e=>e.tipo===MANIFEST_PROPOSAL),proposal=marker?parseProposal(marker.descripcion):null;
    const role=proposal?(proposalRole(req.user,proposal)||(req.user.rol==='ADMIN'?'ADMIN':null)):req.user.rol;
    let action='',detail='';
-   if(m.estado==='PENDIENTE_APROBACION'&&proposal){
+   if(m.estado==='BORRADOR'){
+    action='Firma del generador pendiente';
+    detail=m.modalidad==='IN_SITU'?'Tratamiento en origen, sin transporte. El generador debe revisar y firmar antes de la recepción del operador.':'Borrador del circuito anterior. Todavía no fue enviado a las tres partes para su aprobación.';
+   }else if(m.estado==='PENDIENTE_APROBACION'&&proposal){
     const missing=(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).filter(r=>!m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[r]));
     action=role&&missing.includes(role as ProposalRole)?'Revisá y aprobá tu participación':'Esperando a las otras partes';detail='Falta aprobar: '+missing.map(r=>labels[r]).join(', ')+'.';
    }else if(m.estado==='APROBADO'&&proposal){
@@ -189,7 +192,7 @@ export async function getTrainingTasks(req:AuthRequest,res:Response,next:NextFun
    const partes=proposal?(Object.keys(APPROVAL_EVENTS) as ProposalRole[]).map(rol=>({rol,aprobada:m.eventos.some(e=>e.tipo===APPROVAL_EVENTS[rol])})):null;
    const inicio=m.eventos.find(e=>COORDINATION_EVENTS.includes(e.tipo))?.createdAt||null;
    const requiereMiAprobacion=!!role&&m.estado==='PENDIENTE_APROBACION'&&!!partes?.some(p=>p.rol===role&&!p.aprobada);
-   return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];
+   return [{id:m.id,numero:m.numero,estado:m.estado,modalidad:m.modalidad,action,detail,actores:{generador:m.generador?.razonSocial||'',transportista:m.transportista?.razonSocial||null,operador:m.operador?.razonSocial||''},fechaEstimadaRetiro:m.fechaEstimadaRetiro,partes,inicio,requiereMiAprobacion,pesajePendiente:m.residuos.some(r=>!r.cantidadRecibida),certificatePending:m.estado==='TRATADO'}];
   });
   res.json({success:true,data:{items,total,page,limit:agenda.limit,counts,limited:false}});
  }catch(e){next(e);}
