@@ -10,7 +10,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Factory, Truck, Flask
 import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { MendozaBrand } from '../../components/MendozaBrand';
-import { SitrepMark } from '../../components/SitrepMark';
+import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
 import { BrandSpinner } from '../../components/ui/LoadingState';
 import { postLoginDestination } from '../../utils/authRedirect';
 import './institutional.css';
@@ -54,7 +54,7 @@ const LoginPage: React.FC = () => {
           <MendozaBrand />
           <div className="sitrep-wordmark">
             <SitrepMark size={36} />
-            <span style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>SITREP</span>
+            <SitrepWordmark className="font-display" />
           </div>
         </div>
         <p className="text-xs md:text-sm text-neutral-600">

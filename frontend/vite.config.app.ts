@@ -57,7 +57,7 @@ function pwaPrecachePlugin(): Plugin {
       }
 
       // Add icon files if they exist
-      for (const icon of ['favicon.svg', 'icon-192.png', 'icon-512.png']) {
+      for (const icon of ['favicon.svg', 'sitrep-mark-green.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
         if (fs.existsSync(path.join(outDir, icon))) {
           precacheUrls.push(`/app/${icon}`)
         }

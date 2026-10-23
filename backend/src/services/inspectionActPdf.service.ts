@@ -10,6 +10,7 @@ import { prepareInspectionPdfImages, type PreparedInspectionImage } from './insp
 import {
   drawMendozaMark,
   drawInstitutionalMasthead,
+  drawInstitutionalRule,
   drawSitrepMark,
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
@@ -86,10 +87,10 @@ function runningHeader(
 ) {
   drawMendozaMark(doc, branding, 44, 13, 94, 30);
   doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · DGFA', 147, 19, { width: 224, lineBreak: false });
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · DGFA', 147, 19, { width: 270, lineBreak: false });
   doc.font('Helvetica').fontSize(8).fillColor(C.muted)
-    .text(`${unified ? 'EXPEDIENTE' : 'INFORME TÉCNICO'} · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 224, lineBreak: false });
-  drawSitrepMark(doc, 424, 16, { compact: true, width: 127 });
+    .text(`${unified ? 'EXPEDIENTE' : 'INFORME TÉCNICO'} · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 270, lineBreak: false });
+  drawSitrepMark(doc, 442, 16, { compact: true, width: 109 });
   doc.moveTo(44, 47).lineTo(doc.page.width - 44, 47).lineWidth(0.9).strokeColor(C.darkGreen).stroke();
   doc.font('Helvetica').fontSize(7.5).fillColor(C.muted)
     .text(state, 44, 51, { width: doc.page.width - 88, align: 'right', lineBreak: false });
@@ -109,7 +110,7 @@ function header(
   drawInstitutionalMasthead(doc, branding, 44, 16, doc.page.width - 88);
   doc.font('Helvetica').fontSize(7.5).fillColor(C.muted)
     .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 77, { width: doc.page.width - 88, lineBreak: false });
-  doc.moveTo(44, 89).lineTo(doc.page.width - 44, 89).lineWidth(1).strokeColor(C.darkGreen).stroke();
+  drawInstitutionalRule(doc, 44, 89, doc.page.width - 88);
 
   doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text(unified ? 'EXPEDIENTE DE INSPECCIÓN' : 'INFORME TÉCNICO DE INSPECCIÓN', 44, 103, { characterSpacing: 0.45 });
   doc.font('Helvetica-Bold').fontSize(23).fillColor(C.navy).text(inspection.numero, 44, 120, { width: 315 });

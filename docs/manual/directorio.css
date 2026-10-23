@@ -1023,20 +1023,21 @@ body a:hover { color: var(--primary); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .skip-link { position: fixed; top: 8px; left: 8px; z-index: 3000; transform: translateY(-140%); border-radius: 8px; background: #fff; color: var(--primary-dark); font-weight: 700; padding: 10px 16px; }
 .skip-link:focus { transform: translateY(0); }
-.site-header { min-height: var(--header-height); height: auto; padding: 0 max(24px, calc((100vw - 1340px) / 2)); gap: 18px; background: #1b5e3c; box-shadow: none; }
-.directory-brand { color: #fff !important; display: inline-flex; align-items: center; gap: 12px; min-width: 0; text-decoration: none !important; white-space: nowrap; }
+.site-header { min-height: var(--header-height); height: auto; padding: 0 max(24px, calc((100vw - 1340px) / 2)); gap: 18px; background: #fff; color: #1b5e3c; border-bottom: 1px solid #dce3e9; box-shadow: none; }
+.directory-brand { color: #1b5e3c !important; display: inline-flex; align-items: center; gap: 12px; min-width: 0; text-decoration: none !important; white-space: nowrap; }
 .directory-brand img { width: 42px; height: 42px; object-fit: contain; }
 .directory-brand-name { font-family: 'Plus Jakarta Sans', Inter, sans-serif; font-size: 20px; font-weight: 700; }
-.directory-brand-name strong { color: #b7f0cf; }
-.directory-brand-divider { width: 1px; height: 30px; background: rgba(255,255,255,.44); }
+.directory-brand-name strong { color: #52617b; }
+.directory-brand-divider { width: 1px; height: 30px; background: #c6d0da; }
 .directory-brand-product { font-size: 15px; font-weight: 500; }
 .directory-header-nav { margin-left: auto; display: flex; align-items: center; gap: 4px; }
-.directory-header-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 13px; border-radius: 10px; color: #fff !important; font-size: 14px; font-weight: 600; text-decoration: none !important; white-space: nowrap; }
-.directory-header-link:hover, .directory-header-link.current { background: rgba(255,255,255,.12); }
-.directory-header-link.current { box-shadow: inset 0 -2px #b7f0cf; }
+.directory-header-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 13px; border-radius: 10px; color: #1b5e3c !important; font-size: 14px; font-weight: 600; text-decoration: none !important; white-space: nowrap; }
+.directory-header-link:hover, .directory-header-link.current { background: #f0f8f4; }
+.directory-header-link.current { box-shadow: inset 0 -2px #1b5e3c; }
 .header-actions { margin-left: 2px; }
-.header-action-btn { width: 40px; height: 40px; background: transparent; opacity: 1; }
-.header-action-btn:hover { background: rgba(255,255,255,.12); }
+.header-action-btn { width: 44px; height: 44px; color: #1b5e3c; background: transparent; opacity: 1; }
+.site-header .hamburger span { background: #1b5e3c; }
+.header-action-btn:hover { background: #f0f8f4; }
 .sidebar { padding: 20px 0 32px; background: #fff; border-color: var(--border); }
 .directory-sidebar-heading { padding: 0 20px 14px; color: var(--text); font-family: 'Plus Jakarta Sans', Inter, sans-serif; font-size: 15px; font-weight: 700; }
 .directory-sidebar-heading span { display: block; margin-top: 2px; color: var(--text-secondary); font: 400 12px Inter, sans-serif; }
@@ -1101,8 +1102,9 @@ section[id], h3[id], h4[id], #roleTabs { scroll-margin-top: var(--scroll-offset)
   .directory-brand { gap: 7px; }
   .directory-brand img { width: 30px; height: 30px; }
   .directory-brand-name { font-size: 17px; }
+  .directory-brand-name strong { display: none; }
   .header-actions { margin-left: auto; }
-  .header-action-btn { width: 38px; height: 38px; }
+  .header-action-btn { width: 44px; height: 44px; }
   .hero { min-height: 0; margin: 0 -16px 20px; padding: 32px 16px; }
   .hero-title { font-size: 34px; }
   .hero-subtitle { font-size: 16px; }

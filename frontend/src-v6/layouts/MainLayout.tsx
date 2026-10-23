@@ -45,7 +45,7 @@ import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
 import { UserSwitcher } from '../components/ui/UserSwitcher';
 import { NotificationBell } from '../components/NotificationBell';
-import { SitrepMark } from '../components/SitrepMark';
+import { SitrepMark, SitrepWordmark } from '../components/SitrepMark';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
@@ -269,14 +269,14 @@ export const MainLayout: React.FC = () => {
           w-64 h-full shrink-0 sidebar-polished border-r border-[#164D32]
           flex flex-col
           transition-transform duration-300 ease-out
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${sidebarOpen ? 'visible translate-x-0' : 'invisible -translate-x-full lg:visible lg:translate-x-0'}
         `}
       >
         {/* Logo */}
         <div className="min-h-16 flex items-center gap-2 px-4 lg:px-6 border-b border-neutral-200 bg-white">
           <SitrepMark size={36} className="shrink-0 lg:mr-1" />
           <div className="min-w-0 flex-1">
-            <span className="font-bold text-lg text-primary-800">SITREP</span>
+            <SitrepWordmark className="font-bold text-lg" />
             <span title={`Rol base: ${currentUser.rol}`} className="block break-words text-xs font-medium text-neutral-600 lg:inline lg:ml-1">{inspectionLabel ?? currentUser.rol}</span>
           </div>
           <button type="button" aria-label="Cerrar menú" onClick={closeSidebar}

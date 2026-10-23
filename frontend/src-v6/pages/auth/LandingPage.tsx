@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Factory, Truck, FlaskConical, Shield, ShieldCheck, ShieldPlus, Smartphone, Monitor, ArrowRight, LogIn, UserPlus, PlayCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../contexts/AuthContext';
-import { SitrepMark } from '../../components/SitrepMark';
+import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
 import './institutional.css';
 
 const PERFILES = [
@@ -38,7 +38,7 @@ const LandingPage: React.FC = () => {
             alt="Mendoza — Gobierno de la Provincia" className="landing-government-mark" fetchPriority="high" />
           <div className="landing-wordmark" data-testid="landing-wordmark">
             <SitrepMark size={36} appearance="green" />
-            <span>SITREP</span>
+            <SitrepWordmark />
           </div>
           </div>
           <nav aria-label="Acceso al sistema" className="landing-header-actions">
@@ -59,7 +59,7 @@ const LandingPage: React.FC = () => {
         <div className="landing-container landing-hero-inner">
         <div>
           <h1 className="institutional-title landing-title">
-            <span className="landing-title-name">SITREP</span>{' '}
+            <SitrepWordmark className="landing-title-name" />{' '}
             <span className="landing-title-description">Sistema de trazabilidad de residuos peligrosos</span>
           </h1>
           <p className="text-neutral-600 text-sm leading-relaxed mb-8 max-w-md">

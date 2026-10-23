@@ -111,6 +111,10 @@ try{
          const size=await iframe.evaluate((e:any)=>({width:e.contentDocument.documentElement.clientWidth,scroll:e.contentDocument.documentElement.scrollWidth,text:e.contentDocument.body.innerText.length,images:[...e.contentDocument.images].filter((i:any)=>!i.complete||i.naturalWidth===0).length}));
          assert.ok(size.text>10,c.id+' blank '+ch);
          assert.equal(size.images,0,c.id+' missing image '+ch);
+         if(ch==='email') {
+          const brand=await iframe.evaluate((e:any)=>{const mark=e.contentDocument.querySelector('[data-mail-wordmark]');return mark?{text:mark.textContent,color:e.contentWindow.getComputedStyle(mark).color}:null;});
+          assert.deepEqual(brand,{text:'SITREP',color:'rgb(27, 94, 60)'},c.id+' email wordmark');
+         }
          if(size.scroll>size.width+2)overflows.push({id:c.id,channel:ch,...size});
        } else await expect(page.locator('.unavailable')).toBeVisible();
      }

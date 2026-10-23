@@ -12,3 +12,8 @@ export const SitrepMark: React.FC<{ size?: number; className?: string; appearanc
     className={`shrink-0 ${className}`}
   />
 );
+
+/** Product wordmark stays the same green as its mark, independent of role/theme colors. */
+export const SitrepWordmark: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <span data-sitrep-wordmark="" className={className} style={{ color: '#1B5E3C' }}>SITREP</span>
+);

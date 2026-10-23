@@ -9,9 +9,19 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText, FlaskConical, Truck, Factory, Calendar, Shield,
-  AlertTriangle, CheckCircle2, Clock, ArrowRight, Loader2
+  AlertTriangle, CheckCircle2, Clock, ArrowRight
 } from 'lucide-react';
 import axios from 'axios';
+import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
+import { LoadingIndicator } from '../../components/ui/LoadingState';
+
+function VerificationBrand() {
+  return <div className="flex items-center justify-between gap-3 border-b border-neutral-200 bg-white px-5 py-4">
+    <img src={`${import.meta.env.BASE_URL}mendoza-marca-horizontal-transparente.png`} alt="Gobierno de Mendoza" className="h-8 w-auto max-w-[42%] object-contain" />
+    <span className="h-8 w-px bg-neutral-200" aria-hidden="true" />
+    <div className="flex items-center gap-2"><SitrepMark size={28} /><SitrepWordmark className="text-xl font-extrabold" /></div>
+  </div>;
+}
 
 interface SelloData {
   tipo: string;
@@ -90,10 +100,7 @@ const VerificarManifiestoPage: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
-          <p className="text-neutral-600 font-medium">Verificando manifiesto...</p>
-        </div>
+        <LoadingIndicator label="Verificando manifiesto…" size={40} />
       </div>
     );
   }
@@ -101,7 +108,9 @@ const VerificarManifiestoPage: React.FC = () => {
   if (notFound || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4">
-        <div className="bg-white rounded-2xl shadow-lg border border-neutral-200 p-8 max-w-md w-full text-center">
+        <div className="bg-white rounded-2xl shadow-lg border border-neutral-200 max-w-md w-full overflow-hidden text-center">
+          <VerificationBrand />
+          <div className="p-6">
           <div className="w-16 h-16 rounded-full bg-error-50 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-8 h-8 text-error-500" />
           </div>
@@ -115,6 +124,7 @@ const VerificarManifiestoPage: React.FC = () => {
           >
             Iniciar sesión
           </button>
+          </div>
         </div>
       </div>
     );
@@ -126,15 +136,12 @@ const VerificarManifiestoPage: React.FC = () => {
     <div className="min-h-screen bg-neutral-50 p-4 flex items-start justify-center pt-8 md:pt-16">
       <div className="bg-white rounded-2xl shadow-lg border border-neutral-200 max-w-lg w-full overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-5 text-white">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-white" aria-hidden="true">
-              <Shield size={20} className="block" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <span className="block text-sm font-medium leading-6 text-white/90">SITREP — Verificación de Manifiesto</span>
-              <h1 className="mt-1 break-words text-2xl font-bold font-mono tracking-wide text-white">{data.numero}</h1>
-            </div>
+        <VerificationBrand />
+        <div className="flex items-start gap-3 border-b border-neutral-100 px-6 py-5">
+          <Shield size={20} className="mt-1 shrink-0 text-[#1B5E3C]" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-neutral-600">Verificación de manifiesto</p>
+            <h1 className="mt-1 break-words font-mono text-2xl font-bold tracking-wide text-neutral-900">{data.numero}</h1>
           </div>
         </div>
 

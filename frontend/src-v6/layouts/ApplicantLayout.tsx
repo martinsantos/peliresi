@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
-import { SitrepMark } from '../components/SitrepMark';
+import { SitrepMark, SitrepWordmark } from '../components/SitrepMark';
 import { ToastContainer } from '../components/ui/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
@@ -16,7 +16,7 @@ export function ApplicantLayout() {
         <div className="flex min-w-0 items-center gap-3">
           <SitrepMark size={36} />
           <div className="min-w-0">
-            <span className="text-xs font-semibold tracking-wide">SITREP</span>
+            <SitrepWordmark className="text-xs font-semibold tracking-wide" />
             <h1 className="text-lg font-semibold text-neutral-900">Mi solicitud</h1>
           </div>
         </div>

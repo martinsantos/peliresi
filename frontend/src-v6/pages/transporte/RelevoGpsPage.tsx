@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { MapPin, Navigation, Radio, Square, Truck } from 'lucide-react';
 import { Card,CardContent,CardHeader } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
+import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
+import { LoadingIndicator } from '../../components/ui/LoadingState';
 
 import { limitedLegRequest,type LimitedTransportInfo as LegInfo,type LimitedTransportUpload,type TransportGpsPoint as GpsPoint } from '../../services/limited-transport-gps';
 
@@ -55,7 +57,7 @@ export default function RelevoGpsPage() {
   },[sharing,!!info,blocked,tramoId,token,stop]);
   return <main className="min-h-screen bg-neutral-50 px-4 py-6 text-neutral-900"><div className="mx-auto max-w-lg space-y-4">
     {info?.training&&<p className="rounded-lg bg-warning-100 p-3 text-sm font-semibold text-warning-900">Capacitación · datos artificiales · sin validez oficial</p>}
-    <header className="flex items-center gap-3 py-2"><Truck size={28} className="text-primary-700"/><div><p className="text-sm font-bold text-primary-800">SITREP · Relevo de transporte</p><h1 className="text-xl font-bold">{info?.numero||'Seguimiento del tramo'}</h1></div></header>
+    <header className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4"><SitrepMark size={32}/><div className="min-w-0"><p className="text-sm font-bold"><SitrepWordmark/> <span className="font-medium text-neutral-600">· Relevo de transporte</span></p><h1 className="break-words text-xl font-bold">{info?.numero||'Seguimiento del tramo'}</h1></div></header>
     {error&&<p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-800">{error}</p>}
     {info&&<><Card><CardHeader title={info.empresa} icon={<Truck size={20}/>}/><CardContent className="space-y-3">
       <p className="text-sm text-neutral-600">Tramo {info.orden} · traslado declarado por la transportista de origen</p>
@@ -68,6 +70,6 @@ export default function RelevoGpsPage() {
       <p className="text-sm text-neutral-600">Mantené esta pantalla abierta y permití la ubicación. Se envía cada 30 segundos mientras haya señal y una posición reciente.</p>
       <p className="text-sm text-neutral-600">La transportista de origen registra la entrega. Este enlace sólo comparte el GPS de este tramo.</p>
     </CardContent></Card></>}
-    {!info&&!error&&<p role="status" className="p-4 text-sm text-neutral-600">Comprobando enlace…</p>}
+    {!info&&!error&&<LoadingIndicator label="Comprobando enlace…" />}
   </div></main>;
 }

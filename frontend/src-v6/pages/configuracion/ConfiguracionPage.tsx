@@ -50,13 +50,33 @@ const BASE_SECTIONS = [
 ];
 
 const ConfiguracionPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const { currentUser, isAdmin, showOnboarding } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const validSections = [...BASE_SECTIONS, { id: 'notificaciones' }].map(s => s.id);
   const [activeSection, setActiveSection] = useState(
     tabParam && validSections.includes(tabParam) ? tabParam : 'perfil'
   );
-  const [welcome, setWelcome] = useState(false);
+  const [welcome, setWelcome] = useState(searchParams.get('bienvenida') === '1');
+  useEffect(() => {
+    if (searchParams.get('bienvenida') !== '1') return;
+    // First login already presents this guide. Consume the link without
+    // opening a second dialog after the automatic introduction is closed.
+    setWelcome(!showOnboarding);
+    if (showOnboarding) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('bienvenida');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, showOnboarding]);
+  const dismissWelcome = () => {
+    setWelcome(false);
+    if (searchParams.has('bienvenida')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('bienvenida');
+      setSearchParams(next, { replace: true });
+    }
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [notifNuevoRegistro, setNotifNuevoRegistro] = useState(true);
   const [notifEmail, setNotifEmail] = useState(true);
@@ -65,7 +85,6 @@ const ConfiguracionPage: React.FC = () => {
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [telegramChatId, setTelegramChatId] = useState('');
   const [savingNotif, setSavingNotif] = useState(false);
-  const { currentUser, isAdmin } = useAuth();
 
   // Profile form state
   const [profile, setProfile] = useState({
@@ -380,7 +399,7 @@ const ConfiguracionPage: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <h2 className="sr-only">Configuración</h2>
-      {welcome && currentUser && <OnboardingWizard key={currentUser.rol} rol={currentUser.rol} esInspector={currentUser.esInspector} userId={currentUser.id} onDismiss={() => setWelcome(false)} />}
+      {welcome && !showOnboarding && currentUser && <OnboardingWizard key={currentUser.rol} rol={currentUser.rol} esInspector={currentUser.esInspector} userId={currentUser.id} onDismiss={dismissWelcome} />}
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Sidebar */}

@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { drawInstitutionalMasthead, loadInspectionPdfBranding, type InspectionPdfBranding } from './inspectionPdfBranding.service';
+import { drawInstitutionalMasthead, drawInstitutionalRule, loadInspectionPdfBranding, type InspectionPdfBranding } from './inspectionPdfBranding.service';
 import { inspectionPdfLines, drawInspectionPdfBlocks } from './inspectionPdfLayout.service';
 
 export const PDF_STYLE = { green: '#1B5E3C', ink: '#172C24', muted: '#526359', line: '#DCE5DF', light: '#F3F7F4' };
@@ -9,8 +9,8 @@ export function documentHeader(doc: PDFKit.PDFDocument, title: string, reference
   // Footer sits outside the body. Prevent PDFKit from creating a page while drawing it.
   const bottom = doc.page.margins.bottom; doc.page.margins.bottom = 0;
   doc.save();
-  drawInstitutionalMasthead(doc, branding);
-  doc.moveTo(44, 91).lineTo(551, 91).lineWidth(1).strokeColor(PDF_STYLE.green).stroke();
+  drawInstitutionalMasthead(doc, branding, 44, 28);
+  drawInstitutionalRule(doc, 44, 83, 507);
   doc.moveTo(44, 792).lineTo(551, 792).lineWidth(0.5).strokeColor(PDF_STYLE.line).stroke();
   doc.font('Helvetica').fontSize(7).fillColor(PDF_STYLE.muted).text(reference, 44, 804, { width: 430, lineBreak: false });
   doc.text('Página ' + page, 484, 804, { width: 67, align: 'right', lineBreak: false });

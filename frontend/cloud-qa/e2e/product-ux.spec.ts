@@ -1,6 +1,12 @@
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { login, prefix, isolatedMapTiles, readablePageHeading } from './helpers';
 const origin = 'http://127.0.0.1:4177';
+async function greenWordmarks(page:Page) {
+ for(const wordmark of await page.locator('[data-sitrep-wordmark]:visible, .brand-name:visible, .directory-brand-name:visible').all()) {
+  await expect(wordmark).toHaveCSS('color', 'rgb(27, 94, 60)');
+  expect(await wordmark.evaluate(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.height>0}), 'Wordmark fits the visible screen').toBe(true);
+ }
+}
 async function shot(page:Page, info:TestInfo, name:string){
  await expect(page).toHaveTitle(/SITREP/);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
@@ -16,6 +22,7 @@ async function shot(page:Page, info:TestInfo, name:string){
   await expect(mark).toHaveAttribute('src',/sitrep-mark-green.svg$/);
   expect(await mark.evaluate((e:HTMLImageElement)=>e.complete&&e.naturalWidth>0)).toBe(true);
  }
+ await greenWordmarks(page);
  await page.screenshot({path:info.outputPath(name+'.png'),animations:'disabled'});
 }
 for(const role of ['generador','transportista','operador','admin','inspector','jefe-generadores','jefe-transporte','jefe-operadores'])test('welcome and contextual help for '+role,async({page},info)=>{
@@ -31,6 +38,38 @@ for(const role of ['generador','transportista','operador','admin','inspector','j
  const help=page.getByRole('dialog',{name:role==='inspector'?'Seguimiento de la inspección':'Tu próximo paso'});await expect(help).toBeVisible();await shot(page,info,role+'-help');
  await help.getByRole('button',{name:'Repasar mi rol'}).click();await expect(dialog).toBeVisible();
  await dialog.getByRole('button',{name:'Saltar introducción'}).click();expect(errors).toEqual([]);
+});
+test('welcome direct link reopens a dismissed introduction and returns to preferences',async({page},info)=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await login(page,info,'operador');
+ await page.goto(prefix(info)+'/configuracion?tab=apariencia&bienvenida=1');
+ const dialog=page.getByRole('dialog',{name:'Bienvenido a SITREP'});
+ await expect(dialog).toBeVisible();
+ await expect(dialog).toContainText('Desde la propuesta hasta la certificación');
+ await shot(page,info,'welcome-direct-link');
+ await dialog.getByRole('button',{name:'Saltar introducción'}).click();
+ await expect(page).toHaveURL(origin+prefix(info)+'/configuracion?tab=apariencia');
+ await expect(page.getByRole('region',{name:'Dónde abrir los enlaces'})).toBeVisible();
+ await page.reload();await expect(dialog).toHaveCount(0);
+ expect(errors).toEqual([]);
+});
+test('first login through the welcome link opens exactly one introduction',async({page},info)=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await isolatedMapTiles(page,info);
+ await page.context().addCookies([{name:'sitrep_qa_client',value:'127.11.41.28',url:origin}]);
+ await page.goto(prefix(info)+'/configuracion?tab=apariencia&bienvenida=1');
+ await expect(page).toHaveURL(origin+prefix(info)+'/login');
+ await page.getByLabel('Correo electrónico o CUIT').fill('operador@night-qa.invalid');
+ await page.getByLabel('Contraseña',{exact:true}).fill('OnlyLocal-NightQA-2026!');
+ await page.getByRole('button',{name:'Ingresar',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Bienvenido a SITREP'});
+ await expect(dialog).toHaveCount(1);await expect(dialog).toBeVisible();
+ await shot(page,info,'first-login-welcome');
+ await dialog.getByRole('button',{name:'Saltar introducción'}).click();
+ await expect(dialog).toHaveCount(0);
+ await expect(page).toHaveURL(origin+prefix(info)+'/configuracion?tab=apariencia');
+ await expect(page.getByRole('region',{name:'Dónde abrir los enlaces'})).toBeVisible();
+ expect(errors).toEqual([]);
 });
 test('preference persists by account and resolves exact mail destination after login',async({page,browser},info)=>{
  await login(page,info,'generador');
@@ -57,7 +96,7 @@ test('preference persists by account and resolves exact mail destination after l
   const other=await context.newPage();await isolatedMapTiles(other,info);
   await other.context().addCookies([{name:'sitrep_qa_client',value:'127.11.33.51',url:origin}]);
   await other.goto(origin+'/app/abrir?destino='+encodeURIComponent(target));
-  await expect(other).toHaveURL(/\/app\/login$/);await other.reload();
+  await expect(other).toHaveURL(origin+'/app/login');
   await other.getByLabel('Correo electrónico o CUIT').fill('generador@night-qa.invalid');
   await other.getByLabel('Contraseña',{exact:true}).fill('OnlyLocal-NightQA-2026!');
   await other.getByRole('button',{name:'Ingresar',exact:true}).click();
@@ -124,4 +163,51 @@ test('reports download a branded PDF on this surface',async({page},info)=>{
  await expect(action).toBeEnabled();const downloaded=page.waitForEvent('download');await action.click();
  const file=await downloaded;expect(file.suggestedFilename()).toMatch(/\.pdf$/);
  await file.saveAs(info.outputPath('reporte.pdf'));await shot(page,info,'report-export');
+});
+
+
+test('public identity, offline recovery and installation assets stay coherent',async({page},info)=>{
+ await isolatedMapTiles(page,info);
+ const routes=['/login','/recuperar','/reset-password','/verificar/inspecciones/qa-brand-invalid','/manifiestos/verificar/QA-LEGACY-UNCHANGED','/manifiestos/verificar/qa-brand-missing','/relevo/qa-brand-invalid'];
+ if(!prefix(info))routes.unshift('/');
+ for(const [i,route] of routes.entries()) {
+  await page.goto(prefix(info)+route);
+  if(route==='/manifiestos/verificar/QA-LEGACY-UNCHANGED')await expect(page.getByRole('heading',{name:'QA-LEGACY-UNCHANGED',exact:true})).toBeVisible();
+  if(route==='/manifiestos/verificar/qa-brand-missing')await expect(page.getByRole('heading',{name:'Manifiesto no encontrado'})).toBeVisible();
+  if(route==='/relevo/qa-brand-invalid')await expect(page.getByRole('alert')).toContainText('Pedí el enlace completo');
+  await expect(page.locator('[data-sitrep-wordmark]').first()).toBeVisible();
+  await greenWordmarks(page);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({path:info.outputPath('public-brand-'+i+'.png'),animations:'disabled'});
+ }
+ await page.goto(prefix(info)+'/offline.html');
+ await expect(page.getByRole('heading',{name:'No hay conexión'})).toBeVisible();
+ await greenWordmarks(page);
+ await expect(page.getByRole('button',{name:'Reintentar conexión'})).toBeVisible();
+ await page.screenshot({path:info.outputPath('offline.png')});
+ const base=prefix(info);
+ const favicon=await page.request.get(base+'/favicon.svg');expect(favicon.ok()).toBe(true);expect(await favicon.text()).toContain('fill="#1B5E3C"');
+ const response=await page.request.get(base+(base?'/manifest-app.json':'/manifest.json'));expect(response.ok()).toBe(true);
+ const manifest=await response.json();expect(manifest.background_color).toBe('#FFFFFF');expect(manifest.theme_color).toBe('#1B5E3C');
+ expect(manifest.icons.filter((i:any)=>i.purpose==='maskable')).toHaveLength(1);
+ for(const icon of manifest.icons){const image=await page.request.get(icon.src);expect(image.ok(),icon.src).toBe(true);expect(image.headers()['content-type']).toContain('image/png');expect((await image.body()).length).toBeGreaterThan(100);}
+});
+
+test('all manual entries share the green wordmark, favicon and readable masthead',async({page},info)=>{
+ // The complete directory retains its administrative access wall. Exercise it
+ // with an actual permitted session, never a forced click behind that wall.
+ await login(page,info,'admin');
+ for(const file of ['index.html','search.html','tutorial.html?guide=bienvenida-preferencia-ayuda','directorio.html']){
+  await page.goto('/manual/'+file);
+  const wordmark=page.locator('.brand-name, .directory-brand-name');
+  await expect(wordmark).toBeVisible();await greenWordmarks(page);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href','sitrep-mark.svg');
+  const header=page.locator('.site-header, .help-header');await expect(header).toHaveCSS('background-color','rgb(255, 255, 255)');
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  if(file==='directorio.html'){
+   if(info.project.name==='web-desktop')await expect(page.getByRole('navigation',{name:'Recorridos del manual'}).getByRole('link',{name:'Guía por roles'})).toHaveCSS('color','rgb(27, 94, 60)');
+   else {await page.getByRole('button',{name:'Abrir índice del manual'}).click();await expect(page.locator('#sidebar')).toBeVisible();}
+  }
+  await page.screenshot({path:info.outputPath('manual-'+file.split('.')[0]+'.png'),animations:'disabled'});
+ }
 });

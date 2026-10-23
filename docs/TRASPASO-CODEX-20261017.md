@@ -1,5 +1,19 @@
 # SITREP — traspaso vigente de operación
 
+## Revisión de identidad y concurrencia — preview activo, 23/10/2026
+
+**Estado actual: cambios de identidad probados en preview, sin publicar. La concurrencia tiene cuatro fallos reproducidos pendientes de corrección.** Leer [identidad y experiencia](PRODUCTO-IDENTIDAD-AYUDA-20261023.md) y [auditoría operativa](CONCURRENCIA-OPERATIVA-20261023.md).
+
+SITREP y flecha verdes sobre blanco; cabecera PDF con Mendoza/DGFA a la izquierda y SITREP a la derecha, proporcional al correo. Incluye acceso público, recuperación, relevo externo, manual, favicon, icono maskable y página offline. Bienvenida por rol, preferencia web/app y ayuda disponibles en el preview.
+
+Validación nueva desde `df55126b`: **240 unitarias dirigidas / 54 E2E únicos PASS**, 22 secciones por superficie, 14 PDF/43 páginas, 198 escenarios de comunicaciones/614 renders. Backend/tipos/builds PASS; lint 37 archivos: 0 errores/36 advertencias. No confundir con las suites completas históricas de abajo.
+
+Carga sintética serial: tandas de **50/100/200 acciones HTTP** sin errores; aprobaciones repetidas y conflicto de adenda consistentes. **Pendientes confirmados:** Monitor muestra vehículo de la empresa en vez del asignado; incidente GPS duplicado 20 veces; endpoint de recorrido pierde el punto 501; límite por IP bloquea 100/700 solicitudes válidas. No hay certificación de capacidad productiva.
+
+**Preview disponible en http://127.0.0.1:4177 mediante túnel privado en esta Mac**, contenedor `sitrep-qa-training-20261018`, PostgreSQL/runtime conservados activos para revisión. Guardas verificadas: CAP cerrado, cero intentos/envíos/cola activa, correos/push apagados, 64 tablas QA protegidas intactas. 1 CPU/2 GiB/swap cero, sin OOM. Sin producción, main, push ni workflows; cierre con `[skip ci]`.
+
+La publicación documentada sigue siendo `a7f20d2f`; migración de preferencia `20261023120000_user_link_preference` pendiente de una publicación autorizada. No publicar bundles QA `/api`. Android físico, GPS de sensores, PWA instalada, clúster y entrega externa no certificados. Los cierres inferiores son históricos.
+
 ## Identidad, bienvenida y enlaces — sólo preview, 23/10/2026
 
 **Corregido y probado; no publicado.** Leer [cambios, galería, pruebas y límites](PRODUCTO-IDENTIDAD-AYUDA-20261023.md). Cabecera PDF institucional compartida, flecha verde sobre blanco sin recuadro, paginado/documentos extensos, bienvenida por ocho perfiles, preferencia Web/App guardada por persona y ayuda contextual antes del reporte técnico. Corregidos títulos de secciones en web/app. Los documentos firmados existentes conservan sus bytes.

@@ -2,7 +2,7 @@ import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import type { InspectionState } from '../../types/inspection';
 import { Badge, type BadgeColor } from '../../components/ui/BadgeV2';
-import { SitrepMark } from '../../components/SitrepMark';
+import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
 
 const STATE_LABELS: Record<InspectionState, string> = {
   BORRADOR: 'Borrador', PLANIFICADA: 'Planificada', EN_CAMPO: 'En campo', EN_REVISION: 'En revisión',
@@ -39,7 +39,7 @@ export function InspectionInstitutionalMasthead({
           <div className="flex min-w-0 items-center gap-2">
             <SitrepMark size={32} />
             <div className="min-w-0">
-              <p className="font-extrabold tracking-[0.12em] text-[#10213A]">SITREP</p>
+              <p className="font-extrabold tracking-[0.12em]"><SitrepWordmark /></p>
               <p className="truncate text-[10px] font-bold uppercase tracking-[0.1em] text-[#1B5E3C]">Trazabilidad de residuos peligrosos</p>
             </div>
           </div>

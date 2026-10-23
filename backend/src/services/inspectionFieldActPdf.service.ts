@@ -7,6 +7,7 @@ import {
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
 import {
   drawInstitutionalMasthead,
+  drawInstitutionalRule,
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
 } from './inspectionPdfBranding.service';
@@ -368,7 +369,7 @@ function institutionalHeader(
   drawInstitutionalMasthead(doc, branding, 34, 16, doc.page.width - 68);
   doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted)
     .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 34, 77, { width: doc.page.width - 68, lineBreak: false });
-  doc.moveTo(34, 89).lineTo(doc.page.width - 34, 89).lineWidth(1).strokeColor(COLORS.green).stroke();
+  drawInstitutionalRule(doc, 34, 89, doc.page.width - 68);
 
   doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.ink)
     .text('ACTA DE INSPECCIÓN / CONSTATACIÓN', 34, 97, { width: 310 });

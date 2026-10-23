@@ -82,9 +82,9 @@ describe('manual documentation stays usable and truthful', () => {
       const html = readFileSync(manual + file, 'utf8');
       // Guide content uses its own current cache key; the corrected renderer has its own key; CSS has its own identity revision.
       // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.23.1');
+      expect(html).toContain('help-data.js?v=2026.23.2');
       expect(html).toContain('manual.js?v=2026.20.6');
-      expect(html).toContain('manual.css?v=2026.23.1');
+      expect(html).toContain('manual.css?v=2026.23.2');
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');
     expect(script).toContain("'administrador-alertas-proactivas'");

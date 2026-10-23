@@ -37,7 +37,7 @@ interface ExportConfig {
   };
 }
 
-const PRIMARY_COLOR: [number, number, number] = [13, 138, 79]; // #0D8A4F
+const PRIMARY_COLOR: [number, number, number] = [27, 94, 60]; // #1B5E3C
 const DARK_COLOR: [number, number, number] = [18, 26, 38]; // #121A26
 const GRAY_COLOR: [number, number, number] = [107, 114, 128];
 const LIGHT_BG: [number, number, number] = [249, 250, 251];
@@ -58,7 +58,7 @@ export async function exportReportePDF(config: ExportConfig) {
   context.drawImage(mark, 0, 0, 150, 150);
   const brand = canvas.toDataURL('image/png');
   const mendoza = new Image();
-  mendoza.src = import.meta.env.BASE_URL + 'logo-mendoza.webp';
+  mendoza.src = import.meta.env.BASE_URL + 'mendoza-marca-horizontal-transparente.png';
   await mendoza.decode();
   canvas.width = 600; canvas.height = Math.round(600 * mendoza.naturalHeight / mendoza.naturalWidth);
   context.drawImage(mendoza, 0, 0, canvas.width, canvas.height);
@@ -154,14 +154,24 @@ export async function exportReportePDF(config: ExportConfig) {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const pageH = doc.internal.pageSize.getHeight();
-    doc.addImage(institution, 'PNG', 14, 8, 42, 42 * mendoza.naturalHeight / mendoza.naturalWidth);
-    const brandX = pageWidth - 91;
-    doc.addImage(brand, 'PNG', brandX, 9, 13.4, 13.4);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(27,94,60);
-    doc.text('SITREP', brandX + 17, 14);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(94,107,127);
-    doc.text(['Trazabilidad de residuos', 'peligrosos'], brandX + 17, 20, { lineHeightFactor: 1.3 });
-    doc.setDrawColor(27,94,60);doc.line(14,32,pageWidth-14,32);
+    // Same two equal cells, assets and proportions as the email masthead.
+    const scale = (pageWidth - 28) / 600, half = (pageWidth - 28) / 2;
+    const pad = 12 * scale, logoW = 100 * scale, gap = 12 * scale;
+    const headerTop = 10, rowHeight = 56 * scale;
+    doc.addImage(institution, 'PNG', 14 + pad, headerTop + (rowHeight - 32 * scale) / 2, logoW, 32 * scale);
+    const textX = 14 + pad + logoW + gap, baseline = headerTop + (rowHeight - 30 * scale) / 2 + 9 * scale;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(12 * scale * 72 / 25.4); doc.setTextColor(52,76,65);
+    doc.text('Dirección General de', textX, baseline);
+    doc.text('Fiscalización Ambiental', textX, baseline + 15 * scale);
+    const brandX = 14 + half + pad, brandY = headerTop + (rowHeight - 26 * scale) / 2;
+    doc.addImage(brand, 'PNG', brandX, brandY, 22 * scale, 22 * scale);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(20 * scale * 72 / 25.4); doc.setTextColor(27,94,60);
+    doc.text('SITREP', brandX + 28 * scale, brandY + 17 * scale);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(12 * scale * 72 / 25.4); doc.setTextColor(52,76,65);
+    doc.text('Sistema de Trazabilidad de', brandX + logoW + gap, baseline);
+    doc.text('Residuos Peligrosos', brandX + logoW + gap, baseline + 15 * scale);
+    doc.setLineWidth(0.53);doc.setDrawColor(23,74,126);doc.line(14,29.3,14+half,29.3);
+    doc.setDrawColor(...PRIMARY_COLOR);doc.line(14+half,29.3,pageWidth-14,29.3);
 
     doc.setDrawColor(229, 231, 235);
     doc.line(14, pageH - 15, pageWidth - 14, pageH - 15);

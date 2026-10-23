@@ -15,7 +15,7 @@ export function BrandSpinner({ size = 24 }: { size?: number }) {
 
 export function LoadingIndicator({ label = 'Cargando…', size = 24 }: { label?: string; size?: number }) {
   return <div role="status" aria-live="polite" className="flex items-center gap-3 text-sm text-neutral-600">
-    <span className="text-primary-700"><BrandSpinner size={size} /></span><span>{label}</span>
+    <span className="text-[#1B5E3C]"><BrandSpinner size={size} /></span><span>{label}</span>
   </div>;
 }
 

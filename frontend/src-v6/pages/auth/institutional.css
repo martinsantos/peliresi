@@ -45,7 +45,7 @@
 .institutional-login.is-pwa { min-height: 100dvh; padding: 28px 20px; display: flex; justify-content: center; align-items: center; }
 .login-brand-lockup { display: flex; align-items: center; justify-content: center; gap: 24px; margin-bottom: 20px; }
 .login-brand-lockup .mendoza-brand { height: 48px; }
-.login-brand-lockup .sitrep-wordmark { border-left: 1px solid #d2d3dc; padding-left: 24px; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; color: var(--brand-blue); }
+.login-brand-lockup .sitrep-wordmark { border-left: 1px solid #d2d3dc; padding-left: 24px; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; color: #1b5e3c; }
 .institutional-login input { min-height: 48px; font-size: 16px; background: white; }
 .institutional-login input:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px #0811a018; }
 .institutional-login button[type=submit] { min-height: 48px; }

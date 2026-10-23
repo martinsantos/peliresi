@@ -1,5 +1,52 @@
 # Identidad, bienvenida, enlaces y ayuda — 23/10/2026
 
+## Revisión posterior del 23/10 — estado vigente
+
+**Desde `df55126b`, sólo preview.** Esta sección sustituye el estado de cierre de las 11:00 de la revisión anterior, conservada más abajo. Producción y main no se tocaron; CAP cerrado, correos/push apagados.
+
+### Cambios y acceso
+
+- Cabecera PDF con la misma composición del correo: Mendoza/DGFA a la izquierda, flecha y SITREP a la derecha. Proporciones compartidas, sin título repetido ni recuadro detrás de la flecha. El wordmark de marca es verde `#1B5E3C`.
+- La misma identidad se aplica al login, recuperación/verificación de cuenta, layouts, bienvenida, monitor, verificación pública del manifiesto, enlace del relevo, manual y correos.
+- Icono maskable con margen seguro; manifest/theme coherentes; página offline con reintento explícito. El spinner conserva contraste en los botones.
+- Manual **2026.23.2**, estructura y renderer conservados; plantillas de correo **20261023.2**.
+- Corregida la visibilidad del menú lateral cerrado en pantallas angostas: ya no queda accesible fuera de la pantalla.
+
+Preview activo: [entrada](http://127.0.0.1:4177/login), [bienvenida y preferencia web](http://127.0.0.1:4177/configuracion?tab=apariencia&bienvenida=1), [vista app](http://127.0.0.1:4177/app/configuracion?tab=apariencia&bienvenida=1). Túnel privado en esta Mac, contenedor de QA sin puerto público. Cuenta artificial de revisión: `operador@night-qa.invalid`, clave `OnlyLocal-NightQA-2026!`. No es un acceso productivo ni CAP. Configuración → Apariencia permite repasar bienvenida; Ayuda conserva el formulario y ofrece próximos pasos por rol.
+
+### Pruebas nuevas
+
+| Control | Resultado de esta revisión |
+|---|---|
+| Unitarias dirigidas | **240 PASS**: PDF 41, correo 45, frontend/ayuda/manual 67, layouts 80, acceso de relevo/loading 7 |
+| E2E de producto | **54 casos únicos PASS**, 18 por escritorio/web angosta/app; consolidación de 51/54 y repetición dirigida final 6/6 |
+| Navegación visual | 22 secciones por superficie, 66 capturas de secciones; bienvenida de ocho perfiles, ayuda, preferencias y accesos públicos |
+| PDF | 14 documentos / 43 páginas, 11 hojas de contacto inspeccionadas; originales firmados conservados |
+| Correos y avisos | 198 escenarios; 197 muestras de correo, 167 campana/emergente; 614 renders, 10 controles PASS; cero red externa |
+| Compilación | Backend, tipos frontend, web y app PASS; recursos de marca verificados |
+| Lint dirigido | 37 archivos; 0 errores, 36 advertencias; no se presenta como lint global limpio |
+| Aislamiento | 64 tablas protegidas intactas, manifiesto histórico artificial intacto, CAP rechazado, cero correo activo/intentos/envíos |
+
+Las suites completas **1.597 backend / 1.879 frontend** que figuran más abajo pertenecen a la tanda anterior. No se repitieron completas después de estos ajustes de presentación. Los primeros intentos permanecen guardados: un selector del manual coincidía con dos enlaces y faltaba autenticación administrativa para sus entradas privadas. Se corrigió el guion con login real y selector específico, sin forzar clics ni relajar la geometría. El selector de fuente del manual se unificó con su recurso conocido. Las últimas verificaciones dirigidas no tienen omitidos, reintentos ni fallos.
+
+[Consolidado nuevo](../test-results-product-ux-20261023/refinement/e2e-consolidated.json) · [Comprobaciones](../test-results-product-ux-20261023/refinement/checklist.json) · [Galería actualizada](../test-results-product-ux-20261023/index.html) · [Correos](../test-results-product-ux-20261023/proposals/gallery/index.html).
+
+Se inspeccionaron las 43 páginas completas mediante sus hojas de contacto y las 66 vistas de secciones; no se observaron títulos recortados ni superposición de cabeceras. La revisión cubre estas muestras, no todas las combinaciones de datos. Sigue siendo mejorable la densidad de las vistas administrativas y la ocupación de algunas páginas finales de PDF; no se declara diseño perfecto.
+
+### Concurrencia: diagnóstico abierto
+
+Se agregó una prueba acotada de acciones simultáneas con base artificial. Las tandas de 50/100/200 solicitudes mixtas y la consistencia de aprobaciones/adendas pasaron. **Cuatro fallos reproducibles siguen abiertos**: asignación de vehículo en Monitor, incidentes GPS duplicados, recorrido truncado antes del último punto y bloqueo global por IP compartida. El detalle, riesgo y orden de corrección están en [la auditoría operativa](CONCURRENCIA-OPERATIVA-20261023.md). Se añadieron pruebas de diagnóstico, sin refactorizar esos circuitos de negocio en esta revisión.
+
+La segunda ejecución tiene **9 comprobaciones PASS y 4 FAIL**. No debe confundirse con un cierre global de calidad, capacidad o entrega externa. El preview de un proceso con 1 CPU/2 GiB no representa un clúster productivo ni cientos de teléfonos físicos.
+
+### Continuidad
+
+El preview, la base artificial y el túnel se dejan activos para que el dueño pueda ver los cambios; su acceso depende de esta Mac y la vida del contenedor. No hay publicación. Permanece pendiente de publicación autorizada la migración aditiva de preferencia ya descrita abajo. No se alteraron permisos, reglas regulatorias ni documentos firmados.
+
+---
+
+## Antecedente: revisión inicial hasta df55126b
+
 Revisión limitada al checkout `sitrep-production-source-20261001`, rama `codex/sitrep-training-20261018`, desde `9ae90974` (producto anterior `a7f20d2f`). Sólo preview con datos artificiales. **No publicado; sin producción, main, push ni workflows.** CAP cerrado y correos/push apagados.
 
 ## Cambios de producto

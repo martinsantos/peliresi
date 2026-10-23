@@ -24,6 +24,7 @@ const originalCSS=fs.readFileSync(path.join(process.env.QA_WEB_BUILD!,'assets',f
 const offlineCSS=originalCSS.replace(/@import\s*(?:"[^"]*"|'[^']*'|url\([^)]*\))[^;]*;/g,'');
 if(offlineCSS.includes('fonts.googleapis.com')||!offlineCSS.startsWith('.institutional'))throw Error('Invalid offline stylesheet');
 html=html.replace('__CATALOGUE__',()=>json(catalogue)).replace('__PRODUCT_CSS__',()=>json(offlineCSS));
+html=html.replaceAll('__SITREP_MARK_DATA__','data:image/png;base64,'+fs.readFileSync(path.join(root,'frontend/public/mail-sitrep-rotonda.png')).toString('base64'));
 if(html.includes('__CATALOGUE__')||html.includes('__PRODUCT_CSS__'))throw Error('Unresolved placeholder');
 fs.writeFileSync(path.join(dir,'index.html'),html);
 console.log(JSON.stringify({cases:ids.size,sourceFilesVerified:catalogue.coverage.files.length,bytes:Buffer.byteLength(html),sha256:crypto.createHash('sha256').update(html).digest('hex')}));

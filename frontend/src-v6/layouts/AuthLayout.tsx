@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Factory, Truck, FlaskConical } from 'lucide-react';
+import { SitrepMark, SitrepWordmark } from '../components/SitrepMark';
 import { MendozaBrand } from '../components/MendozaBrand';
 import { DemoEnvironmentBanner } from '../components/DemoEnvironmentBanner';
 import '../pages/auth/institutional.css';
@@ -28,7 +29,11 @@ export const AuthLayout: React.FC = () => {
             <div><FlaskConical size={18} />Operadores</div>
           </div>
         </aside>
-        <main className="auth-form-panel"><div><Outlet /></div></main>
+        <main className="auth-form-panel"><div>
+          {['/recuperar', '/reset-password', '/verificar-email'].includes(location.pathname) &&
+            <div className="mb-6 flex items-center gap-2"><SitrepMark size={32} /><SitrepWordmark className="font-display text-xl font-bold" /></div>}
+          <Outlet />
+        </div></main>
       </div>
     </div>
   );

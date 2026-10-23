@@ -45,7 +45,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../components/ui/BadgeV2';
 import { NotificationBell } from '../components/NotificationBell';
-import { SitrepMark } from '../components/SitrepMark';
+import { SitrepMark, SitrepWordmark } from '../components/SitrepMark';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import CompanyContextBar from '../components/CompanyContextBar';
@@ -474,7 +474,7 @@ export const MobileLayout: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <SitrepMark size={40} />
                   <div>
-                    <h2 className="font-bold text-neutral-900">SITREP</h2>
+                    <h2 className="font-bold"><SitrepWordmark /></h2>
                     <p className={`text-xs ${config.color} font-medium`}>{config.label}</p>
                   </div>
                 </div>

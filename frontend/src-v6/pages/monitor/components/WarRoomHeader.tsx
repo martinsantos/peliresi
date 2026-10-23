@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Radio, History, CalendarClock, Film, X } from 'lucide-react';
-import { SitrepMark } from '../../../components/SitrepMark';
+import { SitrepMark, SitrepWordmark } from '../../../components/SitrepMark';
 import type { MonitorMode } from '../WarRoomPage';
 import { formatTime } from '../utils/formatters';
 
@@ -32,7 +32,7 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
         <div className="flex items-center justify-center">
           <SitrepMark size={26} />
         </div>
-        <span className="text-base font-bold tracking-tight text-primary-800">SITREP</span>
+        <SitrepWordmark className="text-base font-bold tracking-tight" />
         <span className="text-sm text-primary-800 hidden sm:inline">Monitor</span>
       </div>
 
