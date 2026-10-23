@@ -1,6 +1,7 @@
 import {test,expect,devices,type Page,type TestInfo} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {login,prefix,readablePageHeading,isolatedMapTiles} from './helpers';
+test.beforeAll(() => { expect(process.env.MANIFEST_PROPOSALS_ENABLED).toBe('true'); });
 const roles=['generador','transportista','operador'] as const;
 type Role=typeof roles[number];
 async function post(page:Page,suffix:string,action:()=>Promise<unknown>,status=200){

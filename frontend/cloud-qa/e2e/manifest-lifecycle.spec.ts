@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { login, prefix } from './helpers';
 
-test('real manifest UI completes approval, transport, receipt, treatment and certificate', async ({ page }, info) => {
+test.beforeAll(() => { expect(process.env.MANIFEST_PROPOSALS_ENABLED, 'Legacy lifecycle is not acceptance for mandatory party approvals').not.toBe('true'); });
+
+test('legacy manifest UI with proposals disabled completes signature, transport, receipt, treatment and certificate', async ({ page }, info) => {
   await login(page, info);
   if (info.project.name === 'app') {
     await page.goto(`${prefix(info)}/manifiestos`);
