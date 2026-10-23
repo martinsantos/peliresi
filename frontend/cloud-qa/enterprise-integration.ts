@@ -22,7 +22,7 @@ try {
  const legacy=await db.manifiesto.findMany({orderBy:{id:'asc'},include:manifestInclude});
  const beforeUsers=await db.usuario.findMany({orderBy:{id:'asc'}});
  const beforeActors=await db.generador.findMany({orderBy:{id:'asc'}});
- const admin=await login('admin');
+ const admin=await login('admin'),existingCompanies=await db.empresa.count({where:{activa:true}});
  for(const [i,surface] of ['http','web-desktop','web-responsive','app','apk'].entries()) {
   const prefix='empresa-'+surface;
   const user=async(suffix:string,extra:any={})=>(await db.usuario.findUnique({where:{email:prefix+'-'+suffix+'@night-qa.invalid'}}))||db.usuario.create({data:{email:prefix+'-'+suffix+'@night-qa.invalid',nombre:'QA '+surface+' '+suffix,password:original.password,rol:'GENERADOR',activo:true,emailVerified:true,notifEmail:false,notifWhatsapp:false,notifTelegram:false,notifNuevoRegistro:false,...extra}});
@@ -65,9 +65,9 @@ try {
  const last=paginationCompanies.at(-1)!,lastActivity=activities.at(-1)!;
  await db.autorizacionEmpresa.createMany({data:browserOwners.map(usuarioId=>({empresaId:last.id,actividadId:lastActivity.id,usuarioId,todosEstablecimientos:true,establecimientoIds:[],otorgadaPor:fixture.users.admin}))});
  const adminAll=await req(admin,'/empresas?limit=100'),allIds:string[]=[];
- assert.equal(adminAll.pagination.total,215);assert.equal(adminAll.empresas.length,100);
+ assert.equal(adminAll.pagination.total,existingCompanies+215);assert.equal(adminAll.empresas.length,100);
  for(let page=1;page<=adminAll.pagination.totalPages;page++)allIds.push(...(await req(admin,'/empresas?limit=100&page='+page)).empresas.map((e:any)=>e.id));
- assert.equal(new Set(allIds).size,215);assert.equal(allIds.length,215);
+ assert.equal(new Set(allIds).size,existingCompanies+215);assert.equal(allIds.length,existingCompanies+215);
  assert.deepEqual((await req(admin,'/empresas?limit=100&page=2')).empresas.map((e:any)=>e.id),allIds.slice(100,200),'stable ordering');
  const owned=await req(owner,'/empresas?limit=100&page=3');assert.equal(owned.pagination.total,211);assert.equal(owned.empresas.length,11);
  assert.ok(owned.empresas.some((p:any)=>p.id===last.id));
@@ -133,7 +133,8 @@ try {
  await req(null,inviteRoute+'/aceptar',403,{email:c.other.email,password:'wrong'});
  await req(null,inviteRoute+'/aceptar',200,{email:c.other.email,password});
  await req(null,inviteRoute+'/aceptar',404,{email:c.other.email,password});
- const brute=await invite(c.other.email),bruteRoute=brute.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/')+'/aceptar';
+ const extraRole=await db.empresaActividad.findUniqueOrThrow({where:{empresaId_rol:{empresaId:c.company.id,rol:'OPERADOR'}}});
+ const brute=await req(owner,route+'/invitaciones',201,{email:c.other.email,actividadId:extraRole.id,todosEstablecimientos:true,establecimientoIds:[]}),bruteRoute=brute.ruta.replace('/empresa-invitacion/','/empresas/invitaciones/')+'/aceptar';
  for(let i=0;i<5;i++)await req(null,bruteRoute,403,{email:c.other.email,password:'wrong'});
  await req(null,bruteRoute,429,{email:c.other.email,password:'wrong'});
  await req(owner,route+'/invitaciones/'+brute.invitacion.id+'/revocar',200,{});

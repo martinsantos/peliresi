@@ -662,7 +662,7 @@ const ManifiestoDetailPage: React.FC = () => {
         {/* Sidebar */}
         <div className="space-y-6 animate-fade-in min-w-0">
           {/* Blockchain Certification */}
-          {m.estado !== 'BORRADOR' && (
+          {m.estado !== 'BORRADOR' && (!currentUser?.empresaContexto || currentUser.empresaContexto.todasSedes) && (
             <BlockchainPanel
               manifiestoId={id!}
               manifiestoEstado={m.estado as string}

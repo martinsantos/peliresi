@@ -6,7 +6,7 @@ import ManifiestoDetallePage from '../../pages/manifiestos/ManifiestoDetallePage
 import { canAccessMobilePath } from '../../utils/mobileAccess';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const state = vi.hoisted(() => ({ user: {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}, writes: vi.fn(), status: 'TRATADO' }));
+const state = vi.hoisted(() => ({ user: {rol: 'ADMIN', esInspector: false, actorId: 'g-1', empresaContexto: undefined as {todasSedes:boolean}|undefined}, writes: vi.fn(), status: 'TRATADO' }));
 vi.mock('../../contexts/AuthContext', () => ({useAuth: () => ({currentUser: state.user, isAdmin: state.user.rol === 'ADMIN'})}));
 vi.mock('../../hooks/useManifiestos', () => {
   const mutation = () => ({isPending: false, mutateAsync: state.writes});
@@ -20,14 +20,14 @@ vi.mock('../../hooks/useManifiestos', () => {
     useRechazarManifiesto: mutation, useRegistrarIncidente: mutation, useRevertirEstado: mutation,
   };
 });
-vi.mock('../../components/BlockchainPanel', () => ({default: () => null}));
+vi.mock('../../components/BlockchainPanel', () => ({default: () => <aside aria-label="Sellos blockchain"/>}));
 vi.mock('../../pages/manifiestos/components/ManifiestoTimeline', () => ({default: () => null}));
 vi.mock('../../pages/manifiestos/components/ManifiestoActions', () => ({default: () => null}));
 vi.mock('../../services/manifiesto.service', () => ({manifiestoService: {}}));
 
 let queryClient: QueryClient;
 beforeEach(() => {
-  state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1'}; state.writes.mockClear(); state.status = 'TRATADO';
+  state.user = {rol: 'ADMIN', esInspector: false, actorId: 'g-1', empresaContexto: undefined}; state.writes.mockClear(); state.status = 'TRATADO';
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   queryClient.setQueryData(['tramos-transporte', 'm-1', undefined], { tramos: [], puedeRegistrar: false });
 });
@@ -71,5 +71,15 @@ for (const prefix of ['', '/app']) test(`carrier opens its ready trip without a 
     <Route path={prefix+'/transporte/viaje/:id'} element={<h1>Viaje listo para retirar</h1>}/>
   </Routes></MemoryRouter>);
   expect(await screen.findByRole('heading',{name:'Viaje listo para retirar'})).toBeVisible();
+  expect(state.writes).not.toHaveBeenCalled();
+});
+
+for (const prefix of ['', '/app']) for (const todasSedes of [false, true]) test(`blockchain follows company site scope ${todasSedes} on ${prefix || 'web'}`, () => {
+  state.user.rol = 'GENERADOR'; state.user.empresaContexto = {todasSedes};
+  render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[prefix+'/manifiestos/m-1']}><Routes>
+    <Route path={prefix+'/manifiestos/:id'} element={<ManifiestoDetallePage/>}/>
+  </Routes></MemoryRouter></QueryClientProvider>);
+  expect(screen.getByText('QA Generador')).toBeVisible();
+  expect(screen.queryByRole('complementary',{name:'Sellos blockchain'}) !== null).toBe(todasSedes);
   expect(state.writes).not.toHaveBeenCalled();
 });

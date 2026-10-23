@@ -1,5 +1,15 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Multirol y dos personas — sólo preview, 22/10/2026
+
+**Cerrado, no publicado.** Leer [correcciones, alcance y evidencia](docs/MULTIROL-DOS-PERSONAS-20261022.md). Una razón social con G/T/O mantiene **dos personas en total, incluida la titular**, compartidas entre roles y sedes. Corregidos el bypass de tercera persona en alta/aprobación, la inferencia de solicitudes pendientes, invitaciones duplicadas o irrecuperables y una consulta blockchain ajena al alcance del representante de una sede. Sin ampliar permisos ni alterar históricos.
+
+**1.582 backend / 1.858 frontend / 33 E2E únicos PASS**; después del último ajuste de visibilidad, **30 unitarias y 3 E2E** finales PASS. Invitaciones y tres roles de la segunda persona repitieron otros **6 E2E PASS**; no suman casos únicos. HTTP **131 + 133 solicitudes**, empresa **7 grupos** y multirol **8 grupos PASS**. Tipos/builds PASS, lint 0 errores/42 advertencias, 84 capturas. Manual **2026.22.7**, mismo renderer/CSS. El informe conserva el timeout inicial de la suite completa y el detalle cosmético previo del encabezado de Transporte.
+
+**1.038 tablas QA previas intactas**, cero intentos/envíos/cola activa; CAP cerrado y correos/push apagados. Preview detenido **21:38:34 Mendoza**, imagen/base/evidencias preservadas, serial/un worker/1 CPU/2 GiB/swap cero, sin OOM ni presión. Main intacto; sin producción, push ni workflows; cierre `[skip ci]`.
+
+La última publicación documentada sigue siendo **712de167**, con empresa/multirol apagados allí; esta tanda no cambia esa configuración. Android físico y entrega externa pendientes. No usar bundles QA `/api` para producción.
+
 ## Publicación vigente — comunicaciones, 22/10/2026
 
 **`712de167` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 22/10/2026 20:15:03 Mendoza.** Leer [evidencia y reversión vigente](docs/ENLACES-AVISOS-CORREOS-20261022.md). Incluye enlaces exactos de correos/campana, plazo PSIP, recordatorios desde la firma y las revisiones previas de formularios/representación. Manual **2026.22.6**, estilos y renderer conservados.

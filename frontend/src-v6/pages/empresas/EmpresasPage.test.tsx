@@ -138,3 +138,51 @@ test('two people share all roles: a third is blocked while an existing person ca
  expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeEnabled();expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled();
  expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
 });
+
+for(const active of [true,false])test(`an existing ${active?'active':'revoked'} role guides explicit authorization instead of an unusable invitation`,async()=>{
+ setup({actividades:[{id:'activity',rol:'GENERADOR'}],personas:[{id:'two',email:'two@qa.invalid',nombre:'Representante QA'}],autorizaciones:[{id:'grant',usuarioId:'two',actividadId:'activity',activa:active,revision:4,todosEstablecimientos:true}]});
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'TWO@qa.invalid'}});
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();
+ expect(within(screen.getByRole('button',{name:'Autorizar cuenta verificada'}).closest('form')!).getByRole('status')).toHaveTextContent(active?'ya está autorizada':'fue revocado');
+ fireEvent.click(screen.getByRole('button',{name:'Autorizar cuenta verificada'}));
+ await waitFor(()=>expect(mocks.request).toHaveBeenCalledWith(expect.objectContaining({method:'POST',url:'/empresas/first/personas',data:expect.objectContaining({email:'two@qa.invalid',revision:4})})));
+});
+test('a live invitation blocks duplicates only for its own role and expiration releases the action',async()=>{
+ const invitation={id:'invite',email:'two@qa.invalid',actividadId:'g',venceAt:new Date(Date.now()+86400000).toISOString()};
+ const details={actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}],invitaciones:[invitation]};
+ const state=setup(details);
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'two@qa.invalid'}});
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();expect(within(screen.getByRole('button',{name:'Autorizar cuenta verificada'}).closest('form')!).getByRole('status')).toHaveTextContent('Ya hay una invitación vigente');
+ fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'o'}});
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled();
+ fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'g'}});
+ details.invitaciones=[{...invitation,venceAt:new Date(Date.now()-1000).toISOString()}];await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled());
+});
+
+test('a prepared link only remains visible for its current person and role while it is usable',async()=>{
+ const details={actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}],invitaciones:[] as Array<{id:string;email:string;actividadId:string;venceAt:string;revocadaAt?:string}>};
+ setup(details);const original=mocks.request.getMockImplementation()!;
+ mocks.request.mockImplementation(async request=>{
+  if(request.method==='POST'&&request.url.endsWith('/invitaciones')){
+   details.invitaciones=[{id:'new',email:request.data.email,actividadId:request.data.actividadId,venceAt:new Date(Date.now()+86400000).toISOString()}];
+   return {data:{data:{invitacion:{id:'new'},ruta:'/empresa-invitacion/qa-token'}}};
+  }
+  if(request.method==='POST'&&request.url.endsWith('/invitaciones/new/revocar')){
+   details.invitaciones=details.invitaciones.map(i=>({...i,revocadaAt:new Date().toISOString()}));return {data:{data:{revocada:true}}};
+  }
+  return original(request);
+ });
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'two@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));
+ expect(await screen.findByLabelText('Enlace de invitación')).toHaveValue(window.location.origin+'/empresa-invitacion/qa-token');
+ fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'o'}});expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'g'}});expect(screen.getByLabelText('Enlace de invitación')).toBeVisible();
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'another@qa.invalid'}});expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'two@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Revocar invitación'}));
+ await waitFor(()=>expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument());
+});

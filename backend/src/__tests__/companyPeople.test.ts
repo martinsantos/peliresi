@@ -33,6 +33,7 @@ describe('two representatives per legal identity, never per role', () => {
   });
   it('adding another activity to the same verified person consumes no additional slot', async () => {
     const { db, owner, representative } = fixture(); db.usuario.findMany.mockResolvedValue([owner, representative]);
+    db.autorizacionEmpresa.findMany.mockResolvedValue([{usuarioId:representative.id}]);
     await expect(reserveCompanyPerson(db, 'company', representative)).resolves.toMatchObject({ocupados:2});
   });
   it('invitations for several activities of the same normalized email reserve one slot', async () => {
@@ -51,6 +52,7 @@ describe('two representatives per legal identity, never per role', () => {
   });
   it('reports legacy overflow without revoking it and still permits adjusting an existing person', async () => {
     const { db, owner, representative } = fixture(); db.usuario.findMany.mockResolvedValue([owner,representative,{id:'legacy',email:'legacy@qa.invalid'}]);
+    db.autorizacionEmpresa.findMany.mockResolvedValue([{usuarioId:representative.id}]);
     await expect(reserveCompanyPerson(db,'company',representative)).resolves.toMatchObject({ocupados:3});
     await expect(reserveCompanyPerson(db,'company',{email:'new@qa.invalid'})).rejects.toMatchObject({statusCode:409});
   });
@@ -70,4 +72,22 @@ describe('two representatives per legal identity, never per role', () => {
     const {db,owner,representative}=fixture();db.usuario.findMany.mockResolvedValue([owner,representative]);
     await expect(reserveCompanyPerson(db,'company',{id:'third',email:representative.email.toUpperCase()})).rejects.toMatchObject({statusCode:409});
   });
+  it('does not mistake a newly created CUIT owner for a previously authorized third person', async () => {
+    const {db,owner,representative}=fixture();
+    const candidate={id:'new-owner',email:'new-owner@qa.invalid',nombre:'New owner',activo:true};
+    db.responsableEmpresa.findMany.mockResolvedValue([{usuarioId:owner.id},{usuarioId:representative.id}]);
+    db.usuario.findMany.mockResolvedValue([owner,representative,candidate]);
+    await expect(reserveCompanyPerson(db,'company',candidate)).rejects.toMatchObject({statusCode:409});
+  });
+  it('permits the new CUIT owner when only one established person occupies the entity', async () => {
+    const {db,owner,representative}=fixture();db.usuario.findMany.mockResolvedValue([owner,representative]);
+    await expect(reserveCompanyPerson(db,'company',representative)).resolves.toMatchObject({ocupados:1});
+  });
+  it('email-only invitations cannot count an unlinked CUIT owner as already authorized', async () => {
+    const {db,owner,representative}=fixture();
+    db.responsableEmpresa.findMany.mockResolvedValue([{usuarioId:owner.id},{usuarioId:representative.id}]);
+    db.usuario.findMany.mockResolvedValue([owner,representative,{id:'third',email:'third@qa.invalid'}]);
+    await expect(reserveCompanyPerson(db,'company',{email:'THIRD@QA.INVALID'})).rejects.toMatchObject({statusCode:409});
+  });
+
 });

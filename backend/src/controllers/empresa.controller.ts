@@ -144,6 +144,10 @@ export const invitePerson=companyAction(async(req,res)=>{
  const invitation=await transaction(async db=>{
   await requireCompanyManager(db,req.user,req.params.id);await checkCompanyScope(db,req.params.id,data);
   await reserveCompanyPerson(db,req.params.id,{email:data.email});
+  const person=await db.usuario.findUnique({where:{email:data.email},select:{id:true}});
+  if(person&&await db.autorizacionEmpresa.findUnique({where:{actividadId_usuarioId:{actividadId:data.actividadId,usuarioId:person.id}}}))throw new AppError('Esta persona ya tiene un acceso registrado en este rol. Revisá sus permisos y usá Autorizar cuenta verificada para actualizarlos o reactivarlos.',409);
+  const pending=await db.invitacionEmpresa.findFirst({where:{empresaId:req.params.id,actividadId:data.actividadId,email:data.email,aceptadaAt:null,revocadaAt:null,venceAt:{gt:new Date()}}});
+  if(pending)throw new AppError('Ya hay una invitación vigente para esta persona y rol. Usá el enlace preparado o revocá esa invitación antes de generar otra.',409);
   const i=await db.invitacionEmpresa.create({data:{...data,empresaId:req.params.id,tokenHash:crypto.createHash('sha256').update(token).digest('hex'),creadaPor:req.user.id,venceAt:new Date(Date.now()+86400000)}});
   await enterpriseEvent(db,req.user,req.params.id,'PERSONA_INVITADA',{invitacionId:i.id,email:i.email,actividadId:i.actividadId});return i;
  });return send(res,{invitacion:{id:invitation.id,email:invitation.email,venceAt:invitation.venceAt},ruta:'/empresa-invitacion/'+token,enviada:false},201);
@@ -151,7 +155,7 @@ export const invitePerson=companyAction(async(req,res)=>{
 const tokenHash=(token:unknown)=>{if(typeof token!=='string'||!/^\w{64}$/.test(token))throw new AppError('Invitación no disponible',404);return crypto.createHash('sha256').update(token).digest('hex');};
 async function availableInvitation(db:any,hash:string) {
  const i=await db.invitacionEmpresa.findUnique({where:{tokenHash:hash}});
- if(!i||i.revocadaAt||i.aceptadaAt||i.venceAt<new Date())throw new AppError('Invitación vencida, utilizada o revocada',404);
+ if(!i||i.revocadaAt||i.aceptadaAt||i.venceAt<=new Date())throw new AppError('Invitación vencida, utilizada o revocada',404);
  const issuer=await db.usuario.findUnique({where:{id:i.creadaPor}});
  if(!issuer?.activo)throw new AppError('Invitación no disponible',404);
  await requireCompanyManager(db,{...issuer,restricted:false},i.empresaId);
@@ -188,6 +192,7 @@ export const revokeInvitation=companyAction(async(req,res)=>{
   await requireCompanyManager(db,req.user,req.params.id);
   const i=await db.invitacionEmpresa.findFirst({where:{id:req.params.inviteId,empresaId:req.params.id}});
   if(!i||i.aceptadaAt)throw new AppError('La invitación ya no está pendiente',409);
+  if(i.revocadaAt)return;
   await db.invitacionEmpresa.update({where:{id:i.id},data:{revocadaAt:new Date()}});
   await enterpriseEvent(db,req.user,req.params.id,'INVITACION_REVOCADA',{invitacionId:i.id});
  });return send(res,{revocada:true});
