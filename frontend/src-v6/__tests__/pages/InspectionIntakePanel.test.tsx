@@ -30,7 +30,7 @@ it('does not turn a failed or offline queue into an empty-list success', async (
   mock.get.mockRejectedValue(new Error('offline')); view();
   await screen.findByRole('alert'); expect(screen.queryByText('Sin antecedentes para estos filtros.')).not.toBeInTheDocument();
   cleanup(); mock.get.mockClear(); view(false); expect(mock.get).not.toHaveBeenCalled();
-  expect(screen.getByText('Sin conexión. La cola requiere datos actuales del servidor.')).toBeVisible();
+  expect(screen.getByText('Sin conexión. Los antecedentes requieren datos actuales del servidor.')).toBeVisible();
 });
 it('keeps the reason and idempotency reference after a rejected decision', async () => {
   mock.post.mockRejectedValue(new Error('offline')); view();
@@ -46,12 +46,18 @@ it('keeps the reason and idempotency reference after a rejected decision', async
 it('cannot evaluate from a read-only inspector view', async () => {
   mock.get.mockResolvedValue({ data: { data: { items: [row], total: 1, puedeEvaluar: false } } }); view();
   fireEvent.click(await screen.findByRole('button', { name: /BI-qa-record/ }));
+  expect(screen.getByText(/Tu acceso es de consulta/)).toBeVisible();
   expect(screen.queryByLabelText('Motivo de evaluación')).not.toBeInTheDocument(); expect(mock.list).not.toHaveBeenCalled();
 });
 it('sends pagination/filter criteria to the server, instead of filtering only a visible page', async () => {
   view(); await screen.findByRole('button', { name: /BI-qa-record/ });
   fireEvent.change(screen.getByLabelText('Estado del antecedente'), { target: { value: 'EN_EVALUACION' } });
   await waitFor(() => expect(mock.get).toHaveBeenLastCalledWith('/inspecciones/antecedentes', { params: { estado: 'EN_EVALUACION', tipoActor: '', search: '', page: 1 } }));
+  expect(screen.getByRole('heading', { name: 'Antecedentes para inspección' })).toBeVisible();
+  expect(screen.getByRole('status')).toHaveTextContent('1 antecedente · En evaluación');
+  fireEvent.change(screen.getByLabelText('Estado del antecedente'), { target: { value: 'VINCULADA' } });
+  await waitFor(() => expect(mock.get).toHaveBeenLastCalledWith('/inspecciones/antecedentes', { params: { estado: 'VINCULADA', tipoActor: '', search: '', page: 1 } }));
+  expect(screen.getByRole('status')).toHaveTextContent('1 antecedente · Con inspección');
 });
 it('does not silently apply a draft reason to a newer server version', async () => {
   const { client } = view(); await screen.findByRole('button', { name: /BI-qa-record/ });

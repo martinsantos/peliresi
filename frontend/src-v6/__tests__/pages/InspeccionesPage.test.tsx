@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import InspeccionesPage from '../../pages/inspecciones/InspeccionesPageV2';
 import { saveInspectionResume } from '../../services/inspectionResume';
@@ -7,6 +7,9 @@ import type { Inspection } from '../../types/inspection';
 
 const mocks = vi.hoisted(() => ({ useInspections: vi.fn(), refetch: vi.fn() }));
 vi.mock('../../hooks/useInspectionOperations', () => ({ useInspectionOperations: () => ({ data: undefined, isLoading: false, isError: false }) }));
+vi.mock('../../pages/inspecciones/InspectionIntakePanel', () => ({
+  InspectionIntakePanel: () => <section aria-label="Antecedentes para inspección">Administración evalúa</section>,
+}));
 vi.mock('../../services/inspectionOperations.service', async (original) => ({ ...await original<typeof import('../../services/inspectionOperations.service')>(), inspectionOperationsService: { inspectors: vi.fn().mockResolvedValue([]) } }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -27,10 +30,49 @@ vi.mock('../../hooks/useCatalogos', () => ({
   useCatalogoOperadores: () => ({ data: [] }),
 }));
 
+function NavigationProbe() {
+  const location = useLocation(), navigate = useNavigate();
+  return <><output aria-label="Ruta actual">{location.pathname + location.search}</output><button onClick={() => navigate(-1)}>Atrás en navegador</button><button onClick={() => navigate('?vista=antecedentes')}>Abrir aviso de antecedente</button></>;
+}
+
 describe('InspeccionesPage', () => {
   beforeEach(() => {
     localStorage.clear();
     mocks.useInspections.mockReturnValue({ data: { items: [], total: 0 }, isLoading: false, isError: false, refetch: mocks.refetch });
+  });
+
+  it.each(['/inspecciones', '/mobile/inspecciones'])('keeps antecedents within Inspecciones and restores the filtered list at %s', (path) => {
+    render(<MemoryRouter initialEntries={[path + '?search=QA&etapa=SEGUIMIENTO']}><InspeccionesPage /><NavigationProbe /></MemoryRouter>);
+    const expedientes = screen.getByRole('link', { name: 'Expedientes', exact: true });
+    const antecedentes = screen.getByRole('link', { name: 'Antecedentes', exact: true });
+    expect(expedientes).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(antecedentes);
+    expect(antecedentes).toHaveAttribute('aria-current', 'page');
+    expect(expedientes).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('region', { name: 'Antecedentes para inspección' })).toBeVisible();
+    const url = new URL(screen.getByLabelText('Ruta actual').textContent!, 'https://qa.invalid');
+    expect(url.pathname).toBe(path);
+    expect(url.searchParams.get('search')).toBe('QA');
+    expect(url.searchParams.get('etapa')).toBe('SEGUIMIENTO');
+    expect(url.searchParams.get('vista')).toBe('antecedentes');
+    expect(screen.queryByLabelText('Buscar inspección')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás en navegador' }));
+    expect(expedientes).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByLabelText('Buscar inspección')).toHaveValue('QA');
+    expect(screen.queryByRole('region', { name: 'Antecedentes para inspección' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso de antecedente' }));
+    expect(antecedentes).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('opens a notice directly in the selected section and retains navigation after re-entry', () => {
+    render(<MemoryRouter initialEntries={['/inspecciones?vista=antecedentes']}><InspeccionesPage /></MemoryRouter>);
+    expect(screen.getByRole('link', { name: 'Antecedentes', exact: true })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('button', { name: 'Volver a inspecciones' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Expedientes', exact: true }));
+    expect(screen.getByRole('navigation', { name: 'Secciones de Inspecciones' })).toBeVisible();
+    expect(screen.getByRole('navigation', { name: 'Etapas PSIP' })).toBeVisible();
+    fireEvent.click(screen.getByRole('link', { name: 'Antecedentes', exact: true }));
+    expect(screen.getByRole('region', { name: 'Antecedentes para inspección' })).toBeVisible();
   });
 
   it('filters the full follow-up phase and narrows its detailed states', () => {

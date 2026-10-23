@@ -36,11 +36,11 @@ test('operator finding remains in its adenda and reaches an assigned PSIP inspec
   try {
     const authority = await context.newPage(); authority.on('pageerror', error => errors.push(error.message));
     await login(authority, info); await authority.goto(`${base}/inspecciones?vista=antecedentes`);
-    const queue = authority.getByRole('region', { name: 'Cola de revisión PSIP', exact: true });
+    const queue = authority.getByRole('region', { name: 'Antecedentes para inspección', exact: true });
     await queue.getByLabel('Actor del antecedente').selectOption('GENERADOR'); await queue.getByLabel('Buscar antecedente').fill(manifest.numero);
     const source = queue.getByRole('button', { name: new RegExp(manifest.numero) }); await source.click();
     await expect(queue.getByRole('region', { name: 'Informe de hallazgo' })).toContainText('Y21');
-    await readableWholeWords(queue.getByRole('heading', { name: /Por evaluar en PSIP/ }));
+    await readableWholeWords(queue.getByRole('heading', { name: /Antecedentes para inspección/ }));
     const opening = queue.getByRole('button', { name: 'Abrir inspección', exact: true }); await opening.scrollIntoViewIfNeeded();
     await readableFixedAction(opening, queue); await noOverflow(authority);
     await authority.screenshot({ path: info.outputPath('psip-intake.png'), animations: 'disabled' });
@@ -87,7 +87,7 @@ test('external handoff and incomplete eventual keep separate declared identities
     const created = await api(authority, '/manifiestos/baja-intensidad', 'POST', { id: eventualId, motivo: 'QA eventual sin identidades completas', residuos: [{ corriente: 'Y1', cantidad: 1, unidad: 'kg' }] });
     expect(created.status).toBe(201);
     await authority.goto(`${base}/inspecciones?vista=antecedentes`);
-    const queue = authority.getByRole('region', { name: 'Cola de revisión PSIP', exact: true });
+    const queue = authority.getByRole('region', { name: 'Antecedentes para inspección', exact: true });
     await queue.getByLabel('Buscar antecedente').fill(manifest.numero); await queue.getByRole('button', { name: new RegExp(manifest.numero) }).click();
     await expect(queue.getByText('Relevo sin alta', { exact: true })).toBeVisible(); await expect(queue.getByText('Identidad incompleta', { exact: true })).toBeVisible();
     await expect(queue.getByText('Sin alta vinculada · identidad pendiente de verificar', { exact: true })).toBeVisible();

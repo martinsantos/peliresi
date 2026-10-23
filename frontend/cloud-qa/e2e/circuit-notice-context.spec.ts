@@ -18,13 +18,13 @@ test('an inspection intake notice names its own queue and opens it in the same s
   const action = page.getByRole('list', { name: 'Avisos', exact: true }).getByRole('button', { name: 'Abrir aviso: ' + target!.titulo, exact: true }).filter({ hasText: target!.mensaje });
   await expect(action).toBeVisible();
   await action.evaluate(element => element.scrollIntoView({ block: 'center' }));
-  const destination = action.getByText('Abrir cola de revisión →', { exact: true });
+  const destination = action.getByText('Ver antecedentes en Inspecciones →', { exact: true });
   await expect(destination).toBeInViewport({ ratio: 1 });
   await destination.click({ trial: true });
   await action.screenshot({ path: info.outputPath('notice-destination.png') });
   await expect(action.getByText('Abrir manifiesto y ver qué sigue →', { exact: true })).toHaveCount(0);
   await action.click();
   await expect(page).toHaveURL('http://127.0.0.1:4177' + prefix(info) + '/inspecciones?vista=antecedentes');
-  await expect(page.getByRole('region', { name: 'Cola de revisión PSIP', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Antecedentes para inspección', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

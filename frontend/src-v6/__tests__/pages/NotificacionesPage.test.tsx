@@ -21,7 +21,7 @@ function setup(path = '/notificaciones') {
 }
 describe('notification inbox states and interaction', () => {
   for (const base of ['', '/app']) it.each([
-    ['/inspecciones?vista=antecedentes', 'Abrir cola de revisión →'],
+    ['/inspecciones?vista=antecedentes', 'Ver antecedentes en Inspecciones →'],
     ['/soporte/qa-ticket', 'Abrir consulta de soporte →'],
     ['/mi-perfil', 'Abrir mi ficha y documentos →'],
     ['/admin/usuarios', 'Revisar cuentas de usuarios →'],

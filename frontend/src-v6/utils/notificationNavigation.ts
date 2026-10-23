@@ -47,8 +47,8 @@ export function refreshInspectionNotification(notificacion: Notificacion, queryC
 
 /** The action describes the resolved destination, including notices without a manifest. */
 export function notificationActionLabel(path: string): string {
-  const [pathname, query = ''] = path.replace(/^\/app(?=\/|$)/, '').split('#')[0].split('?');
-  if (pathname === '/inspecciones' && new URLSearchParams(query).get('vista') === 'antecedentes') return 'Abrir cola de revisión →';
+  const [pathname, query = ''] = path.replace(/^\/(?:app|mobile)(?=\/|$)/, '').split('#')[0].split('?');
+  if (pathname === '/inspecciones' && new URLSearchParams(query).get('vista') === 'antecedentes') return 'Ver antecedentes en Inspecciones →';
   if (/^\/(?:admin\/solicitudes\/|mi-solicitud$)/.test(pathname)) return 'Abrir solicitud y ver su estado →';
   if (/^\/(?:mis-)?inspecciones\//.test(pathname)) return 'Abrir expediente y ver el intercambio →';
   if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';

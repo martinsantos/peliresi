@@ -1,9 +1,50 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { login, prefix } from './helpers';
+import { login, prefix, readableFixedAction, readableWholeWords } from './helpers';
 async function proof(page:Page,info:TestInfo,name:string) {
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
  await page.screenshot({path:info.outputPath(name+'.png'),animations:'disabled'});
 }
+test('inspection antecedents remain a selected section across links, history and reload', async ({ page }, info) => {
+ const errors: string[] = [];
+ page.on('pageerror', error => errors.push(error.message));
+ await login(page, info, 'admin');
+ await page.goto(prefix(info) + '/inspecciones?search=QA&etapa=SEGUIMIENTO');
+ await expect(page).toHaveTitle(/SITREP/i);
+ const sections = page.getByRole('navigation', { name: 'Secciones de Inspecciones' });
+ const cases = sections.getByRole('link', { name: 'Expedientes', exact: true });
+ const antecedents = sections.getByRole('link', { name: 'Antecedentes', exact: true });
+ await expect(cases).toHaveAttribute('aria-current', 'page');
+ const loaded = page.waitForResponse(response => response.url().includes('/api/inspecciones/antecedentes?') && response.status() === 200);
+ await antecedents.click();
+ await loaded;
+ const panel = page.getByRole('region', { name: 'Antecedentes para inspección', exact: true });
+ await expect(panel).toBeVisible();
+ await expect(antecedents).toHaveAttribute('aria-current', 'page');
+ await expect(cases).not.toHaveAttribute('aria-current');
+ await expect(page.getByLabel('Buscar inspección')).toHaveCount(0);
+ await expect(page.getByRole('button', { name: 'Volver a inspecciones', exact: true })).toHaveCount(0);
+ await readableWholeWords(panel.getByRole('heading', { name: 'Antecedentes para inspección' }));
+ await sections.scrollIntoViewIfNeeded();
+ await readableFixedAction(antecedents, sections); await readableFixedAction(cases, sections);
+ await proof(page, info, 'inspection-antecedents-section');
+ await panel.getByLabel('Estado del antecedente').selectOption('VINCULADA');
+ await expect(panel.getByRole('status')).toContainText('Con inspección');
+ await page.goBack();
+ await expect(cases).toHaveAttribute('aria-current', 'page');
+ await expect(page.getByLabel('Buscar inspección')).toHaveValue('QA');
+ await expect(page.getByRole('button', { name: /^Seguimiento / })).toHaveAttribute('aria-pressed', 'true');
+ await page.goForward();
+ await expect(antecedents).toHaveAttribute('aria-current', 'page');
+ await page.reload();
+ await expect(antecedents).toHaveAttribute('aria-current', 'page');
+ await expect(panel).toBeVisible();
+ await cases.click(); await expect(cases).toHaveAttribute('aria-current', 'page');
+ await page.goto(prefix(info) + '/inspecciones?vista=antecedentes');
+ await expect(antecedents).toHaveAttribute('aria-current', 'page');
+ await expect(panel).toContainText('Administración evalúa');
+ expect(await page.locator('vite-error-overlay').count()).toBe(0);
+ expect(errors).toEqual([]);
+});
 for (const [account, group] of [['operador','Operadores'],['generador','Generadores'],['transportista','Transportistas']]) {
  test(`temporary ${account} access explains the boundary before fields and restores the administrator`,async({page},info)=>{
   await login(page,info,'admin'); await page.goto(prefix(info)+'/switch-user');

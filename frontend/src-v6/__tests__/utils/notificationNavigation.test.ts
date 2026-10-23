@@ -18,6 +18,9 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app', '/mobile'])('names the Inspecciones section consistently for %s notices', prefix => {
+    expect(notificationActionLabel(prefix + '/inspecciones?vista=antecedentes')).toBe('Ver antecedentes en Inspecciones →');
+  });
   it('opens the exact entity on web and app and refreshes the open company record', () => {
     const notice={...base,datos:JSON.stringify({tipo:'representacion_empresa',version:1,empresaId:'entity-1',evento:'PERSONA_AUTORIZADA',url:'/wrong'})};
     expect(resolveNotificationPath(notice)).toBe('/empresas?empresa=entity-1');

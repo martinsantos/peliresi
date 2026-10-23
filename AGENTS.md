@@ -1,5 +1,7 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+> **Tanda pendiente de validación y publicación — 23/10:** Vista temporal, Ayuda, Monitor y la integración de Antecedentes dentro de Inspecciones están preparados en esta rama. El preview no responde por SSH; no dar por finalizadas las pruebas ni publicar sin recuperarlo. Producción sigue en `6580c1ca`. Ver [alcance, evidencia parcial y pendientes](docs/CORRECCIONES-VISTA-TEMPORAL-AYUDA-MONITOR-20261023.md). CAP cerrado, correos/push apagados; sin main ni datos reales.
+
 ## Publicación vigente — identidad, experiencia y concurrencia, 23/10/2026
 
 **`6580c1ca` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 23/10/2026 14:21:27 Mendoza.** Incluye toda la tanda acumulada desde `a7f20d2f`: identidad/PDF/correos/iconos, bienvenida por rol, preferencia web/app, ayuda contextual y cuatro correcciones de concurrencia. Leer [publicación, respaldo y reversión vigente](docs/DESPLIEGUE-PRODUCTO-CONCURRENCIA-20261023.md).

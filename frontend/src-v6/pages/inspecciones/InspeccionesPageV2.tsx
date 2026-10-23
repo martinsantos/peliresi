@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, MapPin, Plus, Search, UserRound } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, FileSearch, MapPin, Plus, Search, UserRound } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal } from '../../components/ui/Modal';
@@ -44,7 +44,13 @@ const InspeccionesPageV2: React.FC = () => {
   const [actorFilter, setActorFilter] = useState(initialActor);
   const [page, setPage] = useState(Math.max(1, Number(searchParams.get('page')) || 1));
   const [showCreate, setShowCreate] = useState(false);
-  const [showQueue, setShowQueue] = useState(searchParams.get('vista') === 'antecedentes');
+  const showQueue = searchParams.get('vista') === 'antecedentes';
+  const sectionSearch = (antecedentes: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (antecedentes) next.set('vista', 'antecedentes');
+    else next.delete('vista');
+    return next.toString();
+  };
   const [sourceIntake, setSourceIntake] = useState<InspectionIntake | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -81,17 +87,19 @@ const InspeccionesPageV2: React.FC = () => {
   }, [actorFilter, typeFilter, generadores.data, transportistas.data, operadores.data]);
 
   useEffect(() => {
-    const next = new URLSearchParams();
-    if (showQueue) next.set('vista', 'antecedentes');
-    if (search) next.set('search', search);
-    if (state) next.set('estado', state);
-    if (phase) next.set('etapa', phase);
-    if (typeFilter) next.set('tipoActor', typeFilter);
-    if (inspectionFilter) next.set('tipoInspeccion', inspectionFilter);
-    if (actorFilter) next.set('actorId', actorFilter);
-    if (page > 1) next.set('page', String(page));
-    setSearchParams(next, { replace: true });
-  }, [search, state, phase, typeFilter, inspectionFilter, actorFilter, page, showQueue, setSearchParams]);
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous);
+      for (const key of ['search', 'estado', 'etapa', 'tipoActor', 'tipoInspeccion', 'actorId', 'page']) next.delete(key);
+      if (search) next.set('search', search);
+      if (state) next.set('estado', state);
+      if (phase) next.set('etapa', phase);
+      if (typeFilter) next.set('tipoActor', typeFilter);
+      if (inspectionFilter) next.set('tipoInspeccion', inspectionFilter);
+      if (actorFilter) next.set('actorId', actorFilter);
+      if (page > 1) next.set('page', String(page));
+      return next;
+    }, { replace: true });
+  }, [search, state, phase, typeFilter, inspectionFilter, actorFilter, page, setSearchParams]);
 
   const createMutation = useInspectionMutation(async () => inspeccionService.create({ clienteId: creationId, ...(sourceIntake ? { antecedenteId: sourceIntake.id } : {}), tipoInspeccion: inspectionType, observaciones: description || undefined, tipoActor: withoutActor ? null : type, actorId: withoutActor ? null : actorId, inspectorId: assignedInspector || undefined, numeroActa: numeroActa || undefined, ubicacion: ubicacion || undefined, fechaProgramada: fechaProgramada ? new Date(fechaProgramada).toISOString() : undefined }));
 
@@ -142,8 +150,19 @@ const InspeccionesPageV2: React.FC = () => {
   return <div className="space-y-4">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="sr-only">Inspecciones</h2>
-      <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" aria-pressed={showQueue} onClick={() => setShowQueue(!showQueue)}>{showQueue ? 'Volver a inspecciones' : 'Cola de revisión'}</Button><Button size="sm" variant="outline" onClick={() => { setShowQueue(false); setFindingRequest((value) => value + 1); }}>Denuncia / hallazgo</Button><Button size="sm" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }}>Nueva inspección</Button></div>
+      <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { setSearchParams(sectionSearch(false)); setFindingRequest((value) => value + 1); }}>Denuncia / hallazgo</Button><Button size="sm" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }}>Nueva inspección</Button></div>
     </header>
+    <nav aria-label="Secciones de Inspecciones" className="flex border-b border-neutral-200">
+      {[
+        { antecedentes: false, label: 'Expedientes', Icon: ClipboardCheck },
+        { antecedentes: true, label: 'Antecedentes', Icon: FileSearch },
+      ].map(({ antecedentes, label, Icon }) => <Link
+        key={label}
+        to={{ pathname: location.pathname, search: sectionSearch(antecedentes) }}
+        aria-current={showQueue === antecedentes ? 'page' : undefined}
+        className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 border-b-2 px-3 py-2 text-sm !no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700 sm:flex-none sm:px-5 ${showQueue === antecedentes ? 'border-primary-700 bg-primary-50 font-bold !text-primary-800' : 'border-transparent !text-neutral-600 hover:bg-neutral-50'}`}
+      ><Icon size={18} aria-hidden="true" />{label}</Link>)}
+    </nav>
     {showQueue && <InspectionIntakePanel mobile={mobile} online={isOnline && navigator.onLine} onCreate={createFromIntake} />}
     {!showQueue && <>
 
@@ -160,7 +179,7 @@ const InspeccionesPageV2: React.FC = () => {
     <nav aria-label="Etapas PSIP" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-neutral-200 text-sm [&>button]:shrink-0">
       <button aria-pressed={!phase && !state && !agendaOpen} className={!phase && !state && !agendaOpen ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(''); setState(''); setAgendaOpen(false); setPage(1); }}>Todas</button>
       {(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).map((key) => <button key={key} aria-pressed={phase === key && !agendaOpen} className={phase === key && !agendaOpen ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(key); setState(''); setAgendaOpen(false); setPage(1); }}>{INSPECTION_PHASES[key].label} <span className="ml-1 tabular-nums">{totalsUnknown ? '—' : INSPECTION_PHASES[key].states.reduce((sum, value) => sum + (stateCounts[value] || 0), 0)}</span></button>)}
-      <button aria-pressed={agendaOpen} className="min-h-11 text-neutral-600" onClick={() => setAgendaOpen((value) => !value)}>Agenda</button>
+      <button aria-pressed={agendaOpen} className={agendaOpen ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => setAgendaOpen((value) => !value)}>Agenda</button>
       <span className="hidden shrink-0 text-neutral-500 xl:inline">{totalsUnknown ? '—' : deadlines} con plazo vigente sin responder</span>
       <Button aria-label="Exportar" title="Exportar listado" className="ml-auto shrink-0 max-sm:w-11 max-sm:px-0" variant="ghost" size="sm" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}><span className="sr-only sm:not-sr-only">Exportar</span></Button>
     </nav>
