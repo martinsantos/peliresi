@@ -4,6 +4,7 @@
  * Each widget: collapsible header + closeable. Closed → tray.
  */
 
+import { manifestEventLabel, manifestEventDescription } from '../../../utils/manifestEventPresentation';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   ClipboardCheck, Factory, FlaskConical, Package, Beaker, Droplets,
@@ -163,9 +164,9 @@ const ManifiestoCard: React.FC<{
           className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
           style={{ backgroundColor: color + '20' }}
         >
-          {tipo || 'EVENTO'}
+          {manifestEventLabel(tipo)}
         </span>
-        <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 font-mono tabular-nums">
+        <div className="flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[10px] text-neutral-600 font-mono tabular-nums">
           <span>{formatTimeShort(event.timestamp)}</span>
           {totalEvents > 0 && <span className="text-neutral-600">{eventIndex + 1}/{totalEvents}</span>}
         </div>
@@ -196,7 +197,7 @@ const ManifiestoCard: React.FC<{
       )}
 
       {/* Description */}
-      <p className="text-[10px] text-neutral-400 truncate">{event.descripcion}</p>
+      <p className="break-words text-xs leading-relaxed text-neutral-700">{manifestEventDescription(tipo, event.descripcion)}</p>
     </div>
   );
 };

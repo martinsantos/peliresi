@@ -32,23 +32,23 @@ const faqs = [
     questions: [
       {
         q: '¿Cómo creo un nuevo manifiesto?',
-        a: 'Ve a Manifiestos → Nuevo Manifiesto. El formulario multi-paso te guiará: selecciona el tipo de residuo, ingresa la cantidad, elige el transportista y el operador destino, y revisa el resumen antes de guardar como Borrador.'
+        a: 'Ingresá con tu propia cuenta y el rol correcto. Con las propuestas habilitadas, generador, transportista u operador pueden iniciar un manifiesto con traslado: elegí las partes, declará los residuos y revisá el resumen. Queda Pendiente de aprobación hasta que las tres partes confirmen. Los borradores del circuito anterior y la modalidad in situ mantienen sus acciones específicas.'
       },
       {
         q: '¿Qué estados puede tener un manifiesto?',
-        a: 'El ciclo completo es: Borrador → Aprobado → En tránsito → Entregado → Recibido → En tratamiento → Tratado. También puede ser Rechazado o Cancelado en determinadas condiciones.'
+        a: 'Una propuesta pasa de Pendiente de aprobación a Aprobado cuando confirman las tres partes. Luego siguen el retiro, En tránsito, Entregado, Recibido, En tratamiento y Tratado. Iniciar la coordinación no confirma el retiro físico. El detalle indica quién debe actuar; los borradores anteriores conservan su circuito de firma.'
       },
       {
         q: '¿Cómo descargo el certificado de disposición final?',
-        a: 'El certificado solo está disponible cuando el manifiesto alcanza el estado TRATADO. Abre el detalle del manifiesto y haz clic en "Descargar Certificado" (botón verde).'
+        a: 'Abrí Certificaciones en el detalle del manifiesto. El operador emite y firma los certificados parciales y el final cuando se cumplen sus requisitos. El final requiere el cierre y las adendas resueltas: Tratado no significa que ya esté emitido. Una vez liberado, las partes involucradas reciben un aviso en la campana y pueden descargar el mismo documento. Los documentos históricos conservan su acceso.'
       },
       {
         q: '¿Cómo edito un manifiesto?',
-        a: 'Solo los manifiestos en estado BORRADOR pueden editarse. Abre el detalle y usa el botón de edición. Una vez aprobado, el manifiesto no puede modificarse.'
+        a: 'Los borradores del circuito anterior pueden editarse si tu rol tiene permiso. Una propuesta presentada conserva lo acordado: para corregirla, creá otra propuesta. Las diferencias constatadas durante el circuito se registran mediante una adenda, con su informe de hallazgo y las revisiones que correspondan; no se sobrescribe la declaración original.'
       },
       {
         q: '¿Cómo cancelo un manifiesto?',
-        a: 'Un manifiesto puede cancelarse desde cualquier estado, excepto CANCELADO o TRATADO. Abre el detalle y usa la opción "Cancelar Manifiesto". Se solicitará confirmación.'
+        a: 'Abrí el detalle y revisá las acciones disponibles para tu rol y el estado actual. Si aparece Cancelar Manifiesto, indicá el motivo y confirmá. En una propuesta, rechazar la participación es una decisión distinta de cancelar. Las decisiones y el historial se conservan.'
       },
       {
         q: '¿Cómo verifico un manifiesto con QR?',
@@ -61,11 +61,11 @@ const faqs = [
     questions: [
       {
         q: '¿Cómo inicio el tracking GPS de un viaje?',
-        a: 'El transportista debe ir a Transporte → Perfil → tab Viaje. Si hay manifiestos APROBADOS asignados, aparece el botón "Tomar Viaje". Al confirmar el retiro, el GPS comienza a registrar la posición cada 30 segundos.'
+        a: 'Abrí Mis viajes y elegí el manifiesto. Primero deben estar las aprobaciones necesarias. Confirmá el retiro sólo cuando recibas la carga y permití el acceso a ubicación. Revisá el indicador de GPS: iniciar la coordinación no inicia el viaje. Con varios viajes simultáneos, verificá cuáles están seleccionados para compartir ubicación.'
       },
       {
         q: '¿Qué hago si el GPS falla durante el viaje?',
-        a: 'La app almacena los puntos GPS pendientes localmente y los envía automáticamente al recuperar la conexión. El viaje no se interrumpe. Si la señal es persistentemente baja, ve a Configuración del teléfono y activa el modo de ubicación de alta precisión.'
+        a: 'Revisá el indicador de ubicación y usá Reintentar GPS. Si se denegó el permiso, habilitalo en el navegador o teléfono. Los puntos pendientes se reenvían al recuperar conexión; verificá la hora del último punto recibido en Monitor. Mantener la app abierta facilita el seguimiento: no se garantiza GPS con la app cerrada.'
       },
       {
         q: '¿Cómo registro un incidente durante el transporte?',
@@ -103,11 +103,11 @@ const faqs = [
       },
       {
         q: '¿Cuáles son los roles del sistema?',
-        a: 'Existen 4 roles principales (ADMIN, GENERADOR, TRANSPORTISTA, OPERADOR) y 3 sub-roles administrativos delegados (ADMIN_GENERADOR, ADMIN_TRANSPORTISTA, ADMIN_OPERADOR). Cada rol tiene acceso a un subconjunto diferente de páginas.'
+        a: 'Hay generadores, transportistas, operadores, administración general, administraciones delegadas de cada actividad y auditoría. Una razón social puede tener varias actividades aprobadas. Elegí el rol y establecimiento correctos antes de actuar; cambiar de contexto no amplía tus permisos.'
       },
       {
-        q: '¿Qué es la función Acceso Comodín?',
-        a: 'El ADMIN puede "impersonar" a cualquier usuario activo para ver la aplicación exactamente como la ve ese usuario, sin necesitar su contraseña. Aparece un banner naranja durante la sesión de impersonación. Usar el botón "Volver a mi cuenta" para salir.'
+        q: '¿Qué permite la Vista temporal (Acceso Comodín)?',
+        a: 'La administración puede abrir una Vista temporal para asistir a un usuario, identificada por una banda amarilla. No sustituye la cuenta real para crear propuestas ni aprobar la participación de las partes. El formulario explica esta limitación antes de cargar datos. Usá Volver a mi cuenta para recuperar tu identidad administrativa y el contexto de origen.'
       },
       {
         q: '¿Cómo uso la búsqueda global (Cmd+K)?',
@@ -128,7 +128,7 @@ const faqs = [
       },
       {
         q: '¿Cómo configuro mis notificaciones por email?',
-        a: 'Ve a Configuración → pestaña Notificaciones. Activa o desactiva el toggle "Recibir alertas por email". Los administradores tienen un toggle adicional para notificaciones de nuevos usuarios pendientes.'
+        a: 'En Configuración → Notificaciones podés guardar tus preferencias. La entrega depende también de que el canal esté habilitado por la administración: activar una preferencia no habilita correos ni push del sistema. Si están apagados, no se envía nada por esos canales. Los avisos internos se consultan en la campana.'
       }
     ]
   },
@@ -277,6 +277,7 @@ const AyudaPage: React.FC = () => {
                           >
                             <button
                               onClick={() => setExpandedFaq(isExpanded ? null : key)}
+                              aria-expanded={isExpanded}
                               className="w-full flex items-center justify-between p-4 text-left hover:bg-neutral-50 transition-colors"
                             >
                               <span className="font-medium text-neutral-900">{faq.q}</span>

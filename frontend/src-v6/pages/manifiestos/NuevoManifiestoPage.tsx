@@ -1,3 +1,4 @@
+import { useImpersonation } from '../../contexts/ImpersonationContext';
 import { manifestProposalsVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Nuevo Manifiesto Page
@@ -60,7 +61,39 @@ function parseCorrientes(raw: string | string[] | null | undefined): string[] {
   return raw.split(/[,/]|(?<=\d)-(?=Y)/i).map(s => s.replace(/\s*e\s*$/, '').trim()).filter(Boolean);
 }
 
+/** Temporary access must explain the boundary before mounting a writable form. */
 export const NuevoManifiestoPage: React.FC = () => {
+  const { currentUser } = useAuth();
+  const { impersonationData, exitImpersonation } = useImpersonation();
+  const navigate = useNavigate();
+  const mp = useMobilePrefix();
+
+  if (impersonationData && !currentUser?.training) {
+    return (
+      <section className="mx-auto w-full max-w-xl space-y-4" aria-labelledby="temporary-manifest-title">
+        <Card>
+          <CardContent className="space-y-4 p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={24} className="mt-1 shrink-0 text-warning-700" aria-hidden="true" />
+              <div>
+                <h2 id="temporary-manifest-title" className="text-xl font-bold text-neutral-900">Estás en una vista temporal</h2>
+                <p className="mt-2 text-neutral-700">Para crear una propuesta, la persona responsable debe ingresar con su propia cuenta.</p>
+              </div>
+            </div>
+            <p className="text-sm text-neutral-700">Esta vista es de asistencia: no permite proponer ni aprobar en nombre del actor. No se creó ningún manifiesto.</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button onClick={exitImpersonation}>Volver a mi cuenta</Button>
+              <Button variant="outline" onClick={() => navigate(mp('/manifiestos'))}>Ver manifiestos</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+  return <NuevoManifiestoForm />;
+};
+
+const NuevoManifiestoForm: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser, isAdmin, isGenerador } = useAuth();
@@ -268,7 +301,7 @@ export const NuevoManifiestoPage: React.FC = () => {
 
   // Removed isMobile — React Router handles /app/ basename
 
-  // Operational permissions are unchanged; signed CAP actors can propose their own participation.
+  // Preserve existing role and feature checks for the signed-in actor.
   const canCreate = isAdmin || isGenerador || (operatorProposal && !!ownOperatorId) || (carrierProposal && !!ownCarrierId);
 
   if (!canCreate) {
@@ -293,7 +326,7 @@ export const NuevoManifiestoPage: React.FC = () => {
                 El perfil <span className="font-semibold">{currentUser?.rol || 'actual'}</span> no tiene permisos para crear manifiestos.
               </p>
               <p className="text-sm text-neutral-500 mb-6">
-                Solo los perfiles <span className="font-semibold">GENERADOR</span> y <span className="font-semibold">ADMIN</span> pueden crear nuevos manifiestos de residuos.
+                La creación depende del rol activo, su actor vinculado y las funciones habilitadas. Si tenés más de una actividad, seleccioná la que corresponde antes de continuar.
               </p>
               <Button fullWidth onClick={() => navigate('/manifiestos')}>
                 Volver a Manifiestos

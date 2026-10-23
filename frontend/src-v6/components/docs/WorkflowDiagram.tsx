@@ -24,18 +24,20 @@ interface Transition {
 
 const STATES: State[] = [
   { id: 'BORRADOR',       label: 'Borrador',       color: '#F3F4F6', textColor: '#374151', description: 'Manifiesto creado, pendiente de firma' },
-  { id: 'APROBADO',       label: 'Aprobado',        color: '#DBEAFE', textColor: '#1E40AF', description: 'Firmado por el generador, listo para retiro' },
-  { id: 'EN_TRANSITO',    label: 'En Tránsito',     color: '#FFF7ED', textColor: '#9A3412', description: 'Transportista retiró el residuo, GPS activo' },
+  { id: 'PENDIENTE_APROBACION', label: 'Pendiente de aprobación', color: '#FEF3C7', textColor: '#92400E', description: 'Propuesta presentada: cada parte confirma desde su propia cuenta' },
+  { id: 'APROBADO',       label: 'Aprobado',        color: '#DBEAFE', textColor: '#1E40AF', description: 'Aprobaciones completas. En propuestas con traslado, las tres partes confirmaron; la coordinación y el retiro son acciones distintas' },
+  { id: 'EN_TRANSITO',    label: 'En Tránsito',     color: '#FFF7ED', textColor: '#9A3412', description: 'Transportista confirmó el retiro. Revisá el permiso de ubicación y el último punto recibido para comprobar el GPS' },
   { id: 'ENTREGADO',      label: 'Entregado',       color: '#FEF3C7', textColor: '#92400E', description: 'Llegó a la planta del operador' },
-  { id: 'RECIBIDO',       label: 'Recibido',        color: '#D1FAE5', textColor: '#065F46', description: 'Operador confirmó recepción y pesaje' },
+  { id: 'RECIBIDO',       label: 'Recibido',        color: '#D1FAE5', textColor: '#065F46', description: 'Operador confirmó la recepción; el pesaje se registra por separado' },
   { id: 'EN_TRATAMIENTO', label: 'En Tratamiento',  color: '#E0E7FF', textColor: '#3730A3', description: 'Proceso de tratamiento en curso' },
-  { id: 'TRATADO',        label: 'Tratado',         color: '#A7F3D0', textColor: '#064E3B', description: 'Disposición final completa — certificado emitido' },
-  { id: 'RECHAZADO',      label: 'Rechazado',       color: '#FEE2E2', textColor: '#991B1B', description: 'Operador rechazó la carga al recibirla' },
+  { id: 'TRATADO',        label: 'Tratado',         color: '#A7F3D0', textColor: '#064E3B', description: 'Tratamiento cerrado. El operador emite el certificado final por separado, con las adendas resueltas' },
+  { id: 'RECHAZADO',      label: 'Rechazado',       color: '#FEE2E2', textColor: '#991B1B', description: 'Una parte rechazó su participación o el operador rechazó la carga. El historial indica el motivo' },
   { id: 'CANCELADO',      label: 'Cancelado',       color: '#F3F4F6', textColor: '#4B5563', description: 'Manifiesto cancelado antes del cierre' },
 ];
 
 const TRANSITIONS: Transition[] = [
-  { from: 'BORRADOR',       to: 'APROBADO',       label: 'Firmar',            roles: 'GENERADOR / ADMIN' },
+  { from: 'PENDIENTE_APROBACION', to: 'APROBADO', label: 'Aprobar la participación', roles: 'Generador + Transporte + Operador' },
+  { from: 'BORRADOR',       to: 'APROBADO',       label: 'Firmar borrador anterior',            roles: 'GENERADOR / ADMIN' },
   { from: 'APROBADO',       to: 'EN_TRANSITO',    label: 'Confirmar Retiro',  roles: 'TRANSPORTISTA / ADMIN' },
   { from: 'EN_TRANSITO',    to: 'ENTREGADO',      label: 'Confirmar Entrega', roles: 'TRANSPORTISTA / ADMIN' },
   { from: 'ENTREGADO',      to: 'RECIBIDO',       label: 'Confirmar Recepción', roles: 'OPERADOR / ADMIN' },
@@ -50,8 +52,8 @@ const stateById = Object.fromEntries(STATES.map(s => [s.id, s]));
 const WorkflowDiagram: React.FC = () => {
   const [activeState, setActiveState] = useState<string | null>(null);
 
-  const mainFlow = ['BORRADOR', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
-  const sideStates = ['RECHAZADO', 'CANCELADO'];
+  const mainFlow = ['PENDIENTE_APROBACION', 'APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO'];
+  const sideStates = ['BORRADOR', 'RECHAZADO', 'CANCELADO'];
 
   const getActiveTransitions = (stateId: string) =>
     TRANSITIONS.filter(t => t.from === stateId || t.to === stateId);
@@ -60,6 +62,7 @@ const WorkflowDiagram: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-neutral-700">Propuestas con traslado: tres partes aprueban desde sus cuentas. Los borradores anteriores y la modalidad in situ conservan sus acciones específicas.</p>
       {/* Main flow */}
       <div className="flex flex-wrap items-center gap-2">
         {mainFlow.map((stateId, idx) => {
@@ -74,7 +77,7 @@ const WorkflowDiagram: React.FC = () => {
               <button
                 onClick={() => setActiveState(isActive ? null : stateId)}
                 className={`
-                  px-3 py-2 rounded-lg font-semibold text-sm border-2 transition-all duration-200
+                  min-h-11 px-3 py-2 rounded-lg font-semibold text-sm border-2 transition-all duration-200
                   ${isActive ? 'scale-105 shadow-md border-current' : 'border-transparent hover:border-current hover:scale-102'}
                   ${!activeState || isActive || isRelated ? 'opacity-100' : 'opacity-40'}
                 `}
@@ -106,7 +109,7 @@ const WorkflowDiagram: React.FC = () => {
               key={stateId}
               onClick={() => setActiveState(isActive ? null : stateId)}
               className={`
-                px-3 py-1.5 rounded-lg font-semibold text-sm border-2 transition-all duration-200
+                min-h-11 px-3 py-1.5 rounded-lg font-semibold text-sm border-2 transition-all duration-200
                 ${isActive ? 'scale-105 shadow-md border-current' : 'border-transparent hover:border-current'}
                 ${!activeState || isActive || isRelated ? 'opacity-100' : 'opacity-40'}
               `}
@@ -131,7 +134,7 @@ const WorkflowDiagram: React.FC = () => {
           <p className="text-sm text-neutral-700 mb-3">{activeInfo.description}</p>
           <div className="space-y-1">
             {getActiveTransitions(activeState!).map((t, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs text-neutral-600">
+              <div key={i} className="flex flex-wrap items-center gap-2 text-xs text-neutral-700">
                 <span className="font-mono bg-white/60 px-1.5 py-0.5 rounded">
                   {t.from === activeState ? `→ ${stateById[t.to]?.label}` : `← ${stateById[t.from]?.label}`}
                 </span>
@@ -144,7 +147,7 @@ const WorkflowDiagram: React.FC = () => {
       )}
 
       {!activeState && (
-        <p className="text-xs text-neutral-400">Haz clic en un estado para ver sus transiciones</p>
+        <p className="text-xs text-neutral-400">Elegí un estado para ver sus transiciones</p>
       )}
     </div>
   );

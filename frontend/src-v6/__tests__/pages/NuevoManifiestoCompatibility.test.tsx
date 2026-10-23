@@ -5,6 +5,8 @@ import NuevoManifiestoPage from '../../pages/manifiestos/NuevoManifiestoPage';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn() }));
 
+vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
+
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN' }, isAdmin: true, isGenerador: false }),
 }));

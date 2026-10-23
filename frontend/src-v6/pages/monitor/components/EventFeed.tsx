@@ -3,6 +3,7 @@
  * Colored left borders, bold manifest numbers, Lucide icons per event type
  */
 
+import { manifestEventLabel, manifestEventDescription } from '../../../utils/manifestEventPresentation';
 import React, { useRef, useEffect } from 'react';
 import { Plus, PenLine, Truck, Package, FlaskConical, Zap, AlertTriangle, XCircle, RotateCcw } from 'lucide-react';
 import type { MonitorMode } from '../WarRoomPage';
@@ -76,7 +77,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
             <button
               key={ev.id}
               type="button"
-              aria-label={`Abrir evento ${ev.manifiestoNumero}: ${ev.descripcion}`}
+              aria-label={`Abrir evento ${ev.manifiestoNumero}: ${manifestEventDescription(ev.tipo, ev.descripcion)}`}
               aria-current={isActive ? 'true' : undefined}
               className={`wr-event-item w-full text-left min-h-11 flex items-start gap-2 py-2 pr-2 rounded cursor-pointer transition-colors ${
                 isActive ? 'bg-emerald-50' : 'hover:bg-neutral-50/80'
@@ -95,7 +96,7 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono font-semibold text-neutral-500 tabular-nums">
+                  <span className="shrink-0 whitespace-nowrap text-[10px] font-mono font-semibold text-neutral-600 tabular-nums">
                     {formatTimeShort(ev.timestamp)}
                   </span>
                   <span
@@ -108,13 +109,13 @@ export const EventFeed: React.FC<Props> = ({ eventos, mode, onEventClick, curren
                     }}
                   >
                     {TipoIcon && <TipoIcon size={12} strokeWidth={2.5} aria-hidden="true" />}
-                    {ev.tipo}
+                    {manifestEventLabel(ev.tipo)}
                   </span>
                 </div>
                 <p className="text-[11px] leading-tight truncate">
                   <span className="font-black text-neutral-800 font-mono tracking-tight">{ev.manifiestoNumero}</span>
                   <span aria-hidden="true" className="text-neutral-600 mx-1">·</span>
-                  <span className="text-neutral-500 text-[10px]">{ev.descripcion}</span>
+                  <span className="text-neutral-500 text-[10px]">{manifestEventDescription(ev.tipo, ev.descripcion)}</span>
                 </p>
                 {ev.tipo === 'CREACION' && ev.generador && (
                   <p className="text-[10px] text-neutral-800 font-semibold truncate mt-0.5">

@@ -5,6 +5,7 @@
  * Pure mousedown/mousemove drag — no external libraries.
  */
 
+import { manifestEventLabel, manifestEventDescription } from '../../../utils/manifestEventPresentation';
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   GripVertical, X, Minus, Maximize2,
@@ -79,9 +80,9 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
           className="text-[10px] text-neutral-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
           style={{ backgroundColor: color + '20' }}
         >
-          {tipo || 'EVENTO'}
+          {manifestEventLabel(tipo)}
         </span>
-        <span className="text-[10px] font-mono text-neutral-400 tabular-nums">
+        <span className="shrink-0 whitespace-nowrap text-[10px] font-mono text-neutral-600 tabular-nums">
           {formatTimeShort(data.timestamp)}
         </span>
       </div>
@@ -159,8 +160,8 @@ const ManifiestoContent: React.FC<{ data: ManifiestoFPData }> = ({ data }) => {
       )}
 
       {/* Description */}
-      <p className="text-[10px] text-neutral-400 truncate border-t border-black/5 pt-1.5">
-        {data.descripcion}
+      <p className="break-words text-xs leading-relaxed text-neutral-700 border-t border-black/5 pt-1.5">
+        {manifestEventDescription(tipo, data.descripcion)}
       </p>
     </div>
   );

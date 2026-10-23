@@ -3,6 +3,7 @@
  * Shows the current event as a compact, dark terminal-style card.
  */
 
+import { manifestEventLabel, manifestEventDescription } from '../../../utils/manifestEventPresentation';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, MapPin, Package, FileText, CheckCircle, Truck, Box, FlaskConical, Zap } from 'lucide-react';
 import { EVENT_COLORS, RESIDUO_PALETTE } from '../utils/war-room-icons';
@@ -52,19 +53,6 @@ const TIPO_TO_PROGRESS: Record<string, number> = {
   CIERRE: 6,
 };
 
-const EVENT_LABELS: Record<string, string> = {
-  CREACION: 'CREACION',
-  FIRMA: 'FIRMA',
-  RETIRO: 'RETIRO',
-  ENTREGA: 'ENTREGA',
-  RECEPCION: 'RECEPCION',
-  TRATAMIENTO: 'TRATAMIENTO',
-  CIERRE: 'CIERRE',
-  INCIDENTE: 'INCIDENTE',
-  CANCELACION: 'CANCELACION',
-  RECHAZO: 'RECHAZO',
-};
-
 export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents }) => {
   const [animKey, setAnimKey] = useState(0);
   const prevEventRef = useRef<string | null>(null);
@@ -86,7 +74,7 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
     );
   }
 
-  const tipo = event.eventoTipo || 'CREACION';
+  const tipo = event.eventoTipo || '';
   const borderColor = EVENT_COLORS[tipo] || '#6B7280';
   const progressIdx = TIPO_TO_PROGRESS[tipo] ?? -1;
   const progressPct = progressIdx >= 0 ? ((progressIdx + 1) / WORKFLOW_STATES.length) * 100 : 0;
@@ -111,10 +99,10 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
           className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider"
           style={{ backgroundColor: borderColor + '22', color: borderColor }}
         >
-          {EVENT_LABELS[tipo] || tipo}
+          {manifestEventLabel(tipo)}
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono text-neutral-400 tabular-nums">
+          <span className="shrink-0 whitespace-nowrap text-[11px] font-mono text-neutral-300 tabular-nums">
             {formatTimeShort(event.timestamp)}
           </span>
           <span className="text-[10px] font-mono text-neutral-600 tabular-nums">
@@ -225,8 +213,8 @@ export const DepartureBoard: React.FC<Props> = ({ event, eventIndex, totalEvents
 
       {/* Description footer */}
       <div className="px-3 py-1.5 border-t border-neutral-800">
-        <p className="text-[10px] text-neutral-500 leading-tight truncate">
-          {event.descripcion}
+        <p className="break-words text-xs text-neutral-300 leading-relaxed">
+          {manifestEventDescription(tipo, event.descripcion)}
         </p>
       </div>
     </div>
