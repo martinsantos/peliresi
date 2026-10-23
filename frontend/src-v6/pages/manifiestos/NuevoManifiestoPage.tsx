@@ -26,6 +26,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
+import { getApiErrorMessage } from '../../utils/api-error';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
 import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
@@ -254,9 +255,11 @@ export const NuevoManifiestoPage: React.FC = () => {
       toast.success('Manifiesto creado', `El manifiesto ${result.numero || result.id} fue creado exitosamente`);
       navigate(mp(`/manifiestos/${result.id}`));
     } catch (err: any) {
-      toast.error(
+      // The API client explains 429 with its retry time. Keep all fields and
+      // avoid a second, contradictory toast; only the user repeats the write.
+      if (err?.response?.status !== 429) toast.error(
         'Error al crear manifiesto',
-        err?.response?.data?.message || err?.message || 'Ocurrio un error inesperado'
+        getApiErrorMessage(err, 'No se pudo guardar. Revisá la conexión y reintentá; los datos siguen en pantalla.')
       );
     } finally {
       submitting.current = false;

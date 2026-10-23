@@ -3,7 +3,6 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { config } from './config/config';
@@ -39,6 +38,8 @@ import inspeccionRoutes from './routes/inspeccion.routes';
 import supportRoutes from './routes/support.routes';
 import { startEmailFlushTimer } from './services/email.service';
 import { createAuthenticationLimiters } from './middlewares/authRateLimit';
+import { createApiAdmission } from './middlewares/apiAdmission';
+import { PostgresAdmissionStore } from './services/apiAdmission.service';
 import { trainingSession } from './middlewares/trainingSession';
 import empresaRoutes from './routes/empresa.routes';
 
@@ -67,18 +68,11 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(trainingSession);
 
-// Rate limiting - General API (600 req/min to support 50+ phones behind shared NAT/CGNAT)
-const generalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 600, // 600 requests per minute per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Demasiadas solicitudes, intente de nuevo en un momento' },
-});
-app.use('/api/', generalLimiter);
-
-// Shared Wi-Fi logins retain separate failure quotas for network and identity.
-const authLimiters = createAuthenticationLimiters();
+// Shared counters across workers. Valid sessions have independent work quotas;
+// anonymous requests retain IP protection and login keeps its failure limits.
+const admissionStore = new PostgresAdmissionStore();
+app.use('/api/', createApiAdmission(admissionStore));
+const authLimiters = createAuthenticationLimiters(admissionStore);
 app.use('/api/auth/login', ...authLimiters.login);
 app.use('/api/auth/register', authLimiters.registration);
 

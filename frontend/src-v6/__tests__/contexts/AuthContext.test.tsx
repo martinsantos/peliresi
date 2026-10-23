@@ -386,6 +386,89 @@ describe('AuthContext', () => {
     expect(getAccessToken()).toBeNull();
   });
 
+  it.each([429, 503])('keeps a validated session and its open role after HTTP %s on focus, then recovers', async status => {
+    const token = tokenFor();
+    localStorage.setItem('sitrep_access_token', token);
+    localStorage.setItem('sitrep_refresh_token', 'unchanged-refresh');
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    const snapshot = localStorage.getItem(OFFLINE_SESSION_KEY);
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('authError')).not.toHaveTextContent('none'));
+    expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno');
+    expect(screen.getByTestId('rol')).toHaveTextContent('AUDITOR');
+    expect(screen.getByTestId('isLoading')).toHaveTextContent('false');
+    expect(clearTokens).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe(token);
+    expect(localStorage.getItem('sitrep_refresh_token')).toBe('unchanged-refresh');
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBe(snapshot);
+    vi.mocked(authService.getMe).mockResolvedValueOnce({ ...inspector, esInspector: false });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('inspector')).toHaveTextContent('false'));
+    expect(screen.getByTestId('authError')).toHaveTextContent('none');
+    expect(authService.getMe).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([429, 503])('keeps credentials for retry but grants no initial profile after HTTP %s', async status => {
+    // Even a previously cached profile is not authorization after an HTTP error.
+    await cacheVerifiedSession();
+    const token = getAccessToken();
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('isAnyAdmin')).toHaveTextContent('false');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('false');
+    expect(getAccessToken()).toBe(token);
+    expect(clearTokens).not.toHaveBeenCalled();
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+  });
+
+  it.each([429, 503])('does not carry a previous profile to a different token after HTTP %s', async status => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    const nextToken = tokenFor('another-person');
+    localStorage.setItem('sitrep_access_token', nextToken);
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    expect(getAccessToken()).toBe(nextToken);
+    expect(clearTokens).not.toHaveBeenCalled();
+    expect(screen.getByTestId('rol')).toHaveTextContent('none');
+  });
+
+  it.each([401, 403])('invalidates an open validated session on HTTP %s from profile', async status => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    vi.mocked(authService.getMe).mockRejectedValueOnce({ response: { status } });
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    expect(clearTokens).toHaveBeenCalled();
+    expect(getAccessToken()).toBeNull();
+    expect(localStorage.getItem(OFFLINE_SESSION_KEY)).toBeNull();
+  });
+
+  it('does not grant restricted draft access from a token when admission is temporarily unavailable', async () => {
+    const token = `header.${btoa(JSON.stringify({ id: 'candidate', restricted: true, registrationDraft: 'draft-only' }))}.signature`;
+    localStorage.setItem('sitrep_access_token', token);
+    vi.mocked(api.get).mockRejectedValueOnce({ response: { status: 503 } });
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('user')).toHaveTextContent('null');
+    expect(screen.getByTestId('restricted')).toHaveTextContent('false');
+    expect(screen.getByTestId('draft')).toHaveTextContent('none');
+    expect(getAccessToken()).toBe(token);
+    expect(clearTokens).not.toHaveBeenCalled();
+  });
+
   it('does not authenticate offline without a previously verified profile', async () => {
     localStorage.setItem('sitrep_access_token', tokenFor());
     vi.mocked(authService.getMe).mockRejectedValue(networkError);

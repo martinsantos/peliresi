@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {performance} from 'node:perf_hooks';
+import {spawn} from 'node:child_process';
 import {assertCloudDatabase,assertCloudEnvironment,backendRequire} from './safety.ts';
 
-// Diagnostic, bounded and synthetic. Never interpret this single-process preview
+// Diagnostic, bounded and synthetic. Never interpret this bounded preview
 // as a capacity certificate for production, physical phones or delivered mail.
 await assertCloudDatabase();
 const out=process.env.QA_ARTIFACTS!,schema='proposal_operations_20261021';
@@ -21,14 +22,39 @@ const base='http://127.0.0.1:3037/api',run=randomUUID(),prefix='QA-CONC-'+run.sl
 const roles=['generador','transportista','operador','admin','inspector','jefe-generadores','jefe-transporte','jefe-operadores','transportista2'];
 const requests:any[]=[],checks:any[]=[],records:string[]=[],observations:Record<string,unknown>={};
 const startedAt=new Date().toISOString();
-async function request(group:string,role:string,route:string,method='GET',body?:unknown,ip?:string){
+const secondary=process.env.QA_SECONDARY_API;
+if(secondary)assert.equal(secondary,'http://127.0.0.1:3038/api');
+if(process.env.QA_REQUIRE_SECONDARY_API==='true')assert.ok(secondary,'The cluster regression requires a second API in the same preview cgroup');
+const browserFixture:any={run,database:'sitrep_night_qa_20260926',previewOnly:true,externalDelivery:false,assigned:[],handoffs:[],longTrip:null};
+let extraSequence=200;
+async function syntheticTrip(){const row=await db.manifiesto.create({data:manifestData(extraSequence++,'EN_TRANSITO')});records.push(row.id);return row;}
+async function incidentProcesses(event:unknown,count=100){
+ // Both consumers inherit this exact isolated DB and share the container limits.
+ // The stdin barrier starts both processes only after they loaded the subscriber.
+ const childSource=`const {eventoManifiestoSubscriber:consume}=require(process.env.QA_CONSUMER_MODULE);const db=require(process.env.QA_PRISMA_MODULE).default;process.stdout.write('READY\\n');process.stdin.once('data',async()=>{try{await Promise.all(Array.from({length:Number(process.env.QA_ATTEMPTS)},()=>consume(JSON.parse(process.env.QA_EVENT))));process.stdout.write(JSON.stringify({pid:process.pid,completed:Number(process.env.QA_ATTEMPTS)})+'\\n')}catch(error){process.stderr.write(String(error));process.exitCode=1}finally{await db.$disconnect();process.stdin.destroy()}});`;
+ const children=Array.from({length:2},()=>{
+  const child=spawn(process.execPath,['-e',childSource],{env:{...process.env,QA_CONSUMER_MODULE:backendRequire.resolve('./dist/subscribers/eventoManifiesto.subscriber.js'),QA_PRISMA_MODULE:backendRequire.resolve('./dist/lib/prisma.js'),QA_ATTEMPTS:String(count/2),QA_EVENT:JSON.stringify(event)},stdio:['pipe','pipe','pipe']});
+  let output='',errors='';let readyResolve:()=>void,readyReject:(error:Error)=>void;
+  const ready=new Promise<void>((resolve,reject)=>{readyResolve=resolve;readyReject=reject});
+  child.stdout.on('data',data=>{output+=data.toString();if(output.includes('READY\n'))readyResolve()});
+  child.stderr.on('data',data=>{errors+=data.toString()});
+  const timer=setTimeout(()=>child.kill('SIGTERM'),45000);
+  const done=new Promise<any>((resolve,reject)=>{child.on('error',error=>{readyReject(error);reject(error)});child.on('exit',code=>{clearTimeout(timer);if(code!==0){const error=new Error('Incident consumer failed: '+errors+' '+output);readyReject(error);reject(error)}else resolve(JSON.parse(output.trim().split('\n').at(-1)!))})});
+  // Attach rejection immediately, while retaining the rejecting promise for the barrier.
+  void done.catch(()=>{});return {child,ready,done};
+ });
+ try{await Promise.all(children.map(c=>c.ready));children.forEach(c=>c.child.stdin.end('start'));const results=await Promise.all(children.map(c=>c.done));assert.equal(new Set(results.map(r=>r.pid)).size,2);assert.equal(results.reduce((sum,r)=>sum+r.completed,0),count);return results}
+ finally{for(const c of children)if(c.child.exitCode===null)c.child.kill('SIGTERM')}
+}
+
+async function request(group:string,role:string,route:string,method='GET',body?:unknown,ip?:string,server=base,accessToken?:string){
  const begin=performance.now();
  try{
-  const res=await fetch(base+route,{method,signal:AbortSignal.timeout(30000),headers:{
-   'X-Forwarded-For':ip||`127.51.1.${roles.indexOf(role)+1}`,Authorization:'Bearer '+(tokens.get(role)||''),'Content-Type':'application/json'},
+  const res=await fetch(server+route,{method,signal:AbortSignal.timeout(30000),headers:{
+   'X-Forwarded-For':ip||`127.51.1.${roles.indexOf(role)+1}`,Authorization:'Bearer '+(accessToken??tokens.get(role)??''),'Content-Type':'application/json'},
    ...(body===undefined?{}:{body:JSON.stringify(body)})});
   const raw=Buffer.from(await res.arrayBuffer()),text=raw.toString();let data:any;try{data=JSON.parse(text)}catch{data=res.headers.get('content-type')?.includes('application/pdf')?{pdf:raw.subarray(0,5).toString()==='%PDF-',bytes:raw.length}:{message:text.slice(0,200)}}
-  const row={group,role,method,status:res.status,ms:Math.round(performance.now()-begin),bytes:raw.length};
+  const row={group,role,method,status:res.status,retryAfter:res.headers.get('retry-after'),server,ms:Math.round(performance.now()-begin),bytes:raw.length};
   requests.push(row);return {...row,data};
  }catch(error){const row={group,role,method,status:0,ms:Math.round(performance.now()-begin),bytes:0,error:String(error)};requests.push(row);return {...row,data:null};}
 }
@@ -110,32 +136,98 @@ try{
    await checked('assigned-vehicle','operador',`/manifiestos/${m.id}/iniciar-coordinacion`,'POST',{});
    await checked('assigned-vehicle','transportista',`/manifiestos/${m.id}/confirmar-retiro`,'POST',{latitud:-32.88,longitud:-68.84});
    const assigned=await db.vehiculo.findUniqueOrThrow({where:{id:index%2?'night-qa-vehicle-1':'manifest-qa-second-vehicle'},select:{patente:true}});
-   expected.push({id:m.id,expected:assigned.patente});
+   const snapshot=await db.manifiesto.findUniqueOrThrow({where:{id:m.id},select:{asignacionTransporte:true}});
+   const driver=snapshot.asignacionTransporte.chofer;
+   expected.push({id:m.id,numero:m.numero,expected:assigned.patente,driver:driver.nombre+' '+driver.apellido});
   }
   const data=(await checked('assigned-vehicle','admin','/centro-control/monitor-live')).data;
-  const comparisons=expected.map(row=>({...row,shown:data.enTransito.find((r:any)=>r.manifiestoId===row.id)?.vehiculo?.patente}));
+  const comparisons=expected.map(row=>({...row,shown:data.enTransito.find((r:any)=>r.manifiestoId===row.id)?.vehiculo?.patente,shownDriver:data.enTransito.find((r:any)=>r.manifiestoId===row.id)?.chofer?.nombre}));
   observations.assignedVehicles=comparisons;
-  assert.ok(comparisons.every(row=>row.expected===row.shown),JSON.stringify(comparisons));
+  assert.ok(comparisons.every(row=>row.expected===row.shown&&row.driver===row.shownDriver),JSON.stringify(comparisons));
+  browserFixture.assigned=expected;
+  const legacy=data.enTransito.find((r:any)=>r.manifiestoId===records[0]);
+  assert.equal(legacy.vehiculo,null);assert.equal(legacy.chofer,null);
+  // Relays use separate new trips; the two original assignments stay available for UI.
+  for(const tipo of ['REGISTRADO','EXTERNO']){
+   const m=await syntheticTrip();await checked('handoff-origin','transportista',`/manifiestos/${m.id}/ubicacion`,'POST',{latitud:-32.88,longitud:-68.84});
+   let relaySelection:any;
+   if(tipo==='REGISTRADO'){
+    const vehicle=await db.vehiculo.create({data:{id:prefix+'-relay-vehicle',transportistaId:fixture.actors.transportista2,patente:'QAREL99',marca:'QA',modelo:'Relevo',anio:2026,capacidad:1000,numeroHabilitacion:'QA-'+run,vencimiento:new Date('2099-01-01')}});
+    const driver=await db.chofer.create({data:{id:prefix+'-relay-driver',transportistaId:fixture.actors.transportista2,nombre:'QA',apellido:'Chofer relevo',dni:'99999999',licencia:'QA-'+run,vencimiento:new Date('2099-01-01'),telefono:'000000000'}});
+    relaySelection={transportistaId:fixture.actors.transportista2,vehiculoId:vehicle.id,choferId:driver.id};
+   }
+   const legId=randomUUID();const datos=tipo==='EXTERNO'?{empresa:'QA Relevo eventual '+prefix,patente:'QAEXT99',chofer:'QA Chofer eventual'}:{};
+   const relay=await checked('handoff-create','transportista',`/manifiestos/${m.id}/tramos`,'POST',{id:legId,anteriorId:null,tipo,motivo:'QA rotura artificial: comprobar identidad de tramo',datos,...(tipo==='REGISTRADO'?relaySelection:{})},201);
+   const pending=(await checked('handoff-waiting','admin','/centro-control/monitor-live')).data.enTransito.find((r:any)=>r.manifiestoId===m.id);
+   assert.equal(pending.tramoActual.id,legId);assert.equal(pending.ultimaPosicion,null);assert.deepEqual(pending.ruta,[]);
+   assert.equal((await request('handoff-revoked-original','transportista',`/manifiestos/${m.id}/ubicacion`,'POST',{latitud:-32.89,longitud:-68.85})).status,409);
+   const point={latitud:-32.9-extraSequence*.00001,longitud:-68.85,velocidad:22};
+   const received=await request('handoff-gps','transportista',`/seguimiento-relevo/${legId}/ubicacion`,'POST',point,undefined,base,relay.data.acceso);assert.equal(received.status,200,JSON.stringify(received.data));
+   const current=(await checked('handoff-current','admin','/centro-control/monitor-live')).data.enTransito.find((r:any)=>r.manifiestoId===m.id);
+   const expectedVehicle=tipo==='EXTERNO'?'QAEXT99':'QAREL99',expectedDriver=tipo==='EXTERNO'?'QA Chofer eventual':'QA Chofer relevo';
+   assert.equal(current.vehiculo.patente,expectedVehicle);assert.equal(current.chofer.nombre,expectedDriver);assert.equal(current.ultimaPosicion.latitud,point.latitud);assert.equal(current.ruta.length,1);assert.equal(current.tramoActual.gpsRecibido,true);
+   browserFixture.handoffs.push({id:m.id,numero:m.numero,expected:expectedVehicle,driver:expectedDriver,tipo,point});
+  }
  });
- await check('concurrent duplicate GPS alerts create only one incident',async()=>{
-  // This uses the actual compiled subscriber and real isolated DB, without SMTP.
+ await check('100 duplicate GPS incidents across two processes persist once and keep independent classes, manifests and windows',async()=>{
   const {eventoManifiestoSubscriber}=backendRequire('./dist/subscribers/eventoManifiesto.subscriber.js');
-  const event={type:'TIEMPO_EXCESIVO',manifiestoId:records[100],horasTransito:25,numero:records[100],userId:fixture.users.transportista};
-  await Promise.all(Array.from({length:20},()=>eventoManifiestoSubscriber(event)));
-  const count=await db.eventoManifiesto.count({where:{manifiestoId:records[100],tipo:'INCIDENTE'}});observations.duplicateIncidentCount=count;assert.equal(count,1);
+  const m=await syntheticTrip(),other=await syntheticTrip(),inside=await syntheticTrip(),outside=await syntheticTrip(),failed=await syntheticTrip();
+  const event={type:'TIEMPO_EXCESIVO',manifiestoId:m.id,horasTransito:25,numero:m.numero,userId:fixture.users.transportista};
+  const consumers=await incidentProcesses(event,100);assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:m.id,tipo:'INCIDENTE'}}),1);
+  await Promise.all([eventoManifiestoSubscriber({...event,manifiestoId:other.id}),eventoManifiestoSubscriber({...event,type:'DESVIO_RUTA',distanciaKm:100}),eventoManifiestoSubscriber({...event,type:'ANOMALIA_GPS',tipoAnomalia:'QA_DISTINCT',descripcion:'QA anomalía independiente',severidad:'ALTA'})]);
+  assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:m.id,tipo:'INCIDENTE'}}),3);assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:other.id,tipo:'INCIDENTE'}}),1);
+  for(const [trip,minutes] of [[inside,29],[outside,31]] as const)await db.eventoManifiesto.create({data:{manifiestoId:trip.id,tipo:'INCIDENTE',usuarioId:fixture.users.transportista,descripcion:'Tiempo de tránsito excesivo: QA anterior',createdAt:new Date(Date.now()-minutes*60000)}});
+  await incidentProcesses({...event,manifiestoId:inside.id},20);await incidentProcesses({...event,manifiestoId:outside.id},20);
+  assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:inside.id,tipo:'INCIDENTE'}}),1);assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:outside.id,tipo:'INCIDENTE'}}),2);
+  await assert.rejects(()=>eventoManifiestoSubscriber({...event,manifiestoId:failed.id,userId:prefix+'-missing-user'}));
+  assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:failed.id,tipo:'INCIDENTE'}}),0);
+  await incidentProcesses({...event,manifiestoId:failed.id},20);assert.equal(await db.eventoManifiesto.count({where:{manifiestoId:failed.id,tipo:'INCIDENTE'}}),1);
+  observations.incidentAtomicity={consumers,duplicateCount:1,distinctClasses:3,distinctManifest:1,inside29Minutes:1,outside31Minutes:2,retryAfterRollback:1};
  });
- await check('long trip endpoint includes its latest point after 501 observations',async()=>{
-  await db.trackingGPS.createMany({data:Array.from({length:501},(_,i)=>({manifiestoId:records[100],latitud:-32.88+i*.000001,longitud:-68.84,timestamp:new Date(Date.now()-1000000+i*1000)}))});
-  const all=(await checked('long-trip','transportista',`/manifiestos/${records[100]}/viaje-actual`)).data;
-  const latest=await db.trackingGPS.findFirst({where:{manifiestoId:records[100]},orderBy:{timestamp:'desc'}});
-  observations.longTrip={stored:501,returned:all.length,containsLatest:all.some((r:any)=>r.id===latest.id)};
-  assert.ok(observations.longTrip.containsLatest,'The currently displayed route loses its newest sample after the hard limit');
+ await check('GPS windows preserve the newest 500 points in stable chronological order at every boundary',async()=>{
+  const results=[];
+  for(const count of [0,1,499,500,501,1201]){
+   const m=await syntheticTrip(),epoch=Date.now()-count*1000;
+   const points=Array.from({length:count},(_,i)=>({id:prefix+'-gps-'+count+'-'+String(i).padStart(5,'0'),manifiestoId:m.id,latitud:-32.88+i*.000001,longitud:-68.84,isDemoData:true,
+    // Last 20 share a timestamp: timestamp alone cannot define the window edge.
+    timestamp:new Date(epoch+(count===501?0:Math.min(i,Math.max(0,count-20)))*1000)}));
+   if(points.length)await db.trackingGPS.createMany({data:points});
+   const response=await checked('gps-window-'+count,'transportista',`/manifiestos/${m.id}/viaje-actual`),all=response.data;
+   const expected=points.slice(-500);assert.deepEqual(all.map((p:any)=>p.id),expected.map(p=>p.id));assert.equal(await db.trackingGPS.count({where:{manifiestoId:m.id}}),count);
+   assert.equal(response.ventana.limite,500);assert.equal(response.ventana.hayAnteriores,count>500);assert.equal(response.ventana.orden,'timestamp_asc_id_asc');
+   const repeated=(await checked('gps-window-repeat-'+count,'transportista',`/manifiestos/${m.id}/viaje-actual`)).data;assert.deepEqual(repeated.map((p:any)=>p.id),all.map((p:any)=>p.id));
+   results.push({stored:count,returned:all.length,latest:all.at(-1)?.id??null,hasEarlier:response.ventana.hayAnteriores});
+   if(count===1201)browserFixture.longTrip={id:m.id,numero:m.numero,latest:await db.trackingGPS.findUniqueOrThrow({where:{id:points.at(-1)!.id}}),expectedIds:expected.map(p=>p.id)};
+  }
+  observations.gpsWindows=results;
  });
  // NAT admission is a separate experiment: never bypass or raise the limiter.
  const nat='127.52.99.201',natRows:any[]=[];const natStart=performance.now();
- for(let n=0;n<7;n++)natRows.push(...await Promise.all(Array.from({length:100},(_,i)=>request('shared-nat',roles[i%8],'/notificaciones?limit=5','GET',undefined,nat))));
+ for(let n=0;n<7;n++)natRows.push(...await Promise.all(Array.from({length:100},(_,i)=>request('shared-nat',roles[i%8],'/notificaciones?limit=5','GET',undefined,nat,secondary&&i%2?secondary:base))));
  observations.sharedNat={wallMs:Math.round(performance.now()-natStart),requests:700,statuses:natRows.reduce((a,r)=>({...a,[r.status]:(a[r.status]||0)+1}),{})};
  await check('700 valid actions from eight roles on one shared IP avoid throttling',async()=>{assert.ok(natRows.every(r=>r.status===200),JSON.stringify(observations.sharedNat))});
+ await check('one abusive identity is throttled across workers without blocking another identity or GPS',async()=>{
+  assert.ok(secondary,'A second loopback API is required to validate shared counters');
+  const abusive:any[]=[];
+  for(let n=0;n<7;n++)abusive.push(...await Promise.all(Array.from({length:100},(_,i)=>request('identity-abuse','transportista','/notificaciones?limit=1','GET',undefined,nat,i%2?secondary:base))));
+  const blocked=abusive.filter(r=>r.status===429);assert.ok(blocked.length>0,'The 600/minute limit must still reject abuse across workers');assert.ok(abusive.every(r=>[200,429].includes(r.status)));
+  assert.ok(blocked.every(r=>r.data.code==='RATE_LIMITED'&&Number(r.retryAfter)>0&&r.data.retryAfterSeconds>0));
+  const other=await Promise.all(Array.from({length:20},(_,i)=>request('identity-isolation','operador','/notificaciones?limit=1','GET',undefined,nat,i%2?secondary:base)));assert.ok(other.every(r=>r.status===200));
+  const sample=await request('gps-budget-isolation','transportista',`/manifiestos/${records[0]}/ubicacion`,'POST',{latitud:-32.88,longitud:-68.84},nat,secondary);assert.equal(sample.status,200);
+  observations.identityQuota={workers:[base,secondary],attempts:700,accepted:abusive.filter(r=>r.status===200).length,blocked:blocked.length,otherIdentityAccepted:20,gpsAccepted:true};
+ });
+ await check('shared admission refunds successful requests and preserves a newer window on delayed release',async()=>{
+  const {PostgresAdmissionStore}=backendRequire('./dist/services/apiAdmission.service.js'),store=new PostgresAdmissionStore();
+  const namespace='qa:'+run;
+  const success=await store.consume(namespace,'success',60000);assert.equal(success.hits,1);
+  await store.release(success);assert.equal((await db.rateLimitCounter.findUniqueOrThrow({where:{key:success.key}})).hits,0);
+  const expired=await store.consume(namespace,'late-refund',10);
+  await new Promise(resolve=>setTimeout(resolve,25));
+  const fresh=await store.consume(namespace,'late-refund',60000);assert.equal(fresh.hits,1);assert.ok(fresh.resetAt>expired.resetAt);
+  await store.release(expired);assert.equal((await db.rateLimitCounter.findUniqueOrThrow({where:{key:fresh.key}})).hits,1);
+  await store.release(fresh);assert.equal((await db.rateLimitCounter.findUniqueOrThrow({where:{key:fresh.key}})).hits,0);
+  observations.admissionRefund={successfulRequestRefunded:true,expiredReleasePreservesNewGeneration:true};
+ });
  await check('original historical manifest, CAP closure and disabled delivery are preserved',async()=>{
   assert.equal(JSON.stringify(await db.manifiesto.findUniqueOrThrow({where:{id:'manifest-qa-legacy'},include:{residuos:true,eventos:true}})),readFileSync(out+'/manifest-legacy-before.json','utf8'));
   assert.equal(await db.emailQueue.count({where:{estado:{not:'SUPRIMIDO'}}}),0);assert.equal(await db.emailQueue.count({where:{intentos:{gt:0}}}),0);assert.equal(await db.emailQueue.count({where:{sentAt:{not:null}}}),0);
@@ -145,8 +237,9 @@ try{
 }catch(e){checks.push({name:'setup or unexpected error',status:'FAIL',error:String(e)});console.log(String(e));}
 finally{
  const metrics=[...new Set(requests.map(r=>r.group))].map(group=>{const rows=requests.filter(r=>r.group===group),times=rows.map(r=>r.ms).sort((a,b)=>a-b);return{group,requests:rows.length,statuses:rows.reduce((a,r)=>({...a,[r.status]:(a[r.status]||0)+1}),{}),p50Ms:times[Math.ceil(times.length*.5)-1],p95Ms:times[Math.ceil(times.length*.95)-1],maxMs:times.at(-1),maxBytes:Math.max(...rows.map(r=>r.bytes))}});
- const report={run,startedAt,completedAt:new Date().toISOString(),previewOnly:true,capClosed:true,externalDelivery:false,limits:{cpu:1,memoryGiB:2,workers:1},records,checks,observations,metrics,
- limitations:['One backend process; no PM2 cluster or actual proxy tested','Synthetic GPS observations, not physical sensors or radio/background operation','Repeated sessions across eight roles, not hundreds of distinct humans','Fixture setup inserts artificial trips; measured actions use real APIs except the explicitly named subscriber race','No production or main; no external mail/push']};
+ const report={run,startedAt,completedAt:new Date().toISOString(),previewOnly:true,capClosed:true,externalDelivery:false,limits:{cpu:1,memoryGiB:2,testWorkers:1,apiWorkers:secondary?2:1},records,checks,observations,metrics,
+ limitations:['Two loopback API processes when configured; no actual production proxy or PM2 cluster tested','Synthetic GPS observations, not physical sensors or radio/background operation','Repeated sessions across eight roles, not hundreds of distinct humans','Fixture setup inserts artificial trips; measured actions use real APIs except the explicitly named subscriber race','No production or main; no external mail/push']};
+ writeFileSync(out+'/concurrency-browser-fixture.json',JSON.stringify(browserFixture,null,2));
  writeFileSync(out+'/concurrency-review-'+run+'.json',JSON.stringify(report,null,2));console.log(JSON.stringify({run,checks,observations,metrics},null,2));
  await db.$disconnect();const compiled=backendRequire('./dist/lib/prisma.js').default;await compiled.$disconnect();
  // Findings are results of this diagnostic, not swallowed test failures.

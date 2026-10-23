@@ -165,6 +165,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isRestricted, setIsRestricted] = useState(false);
   const [solicitudId, setSolicitudId] = useState<string | null>(null);
   const authGeneration = useRef(0);
+  // Only a successful server validation (or its bounded offline snapshot) can
+  // bind the visible profile/draft to a token. A decoded JWT is never a profile.
+  const validatedToken = useRef<string | null>(null);
   const sessionChanging = useRef(false);
   const [offlineExpiresAt, setOfflineExpiresAt] = useState<number | null>(null);
 
@@ -184,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isCurrent = () => !disposed && generation === authGeneration.current && getAccessToken() === token;
       try {
         if (!token) {
+          validatedToken.current = null;
           clearOfflineSession();
           setCurrentUser(null);
           return;
@@ -192,6 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const response = await api.get(`/solicitudes/${encodeURIComponent(draftHint)}`);
           if (!isCurrent()) return;
           if (response.data?.data?.solicitud?.id !== draftHint) throw new Error('Solicitud incompatible');
+          validatedToken.current = token;
           clearOfflineSession();
           setCurrentUser(null); setOfflineExpiresAt(null);
           setIsRestricted(true); setSolicitudId(draftHint); setAuthError(null);
@@ -205,10 +210,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!restricted) setSolicitudId(null);
         if (apiUser.activo && !restricted) saveOfflineSession(mapped, token);
         else clearOfflineSession();
+        validatedToken.current = token;
         setOfflineExpiresAt(null);
         setCurrentUser(mapped);
+        setAuthError(null);
       } catch (error) {
         if (!isCurrent()) return;
+        const status = (error as { response?: { status?: number } } | null)?.response?.status;
+        if (status === 429 || status === 503) {
+          // Admission/availability is not a credential rejection. Keep an open
+          // form and the already-confirmed session, but never restore privileges
+          // from JWT hints or a cached profile after an HTTP failure.
+          if (validatedToken.current !== token) {
+            validatedToken.current = null;
+            setCurrentUser(null); setOfflineExpiresAt(null);
+            setIsRestricted(false); setSolicitudId(null);
+            qc.clear();
+          }
+          setAuthError(status === 429
+            ? 'La verificación de sesión está temporalmente limitada. Esperá unos segundos y volvé a intentar.'
+            : 'No pudimos verificar la sesión en este momento. Esperá unos segundos y volvé a intentar.');
+          return;
+        }
         if (draftHint && isOfflineNetworkError(error)) {
           // Preserve credentials for retry, granting no profile from a hint.
           clearOfflineSession(); setCurrentUser(null); setOfflineExpiresAt(null);
@@ -217,9 +240,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         const cached = token && isOfflineNetworkError(error) ? readOfflineSession(token) : null;
         if (cached) {
+          validatedToken.current = token;
           setCurrentUser(cached.user);
           setOfflineExpiresAt(cached.expiresAt);
         } else {
+          validatedToken.current = null;
           clearTokens();
           clearOfflineSession();
           localStorage.removeItem('sitrep_impersonation');
@@ -243,6 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Another tab may have logged out or selected a different account.
       ++authGeneration.current;
       pendingToken = null;
+      validatedToken.current = null;
       clearOfflineSession();
       setCurrentUser(null);
       setOfflineExpiresAt(null);
@@ -259,6 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }).catch(() => {
       if (disposed) return;
       sessionReady = true;
+      validatedToken.current = null;
       clearOfflineSession();
       setCurrentUser(null);
       setAuthError('No pudimos recuperar la sesión de forma segura. Ingresá nuevamente.');
@@ -282,6 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (offlineExpiresAt === null) return;
     const timer = window.setTimeout(() => {
       ++authGeneration.current;
+      validatedToken.current = null;
       clearTokens();
       clearOfflineSession();
       localStorage.removeItem('sitrep_impersonation');
@@ -298,6 +326,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
+    validatedToken.current = null;
     clearOfflineSession();
     setOfflineExpiresAt(null);
     setCurrentUser(null);
@@ -318,6 +347,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSolicitudId(response.solicitudId || null);
       }
       const user = apiUserToUser(response.user);
+      validatedToken.current = response.accessToken;
       if (!response.restricted && response.user.activo) saveOfflineSession(user, response.accessToken);
       setCurrentUser(user);
       const isFirstSession = !localStorage.getItem(`sitrep_onboarding_${user.id}`);
@@ -327,6 +357,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setShowOnboarding(!response.restricted && response.user.activo && (isFirstSession || isPostReset));
       return user;
     } catch (err: any) {
+      validatedToken.current = null;
       clearTokens();
       clearOfflineSession();
       const message = err.response?.data?.message || 'Credenciales incorrectas o API no disponible.';
@@ -343,6 +374,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
+    validatedToken.current = null;
     const confirmation = authService.logout().catch(() => {});
     clearTokens();
     const localConfirmation = confirmSessionCheckpoint();
@@ -379,6 +411,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Switch user — real API login with known credentials
   const switchUser = useCallback(async (userId: number) => {
     ++authGeneration.current;
+    validatedToken.current = null;
     setIsLoading(true);
     setAuthError(null);
     if (currentUser) void clearUserOfflineData(currentUser.id);

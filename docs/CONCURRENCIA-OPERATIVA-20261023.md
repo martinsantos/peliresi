@@ -1,5 +1,7 @@
 # Concurrencia operativa — revisión del 23/10/2026
 
+> **Diagnóstico histórico.** Los cuatro fallos reproducidos de este informe fueron corregidos y verificados posteriormente en preview. Consultar [Correcciones de concurrencia](CORRECCIONES-CONCURRENCIA-20261023.md) para resultados actuales y pendientes. Se conservan aquí los fallos originales y las mediciones; no constituyen el estado actual del código.
+
 **No corresponde declarar el circuito cerrado para cientos de acciones simultáneas.** Las ráfagas de 50, 100 y 200 solicitudes mixtas terminaron correctamente, pero la revisión dirigida reprodujo **cuatro problemas de exactitud o admisión**: vehículo incorrecto en Monitor, incidentes duplicados, pérdida del punto más reciente al consultar un viaje largo y bloqueo de usuarios válidos que comparten IP. Hay además tres riesgos por código que todavía requieren un ensayo específico.
 
 Esta tanda **diagnostica; no corrige esos cuatro problemas**. Los cambios de identidad, PDF y ayuda realizados en paralelo se documentan en [Producto, identidad y ayuda](PRODUCTO-IDENTIDAD-AYUDA-20261023.md). No se modificaron reglas regulatorias, permisos ni históricos para esta auditoría. No se accedió a producción ni se modificó main; **CAP cerrado, correos/push apagados, cero envíos externos**.

@@ -1,8 +1,18 @@
 # SITREP — traspaso vigente de operación
 
+## Correcciones de concurrencia — verificadas sólo en preview, 23/10/2026
+
+**Cuatro defectos corregidos:** vehículo/chofer de Monitor por asignación y tramo, últimos 500 puntos GPS sin perder el más reciente, incidencia única ante eventos simultáneos y cuotas compartidas por persona que no bloquean a todos los usuarios de una IP. Web/app conservan sesión y formularios ante esperas temporales. Leer [cambios, pruebas y pendientes](CORRECCIONES-CONCURRENCIA-20261023.md).
+
+**1.653 backend / 132 frontend dirigidas / 15 grupos concurrentes / 12 E2E únicos PASS**; builds/tipos/migración artificial PASS. Manual **2026.23.3**. Primeros fallos del guion GPS y del mensaje de login conservados; correcciones y repeticiones documentadas. Lint: 0 errores/68 advertencias. 64 tablas QA protegidas intactas; cero envíos.
+
+Preview activo en **http://127.0.0.1:4177**, serial/un worker/1 CPU/2 GiB/sin swap adicional; dos API dentro del mismo límite para probar coordinación. Sin producción, main, push ni workflows. CAP cerrado, correos/push apagados. **No acredita capacidad sostenida ni Android físico.**
+
+**Pendiente operativo:** limpieza de claves abandonadas de admisión bloqueada por el control automático; no se eludió ni se borraron registros. Expiración/reutilización sí funcionan, pero no se declara acotado el tamaño total. Migración nueva `20261023133000_shared_api_admission` y previa `20261023120000_user_link_preference` pendientes de una publicación futura autorizada. Publicación documentada sigue `a7f20d2f`; los cierres inferiores son antecedentes.
+
 ## Revisión de identidad y concurrencia — preview activo, 23/10/2026
 
-**Estado actual: cambios de identidad probados en preview, sin publicar. La concurrencia tiene cuatro fallos reproducidos pendientes de corrección.** Leer [identidad y experiencia](PRODUCTO-IDENTIDAD-AYUDA-20261023.md) y [auditoría operativa](CONCURRENCIA-OPERATIVA-20261023.md).
+**Antecedente: diagnóstico inicial; los cuatro fallos fueron corregidos en la tanda de concurrencia de arriba. Los cambios de identidad siguen sólo en preview.** Leer [identidad y experiencia](PRODUCTO-IDENTIDAD-AYUDA-20261023.md) y [auditoría operativa](CONCURRENCIA-OPERATIVA-20261023.md).
 
 SITREP y flecha verdes sobre blanco; cabecera PDF con Mendoza/DGFA a la izquierda y SITREP a la derecha, proporcional al correo. Incluye acceso público, recuperación, relevo externo, manual, favicon, icono maskable y página offline. Bienvenida por rol, preferencia web/app y ayuda disponibles en el preview.
 

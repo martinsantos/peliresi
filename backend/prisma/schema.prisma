@@ -1665,3 +1665,13 @@ model FuentePadronEmpresa {
   @@unique([sha256, hoja, fila])
   @@map("empresas_fuentes_padron")
 }
+
+// Short-lived shared admission counters; no account identifiers are stored.
+model RateLimitCounter {
+  key     String   @id
+  hits    Int
+  resetAt DateTime @db.Timestamptz(3)
+
+  @@index([resetAt])
+  @@map("rate_limit_counters")
+}

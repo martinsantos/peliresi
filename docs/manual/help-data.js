@@ -663,13 +663,59 @@
       ], image:S+'mobile/transport-handoff-gps-20261019.png',alt:'Acceso limitado del reemplazo con una posición recibida por SITREP',caption:'Datos sintéticos · preview aislado · GPS emulado · 19/10/2026.',expected: 'SITREP recibe posiciones asociadas al tramo del reemplazo; el teléfono anterior deja de enviarlas para ese manifiesto.' },
       { title: 'Las otras partes y C3 comprueban el relevo', body: [
         'Generador y operador abren el aviso Cambio de transporte en tránsito y revisan Tramos de transporte en el mismo manifiesto.',
-        'El administrador busca ese número en Centro de Control → Viajes Activos. Aparece el transporte del nuevo tramo y el historial anterior. Antes de recibir una nueva ubicación muestra Esperando GPS del reemplazo.',
+        'El administrador busca ese número en Centro de Control → Viajes Activos o en Monitor. Comprueba el transporte, la patente y el chofer del tramo vigente; no los de otro viaje de la misma empresa. Si un dato no fue declarado, queda sin informar.',
+        'Antes del primer envío del reemplazo se indica que falta su GPS. No se presenta la última ubicación del transporte anterior como si fuera del nuevo; ese tramo queda en el historial.',
         'Comprobá GPS recibido y el punto del reemplazo. Un externo aparece como eventual declarado. El historial conserva cada tramo; no se dibuja una continuidad GPS entre teléfonos distintos.'
       ], image:S+'mobile/transport-handoff-c3-20261019.png',alt:'Centro de Control muestra el reemplazo actual y conserva el tramo anterior',caption:'Datos sintéticos · preview aislado · mapa y GPS emulados · 19/10/2026.',expected: 'Todos reconocen el mismo manifiesto, el transporte vigente y la ubicación efectivamente recibida.' },
       { title: 'La transportista original confirma la entrega', body: [
         'Cuando se entregue la carga, la transportista de origen abre el mismo manifiesto y toca Confirmar Entrega. El operador continúa con recepción, pesaje y tratamiento.',
         'El tramo se cierra y el enlace GPS deja de funcionar. Si hay otra rotura antes de entregar, la transportista original registra otro traspaso y comparte el nuevo enlace.'
       ], expected: 'La entrega cierra el transporte; el expediente y sus tramos quedan conservados.' }
+    ]
+  });
+
+  window.SITREP_HELP.guides.push({
+    id: 'monitor-viaje-vigente', profile: 'administrador', audiences: ['transportista', 'generador', 'operador'],
+    title: 'Comprobar el viaje y su última ubicación', summary: 'Identificá la carga, el móvil vigente y la ubicación recibida, también después de un relevo.',
+    duration: '3 min', icon: 'route', keywords: ['monitor', 'C3', 'centro de control', 'patente', 'chofer', 'GPS', '500 puntos', 'relevo'],
+    safety: 'Consultá el mismo número de manifiesto en cada pantalla. Una ubicación sólo confirma el punto recibido; no acredita por sí sola una entrega ni una habilitación.',
+    steps: [
+      { title: 'Abrir el viaje correcto', body: [
+        'Administración abre Monitor o Centro de Control → Viajes Activos y busca el número del manifiesto. Las partes consultan el viaje desde su propio manifiesto.',
+        'Revisá patente y chofer: corresponden a la asignación de ese viaje o al tramo de relevo vigente. Dos viajes de la misma empresa pueden tener móviles distintos. Si falta la asignación, SITREP no la completa con otro móvil de la empresa.'
+      ], expected: 'La carga y su transporte quedan identificados sin confundirlos con otro viaje.', resources: [{ label: 'Monitor', path: '/monitor' }, { label: 'Centro de Control', path: '/centro-control' }] },
+      { title: 'Esperar la primera ubicación del reemplazo', body: [
+        'Después de un relevo, comprobá los datos declarados del nuevo transporte y esperá su primer envío GPS. Hasta entonces, el viaje indica que está esperando ubicación.',
+        'La posición del tramo anterior no se usa como ubicación actual del reemplazo. Los tramos previos siguen registrados; no se unen como si fueran un único recorrido del mismo teléfono.'
+      ], expected: 'Cuando llega el primer envío, el punto visible corresponde al tramo vigente.' },
+      { title: 'Leer un recorrido largo', body: [
+        'El recorrido del viaje actual muestra hasta los últimos 500 puntos, en orden del más antiguo al más reciente dentro de esa ventana. Así incluye la última ubicación recibida aunque el viaje sea largo.',
+        'Los puntos anteriores permanecen guardados. Que no aparezcan todos en esta vista no significa que se hayan borrado ni que el viaje haya empezado en el primer punto visible.'
+      ], expected: 'El mapa reciente y el historial se interpretan sin confundir una ventana de consulta con todo el viaje.' },
+      { title: 'Comprobar la recepción del GPS', body: [
+        'Transporte mantiene la pantalla de seguimiento abierta y comprueba el envío recibido por SITREP. Administración revisa ese mismo número y la hora de la ubicación en Monitor o Centro de Control.',
+        'Si todavía no llegó un punto del tramo vigente, revisen permiso de ubicación y conexión antes de continuar. GPS activo en el teléfono no demuestra por sí solo que la oficina haya recibido el envío.'
+      ], expected: 'Las dos partes pueden distinguir la posición del teléfono del punto efectivamente recibido.', resources: [{ label: 'Resolver problemas de GPS', href: '/manual/tutorial.html?guide=resolver-gps' }] }
+    ]
+  });
+
+  window.SITREP_HELP.guides.push({
+    id: 'resolver-espera-reintento', profile: 'generador', audiences: ['transportista', 'operador', 'administrador', 'inspector', 'auditor'],
+    title: 'Continuar cuando aparece Esperá un momento', summary: 'Conservá lo cargado y reintentá la misma acción cuando termine la espera indicada.',
+    duration: '2 min', icon: 'hourglass_empty', keywords: ['espera', 'reintentar', '429', 'formulario', 'demasiados intentos', 'guardar'],
+    steps: [
+      { title: 'Mantener la tarea abierta', body: [
+        'Si aparece Esperá un momento, leé el plazo indicado. Conservá el formulario y los datos en pantalla; no hace falta recargar la página ni cerrar sesión.',
+        'No pulses varias veces Guardar, Aprobar o Enviar. El aviso de espera no confirma que esa acción se haya guardado.'
+      ], expected: 'Sabés cuánto esperar y evitás abandonar el trabajo cargado.' },
+      { title: 'Reintentar expresamente', body: [
+        'Cuando termine el plazo, volvé a pulsar la acción que estabas realizando. Si el aviso dice en un momento, esperá unos segundos antes de reintentar.',
+        'Las acciones rechazadas por esta espera no se reenvían automáticamente. Si hubo un envío anterior sin confirmación, revisá el estado o el historial del mismo registro antes de repetirlo.'
+      ], expected: 'La confirmación de SITREP, y no el fin de la espera, indica que se completó la acción.' },
+      { title: 'Si la espera se repite', body: [
+        'Conservá el formulario abierto y pedí ayuda desde la pantalla. Indicá la acción, el número del registro y el mensaje que aparece, sin compartir contraseñas.',
+        'No crees otro manifiesto, adenda o trámite para esquivar el aviso. Retomá el mismo registro cuando puedas continuar.'
+      ], expected: 'La consulta mantiene el contexto y no genera un caso duplicado.' }
     ]
   });
 

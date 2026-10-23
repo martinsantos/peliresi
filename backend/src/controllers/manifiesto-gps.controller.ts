@@ -189,13 +189,24 @@ export const getViajeActual = async (req: AuthRequest, res: Response, next: Next
       throw new AppError('Manifiesto no encontrado', 404);
     }
 
-    const tracking = await prisma.trackingGPS.findMany({
+    // Keep a bounded RECENT window, then deliver it chronologically for maps.
+    // The ID tie-breaker makes equal sensor timestamps deterministic. One extra
+    // row reports clipping without loading/counting the entire trip history.
+    const rows = await prisma.trackingGPS.findMany({
       where: { manifiestoId: id },
-      orderBy: { timestamp: 'asc' },
-      take: 500,
+      orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
+      take: 501,
     });
+    const tracking = rows.slice(0, 500).reverse();
 
-    res.json({ success: true, data: tracking });
+    // Preserve data[] for existing web/app clients. This is a recent window,
+    // not the complete historical route; stored points and leg IDs are intact.
+    res.json({ success: true, data: tracking, ventana: {
+      tipo: 'ULTIMOS_PUNTOS', limite: 500, orden: 'timestamp_asc_id_asc',
+      hayAnteriores: rows.length > 500,
+      desde: tracking[0]?.timestamp ?? null,
+      hasta: tracking[tracking.length - 1]?.timestamp ?? null,
+    } });
   } catch (error) {
     next(error);
   }

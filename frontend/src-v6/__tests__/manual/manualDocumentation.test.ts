@@ -82,7 +82,7 @@ describe('manual documentation stays usable and truthful', () => {
       const html = readFileSync(manual + file, 'utf8');
       // Guide content uses its own current cache key; the corrected renderer has its own key; CSS has its own identity revision.
       // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.23.2');
+      expect(html).toContain('help-data.js?v=2026.23.3');
       expect(html).toContain('manual.js?v=2026.20.6');
       expect(html).toContain('manual.css?v=2026.23.2');
     }
@@ -108,4 +108,24 @@ it('explains eventual search, live updates and explicit conflict recovery', () =
  expect(guide?.safety).toContain('La referencia BI- es interna');
  expect(content).toContain('Correo y push permanecen apagados');
  expect(content).not.toContain('en este ensayo');
+});
+
+
+it('explains current transport identity, first GPS after handoff and the recent route window', () => {
+  const guide = data.guides.find(item => item.id === 'monitor-viaje-vigente');
+  expect(guide).toBeDefined();
+  const text = guide!.steps.flatMap(step => [...step.body, step.expected]).join(' ');
+  for (const phrase of ['tramo de relevo vigente', 'no la completa con otro móvil', 'no se usa como ubicación actual', 'últimos 500 puntos', 'puntos anteriores permanecen guardados']) {
+    expect(text).toContain(phrase);
+  }
+  const handoff = data.guides.find(item => item.id === 'transporte-relevo')!;
+  expect(handoff.steps.flatMap(step => step.body).join(' ')).toContain('no los de otro viaje de la misma empresa');
+});
+
+it('describes explicit retry after waiting without reloading or claiming the action was saved', () => {
+  const guide = data.guides.find(item => item.id === 'resolver-espera-reintento');
+  expect(guide).toBeDefined();
+  const text = guide!.steps.flatMap(step => [...step.body, step.expected]).join(' ');
+  for (const phrase of ['datos en pantalla', 'no hace falta recargar', 'no confirma', 'no se reenvían automáticamente', 'mismo registro']) expect(text).toContain(phrase);
+  expect(text).not.toMatch(/CPU|Redis|rate.?limit|solicitudes por minuto/i);
 });
