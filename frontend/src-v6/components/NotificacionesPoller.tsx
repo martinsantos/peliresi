@@ -40,9 +40,8 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
     if (!initialized.current) {
       data.items.forEach((n) => seen.current.add(n.id));
       initialized.current = true;
-      if (data.noLeidas > 0) toastIds.current.push(toast.add({ type: 'info',
-        title: `${data.noLeidas} ${data.noLeidas === 1 ? 'aviso' : 'avisos'} sin leer`, duration: 8000, compact: true,
-        actionLabel: 'Ver avisos', onAction: () => navigate(mp('/notificaciones')) }));
+      // Existing unread notices already have a persistent count in the bell.
+      // Reserve the live banner for events received during this session.
       return;
     }
 

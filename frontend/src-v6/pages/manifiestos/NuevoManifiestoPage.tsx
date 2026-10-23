@@ -7,7 +7,7 @@ import { manifestProposalsVisible } from '../../utils/manifestFeatures';
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
-import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
@@ -96,7 +95,9 @@ export const NuevoManifiestoPage: React.FC = () => {
 
 const NuevoManifiestoForm: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const mp = useMobilePrefix();
+  const hasMobileHeader = import.meta.env.BASE_URL === '/app/' || location.pathname.startsWith('/mobile');
   const { currentUser, isAdmin, isGenerador } = useAuth();
   const proposalsAvailable = manifestProposalsVisible(currentUser) && ['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'].includes(currentUser?.rol || '');
   const carrierProposal = proposalsAvailable && currentUser?.rol === 'TRANSPORTISTA';
@@ -369,8 +370,6 @@ const NuevoManifiestoForm: React.FC = () => {
     }
   };
 
-  // Removed isMobile — React Router handles /app/ basename
-
   // Preserve existing role and feature checks for the signed-in actor.
   const canCreate = isAdmin || isGenerador || (operatorProposal && !!ownOperatorId) || (carrierProposal && !!ownCarrierId);
 
@@ -398,7 +397,7 @@ const NuevoManifiestoForm: React.FC = () => {
               <p className="text-sm text-neutral-500 mb-6">
                 La creación depende del rol activo, su actor vinculado y las funciones habilitadas. Si tenés más de una actividad, seleccioná la que corresponde antes de continuar.
               </p>
-              <Button fullWidth onClick={() => navigate('/manifiestos')}>
+              <Button fullWidth onClick={() => navigate(mp('/manifiestos'))}>
                 Volver a Manifiestos
               </Button>
             </CardContent>
@@ -419,24 +418,22 @@ const NuevoManifiestoForm: React.FC = () => {
               size="sm"
               className="shrink-0"
               aria-label="Volver a Manifiestos"
-              onClick={() => navigate('/manifiestos')}
+              leftIcon={<ArrowLeft size={20} aria-hidden="true" />}
+              onClick={() => navigate(mp('/manifiestos'))}
             >
-              <ArrowLeft size={20} />
+              {hasMobileHeader && 'Manifiestos'}
             </Button>
-            <div className="min-w-0">
+            {!hasMobileHeader && <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Nuevo Manifiesto</h1>
-            </div>
+            </div>}
           </div>
-          <Badge variant="soft" color="neutral" className="shrink-0">
-            Sin guardar
-          </Badge>
         </div>
       </header>
 
-      {partyProposal && <p className="mb-3 rounded-lg bg-primary-50 p-3 text-sm">{formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas antes de comenzar el tratamiento en origen.':'Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro.'} Tu empresa queda vinculada a tu rol.</p>}
-      <ol aria-label="Etapas del formulario" className="flex gap-4 py-3 text-sm text-neutral-600">
-        {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={step === index + 1 ? 'font-semibold text-primary-800' : ''}>{index + 1}. {label}</li>)}
+      <ol aria-label="Etapas del formulario" className="mb-3 grid grid-cols-3 gap-2 text-sm text-neutral-600">
+        {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={`border-b-2 py-3 text-center ${step === index + 1 ? 'border-primary-700 font-semibold text-primary-800' : 'border-neutral-200'}`}>{index + 1}. {label}</li>)}
       </ol>
+      {partyProposal && <details className="group mb-3 text-sm text-neutral-700"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">Cómo se aprueba<ChevronDown size={16} aria-hidden="true" className="group-open:rotate-180"/></summary><p className="px-2 pb-3">{formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas antes de comenzar el tratamiento en origen.':'Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro.'}{!isAdmin && ' Tu empresa queda vinculada a tu rol.'}</p></details>}
       {hasPartyIssue && <div data-party-error tabIndex={-1} role="alert" className="mb-4 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-900">
         <p className="font-semibold">Revisá las partes antes de crear</p>
         <p className="mt-1">{submitError || 'Hay un actor o una cuenta que no puede aprobar. El motivo aparece junto a su selección.'}</p>
@@ -500,10 +497,6 @@ const NuevoManifiestoForm: React.FC = () => {
               </div>
 
               <ActorSummary actor={selectedGenerador} label="Datos del generador" />
-
-              {!selectedGenerador && (
-                <p className="text-xs text-neutral-400 italic">Seleccioná un generador para ver sus datos</p>
-              )}
 
               <div className="flex justify-end pt-4">
                 <Button onClick={() => { if (validateForm(1)) setStep(2); }}>

@@ -10,9 +10,11 @@ vi.mock('../../services/notificacion.service',()=>({notificacionService:{list:mo
 vi.mock('../../components/ui/Toast',()=>({toast:{add:mocks.add,remove:mocks.remove}}));
 it('a newly received certificate refreshes an open inbox and unread badge without re-polling or marking it read',async()=>{
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
- mocks.list.mockResolvedValue({items:[],noLeidas:0});
+ const initial={items:[{id:'existing',titulo:'Aviso anterior'}],noLeidas:6};
+ mocks.list.mockResolvedValue(initial);
  const view=render(<MemoryRouter><QueryClientProvider client={client}><NotificacionesPoller/></QueryClientProvider></MemoryRouter>);
- await waitFor(()=>expect(mocks.list).toHaveBeenCalledTimes(1));await waitFor(()=>expect(client.getQueryData(['notificaciones','poll','g'])).toEqual({items:[],noLeidas:0}));
+ await waitFor(()=>expect(mocks.list).toHaveBeenCalledTimes(1));await waitFor(()=>expect(client.getQueryData(['notificaciones','poll','g'])).toEqual(initial));
+ expect(mocks.add).not.toHaveBeenCalled();
  const spy=vi.spyOn(client,'invalidateQueries');
  client.setQueryData(['notificaciones','poll','g'],{items:[{id:'new',titulo:'Certificación parcial disponible',mensaje:'M-P01',prioridad:'NORMAL',manifiestoId:'m',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'c',tipoCertificado:'PARCIAL'})}],noLeidas:1});
  await waitFor(()=>expect(spy).toHaveBeenCalledWith({queryKey:['notificaciones','list']}));

@@ -28,7 +28,7 @@ describe('Sidebar: one visible current destination',()=>{
     if(method==='Escape')fireEvent.keyDown(document,{key:'Escape'});else fireEvent.click(close);
     expect(trigger).toHaveAttribute('aria-expanded','false');
     expect(trigger).toHaveFocus();
-    expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Dashboard',exact:true})).toBeVisible();
+    expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Inicio',exact:true})).toBeVisible();
   });
   it('identifies direct classroom sessions without an operational return or role switch',()=>{
     authState.training=true;show('/dashboard');

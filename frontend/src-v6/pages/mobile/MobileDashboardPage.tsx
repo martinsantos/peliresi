@@ -145,7 +145,7 @@ export const MobileDashboardPage: React.FC = () => {
       <header>
         <p className="text-sm text-neutral-600">Hola, {currentUser?.nombre || 'Usuario'}</p>
         <h2 className="text-xl font-bold text-neutral-900">
-          {isInspector ? 'Trabajo de inspección' : isTransportista ? 'Mis viajes' : isOperador ? 'Cargas por resolver' : currentUser?.rol === 'GENERADOR' ? 'Mis trámites' : 'Trabajo pendiente'}
+          {currentUser?.rol.startsWith('ADMIN') ? 'Trabajo pendiente' : isInspector ? 'Trabajo de inspección' : isTransportista ? 'Mis viajes' : isOperador ? 'Cargas por resolver' : currentUser?.rol === 'GENERADOR' ? 'Mis trámites' : 'Trabajo pendiente'}
         </h2>
       </header>
 

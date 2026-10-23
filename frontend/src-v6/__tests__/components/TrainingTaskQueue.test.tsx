@@ -91,13 +91,14 @@ it('shows administrator approval tasks with actor names and the missing parties'
  mock.get.mockImplementation(async(_url,options)=>reply([record],options));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
- const pending=await screen.findByRole('region',{name:'Aprobaciones pendientes'});
- expect(pending).toHaveTextContent('1 manifiesto por aprobar por las partes');
- fireEvent.click(within(pending).getByRole('button',{name:'Revisar pendientes'}));
+ const pending=await screen.findByRole('button',{name:'Por aprobar',exact:true});
+ await waitFor(()=>expect(pending).toHaveAttribute('title','1 manifiesto · Por aprobar'));
+ fireEvent.click(pending);
  await waitFor(()=>expect(mock.get).toHaveBeenLastCalledWith('/manifiestos/tareas-partes',expect.objectContaining({params:expect.objectContaining({filter:'waiting'})})));
  const row=await screen.findByRole('link',{name:/CAP-NEW/});
  expect(row).toHaveTextContent('Origen artificial → Destino artificial');
- expect(row).toHaveTextContent('Falta aprobar: Generador');
+ expect(within(row).getByLabelText('Generador: Pendiente')).toBeVisible();
+ expect(row).not.toHaveTextContent('Falta aprobar:');
  expect(row).toHaveAttribute('title',expect.stringContaining('Falta aprobar: Generador'));
  expect(screen.queryByRole('button',{name:'En espera'})).not.toBeInTheDocument();
  client.clear();
@@ -109,7 +110,7 @@ it('does not advertise a start in the agenda when an approval is missing despite
  render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
  expect(await screen.findByText('Revisar aprobaciones')).toBeVisible();
  expect(screen.queryByText('Listo para iniciar')).not.toBeInTheDocument();
- expect(screen.getByText('Falta aprobar: Generador')).toBeVisible();
+ expect(screen.getByLabelText('Generador: Pendiente')).toBeVisible();
  client.clear();
 });
 

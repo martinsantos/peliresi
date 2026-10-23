@@ -87,8 +87,7 @@ const AdminDashboard: React.FC = () => {
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
-            <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
+            <h2 className="sr-only">Resumen de actividad</h2>
           </div>
         </div>
         <SkeletonStats count={4} />
@@ -105,8 +104,7 @@ const AdminDashboard: React.FC = () => {
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
-            <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
+            <h2 className="sr-only">Resumen de actividad</h2>
           </div>
         </div>
         <div className="flex flex-col items-center justify-center py-16">
@@ -125,8 +123,7 @@ const AdminDashboard: React.FC = () => {
       {/* Welcome */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Panel de Control</h2>
-          <p className="text-neutral-600">Vista general del sistema de trazabilidad</p>
+          <h2 className="sr-only">Resumen de actividad</h2>
         </div>
         <Button leftIcon={<Plus size={18} />} onClick={() => navigate(route('/manifiestos/nuevo'))} className="hover-glow">
           Nuevo Manifiesto

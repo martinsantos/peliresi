@@ -109,7 +109,8 @@ test('a real generator proposal reaches the other parties, the bell and the admi
   const row=queue.getByRole('link',{name:new RegExp(manifest.numero)});
   await expect(row).toContainText('Te toca aprobar');
   await expect(row).toContainText('QA Generador 1 → QA Operador 1');
-  await expect(row).toContainText('Falta aprobar: Generador, Transporte, Operador');
+  await expect(row).toHaveAttribute('title',/Falta aprobar: Generador, Transporte, Operador/);
+  for(const party of ['Generador','Transporte','Operador']) await expect(row.getByLabel(party+': Pendiente',{exact:true})).toBeVisible();
   await readableWholeWords(row.getByText(manifest.numero,{exact:true}));
   await operator.getByRole('button',{name:/^Notificaciones(?: \(|$)/}).click();
   const bell=operator.getByRole('region',{name:'Notificaciones recientes'});
@@ -126,12 +127,12 @@ test('a real generator proposal reaches the other parties, the bell and the admi
    try{
     const reader=await context.newPage();reader.on('pageerror',error=>errors.push(error.message));await login(reader,info,role);
     const agenda=reader.getByRole('region',{name:'Agenda de manifiestos'});
-    const pending=agenda.getByRole('region',{name:'Aprobaciones pendientes'});
-    await expect(pending).toBeVisible();await pending.getByRole('button',{name:'Revisar pendientes'}).click();
+    const pending=agenda.getByRole('button',{name:'Por aprobar',exact:true});
+    await expect(pending).toBeVisible();await pending.click();
     await agenda.getByLabel('Buscar manifiesto en agenda').fill(manifest.numero);
     const task=agenda.getByRole('link',{name:new RegExp(manifest.numero)});
     await expect(task).toContainText('QA Generador 1 → QA Operador 1');
-    await expect(task).toContainText('Falta aprobar: Generador, Transporte, Operador');
+    await expect(task).toHaveAttribute('title',/Falta aprobar: Generador, Transporte, Operador/);
     await expect(task).toHaveAttribute('title',/Transporte: QA Transporte 1/);
     await readableWholeWords(task.getByText(manifest.numero,{exact:true}));
     await proof(reader,info,role+'-pending-agenda');

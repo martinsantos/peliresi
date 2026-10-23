@@ -196,7 +196,7 @@ export const MainLayout: React.FC = () => {
     const items = [];
     
     // Dashboard para todos
-    items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' });
+    items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Inicio' });
     
     // Centro de Control para Admin, Transportista y todos los Admin Sectoriales
     if (isAdmin || isTransportista || isAdminTransportista || isAdminOperador || isAdminGenerador) {

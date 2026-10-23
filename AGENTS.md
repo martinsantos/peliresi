@@ -1,5 +1,13 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Claridad de UI — preview, 23/10/2026
+
+**Corregido y probado, no publicado.** Inicio y agenda sin banners/subtextos repetidos; aprobaciones con resumen, íconos y acción por rol; formulario sin título duplicado en app, etapas alineadas y ayuda desplegable; agenda de inspecciones independiente de las etapas. La campana conserva los avisos históricos y el banner se reserva para novedades. Manual **2026.23.6**.
+
+**150 unitarias dirigidas + 21 E2E únicos PASS** en escritorio, web móvil y app, cuatro roles. Último ajuste de formulario: **20 unitarias y 6 E2E repetidos PASS**, incluida alineación geométrica de Volver. Tipos/builds PASS; lint dirigido 0 errores/59 advertencias. No certifica toda la UI ni Android físico. Altas, reportes, otros listados, PDFs/correos y accesibilidad completa requieren continuar la revisión por secciones.
+
+Preview real activo en **http://127.0.0.1:4177**, con datos artificiales, 1 CPU/2 GiB/swap adicional cero y un worker. CAP cerrado, correos/push apagados. Sin producción, main, migraciones, datos reales ni workflows. La guarda detuvo un intento cuando el swap efectivo cambió; se restableció y verificó antes de continuar. Evidencias locales: `ui-clarity-20261023/revision.md`, `suite-21-evidence.tgz`, `final-evidence.tgz` y `source-files.json`, bajo el workspace del hilo `01a14c11-b01f-7b40-87c5-1672e1d92833`. Incluye también la corrección de elegibilidad todavía no publicada que sigue abajo.
+
 ## Creación de manifiesto: motivo por parte — preview, 23/10/2026
 
 **Corregido y probado, no publicado.** [Resultado y evidencias](docs/MANIFIESTO-ELEGIBILIDAD-20261023.md). Catálogos y servidor identifican rol, razón social y motivo (actor inactivo, cuenta inactiva/faltante, actor no encontrado). El formulario señala el campo antes de enviar, conserva datos tras un rechazo y permite actualizar estados sin reactivar cuentas ni enviar automáticamente.

@@ -12,7 +12,7 @@ it('refreshes the parent when another party starts coordination without changing
  mock.get.mockImplementation(async()=>({data:{data:{...data}}}));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}}),invalidate=vi.spyOn(client,'invalidateQueries');
  render(<QueryClientProvider client={client}><ManifestProposalApprovals id="proposal" estado="APROBADO" onSign={()=>{}}/></QueryClientProvider>);
- await screen.findByText('Todo aprobado');await waitFor(()=>expect(invalidate).toHaveBeenCalledWith({queryKey:['manifiestos','detail','proposal']}));invalidate.mockClear();
+ await screen.findByRole('button',{name:'Iniciar coordinación'});await waitFor(()=>expect(invalidate).toHaveBeenCalledWith({queryKey:['manifiestos','detail','proposal']}));invalidate.mockClear();
  data.inicio=new Date().toISOString();data.puedeIniciar=false;
  await act(async()=>{await client.invalidateQueries({queryKey:['manifest-proposal']});});
  await screen.findByText('Coordinación iniciada');expect(invalidate).toHaveBeenCalledWith({queryKey:['manifiestos','detail','proposal']});
