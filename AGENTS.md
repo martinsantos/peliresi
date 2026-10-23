@@ -1,16 +1,26 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Multirol y dos personas — sólo preview, 22/10/2026
+## Publicación vigente — empresa y multirol, 22/10/2026
 
-**Cerrado, no publicado.** Leer [correcciones, alcance y evidencia](docs/MULTIROL-DOS-PERSONAS-20261022.md). Una razón social con G/T/O mantiene **dos personas en total, incluida la titular**, compartidas entre roles y sedes. Corregidos el bypass de tercera persona en alta/aprobación, la inferencia de solicitudes pendientes, invitaciones duplicadas o irrecuperables y una consulta blockchain ajena al alcance del representante de una sede. Sin ampliar permisos ni alterar históricos.
+**`a7f20d2f` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 22/10/2026 22:47:21 Mendoza.** Leer primero [resultado, respaldo y reversión vigente](docs/DESPLIEGUE-MULTIROL-20261022.md). **Empresa y multirol habilitados** en backend/web/app; una razón social, varias actividades aprobadas y **dos personas en total incluida la titular**, sin sumar cupos por rol o sede. Sin vincular cuentas existentes por inferencia.
+
+Pruebas nuevas sobre el commit final: **1.582/1.582 backend, 1.862/1.862 frontend y 33/33 E2E PASS**, sin omitidos/reintentos; HTTP **131 + 133 solicitudes**, empresa **7 grupos** y multirol **8 grupos PASS**; 66 capturas. Compilación/tipos/builds PASS, **2.444 archivos Git exactos**, API final. Preview serial/un worker/1 CPU/2 GiB/swap cero, detenido **22:43:59 Mendoza**, bases artificiales e imagen conservadas; sin OOM.
+
+**CAP cerrado, correos/push apagados**; uploads, identidad y demás flags conservados. Sólo cambian empresa/multirol. Sin migraciones: **28/28 ya aplicadas**, esquema idéntico. Backup privado completo verificado antes de activar. Smoke no mutante **161/161 + externo 9/9 + PWA 8/8**, sin sesiones ni operaciones sobre datos de negocio. Dos workers estables. Manual **2026.22.7**, mismo renderer/CSS; SW **v158**, app **20261023014306**.
+
+**Reversión vigente a 712de167**, preparada y no ejecutada, con empresa/multirol apagados como antes, demás guardas conservadas, sin restaurar base ni borrar registros. Worker de reversión v159/app 20261023014611. No usar reversiones históricas. Main intacto; sin push/workflows, cierre `[skip ci]`. Android físico, PWA instalada y entrega externa siguen pendientes. Los cierres anteriores son antecedentes.
+
+## Validación previa — multirol y dos personas, 22/10/2026
+
+**Validación previa, incorporada en la publicación a7f20d2f de arriba.** Leer [correcciones, alcance y evidencia](docs/MULTIROL-DOS-PERSONAS-20261022.md). Una razón social con G/T/O mantiene **dos personas en total, incluida la titular**, compartidas entre roles y sedes. Corregidos el bypass de tercera persona en alta/aprobación, la inferencia de solicitudes pendientes, invitaciones duplicadas o irrecuperables y una consulta blockchain ajena al alcance del representante de una sede. Sin ampliar permisos ni alterar históricos.
 
 **1.582 backend / 1.858 frontend / 33 E2E únicos PASS**; después del último ajuste de visibilidad, **30 unitarias y 3 E2E** finales PASS. Invitaciones y tres roles de la segunda persona repitieron otros **6 E2E PASS**; no suman casos únicos. HTTP **131 + 133 solicitudes**, empresa **7 grupos** y multirol **8 grupos PASS**. Tipos/builds PASS, lint 0 errores/42 advertencias, 84 capturas. Manual **2026.22.7**, mismo renderer/CSS. El informe conserva el timeout inicial de la suite completa y el detalle cosmético previo del encabezado de Transporte.
 
 **1.038 tablas QA previas intactas**, cero intentos/envíos/cola activa; CAP cerrado y correos/push apagados. Preview detenido **21:38:34 Mendoza**, imagen/base/evidencias preservadas, serial/un worker/1 CPU/2 GiB/swap cero, sin OOM ni presión. Main intacto; sin producción, push ni workflows; cierre `[skip ci]`.
 
-La última publicación documentada sigue siendo **712de167**, con empresa/multirol apagados allí; esta tanda no cambia esa configuración. Android físico y entrega externa pendientes. No usar bundles QA `/api` para producción.
+Al cerrar esa revisión, producción seguía en **712de167** con empresa/multirol apagados. La publicación a7f20d2f de arriba la incorpora y habilita. Android físico y entrega externa pendientes; los bundles QA `/api` no se publican.
 
-## Publicación vigente — comunicaciones, 22/10/2026
+## Publicación anterior — comunicaciones, 22/10/2026
 
 **`712de167` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 22/10/2026 20:15:03 Mendoza.** Leer [evidencia y reversión vigente](docs/ENLACES-AVISOS-CORREOS-20261022.md). Incluye enlaces exactos de correos/campana, plazo PSIP, recordatorios desde la firma y las revisiones previas de formularios/representación. Manual **2026.22.6**, estilos y renderer conservados.
 

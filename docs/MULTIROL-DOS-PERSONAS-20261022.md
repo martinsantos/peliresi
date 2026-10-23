@@ -1,5 +1,7 @@
 # Multirol y dos personas por razón social — 22/10/2026
 
+**Publicado en a7f20d2f el 22/10/2026 22:47:21 Mendoza**, con empresa/multirol habilitados. Ver [nuevas suites completas, respaldo y reversión vigente](DESPLIEGUE-MULTIROL-20261022.md). El resto de este documento registra la revisión previa en preview.
+
 ## Alcance
 
 Revisión solicitada exclusivamente en preview: una razón social/CUIT con actividades Generador, Transportista y Operador aprobadas, y hasta dos personas en total, incluida la titular. El cupo no crece con roles ni establecimientos. Responsabilidad ante SITREP y permisos operativos siguen siendo decisiones separadas.
