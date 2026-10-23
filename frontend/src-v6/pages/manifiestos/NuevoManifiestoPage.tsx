@@ -145,7 +145,7 @@ const NuevoManifiestoForm: React.FC = () => {
   });
 
   const partyProposal = proposalsAvailable;
-  const useInSitu = () => {
+  const selectInSitu = () => {
     setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', vehiculoId: '', choferId: '', operador: ownOperatorId }));
     setConfirmWithoutTransport(false);
     setValidationErrors(prev => { const next = { ...prev }; delete next.transportista; return next; });
@@ -626,7 +626,7 @@ const NuevoManifiestoForm: React.FC = () => {
                     onClick={() => {
                       if (formData.modalidad === 'IN_SITU') return;
                       if (formData.transportista) setConfirmWithoutTransport(true);
-                      else useInSitu();
+                      else selectInSitu();
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
                       formData.modalidad === 'IN_SITU'
@@ -647,7 +647,7 @@ const NuevoManifiestoForm: React.FC = () => {
                 <p><strong>Ya asignaste un transporte.</strong> Pasar a tratamiento en origen lo quita de esta propuesta, junto con su vehículo y chofer. Si participa, mantené el traslado para solicitar las tres aprobaciones.</p>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => setConfirmWithoutTransport(false)}>Mantener transporte</Button>
-                  <Button onClick={useInSitu}>Continuar sin transporte</Button>
+                  <Button onClick={selectInSitu}>Continuar sin transporte</Button>
                 </div>
               </div>}
 
