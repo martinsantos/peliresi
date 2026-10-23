@@ -1,3 +1,4 @@
+import { documentHeader } from './institutionalPdf.service';
 import PDFDocument from 'pdfkit';
 import { addendumDocument } from '../domain/manifiestoAdendaDocument';
 import { drawInspectionPdfBlocks, InspectionPdfTextBlock } from './inspectionPdfLayout.service';
@@ -15,19 +16,7 @@ export async function renderAddendumPdf(data: ReturnType<typeof addendumDocument
   const ready = new Promise<Buffer>((resolve, reject) => { doc.on('data', c => chunks.push(c)); doc.on('end', () => resolve(Buffer.concat(chunks))); doc.on('error', reject); });
   let page = 0;
   const header = () => {
-    page++;
-    drawMendozaMark(doc, branding, 44, 22, 128, 34);
-    doc.save().translate(382, 24).scale(0.32);
-    for (const angle of [0, 120, 240]) {
-      doc.save().rotate(angle, { origin: [50, 50] })
-        .path('M36.319 12.412A40 40 0 0 1 80.642 24.288L86.77 19.146L83.483 44.096L65.321 37.144L71.449 32.002A28 28 0 0 0 40.423 23.689Z')
-        .fill('#1B5E3C').restore();
-    }
-    doc.restore();
-    doc.font('Helvetica-Bold').fontSize(18).fillColor('#1B5E3C').text('SITREP', 421, 28, { lineBreak: false });
-    doc.font('Helvetica').fontSize(8).fillColor('#4B5563').text('Sistema de Trazabilidad de Residuos Peligrosos', 44, 67, { lineBreak: false });
-    doc.moveTo(44, 86).lineTo(551, 86).strokeColor('#1B5E3C').stroke();
-    doc.font('Helvetica').fontSize(8).fillColor('#4B5563').text('Anexo informativo - v' + data.version + ' - Página ' + page, 44, 807, { lineBreak: false });
+    documentHeader(doc, 'Anexo de adenda · versión ' + data.version, data.id, ++page, branding);
     doc.y = 108;
   };
   header();

@@ -26,7 +26,7 @@ describe('Monitor: controles operativos y datos sin simulación',()=>{
   });
   it('usa la marca vigente, no un icono distinto para Monitor',()=>{
     const {container}=render(<WarRoomHeader mode="LIVE" cinemaMode={false} onModeChange={vi.fn()} onCinemaToggle={vi.fn()} onClose={vi.fn()}/>);
-    expect(container.querySelector('img')).toHaveAttribute('src','/favicon.svg');
+    expect(container.querySelector('img')).toHaveAttribute('src','/sitrep-mark-green.svg');
   });
   it('permite plegar y restaurar un panel por botones identificables',()=>{
     render(<MemoryRouter><DashboardPanels mode="LIVE" liveData={null} forecastData={null}/></MemoryRouter>);

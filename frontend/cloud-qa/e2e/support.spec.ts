@@ -414,6 +414,7 @@ test('support list rows are keyboard navigable and a common actor cannot open an
   page.on('request', request => { if (request.url().endsWith('/api/soporte') && request.method() === 'POST') supportPosts++; });
   await screenshot(page, info, 'bubble-on-current-task');
   await bubble.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Reportar un problema', exact: true }).click();
   const reviewed = page.getByRole('dialog', { name: 'Reportar un problema', exact: true });
   const preview = reviewed.getByRole('img', { name: 'Captura de la pantalla que estabas usando', exact: true });
   await expect(preview).toBeVisible();
@@ -428,6 +429,7 @@ test('support list rows are keyboard navigable and a common actor cannot open an
   await reviewed.getByRole('button', { name: 'Continuar luego', exact: true }).click();
   await expect(page).toHaveURL(taskUrl); await expect(unsentReply).toHaveValue('QA comentario del trámite que aún no envié.');
   await bubble.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Reportar un problema', exact: true }).click();
   await expect(preview).toBeVisible();
   await reviewed.getByLabel('Asunto', { exact: true }).fill('QA burbuja contextual ' + info.project.name);
   await reviewed.getByLabel('¿Qué intentabas hacer y qué ocurrió?', { exact: true }).fill('QA envío desde la pantalla actual con captura revisada.');

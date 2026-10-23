@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { register, login, getProfile, updateOwnProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
+import { register, login, getProfile, updateLinkPreference, updateOwnProfile, logout, refreshToken, changePassword, verifyEmail, forgotPassword, resetPassword, claimAccount } from '../controllers/auth.controller';
 import { isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 
 const router = Router();
@@ -248,6 +248,7 @@ router.post('/claim-account', claimAccount);
  */
 // Protegidas
 router.get('/profile', isAuthenticated, getProfile);
+router.put('/preferencia-enlaces', isAuthenticated, updateLinkPreference);
 
 /**
  * @openapi

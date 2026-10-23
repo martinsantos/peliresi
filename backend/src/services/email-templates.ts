@@ -1,4 +1,4 @@
-export const MAIL_TEMPLATE_VERSION = '20261022.1';
+export const MAIL_TEMPLATE_VERSION = '20261023.1';
 export function escapeMail(value: string): string {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]!));
 }
@@ -29,19 +29,20 @@ export function mailShell(content: string): string {
 <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #dce5df;border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#172c24">
 <tr data-mail-header-row>
 <td data-mail-masthead width="50%" align="left" valign="middle" style="width:50%;padding:10px 12px;text-align:left;border-bottom:3px solid #174a7e;border-radius:10px 0 0 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td class="mail-logo-cell" width="100" valign="middle" style="width:100px;padding-right:12px"><img src="${logo}" width="100" height="32" alt="Gobierno de Mendoza" style="display:block;width:100px;height:32px;color:#174a7e;font-size:12px"></td><td class="mail-header-reference" valign="middle" align="left"><p data-mail-government-reference style="margin:0;color:#344c41;font:12px/15px Arial,Helvetica,sans-serif;text-align:left">Dirección General de Fiscalización Ambiental</p></td></tr></table></td>
-<td data-mail-brand width="50%" align="left" valign="middle" bgcolor="#1B5E3C" style="width:50%;background:#1B5E3C;padding:10px 12px;text-align:left;border-bottom:3px solid #0D8A4F;border-radius:0 10px 0 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td data-mail-brand-lockup class="mail-logo-cell" width="100" valign="middle" style="width:100px;padding-right:12px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td valign="middle" style="padding-right:6px"><img src="${brand}" width="22" height="22" alt="" role="presentation" style="display:block;width:22px;height:22px;border:0"></td><td valign="middle"><p data-mail-wordmark style="margin:0;color:#ffffff;font:700 20px/26px Arial,Helvetica,sans-serif">SITREP</p></td></tr></table></td><td class="mail-header-reference" valign="middle" align="left"><p data-mail-system-reference style="margin:0;color:#ffffff;font:12px/15px Arial,Helvetica,sans-serif;text-align:left">Sistema de Trazabilidad de Residuos Peligrosos</p></td></tr></table></td>
+<td data-mail-brand width="50%" align="left" valign="middle" bgcolor="#ffffff" style="width:50%;background:#ffffff;padding:10px 12px;text-align:left;border-bottom:3px solid #0D8A4F;border-radius:0 10px 0 0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td data-mail-brand-lockup class="mail-logo-cell" width="100" valign="middle" style="width:100px;padding-right:12px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td valign="middle" style="padding-right:6px"><img src="${brand}" width="22" height="22" alt="" role="presentation" style="display:block;width:22px;height:22px;border:0"></td><td valign="middle"><p data-mail-wordmark style="margin:0;color:#1B5E3C;font:700 20px/26px Arial,Helvetica,sans-serif">SITREP</p></td></tr></table></td><td class="mail-header-reference" valign="middle" align="left"><p data-mail-system-reference style="margin:0;color:#344c41;font:12px/15px Arial,Helvetica,sans-serif;text-align:left">Sistema de Trazabilidad de Residuos Peligrosos</p></td></tr></table></td>
 </tr><!-- mail-header-end -->
 <tr><td colspan="2" style="padding:24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#172c24;overflow-wrap:anywhere">${content}</td></tr>
 <tr><td colspan="2" style="padding:20px 24px;border-top:1px solid #dce5df;font-size:12px;line-height:1.6;color:#526359"><span data-mail-institution>Gobierno de Mendoza</span><br>Dirección General de Fiscalización Ambiental<p style="margin:12px 0 0">Este aviso informativo no reemplaza las notificaciones formales del trámite.</p></td></tr>
 </table></td></tr></table></body></html>`;
 }
 
-/** HTTPS inside the installed PWA scope; the browser remains a working fallback. */
+/** Resolver reads the recipient's preference after login; explicit alternatives never depend on app installation. */
 export function mailAction(path: string, label: string): string {
   const canonical = path.replace(/^\/app(?=\/|$)/, '') || '/';
   const web = escapeMail(mailLink(canonical));
   const app = escapeMail(mailLink('/app' + canonical));
-  return `<p style="margin:24px 0 8px"><a data-mail-action="app" href="${app}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;line-height:24px">${escapeMail(label)}</a></p><p style="font-size:14px;margin:8px 0"><a data-mail-action="web" href="${web}" style="color:#1B5E3C;text-decoration:underline">Abrir en la web</a></p><p style="font-size:12px;color:#526359">El botón abre la app si tu dispositivo la tiene asociada; de lo contrario, continúa en el navegador. Ambos enlaces muestran el mismo contenido.</p>`;
+  const preferred = escapeMail(mailLink('/app/abrir?destino=' + encodeURIComponent(canonical)));
+  return `<p style="margin:24px 0 8px"><a data-mail-action="preferred" href="${preferred}" style="display:inline-block;padding:12px 20px;background:#1B5E3C;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;line-height:24px">${escapeMail(label)}</a></p><p style="font-size:14px;margin:8px 0"><a data-mail-action="web" href="${web}" style="color:#1B5E3C;text-decoration:underline">Abrir en la web</a> · <a data-mail-action="app" href="${app}" style="color:#1B5E3C;text-decoration:underline">Abrir en la app</a></p><p style="font-size:12px;color:#526359">El botón respeta tu preferencia de cuenta después de ingresar. Sin una preferencia, elige la vista según el dispositivo. La app también funciona en el navegador; abrir una app instalada depende del dispositivo.</p>`;
 }
 
 export type MailTemplateId = 'verify' | 'pending' | 'approved' | 'newAccount' | 'reset' | 'application' | 'observed' | 'response' | 'rejected' | 'modification' | 'modificationApproved' | 'modificationRejected';
@@ -80,7 +81,10 @@ export function mailItemAction(html: string): string {
   if (match) {
     try {
       const url = new URL(match[1].replace(/&amp;/g, '&'));
-      if (url.origin === new URL(mailLink('/')).origin) return mailAction(url.pathname + url.search + url.hash, 'Abrir este aviso');
+      if (url.origin === new URL(mailLink('/')).origin) {
+        const target = url.pathname === '/app/abrir' || url.pathname === '/abrir' ? url.searchParams.get('destino') : url.pathname + url.search + url.hash;
+        if (target && !/^\/(?:app\/)?abrir(?:[?#]|$)/.test(target)) return mailAction(target, 'Abrir este aviso');
+      }
     } catch { /* An old/malformed rendering gets a safe inbox fallback. */ }
   }
   return mailAction('/notificaciones', 'Consultar mis avisos');

@@ -1,3 +1,4 @@
+import OpenLinkPage from './pages/notificaciones/OpenLinkPage';
 import AvisoPage from './pages/notificaciones/AvisoPage';
 /**
  * SITREP v6 - Mobile App Router
@@ -81,7 +82,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   // Public routes that don't need auth
   const publicPaths = ['/relevo/', '/l', '/login', '/reclamar', '/manifiestos/verificar', '/verificar/inspecciones', '/verificar-email', '/inscripcion', '/registro', '/recuperar', '/reset-password', '/empresa-invitacion'];
-  const isPublic = publicPaths.some(p => location.pathname.startsWith(p));
+  const isPublic = location.pathname === '/abrir' || publicPaths.some(p => location.pathname.startsWith(p));
 
   // Keep public forms mounted while validating a session or login attempt.
   // Replacing them with the loader discards the user's input on a failed login.
@@ -125,6 +126,7 @@ function AppMobile() {
         <AuthGate>
         <Routes>
           <Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/>
+          <Route path="/abrir" element={<OpenLinkPage />} />
           {/* Auth — public, sin layout */}
           <Route path="/l" element={<Navigate to="/login" replace />} />
           <Route path="/l/" element={<Navigate to="/login" replace />} />

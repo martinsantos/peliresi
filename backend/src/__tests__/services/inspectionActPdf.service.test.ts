@@ -112,7 +112,7 @@ describe('inspection act PDF', () => {
     const extracted = spawnSync('pdftotext', [renderedPdf, '-'], { encoding: 'utf8' });
     if (!extracted.error) {
       expect(extracted.status, extracted.stderr).toBe(0);
-      expect(extracted.stdout).toContain('TRAZABILIDAD DE RESIDUOS PELIGROSOS');
+      expect(extracted.stdout.replace(/\s+/g, ' ').toLowerCase()).toContain('trazabilidad de residuos peligrosos');
       expect(extracted.stdout).toContain('Gobierno de Mendoza');
       expect(extracted.stdout).toContain('Documento oficial generado por SITREP');
       expect(extracted.stdout).toContain('VERIFICAR TRAZABILIDAD DE ESTA INSPECCIÓN');

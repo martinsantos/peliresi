@@ -9,6 +9,7 @@ import {
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
 import {
   drawMendozaMark,
+  drawInstitutionalMasthead,
   drawSitrepMark,
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
@@ -84,13 +85,13 @@ function runningHeader(
   unified = false,
 ) {
   drawMendozaMark(doc, branding, 44, 13, 94, 30);
-  doc.font('Helvetica-Bold').fontSize(5.8).fillColor(C.darkGreen)
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen)
     .text('MINISTERIO DE ENERGÍA Y AMBIENTE · DGFA', 147, 19, { width: 224, lineBreak: false });
-  doc.font('Helvetica').fontSize(5.5).fillColor(C.muted)
+  doc.font('Helvetica').fontSize(8).fillColor(C.muted)
     .text(`${unified ? 'EXPEDIENTE' : 'INFORME TÉCNICO'} · ${inspection.numero} · v${inspection.version}`, 147, 29, { width: 224, lineBreak: false });
   drawSitrepMark(doc, 424, 16, { compact: true, width: 127 });
   doc.moveTo(44, 47).lineTo(doc.page.width - 44, 47).lineWidth(0.9).strokeColor(C.darkGreen).stroke();
-  doc.font('Helvetica').fontSize(6.4).fillColor(C.muted)
+  doc.font('Helvetica').fontSize(7.5).fillColor(C.muted)
     .text(state, 44, 51, { width: doc.page.width - 88, align: 'right', lineBreak: false });
   doc.y = PAGE.top;
 }
@@ -105,18 +106,15 @@ function header(
 ) {
   const actor = actorOf(inspection);
   const state = documentState(inspection, readiness);
-  drawMendozaMark(doc, branding, 44, 20, 154, 48);
-  drawSitrepMark(doc, 358, 23, { width: 193 });
-  doc.font('Helvetica-Bold').fontSize(6.5).fillColor(C.darkGreen)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 71, { width: 355, lineBreak: false });
-  doc.font('Helvetica').fontSize(6.2).fillColor(C.muted)
-    .text(unified ? 'Acta · Evaluación · Evidencias' : 'Documento 2 de 2 · Complementa el acta de campo', 350, 71, { width: 201, align: 'right', lineBreak: false });
-  doc.moveTo(44, 86).lineTo(doc.page.width - 44, 86).lineWidth(1.5).strokeColor(C.darkGreen).stroke();
+  drawInstitutionalMasthead(doc, branding, 44, 16, doc.page.width - 88);
+  doc.font('Helvetica').fontSize(7.5).fillColor(C.muted)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 44, 77, { width: doc.page.width - 88, lineBreak: false });
+  doc.moveTo(44, 89).lineTo(doc.page.width - 44, 89).lineWidth(1).strokeColor(C.darkGreen).stroke();
 
   doc.font('Helvetica-Bold').fontSize(8).fillColor(C.darkGreen).text(unified ? 'EXPEDIENTE DE INSPECCIÓN' : 'INFORME TÉCNICO DE INSPECCIÓN', 44, 103, { characterSpacing: 0.45 });
   doc.font('Helvetica-Bold').fontSize(23).fillColor(C.navy).text(inspection.numero, 44, 120, { width: 315 });
   doc.font('Helvetica').fontSize(8.2).fillColor(C.muted).text(`Versión ${inspection.version} · Acta ${inspection.numeroActa || 'sin número asignado'}`, 44, 150, { width: 330 });
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.navy).text('EXPEDIENTE DE INSPECCIÓN', 366, 109, { width: 185, align: 'right' });
+  doc.font('Helvetica').fontSize(8).fillColor(C.muted).text(unified ? 'Acta · Evaluación · Evidencias' : 'Documento 2 de 2 · Complementa el acta de campo', 366, 102, { width: 185, align: 'right' });
   doc.font('Helvetica').fontSize(7.6).fillColor(C.muted).text(`Estado: ${stateLabel(String(inspection.estado))}`, 366, 127, { width: 185, align: 'right' });
   doc.text(`Emitido ${formatDate(generatedAt, true)} ART`, 366, 143, { width: 185, align: 'right' });
 

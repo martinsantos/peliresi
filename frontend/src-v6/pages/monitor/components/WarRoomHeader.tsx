@@ -26,14 +26,14 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
   }, []);
 
   return (
-    <header className="wr-header flex items-center justify-between px-4 py-2 bg-[#1B5E3C] text-white">
+    <header className="wr-header flex items-center justify-between px-4 py-2 bg-white text-primary-800 border-b border-neutral-200">
       {/* Logo */}
       <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center">
+        <div className="flex items-center justify-center">
           <SitrepMark size={26} />
         </div>
-        <span className="text-base font-bold tracking-tight text-white">SITREP</span>
-        <span className="text-sm text-white hidden sm:inline">Monitor</span>
+        <span className="text-base font-bold tracking-tight text-primary-800">SITREP</span>
+        <span className="text-sm text-primary-800 hidden sm:inline">Monitor</span>
       </div>
 
       {/* Mode selector */}
@@ -42,7 +42,7 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
           onClick={() => onModeChange('LIVE')}
           aria-pressed={mode === 'LIVE'}
           className={`flex items-center gap-2 px-3 min-h-11 rounded-md text-sm font-semibold transition-colors ${
-            mode === 'LIVE' ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'
+            mode === 'LIVE' ? 'bg-primary-800 text-white' : 'text-primary-800 hover:bg-primary-50'
           }`}
         >
           {mode === 'LIVE' && liveCurrent && <span className="wr-live-dot" aria-hidden="true" />}
@@ -53,7 +53,7 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
           onClick={() => onModeChange('PLAYBACK')}
           aria-pressed={mode === 'PLAYBACK'}
           className={`flex items-center gap-2 px-3 min-h-11 rounded-md text-sm font-semibold transition-colors ${
-            mode === 'PLAYBACK' ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'
+            mode === 'PLAYBACK' ? 'bg-primary-800 text-white' : 'text-primary-800 hover:bg-primary-50'
           }`}
         >
           <History size={16} />
@@ -63,7 +63,7 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
           onClick={() => onModeChange('FORECAST')}
           aria-pressed={mode === 'FORECAST'}
           className={`flex items-center gap-2 px-3 min-h-11 rounded-md text-sm font-semibold transition-colors ${
-            mode === 'FORECAST' ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'
+            mode === 'FORECAST' ? 'bg-primary-800 text-white' : 'text-primary-800 hover:bg-primary-50'
           }`}
         >
           <CalendarClock size={16} />
@@ -73,10 +73,10 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
 
       {/* Right controls */}
       <div className="wr-header-tools flex items-center gap-3">
-        <span className="wr-clock font-mono text-sm text-white/80 tabular-nums">{clock}</span>
+        <span className="wr-clock font-mono text-sm text-neutral-600 tabular-nums">{clock}</span>
         <button
           onClick={onCinemaToggle}
-          className={`min-w-11 min-h-11 flex items-center justify-center rounded-lg transition-colors ${cinemaMode ? 'bg-white text-[#1B5E3C]' : 'text-white hover:bg-white/15'}`}
+          className={`min-w-11 min-h-11 flex items-center justify-center rounded-lg transition-colors ${cinemaMode ? 'bg-primary-800 text-white' : 'text-primary-800 hover:bg-primary-50'}`}
           aria-pressed={cinemaMode}
           title="Modo mapa oscuro (C)"
         >
@@ -84,7 +84,7 @@ export const WarRoomHeader: React.FC<Props> = ({ mode, cinemaMode, onModeChange,
         </button>
         <button
           onClick={onClose}
-          className="min-w-11 min-h-11 flex items-center justify-center rounded-lg text-white hover:bg-white/15 transition-colors"
+          className="min-w-11 min-h-11 flex items-center justify-center rounded-lg text-primary-800 hover:bg-primary-50 transition-colors"
           title="Cerrar (Esc)"
         >
           <X size={16} />

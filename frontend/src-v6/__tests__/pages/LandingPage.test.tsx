@@ -27,9 +27,9 @@ describe('public landing identity and entry points', () => {
     }
   });
 
-  it('retains the existing tiled appearance everywhere that does not opt in', () => {
+  it('uses the unboxed green brand consistently by default', () => {
     const { container } = render(<SitrepMark size={24} />);
-    expect(container.firstChild).toHaveAttribute('src', '/favicon.svg');
+    expect(container.firstChild).toHaveAttribute('src', '/sitrep-mark-green.svg');
     expect(container.firstChild).toHaveAttribute('width', '24');
     expect(container.firstChild).toHaveAttribute('aria-hidden', 'true');
   });

@@ -258,7 +258,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         res.setHeader('X-SITREP-Training', 'true');
         res.setHeader('Cache-Control', 'no-store');
         return res.json({ success: true, data: { user: { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol,
-          activo: user.activo, esInspector: user.esInspector, generador: user.generador, transportista: user.transportista,
+          activo: user.activo, preferenciaEnlaces: user.preferenciaEnlaces, esInspector: user.esInspector, generador: user.generador, transportista: user.transportista,
           operador: user.operador, createdAt: user.createdAt, training: true }, tokens } });
       });
     }
@@ -301,7 +301,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         const userData = {
           id: user.id, email: user.email, rol: user.rol, nombre: user.nombre,
           apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
-          activo: user.activo, esInspector: user.esInspector, generador: user.generador,
+          activo: user.activo, preferenciaEnlaces: user.preferenciaEnlaces, esInspector: user.esInspector, generador: user.generador,
           transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
         };
 
@@ -354,7 +354,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const userData = {
       id: user.id, email: user.email, rol: user.rol, nombre: user.nombre,
       apellido: user.apellido, empresa: user.empresa, telefono: user.telefono,
-      activo: user.activo, esInspector: user.esInspector, generador: user.generador,
+      activo: user.activo, preferenciaEnlaces: user.preferenciaEnlaces, esInspector: user.esInspector, generador: user.generador,
       transportista: user.transportista, operador: user.operador, createdAt: user.createdAt,
     };
 
@@ -455,7 +455,7 @@ export const getProfile = async (req: Request & { user?: any }, res: Response, n
         id: true, email: true, rol: true, nombre: true, apellido: true,
         empresa: true, telefono: true, activo: true, esInspector: true,
         createdAt: true, generador: true, transportista: true, operador: true,
-        notifNuevoRegistro: true, notifEmail: true,
+        notifNuevoRegistro: true, notifEmail: true, preferenciaEnlaces: true,
       },
     });
     if (!user) throw new AppError('Usuario no encontrado', 404);
@@ -658,4 +658,17 @@ export const claimAccount = async (req: Request, res: Response, next: NextFuncti
   } catch (error) {
     next(error);
   }
+};
+
+const linkPreferenceSchema = z.object({ preferenciaEnlaces: z.enum(['AUTO', 'WEB', 'APP']) }).strict();
+/** Personal setting: no actor mutation, role change or delivery side effects. */
+export const updateLinkPreference = async (req: Request & { user?: any }, res: Response, next: NextFunction) => {
+  try {
+    if (req.user.impersonatedBy) throw new AppError('Volvé a tu cuenta para elegir tu preferencia', 403);
+    const parsed = linkPreferenceSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError('Elegí Según el dispositivo, Web o App', 400);
+    const user = await prisma.usuario.update({ where: { id: req.user.id }, data: parsed.data,
+      select: { id: true, preferenciaEnlaces: true } });
+    res.json({ success: true, data: { user } });
+  } catch (error) { next(error); }
 };

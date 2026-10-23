@@ -11,17 +11,17 @@ export function ApplicantLayout() {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   return <div className="min-h-dvh bg-neutral-50">
-    <header className="border-b border-primary-900 bg-primary-800 px-4 py-3 text-white">
+    <header className="border-b border-neutral-200 bg-white px-4 py-3 text-primary-800">
       <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <SitrepMark size={36} className="rounded-lg bg-white p-1" />
+          <SitrepMark size={36} />
           <div className="min-w-0">
             <span className="text-xs font-semibold tracking-wide">SITREP</span>
-            <h1 className="text-lg font-semibold !text-white">Mi solicitud</h1>
+            <h1 className="text-lg font-semibold text-neutral-900">Mi solicitud</h1>
           </div>
         </div>
         <button type="button" onClick={() => { logout(); navigate(mp('/login'), { replace: true }); }}
-          className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
           <LogOut size={18} aria-hidden="true" />Salir
         </button>
       </div>

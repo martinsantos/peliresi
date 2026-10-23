@@ -1,3 +1,4 @@
+import OpenLinkPage from './pages/notificaciones/OpenLinkPage';
 import AvisoPage from './pages/notificaciones/AvisoPage';
 /**
  * SITREP v6 - App Router
@@ -88,6 +89,7 @@ function App() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/relevo/:tramoId" element={<RelevoGpsPage/>}/>
+        <Route path="/abrir" element={<OpenLinkPage />} />
         {/* Public Routes */}
         <Route element={<AuthLayout />}>
           <Route path="/l" element={<Navigate to="/login" replace />} />

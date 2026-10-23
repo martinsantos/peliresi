@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { MendozaBrand } from '../../components/MendozaBrand';
 import { SitrepMark } from '../../components/SitrepMark';
+import { BrandSpinner } from '../../components/ui/LoadingState';
 import { postLoginDestination } from '../../utils/authRedirect';
 import './institutional.css';
 
@@ -127,7 +128,7 @@ const LoginPage: React.FC = () => {
           className="brand-action w-full min-h-12 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
         >
           {loading ? (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <><BrandSpinner size={20} /><span>Ingresando…</span></>
           ) : (
             <>
               Ingresar

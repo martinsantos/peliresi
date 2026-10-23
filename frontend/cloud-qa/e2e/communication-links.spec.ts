@@ -47,6 +47,18 @@ for (const [index,item] of f.mails.entries()) test('real mail preserves target a
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await page.screenshot({path:info.outputPath('destino.png'),animations:'disabled'});
 });
+for (const [index,item] of f.mails.entries()) test('preferred mail action preserves target after login: '+index,async({page},info)=>{
+  await isolatedMapTiles(page,info);
+  await page.context().addCookies([{name:'sitrep_qa_client',value:`127.23.${info.project.name==='app'?2:1}.${index+1}`,url:'http://127.0.0.1:4177'}]);
+  await page.setContent(item.html);
+  const primary=page.locator('[data-mail-action="preferred"]');await expect(primary).toHaveCount(1);
+  const direct=new URL((await page.locator('[data-mail-action="web"]').getAttribute('href'))!);
+  const target=direct.origin+(info.project.use.hasTouch?'/app':'')+direct.pathname+direct.search+direct.hash;
+  await primary.click();await enterAfterMail(page);await expect(page).toHaveURL(target);
+  await expect(page.getByRole('banner')).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
+  await page.screenshot({path:info.outputPath('preferencia-destino.png'),animations:'disabled'});
+});
 test('old individual notice is private, read-only and independent of the inbox page',async({page},info)=>{
   const db=new PrismaClient();let id='';
   try{

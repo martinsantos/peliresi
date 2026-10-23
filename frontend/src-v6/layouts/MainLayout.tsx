@@ -72,6 +72,8 @@ const UNLISTED_PAGE_TITLES: Record<string, string> = {
   '/notificaciones': 'Notificaciones',
   '/estadisticas': 'Estadísticas',
   '/ayuda': 'Ayuda',
+  '/admin/renovaciones': 'Renovaciones',
+  '/admin/vehiculos': 'Vehículos',
 };
 
 export const MainLayout: React.FC = () => {
@@ -156,9 +158,9 @@ export const MainLayout: React.FC = () => {
   // Guard: show loading or redirect if no user
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-neutral-50">
+      <div className="flex items-center justify-center h-screen bg-white">
         <div className="text-center">
-          <div className="w-10 h-10 border-3 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+          <SitrepMark size={40} className="motion-safe:animate-spin mx-auto mb-4" />
           <p className="text-neutral-600">Cargando...</p>
         </div>
       </div>
@@ -271,14 +273,14 @@ export const MainLayout: React.FC = () => {
         `}
       >
         {/* Logo */}
-        <div className="min-h-16 flex items-center gap-2 px-4 lg:px-6 border-b border-white/15">
+        <div className="min-h-16 flex items-center gap-2 px-4 lg:px-6 border-b border-neutral-200 bg-white">
           <SitrepMark size={36} className="shrink-0 lg:mr-1" />
           <div className="min-w-0 flex-1">
-            <span className="font-bold text-lg text-white">SITREP</span>
-            <span title={`Rol base: ${currentUser.rol}`} className="block break-words text-xs font-medium text-white/80 lg:inline lg:ml-1">{inspectionLabel ?? currentUser.rol}</span>
+            <span className="font-bold text-lg text-primary-800">SITREP</span>
+            <span title={`Rol base: ${currentUser.rol}`} className="block break-words text-xs font-medium text-neutral-600 lg:inline lg:ml-1">{inspectionLabel ?? currentUser.rol}</span>
           </div>
           <button type="button" aria-label="Cerrar menú" onClick={closeSidebar}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-white hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white lg:hidden">
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 lg:hidden">
             <X size={20} aria-hidden="true" />
           </button>
         </div>

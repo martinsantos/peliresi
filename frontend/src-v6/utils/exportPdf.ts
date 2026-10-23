@@ -48,23 +48,21 @@ export async function exportReportePDF(config: ExportConfig) {
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = 15;
 
-  // ── Header bar ──
-  doc.setFillColor(...PRIMARY_COLOR);
-  doc.rect(0, 0, pageWidth, 28, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text('SITREP', 14, 12);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Sistema de Trazabilidad de Residuos Peligrosos', 14, 18);
-  doc.text('Provincia de Mendoza', 14, 23);
-
-  // Date on right side
-  doc.setFontSize(9);
-  doc.text(new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' }), pageWidth - 14, 12, { align: 'right' });
-  doc.text(new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }), pageWidth - 14, 18, { align: 'right' });
+  const mark = new Image();
+  mark.src = import.meta.env.BASE_URL + 'sitrep-mark-green.svg';
+  await mark.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = 150; canvas.height = 150;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('No se pudo preparar la marca del documento. Reintentá la descarga.');
+  context.drawImage(mark, 0, 0, 150, 150);
+  const brand = canvas.toDataURL('image/png');
+  const mendoza = new Image();
+  mendoza.src = import.meta.env.BASE_URL + 'logo-mendoza.webp';
+  await mendoza.decode();
+  canvas.width = 600; canvas.height = Math.round(600 * mendoza.naturalHeight / mendoza.naturalWidth);
+  context.drawImage(mendoza, 0, 0, canvas.width, canvas.height);
+  const institution = canvas.toDataURL('image/png');
 
   y = 38;
 
@@ -72,15 +70,17 @@ export async function exportReportePDF(config: ExportConfig) {
   doc.setTextColor(...DARK_COLOR);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text(config.titulo, 14, y);
-  y += 6;
+  const titleLines = doc.splitTextToSize(config.titulo, pageWidth - 28);
+  doc.text(titleLines, 14, y);
+  y += titleLines.length * 7;
 
   if (config.subtitulo) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...GRAY_COLOR);
-    doc.text(config.subtitulo, 14, y);
-    y += 5;
+    const subtitleLines = doc.splitTextToSize(config.subtitulo, pageWidth - 28);
+    doc.text(subtitleLines, 14, y);
+    y += subtitleLines.length * 5;
   }
 
   doc.setFontSize(9);
@@ -145,7 +145,7 @@ export async function exportReportePDF(config: ExportConfig) {
         lineColor: [229, 231, 235],
         lineWidth: 0.3,
       },
-      margin: { left: 14, right: 14 },
+      margin: { left: 14, right: 14, top: 38, bottom: 22 },
     });
   }
 
@@ -154,6 +154,14 @@ export async function exportReportePDF(config: ExportConfig) {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     const pageH = doc.internal.pageSize.getHeight();
+    doc.addImage(institution, 'PNG', 14, 8, 42, 42 * mendoza.naturalHeight / mendoza.naturalWidth);
+    const brandX = pageWidth - 91;
+    doc.addImage(brand, 'PNG', brandX, 9, 13.4, 13.4);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(27,94,60);
+    doc.text('SITREP', brandX + 17, 14);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(94,107,127);
+    doc.text(['Trazabilidad de residuos', 'peligrosos'], brandX + 17, 20, { lineHeightFactor: 1.3 });
+    doc.setDrawColor(27,94,60);doc.line(14,32,pageWidth-14,32);
 
     doc.setDrawColor(229, 231, 235);
     doc.line(14, pageH - 15, pageWidth - 14, pageH - 15);

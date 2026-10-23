@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import PDFDocument from 'pdfkit';
+import { institutionalPdf, PDF_STYLE } from './institutionalPdf.service';
 import type { Prisma } from '@prisma/client';
 import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
@@ -38,33 +38,27 @@ export async function notifyCertificateParties(tx: Prisma.TransactionClient, man
   datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:record.id,tipoCertificado:record.tipo,url:'/manifiestos/'+manifest.id+'?certificado='+record.id+'#certificaciones'}),
  }))});
 }
-export function renderManifestCertificate(data:CertificateSnapshot, id:string, signature:string):Promise<Buffer> {
- return new Promise((resolve,reject)=>{
-  const doc=new PDFDocument({size:'A4',margins:{top:100,bottom:55,left:45,right:45},info:{Title:data.numero,Author:'SITREP · '+data.operador,CreationDate:new Date(data.fecha)}});
-  const chunks:Buffer[]=[];doc.on('data',chunk=>chunks.push(chunk));doc.on('error',reject);doc.on('end',()=>resolve(Buffer.concat(chunks)));
-  function header(){
-   doc.roundedRect(45,25,65,48,10).fill('#165B3C');
-   doc.font('Helvetica-Bold').fontSize(30).fillColor('#FFFFFF').text('C3',52,32,{lineBreak:false});
-   doc.fontSize(12).fillColor('#165B3C').text('SITREP · Certificaciones',125,35,{lineBreak:false});
-   doc.font('Helvetica').fontSize(9).fillColor('#475569').text('Documento emitido por el operador',125,56,{lineBreak:false});
-   doc.x=45;doc.y=100;doc.font('Helvetica').fontSize(11).fillColor('#182822');
-  }
-  doc.on('pageAdded',header);header();
-  doc.font('Helvetica-Bold').fontSize(18).text(data.tipo==='FINAL'?'Certificación final total':'Certificación parcial');
-  doc.fontSize(12).text(data.numero).moveDown();
-  if(data.artificial) doc.fontSize(10).text('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL').moveDown();
-  doc.font('Helvetica').fontSize(11).text('Manifiesto: '+data.manifiestoNumero).text('Generador: '+data.generador).text('Transporte: '+data.transportista).text('Operador: '+data.operador).text('Emitido por: '+data.autor);
-  doc.text('Fecha: '+new Date(data.fecha).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza',hour12:false})+' (Mendoza)');
-  doc.moveDown().text('Método declarado: '+data.metodo);
-  if(data.nota)doc.text('Observaciones: '+data.nota);
-  doc.moveDown().font('Helvetica-Bold').text(data.tipo==='FINAL'?'Total recibido y tratado (incluye los parciales previos)':'Cantidad tratada certificada en este parcial').font('Helvetica');
-  for(const row of data.cantidades)doc.text(row.corriente+': '+row.cantidad+' '+row.unidad);
-  if(data.parcialesPrevios.length)doc.moveDown().text('Parciales previos: '+data.parcialesPrevios.join(', '));
-  if(data.adendas.length)doc.moveDown().text((data.tipo==='FINAL'?'Adendas resueltas: ':'Adendas vinculadas: ')+data.adendas.map(a=>a.id+' v'+a.version).join(', '));
-  if(doc.y>610)doc.addPage();
-  doc.moveDown().text('Firma manuscrita del operador:');
-  doc.image(Buffer.from(signature.split(',')[1],'base64'),45,doc.y,{fit:[220,90]});doc.y+=100;
-  doc.fontSize(8).text('Registro: '+id).text('Huella de la firma: '+data.firmaSha256);
-  doc.end();
- });
+export function renderManifestCertificate(data: CertificateSnapshot, id: string, signature: string): Promise<Buffer> {
+ return institutionalPdf(data.tipo === 'FINAL' ? 'Certificación final total' : 'Certificación parcial', data.numero, layout => {
+  const doc = layout.doc;
+  layout.text(data.tipo === 'FINAL' ? 'Certificación final total' : 'Certificación parcial', true, 22, PDF_STYLE.green);
+  layout.text(data.numero, true, 13);
+  if (data.artificial) layout.text('DATOS ARTIFICIALES · SIN VALIDEZ OFICIAL', true, 10);
+  layout.fields([{label: 'Manifiesto', value: data.manifiestoNumero}, {label: 'Emisión (Mendoza)', value: new Date(data.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza',hour12:false})}]);
+  layout.section('01  PARTES Y EMISOR');
+  layout.fields([{label:'Generador',value:data.generador}]);
+  layout.fields([{label:'Transporte',value:data.transportista}]);
+  layout.fields([{label:'Operador',value:data.operador},{label:'Emitido por',value:data.autor}]);
+  layout.section('02  TRATAMIENTO CERTIFICADO');
+  layout.fields([{label:'Método declarado',value:data.metodo}]);
+  if (data.nota) { layout.text('Observaciones',true,9); layout.text(data.nota); }
+  layout.text(data.tipo==='FINAL'?'Total recibido y tratado (incluye los parciales previos)':'Cantidad tratada certificada en este parcial',true,10);
+  layout.table(['Corriente','Cantidad','Unidad'],data.cantidades.map(row=>[row.corriente,String(row.cantidad),row.unidad]),[260,155,92]);
+  if(data.parcialesPrevios.length) { layout.text('Parciales previos',true,9); layout.text(data.parcialesPrevios.join(', '),false,9); }
+  if(data.adendas.length) { layout.text(data.tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas',true,9); layout.text(data.adendas.map(a=>a.id+' v'+a.version).join(', '),false,8); }
+  layout.section('03  FIRMA E INTEGRIDAD', 155);
+  layout.text('Firma manuscrita del operador',true,10);
+  const y=doc.y;doc.image(Buffer.from(signature.split(',')[1],'base64'),44,y,{fit:[220,60]});doc.y=y+70;
+  layout.text('Registro: '+id,false,8);layout.text('Huella de la firma: '+data.firmaSha256,false,8,PDF_STYLE.muted);
+ }, new Date(data.fecha));
 }

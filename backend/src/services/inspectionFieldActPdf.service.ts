@@ -6,8 +6,7 @@ import {
 } from './inspectionDocumentIntegrity.service';
 import { prepareInspectionPdfImages, type PreparedInspectionImage } from './inspectionPdfImage.service';
 import {
-  drawMendozaMark,
-  drawSitrepMark,
+  drawInstitutionalMasthead,
   loadInspectionPdfBranding,
   type InspectionPdfBranding,
 } from './inspectionPdfBranding.service';
@@ -366,19 +365,17 @@ function institutionalHeader(
   branding: InspectionPdfBranding,
   subtitle?: string,
 ) {
-  drawMendozaMark(doc, branding, 34, 17, 152, 48);
-  drawSitrepMark(doc, 374, 21, { width: 187 });
-  doc.font('Helvetica-Bold').fontSize(6.3).fillColor(COLORS.green)
-    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 34, 69, { width: 365, lineBreak: false });
-  doc.font('Helvetica').fontSize(6).fillColor(COLORS.muted)
-    .text('DOCUMENTO OFICIAL GENERADO POR SITREP', 385, 69, { width: 176, align: 'right', lineBreak: false });
-  doc.moveTo(34, 84).lineTo(doc.page.width - 34, 84).lineWidth(1.5).strokeColor(COLORS.green).stroke();
+  drawInstitutionalMasthead(doc, branding, 34, 16, doc.page.width - 68);
+  doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted)
+    .text('MINISTERIO DE ENERGÍA Y AMBIENTE · SUBSECRETARÍA DE AMBIENTE · DGFA', 34, 77, { width: doc.page.width - 68, lineBreak: false });
+  doc.moveTo(34, 89).lineTo(doc.page.width - 34, 89).lineWidth(1).strokeColor(COLORS.green).stroke();
 
   doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.ink)
     .text('ACTA DE INSPECCIÓN / CONSTATACIÓN', 34, 97, { width: 310 });
   doc.font('Helvetica-Bold').fontSize(15).fillColor(COLORS.green)
     .text(`N.º ${actNumber}`, 337, 94, { width: 224, align: 'right' });
-  if (subtitle) doc.font('Helvetica').fontSize(6.8).fillColor(COLORS.muted)
+  doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted).text('DOCUMENTO OFICIAL GENERADO POR SITREP', 34, 115, { width: 295, lineBreak: false });
+  if (subtitle) doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted)
     .text(subtitle, 337, 115, { width: 224, align: 'right', height: 13, ellipsis: true });
   doc.moveTo(34, 133).lineTo(doc.page.width - 34, 133).lineWidth(0.6).strokeColor(COLORS.line).stroke();
   doc.y = 143;

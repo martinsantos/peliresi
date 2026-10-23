@@ -7,13 +7,16 @@ import { signatureReminderPhase } from '../jobs/manifestSignatureReminder.job';
 import { getNotificacion } from '../controllers/notification.controller';
 afterEach(() => vi.unstubAllEnvs());
 describe('communication links', () => {
-  it.each(['/manifiestos/m?certificado=c#certificaciones', '/manifiestos/m/adendas?adenda=a', '/mis-inspecciones/i#intercambios', '/soporte/s', '/mi-solicitud?solicitud=s', '/app/notificaciones/n'])('app first and identical explicit web fallback: %s', path => {
+  it.each(['/manifiestos/m?certificado=c#certificaciones', '/manifiestos/m/adendas?adenda=a', '/mis-inspecciones/i#intercambios', '/soporte/s', '/mi-solicitud?solicitud=s', '/app/notificaciones/n'])('account preference plus identical explicit web/app alternatives: %s', path => {
     vi.stubEnv('FRONTEND_URL', 'https://sitrep.example.invalid');
     const html = mailAction(path, 'Abrir');
     const urls = [...html.matchAll(/href="([^"]+)"/g)].map(m => new URL(m[1]));
-    expect(urls).toHaveLength(2); expect(urls[0].origin).toBe(urls[1].origin);
-    expect(urls[0].pathname).toBe('/app' + urls[1].pathname);
-    expect(urls[0].search + urls[0].hash).toBe(urls[1].search + urls[1].hash);
+    expect(urls).toHaveLength(3);
+    expect(new Set(urls.map(u => u.origin)).size).toBe(1);
+    expect(urls[0].pathname).toBe('/app/abrir');
+    expect(urls[0].searchParams.get('destino')).toBe(urls[1].pathname + urls[1].search + urls[1].hash);
+    expect(urls[2].pathname).toBe('/app' + urls[1].pathname);
+    expect(urls[2].search + urls[2].hash).toBe(urls[1].search + urls[1].hash);
   });
   it.each(['//other.invalid','/\\other.invalid','/\nother.invalid','/x/%2f../outside'])('rejects an unsafe destination: %s', path => expect(() => mailAction(path, 'Abrir')).toThrow());
   it('preserves encoded auth tokens without using them as paths', () => {

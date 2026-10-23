@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { TaskHelp } from './TaskHelp';
+import OnboardingWizard from './OnboardingWizard';
+import { useLocation } from 'react-router-dom';
 import { HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
@@ -21,6 +24,30 @@ export function SupportBubble({ mobile = false, aboveTrip = false, hidden = fals
 
 function Bubble({ owner, mobile, aboveTrip, hidden, inline }: { owner: string; mobile: boolean; aboveTrip: boolean; hidden: boolean; inline: boolean }) {
   const { impersonationData } = useImpersonation();
+  const { currentUser } = useAuth();
+  const location = useLocation();
+  const [help, setHelp] = useState(false);
+  const [welcome, setWelcome] = useState(false);
+  const [needsHelp, setNeedsHelp] = useState(false);
+  useEffect(() => {
+    setHelp(false); setWelcome(false); setNeedsHelp(false);
+    let attempted = false, indicated = false;
+    // Observe validity markers, never typed values. Do not open a dialog or steal focus.
+    const root = document.querySelector('main') || document.body;
+    const check = () => {
+      const invalidControl = attempted && [...root.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input, select, textarea')]
+        .some(control => control.willValidate && !control.validity.valid);
+      const next = Boolean(root.querySelector('[aria-invalid="true"]') || invalidControl);
+      if (next !== indicated) { indicated = next; setNeedsHelp(next); }
+    };
+    const invalid = () => { attempted = true; check(); };
+    document.addEventListener('invalid', invalid, true);
+    document.addEventListener('input', check, true);
+    const observer = new MutationObserver(check);
+    observer.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-invalid'] });
+    check();
+    return () => { document.removeEventListener('invalid', invalid, true); document.removeEventListener('input', check, true); observer.disconnect(); };
+  }, [location.pathname]);
   const [open, setOpen] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [screenshot, setScreenshot] = useState<File>();
@@ -66,10 +93,12 @@ function Bubble({ owner, mobile, aboveTrip, hidden, inline }: { owner: string; m
     {!hidden && !keyboard && <div data-support-ui className={inline ? 'relative flex shrink-0 items-center' : 'fixed right-4 z-[45] flex flex-col items-end gap-2'} style={inline ? undefined : { bottom }} hidden={open && !inline}>
       {sent && !inline && <p role="status" className="max-w-[240px] rounded-lg border border-primary-200 bg-white p-3 text-sm text-primary-900 shadow-sm">Reporte enviado a soporte. Podés continuar.</p>}
       <button type="button" title="Ayuda y soporte técnico" aria-label="Ayuda y soporte técnico" aria-haspopup="dialog" aria-busy={capturing || undefined} disabled={capturing || open}
-        onClick={() => void report()} className={`flex items-center justify-center gap-2 rounded-full border-2 border-white bg-primary-700 text-white transition-colors hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:opacity-80 ${inline ? 'h-11 w-11 p-0' : mobile ? 'h-12 w-12 p-0 shadow-lg' : 'min-h-12 min-w-12 px-3 shadow-lg'}`}>
-        <HelpCircle size={inline ? 20 : 24} aria-hidden="true" />{!mobile && !inline && <span className="hidden text-sm font-semibold sm:inline">{capturing ? 'Capturando…' : 'Ayuda'}</span>}
+        onClick={() => setHelp(true)} className={`flex items-center justify-center gap-2 rounded-full border-2 border-white bg-primary-700 text-white transition-colors hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:opacity-80 ${inline ? 'h-11 w-11 p-0' : mobile ? 'h-12 w-12 p-0 shadow-lg' : 'min-h-12 min-w-12 px-3 shadow-lg'}`}>
+        <HelpCircle size={inline ? 20 : 24} aria-hidden="true" />{!mobile && !inline && <span className="hidden text-sm font-semibold sm:inline">{capturing ? 'Capturando…' : needsHelp ? 'Ayuda para completar' : 'Ayuda'}</span>}
       </button>
     </div>}
+    <TaskHelp open={help} onClose={() => setHelp(false)} onReport={() => { setHelp(false); void report(); }} onWelcome={() => { setHelp(false); setWelcome(true); }} path={location.pathname} role={currentUser?.rol || 'AUDITOR'} inspector={currentUser?.esInspector} needsHelp={needsHelp} />
+    {welcome && currentUser && <OnboardingWizard key={currentUser.rol} rol={currentUser.rol} esInspector={currentUser.esInspector} userId={owner} onDismiss={() => setWelcome(false)} />}
     <SupportReportDialog open={open} onClose={() => { setOpen(false); setScreenshot(undefined); }}
       onSubmitted={() => { if (inline) toast.success('Reporte enviado a soporte'); else setSent(true); }} screenshot={screenshot} captureError={captureError} context={context} returnToTask />
   </>;

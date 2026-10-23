@@ -349,6 +349,9 @@ export const MobileLayout: React.FC = () => {
     if (path.includes('/switch-user')) return 'Cuenta';
     if (path.includes('/centro-control')) return 'Centro de Control';
     if (path.includes('/admin/usuarios')) return 'Usuarios';
+    if (path.includes('/admin/solicitudes')) return 'Solicitudes';
+    if (path.includes('/admin/renovaciones')) return 'Renovaciones';
+    if (path.includes('/admin/tratamientos')) return 'Tratamientos';
     if (path.includes('/admin/generadores')) return 'Generadores';
     if (path.includes('/admin/operadores')) return 'Operadores';
     if (path.includes('/admin/vehiculos')) return 'Vehículos';
@@ -399,27 +402,27 @@ export const MobileLayout: React.FC = () => {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 shrink-0 sidebar-polished safe-area-top">
+      <header className="sticky top-0 z-40 shrink-0 bg-white border-b border-neutral-200 safe-area-top">
         <div className="flex items-center justify-between gap-2 h-16 px-4 safe-top">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <button
               onClick={() => setIsMenuOpen(true)}
-              className="p-2 -ml-2 text-white/80 hover:bg-white/10 rounded-xl transition-colors touch-target"
+              className="p-2 -ml-2 text-primary-800 hover:bg-primary-50 rounded-xl transition-colors touch-target"
               aria-label="Abrir menu"
             >
               <Menu size={24} />
             </button>
             <SitrepMark size={24} />
             <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-              <h1 className="min-w-0 whitespace-normal break-words text-base font-bold leading-5 text-white">{getPageTitle()}</h1>
-              <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="w-fit max-w-full whitespace-normal break-normal text-xs leading-4 font-medium px-2 py-0.5 rounded-full bg-white/20 text-white">
+              <h1 className="min-w-0 whitespace-normal break-words text-base font-bold leading-5 text-neutral-900">{getPageTitle()}</h1>
+              <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="w-fit max-w-full whitespace-normal break-normal text-xs leading-4 font-medium px-2 py-0.5 rounded-full bg-primary-50 text-neutral-900">
                 {config.label}
               </span>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {inlineSupport && <SupportBubble mobile inline hidden={isMenuOpen} />}
-            <NotificationBell basePath={mp('')} inverse />
+            <NotificationBell basePath={mp('')} />
           </div>
         </div>
       </header>
@@ -466,7 +469,7 @@ export const MobileLayout: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drawer Header */}
-            <div className={`p-4 border-b ${config.bgColor} bg-opacity-10`}>
+            <div className="p-4 border-b border-neutral-200 bg-white">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <SitrepMark size={40} />

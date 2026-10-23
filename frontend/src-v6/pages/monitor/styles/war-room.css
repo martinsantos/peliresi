@@ -121,7 +121,7 @@
 .wr-layout button:focus-visible, .wr-layout a:focus-visible, .wr-layout input:focus-visible, .wr-layout select:focus-visible {
   outline: 2px solid #0D8A4F; outline-offset: 2px;
 }
-.wr-header button:focus-visible { outline-color: #fff; }
+.wr-header button:focus-visible { outline-color: #1B5E3C; }
 .wr-timeline-actions button { min-height: 44px; min-width: 44px; }
 .wr-widget-content [class*="text-[9px]"], .wr-event-item [class*="text-[9px]"] { font-size: 11px; }
 .wr-widget-content [class*="text-[10px]"], .wr-event-item [class*="text-[10px]"] { font-size: 12px; }

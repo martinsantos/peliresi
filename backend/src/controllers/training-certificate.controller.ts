@@ -1,3 +1,4 @@
+import { drawSitrepMark } from '../services/inspectionPdfBranding.service';
 import { createHash } from 'node:crypto';
 import PDFDocument from 'pdfkit';
 import { Response,NextFunction } from 'express';
@@ -61,10 +62,8 @@ export async function downloadTrainingCertificate(req:AuthRequest,res:Response,n
   doc.on('data',chunk=>chunks.push(chunk));doc.on('error',reject);doc.on('end',()=>resolve(Buffer.concat(chunks)));
   function heading(){
    const y=doc.y;
-   doc.roundedRect(45,25,65,48,10).fill('#165B3C');
-   doc.font('Helvetica-Bold').fontSize(30).fillColor('#FFFFFF').text('C3',52,32,{lineBreak:false});
-   doc.fontSize(11).fillColor('#165B3C').text('SITREP · Trazabilidad de residuos',125,33,{lineBreak:false});
-   doc.font('Helvetica').fontSize(9).fillColor('#475569').text('Certificaciones · Registro compartido entre las partes',125,52,{lineBreak:false});
+   drawSitrepMark(doc,45,25,{width:220});
+   doc.font('Helvetica').fontSize(9).fillColor('#475569').text('Registro compartido entre las partes',300,50,{lineBreak:false});
    doc.rect(45,84,505,22).fill('#FEF3C7');doc.font('Helvetica-Bold').fontSize(9).fillColor('#78350F').text('CAPACITACIÓN - SIN VALIDEZ OFICIAL',54,91,{lineBreak:false});
    doc.y=Math.max(y,125);doc.x=45;doc.fillColor('#182822').font('Helvetica').fontSize(11);
   }

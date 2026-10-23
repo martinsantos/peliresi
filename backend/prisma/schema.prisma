@@ -29,6 +29,7 @@ model Usuario {
   dosFaVerificado        Boolean   @default(false)
   notifNuevoRegistro     Boolean   @default(true)
   notifEmail             Boolean   @default(true)
+  preferenciaEnlaces      String    @default("AUTO")
   notifWhatsapp          Boolean   @default(false)
   notifTelegram          Boolean   @default(false)
   telegramChatId         String?

@@ -1,5 +1,15 @@
 # SITREP — traspaso vigente de operación
 
+## Identidad, bienvenida y enlaces — sólo preview, 23/10/2026
+
+**Corregido y probado; no publicado.** Leer [cambios, galería, pruebas y límites](PRODUCTO-IDENTIDAD-AYUDA-20261023.md). Cabecera PDF institucional compartida, flecha verde sobre blanco sin recuadro, paginado/documentos extensos, bienvenida por ocho perfiles, preferencia Web/App guardada por persona y ayuda contextual antes del reporte técnico. Corregidos títulos de secciones en web/app. Los documentos firmados existentes conservan sus bytes.
+
+**1.597 backend / 1.879 frontend / 141 E2E únicos PASS**; comprobaciones posteriores: 80 unitarias de layouts, 21 de enlaces y 8 del manual, más navegador afectado. **47 E2E por superficie**, sin contar repeticiones. 14 PDF/43 páginas, revisión de 22 secciones por superficie, galería 198 escenarios. Tipos/builds PASS. Lint de 31 archivos modificados: cero errores/31 advertencias; el lint global mantiene deuda preexistente, detallada en el informe.
+
+Manual **2026.23.1**, renderer/recorridos preservados y cabecera blanca. Nueva migración aditiva **20261023120000_user_link_preference**, probada sólo en base artificial; publicación futura requiere backup/migración y builds con API final. Los bundles QA no se publican.
+
+**CAP cerrado, correos/push apagados, cero envíos; sin producción, main, push ni workflows.** Preview serial/un worker/1 CPU/2 GiB/swap cero, cerrado **23/10/2026 11:00:33 Mendoza**, imagen/base/evidencias conservadas; límite de memoria alcanzado sin OOM. La publicación y reversión vigentes siguen siendo las de `a7f20d2f` de abajo. Android físico, sensores, captura por PWA instalada y entrega externa pendientes.
+
 ## Validación adicional — web y app en preview, 23/10/2026
 
 **105/105 E2E y 382/382 unitarias dirigidas PASS** sobre producto `a7f20d2f`, sin cambios de producto ni despliegue. Leer [alcance, resultados y evidencia](VALIDACION-WEB-APP-PREVIEW-20261023.md). Login, una razón social con G/T/O y dos personas en total incluida la titular, representantes, propuestas por los tres actores, ciclo completo con certificados y enlaces exactos tras login. **35 E2E por superficie**: escritorio, web angosta y `/app`; 249 capturas. Se conserva el fallo inicial del guion de entrega y su corrección, seguida de 3/3 ciclos completos PASS.

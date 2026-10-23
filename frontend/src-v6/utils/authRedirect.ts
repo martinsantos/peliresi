@@ -3,8 +3,9 @@ export function safeLocalRedirect(from: unknown, fallback = '/dashboard'): strin
   return typeof from === 'string'
     && from.startsWith('/')
     && !from.startsWith('//')
-    && !/[\\\s\u0000-\u001f]/.test(from)
-    && !/%(?:2f|5c|0[ad])/i.test(from)
+    && !/[\\\s]/.test(from)
+    && !Array.from(from).some(character => character.charCodeAt(0) < 32)
+    && !/%(?:2f|5c|0[ad])/i.test(from.split(/[?#]/)[0])
     ? from
     : fallback;
 }

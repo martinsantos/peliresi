@@ -60,7 +60,7 @@ it('does not permit an actorRead guard to authorize a different category', () =>
 });
 it('keeps loading from mounting an actor or deciding access prematurely', () => {
   auth.isLoading = true; open();
-  expect(screen.getByText('Verificando autenticacion...')).toBeVisible(); expect(auth.mount).not.toHaveBeenCalled();
+  expect(screen.getByText('Verificando tu sesión…')).toBeVisible(); expect(auth.mount).not.toHaveBeenCalled();
 });
 it('retains an anonymous return path including query and hash in the app basename', () => {
   auth.currentUser = null; open('/admin/actores/generadores/g-1?view=docs#registro', '/app');

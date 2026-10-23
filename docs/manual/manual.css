@@ -93,8 +93,9 @@ p { margin: 0; }
   z-index: 100;
   min-height: var(--header-height);
   padding: 0 max(24px, calc((100vw - 1340px) / 2));
-  background: var(--green-800);
-  color: #fff;
+  background: var(--surface);
+  color: var(--green-800);
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -102,7 +103,7 @@ p { margin: 0; }
 }
 .brand {
   min-width: 0;
-  color: #fff;
+  color: var(--green-800);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -111,8 +112,8 @@ p { margin: 0; }
 }
 .brand img { width: 42px; height: 42px; object-fit: contain; }
 .brand-name { font-family: "Plus Jakarta Sans", sans-serif; font-size: 20px; font-weight: 700; }
-.brand-name strong { color: #b7f0cf; }
-.brand-divider { width: 1px; height: 30px; background: rgba(255,255,255,.44); }
+.brand-name strong { color: var(--ink-600); }
+.brand-divider { width: 1px; height: 30px; background: var(--line-strong); }
 .brand-product { font-weight: 500; font-size: 15px; }
 .header-nav, .header-link {
   display: flex;
@@ -123,26 +124,26 @@ p { margin: 0; }
   min-height: 44px;
   gap: 8px;
   border-radius: 10px;
-  color: #fff;
+  color: var(--green-800);
   font-size: 14px;
   font-weight: 600;
   padding: 0 13px;
   text-decoration: none;
 }
-.header-link:hover { background: rgba(255,255,255,.1); }
-.header-link-primary { border-left: 1px solid rgba(255,255,255,.34); border-radius: 0; padding-left: 22px; }
+.header-link:hover { background: var(--green-50); }
+.header-link-primary { border-left: 1px solid var(--line); border-radius: 0; padding-left: 22px; }
 .header-search {
   width: min(520px, 42vw);
   min-height: 44px;
-  border: 1px solid rgba(255,255,255,.24);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255,255,255,.12);
+  background: var(--surface-soft);
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 14px;
 }
-.header-search:focus-within { background: #fff; color: var(--ink-950); outline: 3px solid rgba(255,255,255,.28); }
+.header-search:focus-within { background: #fff; color: var(--ink-950); outline: 3px solid var(--focus); }
 .header-search input {
   min-width: 0;
   flex: 1;
@@ -151,7 +152,7 @@ p { margin: 0; }
   background: transparent;
   color: inherit;
 }
-.header-search input::placeholder { color: rgba(255,255,255,.75); }
+.header-search input::placeholder { color: var(--ink-500); }
 .header-search:focus-within input::placeholder { color: var(--ink-500); }
 .header-search button {
   min-height: 34px;
@@ -607,10 +608,10 @@ p { margin: 0; }
   .tutorial-header .header-search { margin-left: auto; width: 44px; min-height: 44px; border: 0; background: transparent; padding: 0; justify-content: center; }
   .tutorial-header .header-search input, .tutorial-header .header-search button { display: none; }
   body[data-page="tutorial"] .header-search { display: none; }
-  .mobile-search-link { display: flex; align-items: center; justify-content: center; margin-left: auto; min-width: 44px; min-height: 44px; color: #fff; text-decoration: none; }
+  .mobile-search-link { display: flex; align-items: center; justify-content: center; margin-left: auto; min-width: 44px; min-height: 44px; color: var(--green-800); text-decoration: none; }
   /* Search must remain usable on phones, not collapse into an inert icon. */
   body[data-page="search"] .help-header { flex-wrap: wrap; gap: 8px; padding-block: 8px; }
-  body[data-page="search"] .search-page-form { order: 3; width: 100%; margin: 0; padding: 0 10px; background: rgba(255,255,255,.12); }
+  body[data-page="search"] .search-page-form { order: 3; width: 100%; margin: 0; padding: 0 10px; background: var(--surface-soft); }
   body[data-page="search"] .search-page-form input { display: block; min-height: 44px; }
   body[data-page="search"] .search-page-form button { display: block; min-height: 44px; }
   .home-container { width: min(100% - 36px, var(--content-max)); }

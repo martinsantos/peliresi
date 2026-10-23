@@ -22,6 +22,7 @@ import type { Usuario } from '../types/models';
 export type UserRole = 'ADMIN' | 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | 'AUDITOR' | 'ADMIN_TRANSPORTISTA' | 'ADMIN_GENERADOR' | 'ADMIN_OPERADOR';
 
 export interface User {
+  preferenciaEnlaces?: import('../utils/linkPreference').LinkPreference;
   empresaContexto?:import('../services/companyContext').CompanyContext;
   contextosEmpresa?:import('../services/companyContext').CompanyChoice[];
   empresaContextoError?:string;
@@ -103,6 +104,7 @@ function apiUserToUser(u: Usuario): User {
 
   return {
     id: u.id,
+    preferenciaEnlaces: u.preferenciaEnlaces || 'AUTO',
     nombre: [u.nombre, u.apellido].filter(Boolean).join(' '),
     email: u.email,
     rol: u.rol as UserRole,

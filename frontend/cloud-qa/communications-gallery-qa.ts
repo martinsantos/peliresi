@@ -36,11 +36,15 @@ try{
  await check('every email retains app and web destinations with identical record and parameters',async()=>{
    for(const [ref,html] of Object.entries(data.blobs) as [string,string][]){
      if(!html.includes('data-mail-action'))continue;
-     const links=[...html.matchAll(/data-mail-action="(app|web)" href="([^"]+)"/g)];
-     assert.ok(links.length>=2,ref);assert.equal(links.length%2,0,ref);
-     for(let i=0;i<links.length;i+=2){
-       const app=new URL(links[i][2].replace(/&amp;/g,'&')),web=new URL(links[i+1][2].replace(/&amp;/g,'&'));
+     const links=[...html.matchAll(/data-mail-action="(preferred|app|web)" href="([^"]+)"/g)];
+     assert.ok(links.length>=3,ref);assert.equal(links.length%3,0,ref);
+     for(let i=0;i<links.length;i+=3){
+       const group=new Map(links.slice(i,i+3).map(link=>[link[1],new URL(link[2].replace(/&amp;/g,'&'))]));
+       const app=group.get('app')!,web=group.get('web')!,preferred=group.get('preferred')!;
+       assert.ok(app&&web&&preferred,ref);
        assert.equal(app.origin,'https://sitrep.example.invalid',ref);assert.equal(web.origin,app.origin,ref);
+       assert.equal(preferred.origin,app.origin,ref);assert.equal(preferred.pathname,'/app/abrir',ref);
+       assert.equal(preferred.searchParams.get('destino'),web.pathname+web.search+web.hash,ref);
        assert.equal(app.pathname,'/app'+web.pathname,ref);assert.equal(app.search+app.hash,web.search+web.hash,ref);
        assert.ok(!app.href.includes('undefined'),ref);
        assert.ok(webRoutes.some(route=>route.test(web.pathname)),ref+' missing web route '+web.pathname);
