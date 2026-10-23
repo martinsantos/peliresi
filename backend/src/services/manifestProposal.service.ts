@@ -23,7 +23,7 @@ export async function validateProposalParties(tx: Tx, p: Parties) {
 }
 /** Creation and inbox commit together. Return only fresh IDs for a caller's
  * post-commit dispatch; CAP never sends external notifications. */
-export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:string;numero:string;creadoPorId:string;fechaEstimadaRetiro:Date|null;modalidad?:string}, phase:string, author:string) {
+export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:string;numero:string;creadoPorId:string;fechaEstimadaRetiro:Date|null;modalidad?:string|null}, phase:string, author:string) {
   const users=await parties(tx,manifest);
   const partyUsers=users.filter(p=>p.usuario?.activo).map(p=>p.usuario!.id);
   const origin=users.find(p=>p.usuario?.id===author);
