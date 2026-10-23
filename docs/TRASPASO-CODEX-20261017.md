@@ -1,5 +1,11 @@
 # SITREP — traspaso vigente de operación
 
+## Validación adicional — web y app en preview, 23/10/2026
+
+**105/105 E2E y 382/382 unitarias dirigidas PASS** sobre producto `a7f20d2f`, sin cambios de producto ni despliegue. Leer [alcance, resultados y evidencia](VALIDACION-WEB-APP-PREVIEW-20261023.md). Login, una razón social con G/T/O y dos personas en total incluida la titular, representantes, propuestas por los tres actores, ciclo completo con certificados y enlaces exactos tras login. **35 E2E por superficie**: escritorio, web angosta y `/app`; 249 capturas. Se conserva el fallo inicial del guion de entrega y su corrección, seguida de 3/3 ciclos completos PASS.
+
+**CAP cerrado, correos/push apagados, cero envíos**. Preview serial/un worker/1 CPU/2 GiB/swap cero, detenido **23/10/2026 07:47:43 Mendoza**; bases artificiales e imagen conservadas, sin OOM. Sin producción, main, push ni workflows. Manual **2026.22.7** verificado, sin cambios. Android físico queda para cuando el dueño tenga el teléfono; no certifica PWA instalada, sensores ni entrega externa. La publicación y reversión vigentes de abajo no cambian.
+
 ## Publicación vigente — empresa y multirol, 22/10/2026
 
 **`a7f20d2f` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 22/10/2026 22:47:21 Mendoza.** Leer primero [resultado, respaldo y reversión vigente](DESPLIEGUE-MULTIROL-20261022.md). **Empresa y multirol habilitados** en backend/web/app; una razón social, varias actividades aprobadas y **dos personas en total incluida la titular**, sin sumar cupos por rol o sede. Sin vincular cuentas existentes por inferencia.
