@@ -96,11 +96,37 @@ try{
   await request('generador',`/manifiestos/${cancelled.id}/cancelar`,'POST',{motivo:'QA cancelación antes del retiro'});
   await approve('operador',cancelled.id,409);await request('generador',`/manifiestos/${cancelled.id}`,'DELETE',undefined,409);
   passed.push('cancellation preserves immutable history and rejects subsequent approval');
-  const insitu=(await request('generador','/manifiestos','POST',{...body,modalidad:'IN_SITU',transportistaId:undefined,vehiculoId:undefined,choferId:undefined},201)).data.manifiesto;
-  assert.equal(insitu.estado,'BORRADOR');assert.equal(insitu.transportistaId,null);
-  await request('generador',`/manifiestos/${insitu.id}/firmar`,'POST',{firma});
-  await request('operador',`/manifiestos/${insitu.id}/recepcion-insitu`,'POST',{});
-  passed.push('existing in-situ two-party creation, signature and reception unchanged');
+  for(const creator of ['generador','operador']){
+   const insitu=(await request(creator,'/manifiestos','POST',{...body,modalidad:'IN_SITU',transportistaId:undefined,vehiculoId:undefined,choferId:undefined},201)).data.manifiesto;
+   assert.equal(insitu.estado,'PENDIENTE_APROBACION');assert.equal(insitu.transportistaId,null);
+   const initial=(await request(creator,`/manifiestos/${insitu.id}/aprobaciones`)).data;
+   assert.deepEqual(initial.partes.map((p:any)=>[p.rol,p.aprobada]),[['GENERADOR',false],['OPERADOR',false]]);
+   await request('operador',`/manifiestos/${insitu.id}/recepcion-insitu`,'POST',{},409);
+   await request('operador',`/manifiestos/${insitu.id}/iniciar-coordinacion`,'POST',{},409);
+   await approve(creator,insitu.id);
+   const partial=(await request(creator,`/manifiestos/${insitu.id}/aprobaciones`)).data;
+   assert.equal(partial.estado,'PENDIENTE_APROBACION');assert.equal(partial.partes.filter((p:any)=>p.aprobada).length,1);
+   assert.equal(partial.puedeIniciar,false);
+   await request('operador',`/manifiestos/${insitu.id}/recepcion-insitu`,'POST',{},409);
+   await request('operador',`/manifiestos/${insitu.id}/iniciar-coordinacion`,'POST',{},409);
+   const other=creator==='generador'?'operador':'generador';await approve(other,insitu.id);
+   const unanimous=(await request(creator,`/manifiestos/${insitu.id}/aprobaciones`)).data;
+   assert.equal(unanimous.estado,'APROBADO');assert.ok(unanimous.partes.every((p:any)=>p.aprobada));
+   await request('operador',`/manifiestos/${insitu.id}/recepcion-insitu`,'POST',{},409);
+   await request(creator,`/manifiestos/${insitu.id}/iniciar-coordinacion`,'POST',{});
+   // Every phase reaches both actual participants; no transport is invented.
+   const notices=await db.notificacion.findMany({where:{manifiestoId:insitu.id}});
+   assert.equal(notices.length,8);
+   for(const phase of ['creada','aprobacion-'+creator.toUpperCase(),'aprobada','iniciada']){
+    const phaseNotices=notices.filter((n:any)=>JSON.parse(n.datos).fase===phase);
+    assert.deepEqual(phaseNotices.map((n:any)=>n.usuarioId).sort(),[fixture.users.generador,fixture.users.operador].sort());
+    assert.ok(phaseNotices.every((n:any)=>JSON.parse(n.datos).url===`/manifiestos/${insitu.id}`));
+   }
+   await request('operador',`/manifiestos/${insitu.id}/recepcion-insitu`,'POST',{});
+   const received=await db.manifiesto.findUniqueOrThrow({where:{id:insitu.id}});
+   assert.equal(received.estado,'RECIBIDO');assert.equal(received.fechaRetiro,null);
+   passed.push(creator+': in-situ requires both explicit approvals and coordination before receipt; both parties notified at every phase');
+  }
   const legacy=await db.manifiesto.findUniqueOrThrow({where:{id:'manifest-qa-legacy'},include:{residuos:true,eventos:true}});
   assert.equal(JSON.stringify(legacy),readFileSync(out+'/manifest-legacy-before.json','utf8'));
   passed.push('legacy historical manifest unchanged byte-for-byte');

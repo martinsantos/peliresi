@@ -51,8 +51,20 @@ No se publicó esta tanda, no se modificó main ni datos reales y no se enviaron
 
 ## Reanudación
 
+### Ampliación de aceptación y publicación autorizada — 23/10, 17:03 Mendoza
+
+El dueño volvió a autorizar corregir, publicar y comprobar la versión real en web/app. **La autorización no acredita pruebas ejecutadas ni un despliegue realizado.** Se mantienen main y datos reales intactos, CAP cerrado, correo/push apagados y sin workflows.
+
+Se encontró otra omisión en el guion HTTP: todavía esperaba un `BORRADOR` nuevo en origen y aceptaba firma → recepción. Se reemplazó esa expectativa por creación pendiente desde generador y operador, decisiones independientes, rechazo HTTP de recepción/coordinación prematuras, ocho avisos para las dos partes efectivas y recepción sólo después del acuerdo y la coordinación. Los casos con transporte mantienen las tres decisiones obligatorias.
+
+El E2E de web, web angosta y app ahora comprueba también que cancelar el cambio a En origen conserve transporte, vehículo y chofer, y que cada una de las tres cuentas reciba todos los avisos de creación, decisiones, unanimidad e inicio, con enlace al mismo manifiesto e íconos verdes tras el acuerdo. **Estas ampliaciones sólo tienen revisión sintáctica; todavía no se ejecutaron.** No se suman a las 119 unitarias anteriores.
+
+Infraestructura comprobada por lectura: SITREP productivo en `23.105.176.45` sigue en `6580c1ca`, con dos workers estables, health/live/ready HTTP 200, CAP cerrado y canales externos apagados. El preview separado en `76.13.234.213` sigue sin responder por SSH. Producción mostró 958 MiB disponibles y swap prácticamente completa: no se inició allí una batería pesada ni un contenedor adicional. No se reutilizaron resultados de otra versión como aceptación de esta tanda.
+
+La comprobación final en producción debe registrar por separado la versión/hash servidos en web/app, las guardas reales y el recorrido efectivamente observado. El smoke de lectura no equivale a crear/aprobar manifiestos productivos. No inventar evidencia ni alterar el caso real 2026-000197 para simular la resolución.
+
 1. Recuperar diagnóstico de .qa-product-ux-20261023/proposals/ui-help-unit.json en el preview. Verificar procesos antes de iniciar otro trabajo.
 2. Sincronizar una fuente única con su comprobación de integridad. El preview conserva 185db0e2: todavía no contiene estos cambios.
-3. Ejecutar unitarias de agenda/propuestas/avisos y UI afectada, tipos, backend, builds web/app, manual y E2E ui-help-browser + proposal-browser con un trabajador. Revisar capturas y consola, no sólo el resultado del build.
+3. Ejecutar unitarias de agenda/propuestas/avisos y UI afectada, tipos, backend, builds web/app, manual, `proposal-http` actualizado y E2E ui-help-browser + proposal-browser con un trabajador. Revisar capturas y consola, no sólo el resultado del build. El guion HTTP anterior no es aceptación válida del nuevo circuito en origen.
 4. Auditar tablas protegidas y ausencia de envíos. No usar los scripts de publicación frontend de 185db0e2 para afirmar que se publicó esta tanda: ahora hay cambios de backend.
 5. Completar la publicación autorizada sólo con evidencia final, guardas y smoke no mutante. No ejecutar workflows ni hacer push.

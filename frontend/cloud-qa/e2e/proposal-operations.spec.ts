@@ -35,6 +35,17 @@ async function create(page:Page,info:TestInfo,role:Role){
  if(role!=='transportista')await choose(page,'Transportista *',/^QA Transporte 1 /);
  await choose(page,'Vehículo (opcional)',/^QA002ZZ/);await choose(page,'Chofer (opcional)',/^QA Segundo/);
  if(role!=='operador')await choose(page,'Operador / Destino *',/^QA Operador 1 /);
+ // A mode switch must never silently remove the third assigned party.
+ if(role!=='transportista'){
+  await page.getByRole('button',{name:/^En origen/}).click();
+  const warning=page.getByRole('alert').filter({hasText:'Ya asignaste un transporte.'});
+  await expect(warning).toBeVisible();
+  await expect(page.getByRole('button',{name:/^Con traslado/})).toHaveAttribute('aria-pressed','true');
+  await warning.getByRole('button',{name:'Mantener transporte',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Transportista *',exact:true})).toContainText('QA Transporte 1');
+  await expect(page.getByRole('button',{name:'Vehículo (opcional)',exact:true})).toContainText('QA002ZZ');
+  await expect(page.getByRole('button',{name:'Chofer (opcional)',exact:true})).toContainText('QA Segundo');
+ }
  await page.getByLabel('Fecha estimada de retiro',{exact:true}).fill('2099-12-25');
  await proof(page,info,'creation-'+role);
  const result=await post(page,'/api/manifiestos',()=>page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201);
@@ -144,6 +155,23 @@ for(const creator of roles)test('ordinary proposal: '+creator+' creates; each pa
   await proof(page,info,'unanimous-'+creator);
   await post(page,'/'+m.id+'/iniciar-coordinacion',()=>panel.getByRole('button',{name:'Iniciar coordinación',exact:true}).click());
   await expect(panel).toContainText('Coordinación iniciada');
+  // Verify the complete persisted notice history for every participant,
+  // not only the creation notice or the last operator's session.
+  const approvalOrder=[creator,...roles.filter(role=>role!==creator)];
+  const roleName={generador:'Generador',transportista:'Transporte',operador:'Operador'};
+  const stages=['Manifiesto pendiente de tu aprobación',
+   ...approvalOrder.slice(0,2).map(role=>roleName[role]+' aprobó su participación'),
+   '¡Tres aprobaciones! Listos para iniciar','¡Coordinación iniciada! Preparar el retiro'];
+  for(const role of roles){
+   const reader=pages[role];await reader.goto(prefix(info)+'/notificaciones');
+   const notices=reader.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:m.numero});
+   for(const stage of stages)await expect(notices.filter({hasText:stage})).toHaveCount(1);
+   await proof(reader,info,'all-stage-notices-'+creator+'-'+role);
+   await notices.filter({hasText:'¡Coordinación iniciada! Preparar el retiro'}).getByRole('button',{name:/^Abrir aviso:/}).click();
+   await expect(reader).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
+   const reflected=reader.getByRole('region',{name:'Aprobaciones de las partes'});
+   for(const name of ['Generador','Transporte','Operador'])await expect(reflected.getByLabel(name+': Aprobado',{exact:true})).toHaveClass(/text-emerald-900/);
+  }
   const transport=pages.transportista;
   if(creator!=='transportista')await expect(transport.getByRole('region',{name:'Aprobaciones de las partes'})).toContainText('Coordinación iniciada',{timeout:12000});
   await expect(transport.getByRole('button',{name:'Confirmar retiro',exact:true})).toBeEnabled({timeout:12000});
