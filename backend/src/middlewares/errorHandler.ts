@@ -8,6 +8,8 @@ export class AppError extends Error {
   public statusCode?: number;
   public code?: string | number;
   public details?: any;
+  /** Explicit, user-facing form guidance; never generic internal error details. */
+  public fieldErrors?: Partial<Record<'generador' | 'transportista' | 'operador', string>>;
   public meta?: {
     target?: string[];
   };
@@ -82,6 +84,7 @@ export const errorHandler = (
     status: statusCode,
     message,
     details: process.env.NODE_ENV === 'development' ? details : undefined,
+    fieldErrors: statusCode === 400 && err instanceof AppError ? err.fieldErrors : undefined,
   });
 };
 

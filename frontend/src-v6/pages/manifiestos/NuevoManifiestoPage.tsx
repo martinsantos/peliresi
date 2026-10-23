@@ -28,6 +28,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
 import { getApiErrorMessage } from '../../utils/api-error';
+import { manifestPartyErrors, partyApprovalMessage, partyApprovalSuffix, type ManifestPartyField } from '../../utils/manifestPartyEligibility';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreateManifiesto } from '../../hooks/useManifiestos';
 import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, useCatalogoOperadores } from '../../hooks/useCatalogos';
@@ -105,6 +106,9 @@ const NuevoManifiestoForm: React.FC = () => {
   const [step, setStep] = useState(1);
   const [confirmWithoutTransport, setConfirmWithoutTransport] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [refreshingParties, setRefreshingParties] = useState(false);
+  const [submitError, setSubmitError] = useState<string>();
+  const [serverPartyIssues, setServerPartyIssues] = useState<Partial<Record<ManifestPartyField, string>>>({});
   const formRef = useRef<HTMLDivElement>(null);
   const focusError = useRef(false);
   const submitting = useRef(false);
@@ -112,7 +116,7 @@ const NuevoManifiestoForm: React.FC = () => {
   useEffect(() => {
     if (!focusError.current) return;
     focusError.current = false;
-    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled)') || formRef.current?.querySelector<HTMLElement>('[data-party-error]');
     field?.focus({ preventScroll: true });
     field?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [validationErrors, step]);
@@ -120,9 +124,12 @@ const NuevoManifiestoForm: React.FC = () => {
   // API hooks
   const createManifiesto = useCreateManifiesto();
   const { data: apiTiposResiduo } = useTiposResiduo();
-  const { data: apiGeneradores } = useCatalogoGeneradores();
-  const { data: apiTransportistas } = useCatalogoTransportistas();
-  const { data: apiOperadores } = useCatalogoOperadores();
+  const catalogoGeneradores = useCatalogoGeneradores();
+  const catalogoTransportistas = useCatalogoTransportistas();
+  const catalogoOperadores = useCatalogoOperadores();
+  const apiGeneradores = catalogoGeneradores.data;
+  const apiTransportistas = catalogoTransportistas.data;
+  const apiOperadores = catalogoOperadores.data;
 
   // Use API catalogos only
   const tiposResiduo = apiTiposResiduo || [];
@@ -155,6 +162,46 @@ const NuevoManifiestoForm: React.FC = () => {
   const selectedGenerador = companyGeneratorView(generadoresList.find((g) => g.id === formData.generadorId),currentUser?.empresaContexto);
   const selectedTransportista = transportistasList.find((t) => t.id === formData.transportista);
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
+  const partyIssues: Partial<Record<ManifestPartyField, string>> = partyProposal ? {
+    generador: partyApprovalMessage(selectedGenerador),
+    transportista: formData.modalidad === 'FIJO' ? partyApprovalMessage(selectedTransportista) : undefined,
+    operador: partyApprovalMessage(selectedOperador),
+    ...serverPartyIssues,
+  } : {};
+  if (formData.modalidad === 'IN_SITU') partyIssues.transportista = undefined;
+  const hasPartyIssue = Object.values(partyIssues).some(Boolean) || !!submitError;
+  const clearPartyError = (field: ManifestPartyField) => {
+    setValidationErrors(prev => Object.fromEntries(Object.entries(prev).filter(([key]) => key !== field)));
+    setServerPartyIssues(prev => Object.fromEntries(Object.entries(prev).filter(([key]) => key !== field)));
+    setSubmitError(undefined);
+  };
+  const refreshPartyStates = async () => {
+    setRefreshingParties(true);
+    try {
+      const checks = [
+        ['generador', formData.generadorId, catalogoGeneradores],
+        ['transportista', formData.transportista, catalogoTransportistas],
+        ['operador', formData.operador, catalogoOperadores],
+      ] as const;
+      const results = await Promise.all(checks.map(async ([field, id, query]) => ({ field, id, result: await query.refetch() })));
+      setServerPartyIssues(prev => Object.fromEntries(Object.entries(prev).filter(([field]) => !results.some(check =>
+        check.field === field && !check.result.isError && check.result.data?.find((item: CatalogoItem) => item.id === check.id)?.aprobacionManifiesto?.habilitada === true))));
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        for (const { field, id, result } of results) {
+          if (result.isError) continue;
+          const actor = result.data?.find((item: CatalogoItem) => item.id === id);
+          if (actor?.aprobacionManifiesto?.habilitada === true) next[field] = '';
+          else if (actor?.aprobacionManifiesto?.mensaje) next[field] = actor.aprobacionManifiesto.mensaje;
+        }
+        return Object.fromEntries(Object.entries(next).filter(([, message]) => message));
+      });
+      if (results.some(({ result }) => result.isError)) toast.error('No se pudieron actualizar los estados', 'Revisá la conexión. Los datos del manifiesto siguen cargados.');
+      else setSubmitError(undefined);
+    } catch {
+      toast.error('No se pudieron actualizar los estados', 'Revisá la conexión. Los datos del manifiesto siguen cargados.');
+    } finally { setRefreshingParties(false); }
+  };
   const vehiculos = (selectedTransportista?.vehiculos || []).filter((v: { activo?: boolean }) => v.activo === true);
   const choferes = (selectedTransportista?.choferes || []).filter((c: { activo?: boolean }) => c.activo === true);
 
@@ -259,6 +306,13 @@ const NuevoManifiestoForm: React.FC = () => {
       errors.residuos = 'Completá el tipo y una cantidad mayor que cero en cada residuo, o quitá la fila que no corresponda.';
     }
 
+    if (partyProposal) {
+      if ((!targetStep || targetStep === 1) && partyIssues.generador) errors.generador = partyIssues.generador;
+      if (!targetStep || targetStep === 3) {
+        if (partyIssues.transportista) errors.transportista = partyIssues.transportista;
+        if (partyIssues.operador) errors.operador = partyIssues.operador;
+      }
+    }
     setValidationErrors(errors);
     if (Object.keys(errors).length) {
       focusError.current = true;
@@ -274,6 +328,7 @@ const NuevoManifiestoForm: React.FC = () => {
     }
 
     submitting.current = true;
+    setSubmitError(undefined);
     try {
       const result = await createManifiesto.mutateAsync({
         generadorId: formData.generadorId || formData.generador,
@@ -294,6 +349,15 @@ const NuevoManifiestoForm: React.FC = () => {
       toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? (formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas.':'Generador, transporte y operador deben aprobar desde sus cuentas.') : 'Todavía falta la firma del generador para continuar.'}`);
       navigate(mp(`/manifiestos/${result.id}`));
     } catch (err: any) {
+      const fields = manifestPartyErrors(err);
+      if (Object.keys(fields).length) {
+        setServerPartyIssues(fields);
+        setValidationErrors(fields);
+        setSubmitError('No se creó el manifiesto. Revisá las partes indicadas; todos los datos siguen cargados.');
+        focusError.current = true;
+        setStep(fields.generador ? 1 : 3);
+        return;
+      }
       // The API client explains 429 with its retry time. Keep all fields and
       // avoid a second, contradictory toast; only the user repeats the write.
       if (err?.response?.status !== 429) toast.error(
@@ -373,8 +437,13 @@ const NuevoManifiestoForm: React.FC = () => {
       <ol aria-label="Etapas del formulario" className="flex gap-4 py-3 text-sm text-neutral-600">
         {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={step === index + 1 ? 'font-semibold text-primary-800' : ''}>{index + 1}. {label}</li>)}
       </ol>
+      {hasPartyIssue && <div data-party-error tabIndex={-1} role="alert" className="mb-4 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-900">
+        <p className="font-semibold">Revisá las partes antes de crear</p>
+        <p className="mt-1">{submitError || 'Hay un actor o una cuenta que no puede aprobar. El motivo aparece junto a su selección.'}</p>
+        <Button variant="outline" className="mt-2" disabled={refreshingParties} onClick={refreshPartyStates}>{refreshingParties ? 'Actualizando estados…' : 'Actualizar estados'}</Button>
+      </div>}
 
-      <div>
+      <fieldset className="min-w-0" disabled={refreshingParties} aria-busy={refreshingParties}>
         {/* Step 1: Datos del Generador */}
         {step === 1 && (
           <Card className="p-4 sm:p-5">
@@ -388,6 +457,9 @@ const NuevoManifiestoForm: React.FC = () => {
                   value={formData.generadorId}
                   onChange={(val) => {
                     if (val === formData.generadorId) return;
+                    clearPartyError('generador');
+                    setServerPartyIssues({});
+                    setValidationErrors({});
                     const gen = generadoresList.find((g: any) => g.id === val);
                     setFormData({ ...formData, generadorId: val, generador: gen?.razonSocial || gen?.nombre || '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }], transportista: ownCarrierId, operador: ownOperatorId });
                   }}
@@ -395,7 +467,7 @@ const NuevoManifiestoForm: React.FC = () => {
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                     .map((g: any) => ({
                       value: g.id,
-                      label: `${g.razonSocial || g.nombre || g.label} — ${g.cuit || ''}`,
+                      label: `${g.razonSocial || g.nombre || g.label} — ${g.cuit || ''}${partyProposal ? partyApprovalSuffix(g) : ''}`,
                     }))}
                   renderOption={(opt) => {
                     const gen = generadoresList.find((g: any) => g.id === opt.value) as any;
@@ -403,6 +475,7 @@ const NuevoManifiestoForm: React.FC = () => {
                     return (
                       <div>
                         <div className="text-sm font-medium text-neutral-900 truncate">{gen?.razonSocial || opt.label}</div>
+                        {partyProposal && gen && partyApprovalSuffix(gen) && <p className="text-xs text-error-700">{partyApprovalSuffix(gen).replace(' · ', '')}</p>}
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className="text-xs text-neutral-500 font-mono">{gen?.cuit || ''}</span>
                           {corrientes.length > 0 && (
@@ -420,7 +493,7 @@ const NuevoManifiestoForm: React.FC = () => {
                   }}
                   placeholder="Buscar generador por nombre o CUIT..."
                   searchable
-                  errorMessage={validationErrors.generador}
+                  errorMessage={validationErrors.generador || partyIssues.generador}
                   size="base"
                   disabled={isGenerador}
                 />
@@ -665,7 +738,7 @@ const NuevoManifiestoForm: React.FC = () => {
                   {selectedCodigos.length > 0 && transportistasFiltrados.length < transportistasList.length && (
                     <div className="flex items-center gap-2 p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
                       <Info size={14} className="shrink-0" />
-                      <span>Mostrando <strong>{transportistasFiltrados.length}</strong> transportistas habilitados para los residuos seleccionados</span>
+                      <span>Mostrando <strong>{transportistasFiltrados.length}</strong> transportistas compatibles con los residuos seleccionados</span>
                     </div>
                   )}
                   <div>
@@ -673,16 +746,16 @@ const NuevoManifiestoForm: React.FC = () => {
                       label="Transportista *"
                       value={formData.transportista}
                       disabled={carrierProposal}
-                      onChange={(val) => setFormData(prev => val === prev.transportista ? prev : ({ ...prev, transportista: val, vehiculoId: '', choferId: '' }))}
+                      onChange={(val) => { clearPartyError('transportista'); setFormData(prev => val === prev.transportista ? prev : ({ ...prev, transportista: val, vehiculoId: '', choferId: '' })); }}
                       options={[...(carrierProposal ? transportistasFiltrados.filter(t => t.id === ownCarrierId) : transportistasFiltrados)]
                         .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                         .map((t: any) => ({
                           value: t.id,
-                          label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}`,
+                          label: `${t.razonSocial || t.nombre || t.label}${t.cuit ? ` — ${t.cuit}` : ''}${partyProposal ? partyApprovalSuffix(t) : ''}`,
                         }))}
-                      placeholder={transportistasFiltrados.length === 0 ? 'No hay transportistas habilitados para estos residuos' : 'Buscar transportista por nombre o CUIT...'}
+                      placeholder={transportistasFiltrados.length === 0 ? 'No hay transportistas compatibles con estos residuos' : 'Buscar transportista por nombre o CUIT...'}
                       searchable
-                      errorMessage={validationErrors.transportista}
+                      errorMessage={validationErrors.transportista || partyIssues.transportista}
                       size="base"
                     />
                   </div>
@@ -707,7 +780,7 @@ const NuevoManifiestoForm: React.FC = () => {
                 {selectedResiduoIds.length > 0 && (
                   <div className="mb-2 text-sm text-neutral-600">
                     <span>
-                      Mostrando {operadoresFiltrados.length} operador{operadoresFiltrados.length !== 1 ? 'es' : ''} habilitado{operadoresFiltrados.length !== 1 ? 's' : ''} para los residuos seleccionados
+                      Mostrando {operadoresFiltrados.length} operador{operadoresFiltrados.length !== 1 ? 'es' : ''} compatible{operadoresFiltrados.length !== 1 ? 's' : ''} con los residuos seleccionados
                     </span>
                   </div>
                 )}
@@ -715,18 +788,18 @@ const NuevoManifiestoForm: React.FC = () => {
                   label="Operador / Destino *"
                   value={formData.operador}
                   disabled={operatorProposal}
-                  onChange={(val) => setFormData({ ...formData, operador: val })}
+                  onChange={(val) => { clearPartyError('operador'); setFormData({ ...formData, operador: val }); }}
                   options={[...operadoresFiltrados]
                     .sort((a: any, b: any) => (a.razonSocial || '').localeCompare(b.razonSocial || ''))
                     .map((o: any) => ({
                       value: o.id,
-                      label: `${o.razonSocial || o.nombre || o.label}${o.cuit ? ` — ${o.cuit}` : ''}`,
+                      label: `${o.razonSocial || o.nombre || o.label}${o.cuit ? ` — ${o.cuit}` : ''}${partyProposal ? partyApprovalSuffix(o) : ''}`,
                     }))}
                   placeholder={operadoresFiltrados.length === 0 && selectedResiduoIds.length > 0
-                    ? 'No hay operadores habilitados para estos residuos'
+                    ? 'No hay operadores compatibles con estos residuos'
                     : 'Buscar operador por nombre o CUIT...'}
                   searchable
-                  errorMessage={validationErrors.operador}
+                  errorMessage={validationErrors.operador || partyIssues.operador}
                   size="base"
                 />
               </div>
@@ -763,7 +836,7 @@ const NuevoManifiestoForm: React.FC = () => {
                 <Button
                   leftIcon={createManifiesto.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                   onClick={handleSubmit}
-                  disabled={createManifiesto.isPending}
+                  disabled={createManifiesto.isPending || refreshingParties}
                 >
                   {createManifiesto.isPending ? 'Guardando...' : 'Crear Manifiesto'}
                 </Button>
@@ -771,7 +844,7 @@ const NuevoManifiestoForm: React.FC = () => {
             </CardContent>
           </Card>
         )}
-      </div>
+      </fieldset>
     </div>
   );
 };

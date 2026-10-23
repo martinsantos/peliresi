@@ -591,7 +591,8 @@ export interface CatalogoItem {
   patente?: string;       // Vehiculo
   licencia?: string;      // Chofer
   metodo?: string;        // TratamientoAutorizado
-  usuario?: { email: string; nombre?: string };
+  usuario?: { email: string; nombre?: string; activo?: boolean };
+  aprobacionManifiesto?: { habilitada: boolean; motivo: 'ACTOR_NO_ENCONTRADO' | 'ACTOR_INACTIVO' | 'SIN_CUENTA' | 'CUENTA_INACTIVA' | null; mensaje: string | null };
   vehiculos?: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'activo'>[];
   choferes?: Pick<Chofer, 'id' | 'nombre' | 'apellido' | 'dni' | 'activo'>[];
   [key: string]: unknown;

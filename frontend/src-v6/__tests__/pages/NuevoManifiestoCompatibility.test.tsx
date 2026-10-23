@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NuevoManifiestoPage from '../../pages/manifiestos/NuevoManifiestoPage';
 
-const mocks = vi.hoisted(() => ({ create: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), refreshError: false, availability: {} as Record<string, unknown> }));
 
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
 
@@ -18,17 +18,17 @@ vi.mock('../../hooks/useCatalogos', () => ({
     { id: 'y8', codigo: 'Y8', nombre: 'Aceites' },
     { id: 'y9', codigo: 'Y9', nombre: 'Emulsiones' },
   ] }),
-  useCatalogoGeneradores: () => ({ data: [{ id: 'generador-1', razonSocial: 'Generador QA' }] }),
-  useCatalogoTransportistas: () => ({ data: [
-    { id: 'trans-y8', razonSocial: 'Transporte Y8', corrientesAutorizadas: 'Y8',
+  useCatalogoGeneradores: () => ({ refetch: async () => ({ isError: mocks.refreshError, data: [{ id: 'generador-1', aprobacionManifiesto: { habilitada: true } }] }), data: [{ id: 'generador-1', razonSocial: 'Generador QA', aprobacionManifiesto: mocks.availability.generador }] }),
+  useCatalogoTransportistas: () => ({ refetch: async () => ({ data: [] }), data: [
+    { id: 'trans-y8', razonSocial: 'Transporte Y8', corrientesAutorizadas: 'Y8', aprobacionManifiesto: mocks.availability.transportista,
       vehiculos: [{ id: 'v1', patente: 'QA001', marca: 'QA', modelo: 'Uno', activo: true }, { id: 'v2', patente: 'QA002', marca: 'QA', modelo: 'Dos', activo: true }, { id: 'v-off', patente: 'INACTIVO', activo: false }],
       choferes: [{ id: 'c1', nombre: 'QA', apellido: 'Uno', dni: '00001', activo: true }, { id: 'c2', nombre: 'QA', apellido: 'Dos', dni: '00002', activo: true }] },
     { id: 'trans-y9', razonSocial: 'Transporte Y9', corrientesAutorizadas: 'Y9' },
     { id: 'trans-both', razonSocial: 'Transporte ambas', corrientesAutorizadas: 'Y8, Y9' },
     { id: 'trans-unknown', razonSocial: 'Transporte sin corrientes' },
   ] }),
-  useCatalogoOperadores: () => ({ data: [{
-    id: 'operador-1', razonSocial: 'Operador QA', modalidades: ['FIJO', 'IN_SITU'],
+  useCatalogoOperadores: () => ({ refetch: async () => ({ data: [] }), data: [{
+    id: 'operador-1', razonSocial: 'Operador QA', aprobacionManifiesto: mocks.availability.operador, modalidades: ['FIJO', 'IN_SITU'],
     tratamientos: [{ tipoResiduoId: 'y8', activo: true }, { tipoResiduoId: 'y9', activo: true }],
   }] }),
 }));
@@ -60,6 +60,8 @@ describe('manifest transport compatibility after changing residues', () => {
   afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.availability = {};
+    mocks.refreshError = false;
     mocks.create.mockResolvedValue({ id: 'manifest-1', numero: 'QA-1' });
     HTMLElement.prototype.scrollIntoView = vi.fn();
   });
@@ -177,4 +179,55 @@ describe('manifest transport compatibility after changing residues', () => {
     await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ transportistaId: id }));
   });
+  it('explains an inactive operator account immediately and prevents a doomed submission', async () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
+    mocks.availability.operador = { habilitada: false, motivo: 'CUENTA_INACTIVA', mensaje: 'Operador «Operador QA»: su cuenta de acceso está inactiva. Administración debe revisar y reactivar la cuenta para que pueda aprobar.' };
+    prepareDestination(/^Transporte Y8$/);
+    expect(screen.getByLabelText('Operador / Destino *')).toHaveTextContent('Cuenta inactiva');
+    expect(screen.getByText(/Operador «Operador QA»: su cuenta de acceso está inactiva/)).toBeVisible();
+    expect(screen.queryByText(/operadores habilitados/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Observaciones'), { target: { value: 'Conservar esta observación' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Operador / Destino *')).toHaveFocus();
+    expect(screen.getByLabelText('Observaciones')).toHaveValue('Conservar esta observación');
+  });
+
+  it('blocks an inactive generator at its first step with a specific explanation', () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
+    mocks.availability.generador = { habilitada: false, motivo: 'ACTOR_INACTIVO', mensaje: 'Generador «Generador QA»: el actor está inactivo. Administración debe revisar su habilitación.' };
+    render(<MemoryRouter><NuevoManifiestoPage /></MemoryRouter>);
+    choose('Generador *', /Generador QA/);
+    expect(screen.getByText(/Generador «Generador QA»: el actor está inactivo/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(screen.getByLabelText('Generador *')).toHaveFocus();
+    expect(screen.queryByLabelText('Cantidad *')).not.toBeInTheDocument();
+  });
+
+  it('returns to the precise field if its account changes after selection, preserving the other steps', async () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
+    prepareDestination(/^Transporte Y8$/);
+    fireEvent.change(screen.getByLabelText('Observaciones'), { target: { value: 'Datos preservados' } });
+    mocks.create.mockRejectedValueOnce({ response: { status: 400, data: { fieldErrors: { generador: 'Generador «Generador QA»: su cuenta de acceso está inactiva.' } } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    await waitFor(() => expect(screen.getByLabelText('Generador *')).toHaveFocus());
+    expect(screen.getByRole('alert')).toHaveTextContent('No se creó el manifiesto');
+    expect(screen.getByText(/Generador «Generador QA»: su cuenta de acceso está inactiva/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(screen.getByLabelText('Generador *')).toHaveFocus();
+    mocks.refreshError = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estados' }));
+    expect(screen.getByLabelText('Generador *')).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Actualizar estados' })).toBeEnabled());
+    expect(screen.getByText(/Generador «Generador QA»: su cuenta de acceso está inactiva/)).toBeVisible();
+    mocks.refreshError = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar estados' }));
+    await waitFor(() => expect(screen.queryByText(/Generador «Generador QA»: su cuenta de acceso está inactiva/)).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(screen.getByLabelText('Cantidad *')).toHaveValue(12.5);
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(screen.getByLabelText('Observaciones')).toHaveValue('Datos preservados');
+    expect(screen.getByLabelText('Transportista *')).toHaveTextContent('Transporte Y8');
+  });
+
 });

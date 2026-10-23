@@ -1,5 +1,11 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Creación de manifiesto: motivo por parte — preview, 23/10/2026
+
+**Corregido y probado, no publicado.** [Resultado y evidencias](docs/MANIFIESTO-ELEGIBILIDAD-20261023.md). Catálogos y servidor identifican rol, razón social y motivo (actor inactivo, cuenta inactiva/faltante, actor no encontrado). El formulario señala el campo antes de enviar, conserva datos tras un rechazo y permite actualizar estados sin reactivar cuentas ni enviar automáticamente.
+
+**68 backend + 30 frontend/manual + 3 E2E únicos PASS**, escritorio/web móvil/app; tipos/builds PASS, lint dirigido 0 errores/32 advertencias. Manual **2026.23.5**. Runtime de esta prueba cerrado a las **19:47:29 Mendoza**; base artificial y evidencias conservadas. CAP cerrado, correos/push apagados. Sin producción, main, datos reales, migración ni workflows. La publicación vigente sigue siendo la de abajo; esta corrección no cambia las reglas de aprobaciones ni convierte manifiestos históricos.
+
 ## Publicación vigente — aprobaciones y avisos, 23/10/2026
 
 **`bc0e103b` publicado en backend, web, app y manual a las 18:46:58 Mendoza.** Incluye `81c36219`, guardas de aprobaciones explícitas, avisos/campana, contexto de agenda, vista temporal, Ayuda, Monitor y Antecedentes integrado. [Cierre, evidencia, límites y reversión](docs/DESPLIEGUE-APROBACIONES-20261023.md).

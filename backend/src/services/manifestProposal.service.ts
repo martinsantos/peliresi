@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
+import { manifestPartyEligibility, type ManifestPartyField } from '../domain/manifestPartyEligibility';
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 type Parties = { generadorId: string; transportistaId: string | null; operadorId: string };
 async function parties(tx: Tx, p: Parties) {
@@ -14,12 +15,20 @@ async function parties(tx: Tx, p: Parties) {
     usuario: actor?.activo === false ? undefined : actor?.usuario,
     nombre: actor?.razonSocial,
     rol: roles[index],
+    aprobacion: manifestPartyEligibility(actor, (['generador', 'transportista', 'operador'] as const)[index]),
+    field: (['generador', 'transportista', 'operador'] as const)[index],
   }));
 }
 export async function validateProposalParties(tx: Tx, p: Parties) {
   const users=await parties(tx,p);
   const required = p.transportistaId ? users : [users[0], users[2]];
-  if(required.some(p=>!p.usuario?.activo))throw new AppError('Las partes vinculadas y sus cuentas deben estar activas para aprobar. Si falta un alta, usá Eventuales.',400);
+  const fieldErrors: Partial<Record<ManifestPartyField, string>> = {};
+  for (const party of required) if (party.aprobacion.mensaje) fieldErrors[party.field] = party.aprobacion.mensaje;
+  if (Object.keys(fieldErrors).length) {
+    const error = new AppError(Object.values(fieldErrors).join(' '), 400);
+    error.fieldErrors = fieldErrors;
+    throw error;
+  }
 }
 /** Creation and inbox commit together. Return only fresh IDs for a caller's
  * post-commit dispatch; CAP never sends external notifications. */
