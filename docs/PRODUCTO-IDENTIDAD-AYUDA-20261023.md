@@ -1,5 +1,7 @@
 # Identidad, bienvenida, enlaces y ayuda — 23/10/2026
 
+> **Actualización de publicación:** esta tanda está incorporada en `6580c1ca`, publicado el 23/10/2026. Estado y reversión vigentes en [Publicación de producto y concurrencia](DESPLIEGUE-PRODUCTO-CONCURRENCIA-20261023.md). Las secciones inferiores conservan la evidencia histórica de su fecha.
+
 ## Revisión posterior del 23/10 — estado vigente
 
 **Desde `df55126b`, sólo preview.** Esta sección sustituye el estado de cierre de las 11:00 de la revisión anterior, conservada más abajo. Producción y main no se tocaron; CAP cerrado, correos/push apagados.

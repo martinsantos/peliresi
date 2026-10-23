@@ -1,5 +1,7 @@
 # Correcciones de concurrencia — 23/10/2026
 
+> **Actualización de publicación:** esta tanda está incorporada en `6580c1ca`, publicado el 23/10/2026. Estado y reversión vigentes en [Publicación de producto y concurrencia](DESPLIEGUE-PRODUCTO-CONCURRENCIA-20261023.md). Las secciones inferiores conservan la evidencia histórica de su fecha.
+
 **Estado: cuatro defectos corregidos y verificados, exclusivamente en preview.** Base `09a5a015` en `codex/sitrep-training-20261018`. No publicado; producción y main intactos, CAP cerrado y correos/push apagados.
 
 ## Cambios

@@ -1,5 +1,7 @@
 # Publicación de empresa, multirol y dos personas — 22/10/2026
 
+> **Actualización de publicación:** esta tanda está incorporada en `6580c1ca`, publicado el 23/10/2026. Estado y reversión vigentes en [Publicación de producto y concurrencia](DESPLIEGUE-PRODUCTO-CONCURRENCIA-20261023.md). Las secciones inferiores conservan la evidencia histórica de su fecha.
+
 ## Estado publicado
 
 **`a7f20d2f181adc2e30a1930d175efa831dfd4e05` publicado en backend, web, app y manual de `sitrep.ultimamilla.com.ar` el 22/10/2026 22:47:21 Mendoza.** Autorización del dueño: «Despleguemos a producción con test total», después de la revisión de una razón social con varios roles y máximo dos personas en total.

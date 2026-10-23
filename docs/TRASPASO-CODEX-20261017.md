@@ -1,5 +1,15 @@
 # SITREP — traspaso vigente de operación
 
+## Publicación vigente — identidad, experiencia y concurrencia, 23/10/2026
+
+**`6580c1ca` publicado en backend, web, app y manual de sitrep.ultimamilla.com.ar el 23/10/2026 14:21:27 Mendoza.** Incluye toda la tanda acumulada desde `a7f20d2f`: identidad/PDF/correos/iconos, bienvenida por rol, preferencia web/app, ayuda contextual y cuatro correcciones de concurrencia. Leer [publicación, respaldo y reversión vigente](DESPLIEGUE-PRODUCTO-CONCURRENCIA-20261023.md).
+
+Build de **2.483 archivos Git exactos**, backend/Prisma/tipos/web/app PASS con API final y flags actuales. Backup completo verificado antes de las **dos migraciones aditivas**; operativo y CAP compatibles, sin habilitar CAP. Smoke **182/182**, externo **9/9**, PWA público **8/8**; sin logins ni operaciones de negocio. Workers 1/2 estables. `.env` idéntico, uploads conservados; **CAP cerrado, correos/push apagados**. Manual **2026.23.3**, SW **v160**, app **20261023171533**.
+
+**Reversión vigente a `a7f20d2f`**, preparada y no ejecutada, conserva base/migraciones/flags. Worker rollback **v161**. No usar reversiones históricas. Pruebas funcionales previas en preview: 1.653 backend, 132 frontend dirigidas, 15 grupos concurrentes y 12 E2E únicos, más revisión de identidad documentada. No repetirlas como pruebas productivas.
+
+**Pendientes explícitos:** limpieza de contadores abandonados bloqueada por el control automático (expiración funcional), carga sostenida, durabilidad de eventos/reconexión GPS y Android físico. Sin main, push ni workflows. Preview permanece activo. Los cierres inferiores describen antecedentes; esta sección sustituye las indicaciones de “sólo preview” y migraciones pendientes de esa tanda.
+
 ## Correcciones de concurrencia — verificadas sólo en preview, 23/10/2026
 
 **Cuatro defectos corregidos:** vehículo/chofer de Monitor por asignación y tramo, últimos 500 puntos GPS sin perder el más reciente, incidencia única ante eventos simultáneos y cuotas compartidas por persona que no bloquean a todos los usuarios de una IP. Web/app conservan sesión y formularios ante esperas temporales. Leer [cambios, pruebas y pendientes](CORRECCIONES-CONCURRENCIA-20261023.md).
