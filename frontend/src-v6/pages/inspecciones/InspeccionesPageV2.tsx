@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, FileSearch, MapPin, Plus, Search, UserRound } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
+import { PageToolbar } from '../../components/ui/PageToolbar';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal } from '../../components/ui/Modal';
 import { Card } from '../../components/ui/CardV2';
@@ -147,11 +148,12 @@ const InspeccionesPageV2: React.FC = () => {
   const resumeInspection = rows.filter((row) => row.estado === 'EN_CAMPO' && String(row.inspectorId || row.inspector?.id) === String(currentUser?.id)).sort((left, right) => (readInspectionResume(currentUser!.id, right.id)?.updatedAt || 0) - (readInspectionResume(currentUser!.id, left.id)?.updatedAt || 0))[0];
   const resumePoint = resumeInspection && currentUser ? readInspectionResume(currentUser.id, resumeInspection.id) : null;
 
-  return <div className="space-y-4">
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  return <div className="min-w-0 space-y-4" data-operational-page>
+    <PageToolbar label="Acciones de Inspecciones">
       <h2 className="sr-only">Inspecciones</h2>
-      <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { setSearchParams(sectionSearch(false)); setFindingRequest((value) => value + 1); }}>Denuncia / hallazgo</Button><Button size="sm" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }}>Nueva inspección</Button></div>
-    </header>
+      <Button variant="outline" onClick={() => { setSearchParams(sectionSearch(false)); setFindingRequest((value) => value + 1); }}>Denuncia / hallazgo</Button>
+      <Button className="ml-auto" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }}>Nueva inspección</Button>
+    </PageToolbar>
     <nav aria-label="Secciones de Inspecciones" className="flex border-b border-neutral-200">
       {[
         { antecedentes: false, label: 'Expedientes', Icon: ClipboardCheck },

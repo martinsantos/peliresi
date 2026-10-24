@@ -153,14 +153,15 @@ describe('InspeccionExpedientePage critical review UX', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
-  it('keeps the dossier identity first and back navigation in a separate action row', async () => {
+  it('names the return destination before the dossier identity, without nesting it in the title', async () => {
     renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#checklist');
     const heading = await screen.findByRole('heading', { name: 'I-2026-000001', exact: true });
     const header = heading.closest('header')!;
-    expect(header.firstElementChild).toContainElement(heading);
-    expect(header.firstElementChild).not.toContainElement(screen.getByRole('button', { name: 'Volver al listado', exact: true }));
-    expect(screen.getByRole('button', { name: 'Volver al listado', exact: true })).toHaveTextContent('Listado');
-    expect(header.firstElementChild).toContainElement(screen.getByRole('link', { name: 'Abrir actor inspeccionado: Planta Auditada SA', exact: true }));
+    const back = screen.getByRole('button', { name: 'Volver a Inspecciones', exact: true });
+    expect(header.firstElementChild).toContainElement(back);
+    expect(back).toHaveTextContent('Inspecciones');
+    expect(header.firstElementChild).not.toContainElement(heading);
+    expect(heading.parentElement?.parentElement).toContainElement(screen.getByRole('link', { name: 'Abrir actor inspeccionado: Planta Auditada SA', exact: true }));
   });
 
   it.each(['touch', 'mouse'])('retains the active editor only for touch save without submitting on pointerdown (%s)', async (pointerType) => {

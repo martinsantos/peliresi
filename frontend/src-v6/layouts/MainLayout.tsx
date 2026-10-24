@@ -552,7 +552,7 @@ export const MainLayout: React.FC = () => {
         <ToastContainer />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
-        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (/\/inspecciones\/[^/]+/.test(location.pathname) ? 'overflow-clip px-3 py-3 lg:px-8 lg:py-4' : 'overflow-auto px-4 lg:px-8 lg:pb-8 ' + (inlineSupport ? 'pb-4' : 'pb-12'))}>
+        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (isInspectionCase ? 'overflow-clip p-4 lg:px-8' : 'overflow-auto [scrollbar-gutter:stable] px-4 lg:px-8 lg:pb-8 ' + (inlineSupport ? 'pb-4' : 'pb-12')) + (/^\/(?:manifiestos|inspecciones|mis-inspecciones)(?:\/|$)/.test(location.pathname) ? ' pt-4' : '')}>
           <Outlet />
         </main>
 

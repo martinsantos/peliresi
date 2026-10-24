@@ -812,18 +812,14 @@ const InspeccionExpedientePage: React.FC = () => {
     }
     navigate((mobile ? '/mobile' : '') + '/inspecciones');
   };
-  return <div className="inspection-case flex h-full min-h-0 min-w-0 flex-col gap-3">
-    <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div data-testid="inspection-case-identity" className="min-w-0 sm:flex-1"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h1 className="text-lg sm:text-2xl font-bold text-neutral-900 break-words">{inspection.numero}</h1><Badge variant="soft" color={COLORS[inspection.estado] || 'neutral'}>{LABELS[inspection.estado]}</Badge>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación · datos sintéticos</Badge>}</div>
-          {actor && <Link to={actorRoute} state={{ inspectionReturn: location.pathname + location.search + location.hash }} onClick={(event) => { if (dictating) { event.preventDefault(); return; } if (!flushDraft()) event.preventDefault(); }} aria-label={'Abrir actor inspeccionado: ' + actor.razonSocial} className="mt-1 block max-w-full rounded-sm break-words text-sm font-semibold text-neutral-700 !no-underline hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link>}
-          <p className="mt-1 hidden text-xs text-neutral-500 lg:block">{INSPECTION_PHASES[inspectionPhaseOf(inspection.estado)].label} · Actualizada {inspectionDate(inspection.updatedAt, true)} · Versión {inspection.version}</p>
-        </div>
-        <div data-testid="inspection-case-actions" className="flex shrink-0 items-center justify-between gap-1 sm:justify-end">
-          <Button variant="ghost" size="sm" aria-label="Volver al listado" title="Volver al listado" leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} disabled={dictating} className="min-h-11 shrink-0 px-2"><span>Listado</span></Button>
+  return <div className="inspection-case flex h-full min-h-0 min-w-0 flex-col gap-4" data-operational-page>
+    <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-3">
+        <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 items-center justify-between gap-2">
+          <Button variant="ghost" aria-label="Volver a Inspecciones" title="Volver a Inspecciones" leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} disabled={dictating} className="shrink-0">Inspecciones</Button>
           <div className="flex shrink-0 items-center gap-1">
-          <Button variant="outline" size="sm" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="max-lg:w-11 max-lg:px-0" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
+          <Button variant="outline" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="max-lg:w-11 max-lg:px-0" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
           <DropdownMenu>
-            <DropdownTrigger asChild><Button variant="ghost" size="sm" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span className="sr-only">Documentos por separado</span></Button></DropdownTrigger>
+            <DropdownTrigger asChild><Button variant="ghost" aria-label="Otras descargas" disabled={Boolean(currentUser?.training)} rightIcon={<ChevronDown size={16} />} isLoading={pdfMutation.isPending}><span className="sr-only">Documentos por separado</span></Button></DropdownTrigger>
             <DropdownContent className="w-72">
               <DropdownLabel>Versión guardada en el servidor</DropdownLabel>
               <DropdownItem icon={<FileText size={16} />} onClick={() => pdfMutation.mutate('expediente')}>Expediente completo · PDF<span className="block text-[11px] font-normal text-neutral-500">Acta, evaluación y fotos en un documento</span></DropdownItem>
@@ -833,6 +829,10 @@ const InspeccionExpedientePage: React.FC = () => {
             </DropdownContent>
           </DropdownMenu>
           </div>
+        </div>
+        <div data-testid="inspection-case-identity" className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><h1 className="text-lg sm:text-2xl font-bold text-neutral-900 break-words">{inspection.numero}</h1><Badge variant="soft" color={COLORS[inspection.estado] || 'neutral'}>{LABELS[inspection.estado]}</Badge>{isTrainingActNumber(inspection.numeroActa) && <Badge color="warning">Capacitación · datos sintéticos</Badge>}</div>
+          {actor && <Link to={actorRoute} state={{ inspectionReturn: location.pathname + location.search + location.hash }} onClick={(event) => { if (dictating) { event.preventDefault(); return; } if (!flushDraft()) event.preventDefault(); }} aria-label={'Abrir actor inspeccionado: ' + actor.razonSocial} className="mt-1 block max-w-full rounded-sm break-words text-sm font-semibold text-neutral-700 !no-underline hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{actor.razonSocial}</Link>}
+          <p className="mt-1 hidden text-xs text-neutral-500 lg:block">{INSPECTION_PHASES[inspectionPhaseOf(inspection.estado)].label} · Actualizada {inspectionDate(inspection.updatedAt, true)} · Versión {inspection.version}</p>
         </div>
     </header>
     {currentUser?.training && <p className="text-xs text-neutral-600">Capacitación: sin documentos oficiales.</p>}

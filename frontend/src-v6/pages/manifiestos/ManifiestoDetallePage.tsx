@@ -358,9 +358,7 @@ const ManifiestoDetailPage: React.FC = () => {
   if (!manifiesto && (isError || !isLoading)) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <Link to="/manifiestos">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
-        </Link>
+        <Button variant="ghost" aria-label="Volver a Manifiestos" onClick={() => navigate(mp('/manifiestos'))} leftIcon={<ArrowLeft size={18} />}>Manifiestos</Button>
         <Card>
           <CardContent className="py-16 text-center">
             <AlertCircle size={48} className="mx-auto text-warning-400 mb-4" />
@@ -373,12 +371,10 @@ const ManifiestoDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4" data-operational-page>
       {/* Header */}
-      <div className="space-y-2">
-        <Link to="/manifiestos">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />}>Volver</Button>
-        </Link>
+      <div className="space-y-3">
+        <Button variant="ghost" aria-label="Volver a Manifiestos" onClick={() => navigate(mp('/manifiestos'))} leftIcon={<ArrowLeft size={18} />}>Manifiestos</Button>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{m.numero || id}</h2>
           <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
@@ -397,7 +393,7 @@ const ManifiestoDetailPage: React.FC = () => {
         </p>
         <div className="flex flex-wrap gap-2">
           {m.estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
-            <Button size="sm" onClick={() => navigate(`/manifiestos/${id}/editar`)}>
+            <Button size="sm" onClick={() => navigate(mp(`/manifiestos/${id}/editar`))}>
               Editar
             </Button>
           )}

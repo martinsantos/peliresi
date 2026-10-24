@@ -430,8 +430,8 @@ export const MobileLayout: React.FC = () => {
       <CompanyContextBar />
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
-      <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto')}>
-        <div className={cn(isInspectionCase ? 'h-full min-h-0 p-3' : 'p-4', isInspectionCase ? '' : isFieldTripRoute ? 'pb-6' : 'pb-28')}
+      <main className={cn('relative min-h-0 min-w-0 flex-1', isInspectionCase ? 'overflow-clip' : 'overflow-y-auto [scrollbar-gutter:stable]')}>
+        <div className={cn(isInspectionCase ? 'h-full min-h-0 p-4' : 'p-4', isInspectionCase ? '' : isFieldTripRoute ? 'pb-6' : 'pb-28')}
           style={floatingSupport && !isFieldTripRoute ? { paddingBottom: mobileSupportClearance(false) } : undefined}>
           <Outlet />
         </div>

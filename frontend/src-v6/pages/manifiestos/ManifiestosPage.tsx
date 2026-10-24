@@ -1,5 +1,6 @@
 import { manifestProposalsVisible } from '../../utils/manifestFeatures';
 import { ManifestAgenda } from './components/ManifestAgenda';
+import { PageToolbar } from '../../components/ui/PageToolbar';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 /**
  * SITREP v6 - Manifiestos Page
@@ -295,38 +296,35 @@ const ManifiestosPage: React.FC = () => {
   };
 
   return (
-    <>
+    <div className="flex min-w-0 flex-col gap-4" data-operational-page>
       {/* Header — on phones the shell bar already names the page: one compact row of actions. */}
-      <div className="flex flex-wrap items-center gap-2 mb-2 md:mb-4 xl:max-w-7xl xl:mx-auto">
-        <h2 className="sr-only md:not-sr-only text-xl font-bold text-neutral-900">Manifiestos</h2>
-        {showEventuales && <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-semibold text-primary-800 md:order-last md:basis-full md:border-0 md:bg-transparent md:px-0 md:font-medium md:text-primary-700 md:underline" to={mp('/manifiestos/baja-intensidad')}>Eventuales</Link>}
+      <PageToolbar label="Acciones de Manifiestos">
+        {showEventuales && <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-semibold text-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/manifiestos/baja-intensidad')}>Eventuales</Link>}
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" aria-label="Actualizar listado" disabled={isFetching} leftIcon={<RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}><span className="sr-only sm:not-sr-only">Actualizar listado</span></Button>
-          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-neutral-600 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir">
-            <Printer size={13} />
-          </button>
-          <button
+          <Button variant="outline" className="max-sm:w-11 max-sm:gap-0 max-sm:px-0" aria-label="Actualizar listado" disabled={isFetching} leftIcon={<RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />} onClick={() => refetch()}><span className="sr-only sm:not-sr-only">Actualizar listado</span></Button>
+          <Button variant="outline" onClick={() => window.print()} className="hidden w-11 px-0 sm:inline-flex" aria-label="Imprimir listado" title="Imprimir"><Printer size={16} /></Button>
+          <Button variant="outline" leftIcon={<Download size={16} />}
             onClick={() => {
               const headers = ['Numero', 'Generador', 'Operador', 'Estado', 'Actividad', 'Peso', 'Unidad'];
               const rows = allRows.map(m => [m.numero, m.generadorNombre, m.operadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), typeof m.peso === 'number' ? m.peso : 0, m.unidad]);
               downloadCsv(`manifiestos-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows, { titulo: 'Listado de Manifiestos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', filtros: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', total: totalCount });
             }}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg border border-primary-200 transition-colors" title="CSV"
-          ><Download size={13} /> CSV</button>
-          <button
+            className="hidden sm:inline-flex" title="Exportar CSV"
+          >CSV</Button>
+          <Button variant="outline" leftIcon={<FileDown size={16} />}
             onClick={() => {
               exportReportePDF({ titulo: 'Listado de Manifiestos', subtitulo: estadoFilter ? `Estado: ${ESTADO_LABELS[estadoFilter as EstadoManifiesto] || estadoFilter}` : 'Todos', periodo: fechaDesde || fechaHasta ? `${fechaDesde || '...'} a ${fechaHasta || '...'}` : 'Todos', kpis: [{ label: 'Cargados', value: allRows.length }, { label: 'Total', value: totalCount }], tabla: { headers: ['Numero', 'Generador', 'Estado', 'Actividad', 'Peso'], rows: allRows.map(m => [m.numero, m.generadorNombre, ESTADO_LABELS[m.estado as EstadoManifiesto] || m.estado, formatDateTime(m.actividad), `${typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} ${m.unidad}`]) } });
             }}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="PDF"
-          ><FileDown size={13} /> PDF</button>
-          {canOfferManifestCreate(currentUser?.rol, currentUser?.training) && <Button size="sm" aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>}
+            className="hidden sm:inline-flex" title="Exportar PDF"
+          >PDF</Button>
+          {canOfferManifestCreate(currentUser?.rol, currentUser?.training) && <Button aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>}
         </div>
-      </div>
+      </PageToolbar>
 
       {manifestProposalsVisible(currentUser) && <ManifestAgenda />}
 
       {/* Filters — sticky. Phones: search + Filtros in one row; state joins the other filters. */}
-      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8] pt-1 pb-2 md:pt-2">
+      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8]">
         <Card padding="sm" className="md:p-5">
           <div className="flex gap-2 md:gap-3">
             <div className="min-w-0 flex-1">
@@ -439,7 +437,7 @@ const ManifiestosPage: React.FC = () => {
         </Card>
       </div>
 
-      <div className="xl:max-w-7xl xl:mx-auto">
+      <div className="min-w-0">
         {/* Initial loading */}
         {isLoading && allRows.length === 0 && (
           <div className="flex items-center justify-center py-12"><Loader2 size={32} className="animate-spin text-primary-500" /></div>
@@ -447,7 +445,7 @@ const ManifiestosPage: React.FC = () => {
 
         {/* ── Mobile Card View ──────────────────────────────── */}
         {allRows.length > 0 && (
-          <div className="md:hidden space-y-1 mt-3 -mx-4 px-4 overflow-visible">
+          <div className="md:hidden space-y-1 -mx-4 px-4 overflow-visible">
             {allRows.map((m, idx) => (
               <React.Fragment key={m.id}>
                 {isGroupStart(idx) && (
@@ -488,7 +486,7 @@ const ManifiestosPage: React.FC = () => {
 
         {/* ── Desktop Grid List — div-based so sticky works reliably ── */}
         {allRows.length > 0 && (
-          <div className="hidden md:block mt-3 rounded-xl border border-[#E0E0DC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <div className="hidden md:block rounded-xl border border-[#E0E0DC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
             <div ref={scrollRef} className="overflow-y-auto rounded-xl" style={{ maxHeight: 'calc(100vh - 220px)' }}>
               {/* Column header — sticky */}
               <div ref={theadRefCb} className="sticky top-0 z-10 bg-[#F5F5F3] border-b border-neutral-200 shadow-[0_1px_0_rgba(0,0,0,0.04)] grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1">
@@ -601,7 +599,7 @@ const ManifiestosPage: React.FC = () => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
 

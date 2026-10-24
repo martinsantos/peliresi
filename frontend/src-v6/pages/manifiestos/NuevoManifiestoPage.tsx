@@ -408,20 +408,19 @@ const NuevoManifiestoForm: React.FC = () => {
   }
 
   return (
-    <div ref={formRef} className="mx-auto max-w-3xl min-w-0 pt-4 pb-6">
+    <div ref={formRef} className="mx-auto max-w-3xl min-w-0 pb-6" data-operational-page>
       {/* Header */}
       <header className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-col items-start gap-3 min-w-0">
             <Button
               variant="ghost"
-              size="sm"
               className="shrink-0"
               aria-label="Volver a Manifiestos"
               leftIcon={<ArrowLeft size={20} aria-hidden="true" />}
               onClick={() => navigate(mp('/manifiestos'))}
             >
-              {hasMobileHeader && 'Manifiestos'}
+              Manifiestos
             </Button>
             {!hasMobileHeader && <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Nuevo Manifiesto</h1>

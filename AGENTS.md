@@ -1,5 +1,11 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Navegación y espaciado — preview, 23/10/2026
+
+**Corregido y probado, no publicado.** Manifiestos e Inspecciones comparten margen superior, barra de acciones, alineación y regreso identificado al listado. Se estabilizó el ancho con scroll y se conservaron los controles de guardado de campo. [Cierre y límites](docs/UI-NAVEGACION-ESPACIADO-20261023.md). Manual **2026.23.7**.
+
+**178 unitarias + 21 E2E únicos PASS**; tras el ajuste final de scroll, recompilación web/app y **6 E2E repetidos PASS**. Tipos/builds PASS; lint dirigido 0 errores/62 advertencias. Validación geométrica y visual de 320 a 1920 px; Android físico y el resto de la UI siguen fuera de este cierre. Preview activo en 4177, CAP cerrado, correos/push apagados; sin producción, main, datos reales ni workflows. Publicación vigente: **bc0e103b**. Evidencias: layout-spacing-20261023 en el workspace del hilo.
+
 ## Claridad de UI — preview, 23/10/2026
 
 **Corregido y probado, no publicado.** Inicio y agenda sin banners/subtextos repetidos; aprobaciones con resumen, íconos y acción por rol; formulario sin título duplicado en app, etapas alineadas y ayuda desplegable; agenda de inspecciones independiente de las etapas. La campana conserva los avisos históricos y el banner se reserva para novedades. Manual **2026.23.6**.
