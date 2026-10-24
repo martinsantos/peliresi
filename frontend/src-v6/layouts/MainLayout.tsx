@@ -1,3 +1,4 @@
+import { workspaceNavigation, workspaceTitle } from '../utils/workspaceNavigation';
 import { TrainingBanner } from '../components/TrainingBanner';
 /**
  * SITREP v6 - Main Layout
@@ -10,37 +11,7 @@ import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-do
 import { currentNavigationItem } from '../utils/navigationSelection';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
-import {
-  LayoutDashboard,
-  FileText,
-  MapPin,
-  Settings,
-  Search,
-  Menu,
-  X,
-  User,
-  ChevronDown,
-  LogOut,
-  Command,
-  Users,
-  BarChart3,
-  AlertTriangle,
-  Shield,
-  ShieldCheck,
-  Upload,
-  Truck,
-  FlaskConical,
-  Factory,
-  Building2,
-  SwitchCamera,
-  ClipboardCheck,
-  HelpCircle,
-  BookOpen,
-  FileCheck,
-  Radio,
-  Scale,
-  LifeBuoy,
-} from 'lucide-react';
+import { Settings, Search, Menu, X, User, ChevronDown, LogOut, SwitchCamera, HelpCircle, BookOpen,  } from 'lucide-react';
 import { Button } from '../components/ui/ButtonV2';
 import { Badge } from '../components/ui/BadgeV2';
 import { UserSwitcher } from '../components/ui/UserSwitcher';
@@ -51,13 +22,13 @@ import { ToastContainer } from '../components/ui/Toast';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
 import { SWUpdateBanner } from '../components/SWUpdateBanner';
 import CompanyContextBar from '../components/CompanyContextBar';
-import { canUseCompanySection } from '../services/companyContext';
+
 import { OnboardingTour, resetOnboardingTour } from '../components/OnboardingTour';
 import { DemoAppOnboarding } from '../components/DemoAppOnboarding';
 import { useAuth } from '../contexts/AuthContext';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
-import { SupportEntry } from '../components/SupportReportDialog';
+
 import { SupportBubble } from '../components/SupportBubble';
 import { ApplicantLayout } from './ApplicantLayout';
 import { AttentionBadge } from '../components/AttentionBadge';
@@ -66,16 +37,6 @@ import { useAttentionCounts } from '../hooks/useAttentionCounts';
 // ========================================
 // COMPONENT
 // ========================================
-const UNLISTED_PAGE_TITLES: Record<string, string> = {
-  '/configuracion': 'Configuración',
-  '/mi-perfil': 'Mi Perfil',
-  '/notificaciones': 'Notificaciones',
-  '/estadisticas': 'Estadísticas',
-  '/ayuda': 'Ayuda',
-  '/admin/renovaciones': 'Renovaciones',
-  '/admin/vehiculos': 'Vehículos',
-};
-
 export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const menuTrigger = useRef<HTMLButtonElement>(null);
@@ -104,56 +65,18 @@ export const MainLayout: React.FC = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
   const location = useLocation();
+  useEffect(() => { setSidebarOpen(false); setUserMenuOpen(false); }, [location.pathname]);
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
-  const isActorInspection = /^\/(?:(?:app|mobile)\/)?mis-inspecciones(?:\/|$)/.test(location.pathname);
-  const inlineSupport = isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
+  const isActorInspection = /^\/(?:(?:app|mobile)\/)?(?:mis-inspecciones|requerimientos)(?:\/|$)/.test(location.pathname);
+  const inlineSupport = /^(?:\/(?:app|mobile))?\/dashboard\/?$/.test(location.pathname) || isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
   const attention = useAttentionCounts();
 
-  // Items de administración según rol. Hooks must stay before loading/null guards.
-  const adminItems = useMemo(() => {
-    const items = [];
-
-    if (isAdmin) {
-      items.push({ path: '/admin/actores',                icon: Building2,    label: 'Actores' });
-      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Admin Generadores' });
-      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Admin Operadores' });
-      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Admin Transporte' });
-      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
-      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
-      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isAdminGenerador) {
-      items.push({ path: '/admin/actores/generadores',    icon: Factory,      label: 'Mis Generadores' });
-      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
-      items.push({ path: '/admin/residuos',               icon: FlaskConical, label: 'Catálogo Residuos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isAdminTransportista) {
-      items.push({ path: '/admin/actores/transportistas', icon: Truck,        label: 'Mis Transportistas' });
-      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
-      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Vehículos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isAdminOperador) {
-      items.push({ path: '/admin/actores/operadores',     icon: FlaskConical, label: 'Mis Operadores' });
-      items.push({ path: '/admin/solicitudes',            icon: FileCheck,    label: 'Solicitudes' });
-      items.push({ path: '/admin/tratamientos',           icon: BarChart3,    label: 'Tratamientos' });
-      items.push({ path: '/admin/blockchain',              icon: ShieldCheck,  label: 'Certificación Blockchain' });
-      items.push({ path: '/admin/auditoria',              icon: Shield,       label: 'Auditoría' });
-      items.push({ path: '/admin/carga-masiva',           icon: Upload,       label: 'Carga Masiva' });
-    } else if (isTransportista) {
-      items.push({ path: '/admin/vehiculos',              icon: Truck,        label: 'Mis Vehículos' });
-    }
-
-    return items;
-  }, [isAdmin, isAdminGenerador, isAdminTransportista, isAdminOperador, isTransportista]);
+  const navigation = useMemo(() => workspaceNavigation(currentUser), [currentUser]);
+  const adminItems = navigation.filter(item => item.section === 'admin');
+  const toolsItems = navigation.filter(item => item.section === 'tools');
 
   // Guard: show loading or redirect if no user
   if (isLoading) {
@@ -191,52 +114,9 @@ export const MainLayout: React.FC = () => {
     }
   })();
 
-  // Items de navegacion segun rol
-  const navItems = (() => {
-    const items = [];
-    
-    // Dashboard para todos
-    items.push({ path: '/dashboard', icon: LayoutDashboard, label: 'Inicio' });
-    
-    // Centro de Control para Admin, Transportista y todos los Admin Sectoriales
-    if (isAdmin || isTransportista || isAdminTransportista || isAdminOperador || isAdminGenerador) {
-      items.push({ path: '/centro-control', icon: Command, label: 'Centro de Control' });
-      items.push({ path: '/monitor', icon: Radio, label: 'Monitor' });
-    }
-
-    // Manifiestos para todos
-    items.push({ path: '/manifiestos', icon: FileText, label: 'Manifiestos' });
-
-    // Canal contradictorio: sólo la entidad inspeccionada ve sus propios casos.
-    if (['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(currentUser.rol)) {
-      items.push({ path: '/mis-inspecciones', icon: Scale, label: 'Mis inspecciones' });
-    }
-
-    // Expedientes de inspección: inspectores y administradores gubernamentales.
-    if (currentUser?.esInspector || isAdmin || isAdminTransportista || isAdminOperador || isAdminGenerador) {
-      items.push({ path: '/inspecciones', icon: ClipboardCheck, label: 'Inspecciones' });
-    }
-    
-    // Usuarios del sistema solo para Admin
-    if (isAdmin) {
-      items.push({ path: '/admin/usuarios', icon: Users, label: 'Usuarios' });
-    }
-    
-    // Reportes para todos excepto algunos casos
-    items.push({ path: '/reportes', icon: BarChart3, label: 'Reportes' });
-    
-    // Alertas para todos
-    items.push({ path: '/alertas', icon: AlertTriangle, label: 'Alertas' });
-    
-    return items.filter(item=>canUseCompanySection(currentUser?.empresaContexto,item.path));
-  })();
-
-  // One current section, including detail routes; hidden role items never compete.
-  const currentItem = currentNavigationItem(location.pathname, [...navItems, ...adminItems, { path: '/soporte', icon: LifeBuoy, label: 'Soporte' }]);
-  // Pages outside the side menu still name themselves in the bar (their own heading is screen-reader only).
-  const sectionPath = location.pathname.replace(/^\/mobile(?=\/)/, '');
-  const unlistedPage = Object.entries(UNLISTED_PAGE_TITLES).find(([path]) => sectionPath === path || sectionPath.startsWith(path + '/'))?.[1];
-  const currentPage = isInspectionCase ? 'Inspección' : isActorInspection ? 'Mis inspecciones' : location.pathname.startsWith('/empresas')?'Empresas y sedes':currentItem?.label || unlistedPage || 'SITREP';
+  const navItems = navigation.filter(item => item.section === 'main');
+  const currentItem = currentNavigationItem(isActorInspection ? '/notificaciones' : location.pathname, navigation);
+  const currentPage = workspaceTitle(location.pathname);
 
   return (
     <div data-app-shell className="h-dvh bg-[#F8F8F6] flex flex-col overflow-hidden">
@@ -366,43 +246,11 @@ export const MainLayout: React.FC = () => {
             </NavLink>
           </div>}
           
-          {/* Configuración y Ayuda al final */}
-          <div className="mt-2">
-            <NavLink to="/soporte" onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-white/90 hover:bg-white/10 hover:text-white'}`}>
-              <LifeBuoy size={20} />Soporte <AttentionBadge count={attention.support} />
-            </NavLink>
-            <SupportEntry onSubmitted={() => setSidebarOpen(false)} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-white/90 transition-colors hover:bg-white/10 focus-visible:outline-white" />
-            <NavLink
-              to="/configuracion"
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `
-                flex items-center gap-3 px-3 py-2.5 rounded-xl
-                font-medium text-sm transition-all duration-200
-                ${isActive
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }
-              `}
-            >
-              <Settings size={20} />
-              Configuración
-            </NavLink>
-            <NavLink
-              to="/ayuda"
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) => `
-                flex items-center gap-3 px-3 py-2.5 rounded-xl
-                font-medium text-sm transition-all duration-200
-                ${isActive
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }
-              `}
-            >
-              <HelpCircle size={20} />
-              Ayuda
-            </NavLink>
+          <div className="mt-4 border-t border-white/15 pt-4">
+            {toolsItems.map(item => <NavLink key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}
+              className={({isActive}) => 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium '+(isActive?'bg-white/20 text-white':'text-white/70 hover:bg-white/10 hover:text-white')}>
+              <item.icon size={20} aria-hidden="true"/>{item.label}{item.path==='/soporte'&&<AttentionBadge count={attention.support}/>}
+            </NavLink>)}
             <a
               href="/manual/"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 text-white/70 hover:bg-white/10 hover:text-white"
@@ -423,7 +271,7 @@ export const MainLayout: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm text-white truncate">{currentUser.nombre}</p>
-                <p className="text-xs text-white/60">{currentUser.sector}</p>
+                {currentUser.sector&&currentUser.sector!==currentUser.nombre&&<p className="text-xs text-white/60">{currentUser.sector}</p>}
               </div>
             </div>
           </div>
@@ -451,7 +299,7 @@ export const MainLayout: React.FC = () => {
               <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-neutral-200 rounded-xl shadow-lg py-2 animate-scale-in">
                 <NavLink to="/mi-perfil" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
                   <User size={16} />
-                  Mi Perfil
+                  Mi perfil
                 </NavLink>
                 {isAdmin && !currentUser?.training && <NavLink to="/switch-user" className="w-full flex items-center gap-2 px-4 py-2 text-sm text-primary-800 hover:bg-primary-50">
                   <SwitchCamera size={16} />
@@ -501,7 +349,7 @@ export const MainLayout: React.FC = () => {
               <Badge
                 variant="soft"
                 color={inspectionLabel ? 'primary' : roleStyles.badge}
-                className={inspectionLabel ? 'max-w-full self-start whitespace-normal break-words py-0.5 sm:py-1 sm:shrink-0 sm:self-auto' : 'hidden sm:inline-flex'}
+                className="max-w-full self-start whitespace-normal break-words py-0.5 sm:py-1 sm:shrink-0 sm:self-auto"
                 aria-label="Función actual"
                 title={`Rol base: ${currentUser.rol}`}
               >
@@ -552,7 +400,7 @@ export const MainLayout: React.FC = () => {
         <ToastContainer />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
-        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (isInspectionCase ? 'overflow-clip p-4 lg:px-8' : 'overflow-auto [scrollbar-gutter:stable] px-4 lg:px-8 lg:pb-8 ' + (inlineSupport ? 'pb-4' : 'pb-12')) + (/^\/(?:manifiestos|inspecciones|mis-inspecciones)(?:\/|$)/.test(location.pathname) ? ' pt-4' : '')}>
+        <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (isInspectionCase ? 'overflow-clip p-4 lg:px-8' : 'overflow-auto [scrollbar-gutter:stable] px-4 lg:px-8 lg:pb-8 ' + (inlineSupport ? 'pb-4' : 'pb-12')) + ' pt-4'}>
           <Outlet />
         </main>
 

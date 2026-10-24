@@ -24,11 +24,11 @@ it('filters current work, preserves approval states and links to the exact manif
  const row=screen.getByRole('link',{name:/CAP-NEW/});expect(row).toHaveAttribute('href','/manifiestos/a');expect(within(row).getByLabelText('Generador: Pendiente')).toBeVisible();expect(within(row).getByLabelText('Transporte: Aprobado')).toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'Por aprobar'}));await screen.findByText('CAP-NEW');expect(screen.queryByText('CAP-TRIP')).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('button',{name:'En curso'}));await screen.findByText('CAP-TRIP');expect(screen.queryByText('CAP-NEW')).not.toBeInTheDocument();expect(screen.getByText('CAP-TRIP')).toBeVisible();
- fireEvent.click(screen.getByRole('button',{name:'Todos'}));fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'future'}});expect(screen.queryByText('CAP-TRIP')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Todos'}));fireEvent.click(screen.getByRole('button',{name:'Filtrar',exact:true}));fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'future'}});expect(screen.queryByText('CAP-TRIP')).not.toBeInTheDocument();
  fireEvent.change(screen.getByLabelText('Buscar manifiesto en agenda'),{target:{value:'missing'}});expect(await screen.findByText('Sin manifiestos para estos filtros.')).toBeVisible();
 });
 it('is not enabled in operational sessions',()=>{mock.training=false;mount();expect(mock.get).not.toHaveBeenCalled();expect(screen.queryByLabelText('Agenda de manifiestos')).not.toBeInTheDocument();});
-it('shows an operations agenda for the CAP administrator',async()=>{mock.rol='ADMIN';mount();expect(await screen.findByText('Agenda de operaciones')).toBeVisible();expect(await screen.findByText('CAP-TRIP')).toBeVisible();});
+it('shows an operations agenda for the CAP administrator',async()=>{mock.rol='ADMIN';mount();expect(await screen.findByText('Manifiestos pendientes')).toBeVisible();expect(await screen.findByText('CAP-TRIP')).toBeVisible();});
 
 it('keeps Hoy and Próximos on the Mendoza date when UTC is already the following day',async()=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-20T01:30:00Z'));
@@ -40,7 +40,7 @@ it('keeps Hoy and Próximos on the Mendoza date when UTC is already the followin
  mock.get.mockImplementation(async(_url,options)=>reply(records,options));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
- await screen.findByText('CAP-HOY');fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'today'}});await screen.findByText('CAP-HOY');
+ await screen.findByText('CAP-HOY');fireEvent.click(screen.getByRole('button',{name:'Filtrar',exact:true}));fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'today'}});await screen.findByText('CAP-HOY');
  expect(screen.getByText('CAP-HOY')).toBeVisible();expect(screen.getByText('CAP-TARDE')).toBeVisible();expect(screen.queryByText('CAP-MANANA')).toBeNull();
  fireEvent.change(screen.getByLabelText('Fecha de la agenda'),{target:{value:'future'}});await screen.findByText('CAP-MANANA');expect(screen.getByText('CAP-MANANA')).toBeVisible();expect(screen.queryByText('CAP-HOY')).toBeNull();expect(screen.queryByText('CAP-TARDE')).toBeNull();client.clear();
 });

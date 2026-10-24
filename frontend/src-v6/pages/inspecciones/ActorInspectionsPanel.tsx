@@ -28,7 +28,7 @@ export function ActorInspectionsPanel(props: Props) {
   // Do not fetch the staff-only list for an actor or disguise its403 as zero.
   return <div className="space-y-3">
     <p className="text-sm text-neutral-700">Consultá las inspecciones notificadas y tus respuestas en el portal de participación.</p>
-    <Link to={mp('/mis-inspecciones')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 font-semibold text-primary-700 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+    <Link to={mp('/notificaciones')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 font-semibold text-primary-700 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
       <ClipboardCheck size={18} aria-hidden="true" />Ver mis inspecciones
     </Link>
   </div>;

@@ -44,8 +44,8 @@ describe('Sidebar: one visible current destination',()=>{
   it.each(['ADMIN_GENERADOR','ADMIN_OPERADOR','ADMIN_TRANSPORTISTA'])('provides the authorized registration desk for %s without a hidden-route dead end',rol=>{
     authState.rol=rol;
     show('/admin/solicitudes');
-    expect(screen.getByRole('link',{name:'Solicitudes',exact:true})).toHaveAttribute('href','/admin/solicitudes');
-    expect(screen.getByRole('link',{name:'Solicitudes',exact:true})).toHaveAttribute('aria-current','page');
+    expect(screen.getByRole('link',{name:'Solicitudes de inscripción',exact:true})).toHaveAttribute('href','/admin/solicitudes');
+    expect(screen.getByRole('link',{name:'Solicitudes de inscripción',exact:true})).toHaveAttribute('aria-current','page');
     expect(screen.queryByRole('link',{name:'Usuarios',exact:true})).not.toBeInTheDocument();
   });
   it('exposes contextual technical help without requiring navigation to the desk',()=>{
@@ -65,7 +65,7 @@ describe('Sidebar: one visible current destination',()=>{
     expect(badge).toHaveAttribute('title','Rol base: GENERADOR');
     expect(authState.rol).toBe('GENERADOR');
   });
-  it.each(['/manifiestos','/transporte/perfil','/manifiestos/nuevo','/manifiestos/qa-record','/transporte/viaje/qa-trip','/manifiestos/qa-record/adendas','/app/manifiestos/qa-record/adendas','/mobile/manifiestos/qa-record/adendas'])('keeps help in the header, not over manifest controls on %s',path=>{
+  it.each(['/dashboard','/manifiestos','/transporte/perfil','/manifiestos/nuevo','/manifiestos/qa-record','/transporte/viaje/qa-trip','/manifiestos/qa-record/adendas','/app/manifiestos/qa-record/adendas','/mobile/manifiestos/qa-record/adendas'])('keeps help in the header, not over manifest controls on %s',path=>{
     show(path);
     const help=screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true});
     expect(help.closest('header')).toBe(screen.getByRole('banner'));
@@ -75,16 +75,16 @@ describe('Sidebar: one visible current destination',()=>{
   it('keeps the base role outside the inspection workspace',()=>{
     authState.rol='GENERADOR';authState.esInspector=true;
     show('/mis-inspecciones/qa-expediente');
-    expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Mis inspecciones',exact:true})).toBeVisible();
+    expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Requerimiento',exact:true})).toBeVisible();
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).closest('header')).toBe(screen.getByRole('banner'));
     expect(within(screen.getByRole('banner')).getByLabelText('Función actual')).toHaveTextContent(/^GENERADOR$/);
   });
   it.each([
     ['/admin/actores','Actores'],
-    ['/admin/actores/generadores','Admin Generadores'],
-    ['/admin/actores/generadores/qa-actor','Admin Generadores'],
-    ['/admin/actores/operadores/qa-actor','Admin Operadores'],
-    ['/admin/actores/transportistas/qa-actor','Admin Transporte'],
+    ['/admin/actores/generadores','Generadores'],
+    ['/admin/actores/generadores/qa-actor','Generadores'],
+    ['/admin/actores/operadores/qa-actor','Operadores'],
+    ['/admin/actores/transportistas/qa-actor','Transportistas'],
   ])('keeps only the most specific link current on %s',(path,label)=>{
     show(path);
     const sidebar=document.querySelector('aside')!;
@@ -96,17 +96,17 @@ describe('Sidebar: one visible current destination',()=>{
   });
   it('keeps the section label on a detail route instead of the generic product title',()=>{
     show('/admin/actores/generadores/qa-actor');
-    expect(within(screen.getByRole('banner')).getByText('Admin Generadores')).toBeVisible();
+    expect(within(screen.getByRole('banner')).getByText('Generadores')).toBeVisible();
   });
   it('provides stable hover/focus and a 44px touch target without animating geometry',()=>{
     show('/admin/actores/generadores');
-    const link=screen.getByRole('link',{name:'Admin Generadores',exact:true});
+    const link=screen.getByRole('link',{name:'Generadores',exact:true});
     expect(link).toHaveClass('min-h-11','transition-colors','focus-visible:outline-2');
     expect(link).not.toHaveClass('transition-all');
   });
   it.each([
-    ['/centro-control','Centro de Control'],
-    ['/admin/actores/generadores','Admin Generadores'],
+    ['/centro-control','Centro de control'],
+    ['/admin/actores/generadores','Generadores'],
     ['/inspecciones','Inspecciones'],
   ])('constrains the header without losing its full accessible title on %s',(path,label)=>{
     show(path);
@@ -123,8 +123,18 @@ describe('Sidebar: one visible current destination',()=>{
 });
 describe('Header names pages that are not in the side menu',()=>{
   beforeEach(()=>{authState.rol='GENERADOR';authState.esInspector=false;});
-  it.each([['/configuracion','Configuración'],['/mi-perfil/solicitar-cambios','Mi Perfil'],['/mobile/notificaciones','Notificaciones'],['/estadisticas','Estadísticas']])('%s is titled %s instead of SITREP',(path,title)=>{
+  it.each([['/configuracion','Configuración'],['/mi-perfil/solicitar-cambios','Mi perfil'],['/mobile/notificaciones','Avisos'],['/estadisticas','Estadísticas']])('%s is titled %s instead of SITREP',(path,title)=>{
     show(path);
     expect(within(screen.getByRole('banner')).getByRole('heading',{name:title,exact:true})).toBeVisible();
   });
+});
+
+
+it('closes the compact menu and account menu when navigating to the profile',()=>{
+  show('/dashboard');
+  fireEvent.click(screen.getByRole('button',{name:'Abrir menú',exact:true}));
+  fireEvent.click(screen.getByRole('button',{name:'Mi Cuenta qa@example.invalid'}));
+  fireEvent.click(screen.getByRole('link',{name:'Mi perfil',exact:true}));
+  expect(screen.getByRole('button',{name:'Abrir menú',exact:true})).toHaveAttribute('aria-expanded','false');
+  expect(screen.queryByRole('link',{name:'Mi perfil',exact:true})).not.toBeInTheDocument();
 });

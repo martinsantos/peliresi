@@ -109,8 +109,10 @@ function App() {
           <Route element={<MobileLayout />}>
             <Route path="/mobile" element={<MobileDashboardPage />} />
             <Route path="/mobile/dashboard" element={<MobileDashboardPage />} />
+            <Route path="/mobile/actores" element={<ActoresPage />} />
             <Route path="/mobile/empresas" element={<EmpresasPage />} />
             <Route path="/mobile/centro-control" element={<CentroControlPage />} />
+            <Route path="/mobile/monitor" element={<WarRoomPage />} />
             <Route path="/mobile/centro-control/viaje/:id" element={<ViajeRedirect />} />
             <Route path="/mobile/manifiestos" element={<ManifiestosPage />} />
             <Route path="/mobile/manifiestos/baja-intensidad" element={<BajaIntensidadPage />} />
@@ -122,6 +124,7 @@ function App() {
             <Route path="/mobile/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mobile/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/mobile/requerimientos/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mobile/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/mobile/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/mobile/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />
@@ -146,6 +149,9 @@ function App() {
         {/* Admin Mobile Routes - ADMIN only */}
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'ADMIN_TRANSPORTISTA']} />}>
           <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/blockchain" element={<AdminBlockchainPage />} />
+            <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
+            <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
             <Route path="/mobile/admin/solicitudes" element={<AdminSolicitudesPage />} />
             <Route path="/mobile/admin/solicitudes/:id" element={<SolicitudDetallePage />} />
           </Route>
@@ -153,8 +159,6 @@ function App() {
         <Route element={<ProtectedRoute roles={['ADMIN']} />}>
           <Route element={<MobileLayout />}>
             <Route path="/mobile/admin/actores" element={<ActoresPage />} />
-            <Route path="/mobile/admin/auditoria" element={<AuditoriaPage />} />
-            <Route path="/mobile/admin/carga-masiva" element={<CargaMasivaPage />} />
           </Route>
         </Route>
 
@@ -199,6 +203,7 @@ function App() {
             <Route path="/mobile/admin/actores/operadores/:id/editar" element={<NuevoOperadorPage />} />
             <Route path="/mobile/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
 
+            <Route path="/mobile/admin/tratamientos" element={<AdminTratamientosPage />} />
             <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
         </Route>
@@ -241,6 +246,7 @@ function App() {
           <Route element={<MainLayout />}>
             {/* Dashboard */}
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/actores" element={<ActoresPage />} />
             <Route path="/centro-control" element={<CentroControlPage />} />
             <Route path="/centro-control/viaje/:id" element={<ViajeRedirect />} />
 
@@ -255,6 +261,7 @@ function App() {
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/requerimientos/:id" element={<InspeccionadoParticipacionPage />} />
 
             {/* Transporte */}
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
@@ -377,7 +384,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
 
         {/* Legacy actores redirects */}
-        <Route path="/actores" element={<Navigate to="/admin/actores" replace />} />
+
         <Route path="/actores/*" element={<Navigate to="/admin/actores" replace />} />
         <Route path="/admin/generadores" element={<Navigate to="/admin/actores" replace />} />
         <Route path="/admin/operadores" element={<Navigate to="/admin/actores" replace />} />

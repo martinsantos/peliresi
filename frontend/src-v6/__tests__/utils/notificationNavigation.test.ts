@@ -66,7 +66,7 @@ describe('resolveNotificationPath', () => {
   });
   it.each(['participacion', 'inspeccion'])('opens agenda %s and refreshes current operations without trusting a supplied URL', destino => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'agenda_inspeccion', version: 1, inspeccionId: 'case-1', destino, url: '/wrong' }) };
-    const path = destino === 'participacion' ? '/mis-inspecciones/case-1' : '/inspecciones/case-1';
+    const path = destino === 'participacion' ? '/requerimientos/case-1' : '/inspecciones/case-1';
     expect(resolveNotificationPath(notice)).toBe(path);
     expect(resolveNotificationPath(notice, '/app')).toBe('/app' + path);
     const invalidateQueries = vi.fn(); refreshInspectionNotification(notice, { invalidateQueries } as any);
@@ -98,7 +98,7 @@ describe('resolveNotificationPath', () => {
   });
   it.each(['participacion', 'inspeccion'])('opens a PSIP %s notice in the authorized dossier on web and app', destino => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino, soloCampana: true, ruta: '/wrong' }) };
-    const path = destino === 'participacion' ? '/mis-inspecciones/case-1' : '/inspecciones/case-1#intercambios';
+    const path = destino === 'participacion' ? '/requerimientos/case-1' : '/inspecciones/case-1#intercambios';
     expect(resolveNotificationPath(notice)).toBe(path);
     expect(resolveNotificationPath(notice, '/app')).toBe('/app' + path);
   });

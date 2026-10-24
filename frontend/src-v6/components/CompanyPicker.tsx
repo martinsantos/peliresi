@@ -23,11 +23,11 @@ export function CompanyPicker({companies,selected,pagination,busy,onChoose,onSea
   {options.length>0&&<NativeSelect label="Empresa" value={selected?.id||''} onChange={onChoose}>{options.map(c=><option key={c.id} value={c.id}>{c.razonSocial} · {c.cuit}</option>)}</NativeSelect>}
   <div className="flex flex-wrap items-center justify-between gap-2">
    <p className="text-sm text-neutral-600" role="status" aria-live="polite">{busy?'Consultando empresas…':total===0?'Sin coincidencias':`${start}–${end} de ${total} empresas`}</p>
-   <nav className="flex items-center gap-2" aria-label="Páginas de empresas">
+   {totalPages>1&&<nav className="flex items-center gap-2" aria-label="Páginas de empresas">
     <Button type="button" variant="outline" disabled={busy||page<=1} onClick={()=>onPage(page-1)}>Anterior</Button>
     <span className="whitespace-nowrap text-sm">{page} / {totalPages}</span>
     <Button type="button" variant="outline" disabled={busy||page>=totalPages} onClick={()=>onPage(page+1)}>Siguiente</Button>
-   </nav>
+   </nav>}
   </div>
  </section>;
 }

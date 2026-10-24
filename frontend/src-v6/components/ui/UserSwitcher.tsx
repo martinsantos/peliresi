@@ -5,11 +5,13 @@
  */
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
   Users,
+  Settings,
+  LogOut,
   Shield,
   Factory,
   Truck,
@@ -87,7 +89,8 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
   className,
   onSwitch,
 }) => {
-  const { currentUser, users, switchUser, getUsersByRole } = useAuth();
+  const { currentUser, users, switchUser, getUsersByRole, logout } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [isSwitching, setIsSwitching] = useState(false);
@@ -189,9 +192,15 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
               {/* Outside demo mode there are no switchable accounts: offer the profile, not an empty switcher. */}
               {users.length === 0 ? (
                 <div className="p-3">
-                  <Link to="/mi-perfil" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
-                    Mi perfil
+                  <Link to="/mi-perfil" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                    <User size={16} aria-hidden="true" />Mi perfil
                   </Link>
+                  <Link to="/configuracion" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50">
+                    <Settings size={16} aria-hidden="true" />Configuración
+                  </Link>
+                  <button type="button" onClick={() => { setIsOpen(false); logout(); navigate('/login'); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-error-700 hover:bg-error-50">
+                    <LogOut size={16} aria-hidden="true" />Cerrar sesión
+                  </button>
                 </div>
               ) : <>
               {/* Filtros por rol */}

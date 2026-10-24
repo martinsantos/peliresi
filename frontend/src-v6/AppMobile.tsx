@@ -159,6 +159,7 @@ function AppMobile() {
             <Route path="/inspecciones/:id" element={<InspeccionDetallePage />} />
             <Route path="/mis-inspecciones" element={<InspeccionadoParticipacionPage />} />
             <Route path="/mis-inspecciones/:id" element={<InspeccionadoParticipacionPage />} />
+            <Route path="/requerimientos/:id" element={<InspeccionadoParticipacionPage />} />
             <Route path="/transporte/perfil" element={<TransportePerfilPage />} />
             <Route path="/transporte/cargas" element={<CargasEnCursoPage />} />
             <Route path="/transporte/viaje/:id" element={<ViajeEnCursoTransportista />} />

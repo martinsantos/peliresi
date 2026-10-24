@@ -80,7 +80,8 @@ describe('MobileDashboardPage operator queue', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('heading', { name: 'Cargas por resolver' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cargas por recibir y tratar' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nuevo manifiesto' })).not.toBeInTheDocument();
     expect(screen.getByText('295')).toBeInTheDocument();
     expect(screen.getByText('17')).toBeInTheDocument();
     expect(screen.getByText('Cerrar tratamiento')).toBeInTheDocument();

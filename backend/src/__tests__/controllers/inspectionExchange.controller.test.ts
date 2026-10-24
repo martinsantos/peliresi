@@ -95,28 +95,20 @@ describe('inspection participant exchange controller', () => {
     }));
   });
 
-  it('returns only inspections constrained by the authenticated actor relation', async () => {
-    const res = response();
-    const next = vi.fn();
-    await listarParticipacionInspeccionado({ user: actorUser() } as any, res as any, next);
-    expect(next).not.toHaveBeenCalled();
-    expect(mocks.inspections).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ generadorId: 'generator-1' }),
-    }));
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-      data: [expect.objectContaining({ id: 'inspection-1', cantidadPresentaciones: 2 })],
-    }));
+  it('does not expose an inspection directory to the inspected actor', async () => {
+    const res = response(), next = vi.fn();
+    await listarParticipacionInspeccionado({user:actorUser()} as any, res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
+    expect(mocks.inspections).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
   });
 
   it.each([['TRANSPORTISTA', 'transportista', 'transportistaId'], ['OPERADOR', 'operador', 'operadorId'], ['GENERADOR', 'generador', 'generadorId']])('scopes %s independently of requested filters and hides internal drafts', async (rol, relation, field) => {
     const next = vi.fn();
     await listarParticipacionInspeccionado({ user: { id: 'owner', rol, [relation]: { id: 'own' } },
       query: { actorId: 'other', estado: 'BORRADOR' } } as any, response() as any, next);
-    expect(next).not.toHaveBeenCalled();
-    const where = mocks.inspections.mock.calls[0][0].where;
-    expect(where[field]).toBe('own');
-    expect(where.estado.in).toContain('NOTIFICADA');
-    expect(where.estado.in).not.toContain('BORRADOR');
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
+    expect(mocks.inspections).not.toHaveBeenCalled();
     for (const state of ['BORRADOR', 'EN_CAMPO', 'EN_REVISION']) {
       mocks.inspection.mockResolvedValue({ ...actorInspection, tipoActor: rol, [field]: 'own', estado: state });
       await obtenerIntercambiosInspeccion({ params: { id: 'inspection-1' }, user: { rol, [relation]: { id: 'own' } } } as any, response() as any, next);

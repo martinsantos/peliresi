@@ -144,17 +144,14 @@ describe('MobileLayout Android shell', () => {
     fireEvent.click(screen.getByRole('button',{name:/abrir menu/i}));
     expect(screen.queryByRole('link',{name:'Ver como otro usuario'})).not.toBeInTheDocument();
   });
-  it('closes the reporting drawer only after the server confirms the ticket', async () => {
+  it('has one support destination rather than competing support entries', () => {
     renderMobileLayout('/dashboard');
-    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Reportar problema', exact: true }));
-    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'El lector no responde' } });
-    fireEvent.change(screen.getByLabelText('¿Qué intentabas hacer y qué ocurrió?'), { target: { value: 'Abrí el lector desde el viaje pero no responde.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar ticket', exact: true }));
-    await screen.findByText('Ticket confirmado');
-    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Menú de la aplicación' })).not.toBeInTheDocument());
-    expect(support.create).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', {name:/abrir menu/i}));
+    expect(screen.getAllByRole('link',{name:'Soporte',exact:true})).toHaveLength(1);
+    expect(screen.queryByRole('button',{name:'Reportar problema',exact:true})).toBeNull();
+    expect(screen.getByTestId('dashboard-content')).toBeInTheDocument();
   });
+
   it('offers contextual help above navigation and hides it while the menu is open', () => {
     renderMobileLayout('/dashboard');
     expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).toBeVisible();
@@ -221,16 +218,10 @@ describe('MobileLayout Android shell', () => {
     expect(shell.style.height).toBe('');
   });
 
-  it('keeps the original drawer and work when reporting is deferred without acknowledgement', () => {
-    renderMobileLayout('/dashboard');
-    fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Reportar problema', exact: true }));
-    fireEvent.change(screen.getByLabelText('Asunto'), { target: { value: 'El lector no responde' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Continuar luego', exact: true }));
-    expect(screen.getByRole('navigation', { name: 'Menú de la aplicación' })).toBeVisible();
-    expect(screen.getByTestId('dashboard-content')).toBeInTheDocument();
-    expect(support.create).not.toHaveBeenCalled();
-    expect(localStorage.getItem('sitrep-soporte:v1:17')).toContain('El lector no responde');
+  it('keeps contextual help on the working screen without needing the menu',()=>{
+    renderMobileLayout('/manifiestos/qa-manifiesto');
+    expect(screen.getByRole('button',{name:'Ayuda y soporte técnico'}).closest('header')).toBe(screen.getByRole('banner'));
+    expect(screen.queryByRole('navigation',{name:'Menú de la aplicación'})).toBeNull();
   });
 
   it('uses a short transportista bottom navigation label', () => {
@@ -279,7 +270,7 @@ describe('MobileLayout Android shell', () => {
     expect(badge).toHaveAttribute('title', 'Rol base: GENERADOR');
     expect(authState.currentUser.rol).toBe('GENERADOR');
   });
-  it.each(['/manifiestos', '/app/manifiestos', '/mobile/manifiestos', '/transporte/perfil', '/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip', '/transporte/cargas', '/app/transporte/cargas', '/mobile/transporte/cargas', '/manifiestos/qa-record/adendas', '/app/manifiestos/qa-record/adendas', '/mobile/manifiestos/qa-record/adendas'])('keeps technical help reachable without covering form/trip controls on %s', path => {
+  it.each(['/dashboard', '/manifiestos', '/app/manifiestos', '/mobile/manifiestos', '/transporte/perfil', '/manifiestos/nuevo', '/manifiestos/qa-record', '/transporte/viaje/qa-trip', '/transporte/cargas', '/app/transporte/cargas', '/mobile/transporte/cargas', '/manifiestos/qa-record/adendas', '/app/manifiestos/qa-record/adendas', '/mobile/manifiestos/qa-record/adendas'])('keeps technical help reachable without covering form/trip controls on %s', path => {
     renderMobileLayout(path);
     const help = screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true });
     expect(help.closest('header')).toBe(screen.getByRole('banner'));
@@ -289,7 +280,7 @@ describe('MobileLayout Android shell', () => {
   it('does not reinterpret the actor own inspection route as inspector work', () => {
     authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };
     renderMobileLayout('/mis-inspecciones/qa-expediente');
-    expect(screen.getByRole('banner').querySelector('h1')).toHaveTextContent(/^Mis inspecciones$/);
+    expect(screen.getByRole('banner').querySelector('h1')).toHaveTextContent(/^Requerimiento$/);
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).closest('header')).toBe(screen.getByRole('banner'));
     expect(screen.getByRole('banner').querySelector('[aria-label="Función actual"]')).toHaveTextContent(/^Generador$/);
   });
@@ -336,7 +327,7 @@ describe('MobileLayout Android shell', () => {
   it('keeps menu destinations at least 44px with visible keyboard focus', () => {
     renderMobileLayout('/dashboard');
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
-    const link = screen.getByRole('link', { name: 'Todos los Manifiestos', exact: true });
+    const link = screen.getByRole('link', { name: 'Manifiestos', exact: true });
     expect(link).toHaveClass('min-h-11', 'focus-visible:outline-2', 'transition-colors');
   });
 
@@ -351,14 +342,15 @@ describe('MobileLayout Android shell', () => {
     expect(link).toHaveClass('bg-primary-50', 'text-primary-900');
   });
 
-  it('keeps the last trip in the menu without covering the multi-trip queue', async () => {
+  it('keeps one stable Viajes destination rather than adding a stale last-trip duplicate', async () => {
     localStorage.setItem('sitrep_active_trip_id', 'trip-123');
 
     renderMobileLayout('/dashboard');
 
     expect(screen.queryByRole('button', { name: 'Volver al viaje en curso' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
-    expect(await screen.findByRole('link', { name: 'Último viaje abierto' })).toHaveAttribute('href', '/transporte/viaje/trip-123');
+    expect(screen.queryByRole('link', { name: 'Último viaje abierto' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'Viajes', exact:true }).every(link=>link.getAttribute('href')==='/transporte/perfil')).toBe(true);
   });
 
   it('reduces bottom padding on the field trip route', () => {

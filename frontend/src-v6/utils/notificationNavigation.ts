@@ -50,7 +50,8 @@ export function notificationActionLabel(path: string): string {
   const [pathname, query = ''] = path.replace(/^\/(?:app|mobile)(?=\/|$)/, '').split('#')[0].split('?');
   if (pathname === '/inspecciones' && new URLSearchParams(query).get('vista') === 'antecedentes') return 'Ver antecedentes en Inspecciones →';
   if (/^\/(?:admin\/solicitudes\/|mi-solicitud$)/.test(pathname)) return 'Abrir solicitud y ver su estado →';
-  if (/^\/(?:mis-)?inspecciones\//.test(pathname)) return 'Abrir expediente y ver el intercambio →';
+  if (/^\/(?:requerimientos|mis-inspecciones)\//.test(pathname)) return 'Ver requerimiento y responder →';
+  if (/^\/inspecciones\//.test(pathname)) return 'Abrir expediente y ver el intercambio →';
   if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';
   if (/^\/soporte(?:\/|$)/.test(pathname)) return 'Abrir consulta de soporte →';
   if (pathname === '/empresas') return 'Revisar entidad y personas →';
@@ -84,7 +85,7 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   if (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))) {
     if (data.version !== 1 || typeof data.inspeccionId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.inspeccionId)
       || !['participacion', 'inspeccion'].includes(String(data.destino))) return withBasePath('/notificaciones', basePath);
-    return withBasePath(data.destino === 'participacion' ? `/mis-inspecciones/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}${data.tipo === 'intercambio_inspeccion' ? '#intercambios' : ''}`, basePath);
+    return withBasePath(data.destino === 'participacion' ? `/requerimientos/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}${data.tipo === 'intercambio_inspeccion' ? '#intercambios' : ''}`, basePath);
   }
   const target = cataloguePath(notificacion.datos, true);
   if (data.familia === 'catalogo_verificable') return withBasePath(target || '/notificaciones', basePath);
@@ -106,7 +107,7 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
       || ['solicitud_observada', 'solicitud_aprobada', 'solicitud_rechazada'].includes(String(data.tipo));
     return withBasePath(applicant ? `/mi-solicitud?solicitud=${data.solicitudId}` : `/admin/solicitudes/${data.solicitudId}`, basePath);
   }
-  if (safeId(data.inspeccionId)) return withBasePath(`/${['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(recipientRole || '') ? 'mis-inspecciones' : 'inspecciones'}/${data.inspeccionId}`, basePath);
+  if (safeId(data.inspeccionId)) return withBasePath(`/${['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(recipientRole || '') ? 'requerimientos' : 'inspecciones'}/${data.inspeccionId}`, basePath);
   if (safeId(notificacion.manifiestoId)) return withBasePath(`/manifiestos/${notificacion.manifiestoId}`, basePath);
   if (typeof data.alertaId === 'string') return withBasePath('/alertas', basePath);
   return withBasePath('/notificaciones', basePath);

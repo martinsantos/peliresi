@@ -445,7 +445,15 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   };
 
   if (exchangeQuery.isLoading) return <Card className="text-sm text-neutral-600">Cargando presentaciones auditadas…</Card>;
-  if (exchangeQuery.isError || !timeline) return <Card className="border-error-200 bg-error-50 text-sm text-error-800">No se pudo abrir el intercambio formal de este expediente.</Card>;
+  if (exchangeQuery.isError || !timeline) {
+    const status = (exchangeQuery.error as { response?: { status?: number } } | null)?.response?.status;
+    const inaccessible = status === 403 || status === 404;
+    return <Card className="border-error-200 bg-error-50 text-sm text-error-800">
+      <div role="alert"><p className="font-semibold">{inaccessible ? 'Requerimiento no disponible para esta cuenta' : 'No se pudo cargar el requerimiento'}</p>
+        <p className="mt-1">{inaccessible ? 'Volvé a Avisos y abrí un pedido dirigido a tu rol y cuenta actual.' : 'Comprobá tu conexión y volvé a intentar.'}</p></div>
+      {!inaccessible && <Button variant="outline" className="mt-3" onClick={() => void exchangeQuery.refetch()}>Reintentar</Button>}
+    </Card>;
+  }
 
   const followUp = inspectionFollowUpStatus(timeline.inspeccion.seguimiento || inspectionFollowUpFromEntries(timeline.inspeccion.estado, timeline.intercambios), now);
   const legal = inspectionLegalFollowUp(timeline.inspeccion.estado);
@@ -462,38 +470,38 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
             <div className="flex min-w-0 items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#E6F4EC] text-[#1B5E3C]"><Scale size={21} /></div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B5E3C]">PSIP · {INSPECTION_PHASES[inspectionPhaseOf(timeline.inspeccion.estado)].label}</p>
-                <h3 id="inspection-exchange-title" className="mt-1 text-xl font-extrabold tracking-tight text-[#10213A]">Presentaciones y respuestas</h3>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">Observaciones de la autoridad, respuesta del inspeccionado y decisión en el mismo expediente.</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#1B5E3C]">{party === 'INSPECCIONADO' ? 'Expediente · '+timeline.inspeccion.numero : 'PSIP · '+INSPECTION_PHASES[inspectionPhaseOf(timeline.inspeccion.estado)].label}</p>
+                <h3 id="inspection-exchange-title" className="mt-1 text-xl font-extrabold tracking-tight text-[#10213A]">{party === 'INSPECCIONADO' ? 'Requerimiento de la autoridad' : 'Presentaciones y respuestas'}</h3>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{party === 'INSPECCIONADO' ? (timeline.inspeccion.actor?.razonSocial || 'Comunicación dirigida a tu cuenta') : 'Observaciones de la autoridad, respuesta del inspeccionado y decisión en el mismo expediente.'}</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <Badge color={INSPECTION_STATE_COLORS[timeline.inspeccion.estado] || 'neutral'}>{INSPECTION_STATE_LABELS[timeline.inspeccion.estado]}</Badge>
-              <Badge color={party === 'AUTORIDAD' ? 'primary' : 'info'} variant="outline">Vista: {party === 'AUTORIDAD' ? 'Organismo' : 'Inspeccionado'}</Badge>
+              {party === 'AUTORIDAD' && <Badge color="primary" variant="outline">Organismo</Badge>}
             </div>
           </div>
         </div>
-        <div className="grid gap-0 divide-y divide-neutral-200 px-4 sm:grid-cols-3 sm:divide-x sm:divide-y-0 sm:px-6">
-          <div className="py-3 sm:pr-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Expediente</p><p className="mt-1 font-bold text-[#10213A]">{timeline.inspeccion.numero}</p></div>
-          <div className="py-3 sm:px-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Presentaciones</p><p className="mt-1 font-bold text-[#10213A]">{timeline.intercambios.length}</p></div>
-          <div className="py-3 sm:pl-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">{!open ? 'Último plazo · histórico' : followUp.next ? `Plazo del pedido #${followUp.next.secuencia}` : 'Último plazo registrado · referencia'}</p><p data-testid="inspection-deadline-value" className={`mt-1 font-bold ${deadlineExpired && open ? 'text-error-700' : 'text-[#10213A]'}`}>{inspectionDeadlineDate(displayedDeadline)}</p>{displayedDeadline && <p className="mt-1 text-xs text-neutral-500">Hora de Mendoza</p>}</div>
+        <div className={`grid gap-0 divide-y divide-neutral-200 px-4 sm:px-6 ${party === 'AUTORIDAD' ? 'sm:grid-cols-3 sm:divide-x sm:divide-y-0' : ''}`}>
+          {party === 'AUTORIDAD' && <div className="py-3 sm:pr-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Expediente</p><p className="mt-1 font-bold text-[#10213A]">{timeline.inspeccion.numero}</p></div>}
+          {party === 'AUTORIDAD' && <div className="py-3 sm:px-4"><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">Presentaciones</p><p className="mt-1 font-bold text-[#10213A]">{timeline.intercambios.length}</p></div>}
+          <div className={`py-3 ${party === 'AUTORIDAD' ? 'sm:pl-4' : ''}`}><p className="text-[11px] font-bold uppercase tracking-wide text-neutral-500">{!open ? 'Último plazo · histórico' : followUp.next ? `Plazo del pedido #${followUp.next.secuencia}` : 'Último plazo registrado · referencia'}</p><p data-testid="inspection-deadline-value" className={`mt-1 font-bold ${deadlineExpired && open ? 'text-error-700' : 'text-[#10213A]'}`}>{inspectionDeadlineDate(displayedDeadline)}</p>{displayedDeadline && <p className="mt-1 text-xs text-neutral-500">Hora de Mendoza</p>}</div>
         </div>
         <div data-testid="inspection-next-step" className="border-t border-neutral-200 px-4 py-4 sm:px-6">
           <p data-testid="inspection-responsible" className="mb-2 text-xs font-bold uppercase tracking-wide text-primary-800">{legal ? 'Debe actuar: Administración competente' : followUp.responsible ? `Debe actuar: ${followUp.responsible}` : 'Sin intercambio abierto'}</p>
           <p className="flex items-center gap-2 font-bold text-neutral-900"><Reply size={18} className="shrink-0 text-primary-800" aria-hidden="true" />{nextStep.title}</p>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">{nextStep.detail}</p>
-          {open && party === 'INSPECCIONADO' && nextStep.pending[0] && !composeOpen && <Button className="mt-3" disabled={presentMutation.isPending} leftIcon={<Reply size={16} />} onClick={() => beginReply(nextStep.pending[0])}>Responder requerimiento #{nextStep.pending[0].secuencia}</Button>}
           {open && nextStep.pending.length > 0 && <div aria-label="Requerimientos sin respuesta" role="region" className="mt-4 divide-y divide-neutral-200 rounded-lg border border-neutral-200">
             {nextStep.pending.map(entry => {
               const status = inspectionDeadlineStatus(entry.plazoRespuestaAt, now);
               return <div key={entry.id} data-testid="inspection-pending-request" className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <div className="col-span-2 min-w-0 sm:col-span-1"><p className="break-words text-sm font-semibold text-neutral-900">#{entry.secuencia} · {entry.asunto}</p><p className="mt-1 text-xs text-neutral-600">{inspectionDeadlineDate(entry.plazoRespuestaAt)}{entry.plazoRespuestaAt ? ' · Mendoza' : ''}</p></div>
+                {party === 'INSPECCIONADO' && <p className="col-span-2 whitespace-pre-wrap break-words text-sm leading-6 text-neutral-700 sm:col-span-3">{entry.cuerpo}</p>}
                 <Badge className="justify-self-start" color={status === 'Vencido' ? 'error' : status === 'Vence hoy' ? 'warning' : 'neutral'}>{status}</Badge>
-                {party === 'INSPECCIONADO' && <Button aria-label={`Responder pedido #${entry.secuencia}`} className="justify-self-end" size="sm" variant="outline" disabled={presentMutation.isPending} onClick={() => beginReply(entry)}>Responder</Button>}
+                {party === 'INSPECCIONADO' && <Button aria-label={`Responder requerimiento #${entry.secuencia}`} className="justify-self-end" size="sm" variant="outline" disabled={presentMutation.isPending} onClick={() => beginReply(entry)}>Responder</Button>}
               </div>;
             })}
           </div>}
-          <p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>
+          {party === 'AUTORIDAD' ? (<p className="mt-3 text-xs leading-5 text-neutral-600">Cada actuación avisa en la campana a la contraparte con cuenta activa y acceso al expediente. Este canal no envía correos ni push. Leer el aviso no responde el requerimiento; la primera apertura del intercambio queda registrada y no acredita notificación fehaciente. <a className="font-semibold text-primary-800 underline underline-offset-2" href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer">Ver flujo PSIP</a></p>) : <p className="mt-3 text-xs text-neutral-600">Tu respuesta queda registrada y la autoridad recibe un aviso.</p>}
         </div>
       </Card>
 
@@ -508,6 +516,16 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
       {timeline.intercambios.length === 0 ? (
         <Card className="py-10 text-center"><Files className="mx-auto text-neutral-300" size={36} /><p className="mt-3 font-bold text-[#10213A]">Todavía no hay presentaciones formales</p><p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-neutral-600">La autoridad inicia el circuito con un requerimiento. El inspeccionado podrá responder sobre ese antecedente.</p></Card>
       ) : (
+        party === 'INSPECCIONADO' ? <details open={nextStep.pending.length === 0} className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold text-primary-800">Historial y documentación</summary>
+        <ExchangeLedger
+          cycles={exchangeCycles}
+          parentById={parentById}
+          party={party}
+          open={open && !presentMutation.isPending && nextStep.pending.length === 0}
+          onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
+          onReply={beginReply}
+        />
+        </details> : (
         <ExchangeLedger
           cycles={exchangeCycles}
           parentById={parentById}
@@ -516,10 +534,10 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
           onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
           onReply={beginReply}
         />
+        )
       )}
 
       {open && !composeOpen && party === 'AUTORIDAD' && <Button disabled={presentMutation.isPending} leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
-      {open && !composeOpen && party === 'INSPECCIONADO' && timeline.intercambios.some((entry) => entry.parte === 'AUTORIDAD') && <p className="rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900">Para contestar, seleccione <strong>Responder esta actuación</strong> en el requerimiento correspondiente. Así la relación queda inequívoca.</p>}
 
       {open && composeOpen && (
         <Card id="inspection-exchange-form" className="border-primary-200">

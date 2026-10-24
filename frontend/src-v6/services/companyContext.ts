@@ -17,4 +17,4 @@ export const companyHeaders=(v:CompanySelection)=>({'X-SITREP-Empresa':v.empresa
 export const companyCacheScope=(v:CompanySelection|null)=>v?`${v.empresaId}:${v.actividadId}:${v.establecimientoId||'todos'}`:'personal';
 /** Navigation affordance only; the API remains the authority on every request. */
 export const canUseCompanySection=(context:CompanyContext|undefined,path:string)=>!context||context.todasSedes
- || /^(?:\/mobile)?\/(?:dashboard|manifiestos|empresas|mi-perfil|notificaciones|soporte|ayuda|escaner-qr)(?:[/?]|$)/.test(path);
+ || /^(?:\/mobile)?\/(?:dashboard|manifiestos|empresas|mi-perfil|notificaciones|requerimientos|mis-inspecciones|soporte|ayuda|escaner-qr)(?:[/?]|$)/.test(path);

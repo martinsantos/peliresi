@@ -2,7 +2,7 @@ import { manifestProposalsVisible } from '../utils/manifestFeatures';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, ChevronRight, Clock3, Route, CircleAlert, Award } from 'lucide-react';
+import { CalendarDays, ChevronRight, Clock3, Route, CircleAlert, Award, SlidersHorizontal } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
@@ -27,18 +27,24 @@ function label(m:Task,role:string){
 }
 export function TrainingTaskQueue(){
  const {currentUser}=useAuth(),mp=useMobilePrefix();
+ const [showFilters,setShowFilters]=useState(false);
  const [filter,setFilter]=useState('all'),[period,setPeriod]=useState('all'),[search,setSearch]=useState(''),[page,setPage]=useState(1);
- const query=useQuery({queryKey:['training-tasks',currentUser?.id,currentUser?.rol,currentUser?.actorId,filter,period,search,page],enabled:manifestProposalsVisible(currentUser),queryFn:async()=>(await api.get('/manifiestos/tareas-partes',{params:{filter,period,search,page,limit:6}})).data.data as {items:Task[];total:number;page:number;limit:number;counts:Record<string,number>},refetchInterval:5000,staleTime:0});
+ const query=useQuery({queryKey:['training-tasks',currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.establecimientoId,filter,period,search,page],enabled:manifestProposalsVisible(currentUser),queryFn:async()=>(await api.get('/manifiestos/tareas-partes',{params:{filter,period,search,page,limit:6}})).data.data as {items:Task[];total:number;page:number;limit:number;counts:Record<string,number>},refetchInterval:5000,staleTime:0});
  if(!manifestProposalsVisible(currentUser) || !currentUser)return null;
  const items=query.data?.items||[], counts=query.data?.counts||{};
  const admin=currentUser.rol==='ADMIN'||currentUser.rol.startsWith('ADMIN_');
  const approvalFilter=admin?'waiting':'mine';
  const filters=admin?[['all','Todos'],['waiting','Por aprobar'],['progress','En curso'],['certificates','Certificados'],['drafts','Borradores']]:[['all','Todos'],['mine','Por aprobar'],['waiting','En espera'],['progress','En curso'],['certificates','Certificados'],['drafts','Borradores']];
+ const hasWork=Object.values(counts).some(value=>value>0)||filter!=='all'||period!=='all'||!!search;
  const actualPage=query.data?.page||page, total=query.data?.total||0, pages=Math.max(1,Math.ceil(total/6));
  return <section aria-label="Agenda de manifiestos"><Card padding="none" className="overflow-hidden">
- <div className="px-4 pt-4"><CardHeader icon={<CalendarDays size={22}/>} title={admin?'Agenda de operaciones':'Mi agenda'} className="mb-3 pb-3"/>
- <div className="grid grid-cols-2 gap-2 mb-2"><input aria-label="Buscar manifiesto en agenda" type="search" maxLength={80} placeholder="Buscar nº" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} className="h-11 w-full min-w-0 rounded-lg border border-neutral-300 px-2 text-base sm:text-sm"/><select aria-label="Fecha de la agenda" value={period} onChange={e=>{setPeriod(e.target.value);setPage(1);}} className="h-11 min-w-0 rounded-lg border border-neutral-300 bg-white px-2 text-sm"><option value="all">Toda fecha</option><option value="today">Hoy</option><option value="future">Próximos</option></select></div>
- <div role="group" aria-label="Filtrar agenda" className={`grid grid-cols-3 ${admin?'sm:grid-cols-5':'sm:grid-cols-6'} gap-1.5 pb-3`}>{filters.map(([value,name])=><button type="button" key={value} aria-pressed={filter===value} title={`${counts[value]??0} ${(counts[value]??0)===1?'manifiesto':'manifiestos'} · ${name}`} onClick={()=>{setFilter(value);setPage(1);}} className={`flex min-h-11 items-center justify-center gap-1 rounded-lg border px-1 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-1 ${filter===value?'border-primary-800 bg-primary-800 text-white':value===approvalFilter&&counts[value]>0?'border-primary-300 bg-primary-50 text-primary-900':'border-transparent bg-neutral-100 text-neutral-700 hover:bg-primary-50'}`}>{name}<span aria-hidden="true" className="tabular-nums">{counts[value]??''}</span></button>)}</div></div>
+ <div className="px-4 pt-4">
+ <div className="flex items-center justify-between gap-2 pb-3"><h3 className="flex min-w-0 items-center gap-2 text-base font-bold text-neutral-900"><CalendarDays size={20} className="shrink-0 text-primary-800" aria-hidden="true"/>Manifiestos pendientes</h3>
+ {hasWork&&<button type="button" aria-expanded={showFilters} aria-controls="agenda-filters" onClick={()=>setShowFilters(!showFilters)} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-primary-800 hover:bg-primary-50"><SlidersHorizontal size={16} aria-hidden="true"/>Filtrar</button>}</div>
+ {hasWork&&<>
+ {showFilters&&<div id="agenda-filters" className="grid grid-cols-1 gap-2 pb-3 sm:grid-cols-2"><input aria-label="Buscar manifiesto en agenda" type="search" maxLength={80} placeholder="Buscar nº de manifiesto" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} className="h-11 w-full min-w-0 rounded-lg border border-neutral-300 px-3 text-base sm:text-sm"/><select aria-label="Fecha de la agenda" value={period} onChange={e=>{setPeriod(e.target.value);setPage(1);}} className="h-11 min-w-0 rounded-lg border border-neutral-300 bg-white px-3 text-sm"><option value="all">Toda fecha</option><option value="today">Hoy</option><option value="future">Próximos</option></select></div>}
+ <div role="group" aria-label="Filtrar agenda" className="flex gap-1.5 overflow-x-auto pb-3">{filters.map(([value,name])=><button type="button" key={value} title={(counts[value]??0)+((counts[value]??0)===1?' manifiesto · ':' manifiestos · ')+name} aria-pressed={filter===value} onClick={()=>{setFilter(value);setPage(1);}} className={'flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 '+(filter===value?'border-primary-800 bg-primary-800 text-white':'border-neutral-200 bg-white text-neutral-700 hover:bg-primary-50')}>{name}<span aria-hidden="true" className="tabular-nums">{counts[value]??''}</span></button>)}</div>
+ </>}</div>
  {query.isError?<p role="alert" className="p-4">No pudimos actualizar la agenda. <button className="underline" onClick={()=>void query.refetch()}>Reintentar</button></p>:query.isPending?<p className="p-4">Cargando agenda…</p>:<>
  <ul className="divide-y divide-neutral-200">{items.map(m=>{
   const Icon=m.certificatePending?Award:m.requiereMiAprobacion?CircleAlert:m.estado==='PENDIENTE_APROBACION'?Clock3:Route;
@@ -51,7 +57,9 @@ export function TrainingTaskQueue(){
     {(actors||m.modalidad==='IN_SITU')&&<div className="basis-full pl-6 text-xs text-neutral-700">{actors&&<p className="break-words">{actors}</p>}{m.modalidad==='IN_SITU'&&<p className="mt-1">Tratamiento en origen · sin transporte</p>}</div>}
     </Link></li>;
  })}</ul>
- {!items.length&&<p role="status" className="p-4 text-sm text-neutral-600">Sin manifiestos para estos filtros.</p>}
- <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-4 py-2 text-xs text-neutral-600"><span role="status">{total} pendientes · Página {actualPage} de {pages}</span><div className="flex gap-3"><button disabled={actualPage<=1||query.isFetching} className="min-h-11 font-semibold text-primary-800 disabled:text-neutral-400" onClick={()=>setPage(actualPage-1)}>Anterior</button><button disabled={actualPage>=pages||query.isFetching} className="min-h-11 font-semibold text-primary-800 disabled:text-neutral-400" onClick={()=>setPage(actualPage+1)}>Siguiente</button></div><Link className="min-h-11 inline-flex items-center font-semibold text-primary-800" to={mp('/manifiestos')}>Todos los manifiestos</Link></div></>}
+ {!items.length&&<p role="status" className="p-4 text-sm text-neutral-600">{hasWork?'Sin manifiestos para estos filtros.':'No tenés manifiestos pendientes.'}</p>}
+ <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-4 py-2 text-xs text-neutral-600">
+ {pages>1&&<><span role="status">{total} pendientes · Página {actualPage} de {pages}</span><div className="flex gap-3"><button disabled={actualPage<=1||query.isFetching} className="min-h-11 font-semibold text-primary-800 disabled:text-neutral-400" onClick={()=>setPage(actualPage-1)}>Anterior</button><button disabled={actualPage>=pages||query.isFetching} className="min-h-11 font-semibold text-primary-800 disabled:text-neutral-400" onClick={()=>setPage(actualPage+1)}>Siguiente</button></div></>}
+ <Link className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary-800" to={mp('/manifiestos')}>Ver todos los manifiestos<ChevronRight size={16} aria-hidden="true"/></Link></div></>}
  </Card></section>;
 }

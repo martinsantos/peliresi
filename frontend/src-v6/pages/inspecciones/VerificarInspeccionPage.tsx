@@ -51,7 +51,7 @@ const VerificarInspeccionPage: React.FC = () => {
   const verificationUrl = result.verificacion.url;
   const authorizedPath = result.authorizedPath;
   const authorizedDestination = currentUser && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(currentUser.rol)
-    ? authorizedPath.replace(/^\/inspecciones\//, '/mis-inspecciones/')
+    ? authorizedPath.replace(/^\/inspecciones\//, '/requerimientos/')
     : authorizedPath;
   const isHistorical = result.verificacion.estadoVerificacion === 'HISTORICA_AUTENTICA';
   const isTraining = isTrainingActNumber(result.numeroActa);

@@ -139,35 +139,8 @@ function eventTitle(tipo: TipoIntercambioInspeccion, parte: ParteIntercambioInsp
   return labels[tipo];
 }
 
-export async function listarParticipacionInspeccionado(req: AuthRequest, res: Response, next: NextFunction) {
-  try {
-    const ownActor = participantWhere(req.user);
-    if (!ownActor) throw new AppError('La cuenta no está vinculada a un actor inspeccionable', 403);
-    const rows = await prisma.inspeccion.findMany({
-      where: { ...ownActor, estado: { in: PARTICIPANT_VISIBLE_STATES } },
-      select: {
-        ...inspectionAccessSelect,
-        _count: { select: { intercambios: true } },
-        intercambios: { select: inspectionFollowUpSelect },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
-    res.json({
-      success: true,
-      data: rows.map((inspection) => ({
-        id: inspection.id,
-        numero: inspection.numero,
-        numeroActa: inspection.numeroActa,
-        estado: inspection.estado,
-        tipoActor: inspection.tipoActor,
-        actor: actorSummary(inspection),
-        plazoRespuestaAt: inspection.plazoRespuestaAt,
-        version: inspection.version,
-        cantidadPresentaciones: inspection._count.intercambios,
-        seguimiento: inspectionFollowUp(inspection.estado, inspection.intercambios || []),
-      })),
-    });
-  } catch (error) { next(error); }
+export async function listarParticipacionInspeccionado(_req: AuthRequest, _res: Response, next: NextFunction) {
+  next(new AppError('Abrí el requerimiento desde Avisos. El listado de inspecciones es de uso administrativo.', 403));
 }
 
 export async function obtenerIntercambiosInspeccion(req: AuthRequest, res: Response, next: NextFunction) {

@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { UserSwitcher } from '../../components/ui/UserSwitcher';
 
-const state = vi.hoisted(() => ({ role: 'ADMIN', users: [] as Array<{ id: number; nombre: string; avatar: string; rol: string; sector: string }> }));
+const state = vi.hoisted(() => ({ role: 'ADMIN', logout: vi.fn(), users: [] as Array<{ id: number; nombre: string; avatar: string; rol: string; sector: string }> }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
   currentUser: { id: 1, nombre: 'QA Usuario', avatar: 'QA', rol: state.role },
-  users: state.users, switchUser: vi.fn(), getUsersByRole: () => state.users,
+  logout: state.logout, users: state.users, switchUser: vi.fn(), getUsersByRole: () => state.users,
 }) }));
 
 describe('Current-role caption remains readable on every actor tint', () => {
@@ -37,6 +37,9 @@ describe('Current-role caption remains readable on every actor tint', () => {
     render(<MemoryRouter><UserSwitcher /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Opciones de cuenta de QA Usuario', exact: true }));
     expect(screen.getByRole('link', { name: 'Mi perfil' })).toHaveAttribute('href', '/mi-perfil');
+    expect(screen.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/configuracion');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+    expect(state.logout).toHaveBeenCalledOnce();
     expect(screen.queryByText('Cambiar a:')).not.toBeInTheDocument();
     expect(screen.queryByText('Filtrar por rol')).not.toBeInTheDocument();
     expect(screen.queryByText(/usuarios disponibles/)).not.toBeInTheDocument();

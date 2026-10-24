@@ -2,19 +2,19 @@ export type GuideStep = { title: string; desc: string; icon: 'actors' | 'manifes
 const proposals: GuideStep = { icon: 'approve', title: 'Proponer y aprobar entre las partes', desc: 'Generador, transportista u operador pueden proponer un manifiesto. Cada parte revisa desde su cuenta; sólo con todas las aprobaciones se habilita la coordinación.' };
 export const ROLE_GUIDANCE: Record<string, GuideStep[]> = {
   GENERADOR: [
-    { icon: 'manifest', title: 'Tu trabajo como generador', desc: 'Creá una propuesta o revisá las que te involucran. En Mi agenda ves qué requiere tu aprobación y qué está esperando a otra parte.' },
+    { icon: 'manifest', title: 'Tu trabajo como generador', desc: 'Creá una propuesta o revisá las que te involucran. En Manifiestos pendientes ves qué requiere tu aprobación y qué está esperando a otra parte.' },
     proposals,
     { icon: 'notice', title: 'Seguí la carga y sus cambios', desc: 'La campana abre el manifiesto o la adenda precisa. Revisá las diferencias informadas por el operador; leer el aviso no equivale a aprobar.' },
     { icon: 'certificate', title: 'Recibí las certificaciones', desc: 'Cuando el operador firma y libera una parcial o final, recibís un aviso. Desde Certificaciones podés descargar el documento emitido.' },
   ],
   TRANSPORTISTA: [
-    { icon: 'trip', title: 'Tus viajes, juntos y ordenados', desc: 'Podés proponer manifiestos y aprobar los que te asignan. En Cargas en curso encontrás tus viajes simultáneos y los relevos aceptados.' },
+    { icon: 'trip', title: 'Tus viajes, juntos y ordenados', desc: 'Podés proponer manifiestos y aprobar los que te asignan. En Cargas en este móvil encontrás tus viajes simultáneos y los relevos aceptados.' },
     proposals,
     { icon: 'trip', title: 'Retiro físico y ubicación', desc: 'Confirmá el retiro cuando recibas la carga. Activá Ubicación y verificá el permiso y el estado GPS. Si falla, reintentá; la ubicación no se garantiza con la app cerrada.' },
     { icon: 'notice', title: 'Incidentes, relevos y entrega', desc: 'Registrá la avería y el traspaso desde el viaje que corresponda. Al llegar confirmá la entrega; el operador confirma la recepción y continúa el tratamiento.' },
   ],
   OPERADOR: [
-    { icon: 'manifest', title: 'Desde la propuesta hasta la certificación', desc: 'También podés crear un manifiesto. Tu agenda reúne aprobaciones, cargas por recibir, tratamientos y certificaciones pendientes.' },
+    { icon: 'manifest', title: 'Desde la propuesta hasta la certificación', desc: 'También podés crear un manifiesto. Manifiestos pendientes reúne aprobaciones, cargas por recibir, tratamientos y certificaciones pendientes.' },
     proposals,
     { icon: 'notice', title: 'Recibir, pesar y documentar hallazgos', desc: 'Registrá el peso recibido y el tratamiento. Si la carga difiere, documentá el hallazgo dentro de la adenda y seguí la revisión de las partes.' },
     { icon: 'certificate', title: 'Firmá y liberá cada certificación', desc: 'Emití parciales por lo tratado. La final requiere cierre y adendas resueltas. Cerrar el tratamiento no emite la final: vos revisás, firmás y publicás; las partes reciben el aviso.' },

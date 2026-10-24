@@ -263,7 +263,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   } else if (notice.tipo === 'INFO_GENERAL' && typeof data.inspeccionId === 'string' && data.inspeccionId) {
     family = 'inspecciones'; title = 'Novedad en una inspección';
     const participant = ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) ? data.destino === 'participacion' : !notice.rol.startsWith('ADMIN') && !notice.esInspector;
-    path = (participant ? '/mis-inspecciones/' : '/inspecciones/') + encodeURIComponent(data.inspeccionId)
+    path = (participant ? '/requerimientos/' : '/inspecciones/') + encodeURIComponent(data.inspeccionId)
       + (!participant && data.tipo === 'intercambio_inspeccion' ? '#intercambios' : '');
   } else return null;
   // Only controlled event labels. Never copy free text, notes, attachments or amounts.

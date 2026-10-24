@@ -2,12 +2,16 @@
  * SITREP v6 - Dashboard Hooks
  */
 
+import { useAuth } from '../contexts/AuthContext';
+import { companyCacheScope } from '../services/companyContext';
 import { useQuery } from '@tanstack/react-query';
 import { analyticsService } from '../services/analytics.service';
 
 export function useDashboardStats() {
+  const {currentUser} = useAuth();
   return useQuery({
-    queryKey: ['dashboard', 'stats'],
+    queryKey: ['dashboard', 'stats', currentUser?.id, currentUser?.rol, currentUser?.actorId, companyCacheScope(currentUser?.empresaContexto || null)],
+    enabled: Boolean(currentUser),
     queryFn: () => analyticsService.getDashboardStats(),
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000,

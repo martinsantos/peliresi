@@ -25,6 +25,7 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
   const toastIds = useRef<string[]>([]);
   const seen = useRef<Set<string>>(new Set());
   const initialized = useRef(false);
+  const latestReceivedAt = useRef(Number.NEGATIVE_INFINITY);
 
   const { data } = useQuery({
     queryKey: ['notificaciones', 'poll', userId],
@@ -38,14 +39,27 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
     if (!data) return;
 
     if (!initialized.current) {
-      data.items.forEach((n) => seen.current.add(n.id));
+      data.items.forEach((n) => {
+        seen.current.add(n.id);
+        const createdAt = Date.parse(n.createdAt);
+        if (Number.isFinite(createdAt)) latestReceivedAt.current = Math.max(latestReceivedAt.current, createdAt);
+      });
       initialized.current = true;
       // Existing unread notices already have a persistent count in the bell.
       // Reserve the live banner for events received during this session.
       return;
     }
 
-    const nuevas = data.items.filter((n) => !seen.current.has(n.id));
+    // Reading one notice pulls an older unread item into this limited page.
+    // A newly visible ID is not necessarily a new event. Use the server's
+    // timestamps (not the device clock), keeping simultaneous events eligible.
+    const nuevas = data.items.filter((n) => !seen.current.has(n.id)
+      && Date.parse(n.createdAt) >= latestReceivedAt.current);
+    data.items.forEach((n) => {
+      seen.current.add(n.id);
+      const createdAt = Date.parse(n.createdAt);
+      if (Number.isFinite(createdAt)) latestReceivedAt.current = Math.max(latestReceivedAt.current, createdAt);
+    });
     if (nuevas.length) {
       void qc.invalidateQueries({ queryKey: ['attention'] });
       // Refresh the open inbox and badge, without invalidating this poll and

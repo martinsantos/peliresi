@@ -30,6 +30,7 @@ import { useGenerador, useOperador } from '../../hooks/useActores';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import ActorCertificates from '../../components/ActorCertificates';
 import ActorActivities from '../../components/ActorActivities';
+import { CompanyAccessLink } from '../../components/CompanyAccessLink';
 
 
 const PerfilPage: React.FC = () => {
@@ -86,13 +87,13 @@ const PerfilPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="flex flex-col gap-6 animate-fade-in">
       {/* Header */}
       <h2 className="sr-only">Mi Perfil</h2>
 
       <ActorActivities />
-      {import.meta.env.VITE_ENTERPRISE_ENABLED==='true'&&<Button variant="outline" onClick={()=>navigate(location.pathname.startsWith('/mobile/')?'/mobile/empresas':'/empresas')}>Empresas y establecimientos</Button>}
-      {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y sede en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}
+      <CompanyAccessLink />
+      {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y establecimiento en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}
       {!currentUser?.empresaContexto&&currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}

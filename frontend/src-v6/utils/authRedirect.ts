@@ -14,7 +14,9 @@ const INSPECTED_PARTY_ROLES = new Set(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']
 
 export function postLoginDestination(from: unknown, role?: string, isInspector = false): string {
   const localPath = safeLocalRedirect(from);
-  return role && !isInspector && INSPECTED_PARTY_ROLES.has(role)
-    ? localPath.replace(/^\/inspecciones\//, '/mis-inspecciones/')
-    : localPath;
+  if (!role || isInspector || !INSPECTED_PARTY_ROLES.has(role)) return localPath;
+  if (/^\/(?:mobile\/)?(?:inspecciones|mis-inspecciones)\/?(?:[?#]|$)/.test(localPath)) {
+    return localPath.startsWith('/mobile/') ? '/mobile/dashboard' : '/dashboard';
+  }
+  return localPath.replace(/^(\/(?:mobile\/)?)(?:inspecciones|mis-inspecciones)\//, '$1requerimientos/');
 }

@@ -14,12 +14,12 @@ const clients:QueryClient[]=[];
 beforeEach(()=>{mock.offline=false;mock.navigate.mockClear();localStorage.clear();vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED','true');});
 afterEach(()=>{cleanup();clients.forEach(client=>client.clear());clients.length=0;localStorage.clear();vi.unstubAllEnvs();});
 function mount(){const client=new QueryClient({defaultOptions:{queries:{retry:false}}});clients.push(client);render(<MemoryRouter><QueryClientProvider client={client}><MobileDashboardPage/></QueryClientProvider></MemoryRouter>);}
-it('keeps the existing multiple-trip queue beside the new operational proposal agenda',()=>{
+it('has one pending-work list and explicit access to multi-trip GPS without duplicate manifests',()=>{
  mount();expect(screen.getByRole('region',{name:'Agenda de manifiestos'})).toBeVisible();
- const trips=screen.getByRole('region',{name:'Viajes del transportista'});
- expect(within(trips).getByRole('button',{name:'Ir al viaje QA-TRIP-1'})).toBeVisible();
- fireEvent.click(within(trips).getByRole('button',{name:'Ir al viaje QA-TRIP-2'}));expect(mock.navigate).toHaveBeenCalledWith('/transporte/viaje/two');
- expect(screen.getByRole('button',{name:'Cargas en este móvil'})).toBeVisible();
+ expect(screen.queryByRole('region',{name:'Viajes del transportista'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Cargas en este móvil'}));expect(mock.navigate).toHaveBeenCalledWith('/transporte/cargas');
+ fireEvent.click(screen.getByRole('button',{name:'Viajes',exact:true}));expect(mock.navigate).toHaveBeenCalledWith('/transporte/perfil');
+ expect(screen.queryByText('Actividad Reciente')).toBeNull();
  expect(screen.queryByRole('button',{name:'Abrir viaje asignado QA-COORDINATION-PENDING'})).toBeNull();
 });
 it('retains the saved-trip fallback during an outage with proposals enabled',()=>{

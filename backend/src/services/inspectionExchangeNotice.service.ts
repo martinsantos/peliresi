@@ -5,7 +5,7 @@ type NoticeInspection = InspectionExchangeAccessTarget & { id: string; numero: s
 type NoticeExchange = { id: string; secuencia: number; tipo: TipoIntercambioInspeccion; parte: ParteIntercambioInspeccion; autorId: string; plazoRespuestaAt?: Date | null };
 
 export const INSPECTION_EXCHANGE_LABELS: Record<TipoIntercambioInspeccion, [string, string]> = {
-  REQUERIMIENTO: ['Nuevo requerimiento', 'Revisá el pedido y su plazo para responder desde el expediente.'],
+  REQUERIMIENTO: ['Nuevo requerimiento', 'Abrí este aviso para revisar el pedido, su plazo y responder.'],
   RESPUESTA: ['Nueva respuesta', 'Abrí el intercambio para leer la respuesta y revisar qué sigue.'],
   DESCARGO: ['Descargo presentado', 'Revisá el descargo recibido antes de resolver.'],
   SUBSANACION: ['Subsanación presentada', 'Revisá la documentación recibida antes de resolver.'],

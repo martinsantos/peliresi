@@ -25,7 +25,7 @@ it('switching personal/company context is exclusive, malformed selection fails c
 });
 it('a site-limited delegate is not offered legacy company-wide sections',()=>{
  const limited:any={todasSedes:false};
- for(const path of ['/reportes','/mobile/mis-inspecciones','/centro-control','/admin/usuarios'])expect(canUseCompanySection(limited,path)).toBe(false);
+ for(const path of ['/reportes','/centro-control','/admin/usuarios'])expect(canUseCompanySection(limited,path)).toBe(false);
  for(const path of ['/mobile/manifiestos/nuevo','/empresas','/mi-perfil','/ayuda','/soporte'])expect(canUseCompanySection(limited,path)).toBe(true);
  expect(canUseCompanySection(undefined,'/reportes')).toBe(true);
  expect(canUseCompanySection({...limited,todasSedes:true},'/reportes')).toBe(true);

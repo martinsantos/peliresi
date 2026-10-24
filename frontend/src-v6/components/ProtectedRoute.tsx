@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { canAccessMobilePath } from '../utils/mobileAccess';
 import { LoadingIndicator } from './ui/LoadingState';
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type UserRole } from '../contexts/AuthContext';
@@ -52,6 +53,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/mi-solicitud" replace />;
   }
 
+  // Share the app's route boundary before rendering a page or fetching its data.
+  if (!canAccessMobilePath(currentUser, location.pathname)) {
+    return <Navigate to={location.pathname.startsWith('/mobile/') ? '/mobile/dashboard' : '/dashboard'} replace />;
+  }
+
   // Authenticated but role not allowed -> access denied
   const actor = actorRead ? actorDetailFromPath(location.pathname) : null;
   const actorDenied = actorRead && (!actor || actor.type !== actorRead || !canReadActorDetail(currentUser, actorRead, actor.id));
@@ -73,7 +79,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             to={location.pathname.startsWith('/mobile/') ? '/mobile/dashboard' : '/dashboard'}
             className="mt-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
           >
-            Volver al Dashboard
+            Volver a Inicio
           </Link>
         </div>
       </div>

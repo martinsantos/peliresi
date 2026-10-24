@@ -24,7 +24,7 @@ test('loading disables pagination/search, retains the selected native option and
  render(<CompanyPicker {...callbacks()} companies={[]} selected={first} pagination={{page:1,limit:25,total:0,totalPages:1}} busy/>);
  expect(screen.getByRole('status')).toHaveTextContent('Consultando empresas');
  expect(screen.getByRole('button',{name:'Buscar'})).toBeDisabled();
- expect(screen.getByRole('button',{name:'Siguiente'})).toBeDisabled();
+ expect(screen.queryByRole('navigation',{name:'Páginas de empresas'})).toBeNull();
  expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('a');
  expect(document.activeElement).not.toBe(screen.getByLabelText('Buscar empresa'));
 });

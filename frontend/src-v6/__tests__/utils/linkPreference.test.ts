@@ -9,7 +9,7 @@ describe('personal link destination', () => {
   expect(linkDestination('/notificaciones/n','APP',false,false)).toBe('/app/notificaciones/n');
   expect(linkDestination('/notificaciones/n','AUTO',true,false)).toBe('/app/notificaciones/n');
  });
- it('maps the inspected actor without losing the dossier',()=>expect(linkDestination('/inspecciones/i#intercambios','APP',false,false,'GENERADOR')).toBe('/app/mis-inspecciones/i#intercambios'));
+ it('maps the inspected actor without losing the dossier',()=>expect(linkDestination('/inspecciones/i#intercambios','APP',false,false,'GENERADOR')).toBe('/app/requerimientos/i#intercambios'));
  it('resumes the resolver after login and preserves public auth tokens',()=>{
   expect(safeLocalRedirect('/abrir?destino=%2Fmanifiestos%2Fm')).toBe('/abrir?destino=%2Fmanifiestos%2Fm');
   expect(canonicalLink('/verificar-email?token=a%2Fb%2Bc')).toBe('/verificar-email?token=a%2Fb%2Bc');

@@ -53,7 +53,7 @@ test('sector inspection scope does not widen when consulting another actor categ
   assert.equal(canReadActorInspectionHistory({ rol: 'ADMIN_GENERADOR' }, 'GENERADOR'), true);
 });
 test('actors use participation while cross-sector readers do not fetch a misleading history', () => {
-  assert.equal(actorInspectionAccess({ rol: 'GENERADOR', actorId: 'g-1' }, 'GENERADOR', 'g-1'), 'participation');
+  assert.equal(actorInspectionAccess({ rol: 'GENERADOR', actorId: 'g-1' }, 'GENERADOR', 'g-1'), null);
   assert.equal(actorInspectionAccess({ rol: 'GENERADOR', actorId: 'g-1' }, 'GENERADOR', 'g-2'), null);
   assert.equal(actorInspectionAccess({ rol: 'ADMIN_GENERADOR' }, 'OPERADOR', 'o-1'), null);
   assert.equal(actorInspectionAccess({ rol: 'GENERADOR', esInspector: true }, 'OPERADOR', 'o-1'), 'staff');

@@ -186,3 +186,20 @@ test('a prepared link only remains visible for its current person and role while
  fireEvent.click(screen.getByRole('button',{name:'Revocar invitación'}));
  await waitFor(()=>expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument());
 });
+
+test('initial query failure never renders an empty picker or pagination',async()=>{
+ vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');mocks.request.mockRejectedValue(new Error('QA offline'));
+ render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>);
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos consultar las empresas.');
+ expect(screen.queryByText('Sin coincidencias')).toBeNull();
+ expect(screen.queryByRole('navigation',{name:'Páginas de empresas'})).toBeNull();
+ expect(screen.queryByLabelText('Buscar empresa')).toBeNull();
+});
+test('empty account explains where its actor information is without a useless search',async()=>{
+ vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
+ mocks.request.mockResolvedValue({data:{data:{empresas:[],pagination:{page:1,limit:25,total:0,totalPages:1},puedeValidar:false}}});
+ render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>);
+ expect(await screen.findByText('No hay empresas vinculadas a esta cuenta')).toBeVisible();
+ expect(screen.getByRole('link',{name:'Mi perfil'})).toHaveAttribute('href','/mi-perfil');
+ expect(screen.queryByLabelText('Buscar empresa')).toBeNull();
+});

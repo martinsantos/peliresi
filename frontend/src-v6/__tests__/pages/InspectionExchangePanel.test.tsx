@@ -77,6 +77,23 @@ describe('InspectionExchangePanel', () => {
     mocks.removeDraft.mockResolvedValue(undefined);
   });
 
+  it('explains a different account or role without offering administrative access', async () => {
+    mocks.getExchanges.mockRejectedValue({ response: { status: 403 } });
+    renderPanel();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Requerimiento no disponible para esta cuenta');
+    expect(screen.getByRole('alert')).toHaveTextContent('Volvé a Avisos');
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull();
+  });
+
+  it('recovers a failed requirement request in place', async () => {
+    mocks.getExchanges.mockRejectedValueOnce(new Error('offline'));
+    renderPanel();
+    const retry = await screen.findByRole('button', { name: 'Reintentar' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Comprobá tu conexión');
+    await userEvent.setup().click(retry);
+    expect(await screen.findByRole('region', { name: 'Requerimiento de la autoridad' })).toBeVisible();
+  });
+
   it('waits for in-flight draft writes before removing a successfully submitted response', async () => {
     let finishWrite!: () => void;
     mocks.saveDraft.mockImplementationOnce(() => new Promise<void>((resolve) => { finishWrite = resolve; }));
@@ -122,6 +139,8 @@ describe('InspectionExchangePanel', () => {
     mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
     renderPanel();
     expect(await screen.findByTestId('inspection-next-step')).toHaveTextContent('Tenés requerimientos por responder');
+    expect(screen.getAllByRole('button', { name: /^Responder/ })).toHaveLength(1);
+    expect(screen.queryByRole('button', {name:'Nuevo requerimiento'})).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Responder requerimiento #1' }));
     expect(screen.getByLabelText('Asunto')).toHaveValue('Respuesta a presentación #1: Acompañar constancia vigente');
   });
@@ -139,9 +158,9 @@ describe('InspectionExchangePanel', () => {
     const user = userEvent.setup();
     renderPanel();
 
-    expect(await screen.findByRole('heading', { name: 'Presentaciones y respuestas' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Requerimiento de la autoridad' })).toBeInTheDocument();
     expect(screen.getByText('Acompañar constancia vigente')).toBeInTheDocument();
-    expect(screen.getByText(/no envía correos/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tu respuesta queda registrada/)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Ciclo 1:/ })).toBeInTheDocument();
     expect(screen.getByText('2 actuaciones vinculadas')).toBeInTheDocument();
     expect(screen.getByText(/Responde a actuación #1 · Acompañar constancia vigente/)).toBeInTheDocument();
@@ -245,7 +264,7 @@ describe('InspectionExchangePanel', () => {
   it.each(['CERRADA_CONFORME', 'DERIVADA_LEGALES'])('does not offer a new response on a %s dossier', async (estado) => {
     mocks.getExchanges.mockResolvedValue({ ...timeline, inspeccion: { ...timeline.inspeccion, estado } });
     renderPanel();
-    await screen.findByRole('heading', { name: 'Presentaciones y respuestas' });
+    await screen.findByRole('heading', { name: 'Requerimiento de la autoridad' });
     expect(screen.queryByRole('button', { name: 'Responder esta actuación' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument();
     expect(mocks.presentExchange).not.toHaveBeenCalled();

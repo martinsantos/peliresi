@@ -65,7 +65,7 @@ describe('PSIP mail lifecycle, simulated only', () => {
   ])('names %s and links the recipient to their participation without copying the dossier', (evento, label) => {
     const content = notificationMailContent({ ...base, datos: JSON.stringify({ ...metadata, evento, cuerpo: 'PRIVATE', asunto: '<script>PRIVATE</script>', url: 'https://foreign.invalid' }) });
     expect(content?.subject).toBe('[SITREP] ' + label);
-    expect(content?.html).toContain('/mis-inspecciones/case');
+    expect(content?.html).toContain('/requerimientos/case');
     expect(content?.html).not.toContain('PRIVATE'); expect(content?.html).not.toContain('foreign.invalid');
   });
   it('links authority recipients directly to the exchange', () => {

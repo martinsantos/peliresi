@@ -1,6 +1,7 @@
 import { CompanyRevisionNotice, useCompanyRevisionDraft } from '../../components/CompanyRevisionDraft';
 import { CompanyPeopleSummary, type CompanyCapacity } from '../../components/CompanyPeopleSummary';
-import { Activity,useEffect,useRef,useState } from 'react';
+import ImpersonationContext from '../../contexts/ImpersonationContext';
+import { Activity,useContext,useEffect,useRef,useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,19 +23,23 @@ const request=async(route:string,method='GET',body?:unknown)=>(await api.request
 const message=(e:unknown)=>(e as any)?.response?.data?.message||'No se pudo guardar. Tus datos siguen en el formulario.';
 export default function EmpresasPage(){
  const {currentUser}=useAuth(),[choice,setChoice]=useState<Company>(),[page,setPage]=useState(1),[search,setSearch]=useState(''),mp=useMobilePrefix();
+ const temporary=Boolean(useContext(ImpersonationContext)?.impersonationData);
  const requestedId=new URLSearchParams(window.location.search).get('empresa');
  const requested=requestedId&&/^[a-zA-Z0-9_-]{1,100}$/.test(requestedId)?requestedId:undefined;
- const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',currentUser?.id,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
+ const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',currentUser?.id,currentUser?.rol,temporary,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:!temporary&&import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
  // Pin the initial choice too: editing its name may change the server sort order.
  useEffect(()=>{if(!choice&&!requested&&list.data?.empresas[0])setChoice(list.data.empresas[0]);},[choice,list.data,requested]);
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true')return <p>Funcionalidad no disponible.</p>;
+ if(temporary)return <div className="mx-auto max-w-3xl space-y-4"><Link to={mp('/mi-perfil')} className="inline-flex min-h-11 items-center text-primary-800 underline">Volver a Mi perfil</Link><Card><h2 className="text-lg font-semibold">Gestión desde la cuenta responsable</h2><p className="mt-2 text-sm text-neutral-600">La gestión de empresas se realiza desde la cuenta del responsable. La vista temporal permite consultar la ficha del actor.</p></Card></div>;
  const selected=choice||(!requested?list.data?.empresas[0]:undefined);
  return <div className="mx-auto w-full max-w-5xl space-y-5 pb-6">
   <div><Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Mi perfil</Link><h1 className="text-2xl font-bold text-neutral-900">Empresas y establecimientos</h1></div>
-  <CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
+  {(list.data && (list.data.empresas.length>0 || !!selected || !!search || page>1))&&<CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
    onChoose={id=>setChoice(list.data?.empresas.find(c=>c.id===id)||selected)}
    onPage={next=>{setChoice(selected);setPage(next);}}
-   onSearch={value=>{setChoice(selected);setPage(1);setSearch(value);}}/>
+   onSearch={value=>{setChoice(selected);setPage(1);setSearch(value);}}/>}
+  {list.isPending&&<Card><p role="status">Consultando empresas…</p></Card>}
+  {list.isSuccess&&!list.data.empresas.length&&!search&&!selected&&!requested&&<Card><h2 className="font-semibold">No hay empresas vinculadas a esta cuenta</h2><p className="mt-2 text-sm text-neutral-600">Los datos de tu actividad están en Mi perfil.</p></Card>}
   {list.isError&&<div role="alert"><p>No pudimos consultar las empresas.</p><Button onClick={()=>void list.refetch()}>Reintentar</Button></div>}
   {(selected||requested)&&<CompanyDetail key={selected?.id||requested} id={(selected?.id||requested)!} reloadList={()=>list.refetch()}/>}
   {list.data?.puedeValidar&&<details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold">Registrar empresa</summary><CompanyCreate done={async c=>{setChoice(c);await list.refetch();}}/></details>}
