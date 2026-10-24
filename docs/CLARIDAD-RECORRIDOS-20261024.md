@@ -1,5 +1,7 @@
 # Claridad de recorridos por rol — preview
 
+**Publicada posteriormente como 7af655f7 el 24/10/2026**, con autorización expresa. Ver [cierre productivo](DESPLIEGUE-PADRONES-20261024.md). Las pruebas funcionales siguientes corresponden al preview; las indicaciones de publicación pendiente son antecedentes.
+
 Base de producto: 51e4271a. Esta revisión no publica cambios ni altera permisos de negocio.
 
 ## Contrato revisado

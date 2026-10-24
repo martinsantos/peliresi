@@ -1,6 +1,14 @@
 # SITREP — traspaso vigente de operación
 
-## Publicación vigente — espacios por rol, 24/10/2026
+## Publicación vigente — padrones y navegación, 24/10/2026
+
+**7af655f7 publicado en backend, web, app y manual a las 17:52:58 Mendoza.** Incluye 7d2d943f: recorridos por rol, Inicio compacto, Listado/Programados separados, padrones/altas coherentes, filtros y regreso identificado. Backend recompilado sin diferencias de código. [Cierre, límites y reversión vigente](DESPLIEGUE-PADRONES-20261024.md).
+
+Preview: **463 frontend + 20 HTTP PASS**, 13 pruebas repetidas finales y recorridos reales web/app. Publicación: **2538 archivos Git exactos**, builds/tipos PASS, smoke **216/216 + externo 9/9 + PWA 8/8**, sólo GET sin logins ni operaciones de negocio. Dos workers online; .env/flags/esquema idénticos; CAP cerrado, correos/push apagados. Sin main, migraciones, datos reales, push ni workflows.
+
+Respaldo /var/backups/sitrep/20261024-producto-7af655f7; reversión preparada a **51e4271a**, SW **trazabilidad-rrpp-v175** y app **20261024205017**. Manual **2026.24.1**, SW **trazabilidad-rrpp-v174**, app **20261024204815**. Runtime QA cerrado. Pendientes del refactor y Android físico conservados en el cierre; no declarar todo el producto validado.
+
+## Publicación anterior — espacios por rol, 24/10/2026
 
 **51e4271a publicado en backend, web, app y manual a las 12:07:22 Mendoza.** Menú/permisos coherentes por función, Inicio con una lista de pendientes, Empresas sólo con acceso útil y actores respondiendo únicamente al requerimiento desde Avisos. Backend limita directorio/expediente; administradores e inspectores designados mantienen sus atribuciones.
 

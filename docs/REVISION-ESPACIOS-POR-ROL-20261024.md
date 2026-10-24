@@ -1,5 +1,7 @@
 # Revisión de espacios por rol y padrones — preview
 
+**Publicada posteriormente como 7af655f7 el 24/10/2026**, con autorización expresa. Ver [cierre productivo](DESPLIEGUE-PADRONES-20261024.md). Las pruebas funcionales siguientes corresponden al preview; las indicaciones de publicación pendiente son antecedentes.
+
 Continuación de `7d2d943f`; producción conserva `51e4271a`. Esta tanda no se publica.
 
 ## Contrato del producto
