@@ -2,7 +2,7 @@
 
 ## Alcance y estado
 
-Implementación y validación en preview aislado sobre la rama `codex/sitrep-training-20261018`. No se publicó esta tanda. No se modificaron producción, main ni workflows. Android físico sigue pendiente.
+Implementación y validación en preview aislado sobre la rama `codex/sitrep-training-20261018`. La revisión se realizó sin modificar producción, main ni workflows. **Publicada posteriormente como 51e4271a el 24/10/2026**, con autorización expresa; ver [cierre productivo](DESPLIEGUE-ROLES-20261024.md). Android físico sigue pendiente.
 
 La corrección trata permisos, destinos, orientación y duplicación de tareas como un único problema. No equivale a una certificación de toda la aplicación ni a una nueva prueba de carga.
 
@@ -71,6 +71,6 @@ La auditoría verifica los dos procesos del preview: CAP vencido/cerrado, `DISAB
 - La app probada es el build `/app/` en navegador, con viewport móvil. No se atribuye esta evidencia a Android físico, GPS en campo o ejecución en segundo plano.
 - Esta tanda verifica los límites de rol y los recorridos indicados. No vuelve a certificar cada ABM, PDF, estado de manifiesto o pantalla administrativa histórica.
 - La misma matriz de permisos, vocabulario y jerarquía debe usarse en las siguientes revisiones de formularios, documentos y operación en campo. No debe reaparecer un segundo listado de tareas en Inicio ni un acceso sin destino autorizado.
-- Publicación pendiente: necesita una instrucción de despliegue sobre el commit de cierre; no se ejecutó en esta tarea.
+- Publicación posterior completada por autorización expresa: 51e4271a, con smoke productivo sólo GET. Los recorridos funcionales de este documento siguen correspondiendo al preview.
 
 Evidencias locales: `roles-navigation-20261024`, con logs, resultados JSON, auditoría, hashes del delta y capturas. El registro detallado distingue las comprobaciones automatizadas de los recorridos manuales.

@@ -1,6 +1,14 @@
 # SITREP — traspaso vigente de operación
 
-## Publicación vigente — último rol y borrador, 24/10/2026
+## Publicación vigente — espacios por rol, 24/10/2026
+
+**51e4271a publicado en backend, web, app y manual a las 12:07:22 Mendoza.** Menú/permisos coherentes por función, Inicio con una lista de pendientes, Empresas sólo con acceso útil y actores respondiendo únicamente al requerimiento desde Avisos. Backend limita directorio/expediente; administradores e inspectores designados mantienen sus atribuciones.
+
+Preview: **330 frontend + 212 backend + 20 HTTP PASS**, recorridos web/app documentados. Publicación: **2.528 archivos Git exactos**, builds/tipos PASS, smoke productivo **187/187 + externo 9/9 + PWA 8/8**, sólo GET sin logins ni operaciones de negocio. Dos workers online; .env/flags/esquema idénticos; CAP cerrado, correos/push apagados; sin main, migraciones, datos reales, push ni workflows.
+
+[Cierre, límites y reversión vigente](DESPLIEGUE-ROLES-20261024.md). Respaldo privado /var/backups/sitrep/20261024-producto-51e4271a; reversión preparada a **75168a08**, SW **v173** y app **20261024150633**. No usar reversiones históricas. Manual **2026.24.1**, SW **v172**, app **20261024150317**. Runtime QA cerrado; Android físico sigue pendiente. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — último rol y borrador, 24/10/2026
 
 **75168a08 publicado en backend, web, app y manual a las 08:30:48 Mendoza.** Al reabrir se recupera el último rol G/T/O elegido y su borrador, por cuenta/contexto; cada pestaña mantiene su propio rol. Preferencia local, sujeta a permisos del servidor. Manual **2026.24.1**, SW **v170**, app **20261024112723**.
 
