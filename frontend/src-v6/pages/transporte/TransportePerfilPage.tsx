@@ -115,7 +115,7 @@ const TransportePerfilPage: React.FC = () => {
         {/* === TAB: VIAJES === */}
         {activeTab === 'viaje' && (
           <div className="space-y-4">
-          {multiGps&&<Button fullWidth leftIcon={<Navigation size={18}/>} onClick={()=>navigate(mp('/transporte/cargas'))}>Cargas en este móvil</Button>}
+          {multiGps&&<Button fullWidth leftIcon={<Navigation size={18}/>} onClick={()=>navigate(mp('/transporte/cargas'))}>GPS de mis viajes</Button>}
           {(loadingViaje || loadingAprobados)
             ? <p role="status" className="rounded-xl bg-neutral-100 p-4 text-sm text-neutral-700">Cargando viajes…</p>
             : <TransportistaTripQueue

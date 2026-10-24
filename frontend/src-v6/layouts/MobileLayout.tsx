@@ -1,4 +1,5 @@
-import { workspaceNavigation, workspaceTitle, isInspectionStaff } from '../utils/workspaceNavigation';
+import { currentNavigationItem } from '../utils/navigationSelection';
+import { workspaceNavigation, workspaceTitle, isInspectionStaff, workspaceSectionPath, workspaceRoleLabel } from '../utils/workspaceNavigation';
 import { TrainingBanner } from '../components/TrainingBanner';
 /**
  * SITREP v6 - Mobile Layout
@@ -7,7 +8,7 @@ import { TrainingBanner } from '../components/TrainingBanner';
  */
 
 import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Menu, X, ChevronRight, User, LogOut, SwitchCamera, Eye, ArrowLeft, AlertTriangle, BookOpen, Navigation,  } from 'lucide-react';
@@ -66,14 +67,13 @@ interface NavItemProps {
 }
 
 const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) => {
-  const related = /\/(?:requerimientos|mis-inspecciones)\//.test(useLocation().pathname) && to.endsWith('/notificaciones');
   return (
-    <NavLink
+    <Link
       to={to}
-      aria-current={related ? 'page' : undefined}
-      className={({ isActive: active }) => cn(
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
         'flex flex-1 flex-col items-center justify-center gap-1 border-t-2 py-2 px-1 min-w-0 min-h-14 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700',
-        active || isActive || related
+        isActive
           ? 'text-primary-800 border-current bg-primary-50'
           : 'border-transparent text-neutral-600 hover:bg-neutral-50'
       )}
@@ -87,7 +87,7 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) =
         ) : null}
       </div>
       <span className="text-xs font-semibold">{label}</span>
-    </NavLink>
+    </Link>
   );
 };
 
@@ -165,19 +165,20 @@ export const MobileLayout: React.FC = () => {
   }, [currentUser?.id]);
 
   const navigation = useMemo(() => workspaceNavigation(currentUser), [currentUser]);
+  const selectedPath = currentNavigationItem(workspaceSectionPath(location.pathname), [...navigation, {path:'/mi-perfil'}])?.path;
   const bottomNavItems = useMemo(() => {
     const paths = ['/dashboard',
       isTransportista ? '/transporte/perfil' : currentUser?.esInspector ? '/inspecciones' : '/manifiestos',
-      isInspectionStaff(currentUser) && !currentUser?.esInspector ? '/inspecciones' : '/reportes',
+      isTransportista ? '/manifiestos' : isInspectionStaff(currentUser) && !currentUser?.esInspector ? '/inspecciones' : '/reportes',
       '/notificaciones'];
     return paths.map(path => navigation.find(item => item.path === path)).filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .map(item => ({to:mp(item.path), icon:<item.icon size={22}/>, label:item.label, badge:item.path==='/notificaciones'?unreadNotificationCount:undefined}));
-  }, [navigation, currentUser, isTransportista, mp, unreadNotificationCount]);
+      .map(item => ({to:mp(item.path), icon:<item.icon size={22}/>, label:item.label, isActive:selectedPath===item.path, badge:item.path==='/notificaciones'?unreadNotificationCount:undefined}));
+  }, [navigation, currentUser, isTransportista, mp, unreadNotificationCount, selectedPath]);
 
   const menuItems = useMemo(() => navigation.map(item => ({
-    to:mp(item.path), icon:<item.icon size={20}/>, label:item.label, section:item.section,
+    to:mp(item.path), icon:<item.icon size={20}/>, label:item.label, section:item.section, isActive:selectedPath===item.path,
     badge:item.path==='/notificaciones'?unreadNotificationCount:item.path==='/admin/solicitudes'?attention.applicationPending:item.path==='/soporte'?attention.support:undefined,
-  })), [navigation, mp, unreadNotificationCount, attention.applicationPending, attention.support]);
+  })), [navigation, mp, unreadNotificationCount, attention.applicationPending, attention.support, selectedPath]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -190,7 +191,7 @@ export const MobileLayout: React.FC = () => {
   if (isRestricted) return <ApplicantLayout />;
 
   const inspectionLabel = inspectionContextLabel(currentUser, location.pathname);
-  const config = inspectionLabel ? { label: inspectionLabel, color: 'text-teal-700', bgColor: 'bg-teal-700' } : roleConfig[currentUser.rol];
+  const config = inspectionLabel ? { label: inspectionLabel, color: 'text-teal-700', bgColor: 'bg-teal-700' } : {...roleConfig[currentUser.rol], label:workspaceRoleLabel(currentUser.rol)};
 
   const getPageTitle = () => workspaceTitle(location.pathname);
 
@@ -273,7 +274,7 @@ export const MobileLayout: React.FC = () => {
       {floatingSupport && <SupportBubble mobile hidden={isMenuOpen} />}
 
       {/* Bottom Navigation */}
-      {!isInspectionCase && <nav className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
+      {!isInspectionCase && <nav aria-label="Navegación principal" className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
         <div className="flex items-center justify-around safe-bottom">
           {bottomNavItems.map((item) => (
             <NavItem 
@@ -281,6 +282,7 @@ export const MobileLayout: React.FC = () => {
               to={item.to} 
               icon={item.icon} 
               label={item.label}
+                        isActive={item.isActive}
               badge={item.badge}
             />
           ))}
@@ -345,7 +347,8 @@ export const MobileLayout: React.FC = () => {
                     key={item.to}
                     to={item.to} 
                     icon={item.icon} 
-                    label={item.label} 
+                    label={item.label}
+                        isActive={item.isActive}
                     badge={item.badge}
                     onClick={() => setIsMenuOpen(false)}
                   />
@@ -365,6 +368,7 @@ export const MobileLayout: React.FC = () => {
                         to={item.to} 
                         icon={item.icon} 
                         label={item.label}
+                        isActive={item.isActive}
                         onClick={() => setIsMenuOpen(false)}
                       />
                     ))}
@@ -385,6 +389,7 @@ export const MobileLayout: React.FC = () => {
                         to={item.to}
                         icon={item.icon}
                         label={item.label}
+                        isActive={item.isActive}
                         badge={item.badge}
                         onClick={() => setIsMenuOpen(false)}
                       />
@@ -422,6 +427,7 @@ export const MobileLayout: React.FC = () => {
                   to={mp('/mi-perfil')}
                   icon={<User size={20} />}
                   label="Mi perfil"
+                  isActive={selectedPath==='/mi-perfil'}
                   onClick={() => setIsMenuOpen(false)}
                 />
               </div>
@@ -452,6 +458,7 @@ export const MobileLayout: React.FC = () => {
 // MENU ITEM
 // ========================================
 interface MenuItemProps {
+  isActive?: boolean;
   to: string;
   icon: React.ReactNode;
   label: string;
@@ -459,16 +466,15 @@ interface MenuItemProps {
   onClick?: () => void;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick }) => {
-  const related = /\/(?:requerimientos|mis-inspecciones)\//.test(useLocation().pathname) && to.endsWith('/notificaciones');
+const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick, isActive }) => {
   return (
-    <NavLink
+    <Link
       to={to}
       onClick={onClick}
-      aria-current={related ? 'page' : undefined}
-      className={({ isActive }) => cn(
+      aria-current={isActive ? 'page' : undefined}
+      className={cn(
         'flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700',
-        isActive || related
+        isActive
           ? 'bg-primary-50 text-primary-900'
           : 'text-neutral-600 hover:bg-neutral-100'
       )}
@@ -477,7 +483,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick }) 
       <span className="flex-1 font-medium">{label}</span>
       <AttentionBadge count={badge} label={label === 'Avisos' ? 'avisos sin leer' : 'pendientes de atender'} />
       <ChevronRight size={16} className="text-neutral-400" />
-    </NavLink>
+    </Link>
   );
 };
 

@@ -8,6 +8,7 @@ import React from 'react';
 import { Route, Clock } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import { formatDateTime } from '../../../utils/formatters';
+import { manifestEventLabel, manifestEventDescription } from '../../../utils/manifestEventPresentation';
 import type { Manifiesto, EventoManifiesto } from '../../../types/models';
 
 type TimelineEntry = {
@@ -17,17 +18,6 @@ type TimelineEntry = {
   description: string;
 };
 
-function describeEvent(ev: EventoManifiesto) {
-  try {
-    const value = JSON.parse(ev.descripcion || '');
-    const roles: Record<string,string> = { ADMIN:'administrador', GENERADOR:'generador', TRANSPORTISTA:'transporte', OPERADOR:'operador' };
-    if (ev.tipo === 'PROPUESTA_PARTES_V1') return `Propuesta creada por ${roles[value.autorRol] || 'una parte'}. Requiere la aprobación de generador, transporte y operador.`;
-    if (ev.tipo === 'CERTIFICADO_CAP_V1') return `${value.tipo === 'FINAL' ? 'Disposición final' : 'Certificado parcial'} liberado por el operador. Sin validez oficial. ${value.cantidades.map((r: any) => `${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}`;
-    if (value.version === 1 && roles[value.rol] && ['FIRMA','APROBACION_TRANSPORTISTA','APROBACION_OPERADOR','RECHAZO_PARTE'].includes(ev.tipo)) return value.decision === 'RECHAZADA' ? `${roles[value.rol]} rechazó: ${value.motivo}` : `${roles[value.rol]} aprobó su participación.`;
-  } catch { /* Historical events are plain text. */ }
-  return String(ev.descripcion || '');
-}
-
 function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
   if (!manifiesto.eventos || !Array.isArray(manifiesto.eventos) || manifiesto.eventos.length === 0) return [];
 
@@ -36,8 +26,8 @@ function buildTimeline(manifiesto: Partial<Manifiesto>): TimelineEntry[] {
   return manifiesto.eventos.map(ev => ({
     id: ev.id,
     date: formatDateTime(ev.createdAt),
-    title: ({INICIO_COORDINACION:'Coordinación iniciada',INICIO_COORDINACION_CAP:'Coordinación iniciada',PROPUESTA_PARTES_V1:'Propuesta a las partes',CERTIFICADO_CAP_V1:'Documento de capacitación liberado',APROBACION_TRANSPORTISTA:'Aprobación del transporte',APROBACION_OPERADOR:'Aprobación del operador',RECHAZO_PARTE:'Participación rechazada'} as Record<string,string>)[ev.tipo] || String(ev.tipo || '').replace(/_/g, ' '),
-    description: describeEvent(ev) + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
+    title: manifestEventLabel(ev.tipo),
+    description: manifestEventDescription(ev.tipo, ev.descripcion) + (ev.usuario ? ` - ${ev.usuario.nombre}` : ''),
   }));
 }
 

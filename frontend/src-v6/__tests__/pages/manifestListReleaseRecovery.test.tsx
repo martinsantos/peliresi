@@ -2,6 +2,7 @@ import { cleanup,fireEvent,render,screen,within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 import ManifiestosPage from '../../pages/manifiestos/ManifiestosPage';
+vi.mock('../../pages/manifiestos/components/ManifestAgenda',()=>({ManifestAgenda:()=> <section aria-label="Manifiestos programados">Programación QA</section>}));
 const mock=vi.hoisted(()=>({query:vi.fn(),refetch:vi.fn()}));
 vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa-user',rol:'ADMIN'}})}));
 vi.mock('../../hooks/useManifiestos',()=>({useManifiestos:mock.query}));
@@ -56,7 +57,7 @@ it('keeps the accessible names of compact header actions',()=>{
  render(<View/>);
  expect(screen.getByRole('button',{name:'Actualizar listado'})).toBeInTheDocument();
  expect(screen.getByRole('button',{name:'Nuevo Manifiesto'})).toBeInTheDocument();
- expect(screen.getByRole('heading',{name:'Manifiestos'})).toBeInTheDocument();
+ expect(screen.getByLabelText('Acciones de Manifiestos')).toBeInTheDocument();
 });
 it('names the exceptional circuit Eventuales only where it is enabled',()=>{
  try{
@@ -72,4 +73,20 @@ it('clears every filter, including state, from the expanded panel',()=>{
  fireEvent.click(screen.getByRole('button',{name:'Limpiar'}));
  expect(mock.query).toHaveBeenLastCalledWith(expect.objectContaining({estado:undefined}));
  expect(screen.getByRole('button',{name:'Filtros'})).toBeInTheDocument();
+});
+
+it('shows only one manifest view and keeps list filters while visiting scheduled work',()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ try {
+ render(<MemoryRouter initialEntries={['/manifiestos?estado=TRATADO&q=QA']}><ManifiestosPage/></MemoryRouter>);
+ expect(screen.getByRole('textbox',{name:'Buscar manifiestos'})).toHaveValue('QA');
+ fireEvent.click(screen.getByRole('button',{name:'Programados',exact:true}));
+ expect(screen.getByRole('region',{name:'Manifiestos programados'})).toBeVisible();
+ expect(screen.queryByRole('textbox',{name:'Buscar manifiestos'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Actualizar listado'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Listado',exact:true}));
+ expect(screen.queryByRole('region',{name:'Manifiestos programados'})).not.toBeInTheDocument();
+ expect(screen.getByRole('textbox',{name:'Buscar manifiestos'})).toHaveValue('QA');
+ expect(mock.query).toHaveBeenLastCalledWith(expect.objectContaining({estado:'TRATADO',search:'QA'}));
+ } finally {vi.unstubAllEnvs();}
 });

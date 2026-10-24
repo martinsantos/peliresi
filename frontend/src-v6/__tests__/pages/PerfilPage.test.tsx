@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import PerfilPage from '../../pages/perfil/PerfilPage';
 
@@ -8,9 +8,10 @@ const m = vi.hoisted(() => ({ get: vi.fn(), user: { id: 'user', actorId: 'op-1',
 vi.mock('../../services/api', () => ({ default: { get: m.get }, api: { get: m.get } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: m.user, isGenerador: m.user.rol === 'GENERADOR', isOperador: m.user.rol === 'OPERADOR' }) }));
 const actor = (id: string) => ({ id, razonSocial: 'QA establecimiento ' + id, cuit: '99-00000001-0', domicilio: 'QA domicilio', numeroInscripcion: 'QA-G-1', numeroHabilitacion: 'QA-O-1', vencimientoHabilitacion: '2026-10-03T22:30:00Z' });
-function setup() {
+const LocationProbe=()=> <output data-testid="profile-location">{useLocation().pathname+useLocation().search}</output>;
+function setup(path='/mi-perfil') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = () => <QueryClientProvider client={client}><MemoryRouter><PerfilPage /></MemoryRouter></QueryClientProvider>;
+  const view = () => <QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><PerfilPage /><LocationProbe/></MemoryRouter></QueryClientProvider>;
   return { ...render(view()), view };
 }
 beforeEach(() => {
@@ -60,11 +61,18 @@ it('does not retain the former actor after an identity change', async () => {
 });
 it('does not request an actor for an unbound administrative identity', async () => {
   m.user = { ...m.user, actorId: '', rol: 'ADMIN' }; setup();
-  expect(screen.queryByText('Datos de mi Establecimiento')).toBeNull();
+  expect(screen.queryByText('Mi establecimiento')).toBeNull();
   expect(m.get).not.toHaveBeenCalled();
 });
 it('identifies loading rather than showing placeholder establishment fields', async () => {
   m.get.mockImplementation(() => new Promise(() => {})); setup();
   expect(await screen.findByText('Cargando datos de tu establecimiento…')).toBeVisible();
   expect(screen.queryByText('Razon Social')).toBeNull();
+});
+
+it.each(['/mi-perfil','/mobile/mi-perfil'])('keeps profile actions in the same surface at %s',async path=>{
+ setup(path);await screen.findByText('QA establecimiento op-1');
+ expect(screen.queryByText('DGFA Mendoza')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Solicitar cambios'}));
+ expect(screen.getByTestId('profile-location')).toHaveTextContent(path+'/solicitar-cambios');
 });

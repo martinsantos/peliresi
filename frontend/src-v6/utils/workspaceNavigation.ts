@@ -55,7 +55,7 @@ export function workspaceTitle(pathname: string): string {
     [/^\/manifiestos\/nuevo/, 'Nuevo manifiesto'],
     [/^\/manifiestos\/[^/]+\/adendas/, 'Adendas del manifiesto'],
     [/^\/manifiestos\/baja-intensidad/, 'Eventuales'],
-    [/^\/transporte\/cargas/, 'Cargas en este móvil'],
+    [/^\/transporte\/cargas/, 'GPS de mis viajes'],
     [/^\/transporte\/viaje\//, 'Viaje en curso'],
     [/^\/mi-perfil/, 'Mi perfil'],
     [/^\/empresas/, 'Empresas y establecimientos'],
@@ -68,4 +68,18 @@ export function workspaceTitle(pathname: string): string {
     || [...catalog].sort((a,b) => b.path.length-a.path.length)
       .find(item => path === item.path || path.startsWith(item.path+'/'))?.label
     || 'SITREP';
+}
+
+/** Associate detail screens with the section that owns the work. */
+export function workspaceSectionPath(pathname: string): string {
+  const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
+  if (/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/.test(path)) return '/notificaciones';
+  if (/^\/transporte\/(?:viaje|cargas)(?:\/|$)/.test(path)) return '/transporte/perfil';
+  if (/^\/empresas(?:\/|$)/.test(path)) return '/mi-perfil';
+  return path;
+}
+
+export function workspaceRoleLabel(role: string): string {
+  return ({ADMIN:'Administrador',GENERADOR:'Generador',TRANSPORTISTA:'Transportista',OPERADOR:'Operador',
+    AUDITOR:'Auditor',ADMIN_GENERADOR:'Adm. Generadores',ADMIN_TRANSPORTISTA:'Adm. Transportistas',ADMIN_OPERADOR:'Adm. Operadores'} as Record<string,string>)[role] || role;
 }

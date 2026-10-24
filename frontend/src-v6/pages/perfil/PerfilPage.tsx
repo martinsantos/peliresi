@@ -1,3 +1,5 @@
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
 /**
  * SITREP v6 - Perfil Page
  * =======================
@@ -35,6 +37,7 @@ import { CompanyAccessLink } from '../../components/CompanyAccessLink';
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const { currentUser, isGenerador:personalGenerador, isOperador:personalOperador } = useAuth();
   const isGenerador=personalGenerador&&!currentUser?.empresaContexto;
   const isOperador=personalOperador&&!currentUser?.empresaContexto;
@@ -63,7 +66,7 @@ const PerfilPage: React.FC = () => {
         nombre,
         email: currentUser.email || '',
         telefono: currentUser.telefono || '',
-        sector: currentUser.sector || 'DGFA Mendoza',
+        sector: currentUser.sector || '',
         rol: currentUser.rol || 'USUARIO',
         avatar: nombre.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase(),
       });
@@ -102,7 +105,7 @@ const PerfilPage: React.FC = () => {
       {(isGenerador || isOperador) && actorData && !actorQuery.isError && (
         <Card>
           <CardHeader
-            title="Datos de mi Establecimiento"
+            title="Mi establecimiento"
             className="flex-col sm:flex-row"
             icon={<Building2 size={18} />}
             action={
@@ -110,9 +113,9 @@ const PerfilPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 rightIcon={<ExternalLink size={14} />}
-                onClick={() => navigate('/mi-perfil/solicitar-cambios')}
+                onClick={() => navigate(mp('/mi-perfil/solicitar-cambios'))}
               >
-                Solicitar Cambios
+                Solicitar cambios
               </Button>
             }
           />
@@ -189,7 +192,7 @@ const PerfilPage: React.FC = () => {
               <div className="mt-3">
                 <Badge variant="soft" color="primary">
                   <Shield size={12} className="mr-1" />
-                  {user.rol}
+                  {workspaceRoleLabel(user.rol)}
                 </Badge>
               </div>
             </CardContent>
@@ -203,7 +206,7 @@ const PerfilPage: React.FC = () => {
                   <Key size={16} className="text-neutral-500" />
                   <span className="text-sm font-medium">Contraseña</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => navigate('/configuracion?tab=seguridad')}>Cambiar</Button>
+                <Button variant="outline" size="sm" onClick={() => navigate(mp('/configuracion?tab=seguridad'))}>Cambiar</Button>
               </div>
             </CardContent>
           </Card>

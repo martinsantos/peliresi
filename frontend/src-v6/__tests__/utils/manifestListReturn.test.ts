@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { manifestListReturn } from '../../utils/manifestListReturn';
+import { manifestListReturn, manifestWorkspaceReturn } from '../../utils/manifestListReturn';
 
 describe('manifest list return context', () => {
   it('retains search, phase, dates, actors and sorting on the same surface', () => {
@@ -13,4 +13,11 @@ describe('manifest list return context', () => {
     }
     expect(manifestListReturn(null, '/manifiestos')).toBe('/manifiestos');
   });
+});
+
+it.each(['','/mobile','/app'])('returns to the explicit home origin or the filtered list on %s',prefix=>{
+ expect(manifestWorkspaceReturn({manifestHomeReturn:prefix+'/dashboard'},prefix+'/manifiestos')).toEqual({path:prefix+'/dashboard',label:'Inicio'});
+ expect(manifestWorkspaceReturn({manifestListReturn:prefix+'/manifiestos?vista=programados&programado=QA'},prefix+'/manifiestos')).toEqual({path:prefix+'/manifiestos?vista=programados&programado=QA',label:'Manifiestos'});
+ for(const invalid of ['https://other.invalid/dashboard','/admin/usuarios','/dashboard/other','//other.invalid/dashboard'])
+ expect(manifestWorkspaceReturn({manifestHomeReturn:invalid},prefix+'/manifiestos')).toEqual({path:prefix+'/manifiestos',label:'Manifiestos'});
 });

@@ -17,7 +17,7 @@ function mount(){const client=new QueryClient({defaultOptions:{queries:{retry:fa
 it('has one pending-work list and explicit access to multi-trip GPS without duplicate manifests',()=>{
  mount();expect(screen.getByRole('region',{name:'Agenda de manifiestos'})).toBeVisible();
  expect(screen.queryByRole('region',{name:'Viajes del transportista'})).toBeNull();
- fireEvent.click(screen.getByRole('button',{name:'Cargas en este móvil'}));expect(mock.navigate).toHaveBeenCalledWith('/transporte/cargas');
+ fireEvent.click(screen.getByRole('button',{name:'GPS de mis viajes'}));expect(mock.navigate).toHaveBeenCalledWith('/transporte/cargas');
  fireEvent.click(screen.getByRole('button',{name:'Viajes',exact:true}));expect(mock.navigate).toHaveBeenCalledWith('/transporte/perfil');
  expect(screen.queryByText('Actividad Reciente')).toBeNull();
  expect(screen.queryByRole('button',{name:'Abrir viaje asignado QA-COORDINATION-PENDING'})).toBeNull();

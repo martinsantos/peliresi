@@ -1,5 +1,11 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Claridad de recorridos por rol — preview, 24/10/2026
+
+Tanda posterior a 51e4271a, todavía sin publicar. Un destino activo, regreso al origen, Listado/Programados separados con filtros conservados, Inicio compacto, GPS coherente, historial con nombres de Monitor y contraste activo corregido. [Resultado y límites](docs/CLARIDAD-RECORRIDOS-20261024.md).
+
+375 pruebas frontend dirigidas y 20 HTTP PASS; repetición final de 34 pruebas del menú, tipos y builds web/app PASS. Recorridos de los cuatro roles principales en web/app mediante CUA. Respuesta sintética desde Avisos recibida por administración. Manual actualizado con capturas sintéticas. Preview aislado en 4177; CAP cerrado, correo/push apagados; 515 manifiestos sin cambios, cero envíos/intentos. Sin producción, main, workflows ni datos reales. Android físico y revisión profunda del resto de formularios siguen pendientes. No atribuir estos resultados a producción.
+
 ## Publicación vigente — espacios por rol, 24/10/2026
 
 **51e4271a publicado en backend, web, app y manual a las 12:07:22 Mendoza.** Menú/permisos coherentes por función, Inicio con una lista de pendientes, Empresas sólo con acceso útil y actores respondiendo únicamente al requerimiento desde Avisos. Backend limita directorio/expediente; administradores e inspectores designados mantienen sus atribuciones.

@@ -1,12 +1,12 @@
 import { manifestProposalsVisible } from '../utils/manifestFeatures';
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, ChevronRight, Clock3, Route, CircleAlert, Award, SlidersHorizontal } from 'lucide-react';
+import { CalendarDays, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
-import { Card, CardHeader } from './ui/CardV2';
+import { Card } from './ui/CardV2';
 import { PartyApprovalStatus, type PartyApproval } from './PartyApprovalStatus';
 type Task={id:string;numero:string;estado:string;modalidad?:string;fechaEstimadaRetiro:string|null;partes:PartyApproval[]|null;inicio:string|null;requiereMiAprobacion:boolean;pesajePendiente:boolean;certificatePending?:boolean;detail?:string;actores?:{generador:string;transportista:string|null;operador:string}};
 const roleNames: Record<string,string> = { GENERADOR:'Generador', TRANSPORTISTA:'Transporte', OPERADOR:'Operador' };
@@ -27,6 +27,7 @@ function label(m:Task,role:string){
 }
 export function TrainingTaskQueue(){
  const {currentUser}=useAuth(),mp=useMobilePrefix();
+ const location=useLocation();
  const [showFilters,setShowFilters]=useState(false);
  const [filter,setFilter]=useState('all'),[period,setPeriod]=useState('all'),[search,setSearch]=useState(''),[page,setPage]=useState(1);
  const query=useQuery({queryKey:['training-tasks',currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.establecimientoId,filter,period,search,page],enabled:manifestProposalsVisible(currentUser),queryFn:async()=>(await api.get('/manifiestos/tareas-partes',{params:{filter,period,search,page,limit:6}})).data.data as {items:Task[];total:number;page:number;limit:number;counts:Record<string,number>},refetchInterval:5000,staleTime:0});
@@ -47,14 +48,11 @@ export function TrainingTaskQueue(){
  </>}</div>
  {query.isError?<p role="alert" className="p-4">No pudimos actualizar la agenda. <button className="underline" onClick={()=>void query.refetch()}>Reintentar</button></p>:query.isPending?<p className="p-4">Cargando agenda…</p>:<>
  <ul className="divide-y divide-neutral-200">{items.map(m=>{
-  const Icon=m.certificatePending?Award:m.requiereMiAprobacion?CircleAlert:m.estado==='PENDIENTE_APROBACION'?Clock3:Route;
   const missing=missingApprovals(m), actors=m.actores ? [m.actores.generador,m.actores.operador].filter(Boolean).join(' → ') : '';
   const context=[m.numero,label(m,currentUser.rol),actors,m.actores?.transportista&&`Transporte: ${m.actores.transportista}`,missing?`Falta aprobar: ${missing}`:m.detail].filter(Boolean).join('. ');
-  return <li key={m.id} data-agenda-row className="agenda-row-enter"><Link aria-label={context} title={context} to={mp(`/manifiestos/${m.id}${m.certificatePending?'#certificaciones':''}`)} className={`flex flex-wrap items-center gap-2 border-l-4 px-3 py-3 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700 ${m.requiereMiAprobacion?'border-l-primary-700 bg-primary-50/60':m.estado==='PENDIENTE_APROBACION'?'border-l-warning-500':'border-l-transparent'}`}>
-    <Icon size={17} aria-hidden="true" className={`shrink-0 ${m.requiereMiAprobacion?'text-primary-800':'text-neutral-500'}`}/>
-    <div className="min-w-[7rem] flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-bold text-neutral-900"><span className="min-w-0 break-all" title={m.numero}>{m.numero}</span><span className="shrink-0 text-[11px] font-normal text-neutral-600">{m.fechaEstimadaRetiro?new Date(m.fechaEstimadaRetiro).toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza',day:'2-digit',month:'short'}):'Sin fecha'}</span></span><span className={`block text-xs font-semibold ${m.requiereMiAprobacion?'text-primary-800':'text-neutral-700'}`}>{label(m,currentUser.rol)}</span></div>
-    {m.partes&&<PartyApprovalStatus partes={m.partes} compact/>}<ChevronRight size={16} aria-hidden="true" className="shrink-0 text-primary-700"/>
-    {(actors||m.modalidad==='IN_SITU')&&<div className="basis-full pl-6 text-xs text-neutral-700">{actors&&<p className="break-words">{actors}</p>}{m.modalidad==='IN_SITU'&&<p className="mt-1">Tratamiento en origen · sin transporte</p>}</div>}
+  return <li key={m.id} data-agenda-row className="agenda-row-enter"><Link aria-label={context} title={context} state={{manifestHomeReturn:mp('/dashboard')+location.search}} to={mp(`/manifiestos/${m.id}${m.certificatePending?'#certificaciones':''}`)} className={`flex items-center gap-2 border-l-4 px-3 py-3 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700 ${m.requiereMiAprobacion?'border-l-primary-700 bg-primary-50/60':m.estado==='PENDIENTE_APROBACION'?'border-l-warning-500':'border-l-transparent'}`}>
+    <div className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-bold text-neutral-900"><span className="min-w-0 truncate" title={m.numero}>{m.numero}</span><span className="shrink-0 text-[11px] font-normal text-neutral-600">{m.fechaEstimadaRetiro?new Date(m.fechaEstimadaRetiro).toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza',day:'2-digit',month:'short'}):'Sin fecha'}</span></span><span className={`block text-xs font-semibold ${m.requiereMiAprobacion?'text-primary-800':'text-neutral-700'}`}>{label(m,currentUser.rol)}</span>{actors&&<span className="block truncate text-xs text-neutral-600" title={actors}>{actors}</span>}{m.modalidad==='IN_SITU'&&<span className="block text-xs text-neutral-600">Tratamiento en origen · sin transporte</span>}</div>
+    {m.partes&&<div className="shrink-0"><PartyApprovalStatus partes={m.partes} compact/></div>}<ChevronRight size={16} aria-hidden="true" className="shrink-0 text-primary-700"/>
     </Link></li>;
  })}</ul>
  {!items.length&&<p role="status" className="p-4 text-sm text-neutral-600">{hasWork?'Sin manifiestos para estos filtros.':'No tenés manifiestos pendientes.'}</p>}

@@ -1,4 +1,4 @@
-import { workspaceNavigation, workspaceTitle } from '../utils/workspaceNavigation';
+import { workspaceNavigation, workspaceTitle, workspaceSectionPath, workspaceRoleLabel } from '../utils/workspaceNavigation';
 import { TrainingBanner } from '../components/TrainingBanner';
 /**
  * SITREP v6 - Main Layout
@@ -115,7 +115,7 @@ export const MainLayout: React.FC = () => {
   })();
 
   const navItems = navigation.filter(item => item.section === 'main');
-  const currentItem = currentNavigationItem(isActorInspection ? '/notificaciones' : location.pathname, navigation);
+  const currentItem = currentNavigationItem(workspaceSectionPath(location.pathname), navigation);
   const currentPage = workspaceTitle(location.pathname);
 
   return (
@@ -157,7 +157,7 @@ export const MainLayout: React.FC = () => {
           <SitrepMark size={36} className="shrink-0 lg:mr-1" />
           <div className="min-w-0 flex-1">
             <SitrepWordmark className="font-bold text-lg" />
-            <span title={`Rol base: ${currentUser.rol}`} className="block break-words text-xs font-medium text-neutral-600 lg:inline lg:ml-1">{inspectionLabel ?? currentUser.rol}</span>
+            <span title={`Rol base: ${currentUser.rol}`} className="block break-words text-xs font-medium text-neutral-600 lg:inline lg:ml-1">{inspectionLabel ?? workspaceRoleLabel(currentUser.rol)}</span>
           </div>
           <button type="button" aria-label="Cerrar menú" onClick={closeSidebar}
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 lg:hidden">
@@ -180,7 +180,7 @@ export const MainLayout: React.FC = () => {
                   flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl
                   font-medium text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
                   ${isItemActive
-                    ? 'bg-white/20 text-white'
+                    ? 'bg-white/20 text-white hover:text-white'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }
                 `}
@@ -210,7 +210,7 @@ export const MainLayout: React.FC = () => {
                       flex min-h-11 items-center gap-3 px-3 py-2.5 rounded-xl
                       font-medium text-sm transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
                       ${isItemActive
-                        ? 'bg-white/20 text-white'
+                        ? 'bg-white/20 text-white hover:text-white'
                         : 'text-white/70 hover:bg-white/10 hover:text-white'
                       }
                     `}
@@ -236,7 +236,7 @@ export const MainLayout: React.FC = () => {
                 flex items-center gap-3 px-3 py-2.5 rounded-xl
                 font-medium text-sm transition-all duration-200
                 ${isActive
-                  ? 'bg-white/20 text-white'
+                  ? 'bg-white/20 text-white hover:text-white'
                   : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }
               `}
@@ -248,7 +248,7 @@ export const MainLayout: React.FC = () => {
           
           <div className="mt-4 border-t border-white/15 pt-4">
             {toolsItems.map(item => <NavLink key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}
-              className={({isActive}) => 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium '+(isActive?'bg-white/20 text-white':'text-white/70 hover:bg-white/10 hover:text-white')}>
+              className={({isActive}) => 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium '+(isActive?'bg-white/20 text-white hover:text-white':'text-white/70 hover:bg-white/10 hover:text-white')}>
               <item.icon size={20} aria-hidden="true"/>{item.label}{item.path==='/soporte'&&<AttentionBadge count={attention.support}/>}
             </NavLink>)}
             <a
@@ -353,7 +353,7 @@ export const MainLayout: React.FC = () => {
                 aria-label="Función actual"
                 title={`Rol base: ${currentUser.rol}`}
               >
-                {inspectionLabel ?? currentUser.rol}
+                {inspectionLabel ?? workspaceRoleLabel(currentUser.rol)}
               </Badge>
             </div>
           </div>

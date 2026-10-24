@@ -107,7 +107,7 @@ export const MobileDashboardPage: React.FC = () => {
       .map(item => ({id:item.path, label:item.label, icon:item.icon, path:mp(item.path)}));
     if (['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(currentUser?.rol || '')) return [
       ...(currentUser?.rol === 'GENERADOR' || proposals ? [{id:'nuevo',label:'Nuevo manifiesto',icon:FileText,path:mp('/manifiestos/nuevo')}] : []),
-      ...(isTransportista ? [{id:'viajes',label:'Viajes',icon:Truck,path:mp('/transporte/perfil')}] : []),
+      ...(isTransportista ? [{id:'viajes',label:'Viajes',icon:Truck,path:mp('/transporte/perfil')}, ...(manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser) ? [{id:'gps',label:'GPS de mis viajes',icon:MapPin,path:mp('/transporte/cargas')}] : [])] : []),
     ];
     return available.filter(item => ['/manifiestos','/reportes'].includes(item.path))
       .map(item => ({id:item.path,label:item.label,icon:item.icon,path:mp(item.path)}));
@@ -138,7 +138,6 @@ export const MobileDashboardPage: React.FC = () => {
       {!connectivity.isOnline && <p role="status" className="rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900">Sin conexión. Revisá abajo qué trabajo quedó guardado en este dispositivo.</p>}
 
       {manifestProposalsVisible(currentUser) && <TrainingTaskQueue/>}
-      {isTransportista&&manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser)&&<Button fullWidth leftIcon={<MapPin size={18}/>} onClick={()=>navigate(mp('/transporte/cargas'))}>Cargas en este móvil</Button>}
       {isTransportista && !currentUser?.training && (!proposals || usingSavedTrip) && (
         <>{usingSavedTrip && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">Se muestra sólo el último viaje guardado en este teléfono. Conectate para ver todos los viajes actuales.</p>}<TransportistaTripQueue
           activeTrips={activeQueueTrips}

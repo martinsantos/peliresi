@@ -60,7 +60,7 @@ export default function CargasEnCursoPage() {
   const label=gps.status==='denied'?'Permití la ubicación del teléfono y tocá Reintentar GPS.':gps.status==='unavailable'?'No se pudo acceder al GPS del dispositivo. Revisá la ubicación y tocá Reintentar GPS.':!started?'GPS detenido':gps.activeCount===0?'Revisá las cargas marcadas: no se está enviando GPS.':gps.status==='active'?`GPS para ${gps.activeCount} carga${gps.activeCount===1?'':'s'}`:'Buscando una ubicación reciente…';
   return <div className="mx-auto max-w-4xl space-y-4 pb-6">
     <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800"><ArrowLeft size={18}/>Mis viajes</Link>
-    <header><h1 className="text-xl font-bold text-neutral-900">Cargas en este móvil</h1><p className="mt-1 text-sm text-neutral-600">Marcá sólo los manifiestos que llevás en este vehículo.</p></header>
+    <p className="text-sm text-neutral-600">Marcá sólo los manifiestos que llevás en este vehículo.</p>
     <Card><CardContent className="space-y-3">
       <p role="status" aria-live="polite" className={`flex items-center gap-2 rounded-lg p-3 text-sm font-semibold ${started&&gps.status==='active'?'bg-primary-50 text-primary-800':'bg-neutral-100 text-neutral-700'}`}><Radio size={18} aria-hidden="true"/>{label}</p>
       <Button fullWidth disabled={!started&&chosen.filter(load=>load.gpsDisponible).length===0} leftIcon={retryLocation?<RefreshCw size={18}/>:started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(retryLocation){gps.retryLocation();return;}if(!started)setChoosing(false);setStarted(value=>!value);}}>{retryLocation?'Reintentar GPS':started?'Detener GPS':'Iniciar GPS'}</Button>

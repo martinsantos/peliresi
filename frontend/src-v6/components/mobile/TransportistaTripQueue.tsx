@@ -58,7 +58,7 @@ export const TransportistaTripQueue: React.FC<TransportistaTripQueueProps> = ({ 
       })}</ul>
       {section.total > section.trips.length && <p className="mt-2 text-xs text-neutral-600">Se muestran {section.trips.length} de {section.total}. Abrí Manifiestos para ver el resto.</p>}
     </div>)}
-    {activeTrips.length > 1 && <p className="text-xs text-neutral-600">{simultaneousGpsAvailable?'Usá Cargas en este móvil para compartir el GPS de los manifiestos que llevás juntos.':'Cada móvil transmite GPS únicamente mientras tiene abierto el seguimiento de ese manifiesto.'}</p>}
+    {activeTrips.length > 1 && <p className="text-xs text-neutral-600">{simultaneousGpsAvailable?'Usá GPS de mis viajes para compartir el GPS de los manifiestos que llevás juntos.':'Cada móvil transmite GPS únicamente mientras tiene abierto el seguimiento de ese manifiesto.'}</p>}
   </section>;
 };
 

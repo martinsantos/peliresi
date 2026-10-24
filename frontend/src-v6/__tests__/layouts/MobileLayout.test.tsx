@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -137,6 +137,27 @@ describe('MobileLayout Android shell', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
   });
 
+  it('selects only the deepest administrative destination in the drawer',()=>{
+    authState.currentUser.rol='ADMIN';
+    renderMobileLayout('/admin/actores/generadores/qa');
+    fireEvent.click(screen.getByRole('button',{name:/abrir menu/i}));
+    expect(screen.getByRole('link',{name:'Generadores',exact:true})).toHaveAttribute('aria-current','page');
+    expect(screen.getByRole('link',{name:'Actores',exact:true})).not.toHaveAttribute('aria-current');
+  });
+  it.each(['/transporte/viaje/qa','/transporte/cargas'])('retains the Viajes destination at %s',path=>{
+    renderMobileLayout(path);
+    const navigation=screen.getByRole('navigation',{name:'Navegación principal'});
+    expect(within(navigation).getByRole('link',{name:'Viajes',exact:true})).toHaveAttribute('aria-current','page');
+    expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+  });
+  it.each(['/manifiestos','/manifiestos/qa'])('keeps the transport manifest section visible at %s',path=>{
+    renderMobileLayout(path);
+    const navigation=screen.getByRole('navigation',{name:'Navegación principal'});
+    expect(within(navigation).getByRole('link',{name:'Manifiestos',exact:true})).toHaveAttribute('aria-current','page');
+    expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button',{name:/abrir menu/i}));
+    expect(screen.getByRole('link',{name:'Reportes',exact:true})).toBeVisible();
+  });
   it('labels a direct CAP login and offers no return to a personal administrator',()=>{
     authState.currentUser.training=true;authState.currentUser.rol='ADMIN';renderMobileLayout();
     expect(screen.getByRole('status',{name:'Modo capacitación'})).toHaveTextContent('Capacitación · sin validez oficial');
@@ -327,7 +348,7 @@ describe('MobileLayout Android shell', () => {
   it('keeps menu destinations at least 44px with visible keyboard focus', () => {
     renderMobileLayout('/dashboard');
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
-    const link = screen.getByRole('link', { name: 'Manifiestos', exact: true });
+    const link = within(screen.getByRole('navigation', { name: 'Menú de la aplicación' })).getByRole('link', { name: 'Manifiestos', exact: true });
     expect(link).toHaveClass('min-h-11', 'focus-visible:outline-2', 'transition-colors');
   });
 

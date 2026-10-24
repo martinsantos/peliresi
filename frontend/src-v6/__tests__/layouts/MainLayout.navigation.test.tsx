@@ -77,7 +77,7 @@ describe('Sidebar: one visible current destination',()=>{
     show('/mis-inspecciones/qa-expediente');
     expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Requerimiento',exact:true})).toBeVisible();
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true}).closest('header')).toBe(screen.getByRole('banner'));
-    expect(within(screen.getByRole('banner')).getByLabelText('Función actual')).toHaveTextContent(/^GENERADOR$/);
+    expect(within(screen.getByRole('banner')).getByLabelText('Función actual')).toHaveTextContent(/^Generador$/);
   });
   it.each([
     ['/admin/actores','Actores'],
@@ -91,7 +91,7 @@ describe('Sidebar: one visible current destination',()=>{
     const current=sidebar.querySelectorAll('a[aria-current="page"]');
     expect(current).toHaveLength(1);
     expect(current[0]).toHaveTextContent(label);
-    expect(current[0]).toHaveClass('bg-white/20');
+    expect(current[0]).toHaveClass('bg-white/20', 'text-white', 'hover:text-white');
     if(label!=='Actores')expect(within(sidebar).getByRole('link',{name:'Actores',exact:true})).not.toHaveClass('bg-white/20');
   });
   it('keeps the section label on a detail route instead of the generic product title',()=>{

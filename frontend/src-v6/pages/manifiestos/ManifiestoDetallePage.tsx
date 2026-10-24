@@ -1,4 +1,4 @@
-import { manifestListReturn } from '../../utils/manifestListReturn';
+import { manifestWorkspaceReturn } from '../../utils/manifestListReturn';
 import { TrainingCertificates } from './components/TrainingCertificates';
 import { TransportLegs } from './components/TransportLegs';
 import { transportTrackSegments } from '../../utils/transportTrackSegments';
@@ -112,7 +112,8 @@ const ManifiestoDetailPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
-  const returnToList = manifestListReturn(location.state, mp('/manifiestos'));
+  const returnContext = manifestWorkspaceReturn(location.state, mp('/manifiestos'));
+  const returnToList = returnContext.path;
   const isApp = location.pathname.startsWith('/app');
   const { data: apiData, isLoading, isError } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
@@ -360,7 +361,7 @@ const ManifiestoDetailPage: React.FC = () => {
   if (!manifiesto && (isError || !isLoading)) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <Button variant="ghost" aria-label="Volver a Manifiestos" onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>Manifiestos</Button>
+        <Button variant="ghost" aria-label={`Volver a ${returnContext.label}`} onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>{returnContext.label}</Button>
         <Card>
           <CardContent className="py-16 text-center">
             <AlertCircle size={48} className="mx-auto text-warning-400 mb-4" />
@@ -376,7 +377,7 @@ const ManifiestoDetailPage: React.FC = () => {
     <div className="min-w-0 space-y-4" data-operational-page>
       {/* Header */}
       <div className="space-y-3">
-        <Button variant="ghost" aria-label="Volver a Manifiestos" onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>Manifiestos</Button>
+        <Button variant="ghost" aria-label={`Volver a ${returnContext.label}`} onClick={() => navigate(returnToList)} leftIcon={<ArrowLeft size={18} />}>{returnContext.label}</Button>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <h2 className="text-lg sm:text-2xl font-bold text-neutral-900 truncate">{m.numero || id}</h2>
           <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">

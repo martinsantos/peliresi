@@ -8,7 +8,7 @@ export const ROLE_GUIDANCE: Record<string, GuideStep[]> = {
     { icon: 'certificate', title: 'Recibí las certificaciones', desc: 'Cuando el operador firma y libera una parcial o final, recibís un aviso. Desde Certificaciones podés descargar el documento emitido.' },
   ],
   TRANSPORTISTA: [
-    { icon: 'trip', title: 'Tus viajes, juntos y ordenados', desc: 'Podés proponer manifiestos y aprobar los que te asignan. En Cargas en este móvil encontrás tus viajes simultáneos y los relevos aceptados.' },
+    { icon: 'trip', title: 'Tus viajes, juntos y ordenados', desc: 'Podés proponer manifiestos y aprobar los que te asignan. En GPS de mis viajes encontrás tus viajes simultáneos y los relevos aceptados.' },
     proposals,
     { icon: 'trip', title: 'Retiro físico y ubicación', desc: 'Confirmá el retiro cuando recibas la carga. Activá Ubicación y verificá el permiso y el estado GPS. Si falla, reintentá; la ubicación no se garantiza con la app cerrada.' },
     { icon: 'notice', title: 'Incidentes, relevos y entrega', desc: 'Registrá la avería y el traspaso desde el viaje que corresponda. Al llegar confirmá la entrega; el operador confirma la recepción y continúa el tratamiento.' },

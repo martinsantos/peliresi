@@ -113,14 +113,14 @@ function mapRow(m: any): MRow {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-const ManifiestosPage: React.FC = () => {
+const ManifestList: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const updateFilters = (values: Record<string, string>) => {
-    const next = new URLSearchParams(window.location.search);
+    const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(values)) {
       if (value) next.set(key, value); else next.delete(key);
     }
@@ -338,7 +338,6 @@ const ManifiestosPage: React.FC = () => {
         </div>
       </PageToolbar>
 
-      {manifestProposalsVisible(currentUser) && <ManifestAgenda />}
 
       {/* Expanded phone filters scroll away so they cannot cover the results. */}
       <div ref={filterBarRefCb} className={`${showFilters ? 'relative md:sticky' : 'sticky'} top-0 z-20 bg-[#FAFAF8]`}>
@@ -497,7 +496,6 @@ const ManifiestosPage: React.FC = () => {
               </React.Fragment>
             ))}
             {hasMore && <div ref={mobileSentinelRef} className="flex items-center justify-center py-4 gap-2 text-neutral-400">{isFetching && <><Loader2 size={16} className="animate-spin" /><span className="text-xs">Cargando...</span></>}</div>}
-            {!hasMore && allRows.length > 0 && <p className="text-center text-xs text-neutral-400 py-3">{totalCount} manifiestos</p>}
           </div>
         )}
 
@@ -565,7 +563,6 @@ const ManifiestosPage: React.FC = () => {
                   {isFetching && <><Loader2 size={16} className="animate-spin" /><span className="text-xs">Cargando más...</span></>}
                 </div>
               )}
-              {!hasMore && allRows.length > 0 && <p className="text-center text-xs text-neutral-400 py-3 border-t border-neutral-100">{totalCount} manifiestos</p>}
             </div>
           </div>
         )}
@@ -591,7 +588,7 @@ const ManifiestosPage: React.FC = () => {
         {/* Status bar */}
         {allRows.length > 0 && (
           <div className="px-3 py-1.5 mt-2 flex items-center gap-2 text-xs text-neutral-400">
-            <span>{allRows.length} de {totalCount}</span>
+            <span>{allRows.length} de {totalCount} {totalCount === 1 ? 'manifiesto' : 'manifiestos'}</span>
             {isFetching && <Loader2 size={12} className="animate-spin" />}
           </div>
         )}
@@ -620,4 +617,19 @@ const ManifiestosPage: React.FC = () => {
   );
 };
 
+/** One view at a time; URL filters survive switching and opening a detail. */
+const ManifiestosPage: React.FC = () => {
+  const {currentUser}=useAuth();
+  const [params,setParams]=useSearchParams();
+  const scheduled=manifestProposalsVisible(currentUser)&&params.get('vista')==='programados';
+  return <div className="space-y-4">
+    {manifestProposalsVisible(currentUser)&&<nav aria-label="Vista de manifiestos" className="flex gap-2">
+      {([['listado','Listado'],['programados','Programados']] as const).map(([value,label])=>
+        <button key={value} type="button" aria-pressed={scheduled===(value==='programados')}
+          onClick={()=>{const next=new URLSearchParams(params);if(value==='programados')next.set('vista',value);else next.delete('vista');setParams(next,{replace:true});}}
+          className={`min-h-11 rounded-lg border px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${scheduled===(value==='programados')?'border-primary-800 bg-primary-800 text-white':'border-neutral-200 bg-white text-neutral-700 hover:bg-primary-50'}`}>{label}</button>)}
+    </nav>}
+    {scheduled?<ManifestAgenda/>:<ManifestList/>}
+  </div>;
+};
 export default ManifiestosPage;

@@ -1,7 +1,7 @@
 import { inspectionContextLabel } from '../../utils/inspectionContextLabel';
 import {describe,it,expect} from 'vitest';
 import type {User,UserRole} from '../../contexts/AuthContext';
-import {workspaceNavigation,workspaceTitle,ADMIN_ROLES} from '../../utils/workspaceNavigation';
+import {workspaceNavigation,workspaceTitle,ADMIN_ROLES,workspaceSectionPath,workspaceRoleLabel} from '../../utils/workspaceNavigation';
 import {canAccessMobilePath} from '../../utils/mobileAccess';
 import {postLoginDestination} from '../../utils/authRedirect';
 const user=(rol:UserRole,esInspector=false)=>({id:'qa',rol,esInspector,actorId:'own'} as User);
@@ -56,4 +56,17 @@ it('keeps the administrator identity at home and the inspection function inside 
   expect(inspectionContextLabel({rol:'ADMIN',esInspector:true},'/app/dashboard')).toBeNull();
   expect(inspectionContextLabel({rol:'ADMIN',esInspector:true},'/app/inspecciones/qa')).toBe('Inspector');
   expect(inspectionContextLabel({rol:'GENERADOR',esInspector:true},'/app/dashboard')).toBe('Inspector');
+});
+
+it.each(['','/app','/mobile'])('keeps each nested workflow in one section on %s',prefix=>{
+ expect(workspaceSectionPath(prefix+'/transporte/viaje/qa')).toBe('/transporte/perfil');
+ expect(workspaceSectionPath(prefix+'/transporte/cargas')).toBe('/transporte/perfil');
+ expect(workspaceSectionPath(prefix+'/requerimientos/qa')).toBe('/notificaciones');
+ expect(workspaceSectionPath(prefix+'/empresas/qa')).toBe('/mi-perfil');
+ expect(workspaceSectionPath(prefix+'/admin/actores/generadores/qa')).toBe('/admin/actores/generadores/qa');
+ expect(workspaceTitle(prefix+'/transporte/cargas')).toBe('GPS de mis viajes');
+});
+it('uses human role names rather than exposing internal enum names',()=>{
+ expect(workspaceRoleLabel('ADMIN_GENERADOR')).toBe('Adm. Generadores');
+ expect(workspaceRoleLabel('OPERADOR')).toBe('Operador');
 });
