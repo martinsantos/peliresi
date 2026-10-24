@@ -1,5 +1,9 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Último rol y borrador — sólo preview, 24/10/2026
+
+La elección G/T/O en Mis actividades se conserva al reabrir y recupera su borrador por contexto. **87 unitarias + 6 ciclos de reapertura web/app PASS**; 33 observaciones guardadas, aislamiento de cuentas/pestañas y permisos revocados comprobados. [Cierre y límites](docs/ULTIMO-ROL-Y-BORRADOR-20261024.md). Sin producción, main ni workflows; CAP cerrado, correos/push apagados. Runtime QA cerrado; Android físico pendiente. Publicación vigente sigue **462ad75a**.
+
 ## Publicación vigente — borrador después del cierre, 24/10/2026
 
 **462ad75a publicado en backend, web, app y manual a las 06:52:10 Mendoza.** Nuevo Manifiesto recupera campos/paso después de cerrar y reabrir el mismo navegador/app, por cuenta/rol/actor/contexto; migra las copias abiertas de la versión anterior y no resucita lo creado/descartado. Manual **2026.24.1**, SW **v168**, app **20261024094810**.

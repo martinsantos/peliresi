@@ -1,4 +1,4 @@
-import { activityOwner } from './actorActivity';
+import { activityOwner, clearActorActivity } from './actorActivity';
 export interface CompanyChoice {empresaId:string;razonSocial:string;actividadId:string;rol:string;autorizacionId:string;revision:number;todosEstablecimientos:boolean;establecimientos:Array<{id:string;codigo:string;nombre:string;domicilio:string}>}
 export interface CompanySelection {empresaId:string;actividadId:string;establecimientoId?:string}
 export interface CompanyContext extends CompanySelection {razonSocial:string;rol:string;actorId:string;autorizacionId:string;revision:number;todasSedes:boolean;domicilioLegal:{calle:string;localidad:string;departamento:string};establecimiento?:{id:string;nombre:string;domicilio:string;localidad?:string;departamento?:string;latitud?:number|null;longitud?:number|null}}
@@ -10,7 +10,7 @@ export function readCompanyContext(token:string|null):CompanySelection|null {
  }catch{return null;}
 }
 export function saveCompanyContext(owner:string,value:CompanySelection|null) {
- if(value){sessionStorage.setItem('sitrep_company:'+owner,JSON.stringify(value));sessionStorage.removeItem('sitrep_activity:'+owner);}
+ if(value){sessionStorage.setItem('sitrep_company:'+owner,JSON.stringify(value));clearActorActivity(owner);}
  else sessionStorage.removeItem('sitrep_company:'+owner);
 }
 export const companyHeaders=(v:CompanySelection)=>({'X-SITREP-Empresa':v.empresaId,'X-SITREP-Empresa-Actividad':v.actividadId,...(v.establecimientoId?{'X-SITREP-Establecimiento':v.establecimientoId}:{})});
