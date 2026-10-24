@@ -12,9 +12,9 @@ export function manifestDraftScope(user: DraftOwner | null) {
   return user ? JSON.stringify([user.id, user.rol, user.actorId || '', !!user.training, user.empresaContexto?.empresaId || '', user.empresaContexto?.actividadId || '', user.empresaContexto?.establecimientoId || '']) : '';
 }
 const lifetime = 7 * 24 * 60 * 60 * 1000;
-// If browser storage is unavailable, preserve navigation within this open app.
-// This fallback is deliberately not described as a saved draft.
-const pendingDrafts = new Map<string, { draft: ManifestDraft; at: number }>();
+type StoredDraft = { version: 1; savedAt: number; draft: ManifestDraft | null };
+// Never describe the memory fallback as durable storage.
+const pendingDrafts = new Map<string, StoredDraft>();
 function validDraft(value: unknown): value is ManifestDraft {
   if (!value || typeof value !== 'object') return false;
   const { step, form } = value as ManifestDraft;
@@ -24,48 +24,89 @@ function validDraft(value: unknown): value is ManifestDraft {
     && form.residuos.every(row => row && ['tipo', 'cantidad', 'unidad'].every(key => typeof row[key as keyof typeof row] === 'string'));
 }
 
-/** Per-tab storage avoids two tabs overwriting one shared draft. No API calls.
+function parseRecord(raw: string | null): StoredDraft | null {
+  try {
+    const value = JSON.parse(raw || 'null');
+    return value?.version === 1 && Number.isFinite(value.savedAt) && value.savedAt <= Date.now()
+      && Date.now() - value.savedAt < lifetime && (value.draft === null || validDraft(value.draft)) ? value : null;
+  } catch { return null; }
+}
+
+/** One durable draft per person/role/actor on this browser, shared by web/app.
  * The form is keyed by scope so role/company changes unmount this state first. */
 export function useManifestDraft(scope: string, initial: ManifestDraft) {
   const key = 'sitrep:manifest-form:v1:' + scope;
   const [loaded] = useState(() => {
+    let durable: StoredDraft | null = null, legacy: StoredDraft | null = null, error = false;
+    if (!scope) return { record: null, error: false, migrate: false };
+    try { durable = parseRecord(localStorage.getItem(key)); } catch { error = true; }
+    try { legacy = parseRecord(sessionStorage.getItem(key)); } catch { /* Session storage is no longer required. */ }
     const pending = pendingDrafts.get(key);
-    if (pending && Date.now() - pending.at < lifetime) return { draft: pending.draft, restored: true, error: true };
+    if (pending && Date.now() - pending.savedAt < lifetime) return { record: pending, error: true, migrate: true };
     pendingDrafts.delete(key);
-    try {
-      const value = scope && JSON.parse(sessionStorage.getItem(key) || 'null');
-      if (value?.version === 1 && Number.isFinite(value.savedAt) && value.savedAt <= Date.now()
-        && Date.now() - value.savedAt < lifetime && validDraft(value.draft)) return { draft: value.draft as ManifestDraft, restored: true, error: false };
-      return { draft: initial, restored: false, error: false };
-    } catch { return { draft: initial, restored: false, error: true }; }
+    // A durable clear marker prevents old tabs from resurrecting legacy drafts.
+    const migrate = !!legacy && (!durable || legacy.savedAt > durable.savedAt);
+    return { record: migrate ? legacy : durable, error, migrate };
   });
-  const [draft, setDraft] = useState(loaded.draft);
+  const initialRef = useRef(initial);
+  const [draft, setDraft] = useState(loaded.record?.draft || initial);
   const current = useRef(draft);
-  const [restored, setRestored] = useState(loaded.restored);
-  const [saved, setSaved] = useState(loaded.restored && !loaded.error);
+  const [restored, setRestored] = useState(!!loaded.record?.draft);
+  const [saved, setSaved] = useState(!!loaded.record?.draft && !loaded.error && !loaded.migrate);
   const [error, setError] = useState(loaded.error);
-  const [dirty, setDirty] = useState(loaded.restored && loaded.error);
-  const update = useCallback((change: SetStateAction<ManifestDraft>) => {
-    const next = typeof change === 'function' ? change(current.current) : change;
-    current.current = next;
-    setDraft(next);
-    setDirty(true);
-    // Synchronous persistence also covers immediate navigation and SW reload.
+  const errorRef = useRef(error);
+  const [dirty, setDirty] = useState(!!loaded.record?.draft);
+  const persist = useCallback((next: ManifestDraft | null) => {
+    const record: StoredDraft = { version: 1, savedAt: Date.now(), draft: next };
     try {
       if (!scope) throw new Error('Missing owner');
-      sessionStorage.setItem(key, JSON.stringify({ version: 1, savedAt: Date.now(), draft: next }));
+      // Mobile shutdown does not guarantee unload. Persist on every input.
+      localStorage.setItem(key, JSON.stringify(record));
       pendingDrafts.delete(key);
-      setSaved(true); setError(false);
-    } catch { pendingDrafts.set(key, { draft: next, at: Date.now() }); setSaved(false); setError(true); }
+      try { sessionStorage.removeItem(key); } catch { /* Durable record supersedes the legacy copy. */ }
+      errorRef.current = false; setSaved(!!next); setError(false);
+      return true;
+    } catch {
+      if (next) pendingDrafts.set(key, record);
+      errorRef.current = true; setSaved(false); setError(true);
+      return false;
+    }
   }, [key, scope]);
+  useEffect(() => {
+    if (loaded.migrate && loaded.record?.draft) persist(loaded.record.draft);
+  }, [loaded, persist]);
+  const update = useCallback((change: SetStateAction<ManifestDraft>) => {
+    let previous = current.current;
+    if (!errorRef.current) {
+      try {
+        const latest = parseRecord(localStorage.getItem(key));
+        if (latest) previous = latest.draft || initialRef.current;
+      } catch { /* Keep current input and retry persistence below. */ }
+    }
+    const next = typeof change === 'function' ? change(previous) : change;
+    current.current = next; setDraft(next); setDirty(true);
+    persist(next);
+  }, [key, persist]);
   const clear = useCallback(() => {
-    try { sessionStorage.removeItem(key); }
-    catch { setError(true); return false; }
-    pendingDrafts.delete(key);
-    current.current = initial;
-    setDraft(initial); setSaved(false); setRestored(false); setDirty(false); setError(false);
+    // A tombstone also invalidates copies still open in other tabs.
+    if (!persist(null)) return false;
+    current.current = initialRef.current;
+    setDraft(initialRef.current); setRestored(false); setDirty(false);
     return true;
-  }, [initial, key]);
+  }, [persist]);
+  useEffect(() => {
+    const synchronize = (event: StorageEvent) => {
+      if (event.key !== key || (event.storageArea && event.storageArea !== localStorage) || errorRef.current) return;
+      // Read the current value: an older queued event must not undo a newer edit.
+      let record: StoredDraft | null;
+      try { record = parseRecord(localStorage.getItem(key)); } catch { return; }
+      const next = record?.draft || initialRef.current;
+      current.current = next; setDraft(next); setRestored(!!record?.draft);
+      setSaved(!!record?.draft); setDirty(!!record?.draft);
+    };
+    window.addEventListener('storage', synchronize);
+    return () => window.removeEventListener('storage', synchronize);
+  }, [key]);
   useEffect(() => {
     if (!dirty || !error) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };

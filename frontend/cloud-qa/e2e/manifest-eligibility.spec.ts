@@ -99,7 +99,7 @@ test('eligibility is explained before submission and stale account rejection rec
     await page.screenshot({ path: info.outputPath('recovered-proposal.png'), animations: 'disabled' });
     await page.goto(prefix(info) + '/manifiestos/nuevo');
     await expect(page.getByRole('button', { name: 'Generador *', exact: true })).toBeVisible();
-    await expect(page.getByText('Borrador recuperado · guardado en esta pestaña')).toHaveCount(0);
+    await expect(page.getByText('Borrador recuperado · guardado en este dispositivo')).toHaveCount(0);
     await expect(page.getByLabel('Observaciones', { exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
     writeFileSync(info.outputPath('evidence.json'), JSON.stringify({ namespace, project: info.project.name,

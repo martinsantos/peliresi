@@ -26,7 +26,7 @@ for (const role of ['admin', 'generador', 'transportista', 'operador']) {
     await page.getByRole('button', { name: 'Volver a Manifiestos', exact: true }).click();
     await page.getByRole('button', { name: 'Nuevo Manifiesto', exact: true }).click();
     await expect(page.getByLabel('Observaciones', { exact: true })).toHaveValue(note);
-    await expect(page.getByText('Borrador recuperado · guardado en esta pestaña')).toBeVisible();
+    await expect(page.getByText('Borrador recuperado · guardado en este dispositivo')).toBeVisible();
     await page.reload();
     await expect(page.getByLabel('Observaciones', { exact: true })).toHaveValue(note);
     await expect(page.getByRole('button', { name: 'Transportista *', exact: true })).toContainText('QA Transporte 1');

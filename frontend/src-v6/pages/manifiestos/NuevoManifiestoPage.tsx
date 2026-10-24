@@ -149,7 +149,7 @@ const NuevoManifiestoForm: React.FC = () => {
   const setFormData = (change: React.SetStateAction<ManifestFormData>) => draft.update(previous => ({ ...previous, form: typeof change === 'function' ? change(previous.form) : change }));
   const returnTo = manifestListReturn(location.state, mp('/manifiestos'));
   const returnToList = () => {
-    if (draft.error && draft.dirty && !window.confirm('No se pudo guardar el borrador en esta pestaña. Si salís, perderás lo cargado. ¿Salir igualmente?')) return;
+    if (draft.error && draft.dirty && !window.confirm('No se pudo guardar el borrador en este dispositivo. Si cerrás la app, podrías perder lo cargado. ¿Salir igualmente?')) return;
     navigate(returnTo);
   };
   const [discardDraft, setDiscardDraft] = useState(false);
@@ -358,7 +358,7 @@ const NuevoManifiestoForm: React.FC = () => {
       });
 
       toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? (formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas.':'Generador, transporte y operador deben aprobar desde sus cuentas.') : 'Todavía falta la firma del generador para continuar.'}`);
-      if (!draft.clear()) toast.error('Manifiesto creado', 'No se pudo borrar la copia de esta pestaña. No vuelvas a enviar el formulario anterior.');
+      if (!draft.clear()) toast.error('Manifiesto creado', 'No se pudo borrar la copia de este dispositivo. No vuelvas a enviar el formulario anterior.');
       navigate(mp(`/manifiestos/${result.id}`), { state: { manifestListReturn: returnTo } });
     } catch (err: any) {
       const fields = manifestPartyErrors(err);
@@ -441,7 +441,7 @@ const NuevoManifiestoForm: React.FC = () => {
       </header>
 
       {(draft.saved || draft.error) && <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-primary-50 px-3 text-sm text-primary-900" aria-label="Borrador del manifiesto">
-        <p role="status" className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : draft.restored ? 'Borrador recuperado · guardado en esta pestaña' : 'Borrador guardado en esta pestaña'}</p>
+        <p role="status" className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : draft.restored ? 'Borrador recuperado · guardado en este dispositivo' : 'Borrador guardado en este dispositivo'}</p>
         {!discardDraft && <button type="button" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar borrador</button>}
         {discardDraft && <div className="flex flex-wrap items-center gap-3 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span><Button size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button><Button size="sm" variant="outline" onClick={() => { if (draft.clear()) { setValidationErrors({}); setServerPartyIssues({}); setSubmitError(undefined); setConfirmWithoutTransport(false); setDiscardDraft(false); } }}>Sí, descartar</Button></div>}
       </div>}

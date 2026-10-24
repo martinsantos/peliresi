@@ -59,7 +59,7 @@ function changeResidue() {
 describe('manifest transport compatibility after changing residues', () => {
   afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
-  sessionStorage.clear();
+  sessionStorage.clear(); localStorage.clear();
     vi.clearAllMocks();
     mocks.availability = {};
     mocks.refreshError = false;
