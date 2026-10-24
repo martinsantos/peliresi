@@ -1,10 +1,14 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Último rol y borrador — sólo preview, 24/10/2026
+## Publicación vigente — último rol y borrador, 24/10/2026
 
-La elección G/T/O en Mis actividades se conserva al reabrir y recupera su borrador por contexto. **87 unitarias + 6 ciclos de reapertura web/app PASS**; 33 observaciones guardadas, aislamiento de cuentas/pestañas y permisos revocados comprobados. [Cierre y límites](docs/ULTIMO-ROL-Y-BORRADOR-20261024.md). Sin producción, main ni workflows; CAP cerrado, correos/push apagados. Runtime QA cerrado; Android físico pendiente. Publicación vigente sigue **462ad75a**.
+**75168a08 publicado en backend, web, app y manual a las 08:30:48 Mendoza.** Al reabrir se recupera el último rol G/T/O elegido y su borrador, por cuenta/contexto; cada pestaña mantiene su propio rol. Preferencia local, sujeta a permisos del servidor. Manual **2026.24.1**, SW **v170**, app **20261024112723**.
 
-## Publicación vigente — borrador después del cierre, 24/10/2026
+Preview: **87 unitarias + 6 ciclos de reapertura web/app PASS**, 33 observaciones DOM/capturas; no son 33 E2E independientes. Build de **2.522 archivos Git exactos**; tipos/backend/web/app PASS. Producción: **187/187 + externo 9/9 + PWA 8/8 PASS**, sólo lectura, sin logins ni operaciones de negocio. Dos workers en línea, .env/flags/esquema idénticos; CAP cerrado, correos/push apagados; sin main, migraciones, datos reales, push ni workflows.
+
+[Cierre, límites y reversión vigente](docs/ULTIMO-ROL-Y-BORRADOR-20261024.md). Respaldo privado en `/var/backups/sitrep/20261024-producto-75168a08`; reversión preparada a **462ad75a**, SW **v171**, app **20261024113005**. No usar reversiones históricas. Runtime QA cerrado; Android físico y cierre de PWA instalada siguen pendientes. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — borrador después del cierre, 24/10/2026
 
 **462ad75a publicado en backend, web, app y manual a las 06:52:10 Mendoza.** Nuevo Manifiesto recupera campos/paso después de cerrar y reabrir el mismo navegador/app, por cuenta/rol/actor/contexto; migra las copias abiertas de la versión anterior y no resucita lo creado/descartado. Manual **2026.24.1**, SW **v168**, app **20261024094810**.
 
