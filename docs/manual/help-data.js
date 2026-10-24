@@ -17,6 +17,18 @@
 
     guides: [
       {
+        id: 'padrones-administrativos', profile: 'administrador',
+        title: 'Consultar padrones y abrir un alta', summary: 'Generadores, Transportistas y Operadores comparten búsqueda, filtros y acciones.',
+        duration: '2 min', icon: 'manage_accounts', keywords: ['padrones', 'generadores', 'transportistas', 'operadores', 'filtros', 'alta'],
+        safety: 'El menú respeta el ámbito de cada administrador. Abrir un formulario no registra ni modifica un actor.',
+        steps: [
+          { title: 'Elegir el padrón', body: ['Abrí Generadores, Transportistas u Operadores en Administración. El título y el destino activo identifican el padrón. Nuevo generador, Nuevo transportista o Nuevo operador inicia el alta correspondiente; en pantallas pequeñas se muestra Nuevo bajo el título del padrón.', 'Los resúmenes distinguen el total de registros de los indicadores calculados sobre la página. No deben interpretarse los activos de una página como el total del padrón.'], image:S+'mobile/role-padron-generadores-20261024.png', alt:'Padrón de Generadores en la app con alta, exportación y filtros agrupados', caption:'Datos sintéticos · preview · app en navegador, no Android físico · 24/10/2026.', expected: 'El mismo orden y las mismas acciones aparecen en web y app.' },
+          { title: 'Buscar y ajustar filtros', body: ['La búsqueda está visible. Filtros despliega los controles adicionales con su nombre. Al cerrarlos, el resumen muestra las selecciones aplicadas; al abrirlos, se conserva su valor.', 'Estado consulta el padrón completo. Tipo y corriente de operadores, y localidad de transportistas, indican página actual porque refinan los registros cargados. Restablecer filtros recupera sus valores iniciales y conserva la búsqueda. Las tarjetas de la app se abren también con teclado.'], expected: 'El listado queda al alcance sin recorrer todos los controles en cada visita.' },
+          { title: 'Exportar o preparar recordatorios', body: ['Exportar reúne CSV, PDF e impresión. Si no hay datos disponibles, no se habilita una descarga vacía. Escape cierra el grupo y devuelve el foco.', 'En Generadores, Recordatorios a generadores se abre sólo cuando necesitás esa acción. Seleccioná los destinatarios y revisá el contenido antes de crear avisos. Abrir el panel o seleccionar filas no envía nada.'], expected: 'Las acciones secundarias no desplazan el listado ni se ejecutan automáticamente.' },
+          { title: 'Volver al mismo espacio', body: ['El encabezado del alta identifica Nuevo, Editar o Renovar y el tipo de actor. Volver a Generadores, Transportistas u Operadores indica el destino de regreso.', 'La app continúa en la app; la vista móvil de la web conserva su recorrido. El borrador y las validaciones existentes siguen vigentes.'], expected: 'La persona conserva la orientación durante la consulta y el alta.' }
+        ]
+      },
+      {
         id: 'navegacion-por-rol', profile: 'administrador', audiences: ['generador', 'transportista', 'operador', 'inspector', 'auditor'],
         title: 'Tu espacio de trabajo según el rol', summary: 'Los mismos destinos y nombres en web y app, con accesos propios de cada función.',
         duration: '3 min', icon: 'route', keywords: ['rol', 'inicio', 'agenda', 'empresas', 'avisos', 'inspecciones'],

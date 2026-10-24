@@ -12,11 +12,11 @@ vi.mock('../../hooks/useActores', () => ({
 }));
 
 describe('Operator administration does not change actor identity to green', () => {
-  it('uses a blue FlaskConical in header, category total, table and mobile card', () => {
+  it('uses a blue FlaskConical in the category total, table and mobile card without a duplicate header', () => {
     const { container } = render(<MemoryRouter><AdminOperadoresPage /></MemoryRouter>);
-    expect(screen.getByRole('heading', { name: 'Admin Operadores', exact: true })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Operadores', exact: true })).toHaveClass('sr-only');
     const icons = container.querySelectorAll('svg.lucide-flask-conical');
-    expect(icons).toHaveLength(4);
+    expect(icons).toHaveLength(3);
     for (const icon of icons) expect(icon).toHaveClass('text-blue-700');
     // Success remains green because it describes state, not actor category.
     expect(container.querySelector('svg.lucide-circle-check-big')).toHaveClass('text-success-600');

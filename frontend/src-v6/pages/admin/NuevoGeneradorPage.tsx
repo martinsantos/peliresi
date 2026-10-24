@@ -1,3 +1,5 @@
+import { PageToolbar } from '../../components/ui/PageToolbar';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Nuevo / Editar Generador — Wizard 6 pasos
  * ======================================================
@@ -95,6 +97,7 @@ function FieldError({ show, msg }: { show: boolean; msg: string }) {
 const NuevoGeneradorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const location = useLocation();
   const isEdit = Boolean(id);
 
@@ -132,7 +135,7 @@ const NuevoGeneradorPage: React.FC = () => {
   const updateMutation = useUpdateGenerador();
   const uploadDocMutation = useUploadDocumento();
 
-  const backPath = '/admin/actores/generadores';
+  const backPath = mp('/admin/actores/generadores');
 
   useEffect(() => {
     initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setSelectedY(new Set());
@@ -387,17 +390,10 @@ const NuevoGeneradorPage: React.FC = () => {
 
   return (
     <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
-      {/* Header */}
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Button variant="outline" size="sm" className="shrink-0" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="shrink-0 p-2 bg-purple-100 rounded-xl"><Factory size={22} className="text-purple-600" /></div>
-          <div className="min-w-0">
-            <h2 aria-label={isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'} className="text-xl sm:text-2xl font-bold text-neutral-900"><span className="sm:hidden">{isEdit ? 'Editar generador' : 'Alta de generador'}</span><span className="hidden sm:inline">{isEdit ? 'Editar Generador' : 'Registro Provincial de Generadores de RRPP'}</span></h2>
-            <p className="text-xs leading-5 text-neutral-600 sm:text-sm">Ley 24.051, Ley Provincial 5917, Decreto 2625/99</p>
-          </div>
-        </div>
-      </div>
+      <PageToolbar label="Acciones del formulario">
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver a Generadores</Button>
+        <h2 className="sr-only">{isEdit ? 'Editar generador' : 'Nuevo generador'}</h2>
+      </PageToolbar>
 
       <ActorRegistrationDraftBar draft={draft} />
       {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos que estaban pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}

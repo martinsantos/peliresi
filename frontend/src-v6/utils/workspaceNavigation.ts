@@ -49,6 +49,12 @@ export function workspaceNavigation(user: User | null | undefined): WorkspaceIte
 }
 export function workspaceTitle(pathname: string): string {
   const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
+  const actorForm = /^\/admin\/actores\/(generadores|transportistas|operadores)\/(nuevo|[^/]+\/(editar|renovar))\/?$/.exec(path);
+  if (actorForm) {
+    const actor = {generadores:'generador',transportistas:'transportista',operadores:'operador'}[actorForm[1]];
+    const action = actorForm[2] === 'nuevo' ? 'Nuevo' : actorForm[3] === 'renovar' ? 'Renovar' : 'Editar';
+    return `${action} ${actor}`;
+  }
   const details: Array<[RegExp, string]> = [
     [/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/, 'Requerimiento'],
     [/^\/inspecciones\//, 'Inspección'],

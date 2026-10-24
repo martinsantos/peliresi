@@ -10,7 +10,7 @@ const stats = [
 ];
 function page() {
   return <MemoryRouter><GenericCRUDPage
-    title="QA Generadores" subtitle="QA sintético" icon={<Factory />} iconBg="bg-purple-100"
+    title="QA Generadores"
     data={[]} isLoading={false} isError={false} columns={[]} getRowKey={row => row.id}
     searchValue="" onSearchChange={vi.fn()} stats={stats}
     pagination={{ currentPage: 1, totalPages: 1, totalItems: 0, itemsPerPage: 20, onPageChange: vi.fn() }}
@@ -40,6 +40,8 @@ describe('CRUD summaries remain readable in narrow cards', () => {
 
   it('does not double the padding around the search and filters', () => {
     render(page());
-    expect(cardFor(screen.getByPlaceholderText('Buscar...'))).toHaveClass('p-0');
+    const search = screen.getByRole('search', { name:'Filtrar qa generadores' });
+    expect(search).toHaveClass('p-3', 'sm:p-4');
+    expect(search.querySelector('.p-4')).toBeNull();
   });
 });

@@ -1,3 +1,4 @@
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Admin Generadores Page
  * ==================================
@@ -23,6 +24,7 @@ import {
   ShieldX,
   RefreshCw,
   BellRing,
+  ChevronDown,
   CheckSquare,
   ListChecks,
 } from 'lucide-react';
@@ -92,6 +94,7 @@ function fallbackFiscalSituation(generador: Generador, fiscalYear: number): Situ
 
 const AdminGeneradoresPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const { isAdmin, isAdminGenerador } = useAuth();
   const { impersonateUser } = useImpersonation();
   const { data: enrichmentData } = useGeneradoresEnrichment();
@@ -205,6 +208,7 @@ const AdminGeneradoresPage: React.FC = () => {
   const filters: CRUDFilter[] = [
     {
       key: 'rubro',
+      label: 'Rubro',
       value: filtroRubro,
       onChange: (v) => { setFiltroRubro(v); setCurrentPage(1); },
       placeholder: 'Todos los rubros',
@@ -218,6 +222,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'categoria',
+      label: 'Categoría',
       value: filtroCategoria,
       onChange: (v) => { setFiltroCategoria(v); setCurrentPage(1); },
       placeholder: 'Todas las categorias',
@@ -230,6 +235,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'estado',
+      label: 'Estado',
       value: filtroEstado,
       onChange: (v) => { setFiltroEstado(v); setCurrentPage(1); },
       placeholder: 'Todos los estados',
@@ -241,6 +247,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'fiscalYear',
+      label: 'Ejercicio fiscal',
       value: String(fiscalYear),
       onChange: (v) => { setFiscalYear(Number(v)); setCurrentPage(1); },
       placeholder: 'Ejercicio fiscal',
@@ -250,6 +257,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'fiscalStatus',
+      label: 'Situación fiscal',
       value: filtroFiscal,
       onChange: (v) => { setFiltroFiscal(v as 'todos' | FiscalStatusFilter); setCurrentPage(1); },
       placeholder: 'Situacion fiscal',
@@ -266,6 +274,7 @@ const AdminGeneradoresPage: React.FC = () => {
     },
     {
       key: 'orden',
+      label: 'Orden',
       value: `${sortBy}:${sortOrder}`,
       onChange: (value) => {
         const [field, direction] = value.split(':');
@@ -473,21 +482,21 @@ const AdminGeneradoresPage: React.FC = () => {
           )}
           <button
             className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/generadores/${row.id}`)); }}
             title="Ver"
           >
             <Eye size={14} />
           </button>
           <button
             className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 hover:text-info-700 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}/editar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/generadores/${row.id}/editar`)); }}
             title="Editar"
           >
             <Edit size={14} />
           </button>
           <button
             className="flex h-8 w-8 shrink-0 items-center justify-center text-neutral-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/generadores/${row.id}/renovar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/generadores/${row.id}/renovar`)); }}
             title="Renovar"
           >
             <RefreshCw size={14} />
@@ -623,10 +632,7 @@ const AdminGeneradoresPage: React.FC = () => {
     <>
     <GenericCRUDPage<Row>
       // Page metadata
-      title="Admin Generadores"
-      subtitle="Panel de gestion de generadores de residuos"
-      icon={<Factory size={24} className="text-purple-600" />}
-      iconBg="bg-purple-100"
+      title="Generadores"
       // Data
       data={tableData}
       isLoading={isLoading}
@@ -637,7 +643,8 @@ const AdminGeneradoresPage: React.FC = () => {
       columns={columns}
       tableClassName="[&_table]:min-w-[40rem]"
       getRowKey={(row) => row.id}
-      onRowClick={(row) => navigate(`/admin/actores/generadores/${row.id}`)}
+      getRowLabel={(row) => row.razonSocial}
+      onRowClick={(row) => navigate(mp(`/admin/actores/generadores/${row.id}`))}
       emptyMessage="No se encontraron generadores"
       // Search
       searchValue={busqueda}
@@ -660,9 +667,8 @@ const AdminGeneradoresPage: React.FC = () => {
         onPageChange: setCurrentPage,
       }}
       // Actions
-      onNew={() => navigate('/admin/actores/generadores/nuevo')}
-      newLabel="Nuevo Generador"
-      mobileNewLabel="Nuevo"
+      onNew={() => navigate(mp('/admin/actores/generadores/nuevo'))}
+      newLabel="Nuevo generador"
       // CSV export
       csvExport={{
         onExport: handleCsvExport,
@@ -695,12 +701,14 @@ const AdminGeneradoresPage: React.FC = () => {
         title: 'Eliminar Generador',
       }}
       renderAfterFilters={() => (
-        <div className="rounded-2xl border border-primary-200 bg-primary-50/60 p-4" aria-live="polite">
+        <details className="group rounded-xl border border-neutral-200 bg-white p-3">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-neutral-700 [&::-webkit-details-marker]:hidden"><BellRing size={16} aria-hidden="true" /><span>Recordatorios a generadores{selectedIds.length > 0 ? ` · ${selectedIds.length} seleccionados` : ''}</span><ChevronDown size={16} aria-hidden="true" className="ml-auto shrink-0 transition-transform group-open:rotate-180" /></summary>
+          <div className="mt-3 border-t border-neutral-100 pt-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-white p-2 text-primary-700 shadow-sm"><ListChecks size={20} /></div>
               <div>
-                <p className="text-sm font-bold text-neutral-900">Gestionar el segmento visible</p>
+                <p className="text-sm font-bold text-neutral-900">Seleccionar destinatarios</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-neutral-600">{selectedIds.length > 0 ? `${selectedIds.length} generadores seleccionados. La audiencia exacta se revisa antes de crear avisos.` : 'Seleccione filas, la pagina actual o todos los resultados de los filtros vigentes.'}</p>
               </div>
             </div>
@@ -709,13 +717,14 @@ const AdminGeneradoresPage: React.FC = () => {
                 const pageIds = tableData.map((row) => row.id);
                 const everyPageRowSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
                 setSelectedIds(everyPageRowSelected ? selectedIds.filter((id) => !pageIds.includes(id)) : Array.from(new Set([...selectedIds, ...pageIds])));
-              }} disabled={tableData.length === 0}>{tableData.every((row) => selectedIds.includes(row.id)) && tableData.length > 0 ? 'Quitar pagina' : 'Seleccionar pagina'}</Button>
-              <Button variant="outline" size="sm" leftIcon={<ListChecks size={15} />} onClick={() => void selectCompleteSegment()} isLoading={selectingSegment} disabled={total === 0}>Todo el segmento ({total})</Button>
+              }} disabled={tableData.length === 0}>{tableData.every((row) => selectedIds.includes(row.id)) && tableData.length > 0 ? 'Quitar página' : 'Seleccionar página'}</Button>
+              <Button variant="outline" size="sm" leftIcon={<ListChecks size={15} />} onClick={() => void selectCompleteSegment()} isLoading={selectingSegment} disabled={total === 0}>Todos los resultados ({total})</Button>
               {selectedIds.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Limpiar</Button>}
               <Button size="sm" leftIcon={<BellRing size={15} />} onClick={openReminderReview} disabled={selectedIds.length === 0 || (!isAdmin && !isAdminGenerador)}>Preparar recordatorio</Button>
             </div>
           </div>
-        </div>
+          </div>
+        </details>
       )}
       renderMobileCard={(row) => (
         <Card className="p-4 pr-14">

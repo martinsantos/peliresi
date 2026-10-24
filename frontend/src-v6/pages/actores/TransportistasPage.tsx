@@ -1,3 +1,4 @@
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Admin Transportistas Page
  * ======================================
@@ -9,7 +10,6 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Truck,
-  Plus,
   Search,
   AlertTriangle,
   CheckCircle,
@@ -25,15 +25,15 @@ import {
   Clock,
   Printer,
 } from 'lucide-react';
-import { Card, CardContent } from '../../components/ui/CardV2';
+import { Card } from '../../components/ui/CardV2';
+import { RecordListToolbar } from '../../components/crud/RecordListToolbar';
+import { RecordListFilters } from '../../components/crud/RecordListFilters';
 import { CRUDSummary } from '../../components/crud/CRUDSummary';
 import { Button } from '../../components/ui/ButtonV2';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/BadgeV2';
 import { Modal, ConfirmModal } from '../../components/ui/Modal';
 import { Table, Pagination } from '../../components/ui/Table';
-import { Select } from '../../components/ui/Select';
-import { SearchInput } from '../../components/ui/SearchInput';
 import { toast } from '../../components/ui/Toast';
 import { downloadCsv } from '../../utils/exportCsv';
 import { exportReportePDF } from '../../utils/exportPdf';
@@ -69,6 +69,7 @@ const INITIAL_FORM = {
 
 const TransportistasPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
@@ -87,7 +88,7 @@ const TransportistasPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading, isError, error } = useTransportistas({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
+  const { data: apiData, isLoading, isError, error } = useTransportistas({ page: currentPage, limit: 20, search: busqueda || undefined, activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo', sortBy, sortOrder });
   const createMutation = useCreateTransportista();
   const updateMutation = useUpdateTransportista();
   const deleteMutation = useDeleteTransportista();
@@ -246,7 +247,7 @@ const TransportistasPage: React.FC = () => {
   };
 
   const openEditar = (row: typeof tableData[0]) => {
-    navigate(`/admin/actores/transportistas/${row.id}/editar`);
+    navigate(mp(`/admin/actores/transportistas/${row.id}/editar`));
     return;
     // Legacy modal code below - kept for reference
     setEditId(row.id);
@@ -302,7 +303,7 @@ const TransportistasPage: React.FC = () => {
       })),
       'admin-transportistas',
       {
-        titulo: 'Admin Transportistas',
+        titulo: 'Transportistas',
         periodo: 'Todos los periodos',
         filtros: [filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : '', filtroLocalidad !== 'todas' ? `Localidad: ${filtroLocalidad}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
         total: filteredData.length,
@@ -314,7 +315,7 @@ const TransportistasPage: React.FC = () => {
   const handleExportPdf = () => {
     const totalVehiculos = filteredData.reduce((sum, t) => sum + t.vehiculosCount, 0);
     exportReportePDF({
-      titulo: 'Admin Transportistas',
+      titulo: 'Transportistas',
       subtitulo: 'Panel de gestión de transportistas de residuos peligrosos',
       periodo: `Total: ${stats.total} transportistas`,
       kpis: [
@@ -536,7 +537,7 @@ const TransportistasPage: React.FC = () => {
           )}
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/transportistas/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/transportistas/${row.id}`)); }}
             title="Ver"
           >
             <Eye size={16} />
@@ -561,29 +562,12 @@ const TransportistasPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-orange-100 rounded-xl">
-            <Truck size={24} className="text-orange-600" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900">Admin Transportistas</h2>
-            <p className="text-neutral-600">Panel de gestión de transportistas de residuos</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => window.print()} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-neutral-50 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors" title="Imprimir"><Printer size={14} />Imprimir</button>
-          <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExport} className="hidden sm:inline-flex">
-            CSV
-          </Button>
-          <button onClick={handleExportPdf} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-error-700 bg-error-50 hover:bg-error-100 rounded-lg border border-error-200 transition-colors" title="Exportar PDF"><FileDown size={14} />PDF</button>
-          <Button leftIcon={<Plus size={18} />} onClick={() => navigate('/admin/actores/transportistas/nuevo')}>
-            Nuevo Transportista
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4 animate-fade-in">
+      <RecordListToolbar title="Transportistas" newLabel="Nuevo transportista" onNew={() => navigate(mp('/admin/actores/transportistas/nuevo'))} exports={[
+        {label: 'Descargar CSV', icon: <Download size={16} />, onClick: handleExport, disabled: isLoading || isError || !filteredData.length},
+        {label: 'Descargar PDF', icon: <FileDown size={16} />, onClick: handleExportPdf, disabled: isLoading || isError || !filteredData.length},
+        {label: 'Imprimir', icon: <Printer size={16} />, onClick: () => window.print(), disabled: isLoading || isError},
+      ]} />
 
       {/* Stats */}
       <CRUDSummary stats={[
@@ -593,42 +577,10 @@ const TransportistasPage: React.FC = () => {
         { label: 'Vencen en 30 días · esta página', value: stats.porVencer, icon: <Clock size={20} className="text-orange-600" />, iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
       ]} />
 
-      {/* Filters */}
-      <Card padding="none">
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <SearchInput
-                value={busqueda}
-                onChange={(v) => { setBusqueda(v); setCurrentPage(1); }}
-                placeholder="Buscar por razón social, CUIT o habilitación..."
-                size="md"
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Select
-                value={filtroEstado}
-                onChange={(v) => { setFiltroEstado(v); setCurrentPage(1); }}
-                options={[
-                  { value: 'todos', label: 'Todos los estados' },
-                  { value: 'activo', label: 'Activo' },
-                  { value: 'inactivo', label: 'Inactivo' },
-                ]}
-                size="sm"
-              />
-              <Select
-                value={filtroLocalidad}
-                onChange={(v) => { setFiltroLocalidad(v); setCurrentPage(1); }}
-                options={[
-                  { value: 'todas', label: 'Todas las localidades' },
-                  ...localidadesUnicas.map(loc => ({ value: loc, label: loc })),
-                ]}
-                size="sm"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <RecordListFilters title="Transportistas" value={busqueda} onChange={v => { setBusqueda(v); setCurrentPage(1); }} placeholder="Razón social o CUIT" filters={[
+        {key: 'estado', label: 'Estado', placeholder: 'Todos los estados', value: filtroEstado, onChange: v => { setFiltroEstado(v); setCurrentPage(1); }, options: [{value:'todos',label:'Todos los estados'},{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}]},
+        {key: 'localidad', label: 'Localidad · página actual', placeholder: 'Todas las localidades', value: filtroLocalidad, onChange: v => { setFiltroLocalidad(v); setCurrentPage(1); }, options: [{value:'todas',label:'Todas las localidades'},...localidadesUnicas.map(loc=>({value:loc,label:loc}))]},
+      ]} />
 
       {/* Table */}
       <Card>
@@ -649,7 +601,7 @@ const TransportistasPage: React.FC = () => {
                 <p className="text-center text-neutral-500 py-8 text-sm">No se encontraron transportistas</p>
               ) : (
                 filteredData.map(row => (
-                  <div key={row.id} className="bg-white rounded-xl border border-neutral-100 p-3 cursor-pointer active:scale-[0.98] transition-transform" onClick={() => navigate(`/admin/actores/transportistas/${row.id}`)}>
+                  <button type="button" key={row.id} aria-label={`Abrir ${row.razonSocial}`} className="block w-full text-left bg-white rounded-xl border border-neutral-100 p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" onClick={() => navigate(mp(`/admin/actores/transportistas/${row.id}`))}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
@@ -669,7 +621,7 @@ const TransportistasPage: React.FC = () => {
                       <span>{row.vehiculosCount} veh.</span>
                       <span>{row.choferesCount} chof.</span>
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
@@ -683,7 +635,7 @@ const TransportistasPage: React.FC = () => {
                 keyExtractor={(row) => row.id}
                 sortable={true}
                 onSort={handleSort}
-                onRowClick={(row) => navigate(`/admin/actores/transportistas/${row.id}`)}
+                onRowClick={(row) => navigate(mp(`/admin/actores/transportistas/${row.id}`))}
                 emptyMessage="No se encontraron transportistas"
                 stickyHeader
                 fixedLayout

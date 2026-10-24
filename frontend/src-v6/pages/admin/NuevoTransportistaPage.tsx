@@ -1,3 +1,4 @@
+import { PageToolbar } from '../../components/ui/PageToolbar';
 /**
  * SITREP v6 - NuevoTransportistaPage
  * ===================================
@@ -259,21 +260,10 @@ const NuevoTransportistaPage: React.FC = () => {
 
   return (
     <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
-      {/* Header */}
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-          Volver
-        </Button>
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-100 rounded-xl">
-            <Truck size={22} className="text-orange-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-neutral-900">{isEdit ? 'Editar' : 'Nuevo'} Transportista</h2>
-            <p className="hidden md:block text-xs text-neutral-500">Paso {step} de {STEPS.length}</p>
-          </div>
-        </div>
-      </div>
+      <PageToolbar label="Acciones del formulario">
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver a Transportistas</Button>
+        <h2 className="sr-only">{isEdit ? 'Editar transportista' : 'Nuevo transportista'}</h2>
+      </PageToolbar>
 
       <ActorRegistrationDraftBar draft={draft} />
       {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}

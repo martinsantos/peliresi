@@ -1,3 +1,4 @@
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Admin Operadores Page
  * ==================================
@@ -40,6 +41,7 @@ import type { CRUDFilter, CRUDStatCard, Column } from '../../components/crud/Gen
 
 const AdminOperadoresPage: React.FC = () => {
   const navigate = useNavigate();
+  const mp = useMobilePrefix();
   const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
   const { impersonateUser } = useImpersonation();
@@ -57,7 +59,7 @@ const AdminOperadoresPage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
 
   // ── API hooks ──
-  const { data: apiData, isLoading, isError, error } = useOperadores({ page: currentPage, limit: 20, search: busqueda || undefined, sortBy, sortOrder });
+  const { data: apiData, isLoading, isError, error } = useOperadores({ page: currentPage, limit: 20, search: busqueda || undefined, activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo', sortBy, sortOrder });
   const deleteMutation = useDeleteOperador();
 
   const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
@@ -150,6 +152,7 @@ const AdminOperadoresPage: React.FC = () => {
   const filters: CRUDFilter[] = [
     {
       key: 'tipo',
+      label: 'Tipo · página actual',
       value: filtroTipo,
       onChange: (v) => { setFiltroTipo(v); setCurrentPage(1); },
       placeholder: 'Todos los tipos',
@@ -161,6 +164,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'corriente',
+      label: 'Corriente Y · página actual',
       value: filtroCorriente,
       onChange: (v) => { setFiltroCorriente(v); setCurrentPage(1); },
       placeholder: 'Todas las corrientes',
@@ -171,6 +175,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'estado',
+      label: 'Estado',
       value: filtroEstado,
       onChange: (v) => { setFiltroEstado(v); setCurrentPage(1); },
       placeholder: 'Todos los estados',
@@ -348,21 +353,21 @@ const AdminOperadoresPage: React.FC = () => {
           )}
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${row.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/operadores/${row.id}`)); }}
             title="Ver"
           >
             <Eye size={16} />
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-info-600 hover:bg-info-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${row.id}/editar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/operadores/${row.id}/editar`)); }}
             title="Editar"
           >
             <Edit size={16} />
           </button>
           <button
             className="p-1.5 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/actores/operadores/${row.id}/renovar`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(mp(`/admin/actores/operadores/${row.id}/renovar`)); }}
             title="Renovar"
           >
             <RefreshCw size={16} />
@@ -383,10 +388,7 @@ const AdminOperadoresPage: React.FC = () => {
   return (
     <GenericCRUDPage<Row>
       // Page metadata
-      title="Admin Operadores"
-      subtitle="Panel de gestion de operadores de tratamiento"
-      icon={<FlaskConical size={24} className="text-blue-700" />}
-      iconBg="bg-blue-100"
+      title="Operadores"
       // Data
       data={filteredData}
       isLoading={isLoading}
@@ -397,12 +399,13 @@ const AdminOperadoresPage: React.FC = () => {
       columns={columns}
       tableClassName="[&_table]:min-w-[40rem]"
       getRowKey={(row) => row.id}
-      onRowClick={(row) => navigate(`/admin/actores/operadores/${row.id}`)}
+      getRowLabel={(row) => row.razonSocial}
+      onRowClick={(row) => navigate(mp(`/admin/actores/operadores/${row.id}`))}
       emptyMessage="No se encontraron operadores"
       // Search
       searchValue={busqueda}
       onSearchChange={(v) => { setBusqueda(v); setCurrentPage(1); }}
-      searchPlaceholder="Buscar por razon social, CUIT o habilitacion..."
+      searchPlaceholder="Razón social o CUIT"
       // Filters
       filters={filters}
       // Stats
@@ -418,8 +421,8 @@ const AdminOperadoresPage: React.FC = () => {
         onPageChange: setCurrentPage,
       }}
       // Actions
-      onNew={() => navigate('/admin/actores/operadores/nuevo')}
-      newLabel="Nuevo Operador"
+      onNew={() => navigate(mp('/admin/actores/operadores/nuevo'))}
+      newLabel="Nuevo operador"
       // CSV export
       csvExport={{
         mapRow: (o: Row) => ({
@@ -443,7 +446,7 @@ const AdminOperadoresPage: React.FC = () => {
         }),
         filename: 'admin-operadores',
         metadata: {
-          titulo: 'Admin Operadores',
+          titulo: 'Operadores',
           periodo: 'Todos los periodos',
           filtros: [filtroTipo ? `Tipo: ${filtroTipo}` : '', filtroCorriente ? `Corriente: ${filtroCorriente}` : '', filtroEstado !== 'todos' ? `Estado: ${filtroEstado}` : ''].filter(Boolean).join(', ') || 'Sin filtros',
           total: filteredData.length,
@@ -451,7 +454,7 @@ const AdminOperadoresPage: React.FC = () => {
       }}
       // PDF export
       pdfExport={{
-        titulo: 'Admin Operadores',
+        titulo: 'Operadores',
         subtitulo: `${filteredData.length} operadores${filtroTipo ? ` — Tipo: ${filtroTipo}` : ''}${filtroEstado !== 'todos' ? ` — ${filtroEstado}` : ''}`,
         periodo: new Date().toLocaleDateString('es-AR'),
         kpis: [

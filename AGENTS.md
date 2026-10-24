@@ -1,5 +1,11 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Padrones y altas coherentes — preview, 24/10/2026
+
+Continuación de `7d2d943f`, sin publicación. Generadores/Transportistas/Operadores comparten título único, acciones y filtros plegables; altas con regreso identificado y rutas conservadas en app/móvil. Estado O/T consulta todo el padrón. [Resultado, evidencia y límites](docs/REVISION-ESPACIOS-POR-ROL-20261024.md).
+
+463 pruebas frontend dirigidas y 20 HTTP PASS; 13 pruebas repetidas después del ajuste final, tipos y builds web/app PASS. Control visual de los cuatro roles en web/app y de las tres altas/padrones administrativos; requerimiento propio y rechazo cruzado comprobados. Manual con guía y captura sintética. 515 manifiestos, cero envíos/intentos, CAP cerrado, correo/push apagados. Sin producción, main, workflows ni datos reales. No equivale a validación exhaustiva de todo el producto: filtros globales restantes, continuidad de padrones, fichas/reportes, accesibilidad integral y Android físico siguen pendientes.
+
 ## Claridad de recorridos por rol — preview, 24/10/2026
 
 Tanda posterior a 51e4271a, todavía sin publicar. Un destino activo, regreso al origen, Listado/Programados separados con filtros conservados, Inicio compacto, GPS coherente, historial con nombres de Monitor y contraste activo corregido. [Resultado y límites](docs/CLARIDAD-RECORRIDOS-20261024.md).

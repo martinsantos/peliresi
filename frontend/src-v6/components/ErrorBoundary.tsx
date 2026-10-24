@@ -24,6 +24,7 @@ export class ErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
+      const assetFailure = /Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk [\w-]+ failed/i.test(this.state.error?.message || '');
       return (
         <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4">
           <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
@@ -35,10 +36,12 @@ export class ErrorBoundary extends React.Component<
               </svg>
             </div>
             <h2 className="text-xl font-bold text-neutral-900 mb-2">
-              Algo salió mal
+              {assetFailure ? 'No pudimos abrir esta pantalla' : 'Algo salió mal'}
             </h2>
             <p className="text-neutral-600 mb-6">
-              Ocurrió un error inesperado. Por favor intenta recargar la página.
+              {assetFailure
+                ? 'Revisá la conexión y volvé a cargar. La dirección de esta pantalla se conserva.'
+                : 'Ocurrió un error inesperado. Podés intentar de nuevo o recargar la página.'}
             </p>
             <div className="flex gap-3 justify-center">
               <button
@@ -47,12 +50,12 @@ export class ErrorBoundary extends React.Component<
               >
                 Recargar página
               </button>
-              <button
+              {!assetFailure && <button
                 onClick={this.handleReset}
                 className="px-6 py-2.5 border border-neutral-200 text-neutral-700 rounded-xl font-medium hover:bg-neutral-50 transition-colors"
               >
                 Intentar de nuevo
-              </button>
+              </button>}
             </div>
           </div>
         </div>

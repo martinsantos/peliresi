@@ -70,3 +70,12 @@ it('uses human role names rather than exposing internal enum names',()=>{
  expect(workspaceRoleLabel('ADMIN_GENERADOR')).toBe('Adm. Generadores');
  expect(workspaceRoleLabel('OPERADOR')).toBe('Operador');
 });
+
+it.each(['','/app','/mobile'])('identifies actor creation, edition and renewal without changing section on %s',prefix=>{
+ for(const [kind,label] of [['generadores','generador'],['transportistas','transportista'],['operadores','operador']]){
+  expect(workspaceTitle(`${prefix}/admin/actores/${kind}/nuevo`)).toBe(`Nuevo ${label}`);
+  expect(workspaceTitle(`${prefix}/admin/actores/${kind}/qa/editar`)).toBe(`Editar ${label}`);
+  expect(workspaceTitle(`${prefix}/admin/actores/${kind}/qa/renovar`)).toBe(`Renovar ${label}`);
+  expect(workspaceSectionPath(`${prefix}/admin/actores/${kind}/nuevo`)).toBe(`/admin/actores/${kind}/nuevo`);
+ }
+});
