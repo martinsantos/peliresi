@@ -1,6 +1,14 @@
 # SITREP — traspaso vigente de operación
 
-## Publicación vigente — continuidad e Inspecciones móvil, 23/10/2026
+## Publicación vigente — borrador después del cierre, 24/10/2026
+
+**462ad75a publicado en backend, web, app y manual a las 06:52:10 Mendoza.** Nuevo Manifiesto recupera campos/paso después de cerrar y reabrir el mismo navegador/app, por cuenta/rol/actor/contexto; migra las copias abiertas de la versión anterior y no resucita lo creado/descartado. Manual **2026.24.1**, SW **v168**, app **20261024094810**.
+
+**190 unitarias únicas + 33 E2E PASS**, incluidos 12 cierres completos de Chromium y cuatro roles en web/web móvil/app. 10 unitarias repetidas finales, sin duplicarlas en el total. Build exacto de 2.520 archivos. Producción **187/187 + 9/9 + 8/8 PASS** en lectura. .env/flags iguales; CAP cerrado, correos/push apagados; sin main, datos reales, migración, push ni workflows.
+
+[Cierre y reversión vigente](BORRADOR-PERSISTENTE-20261024.md). Reversión a **dd4eb8bc**, respaldos en /var/backups/sitrep/20261024-producto-462ad75a; worker de reversión **v169**. El borrador vence tras siete días sin editar y no cruza dispositivos/perfiles. Android físico pendiente. Runtime QA cerrado. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — continuidad e Inspecciones móvil, 23/10/2026
 
 **dd4eb8bc publicado en backend, web, app y manual a las 22:44:34 Mendoza.** Borrador de nuevo manifiesto por pestaña/cuenta/rol/actor; regreso con filtros; panel expandido móvil desplazable; Inspecciones móvil compacta. Manual **2026.23.8**, SW **v166**, app **20261024014143**.
 
