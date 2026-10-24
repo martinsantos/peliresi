@@ -1,6 +1,14 @@
 # SITREP — traspaso vigente de operación
 
-## Publicación vigente — aprobaciones y avisos, 23/10/2026
+## Publicación vigente — elegibilidad, claridad y navegación, 23/10/2026
+
+**b891e288 publicado en backend, web, app y manual a las 21:30:00 Mendoza.** Incluye las tres tandas de preview de abajo: elegibilidad por parte, claridad de agenda/avisos y navegación/espaciado. [Cierre, evidencia y reversión vigente](DESPLIEGUE-NAVEGACION-20261023.md). Manual **2026.23.7**, SW **v164**, app **20261024002325**.
+
+Build de 2.509 archivos exactos; cambios de producto cotejados con 68 pruebas backend, 178 interfaz/manual y 21 E2E únicos del preview (6 repetidos finales). Producción sólo lectura: **187/187 + externo 9/9 + PWA 8/8 PASS**, dos workers en línea. .env/flags idénticos, CAP cerrado, correos/push apagados. Sin main, datos reales, migración, push ni workflows.
+
+Respaldo y reversión a **bc0e103b** en /var/backups/sitrep/20261023-producto-b891e288; frontend rollback con SW **v165**. No usar reversiones históricas. Android físico y pendientes de concurrencia siguen abiertos. Los apartados inferiores son antecedentes; sus indicaciones de «no publicado» quedan sustituidas para estas tres tandas.
+
+## Publicación anterior — aprobaciones y avisos, 23/10/2026
 
 **`bc0e103b` publicado en backend, web, app y manual a las 18:46:58 Mendoza.** Incluye `81c36219`, guardas de aprobaciones explícitas, avisos/campana, contexto de agenda, vista temporal, Ayuda, Monitor y Antecedentes integrado. [Cierre, evidencia, límites y reversión](DESPLIEGUE-APROBACIONES-20261023.md).
 

@@ -1,5 +1,7 @@
 # Crear manifiesto: identificar la parte que no puede aprobar
 
+**Actualización: publicado dentro de b891e288 el 23/10/2026 a las 21:30:00 Mendoza.** [Despliegue y smoke](DESPLIEGUE-NAVEGACION-20261023.md). La evaluación siguiente documenta la prueba previa.
+
 Corrección validada sólo en preview el 23/10/2026. No publicada. Producción permanece en `bc0e103b`; no se modificaron cuentas, manifiestos ni configuración reales.
 
 ## Problema y comportamiento corregido

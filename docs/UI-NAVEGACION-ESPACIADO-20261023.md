@@ -1,5 +1,7 @@
 # Navegación y espaciado de Manifiestos e Inspecciones
 
+**Actualización: publicado dentro de b891e288 el 23/10/2026 a las 21:30:00 Mendoza.** [Despliegue y smoke](DESPLIEGUE-NAVEGACION-20261023.md). La evaluación siguiente documenta la prueba previa.
+
 23/10/2026. Corregido y probado en preview; no publicado.
 
 ## Problemas y correcciones
