@@ -34,6 +34,8 @@ import { useTiposResiduo, useCatalogoGeneradores, useCatalogoTransportistas, use
 import type { CatalogoItem } from '../../types/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { companyGeneratorView } from '../../utils/enterprisePresentation';
+import { manifestDraftScope, useManifestDraft, type ManifestFormData } from '../../hooks/useManifestDraft';
+import { manifestListReturn } from '../../utils/manifestListReturn';
 
 function ActorSummary({ actor, label }: { actor?: CatalogoItem; label: string }) {
   if (!actor) return null;
@@ -90,7 +92,7 @@ export const NuevoManifiestoPage: React.FC = () => {
       </section>
     );
   }
-  return <NuevoManifiestoForm />;
+  return <NuevoManifiestoForm key={manifestDraftScope(currentUser)} />;
 };
 
 const NuevoManifiestoForm: React.FC = () => {
@@ -104,7 +106,6 @@ const NuevoManifiestoForm: React.FC = () => {
   const ownCarrierId = carrierProposal ? currentUser?.actorId || '' : '';
   const operatorProposal = proposalsAvailable && currentUser?.rol === 'OPERADOR';
   const ownOperatorId = operatorProposal ? currentUser?.actorId || '' : '';
-  const [step, setStep] = useState(1);
   const [confirmWithoutTransport, setConfirmWithoutTransport] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [refreshingParties, setRefreshingParties] = useState(false);
@@ -113,14 +114,6 @@ const NuevoManifiestoForm: React.FC = () => {
   const formRef = useRef<HTMLDivElement>(null);
   const focusError = useRef(false);
   const submitting = useRef(false);
-
-  useEffect(() => {
-    if (!focusError.current) return;
-    focusError.current = false;
-    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled)') || formRef.current?.querySelector<HTMLElement>('[data-party-error]');
-    field?.focus({ preventScroll: true });
-    field?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [validationErrors, step]);
 
   // API hooks
   const createManifiesto = useCreateManifiesto();
@@ -138,8 +131,7 @@ const NuevoManifiestoForm: React.FC = () => {
   const transportistasList = apiTransportistas || [];
   const operadoresList = apiOperadores || [];
 
-  // Form state
-  const [formData, setFormData] = useState({
+  const initialForm: ManifestFormData = {
     generador: currentUser?.rol === 'GENERADOR' ? currentUser?.sector || '' : '',
     generadorId: currentUser?.rol === 'GENERADOR' ? currentUser?.actorId || '' : '',
     modalidad: 'FIJO' as 'FIJO' | 'IN_SITU',
@@ -150,7 +142,25 @@ const NuevoManifiestoForm: React.FC = () => {
     fechaRetiro: new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Mendoza'}).format(new Date()),
     observaciones: '',
     residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }],
-  });
+  };
+  const draft = useManifestDraft(manifestDraftScope(currentUser), { step: 1, form: initialForm });
+  const { step, form: formData } = draft.draft;
+  const setStep = (value: number) => draft.update(previous => ({ ...previous, step: value }));
+  const setFormData = (change: React.SetStateAction<ManifestFormData>) => draft.update(previous => ({ ...previous, form: typeof change === 'function' ? change(previous.form) : change }));
+  const returnTo = manifestListReturn(location.state, mp('/manifiestos'));
+  const returnToList = () => {
+    if (draft.error && draft.dirty && !window.confirm('No se pudo guardar el borrador en esta pestaña. Si salís, perderás lo cargado. ¿Salir igualmente?')) return;
+    navigate(returnTo);
+  };
+  const [discardDraft, setDiscardDraft] = useState(false);
+
+  useEffect(() => {
+    if (!focusError.current) return;
+    focusError.current = false;
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled)') || formRef.current?.querySelector<HTMLElement>('[data-party-error]');
+    field?.focus({ preventScroll: true });
+    field?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [validationErrors, step]);
 
   const partyProposal = proposalsAvailable;
   const selectInSitu = () => {
@@ -348,7 +358,8 @@ const NuevoManifiestoForm: React.FC = () => {
       });
 
       toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? (formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas.':'Generador, transporte y operador deben aprobar desde sus cuentas.') : 'Todavía falta la firma del generador para continuar.'}`);
-      navigate(mp(`/manifiestos/${result.id}`));
+      if (!draft.clear()) toast.error('Manifiesto creado', 'No se pudo borrar la copia de esta pestaña. No vuelvas a enviar el formulario anterior.');
+      navigate(mp(`/manifiestos/${result.id}`), { state: { manifestListReturn: returnTo } });
     } catch (err: any) {
       const fields = manifestPartyErrors(err);
       if (Object.keys(fields).length) {
@@ -418,7 +429,7 @@ const NuevoManifiestoForm: React.FC = () => {
               className="shrink-0"
               aria-label="Volver a Manifiestos"
               leftIcon={<ArrowLeft size={20} aria-hidden="true" />}
-              onClick={() => navigate(mp('/manifiestos'))}
+              onClick={returnToList}
             >
               Manifiestos
             </Button>
@@ -428,6 +439,12 @@ const NuevoManifiestoForm: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {(draft.saved || draft.error) && <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-primary-50 px-3 text-sm text-primary-900" aria-label="Borrador del manifiesto">
+        <p role="status" className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : draft.restored ? 'Borrador recuperado · guardado en esta pestaña' : 'Borrador guardado en esta pestaña'}</p>
+        {!discardDraft && <button type="button" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar borrador</button>}
+        {discardDraft && <div className="flex flex-wrap items-center gap-3 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span><Button size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button><Button size="sm" variant="outline" onClick={() => { if (draft.clear()) { setValidationErrors({}); setServerPartyIssues({}); setSubmitError(undefined); setConfirmWithoutTransport(false); setDiscardDraft(false); } }}>Sí, descartar</Button></div>}
+      </div>}
 
       <ol aria-label="Etapas del formulario" className="mb-3 grid grid-cols-3 gap-2 text-sm text-neutral-600">
         {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={`border-b-2 py-3 text-center ${step === index + 1 ? 'border-primary-700 font-semibold text-primary-800' : 'border-neutral-200'}`}>{index + 1}. {label}</li>)}

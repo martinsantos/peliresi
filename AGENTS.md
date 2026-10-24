@@ -1,5 +1,9 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Continuidad de formularios/filtros — preview verificado, 23/10/2026
+
+**185 unitarias y 42 E2E únicos aprobados**, con repeticiones finales de filtros y app documentadas en [cierre de continuidad](docs/UI-CONTINUIDAD-20261023.md). Borrador de nuevo manifiesto por pestaña/cuenta/rol/empresa; regreso con filtros; panel expandido móvil desplazable; Inspecciones móvil compacta. Manual **2026.23.8**. Publicación autorizada, todavía pendiente al crear este commit; no confundir QA con despliegue. CAP cerrado, correos/push apagados, sin main, datos reales ni workflows. Android físico pendiente. La publicación de abajo sigue vigente hasta el cierre nuevo.
+
 ## Publicación vigente — elegibilidad, claridad y navegación, 23/10/2026
 
 **b891e288 publicado en backend, web, app y manual a las 21:30:00 Mendoza.** Incluye las tres tandas de preview de abajo: elegibilidad por parte, claridad de agenda/avisos y navegación/espaciado. [Cierre, evidencia y reversión vigente](docs/DESPLIEGUE-NAVEGACION-20261023.md). Manual **2026.23.7**, SW **v164**, app **20261024002325**.

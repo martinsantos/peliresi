@@ -10,7 +10,7 @@ import { manifestFeatureVisible } from '../../utils/manifestFeatures';
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FileText, Search, Filter, Plus, Eye, Edit, Trash2, Loader2, AlertTriangle, ChevronDown, X, ArrowUpDown, ArrowUp, ArrowDown,
   ShieldCheck, Download, FileDown, Printer, Calendar, RefreshCw, Clock3, Route, CircleCheck,
@@ -117,24 +117,46 @@ const ManifiestosPage: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const updateFilters = (values: Record<string, string>) => {
+    const next = new URLSearchParams(window.location.search);
+    for (const [key, value] of Object.entries(values)) {
+      if (value) next.set(key, value); else next.delete(key);
+    }
+    setSearchParams(next, { replace: true });
+  };
+  // Router transitions can update the address before rows re-render. Capture
+  // the current query at the click, including a fast click after filtering.
+  const listState = () => ({ manifestListReturn: location.pathname + window.location.search });
+  const openManifestLink = (event: React.MouseEvent, id: string) => {
+    event.stopPropagation();
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    navigate(mp(`/manifiestos/${id}`), { state: listState() });
+  };
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
-  const [estadoFilter, setEstadoFilter] = useState(searchParams.get('estado') || '');
-  const [faseFilter, setFaseFilter] = useState<'all' | 'pendientes' | 'en_curso' | 'terminados'>(() => {
-    const raw = searchParams.get('fase');
-    return raw === 'pendientes' || raw === 'en_curso' || raw === 'terminados' ? raw : 'all';
-  });
-  const [fechaDesde, setFechaDesde] = useState(searchParams.get('fechaDesde') || '');
-  const [fechaHasta, setFechaHasta] = useState(searchParams.get('fechaHasta') || '');
-  const [generadorFilter, setGeneradorFilter] = useState('');
-  const [operadorFilter, setOperadorFilter] = useState('');
+  const searchTerm = searchParams.get('q') || '';
+  const setSearchTerm = (value: string) => updateFilters({ q: value });
+  const estadoFilter = searchParams.get('estado') || '';
+  const setEstadoFilter = (value: string) => updateFilters({ estado: value, fase: '' });
+  const rawPhase = searchParams.get('fase');
+  const faseFilter = rawPhase === 'pendientes' || rawPhase === 'en_curso' || rawPhase === 'terminados' ? rawPhase : 'all';
+  const fechaDesde = searchParams.get('fechaDesde') || '';
+  const setFechaDesde = (value: string) => updateFilters({ fechaDesde: value });
+  const fechaHasta = searchParams.get('fechaHasta') || '';
+  const setFechaHasta = (value: string) => updateFilters({ fechaHasta: value });
+  const generadorFilter = searchParams.get('generadorId') || '';
+  const setGeneradorFilter = (value: string) => updateFilters({ generadorId: value });
+  const operadorFilter = searchParams.get('operadorId') || '';
+  const setOperadorFilter = (value: string) => updateFilters({ operadorId: value });
   const [showFilters, setShowFilters] = useState(false);
 
   // Sort
-  const [sortBy, setSortBy] = useState<SortCol>('createdAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const rawSort = searchParams.get('sortBy');
+  const sortBy: SortCol = rawSort && ['createdAt', 'numero', 'estado', 'generador', 'operador'].includes(rawSort) ? rawSort as SortCol : 'createdAt';
+  const sortOrder = searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
 
   // Infinite scroll
   const [page, setPage] = useState(1);
@@ -168,12 +190,7 @@ const ManifiestosPage: React.FC = () => {
   }, []);
 
   const handleSort = (col: SortCol) => {
-    if (sortBy === col) {
-      setSortOrder(o => o === 'desc' ? 'asc' : 'desc');
-    } else {
-      setSortBy(col);
-      setSortOrder('desc');
-    }
+    updateFilters({ sortBy: col, sortOrder: sortBy === col && sortOrder === 'desc' ? 'asc' : 'desc' });
   };
 
   const filterCount = [fechaDesde, fechaHasta, estadoFilter, generadorFilter, operadorFilter, faseFilter !== 'all' ? faseFilter : ''].filter(Boolean).length;
@@ -317,21 +334,21 @@ const ManifiestosPage: React.FC = () => {
             }}
             className="hidden sm:inline-flex" title="Exportar PDF"
           >PDF</Button>
-          {canOfferManifestCreate(currentUser?.rol, currentUser?.training) && <Button aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'))}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>}
+          {canOfferManifestCreate(currentUser?.rol, currentUser?.training) && <Button aria-label="Nuevo Manifiesto" leftIcon={<Plus size={16} />} onClick={() => navigate(mp('/manifiestos/nuevo'), { state: listState() })}>Nuevo<span className="sr-only sm:not-sr-only"> Manifiesto</span></Button>}
         </div>
       </PageToolbar>
 
       {manifestProposalsVisible(currentUser) && <ManifestAgenda />}
 
-      {/* Filters — sticky. Phones: search + Filtros in one row; state joins the other filters. */}
-      <div ref={filterBarRefCb} className="sticky top-0 z-20 bg-[#FAFAF8]">
+      {/* Expanded phone filters scroll away so they cannot cover the results. */}
+      <div ref={filterBarRefCb} className={`${showFilters ? 'relative md:sticky' : 'sticky'} top-0 z-20 bg-[#FAFAF8]`}>
         <Card padding="sm" className="md:p-5">
           <div className="flex gap-2 md:gap-3">
             <div className="min-w-0 flex-1">
               <Input aria-label="Buscar manifiestos" placeholder="Buscar por número o generador..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} leftIcon={<Search size={18} />} />
             </div>
             <div className="hidden md:block md:w-48">
-              <Select value={estadoFilter} onChange={(val) => { setEstadoFilter(val); if (val) setFaseFilter('all'); }} options={estadoOptions} placeholder="Filtrar estado..." size="sm" clearable />
+              <Select value={estadoFilter} onChange={setEstadoFilter} options={estadoOptions} placeholder="Filtrar estado..." size="sm" clearable />
             </div>
             <button type="button" aria-label={filterCount > 0 ? `Filtros, ${filterCount} activos` : 'Filtros'} aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || filterCount > 0 ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-neutral-50 text-neutral-600 border-neutral-300 hover:border-neutral-400'}`}>
               <Filter size={15} />
@@ -347,7 +364,7 @@ const ManifiestosPage: React.FC = () => {
               ['en_curso', 'En curso', Route],
               ['terminados', 'Terminados', CircleCheck],
             ] as const).map(([value, label, Icon]) => <button key={value} type="button" aria-pressed={faseFilter === value && !estadoFilter}
-              onClick={() => { setFaseFilter(value); setEstadoFilter(''); }}
+              onClick={() => updateFilters({ fase: value === 'all' ? '' : value, estado: '' })}
               className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-[11px] font-semibold sm:flex-row sm:gap-2 sm:text-sm ${faseFilter === value && !estadoFilter ? 'bg-primary-800 text-white' : 'bg-neutral-100 text-neutral-700 hover:bg-primary-50'}`}>
               <Icon size={16} aria-hidden="true" /><span>{label}</span>
             </button>)}
@@ -366,7 +383,7 @@ const ManifiestosPage: React.FC = () => {
           {showFilters && (
             <div className="mt-3 pt-3 border-t border-neutral-100 flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
               <div className="md:hidden">
-                <Select label="Estado" value={estadoFilter} onChange={(val) => { setEstadoFilter(val); if (val) setFaseFilter('all'); }} options={estadoOptions} placeholder="Todos los estados" size="sm" clearable />
+                <Select label="Estado" value={estadoFilter} onChange={setEstadoFilter} options={estadoOptions} placeholder="Todos los estados" size="sm" clearable />
               </div>
               <div className="flex flex-col gap-1 w-full sm:w-auto">
                 <label className="text-xs font-medium text-neutral-500">Ordenar por</label>
@@ -387,7 +404,7 @@ const ManifiestosPage: React.FC = () => {
                     />
                   </div>
                   <button
-                    onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+                    onClick={() => updateFilters({ sortOrder: sortOrder === 'desc' ? 'asc' : 'desc' })}
                     className="flex items-center gap-1 px-3 py-2 text-sm border border-neutral-200 rounded-xl bg-white hover:bg-neutral-50 transition-colors"
                   >
                     {sortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
@@ -430,7 +447,7 @@ const ManifiestosPage: React.FC = () => {
                 </div>
               </div>
               {filterCount > 0 && (
-                <button type="button" onClick={() => { setEstadoFilter(''); setFaseFilter('all'); setFechaDesde(''); setFechaHasta(''); setGeneradorFilter(''); setOperadorFilter(''); }} className="flex min-h-11 items-center gap-1 text-sm text-neutral-600 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
+                <button type="button" onClick={() => updateFilters({ estado: '', fase: '', fechaDesde: '', fechaHasta: '', generadorId: '', operadorId: '' })} className="flex min-h-11 items-center gap-1 text-sm text-neutral-600 hover:text-error-600 px-2 py-2"><X size={13} /> Limpiar</button>
               )}
             </div>
           )}
@@ -449,18 +466,18 @@ const ManifiestosPage: React.FC = () => {
             {allRows.map((m, idx) => (
               <React.Fragment key={m.id}>
                 {isGroupStart(idx) && (
-                  <div className="sticky z-10 -mx-4 px-4 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 mt-3 first:mt-0" style={{ top: `${filterBarH}px` }}>
+                  <div className="sticky z-10 -mx-4 px-4 py-1.5 bg-neutral-100/95 backdrop-blur-sm border-b border-neutral-200 mt-3 first:mt-0" style={{ top: showFilters ? 0 : `${filterBarH}px` }}>
                     <div className="flex items-center gap-1.5">
                       <Calendar size={11} className="text-primary-500" />
                       <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">{getGroupLabel(getGroupKey(m, sortBy), sortBy)}</span>
                     </div>
                   </div>
                 )}
-                <Card padding="none" className="cursor-pointer hover:bg-neutral-50 focus-within:bg-neutral-50" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}>
+                <Card padding="none" className="cursor-pointer hover:bg-neutral-50 focus-within:bg-neutral-50" onClick={() => navigate(mp(`/manifiestos/${m.id}`), { state: listState() })}>
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Link to={mp(`/manifiestos/${m.id}`)} onClick={event => event.stopPropagation()} className="font-mono font-semibold text-sm text-neutral-900 hover:underline">{m.numero}</Link>
+                        <Link to={mp(`/manifiestos/${m.id}`)} state={listState()} onClick={event => openManifestLink(event, m.id)} className="font-mono font-semibold text-sm text-neutral-900 hover:underline">{m.numero}</Link>
                         <BcBadge status={m.blockchainStatus} />
                       </div>
                       <Badge variant="soft" color={estadoBadgeColor[m.estado] || 'neutral'} className="text-xs shrink-0">
@@ -471,7 +488,7 @@ const ManifiestosPage: React.FC = () => {
                     <div className="flex items-center justify-between mt-1.5">
                       <span className="text-[11px] text-neutral-400">{formatDateTime(m.actividad)}</span>
                       <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
-                        <Button aria-label={`Ver manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1" onClick={() => navigate(mp(`/manifiestos/${m.id}`))}><Eye size={14} /></Button>
+                        <Button aria-label={`Ver manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1" onClick={() => navigate(mp(`/manifiestos/${m.id}`), { state: listState() })}><Eye size={14} /></Button>
                         {canOfferManifestDelete(currentUser?.rol, m.estado) && <Button aria-label={`Eliminar manifiesto ${m.numero}`} variant="ghost" size="sm" className="h-11 w-11 p-1 text-error-700" onClick={() => setDeleteTarget({ id: m.id, numero: m.numero })}><Trash2 size={14} /></Button>}
                       </div>
                     </div>
@@ -520,10 +537,10 @@ const ManifiestosPage: React.FC = () => {
                   )}
                   <div
                     className="grid grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_100px] lg:grid-cols-[minmax(140px,1.2fr)_1.5fr_100px_160px_70px_100px] xl:grid-cols-[minmax(140px,1.2fr)_1.3fr_1.3fr_100px_160px_70px_100px] items-center px-1 border-b border-neutral-50 hover:bg-neutral-50/60 cursor-pointer transition-colors"
-                    onClick={() => navigate(mp(`/manifiestos/${m.id}`))}
+                    onClick={() => navigate(mp(`/manifiestos/${m.id}`), { state: listState() })}
                   >
                     <div className="px-3 py-2 flex items-center gap-2 min-w-0">
-                      <Link to={mp(`/manifiestos/${m.id}`)} onClick={event => event.stopPropagation()} className="font-mono text-sm font-semibold text-neutral-900 whitespace-nowrap hover:underline">{m.numero}</Link>
+                      <Link to={mp(`/manifiestos/${m.id}`)} state={listState()} onClick={event => openManifestLink(event, m.id)} className="font-mono text-sm font-semibold text-neutral-900 whitespace-nowrap hover:underline">{m.numero}</Link>
                       <BcBadge status={m.blockchainStatus} />
                     </div>
                     <div className="px-3 py-2 text-sm text-neutral-700 truncate" title={m.generadorNombre}>{m.generadorNombre}</div>
@@ -534,7 +551,7 @@ const ManifiestosPage: React.FC = () => {
                     <div className="px-3 py-2 text-xs text-neutral-500 whitespace-nowrap hidden lg:block">{formatDateTime(m.actividad)}</div>
                     <div className="px-3 py-2 text-sm text-neutral-700 whitespace-nowrap hidden lg:block">{typeof m.peso === 'number' ? m.peso.toLocaleString('es-AR') : '0'} {m.unidad}</div>
                     <div className="px-3 py-2 flex items-center justify-end gap-0.5">
-                      <button aria-label={`Ver manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`)); }}><Eye size={15} /></button>
+                      <button aria-label={`Ver manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}`), { state: listState() }); }}><Eye size={15} /></button>
                       {canOfferManifestEdit(currentUser?.rol, m.estado) && <button aria-label={`Editar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-primary-600 transition-colors" onClick={(e) => { e.stopPropagation(); navigate(mp(`/manifiestos/${m.id}/editar`)); }}><Edit size={15} /></button>}
                       {canOfferManifestDelete(currentUser?.rol, m.estado) && <button aria-label={`Eliminar manifiesto ${m.numero}`} className="p-1.5 rounded-lg hover:bg-error-50 text-neutral-400 hover:text-error-500 transition-colors" onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: m.id, numero: m.numero }); }}><Trash2 size={15} /></button>}
                     </div>

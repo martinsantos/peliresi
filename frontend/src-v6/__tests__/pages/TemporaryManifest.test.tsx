@@ -7,7 +7,8 @@ vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { 
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: state.temporary ? {} : null, exitImpersonation: state.exit }) }));
 vi.mock('../../hooks/useManifiestos', () => ({ useCreateManifiesto: () => ({ mutateAsync: state.create }) }));
 vi.mock('../../hooks/useCatalogos', () => ({ useTiposResiduo: () => (state.catalog(), { data: [] }), useCatalogoGeneradores: () => ({ data: [] }), useCatalogoTransportistas: () => ({ data: [] }), useCatalogoOperadores: () => ({ data: [] }) }));
-beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true'); state.temporary = true; state.training = false; });
+beforeEach(() => {
+  sessionStorage.clear(); vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true'); state.temporary = true; state.training = false; });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); });
 it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('explains the temporary %s boundary before mounting the form or loading catalogs', role => {
  state.role = role; render(<MemoryRouter><NuevoManifiestoPage /></MemoryRouter>);

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, FileSearch, MapPin, Plus, Search, UserRound } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FileDown, FileSearch, MapPin, Plus, Search, SlidersHorizontal, UserRound } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { PageToolbar } from '../../components/ui/PageToolbar';
 import { Badge } from '../../components/ui/BadgeV2';
@@ -54,6 +54,7 @@ const InspeccionesPageV2: React.FC = () => {
   };
   const [sourceIntake, setSourceIntake] = useState<InspectionIntake | null>(null);
   const [agendaOpen, setAgendaOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
   const [type, setType] = useState<InspectionActorType>(initialType || (currentUser?.rol === 'ADMIN_OPERADOR' ? 'OPERADOR' : currentUser?.rol === 'ADMIN_TRANSPORTISTA' ? 'TRANSPORTISTA' : 'GENERADOR'));
@@ -151,8 +152,8 @@ const InspeccionesPageV2: React.FC = () => {
   return <div className="min-w-0 space-y-4" data-operational-page>
     <PageToolbar label="Acciones de Inspecciones">
       <h2 className="sr-only">Inspecciones</h2>
-      <Button variant="outline" onClick={() => { setSearchParams(sectionSearch(false)); setFindingRequest((value) => value + 1); }}>Denuncia / hallazgo</Button>
-      <Button className="ml-auto" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }}>Nueva inspección</Button>
+      <Button variant="outline" onClick={() => { setSearchParams(sectionSearch(false)); setFindingRequest((value) => value + 1); }} aria-label="Denuncia / hallazgo"><span className="sm:hidden">Hallazgo</span><span className="hidden sm:inline">Denuncia / hallazgo</span></Button>
+      <Button className="ml-auto" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }} aria-label="Nueva inspección">Nueva<span className="hidden sm:inline"> inspección</span></Button>
     </PageToolbar>
     <nav aria-label="Secciones de Inspecciones" className="flex border-b border-neutral-200">
       {[
@@ -178,22 +179,30 @@ const InspeccionesPageV2: React.FC = () => {
 
     {currentUser?.id && <SpontaneousFindingPanel createRequest={findingRequest} hideTrigger userId={currentUser.id} online={!offline && isOnline && navigator.onLine} mobile={mobile} onActorTypeNeeded={setFindingActorType} actors={{ GENERADOR: generadores.data || [], TRANSPORTISTA: transportistas.data || [], OPERADOR: operadores.data || [] }} />}
 
-    <nav aria-label="Etapas PSIP" className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-neutral-200 text-sm [&>button]:shrink-0">
+    <nav aria-label="Etapas PSIP" className="flex items-center gap-x-4 overflow-x-auto border-b border-neutral-200 text-sm sm:flex-wrap [&>button]:shrink-0 [&>button]:whitespace-nowrap">
       <button aria-pressed={!phase && !state} className={!phase && !state ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(''); setState(''); setAgendaOpen(false); setPage(1); }}>Todas</button>
       {(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).map((key) => <button key={key} aria-pressed={phase === key} className={phase === key ? 'min-h-11 border-b-2 border-primary-700 font-semibold text-primary-800' : 'min-h-11 text-neutral-600'} onClick={() => { setPhase(key); setState(''); setAgendaOpen(false); setPage(1); }}>{INSPECTION_PHASES[key].label} <span className="ml-1 tabular-nums">{totalsUnknown ? '—' : INSPECTION_PHASES[key].states.reduce((sum, value) => sum + (stateCounts[value] || 0), 0)}</span></button>)}
-      <Button aria-label="Exportar" title="Exportar listado" className="ml-auto shrink-0 max-sm:w-11 max-sm:px-0" variant="ghost" size="sm" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}><span className="sr-only sm:not-sr-only">Exportar</span></Button>
+      <Button aria-label="Exportar" title="Exportar listado" className="ml-auto hidden shrink-0 sm:inline-flex" variant="ghost" size="sm" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}><span className="sr-only sm:not-sr-only">Exportar</span></Button>
     </nav>
     {phase && <p className="text-sm text-neutral-600">{INSPECTION_PHASES[phase].description}</p>}
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <Button variant={agendaOpen?'primary':'outline'} size="sm" aria-expanded={agendaOpen} aria-controls="inspection-agenda" leftIcon={<CalendarDays size={16}/>} onClick={() => setAgendaOpen((value) => !value)}>{agendaOpen?'Ocultar agenda':'Ver agenda'}</Button>
       {!totalsUnknown && deadlines>0 && <span className="text-neutral-600">{deadlines} con plazo vigente sin responder</span>}
-      <a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex min-h-11 items-center font-semibold text-primary-800 underline underline-offset-2">Cómo funciona PSIP</a>
+      <a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="ml-auto hidden min-h-11 items-center font-semibold text-primary-800 underline underline-offset-2 sm:inline-flex">Cómo funciona PSIP</a>
     </div>
     {agendaOpen && <div id="inspection-agenda"><InspectionOperationsPanel /></div>}
-    <div className="grid grid-cols-1 gap-3 rounded-xl border border-[#E0E0DC] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:grid-cols-2 lg:grid-cols-[minmax(160px,1fr)_190px_170px]">
-      <label className="relative sm:col-span-2 lg:col-span-1"><span className="sr-only">Buscar inspección</span><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={17} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar por expediente, acta o actor" className="h-11 w-full rounded-lg border border-neutral-400 bg-white pl-10 pr-3 text-base sm:text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100" /></label>
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-xl border border-[#E0E0DC] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:grid-cols-2 sm:p-4 lg:grid-cols-[minmax(160px,1fr)_190px_170px]">
+      <label className="relative sm:col-span-2 lg:col-span-1"><span className="sr-only">Buscar inspección</span><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={17} /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar…" className="h-11 w-full rounded-lg border border-neutral-400 bg-white pl-10 pr-3 text-base sm:text-sm text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100" /></label>
+      <Button variant="outline" aria-label="Filtros de inspecciones" aria-expanded={filtersOpen} aria-controls="inspection-secondary-filters" className="sm:hidden" leftIcon={<SlidersHorizontal size={17} />} onClick={() => setFiltersOpen(value => !value)}>Filtros{(state || inspectionFilter) && <span className="ml-1">{Number(Boolean(state)) + Number(Boolean(inspectionFilter))}</span>}</Button>
+      <div id="inspection-secondary-filters" className={`${filtersOpen ? 'grid' : 'hidden'} col-span-2 grid-cols-1 gap-3 sm:contents`}>
       <select aria-label="Filtrar por estado" value={state} onChange={(event) => { const value = event.target.value as InspectionState | ''; setState(value); if (value) setPhase(inspectionPhaseOf(value)); setPage(1); }} className="h-11 min-w-0 rounded-xl border border-neutral-200 bg-white px-2 text-base sm:text-sm text-neutral-800 focus:border-primary-600 focus:outline-none"><option value="">{phase ? 'Todos en esta etapa' : 'Todos los estados'}</option>{(Object.keys(INSPECTION_PHASES) as InspectionPhase[]).filter((key) => !phase || phase === key).map((key) => <optgroup key={key} label={INSPECTION_PHASES[key].label}>{INSPECTION_PHASES[key].states.map((value) => <option key={value} value={value}>{INSPECTION_STATE_LABELS[value]}</option>)}</optgroup>)}</select>
       <select aria-label="Filtrar por tipo de inspección" value={inspectionFilter} onChange={(event) => { setInspectionFilter(event.target.value as InspectionType | ''); setTypeFilter(''); setActorFilter(''); setPage(1); }} className="h-11 min-w-0 rounded-xl border border-neutral-200 bg-white px-2 text-base sm:text-sm text-neutral-800 focus:border-primary-600 focus:outline-none"><option value="">Todos los tipos</option>{Object.entries(INSPECTION_TYPES).map(([value, type]) => <option key={value} value={value}>{type.label}</option>)}</select>
+      <div className="flex flex-wrap items-center gap-3 sm:hidden">
+        <Button variant="ghost" aria-label="Exportar" leftIcon={<FileDown size={16} />} isLoading={exporting} disabled={offline || inspections.isError} onClick={exportList}>Exportar</Button>
+        <a href="/manual/tutorial.html?guide=psip-flujo-inspecciones" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-800 underline">Cómo funciona PSIP</a>
+      </div>
+      </div>
+      {(state || inspectionFilter) && <p className="col-span-2 text-xs text-neutral-600 sm:hidden">{[state && INSPECTION_STATE_LABELS[state], inspectionFilter && INSPECTION_TYPES[inspectionFilter].label].filter(Boolean).join(' · ')}</p>}
     </div>
 
 
