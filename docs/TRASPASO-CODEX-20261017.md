@@ -1,6 +1,14 @@
 # SITREP — traspaso vigente de operación
 
-## Publicación vigente — elegibilidad, claridad y navegación, 23/10/2026
+## Publicación vigente — continuidad e Inspecciones móvil, 23/10/2026
+
+**dd4eb8bc publicado en backend, web, app y manual a las 22:44:34 Mendoza.** Borrador de nuevo manifiesto por pestaña/cuenta/rol/actor; regreso con filtros; panel expandido móvil desplazable; Inspecciones móvil compacta. Manual **2026.23.8**, SW **v166**, app **20261024014143**.
+
+**185 unitarias y 42 E2E únicos PASS** en preview artificial, cuatro roles, escritorio/web móvil/app. Build de 2.517 archivos Git exactos. Producción: **187/187 + externo 9/9 + PWA 8/8 PASS**; formulario/regreso con filtros web e Inspecciones móvil verificados en navegador real, sólo lectura. Dos workers en línea; .env/flags idénticos; CAP cerrado, correos/push apagados. Sin main, datos reales, migración, push ni workflows.
+
+[Cierre, evidencia y reversión vigente](DESPLIEGUE-CONTINUIDAD-20261023.md). Reversión a **b891e288** preparada en /var/backups/sitrep/20261023-producto-dd4eb8bc, con SW **v167**. Android físico pendiente; el borrador no se sincroniza entre dispositivos ni garantiza sobrevivir al cierre de la pestaña. Runtime de pruebas cerrado. Los apartados inferiores son antecedentes.
+
+## Publicación anterior — elegibilidad, claridad y navegación, 23/10/2026
 
 **b891e288 publicado en backend, web, app y manual a las 21:30:00 Mendoza.** Incluye las tres tandas de preview de abajo: elegibilidad por parte, claridad de agenda/avisos y navegación/espaciado. [Cierre, evidencia y reversión vigente](DESPLIEGUE-NAVEGACION-20261023.md). Manual **2026.23.7**, SW **v164**, app **20261024002325**.
 

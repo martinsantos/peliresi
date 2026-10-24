@@ -25,7 +25,7 @@ Casos cubiertos: recuperación de todos los campos/paso tras salir y recargar pa
 
 El almacenamiento local bloqueado se prueba con unidad y conserva navegación interna en memoria. No garantiza recuperación después de cerrar la pestaña ni sincronización entre dispositivos. Android físico, captura GPS y servicios de mapas externos no forman parte de este cierre.
 
-La publicación está autorizada y se prepara sobre esta revisión. El cierre de despliegue registrará la versión efectivamente publicada y el smoke no mutante; este resultado de preview no se presenta como prueba de operaciones sobre producción.
+Publicado como **dd4eb8bc** el 23/10/2026 a las **22:44:34 Mendoza** en backend, web, app y manual. [Cierre de despliegue y reversión](DESPLIEGUE-CONTINUIDAD-20261023.md): smoke no mutante 187/187, externo 9/9 y PWA 8/8 PASS; verificación visual de web y app en producción. Las operaciones funcionales siguen siendo pruebas de preview artificial, no sobre datos reales.
 
 Evidencias de esta tarea: `continuidad-ui-20261023` en el workspace del hilo: unit.json, coverage.json, source-files.json y qa-evidence.tar.gz. Los fallos de retorno, de aserción del guion y del panel expandido se conservan, junto con capturas y trazas finales. No cambian backend, esquema, migraciones ni dependencias; no hubo correos/push, main, datos reales ni workflows.
 
