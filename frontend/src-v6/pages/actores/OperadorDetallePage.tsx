@@ -193,7 +193,7 @@ const OperadorDetallePage: React.FC = () => {
         </div>
       </div>
 
-      {canViewCatalog && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/operadores/${id}/editar`))}>Editar datos del padrón</Button>}
+      {canViewCatalog && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/operadores/${id}/editar`), { state: { actorReturn: backPath } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="OPERADOR" actorId={id || ''} />
       <AdministrativeTEF actorType="OPERADOR" identity={operador.id} declaration={apiOperador}
         corrientesY={(apiOperador?.corrientesY || enriched?.corrientes.join(',') || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}

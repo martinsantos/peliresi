@@ -10,7 +10,7 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
  */
 
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useActorListNavigation } from '../../hooks/useActorListNavigation';
 import {
   Factory,
   CheckCircle,
@@ -93,7 +93,8 @@ function fallbackFiscalSituation(generador: Generador, fiscalYear: number): Situ
 }
 
 const AdminGeneradoresPage: React.FC = () => {
-  const navigate = useNavigate();
+  const list = useActorListNavigation();
+  const navigate = list.open;
   const mp = useMobilePrefix();
   const { isAdmin, isAdminGenerador } = useAuth();
   const { impersonateUser } = useImpersonation();
@@ -102,15 +103,17 @@ const AdminGeneradoresPage: React.FC = () => {
   const topRubros = useMemo(() => enrichmentData?.topRubros || [], [enrichmentData]);
 
   // ── State ──
-  const [busqueda, setBusqueda] = useState('');
-  const [filtroCategoria, setFiltroCategoria] = useState('');
-  const [filtroRubro, setFiltroRubro] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [filtroFiscal, setFiltroFiscal] = useState<'todos' | FiscalStatusFilter>('todos');
-  const [fiscalYear, setFiscalYear] = useState(CURRENT_YEAR);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>('razonSocial');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const busqueda = list.text('q'), setBusqueda = (value: string) => list.set('q', value);
+  const filtroCategoria = list.text('categoria'), setFiltroCategoria = (value: string) => list.set('categoria', value);
+  const filtroRubro = list.text('rubro'), setFiltroRubro = (value: string) => list.set('rubro', value);
+  const filtroEstado = list.text('estado', 'todos'), setFiltroEstado = (value: string) => list.set('estado', value);
+  const filtroFiscal = list.text('fiscal', 'todos') as 'todos' | FiscalStatusFilter;
+  const setFiltroFiscal = (value: 'todos' | FiscalStatusFilter) => list.set('fiscal', value);
+  const fiscalYear = list.number('year', CURRENT_YEAR), setFiscalYear = (value: number) => list.set('year', value);
+  const currentPage = list.number('page', 1), setCurrentPage = (value: number) => list.set('page', value);
+  const sortBy = list.text('sortBy', 'razonSocial'), setSortBy = (value: string) => list.set('sortBy', value);
+  const sortOrder = list.text('sortOrder', 'asc') === 'desc' ? 'desc' : 'asc';
+  const setSortOrder = (value: 'asc' | 'desc') => list.set('sortOrder', value);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectingSegment, setSelectingSegment] = useState(false);

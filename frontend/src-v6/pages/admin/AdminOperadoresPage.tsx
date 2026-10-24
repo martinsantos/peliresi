@@ -1,4 +1,5 @@
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useActorListNavigation } from '../../hooks/useActorListNavigation';
 /**
  * SITREP v6 - Admin Operadores Page
  * ==================================
@@ -10,7 +11,6 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
  */
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FlaskConical,
   AlertTriangle,
@@ -40,26 +40,27 @@ import { GenericCRUDPage } from '../../components/crud/GenericCRUDPage';
 import type { CRUDFilter, CRUDStatCard, Column } from '../../components/crud/GenericCRUDPage.types';
 
 const AdminOperadoresPage: React.FC = () => {
-  const navigate = useNavigate();
+  const list = useActorListNavigation();
+  const navigate = list.open;
   const mp = useMobilePrefix();
-  const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
   const { impersonateUser } = useImpersonation();
   const { data: enrichmentData } = useOperadoresEnrichment();
   const OPERADORES_DATA = enrichmentData?.operadores || {};
 
   // ── State ──
-  const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
-  const [filtroTipo, setFiltroTipo] = useState('');
-  const [filtroCorriente, setFiltroCorriente] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>('ultimaActividad');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const busqueda = list.text('q'), setBusqueda = (value: string) => list.set('q', value);
+  const filtroTipo = list.text('tipo'), setFiltroTipo = (value: string) => list.set('tipo', value);
+  const filtroCorriente = list.text('corriente'), setFiltroCorriente = (value: string) => list.set('corriente', value);
+  const filtroEstado = list.text('estado', 'todos'), setFiltroEstado = (value: string) => list.set('estado', value);
+  const currentPage = list.number('page', 1), setCurrentPage = (value: number) => list.set('page', value);
+  const sortBy = list.text('sortBy', 'ultimaActividad'), setSortBy = (value: string) => list.set('sortBy', value);
+  const sortOrder = list.text('sortOrder', 'desc') === 'asc' ? 'asc' : 'desc';
+  const setSortOrder = (value: 'asc' | 'desc') => list.set('sortOrder', value);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; razonSocial: string } | null>(null);
 
   // ── API hooks ──
-  const { data: apiData, isLoading, isError, error } = useOperadores({ page: currentPage, limit: 20, search: busqueda || undefined, activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo', sortBy, sortOrder });
+  const { data: apiData, isLoading, isError, error } = useOperadores({ page: currentPage, limit: 20, search: busqueda || undefined, activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo', tipoOperador: filtroTipo || undefined, corriente: filtroCorriente || undefined, sortBy, sortOrder });
   const deleteMutation = useDeleteOperador();
 
   const operadoresData = Array.isArray(apiData?.items) ? apiData.items : [];
@@ -104,20 +105,11 @@ const AdminOperadoresPage: React.FC = () => {
         expediente: enriched?.expediente || null,
       };
     }),
-    [operadoresData]
+    [operadoresData, OPERADORES_DATA]
   );
 
-  // ── Client-side filters ──
-  const filteredData = useMemo(() => {
-    return tableData.filter((o) => {
-      if (filtroTipo && o.tipoOperador !== filtroTipo) return false;
-      if (filtroCorriente && !o.corrientes.includes(filtroCorriente)) return false;
-      const matchesEstado = filtroEstado === 'todos' ||
-                            (filtroEstado === 'activo' && o.activo) ||
-                            (filtroEstado === 'inactivo' && !o.activo);
-      return matchesEstado;
-    });
-  }, [tableData, filtroTipo, filtroCorriente, filtroEstado]);
+  // The API filters before count/pagination. Do not filter the current page again.
+  const filteredData = tableData;
 
   // ── Sort mapping ──
   const OPER_COL_MAP: Record<string, string> = {
@@ -152,7 +144,7 @@ const AdminOperadoresPage: React.FC = () => {
   const filters: CRUDFilter[] = [
     {
       key: 'tipo',
-      label: 'Tipo · página actual',
+      label: 'Tipo',
       value: filtroTipo,
       onChange: (v) => { setFiltroTipo(v); setCurrentPage(1); },
       placeholder: 'Todos los tipos',
@@ -164,7 +156,7 @@ const AdminOperadoresPage: React.FC = () => {
     },
     {
       key: 'corriente',
-      label: 'Corriente Y · página actual',
+      label: 'Corriente Y',
       value: filtroCorriente,
       onChange: (v) => { setFiltroCorriente(v); setCurrentPage(1); },
       placeholder: 'Todas las corrientes',

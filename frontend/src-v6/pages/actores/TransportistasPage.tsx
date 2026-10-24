@@ -7,7 +7,8 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
  */
 
 import React, { useState, useMemo } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useActorListNavigation } from '../../hooks/useActorListNavigation';
+import { useLocation } from 'react-router-dom';
 import {
   Truck,
   Search,
@@ -68,18 +69,19 @@ const INITIAL_FORM = {
 };
 
 const TransportistasPage: React.FC = () => {
-  const navigate = useNavigate();
+  const list = useActorListNavigation();
+  const navigate = list.open;
   const mp = useMobilePrefix();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
   const { impersonateUser } = useImpersonation();
-  const [busqueda, setBusqueda] = useState(searchParams.get('q') || '');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
-  const [filtroLocalidad, setFiltroLocalidad] = useState('todas');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<string | undefined>('ultimaActividad');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const busqueda = list.text('q'), setBusqueda = (value: string) => list.set('q', value);
+  const filtroEstado = list.text('estado', 'todos'), setFiltroEstado = (value: string) => list.set('estado', value);
+  const filtroLocalidad = list.text('localidad', 'todas'), setFiltroLocalidad = (value: string) => list.set('localidad', value);
+  const currentPage = list.number('page', 1), setCurrentPage = (value: number) => list.set('page', value);
+  const sortBy = list.text('sortBy', 'ultimaActividad'), setSortBy = (value: string) => list.set('sortBy', value);
+  const sortOrder = list.text('sortOrder', 'desc') === 'asc' ? 'asc' : 'desc';
+  const setSortOrder = (value: 'asc' | 'desc') => list.set('sortOrder', value);
   const [modalCrear, setModalCrear] = useState(false);
   const [modalEditar, setModalEditar] = useState(false);
   const [modalEliminar, setModalEliminar] = useState(false);
@@ -88,7 +90,7 @@ const TransportistasPage: React.FC = () => {
   const [form, setForm] = useState(INITIAL_FORM);
 
   // API hooks
-  const { data: apiData, isLoading, isError, error } = useTransportistas({ page: currentPage, limit: 20, search: busqueda || undefined, activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo', sortBy, sortOrder });
+  const { data: apiData, isLoading, isError, error } = useTransportistas({ page: currentPage, limit: 20, search: busqueda || undefined, activo: filtroEstado === 'todos' ? undefined : filtroEstado === 'activo', localidad: filtroLocalidad === 'todas' ? undefined : filtroLocalidad, sortBy, sortOrder });
   const createMutation = useCreateTransportista();
   const updateMutation = useUpdateTransportista();
   const deleteMutation = useDeleteTransportista();
@@ -119,11 +121,7 @@ const TransportistasPage: React.FC = () => {
     [transportistasData]
   );
 
-  // Localidades únicas para filtro
-  const localidadesUnicas = useMemo(() => {
-    const set = new Set(tableData.map(t => t.localidad).filter(Boolean));
-    return Array.from(set).sort();
-  }, [tableData]);
+  const localidadesUnicas = [...new Set([...(apiData?.localidades || []), ...(filtroLocalidad === 'todas' ? [] : [filtroLocalidad])])].sort();
 
   const hoy = new Date();
   const en30dias = new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -135,16 +133,7 @@ const TransportistasPage: React.FC = () => {
     return 'vigente';
   }
 
-  // Client-side filters (estado + localidad); sort is server-side
-  const filteredData = useMemo(() => {
-    return tableData.filter((t) => {
-      const matchesEstado = filtroEstado === 'todos' ||
-                            (filtroEstado === 'activo' && t.activo) ||
-                            (filtroEstado === 'inactivo' && !t.activo);
-      const matchesLocalidad = filtroLocalidad === 'todas' || t.localidad === filtroLocalidad;
-      return matchesEstado && matchesLocalidad;
-    });
-  }, [tableData, filtroEstado, filtroLocalidad]);
+  const filteredData = tableData;
 
   const TRANS_COL_MAP: Record<string, string> = {
     transportista: 'razonSocial',
@@ -579,7 +568,7 @@ const TransportistasPage: React.FC = () => {
 
       <RecordListFilters title="Transportistas" value={busqueda} onChange={v => { setBusqueda(v); setCurrentPage(1); }} placeholder="Razón social o CUIT" filters={[
         {key: 'estado', label: 'Estado', placeholder: 'Todos los estados', value: filtroEstado, onChange: v => { setFiltroEstado(v); setCurrentPage(1); }, options: [{value:'todos',label:'Todos los estados'},{value:'activo',label:'Activo'},{value:'inactivo',label:'Inactivo'}]},
-        {key: 'localidad', label: 'Localidad · página actual', placeholder: 'Todas las localidades', value: filtroLocalidad, onChange: v => { setFiltroLocalidad(v); setCurrentPage(1); }, options: [{value:'todas',label:'Todas las localidades'},...localidadesUnicas.map(loc=>({value:loc,label:loc}))]},
+        {key: 'localidad', label: 'Localidad', placeholder: 'Todas las localidades', value: filtroLocalidad, onChange: v => { setFiltroLocalidad(v); setCurrentPage(1); }, options: [{value:'todas',label:'Todas las localidades'},...localidadesUnicas.map(loc=>({value:loc,label:loc}))]},
       ]} />
 
       {/* Table */}

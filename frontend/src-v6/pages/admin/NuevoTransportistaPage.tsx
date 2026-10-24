@@ -1,4 +1,5 @@
 import { PageToolbar } from '../../components/ui/PageToolbar';
+import { actorListReturn } from '../../hooks/useActorListNavigation';
 /**
  * SITREP v6 - NuevoTransportistaPage
  * ===================================
@@ -6,7 +7,7 @@ import { PageToolbar } from '../../components/ui/PageToolbar';
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Check, Truck, MapPin, Shield,
   Plus, Trash2, Loader2, Car, User,
@@ -52,6 +53,7 @@ const STEPS = [
 const NuevoTransportistaPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const mp = useMobilePrefix();
   const isEdit = !!id;
 
@@ -244,7 +246,7 @@ const NuevoTransportistaPage: React.FC = () => {
         setDocumentError(`Transportista guardado. Quedan adjuntos pendientes: ${failed.join(', ')}. Reintentá sin repetir el alta.`);
         return;
       }
-      if (!await draft.clear()) return; navigate(mp('/admin/actores/transportistas'));
+      if (!await draft.clear()) return; navigate(backPath);
     } catch (err: any) {
       toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
     } finally {
@@ -254,7 +256,7 @@ const NuevoTransportistaPage: React.FC = () => {
   };
 
   const isPending = savingDocuments || createMutation.isPending || updateMutation.isPending;
-  const backPath = mp('/admin/actores/transportistas');
+  const backPath = actorListReturn(location.state, mp('/admin/actores/transportistas'));
   if (isEdit && loadingExisting) return <p role="status" className="p-6 text-neutral-700">Recuperando la ficha del transportista…</p>;
   if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del transportista. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
 

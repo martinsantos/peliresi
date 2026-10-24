@@ -398,6 +398,9 @@ export interface AuditoriaEntry {
 
 export interface ActorFilters {
   search?: string;
+  tipoOperador?: string;
+  corriente?: string;
+  localidad?: string;
   activo?: boolean;
   categoria?: string;
   rubro?: string;

@@ -55,11 +55,12 @@ export const actoresService = {
   },
 
   // Transportistas
-  async listTransportistas(filters?: ActorFilters): Promise<PaginatedData<Transportista>> {
+  async listTransportistas(filters?: ActorFilters): Promise<PaginatedData<Transportista> & { localidades: string[] }> {
     const { data } = await api.get('/actores/transportistas', { params: filters });
     const raw = data.data;
     return {
       items: raw.transportistas || [],
+      localidades: raw.localidades || [],
       total: raw.pagination?.total || 0,
       page: raw.pagination?.page || 1,
       limit: raw.pagination?.limit || 10,

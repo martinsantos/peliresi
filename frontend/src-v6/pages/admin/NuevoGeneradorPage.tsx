@@ -1,4 +1,5 @@
 import { PageToolbar } from '../../components/ui/PageToolbar';
+import { actorListReturn } from '../../hooks/useActorListNavigation';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Nuevo / Editar Generador — Wizard 6 pasos
@@ -135,7 +136,7 @@ const NuevoGeneradorPage: React.FC = () => {
   const updateMutation = useUpdateGenerador();
   const uploadDocMutation = useUploadDocumento();
 
-  const backPath = mp('/admin/actores/generadores');
+  const backPath = actorListReturn(location.state, mp('/admin/actores/generadores'));
 
   useEffect(() => {
     initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setSelectedY(new Set());

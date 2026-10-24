@@ -113,6 +113,8 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="app/transporte/cargas" element={<div>Cargas app</div>} />
           <Route path="mobile/transporte/cargas" element={<div>Cargas móvil</div>} />
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
+          <Route path="admin/actores/transportistas/:id" element={<div>Ficha del transportista</div>} />
+          <Route path="admin/actores/operadores/:id" element={<div>Ficha del operador</div>} />
           <Route path="inspecciones/:id" element={<div>Expediente de campo<textarea aria-label="Observación QA" /></div>} />
           <Route path="mis-inspecciones/:id" element={<div>Inspección del actor</div>} />
           <Route path="soporte/:id" element={<div>Ticket confirmado</div>} />
@@ -124,6 +126,13 @@ function renderMobileLayout(initialPath = '/dashboard') {
 }
 
 describe('MobileLayout Android shell', () => {
+  it.each(['generadores','transportistas','operadores'])('keeps %s creation help above the form',kind=>{
+    authState.currentUser.rol='ADMIN';
+    renderMobileLayout('/admin/actores/'+kind+'/nuevo');
+    const help=screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true});
+    expect(help.closest('header')).toBe(screen.getByRole('banner'));
+    expect(help.parentElement).not.toHaveClass('fixed');
+  });
   afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   beforeEach(() => {
     localStorage.clear();

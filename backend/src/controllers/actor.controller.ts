@@ -8,6 +8,7 @@ import { auditarActor } from '../utils/auditoria';
 import { approvedOperatorModeChange, operatorModalitiesForType } from '../domain/operatorModalities';
 import { actorCoordinates, actorNumber } from '../domain/actorNumbers';
 import { parsePagination } from '../utils/pagination';
+import { directoryText, operatorDirectoryQuery } from '../services/actorDirectoryFilters';
 import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
 import {
     buildFiscalWhere,
@@ -478,7 +479,12 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             where.activo = activo === 'true';
         }
 
-        const [transportistas, total] = await Promise.all([
+        // Facets come from the complete authorized directory, never just this page.
+        const facetWhere = { ...where };
+        const localidad = directoryText(req.query.localidad, 'localidad');
+        if (localidad) where.localidad = { equals: localidad, mode: 'insensitive' };
+
+        const [transportistas, total, localidades] = await Promise.all([
             prisma.transportista.findMany({
                 where,
                 skip,
@@ -492,7 +498,8 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
                 },
                 orderBy
             }),
-            prisma.transportista.count({ where })
+            prisma.transportista.count({ where }),
+            prisma.transportista.findMany({ where: facetWhere, distinct: ['localidad'], select: { localidad: true }, orderBy: { localidad: 'asc' } })
         ]);
 
         // Map ultimaActividad from most recent manifiesto
@@ -514,6 +521,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
             success: true,
             data: {
                 transportistas: mappedT,
+                localidades: localidades.map(item => item.localidad).filter((value): value is string => Boolean(value?.trim())),
                 pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }
             }
         });
@@ -947,6 +955,13 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
         }
         if (activo !== undefined) {
             where.activo = activo === 'true';
+        }
+
+        const directoryQuery = operatorDirectoryQuery(req.query);
+        if (directoryQuery) {
+            const matches = await prisma.$queryRaw<Array<{ id: string }>>(directoryQuery);
+            // Keep role/actor scope in conjunction with advanced filters.
+            where.AND = [{ id: { in: matches.map(item => item.id) } }];
         }
 
         const [operadores, total] = await Promise.all([

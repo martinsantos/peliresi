@@ -367,7 +367,7 @@ const TransportistaDetallePage: React.FC = () => {
         </div>
       </div>
 
-      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`))}>Editar datos del padrón</Button>}
+      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`), { state: { actorReturn: backPath } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="TRANSPORTISTA" actorId={id || ''} />
 
       {/* Stats */}

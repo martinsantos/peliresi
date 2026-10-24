@@ -359,7 +359,7 @@ const GeneradorDetallePage: React.FC = () => {
         </Card>
       </div>
 
-      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`))}>Editar datos del padrón</Button>}
+      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`), { state: { actorReturn: backPath } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="GENERADOR" actorId={id || ''} />
 
       {/* 5 Tabs */}

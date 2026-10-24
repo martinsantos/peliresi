@@ -14,7 +14,7 @@ vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => 
 vi.mock('../../hooks/useEnrichment', () => ({ useOperadoresEnrichment: () => ({ data: { operadores: {} } }) }));
 vi.mock('../../hooks/useActores', () => ({
   useOperadores: (filters: unknown) => { queries.operadores(filters); return { data: { items: records, total: 52, totalPages: 3 }, isLoading: false, isError: false }; },
-  useTransportistas: (filters: unknown) => { queries.transportistas(filters); return { data: { items: records, total: 52, totalPages: 3 }, isLoading: false, isError: false }; },
+  useTransportistas: (filters: unknown) => { queries.transportistas(filters); return { data: { items: records, total: 52, totalPages: 3, localidades: ['Tunuyán'] }, isLoading: false, isError: false }; },
   useDeleteOperador: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateTransportista: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateTransportista: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -22,6 +22,20 @@ vi.mock('../../hooks/useActores', () => ({
 }));
 
 describe('Actor summaries disclose the actual denominator', () => {
+  it.each([['Tipo','IN SITU',{tipoOperador:'IN SITU'}],['Corriente Y','Y8',{corriente:'Y8'}]] as const)('queries the full operator directory for %s', (label,option,expected) => {
+    render(<MemoryRouter><AdminOperadoresPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Filtros'}));
+    fireEvent.click(screen.getByRole('button',{name:label,exact:true}));
+    fireEvent.click(screen.getByRole('option',{name:option,exact:true}));
+    expect(queries.operadores).toHaveBeenLastCalledWith(expect.objectContaining({...expected,page:1}));
+  });
+  it('offers a locality returned by the server even when absent from the current page',()=>{
+    render(<MemoryRouter><TransportistasPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button',{name:'Filtros'}));
+    fireEvent.click(screen.getByRole('button',{name:'Localidad',exact:true}));
+    fireEvent.click(screen.getByRole('option',{name:'Tunuyán',exact:true}));
+    expect(queries.transportistas).toHaveBeenLastCalledWith(expect.objectContaining({localidad:'Tunuyán',page:1}));
+  });
   it.each([
     ['operadores', AdminOperadoresPage], ['transportistas', TransportistasPage],
   ] as const)('%s filters active state on the server across all pages', (kind, Page) => {

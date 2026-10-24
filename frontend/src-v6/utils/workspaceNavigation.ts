@@ -8,6 +8,9 @@ import { canAccessMobilePath } from './mobileAccess';
 import { canUseCompanySection } from '../services/companyContext';
 
 export type WorkspaceItem = { path: string; label: string; icon: LucideIcon; section: 'main' | 'admin' | 'tools' };
+/** Keep help in the header throughout actor lists, details and forms. */
+export const isActorWorkspace = (pathname: string) => /^\/(?:(?:app|mobile)\/)?(?:admin\/)?actores(?:\/|$)/.test(pathname)
+  || /^\/(?:(?:app|mobile)\/)?admin\/(?:generadores|operadores)(?:\/|$)/.test(pathname);
 export const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'];
 export const isInspectionStaff = (user: Pick<User, 'rol' | 'esInspector'> | null | undefined) =>
   Boolean(user && (user.esInspector || ADMIN_ROLES.includes(user.rol)));

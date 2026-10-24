@@ -18,6 +18,12 @@ vi.mock('../../components/ui/Toast',()=>({ToastContainer:()=>null}));
 vi.mock('../../components/ui/UserSwitcher',()=>({UserSwitcher:()=>null}));
 function show(path:string){render(<MemoryRouter initialEntries={[path]}><MainLayout/></MemoryRouter>);}
 describe('Sidebar: one visible current destination',()=>{
+  it.each(['generadores','transportistas','operadores'])('keeps %s creation help in the header',kind=>{
+    show('/admin/actores/'+kind+'/nuevo');
+    const help=screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true});
+    expect(help.closest('header')).toBe(screen.getByRole('banner'));
+    expect(help.parentElement).not.toHaveClass('fixed');
+  });
   beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;authState.training=false;attention.support=0;attention.applicationPending=0;});
   it.each(['button','Escape'])('closes the compact menu with %s and restores keyboard focus without leaving the page',method=>{
     show('/dashboard');
@@ -116,8 +122,8 @@ describe('Sidebar: one visible current destination',()=>{
     expect(title).toHaveClass('min-w-0','whitespace-normal','break-words','sm:truncate');
     expect(title).toHaveAttribute('title',label);
     expect(title.parentElement).toHaveClass('min-w-0','flex-1');
-    const help=within(header).getByRole('button',{name:'Ver tour de ayuda',exact:true});
-    expect(help).toHaveClass('h-11','w-11','shrink-0');
+    const help=within(header).getByRole('button',{name:path.startsWith('/admin/actores')?'Ayuda y soporte técnico':'Ver tour de ayuda',exact:true});
+    expect(help).toHaveClass('h-11','w-11');
     expect(help.parentElement).toHaveClass('shrink-0');
   });
 });

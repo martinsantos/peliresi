@@ -1,4 +1,5 @@
 import { PageToolbar } from '../../components/ui/PageToolbar';
+import { actorListReturn } from '../../hooks/useActorListNavigation';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 /**
  * SITREP v6 - Nuevo / Editar Operador — Wizard 7 pasos
@@ -138,7 +139,7 @@ const NuevoOperadorPage: React.FC = () => {
   const updateMutation = useUpdateOperador();
   const uploadDocMutation = useUploadOperadorDocumento();
 
-  const backPath = mp('/admin/actores/operadores');
+  const backPath = actorListReturn(location.state, mp('/admin/actores/operadores'));
 
   useEffect(() => {
     initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setSelectedY(new Set());
