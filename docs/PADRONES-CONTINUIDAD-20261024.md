@@ -1,6 +1,6 @@
 # Continuidad de padrones y Ayuda — 24/10/2026
 
-Tanda autorizada posterior a 7af655f7. Corrige los tres pendientes detectados en la comprobación de producción. Publicación pendiente hasta completar el despliegue y su smoke de lectura.
+**Publicado `8fb6277ecabaace83671a9dfb251147a43c9ccbf` en backend, web, app y manual el 24/10/2026 a las 19:28:47 Mendoza.** Corrige los tres pendientes detectados después de 7af655f7. Despliegue, smoke y seis recorridos visuales productivos completados, sin operaciones de negocio.
 
 ## Cambios
 
@@ -24,6 +24,19 @@ Preview remoto existente, 1 CPU, 2 GiB, sin swap, ejecución serial. Base sinté
 
 Evidencias locales: `padrones-continuidad-20261024` en el directorio de evidencias del hilo (JSON, logs, capturas y herramientas de release). Los nueve registros de observación del navegador no representan nueve E2E independientes.
 
-## Alcance y límites
+## Publicación y comprobación de producción
+
+- Compilación remota de **2.546 archivos Git exactos** antes y después; tipos, backend, web y app PASS. Cero OOM. Esquema, migraciones y dependencias idénticos.
+- **217/217 smoke público + 9/9 externo + 8/8 PWA**, sólo GET, sin logins ni operaciones de negocio. Hashes de recursos, chunks, manual y captura coinciden con los paquetes. Los contadores técnicos de admisión pueden registrar estas consultas.
+- **Seis recorridos visuales en producción**, G/T/O × web/app: búsqueda/filtros/página → alta vacía → volver. Sin completar, guardar ni enviar formularios. Generadores conserva página 2 y estado; Transporte conserva localidad; Operadores conserva modalidad y corriente Y. App conserva el contexto al recargar. Ayuda permanece en el encabezado, cero superposiciones y cero desborde horizontal; diálogo contextual comprobado. Cero errores de consola.
+- El filtro de Malargüe devuelve los tres transportistas del padrón; IN SITU + Y8 devuelve 31 operadores y permite la segunda página. Las altas permanecieron vacías. Sesión administrativa existente, sin cambiar usuarios ni permisos.
+- Dos workers online desde el nuevo release; `.env` idéntico, SHA-256 `b19526c365883d577d3cb5f82a9894d4b9f790b7a4a69831c6d2a77a8631811d`; flags actuales preservados, CAP cerrado y correo/push apagados. Sin main, workflows ni migraciones.
+- Manual **2026.24.1** verificado en navegador productivo; SW web **trazabilidad-rrpp-v176**, app **20261024222609**. Actualizaciones activadas mediante el aviso existente, sin formularios en edición.
+- Respaldo privado **`/var/backups/sitrep/20261024-producto-8fb6277e`**: configuración/PM2 y hashes de releases anteriores conservados. No se necesitó respaldo/restauración de base porque no hay migración ni escrituras de negocio.
+- Reversión preparada a **7af655f7**: backend anterior y frontend `/var/www/sitrep-releases/20261024-producto-8fb6277e-rollback`, SW **v177**, app **20261024222803**. Usar únicamente `publish-production.ts rollback` de este respaldo, tras revisar el estado vigente; no reversiones históricas.
+- Evidencias: `release/build.json`, `release/qa-summary.json`, `release/source-proof.json`, `release/deployment-output.json`, `release/smoke.json`, `release/external-smoke.json`, `release/pwa-smoke.json`, `release/after.json`, `production-browser-checks.json` y capturas reales `production-web-alta.jpg` / `production-app-alta.jpg`.
+- Preview cerrado: runtime y servidor propios detenidos sin señal forzada, PostgreSQL artificial cerrado limpiamente, contenedor y túneles del hilo detenidos. Datos sintéticos y evidencias conservados. Auditoría final: 515 manifiestos y cero envíos/intentos.
+
+## Límites conservados
 
 No modifica main, esquema, migraciones, dependencias, permisos, flags ni workflows. No incluye operaciones sobre datos reales. Android físico, teclado nativo y cierre de PWA instalada siguen pendientes. El orden por última actividad conserva su implementación previa; esta tanda corrige el alcance de filtros, no rediseña el ordenamiento. No equivale a validación exhaustiva del producto.

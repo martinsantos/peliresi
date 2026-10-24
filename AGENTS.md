@@ -1,6 +1,14 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
-## Publicación vigente — padrones y navegación, 24/10/2026
+## Publicación vigente — filtros y Ayuda de padrones, 24/10/2026
+
+**8fb6277e publicado en backend, web, app y manual a las 19:28:47 Mendoza.** Búsqueda/filtros/página/orden conservados al volver de ficha/alta; filtros globales de modalidad/corriente de Operadores y localidad de Transporte; Ayuda en encabezado sin tapar formularios. [Cierre, evidencias y reversión](docs/PADRONES-CONTINUIDAD-20261024.md).
+
+Preview: **481 frontend únicas verificadas + 250 backend + 39 HTTP**, 37 frontend repetidas tras corregir una expectativa anterior de Ayuda, seis recorridos web/app y app a 320 px. Build de **2.546 archivos Git exactos**. Producción: **217/217 + externo 9/9 + PWA 8/8**, seis recorridos visuales G/T/O × web/app sólo consulta/alta vacía/regreso, cero errores de consola. Sin altas guardadas ni datos reales modificados. Dos workers online, .env/flags/esquema idénticos; CAP cerrado, correo/push apagados; sin main, workflows ni migraciones.
+
+Respaldo `/var/backups/sitrep/20261024-producto-8fb6277e`; reversión preparada a **7af655f7**, SW **v177**, app **20261024222803**. Activo: manual **2026.24.1**, SW **v176**, app **20261024222609**. Runtime, PostgreSQL artificial, contenedor y túneles QA cerrados, evidencias conservadas. Android físico y orden por última actividad siguen pendientes. No declarar todo el producto validado. Los apartados siguientes son antecedentes.
+
+## Publicación anterior — padrones y navegación, 24/10/2026
 
 **7af655f7 publicado en backend, web, app y manual a las 17:52:58 Mendoza.** Incluye 7d2d943f: recorridos por rol, Inicio compacto, Listado/Programados separados, padrones/altas coherentes, filtros y regreso identificado. Backend recompilado sin diferencias de código. [Cierre, límites y reversión vigente](docs/DESPLIEGUE-PADRONES-20261024.md).
 
