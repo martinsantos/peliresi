@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
@@ -45,13 +45,13 @@ export default function AvisoPage() {
       <h2 className="text-lg font-semibold">{notice.titulo}</h2><p className="whitespace-pre-wrap break-words">{notice.mensaje}</p>
       {actorRole && !otherRole && <p className="text-sm font-semibold text-primary-800">Actividad: {roleLabel}</p>}
       {otherRole && <div className="space-y-3 rounded-lg bg-primary-50 p-3">
-        <p>Usá tu actividad {roleLabel} para responder este requerimiento.</p>
+        <p>Usá tu actividad {roleLabel} para consultar este requerimiento.</p>
         {canChange ? <Button onClick={() => void changeActivity()} isLoading={changing}>Usar {roleLabel} y abrir requerimiento</Button>
           : <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Revisar los roles de mi cuenta</Link>}
         {contextError && <p role="alert" className="text-sm text-error-700">{contextError}</p>}
       </div>}
       <p className="text-sm text-neutral-600">Aviso del {new Date(notice.createdAt).toLocaleString('es-AR')}. Consultá el estado actual antes de actuar.</p>
-      {target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}>{notificationActionLabel(target)}<ArrowRight size={18} aria-hidden="true" /></Link>}
+      {target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}>{notificationActionLabel(target, notice)}</Link>}
     </article>}
   </section>;
 }

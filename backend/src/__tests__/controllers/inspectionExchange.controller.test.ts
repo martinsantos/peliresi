@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 
 const mocks = vi.hoisted(() => ({
   inspection: vi.fn(),
   inspections: vi.fn(),
   exchanges: vi.fn(),
   existingExchange: vi.fn(),
+  lockedReplay: vi.fn(),
+  persistedEvidence: vi.fn(),
   persist: vi.fn(),
   remove: vi.fn(),
   transaction: vi.fn(),
@@ -26,6 +29,7 @@ vi.mock('../../lib/prisma', () => ({ default: {
   inspeccion: { findUnique: mocks.inspection, findMany: mocks.inspections },
   intercambioInspeccion: { findMany: mocks.exchanges, findFirst: mocks.existingExchange, findUniqueOrThrow: mocks.finalExchange, updateMany: mocks.markViewed },
   eventoInspeccion: { findFirst: mocks.publicResult },
+  evidenciaInspeccion: { findMany: mocks.persistedEvidence },
   $transaction: mocks.transaction,
 } }));
 vi.mock('../../services/inspectionEvidence.service', () => ({
@@ -66,6 +70,12 @@ function actorUser(actorId = 'generator-1') {
   return { id: 'actor-user-1', rol: 'GENERADOR', generador: { id: actorId }, esInspector: false };
 }
 
+const retryBody = { version: 7, clienteId: 'retry_12345678', tipo: 'REQUERIMIENTO', asunto: 'Pedido documentado', cuerpo: 'Constancia artificial solicitada para revisión.' };
+function committed(body = retryBody, extra: Record<string, unknown> = {}) {
+  return { id: 'already-committed', ...body, autorId: 'admin', parte: 'AUTORIDAD', versionExpediente: 8,
+    respondeAId: null, plazoRespuestaAt: null, adjuntos: [], ...extra };
+}
+
 describe('inspection participant exchange controller', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,22 +87,86 @@ describe('inspection participant exchange controller', () => {
     mocks.notices.mockReset().mockResolvedValue({ count: 1 });
     mocks.inspections.mockResolvedValue([{ ...actorInspection, _count: { intercambios: 2 } }]);
     mocks.existingExchange.mockResolvedValue(null);
+    mocks.lockedReplay.mockResolvedValue(null);
+    mocks.persistedEvidence.mockResolvedValue([]);
     mocks.persist.mockResolvedValue({
       storageKey: 'inspecciones/inspection-1/decision.pdf', mimeType: 'application/pdf', bytes: 120, sha256: 'd'.repeat(64),
     });
-    mocks.lockedInspection.mockResolvedValue({ version: 7, estado: 'EN_DESCARGO' });
+    mocks.lockedInspection.mockResolvedValue({ ...actorInspection, estado: 'EN_DESCARGO' });
     mocks.previousExchange.mockResolvedValue({ secuencia: 2, hashCadena: 'c'.repeat(64) });
     mocks.createExchange.mockResolvedValue({ id: 'exchange-decision' });
     mocks.finalExchange.mockResolvedValue({ id: 'exchange-decision', adjuntos: [{ id: 'evidence-decision' }] });
     mocks.transaction.mockImplementation(async (callback) => callback({
       $queryRaw: mocks.lock,
       inspeccion: { findUniqueOrThrow: mocks.lockedInspection, update: mocks.updateInspection },
-      intercambioInspeccion: { findFirst: mocks.previousExchange, create: mocks.createExchange },
+      intercambioInspeccion: { findFirst: (args: any) => args.where.clienteId ? mocks.lockedReplay(args) : mocks.previousExchange(args), create: mocks.createExchange, findUniqueOrThrow: mocks.finalExchange },
       evidenciaInspeccion: { create: mocks.createEvidence },
-      eventoInspeccion: { create: mocks.createEvent },
+      eventoInspeccion: { create: mocks.createEvent, findFirst: mocks.publicResult },
       usuario: { findMany: mocks.recipients },
       notificacion: { createMany: mocks.notices },
     }));
+  });
+
+  it.each(['CERRADA_CONFORME', 'DERIVADA_LEGALES', 'FINALIZADA'])('recovers the identical presentation after %s without reopening the case', async estado => {
+    mocks.inspection.mockResolvedValue({ ...actorInspection, estado, version: 20 });
+    mocks.existingExchange.mockResolvedValue(committed());
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: retryBody } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: 'already-committed' }) }));
+    expect(mocks.createExchange).not.toHaveBeenCalled(); expect(mocks.notices).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { cuerpo: 'Contenido cambiado después del primer envío.' }, { asunto: 'Otro asunto' }, { versionExpediente: 9 },
+    { autorId: 'another-admin' }, { tipo: 'PRONUNCIAMIENTO' }, { respondeAId: 'other-thread' },
+    { plazoRespuestaAt: new Date('2030-01-01T12:00:00Z') }, { parte: 'INSPECCIONADO' },
+  ])('rejects reuse of a command identifier with different immutable data: %j', async changed => {
+    mocks.existingExchange.mockResolvedValue(committed(retryBody, changed));
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: retryBody } as any, res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409 }));
+    expect(res.json).not.toHaveBeenCalled(); expect(mocks.persist).not.toHaveBeenCalled();
+  });
+
+  it.each(['changed-bytes', 'changed-name', 'missing-file', 'extra-file'])('rejects a replay with %s', async change => {
+    const file = { size: 8, originalname: 'original.pdf', buffer: Buffer.from('%PDF-old') };
+    mocks.existingExchange.mockResolvedValue(committed(retryBody, { adjuntos: [{ nombreOriginal: file.originalname, bytes: 8,
+      sha256: createHash('sha256').update(file.buffer).digest('hex'), anuladaAt: null }] }));
+    const files = change === 'missing-file' ? [] : [{ ...file, ...(change === 'changed-name' ? { originalname: 'another.pdf' } : {}), ...(change === 'changed-bytes' ? { buffer: Buffer.from('%PDF-new') } : {}) }];
+    if (change === 'extra-file') files.push(file);
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: retryBody, files } as any, res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409 })); expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('recognizes a concurrent commit under the row lock and removes only its unused temporary files', async () => {
+    const file = { size: 8, originalname: 'original.pdf', buffer: Buffer.from('%PDF-old') };
+    mocks.lockedInspection.mockResolvedValue({ ...actorInspection, version: 8 });
+    mocks.lockedReplay.mockResolvedValue(committed(retryBody, { adjuntos: [{ nombreOriginal: file.originalname, bytes: 8,
+      sha256: createHash('sha256').update(file.buffer).digest('hex'), anuladaAt: null }] }));
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: retryBody, files: [file] } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled(); expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: 'already-committed' }) }));
+    expect(mocks.createExchange).not.toHaveBeenCalled(); expect(mocks.notices).not.toHaveBeenCalled();
+    expect(mocks.remove).toHaveBeenCalledWith('inspecciones/inspection-1/decision.pdf');
+  });
+
+  it('does not expose a replay after the participant assignment changes while waiting for the lock', async () => {
+    mocks.lockedInspection.mockResolvedValue({ ...actorInspection, generadorId: 'other-generator' });
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: actorUser(), body: { ...retryBody, tipo: 'DESCARGO', respondeAId: 'request-1' } } as any, res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+    expect(mocks.createExchange).not.toHaveBeenCalled(); expect(mocks.lockedReplay).not.toHaveBeenCalled();
+  });
+
+  it('preserves attachments if a transaction failure leaves commit outcome unknown', async () => {
+    mocks.transaction.mockRejectedValue(new Error('connection lost after COMMIT'));
+    mocks.persistedEvidence.mockResolvedValue([{ storageKey: 'inspecciones/inspection-1/decision.pdf' }]);
+    const next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: retryBody,
+      files: [{ size: 8, originalname: 'original.pdf', buffer: Buffer.from('%PDF-old') }] } as any, response() as any, next);
+    expect(next).toHaveBeenCalled(); expect(mocks.remove).not.toHaveBeenCalled();
   });
 
   it('does not expose an inspection directory to the inspected actor', async () => {
@@ -101,6 +175,56 @@ describe('inspection participant exchange controller', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
     expect(mocks.inspections).not.toHaveBeenCalled();
     expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('keeps an annulled original attachment in replay comparison without returning it as downloadable', async () => {
+    const file = { size: 8, originalname: 'original.pdf', buffer: Buffer.from('%PDF-old') };
+    mocks.existingExchange.mockResolvedValue(committed(retryBody, { adjuntos: [{ nombreOriginal: file.originalname, bytes: 8,
+      sha256: createHash('sha256').update(file.buffer).digest('hex'), anuladaAt: new Date() }] }));
+    const res = response(), next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: retryBody, files: [file] } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ adjuntos: [] }) }));
+    expect(mocks.existingExchange.mock.calls[0][0].include.adjuntos.where).toBeUndefined();
+    expect(mocks.persist).not.toHaveBeenCalled();
+  });
+
+  it.each(['CERRADA_CONFORME', 'DERIVADA_LEGALES'])('recovers a concurrently committed %s decision before checking the old version', async decision => {
+    const fundamento = 'Fundamento artificial de una decisión que ya quedó guardada.';
+    const legal = decision === 'DERIVADA_LEGALES';
+    mocks.lockedInspection.mockResolvedValue({ ...actorInspection, estado: decision, version: 8 });
+    mocks.lockedReplay.mockResolvedValue(committed(retryBody, { tipo: legal ? 'DERIVACION_LEGALES' : 'CIERRE_CONFORME',
+      asunto: legal ? 'Derivación del expediente a Legales' : 'Cierre conforme del intercambio', cuerpo: fundamento }));
+    // Transactional event lookup must verify the original structured decision as well.
+    mocks.createEvent.mockClear();
+    mocks.publicResult.mockResolvedValue({ detalle: fundamento, metadata: { expedienteLegal: null } });
+    const res = response(), next = vi.fn();
+    await decidirIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: {
+      version: 7, clienteId: retryBody.clienteId, decision, fundamento,
+    } } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled(); expect(res.json).toHaveBeenCalled();
+    expect(mocks.createExchange).not.toHaveBeenCalled(); expect(mocks.createEvent).not.toHaveBeenCalled(); expect(mocks.notices).not.toHaveBeenCalled();
+  });
+
+  it('does not treat the same rendered decision text as the same structured legal reference', async () => {
+    const fundamento = 'Fundamento artificial suficiente para cerrar el intercambio.';
+    mocks.existingExchange.mockResolvedValue(committed(retryBody, { tipo: 'DERIVACION_LEGALES', asunto: 'Derivación del expediente a Legales', cuerpo: fundamento + '\n\nExpediente legal: QA-123' }));
+    mocks.publicResult.mockResolvedValue({ detalle: fundamento, metadata: { expedienteLegal: 'QA-123' } });
+    const res = response(), next = vi.fn();
+    await decidirIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: {
+      version: 7, clienteId: retryBody.clienteId, decision: 'DERIVADA_LEGALES', fundamento: fundamento + '\n\nExpediente legal: QA-123',
+    } } as any, res as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 409 })); expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('does not run evidence cleanup after handing a complete transaction to COMMIT', async () => {
+    const runTransaction = mocks.transaction.getMockImplementation()!;
+    mocks.transaction.mockImplementationOnce(async callback => { await runTransaction(callback); throw new Error('COMMIT reply lost'); });
+    const next = vi.fn();
+    await presentarIntercambioInspeccion({ params: { id: actorInspection.id }, user: { id: 'admin', rol: 'ADMIN' }, body: retryBody,
+      files: [{ size: 8, originalname: 'original.pdf', buffer: Buffer.from('%PDF-old') }] } as any, response() as any, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'COMMIT reply lost' }));
+    expect(mocks.persistedEvidence).not.toHaveBeenCalled(); expect(mocks.remove).not.toHaveBeenCalled();
   });
 
   it.each([['TRANSPORTISTA', 'transportista', 'transportistaId'], ['OPERADOR', 'operador', 'operadorId'], ['GENERADOR', 'generador', 'generadorId']])('scopes %s independently of requested filters and hides internal drafts', async (rol, relation, field) => {
@@ -197,7 +321,9 @@ describe('inspection participant exchange controller', () => {
   });
 
   it.each(['presentation', 'decision'])('does not duplicate bell notices on an idempotent %s retry', async operation => {
-    mocks.existingExchange.mockResolvedValue({ id: 'already-committed' });
+    const fundamento = 'Se revisó toda la documentación y se dispone el cierre conforme.';
+    mocks.existingExchange.mockResolvedValue(committed(retryBody, operation === 'decision' ? { tipo: 'CIERRE_CONFORME', asunto: 'Cierre conforme del intercambio', cuerpo: fundamento } : {}));
+    mocks.publicResult.mockResolvedValue({ detalle: fundamento, metadata: { expedienteLegal: null } });
     const res = response(), next = vi.fn();
     const handler = operation === 'decision' ? decidirIntercambioInspeccion : presentarIntercambioInspeccion;
     await handler({ params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' }, body: {
@@ -205,7 +331,7 @@ describe('inspection participant exchange controller', () => {
       decision: 'CERRADA_CONFORME', fundamento: 'Se revisó toda la documentación y se dispone el cierre conforme.',
     } } as any, res as any, next);
     expect(next).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: { id: 'already-committed' } }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: 'already-committed' }) }));
     expect(mocks.transaction).not.toHaveBeenCalled();
     expect(mocks.notices).not.toHaveBeenCalled();
   });
@@ -233,7 +359,7 @@ describe('inspection participant exchange controller', () => {
     const due = new Date('2026-10-20T15:00:00Z');
     vi.useFakeTimers(); vi.setSystemTime(new Date(due.getTime() + offset));
     try {
-      mocks.lockedInspection.mockResolvedValue({ version: 7, estado: 'EN_DESCARGO', plazoRespuestaAt: null });
+      mocks.lockedInspection.mockResolvedValue({ ...actorInspection, estado: 'EN_DESCARGO', plazoRespuestaAt: null });
       mocks.previousExchange.mockResolvedValueOnce({ secuencia: 2, hashCadena: 'c'.repeat(64) }).mockResolvedValueOnce({
         id: 'exact-request', parte: 'AUTORIDAD', tipo: 'REQUERIMIENTO', secuencia: 1, respondeAId: null, plazoRespuestaAt: due,
       });
@@ -247,19 +373,20 @@ describe('inspection participant exchange controller', () => {
   });
 
   it('recognizes an already committed request on retry after its deadline', async () => {
-    mocks.existingExchange.mockResolvedValue({ id: 'expired-committed-request' });
+    mocks.existingExchange.mockResolvedValue(committed(retryBody, { id: 'expired-committed-request', asunto: 'Pedido ya registrado',
+      cuerpo: 'Reintento artificial del mismo pedido ya guardado, sin alterar el plazo.', plazoRespuestaAt: new Date('2020-01-01T12:00:00Z') }));
     const res = response(), next = vi.fn();
     await presentarIntercambioInspeccion({ params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' }, body: {
       version: 7, clienteId: 'retry_expired_1234', tipo: 'REQUERIMIENTO', asunto: 'Pedido ya registrado',
       cuerpo: 'Reintento artificial del mismo pedido ya guardado, sin alterar el plazo.', plazoRespuestaAt: '2020-01-01T12:00:00Z',
     } } as any, res as any, next);
     expect(next).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: { id: 'expired-committed-request' } }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ id: 'expired-committed-request' }) }));
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it('follows the same reply thread to its original request, without using another thread deadline', async () => {
-    mocks.lockedInspection.mockResolvedValue({ version: 7, estado: 'EN_DESCARGO', plazoRespuestaAt: new Date('2030-01-01T12:00:00Z') });
+    mocks.lockedInspection.mockResolvedValue({ ...actorInspection, estado: 'EN_DESCARGO', plazoRespuestaAt: new Date('2030-01-01T12:00:00Z') });
     mocks.previousExchange.mockResolvedValueOnce({ secuencia: 4, hashCadena: 'c'.repeat(64) })
       .mockResolvedValueOnce({ id: 'authority-answer', parte: 'AUTORIDAD', tipo: 'RESPUESTA', secuencia: 3, respondeAId: 'actor-answer', plazoRespuestaAt: null })
       .mockResolvedValueOnce({ id: 'actor-answer', parte: 'INSPECCIONADO', tipo: 'RESPUESTA', secuencia: 2, respondeAId: 'original', plazoRespuestaAt: null })
@@ -278,7 +405,7 @@ describe('inspection participant exchange controller', () => {
     ['older request still open, newer deadline expired', '2020-01-01T12:00:00Z', '2030-01-01T12:00:00Z', false],
     ['request without a registered deadline', '2020-01-01T12:00:00Z', null, false],
   ] as const)('uses the answered request deadline: %s', async (_label, active, own, late) => {
-    mocks.lockedInspection.mockResolvedValue({ version: 7, estado: 'EN_DESCARGO', plazoRespuestaAt: new Date(active) });
+    mocks.lockedInspection.mockResolvedValue({ ...actorInspection, estado: 'EN_DESCARGO', plazoRespuestaAt: new Date(active) });
     mocks.previousExchange.mockResolvedValueOnce({ secuencia: 3, hashCadena: 'c'.repeat(64) }).mockResolvedValueOnce({
       id: 'request-older', parte: 'AUTORIDAD', tipo: 'REQUERIMIENTO', secuencia: 1, respondeAId: null,
       plazoRespuestaAt: own ? new Date(own) : null,

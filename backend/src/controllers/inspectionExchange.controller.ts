@@ -7,6 +7,7 @@ import {
   TipoIntercambioInspeccion,
 } from '@prisma/client';
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma';
 import { createInspectionExchangeNotices } from '../services/inspectionExchangeNotice.service';
 import { inspectionFollowUp, inspectionFollowUpSelect } from '../services/inspectionFollowUp.service';
@@ -99,6 +100,64 @@ const exchangeInclude = {
     orderBy: { createdAt: 'asc' as const },
   },
 } satisfies Prisma.IntercambioInspeccionInclude;
+
+type ReplayCommand = {
+  version: number; autorId: string; parte: ParteIntercambioInspeccion;
+  tipo: TipoIntercambioInspeccion; asunto: string; cuerpo: string;
+  respondeAId?: string | null; plazoRespuestaAt?: string | Date | null;
+  decision?: { fundamento: string; expedienteLegal?: string };
+};
+
+/** Compare the original files, even if an attachment was subsequently annulled. */
+async function findExchangeReplay(
+  client: Pick<Prisma.TransactionClient, 'intercambioInspeccion' | 'eventoInspeccion'>,
+  inspectionId: string, clienteId: string | undefined, command: ReplayCommand, files: Express.Multer.File[],
+) {
+  if (!clienteId) return null;
+  const existing = await client.intercambioInspeccion.findFirst({
+    where: { inspeccionId: inspectionId, clienteId },
+    include: { ...exchangeInclude, adjuntos: {
+      select: { ...exchangeInclude.adjuntos.select, anuladaAt: true }, orderBy: exchangeInclude.adjuntos.orderBy,
+    } },
+  });
+  if (!existing) return null;
+  const date = (value?: string | Date | null) => value ? new Date(value).toISOString() : null;
+  const fileSet = (values: Array<{ nombreOriginal: string; bytes: number; sha256: string }>) =>
+    JSON.stringify(values.map(({ nombreOriginal, bytes, sha256 }) => [nombreOriginal, bytes, sha256]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  const same = existing.autorId === command.autorId && existing.parte === command.parte
+    && existing.versionExpediente === command.version + 1 && existing.tipo === command.tipo
+    && existing.asunto === command.asunto && existing.cuerpo === command.cuerpo
+    && (existing.respondeAId || null) === (command.respondeAId || null)
+    && date(existing.plazoRespuestaAt) === date(command.plazoRespuestaAt)
+    && fileSet(existing.adjuntos) === fileSet(files.map(file => ({ nombreOriginal: file.originalname,
+      bytes: file.buffer.length, sha256: createHash('sha256').update(file.buffer).digest('hex') })));
+  let sameDecision = true;
+  if (same && command.decision) {
+    const event = await client.eventoInspeccion.findFirst({
+      where: { inspeccionId: inspectionId, tipo: `INTERCAMBIO_${command.tipo}`, metadata: { path: ['intercambioId'], equals: existing.id } },
+      select: { detalle: true, metadata: true },
+    });
+    const metadata = event?.metadata as Record<string, unknown> | null;
+    sameDecision = event?.detalle === command.decision.fundamento
+      && (metadata?.expedienteLegal || null) === (command.decision.expedienteLegal || null);
+  }
+  if (!same || !sameDecision) {
+    const error = new AppError('Este envío ya fue utilizado con otro contenido. Recuperá la presentación original antes de continuar.', 409);
+    error.code = 'INSPECTION_COMMAND_CONFLICT';
+    throw error;
+  }
+  return { ...existing, adjuntos: existing.adjuntos.filter(file => !file.anuladaAt).map(({ anuladaAt: _annulled, ...file }) => file) };
+}
+
+/** A connection error after COMMIT must never delete evidence already linked to the case. */
+async function discardUncommittedEvidence(keys: string[]) {
+  if (!keys.length) return;
+  try {
+    const linked = await prisma.evidenciaInspeccion.findMany({ where: { storageKey: { in: keys } }, select: { storageKey: true } });
+    const keep = new Set(linked.map(file => file.storageKey));
+    await Promise.all(keys.filter(key => !keep.has(key)).map(key => removeInspectionEvidence(key).catch(() => undefined)));
+  } catch { /* Preserve files when commit outcome cannot be reconciled. */ }
+}
 
 function participantWhere(user: any): Prisma.InspeccionWhereInput | null {
   if (user?.rol === 'GENERADOR' && user?.generador?.id) return { generadorId: user.generador.id };
@@ -193,6 +252,7 @@ export async function obtenerIntercambiosInspeccion(req: AuthRequest, res: Respo
 
 export async function presentarIntercambioInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   const storedKeys: string[] = [];
+  let transactionMayHaveCommitted = false;
   try {
     const input = exchangeInputSchema.parse(req.body || {});
     const files = Array.isArray(req.files) ? req.files as Express.Multer.File[] : [];
@@ -205,18 +265,14 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
     });
     if (!inspection) throw new AppError('Inspección no encontrada', 404);
     const party = assertExchangeAccess(req.user, inspection);
-    if (!isInspectionExchangeOpen(inspection.estado)) throw new AppError('El intercambio formal se encuentra cerrado', 409);
     if (!isExchangeTypeAllowed(party, input.tipo)) throw new AppError('El tipo de presentación no corresponde a la parte autenticada', 403);
     if (party === 'INSPECCIONADO' && input.plazoRespuestaAt) throw new AppError('El inspeccionado no puede fijar el plazo de respuesta', 403);
     if (input.plazoRespuestaAt && input.tipo !== 'REQUERIMIENTO') throw new AppError('Sólo un requerimiento puede fijar un nuevo plazo', 400);
 
-    if (input.clienteId) {
-      const existing = await prisma.intercambioInspeccion.findFirst({
-        where: { inspeccionId: inspection.id, clienteId: input.clienteId },
-        include: exchangeInclude,
-      });
-      if (existing) return res.json({ success: true, data: existing, message: 'La presentación ya estaba incorporada.' });
-    }
+    const command: ReplayCommand = { ...input, parte: party, autorId: req.user.id };
+    const existing = await findExchangeReplay(prisma, inspection.id, input.clienteId, command, files);
+    if (existing) return res.json({ success: true, data: existing, message: 'La presentación ya estaba incorporada.' });
+    if (!isInspectionExchangeOpen(inspection.estado)) throw new AppError('El intercambio formal se encuentra cerrado', 409);
     if (input.plazoRespuestaAt && new Date(input.plazoRespuestaAt).getTime() <= Date.now()) throw new AppError('El plazo debe ser posterior al momento actual', 400);
 
     const storedFiles: Array<{ file: Express.Multer.File; stored: StoredInspectionEvidence }> = [];
@@ -228,9 +284,13 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
 
     const created = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "inspecciones" WHERE "id" = ${inspection.id} FOR UPDATE`;
-      const locked = await tx.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, select: { version: true, estado: true, plazoRespuestaAt: true } });
+      const locked = await tx.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, select: inspectionAccessSelect });
+      if (assertExchangeAccess(req.user, locked) !== party) throw new AppError('El contexto del expediente cambió. Volvé a abrir el requerimiento.', 403);
+      const replay = await findExchangeReplay(tx, inspection.id, input.clienteId, command, files);
+      if (replay) return { full: replay, replayed: true };
       if (locked.version !== input.version) throw new AppError('El expediente cambió en otro dispositivo. Actualice antes de presentar.', 409);
       if (!isInspectionExchangeOpen(locked.estado)) throw new AppError('El intercambio formal se encuentra cerrado', 409);
+      if (input.plazoRespuestaAt && new Date(input.plazoRespuestaAt).getTime() <= Date.now()) throw new AppError('El plazo debe ser posterior al momento actual', 400);
 
       const previous = await tx.intercambioInspeccion.findFirst({
         where: { inspeccionId: inspection.id },
@@ -350,21 +410,24 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
           },
         },
       });
-      await createInspectionExchangeNotices(tx, inspection, { id: exchange.id, secuencia, tipo: input.tipo, parte: party, autorId: req.user.id, plazoRespuestaAt: exchange.plazoRespuestaAt });
-      return exchange;
+      await createInspectionExchangeNotices(tx, locked, { id: exchange.id, secuencia, tipo: input.tipo, parte: party, autorId: req.user.id, plazoRespuestaAt: exchange.plazoRespuestaAt });
+      const full = await tx.intercambioInspeccion.findUniqueOrThrow({ where: { id: exchange.id }, include: exchangeInclude });
+      transactionMayHaveCommitted = true;
+      return { full, replayed: false };
     });
 
+    if (created.replayed) await discardUncommittedEvidence(storedKeys);
     storedKeys.length = 0;
-    const full = await prisma.intercambioInspeccion.findUniqueOrThrow({ where: { id: created.id }, include: exchangeInclude });
-    res.status(201).json({ success: true, data: full, message: 'Presentación registrada en SITREP. No se envió correo electrónico.' });
+    res.status(created.replayed ? 200 : 201).json({ success: true, data: created.full, message: created.replayed ? 'La presentación ya estaba incorporada.' : 'Presentación registrada en SITREP. No se envió correo electrónico.' });
   } catch (error) {
-    await Promise.all(storedKeys.map((key) => removeInspectionEvidence(key).catch(() => undefined)));
+    if (!transactionMayHaveCommitted) await discardUncommittedEvidence(storedKeys);
     next(error);
   }
 }
 
 export async function decidirIntercambioInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   const storedKeys: string[] = [];
+  let transactionMayHaveCommitted = false;
   try {
     const input = decisionInputSchema.parse(req.body);
     const files = Array.isArray(req.files) ? req.files as Express.Multer.File[] : [];
@@ -374,13 +437,12 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
     const inspection = await prisma.inspeccion.findUnique({ where: { id: req.params.id }, select: inspectionAccessSelect });
     if (!inspection) throw new AppError('Inspección no encontrada', 404);
     if (!canDecideInspectionExchange(req.user, inspection)) throw new AppError('Sólo el administrador competente puede cerrar o derivar el expediente', 403);
-    if (input.clienteId) {
-      const existing = await prisma.intercambioInspeccion.findFirst({
-        where: { inspeccionId: inspection.id, clienteId: input.clienteId },
-        include: exchangeInclude,
-      });
-      if (existing) return res.json({ success: true, data: existing, message: 'La decisión ya estaba incorporada.' });
-    }
+    const tipo: TipoIntercambioInspeccion = input.decision === 'CERRADA_CONFORME' ? 'CIERRE_CONFORME' : 'DERIVACION_LEGALES';
+    const asunto = input.decision === 'CERRADA_CONFORME' ? 'Cierre conforme del intercambio' : 'Derivación del expediente a Legales';
+    const cuerpo = [input.fundamento, input.expedienteLegal ? `Expediente legal: ${input.expedienteLegal}` : null].filter(Boolean).join('\n\n');
+    const command: ReplayCommand = { version: input.version, autorId: req.user.id, parte: 'AUTORIDAD', tipo, asunto, cuerpo, decision: input };
+    const existing = await findExchangeReplay(prisma, inspection.id, input.clienteId, command, files);
+    if (existing) return res.json({ success: true, data: existing, message: 'La decisión ya estaba incorporada.' });
     if (!isInspectionExchangeOpen(inspection.estado)) throw new AppError('El expediente no admite esta decisión', 409);
 
     const storedFiles: Array<{ file: Express.Multer.File; stored: StoredInspectionEvidence }> = [];
@@ -392,7 +454,10 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
 
     const created = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "inspecciones" WHERE "id" = ${inspection.id} FOR UPDATE`;
-      const locked = await tx.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, select: { version: true, estado: true } });
+      const locked = await tx.inspeccion.findUniqueOrThrow({ where: { id: inspection.id }, select: inspectionAccessSelect });
+      if (!canDecideInspectionExchange(req.user, locked)) throw new AppError('Sólo el administrador competente puede cerrar o derivar el expediente', 403);
+      const replay = await findExchangeReplay(tx, inspection.id, input.clienteId, command, files);
+      if (replay) return { full: replay, replayed: true };
       if (locked.version !== input.version) throw new AppError('El expediente cambió en otro dispositivo. Actualice antes de decidir.', 409);
       if (!isInspectionExchangeOpen(locked.estado)) throw new AppError('El expediente no admite esta decisión', 409);
       const previous = await tx.intercambioInspeccion.findFirst({
@@ -403,9 +468,6 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
       if (!previous) throw new AppError('Debe existir al menos una presentación formal antes de cerrar el intercambio', 409);
       const secuencia = previous.secuencia + 1;
       const createdAt = new Date();
-      const tipo: TipoIntercambioInspeccion = input.decision === 'CERRADA_CONFORME' ? 'CIERRE_CONFORME' : 'DERIVACION_LEGALES';
-      const asunto = input.decision === 'CERRADA_CONFORME' ? 'Cierre conforme del intercambio' : 'Derivación del expediente a Legales';
-      const cuerpo = [input.fundamento, input.expedienteLegal ? `Expediente legal: ${input.expedienteLegal}` : null].filter(Boolean).join('\n\n');
       const digests = buildInspectionExchangeDigests({
         inspeccionId: inspection.id,
         secuencia,
@@ -491,14 +553,16 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
           },
         },
       });
-      await createInspectionExchangeNotices(tx, inspection, { id: exchange.id, secuencia, tipo, parte: 'AUTORIDAD', autorId: req.user.id });
-      return exchange;
+      await createInspectionExchangeNotices(tx, locked, { id: exchange.id, secuencia, tipo, parte: 'AUTORIDAD', autorId: req.user.id });
+      const full = await tx.intercambioInspeccion.findUniqueOrThrow({ where: { id: exchange.id }, include: exchangeInclude });
+      transactionMayHaveCommitted = true;
+      return { full, replayed: false };
     });
+    if (created.replayed) await discardUncommittedEvidence(storedKeys);
     storedKeys.length = 0;
-    const full = await prisma.intercambioInspeccion.findUniqueOrThrow({ where: { id: created.id }, include: exchangeInclude });
-    res.json({ success: true, data: full, message: 'Decisión auditada en SITREP. No se envió correo electrónico.' });
+    res.json({ success: true, data: created.full, message: created.replayed ? 'La decisión ya estaba incorporada.' : 'Decisión auditada en SITREP. No se envió correo electrónico.' });
   } catch (error) {
-    await Promise.all(storedKeys.map((key) => removeInspectionEvidence(key).catch(() => undefined)));
+    if (!transactionMayHaveCommitted) await discardUncommittedEvidence(storedKeys);
     next(error);
   }
 }

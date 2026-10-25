@@ -160,7 +160,7 @@ const NotificacionesPage: React.FC = () => {
                     )}
                     <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
                     {followup && <span className="mt-2 block text-sm font-semibold text-primary-800">{followup}</span>}
-                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{otherActivity ? `Ver aviso para ${otherActivity} →` : notificationActionLabel(path)}</span>}
+                    {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{otherActivity ? `Ver aviso para ${otherActivity} →` : notificationActionLabel(path, notice)}</span>}
                     <time dateTime={notice.createdAt} className="mt-2 block text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
                   </span>
                   {linked && <ChevronRight size={18} aria-hidden="true" className="mt-1 shrink-0 text-neutral-600" />}

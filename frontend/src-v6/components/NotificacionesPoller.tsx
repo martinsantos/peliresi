@@ -77,7 +77,7 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
         message: n.mensaje,
         messagePreview: true,
         duration: n.prioridad === 'URGENTE' ? 12_000 : 10_000,
-        actionLabel: notificationActionLabel(resolveNotificationPath(n, '', userRole)), onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole))); },
+        actionLabel: notificationActionLabel(resolveNotificationPath(n, '', userRole), n), onAction: () => { refreshInspectionNotification(n, qc); navigate(mp(resolveNotificationPath(n, '', userRole))); },
       }));
     });
     if (seen.current.size > 200) seen.current = new Set(data.items.map(n => n.id));

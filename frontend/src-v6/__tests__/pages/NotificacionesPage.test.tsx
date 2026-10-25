@@ -48,7 +48,7 @@ describe('notification inbox states and interaction', () => {
   it('names the PSIP expediente instead of a manifest and opens the actor route in app', async () => {
     service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'psip-1', destino: 'participacion' }) }] });
     setup('/app/notificaciones');
-    expect(await screen.findByText('Ver requerimiento y responder →')).toBeVisible();
+    expect(await screen.findByText('Consultar requerimiento y estado →')).toBeVisible();
     expect(screen.queryByText('Abrir manifiesto y ver qué sigue →')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Nuevo requerimiento', exact: true }));
     expect(screen.getByTestId('location')).toHaveTextContent('/app/requerimientos/psip-1');
@@ -57,6 +57,15 @@ describe('notification inbox states and interaction', () => {
     auth.user.rol = '';
     service.list.mockReset().mockResolvedValue(response);
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
+  });
+  it.each(['', '/app'])('offers the recorded decision rather than a new response on %s', async base => {
+    auth.user.rol = 'OPERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Cierre conforme', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'closed-1', destino: 'participacion', tipoActor: 'OPERADOR', evento: 'CIERRE_CONFORME' }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Consultar cierre conforme →')).toBeVisible();
+    expect(screen.queryByText(/Ver requerimiento y responder/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Cierre conforme', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/requerimientos/closed-1');
   });
   it.each(['', '/app'])('identifies the receiving activity before opening its requirement on %s', async base => {
     auth.user.rol = 'GENERADOR';

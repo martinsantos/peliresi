@@ -18,6 +18,14 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app', '/mobile'])('describes recorded decisions without offering a response on %s', prefix => {
+    for (const [evento, label] of [['CIERRE_CONFORME', 'Consultar cierre conforme →'], ['DERIVACION_LEGALES', 'Consultar derivación a Legales →']]) {
+      const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino: 'participacion', tipoActor: 'OPERADOR', evento }) };
+      expect(notificationActionLabel(resolveNotificationPath(notice, prefix, 'OPERADOR'), notice)).toBe(label);
+      expect(notificationActionLabel(resolveNotificationPath(notice, prefix, 'GENERADOR'), notice)).toBe('Ver aviso y resultado →');
+    }
+    expect(notificationActionLabel(prefix + '/requerimientos/case-1')).toBe('Consultar requerimiento y estado →');
+  });
   it.each(['', '/app', '/mobile'])('routes a requirement through its role explanation when another activity is active in %s', prefix => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino: 'participacion', tipoActor: 'OPERADOR' }) };
     expect(resolveNotificationPath(notice, prefix, 'GENERADOR')).toBe(prefix + '/notificaciones/n-1');

@@ -39,7 +39,7 @@ it('does not announce an older unread notice exposed after reading the first pag
  const fresh={id:'fresh',titulo:'Requerimiento nuevo',createdAt:'2026-10-24T12:01:00Z',datos:JSON.stringify({tipo:'intercambio_inspeccion',version:1,inspeccionId:'own',destino:'participacion'})};
  await act(async()=>{client.setQueryData(['notificaciones','poll','g'],{items:[fresh,...notices.slice(1,20)],noLeidas:35});});
  await waitFor(()=>expect(mocks.add).toHaveBeenCalledTimes(1));
- expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({title:'Requerimiento nuevo',actionLabel:'Ver requerimiento y responder →'}));
+ expect(mocks.add).toHaveBeenCalledWith(expect.objectContaining({title:'Requerimiento nuevo',actionLabel:'Consultar requerimiento y estado →'}));
  await act(async()=>{client.setQueryData(['notificaciones','poll','g'],{items:[fresh,...notices.slice(2),older],noLeidas:34});});
  expect(mocks.add).toHaveBeenCalledTimes(1);
  view.unmount();client.clear();

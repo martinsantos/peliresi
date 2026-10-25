@@ -56,11 +56,16 @@ export function refreshInspectionNotification(notificacion: Notificacion, queryC
 }
 
 /** The action describes the resolved destination, including notices without a manifest. */
-export function notificationActionLabel(path: string): string {
+export function notificationActionLabel(path: string, notice?: Pick<Notificacion, 'datos'>): string {
   const [pathname, query = ''] = path.replace(/^\/(?:app|mobile)(?=\/|$)/, '').split('#')[0].split('?');
+  const data = parseNotificationData(notice?.datos || null);
+  if (/^\/(?:requerimientos|mis-inspecciones|inspecciones)\//.test(pathname) && data.tipo === 'intercambio_inspeccion' && data.version === 1) {
+    if (data.evento === 'CIERRE_CONFORME') return 'Consultar cierre conforme →';
+    if (data.evento === 'DERIVACION_LEGALES') return 'Consultar derivación a Legales →';
+  }
   if (pathname === '/inspecciones' && new URLSearchParams(query).get('vista') === 'antecedentes') return 'Ver antecedentes en Inspecciones →';
   if (/^\/(?:admin\/solicitudes\/|mi-solicitud$)/.test(pathname)) return 'Abrir solicitud y ver su estado →';
-  if (/^\/(?:requerimientos|mis-inspecciones)\//.test(pathname)) return 'Ver requerimiento y responder →';
+  if (/^\/(?:requerimientos|mis-inspecciones)\//.test(pathname)) return 'Consultar requerimiento y estado →';
   if (/^\/inspecciones\//.test(pathname)) return 'Abrir expediente y ver el intercambio →';
   if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';
   if (/^\/soporte(?:\/|$)/.test(pathname)) return 'Abrir consulta de soporte →';

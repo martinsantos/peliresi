@@ -28,9 +28,9 @@ it.each(['', '/app'])('guides a different activity in %s and preserves the curre
  state.query.data = { ...state.query.data, tipo: 'INFO_GENERAL', titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-operator', destino: 'participacion', tipoActor: 'OPERADOR' }) };
  state.activate.mockRejectedValue(new Error('Revoked'));
  show(prefix);
- expect(screen.getByText('Usá tu actividad Operador para responder este requerimiento.')).toBeVisible();
+ expect(screen.getByText('Usá tu actividad Operador para consultar este requerimiento.')).toBeVisible();
  expect(screen.queryByText('Actividad: Operador')).toBeNull();
- expect(screen.queryByRole('link', { name: 'Ver requerimiento y responder →' })).toBeNull();
+ expect(screen.queryByRole('link', { name: 'Consultar requerimiento y estado →' })).toBeNull();
  fireEvent.click(screen.getByRole('button', { name: 'Usar Operador y abrir requerimiento' }));
  await waitFor(() => expect(state.activate).toHaveBeenCalledWith('qa-owner', 'OPERADOR'));
  expect(await screen.findByRole('alert')).toHaveTextContent('Tu actividad actual no cambió');
