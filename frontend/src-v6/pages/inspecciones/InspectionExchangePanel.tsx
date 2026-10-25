@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -22,6 +22,7 @@ import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { InspectionLegalProgress } from './InspectionLegalProgress';
 import { toast } from '../../components/ui/Toast';
+import { useInspectionExchangeCommand } from '../../hooks/useInspectionExchangeCommand';
 import { useAuth } from '../../contexts/AuthContext';
 import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { inspeccionService } from '../../services/inspeccion.service';
@@ -357,63 +358,42 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     ]);
   };
 
-  const presentMutation = useMutation({
-    mutationFn: () => {
-      if (!timeline) throw new Error('Expediente no disponible');
-      return inspeccionService.presentExchange(inspectionId, {
-        version: timeline.inspeccion.version,
-        clienteId: `exchange_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-        tipo: draft.tipo,
-        asunto: draft.asunto.trim(),
-        cuerpo: draft.cuerpo.trim(),
-        respondeAId: draft.respondeAId || undefined,
-        plazoRespuestaAt: draft.plazoRespuestaAt ? inspectionDeadlineFromInput(draft.plazoRespuestaAt) : undefined,
-        files,
-      });
-    },
-    onSuccess: async () => {
-      persistenceBlocked.current = true;
-      setComposeOpen(false);
-      if (draftKey) { try { localStorage.removeItem(draftKey); } catch { setDraftStorageError(true); } }
-      await draftWrites.current;
-      if (currentUser?.id) await removeOfflineExchangeDraft(String(currentUser.id), inspectionId, owner).catch(() => { setDraftStorageError(true); });
-      setDraft(initialDraft(party));
-      setFiles([]);
-      setComposeOpen(false);
-      setRestoredAt(null);
-      if (fileRef.current) fileRef.current.value = '';
-      await refresh();
-      persistenceBlocked.current = false;
-      toast.success('Presentación registrada', 'Quedó incorporada al expediente con huella de integridad. No se envió correo.');
-    },
-    onError: (error) => {
-      persistenceBlocked.current = false;
-      setPersistenceRevision((value) => value + 1);
-      toast.error('No se pudo presentar', inspectionErrorMessage(error, 'Conserve el borrador y vuelva a intentar.'));
-    },
-  });
+  const commandScope = useMemo(() => ({ userId: String(currentUser?.id || ''), inspectionId, owner }), [currentUser?.id, inspectionId, owner]);
+  const delivery = useInspectionExchangeCommand(commandScope);
+  const command = delivery.command;
+  const commandBlocked = !delivery.ready || delivery.busy || Boolean(command);
+  const lastConfirmed = useRef<string | null>(null);
+  useEffect(() => {
+    if (command?.status !== 'confirmed' || lastConfirmed.current === command.input.clienteId) return;
+    lastConfirmed.current = command.input.clienteId;
+    // Refresh is independent of the receipt: a read failure never undoes a write.
+    void refresh().catch(() => undefined);
+  }, [command]);
+  useEffect(() => {
+    persistenceBlocked.current = delivery.busy || Boolean(command);
+    if (delivery.busy || command) draftSaveEpoch.current += 1;
+  }, [delivery.busy, command]);
 
-  const decisionMutation = useMutation({
-    mutationFn: () => {
-      if (!timeline || !decision) throw new Error('Decisión incompleta');
-      return inspeccionService.decideExchange(inspectionId, {
-        version: timeline.inspeccion.version,
-        clienteId: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-        decision,
-        fundamento: fundamento.trim(),
-        expedienteLegal: decision === 'DERIVADA_LEGALES' && expedienteLegal.trim() ? expedienteLegal.trim() : undefined,
-        files: decisionFiles,
-      });
-    },
-    onSuccess: async () => {
-      setDecision(null);
-      setFundamento('');
-      setExpedienteLegal('');
-      setDecisionFiles([]);
-      await refresh();
-      toast.success('Decisión registrada', 'El cierre quedó incorporado a la cadena auditable. No se envió correo.');
-    },
-    onError: (error) => toast.error('No se pudo registrar la decisión', inspectionErrorMessage(error, 'Actualice el expediente e intente nuevamente.')),
+  const releaseCommand = () => void delivery.release(async saved => {
+    if (saved.status === 'confirmed') {
+      await draftWrites.current;
+      if (draftKey) localStorage.removeItem(draftKey);
+      await removeOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner);
+      setComposeOpen(false); setDraft(initialDraft(party)); setFiles([]); setRestoredAt(null);
+      setDecision(null); setFundamento(''); setExpedienteLegal(''); setDecisionFiles([]);
+      if (fileRef.current) fileRef.current.value = '';
+    } else if (saved.kind === 'presentation') {
+      const restored = { tipo: saved.input.tipo, asunto: saved.input.asunto, cuerpo: saved.input.cuerpo,
+        respondeAId: saved.input.respondeAId || '', plazoRespuestaAt: saved.input.plazoRespuestaAt ? inspectionDeadlineInput(saved.input.plazoRespuestaAt) : '' };
+      await saveOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner, restored, saved.input.files || []);
+      setDraft(restored); setFiles(saved.input.files || []); setComposeOpen(true);
+    } else {
+      setDecision(saved.input.decision); setFundamento(saved.input.fundamento);
+      setExpedienteLegal(saved.input.expedienteLegal || ''); setDecisionFiles(saved.input.files || []);
+    }
+    draftInteraction.current += 1;
+    setPersistenceRevision(value => value + 1);
+    await refresh();
   });
 
   const parentById = useMemo(() => new Map((timeline?.intercambios || []).map((entry) => [entry.id, entry])), [timeline?.intercambios]);
@@ -424,7 +404,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   const open = Boolean(timeline && OPEN_STATES.has(timeline.inspeccion.estado));
 
   const beginNew = () => {
-    if (presentMutation.isPending) return;
+    if (commandBlocked) return;
     draftInteraction.current += 1;
     const next = initialDraft(party);
     setDraft(next);
@@ -433,7 +413,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   };
 
   const beginReply = (entry: InspectionExchange) => {
-    if (presentMutation.isPending) return;
+    if (commandBlocked) return;
     draftInteraction.current += 1;
     const next = initialDraft(party);
     next.respondeAId = entry.id;
@@ -450,14 +430,20 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
 
   const submitPresentation = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!online) return toast.warning('Sin conexión', 'El texto quedó guardado en este dispositivo. Envíelo al recuperar conexión y vuelva a seleccionar los adjuntos.');
+    if (commandBlocked || !timeline) return;
+    if (!online) return toast.warning('Sin conexión', 'Revisá la copia local del texto y los adjuntos. Enviá manualmente cuando recuperes conexión.');
     if (draft.asunto.trim().length < 5 || draft.cuerpo.trim().length < 10) return toast.warning('Presentación incompleta', 'Complete asunto y contenido antes de presentar.');
     if (party === 'INSPECCIONADO' && !draft.respondeAId) return toast.warning('Seleccione el antecedente', 'Toda presentación del inspeccionado debe responder a una actuación de la autoridad.');
-    if (files.length > 5 || files.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024) return toast.warning('Adjuntos excedidos', 'Puede adjuntar hasta 5 archivos y 50 MB por presentación.');
+    if (files.some(file => file.size > 25 * 1024 * 1024) || files.length > 5 || files.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024) return toast.warning('Adjuntos excedidos', 'Puede adjuntar hasta 5 archivos, 25 MB por archivo y 50 MB por presentación.');
     persistenceBlocked.current = true;
     draftSaveEpoch.current += 1;
     draftInteraction.current += 1;
-    presentMutation.mutate();
+    void delivery.submit({ kind: 'presentation', input: {
+      version: timeline.inspeccion.version, clienteId: `exchange_${crypto.randomUUID()}`,
+      tipo: draft.tipo, asunto: draft.asunto.trim(), cuerpo: draft.cuerpo.trim(),
+      respondeAId: draft.respondeAId || undefined,
+      plazoRespuestaAt: draft.plazoRespuestaAt ? inspectionDeadlineFromInput(draft.plazoRespuestaAt) : undefined, files,
+    } });
   };
 
   const downloadAttachment = async (entry: InspectionExchange, evidenceId: string, name: string) => {
@@ -495,6 +481,20 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
 
   return (
     <section className={compact ? 'space-y-4' : 'space-y-5'} aria-labelledby="inspection-exchange-title">
+      {!delivery.ready && <Card role="status" className="text-sm"><p>{delivery.error || 'Comprobando envíos guardados en este dispositivo…'}</p>{delivery.error && <Button className="mt-3" variant="outline" onClick={() => void delivery.reload()}>Revisar copia local</Button>}</Card>}
+      {delivery.ready && !command && delivery.error && <Card role="alert" className="text-sm text-error-800">{delivery.error}</Card>}
+      {command && <Card role="status" aria-live="polite" className={command.status === 'confirmed' ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}>
+        <h3 className="text-base font-bold text-neutral-900">{command.status === 'confirmed' ? (command.kind === 'decision' ? 'Decisión registrada' : 'Presentación registrada') : command.status === 'rejected' ? 'El envío necesita revisión' : delivery.busy ? 'Confirmando el envío…' : 'Confirmación pendiente'}</h3>
+        <p className="mt-2 text-sm leading-6 text-neutral-800">{command.status === 'confirmed' ? 'El servidor confirmó esta actuación. Podés consultarla en el historial.' : command.status === 'rejected' ? command.rejection : 'La copia original está guardada. Reintentá para confirmar el resultado sin crear una segunda actuación; conservamos el contenido y los adjuntos.'}</p>
+        <details className="mt-3 text-sm"><summary className="min-h-11 cursor-pointer font-semibold text-primary-800">Contenido del envío{command.input.files?.length ? ` · ${command.input.files.length} adjuntos` : ''}</summary>
+          <p className="break-words font-semibold">{command.kind === 'presentation' ? command.input.asunto : command.input.decision === 'CERRADA_CONFORME' ? 'Cierre conforme' : 'Derivación a Legales'}</p>
+          <p className="mt-2 whitespace-pre-wrap break-words">{command.kind === 'presentation' ? command.input.cuerpo : command.input.fundamento}</p>
+          {command.kind === 'decision' && command.input.expedienteLegal && <p className="mt-2 break-words">Expediente legal: {command.input.expedienteLegal}</p>}
+          <ul className="mt-2 space-y-1">{command.input.files?.map((file, index) => <li className="break-words" key={index}>{file.name} · {formatBytes(file.size)}</li>)}</ul>
+        </details>
+        {delivery.error && <p className="mt-2 break-words text-sm text-error-800">{delivery.error}</p>}
+        <Button className="mt-3 w-full sm:w-auto" variant={command.status === 'confirmed' ? 'outline' : 'primary'} disabled={delivery.busy || (command.status === 'pending' && !online)} isLoading={delivery.busy} onClick={command.status === 'pending' ? () => void delivery.retry() : releaseCommand}>{command.status === 'confirmed' ? 'Continuar en el expediente' : command.status === 'rejected' ? 'Revisar presentación' : 'Reintentar confirmación'}</Button>
+      </Card>}
       {draftStorageError && <Card role="alert" className="border-warning-200 bg-warning-50 text-sm text-warning-900">No pudimos confirmar la copia local del borrador. Conservá esta pantalla abierta hasta guardar con conexión.</Card>}
       <Card className="overflow-hidden !p-0">
         <div className="border-b border-neutral-200 bg-[#F8FAF8] px-4 py-4 sm:px-6">
@@ -529,7 +529,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
                 <div className="col-span-2 min-w-0 sm:col-span-1"><p className="break-words text-sm font-semibold text-neutral-900">#{entry.secuencia} · {entry.asunto}</p><p className="mt-1 text-xs text-neutral-600">{inspectionDeadlineDate(entry.plazoRespuestaAt)}{entry.plazoRespuestaAt ? ' · Mendoza' : ''}</p></div>
                 {party === 'INSPECCIONADO' && <p className="col-span-2 whitespace-pre-wrap break-words text-sm leading-6 text-neutral-700 sm:col-span-3">{entry.cuerpo}</p>}
                 <Badge className="justify-self-start" color={status === 'Vencido' ? 'error' : status === 'Vence hoy' ? 'warning' : 'neutral'}>{status}</Badge>
-                {party === 'INSPECCIONADO' && <Button aria-label={`Responder requerimiento #${entry.secuencia}`} className="justify-self-end" size="sm" variant="outline" disabled={presentMutation.isPending} onClick={() => beginReply(entry)}>Responder</Button>}
+                {party === 'INSPECCIONADO' && <Button aria-label={`Responder requerimiento #${entry.secuencia}`} className="justify-self-end" size="sm" variant="outline" disabled={commandBlocked} onClick={() => beginReply(entry)}>Responder</Button>}
               </div>;
             })}
           </div>}
@@ -553,7 +553,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
           cycles={exchangeCycles}
           parentById={parentById}
           party={party}
-          open={open && !presentMutation.isPending && nextStep.pending.length === 0}
+          open={open && !commandBlocked && nextStep.pending.length === 0}
           onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
           onReply={beginReply}
         />
@@ -562,21 +562,21 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
           cycles={exchangeCycles}
           parentById={parentById}
           party={party}
-          open={open && !presentMutation.isPending}
+          open={open && !commandBlocked}
           onDownload={(entry, evidenceId, name) => void downloadAttachment(entry, evidenceId, name)}
           onReply={beginReply}
         />
         )
       )}
 
-      {open && !composeOpen && party === 'AUTORIDAD' && <Button disabled={presentMutation.isPending} leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
+      {open && !composeOpen && party === 'AUTORIDAD' && <Button disabled={commandBlocked} leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
 
-      {open && composeOpen && (
+      {open && composeOpen && !command && (
         <Card id="inspection-exchange-form" className="border-primary-200">
           <form onSubmit={submitPresentation} onChange={() => { draftInteraction.current += 1; }} className="space-y-4">
-            <div className="flex items-start justify-between gap-3 border-b border-neutral-200 pb-4">
+            <fieldset disabled={commandBlocked} className="min-w-0 space-y-4"><div className="flex items-start justify-between gap-3 border-b border-neutral-200 pb-4">
               <div><p className="text-xs font-bold uppercase tracking-wide text-primary-700">Nueva presentación formal</p><h4 className="mt-1 text-lg font-extrabold text-[#10213A]">{draft.respondeAId ? 'Respuesta vinculada' : 'Requerimiento de la autoridad'}</h4></div>
-              <button type="button" aria-label="Cerrar formulario" className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" onClick={() => setComposeOpen(false)}><X size={18} /></button>
+              <button type="button" aria-label="Cerrar formulario" className="min-h-11 min-w-11 rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" onClick={() => setComposeOpen(false)}><X size={18} /></button>
             </div>
             {draft.respondeAId && <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">Antecedente: presentación #{parentById.get(draft.respondeAId)?.secuencia || '—'} · {parentById.get(draft.respondeAId)?.asunto}</div>}
             {party === 'INSPECCIONADO' && draft.respondeAId && <p data-testid="inspection-reply-deadline" className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-800">Plazo del pedido respondido: <strong>{inspectionDeadlineDate(selectedDeadline)}{selectedDeadline ? ' · Mendoza' : ''}</strong>{selectedDeadline && <span className="ml-2 font-semibold">{inspectionDeadlineStatus(selectedDeadline, now)}</span>}</p>}
@@ -588,15 +588,18 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
             <label className="block text-sm font-semibold text-neutral-800">Contenido<textarea value={draft.cuerpo} maxLength={12_000} onChange={(event) => setDraft((value) => ({ ...value, cuerpo: event.target.value }))} className="mt-1.5 min-h-36 w-full resize-y rounded-lg border border-neutral-300 px-3 py-3 font-normal leading-6" placeholder="Exponga hechos, documentación y petición de forma clara." /></label>
             <label className="block text-sm font-semibold text-neutral-800">Adjuntos probatorios <span className="font-normal text-neutral-500">(hasta 5 archivos, 50 MB total)</span><input ref={fileRef} type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" onChange={(event) => setFiles(Array.from(event.target.files || []))} className="mt-1.5 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:font-semibold file:text-primary-800" /></label>
             {files.length > 0 && <ul className="grid gap-2 sm:grid-cols-2">{files.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-700"><Paperclip size={14} className="shrink-0" /><span className="truncate">{file.name}</span><span className="ml-auto shrink-0 text-neutral-500">{formatBytes(file.size)}</span></li>)}</ul>}
-            <div className="flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-xs text-neutral-500"><ShieldCheck size={15} />Se registra autor, fecha, canal, versión, adjuntos y huella encadenada.</p><Button type="submit" disabled={!online} isLoading={presentMutation.isPending} leftIcon={<Send size={16} />}>Presentar en expediente</Button></div>
-          </form>
+            <div className="flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-xs text-neutral-500"><ShieldCheck size={15} />Se registra autor, fecha, canal, versión, adjuntos y huella encadenada.</p><Button type="submit" disabled={!online} isLoading={delivery.busy} leftIcon={<Send size={16} />}>Presentar en expediente</Button></div>
+          </fieldset></form>
         </Card>
       )}
 
-      {canDecide && open && timeline.intercambios.length > 0 && (
+      {canDecide && open && !command && timeline.intercambios.length > 0 && (
         <Card className="border-neutral-300">
           <div className="flex items-start gap-3"><Landmark className="mt-0.5 text-[#1B5E3C]" size={21} /><div><h4 className="font-extrabold text-[#10213A]">Decisión de la autoridad competente</h4><p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">El cierre o la derivación concluye esta instancia de intercambio. Requiere fundamento expreso y queda encadenado al expediente.</p></div></div>
-          {!decision ? <div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button variant="outline" leftIcon={<CheckCircle2 size={17} />} onClick={() => setDecision('CERRADA_CONFORME')}>Cerrar conforme</Button><Button variant="danger" leftIcon={<Scale size={17} />} onClick={() => setDecision('DERIVADA_LEGALES')}>Derivar a Legales</Button></div> : <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); if (fundamento.trim().length >= 20) decisionMutation.mutate(); }}><div className={`rounded-lg border px-3 py-2 text-sm font-bold ${decision === 'CERRADA_CONFORME' ? 'border-success-200 bg-success-50 text-success-900' : 'border-error-200 bg-error-50 text-error-900'}`}>{decision === 'CERRADA_CONFORME' ? 'Cierre conforme del intercambio' : 'Derivación formal a Legales'}</div><label className="block text-sm font-semibold text-neutral-800">Fundamento de la decisión<textarea value={fundamento} onChange={(event) => setFundamento(event.target.value)} className="mt-1.5 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-3 font-normal leading-6" placeholder="Fundamento verificable, hechos considerados y alcance de la decisión." /></label>{decision === 'DERIVADA_LEGALES' && <label className="block text-sm font-semibold text-neutral-800">Referencia de expediente legal <span className="font-normal text-neutral-500">(si ya fue asignada)</span><input value={expedienteLegal} onChange={(event) => setExpedienteLegal(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>}<label className="block text-sm font-semibold text-neutral-800">Adjuntos de la decisión <span className="font-normal text-neutral-500">(dictamen, nota o constancia)</span><input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" onChange={(event) => setDecisionFiles(Array.from(event.target.files || []))} className="mt-1.5 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:font-semibold file:text-primary-800" /></label>{decisionFiles.length > 0 && <ul className="grid gap-2 sm:grid-cols-2">{decisionFiles.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-700"><Paperclip size={14} className="shrink-0" /><span className="truncate">{file.name}</span><span className="ml-auto shrink-0 text-neutral-500">{formatBytes(file.size)}</span></li>)}</ul>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="ghost" onClick={() => { setDecision(null); setDecisionFiles([]); }}>Cancelar</Button><Button type="submit" variant={decision === 'DERIVADA_LEGALES' ? 'danger' : 'primary'} disabled={fundamento.trim().length < 20 || !online || decisionFiles.length > 5 || decisionFiles.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024} isLoading={decisionMutation.isPending}>{decision === 'CERRADA_CONFORME' ? 'Confirmar cierre conforme' : 'Confirmar derivación'}</Button></div></form>}
+          {!decision ? <div className="mt-4 flex flex-col gap-3 sm:flex-row"><Button variant="outline" leftIcon={<CheckCircle2 size={17} />} disabled={commandBlocked} onClick={() => setDecision('CERRADA_CONFORME')}>Cerrar conforme</Button><Button variant="danger" leftIcon={<Scale size={17} />} disabled={commandBlocked} onClick={() => setDecision('DERIVADA_LEGALES')}>Derivar a Legales</Button></div> : <form className="mt-4 space-y-4" onSubmit={(event) => { event.preventDefault(); if (!commandBlocked && online && fundamento.trim().length >= 20) void delivery.submit({ kind: 'decision', input: {
+            version: timeline.inspeccion.version, clienteId: `decision_${crypto.randomUUID()}`, decision,
+            fundamento: fundamento.trim(), expedienteLegal: decision === 'DERIVADA_LEGALES' ? expedienteLegal.trim() || undefined : undefined, files: decisionFiles,
+          } }); }}><fieldset disabled={commandBlocked} className="min-w-0 space-y-4"><div className={`rounded-lg border px-3 py-2 text-sm font-bold ${decision === 'CERRADA_CONFORME' ? 'border-success-200 bg-success-50 text-success-900' : 'border-error-200 bg-error-50 text-error-900'}`}>{decision === 'CERRADA_CONFORME' ? 'Cierre conforme del intercambio' : 'Derivación formal a Legales'}</div><label className="block text-sm font-semibold text-neutral-800">Fundamento de la decisión<textarea maxLength={12_000} value={fundamento} onChange={(event) => setFundamento(event.target.value)} className="mt-1.5 min-h-28 w-full rounded-lg border border-neutral-300 px-3 py-3 font-normal leading-6" placeholder="Fundamento verificable, hechos considerados y alcance de la decisión." /></label>{decision === 'DERIVADA_LEGALES' && <label className="block text-sm font-semibold text-neutral-800">Referencia de expediente legal <span className="font-normal text-neutral-500">(si ya fue asignada)</span><input maxLength={180} value={expedienteLegal} onChange={(event) => setExpedienteLegal(event.target.value)} className="mt-1.5 h-11 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label>}<label className="block text-sm font-semibold text-neutral-800">Adjuntos de la decisión <span className="font-normal text-neutral-500">(dictamen, nota o constancia)</span><input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm" onChange={(event) => setDecisionFiles(Array.from(event.target.files || []))} className="mt-1.5 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-normal file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:font-semibold file:text-primary-800" /></label>{decisionFiles.length > 0 && <ul className="grid gap-2 sm:grid-cols-2">{decisionFiles.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-700"><Paperclip size={14} className="shrink-0" /><span className="truncate">{file.name}</span><span className="ml-auto shrink-0 text-neutral-500">{formatBytes(file.size)}</span></li>)}</ul>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><Button type="button" variant="ghost" onClick={() => { setDecision(null); setDecisionFiles([]); }}>Cancelar</Button><Button type="submit" variant={decision === 'DERIVADA_LEGALES' ? 'danger' : 'primary'} disabled={fundamento.trim().length < 20 || !online || decisionFiles.some(file => file.size > 25 * 1024 * 1024) || decisionFiles.length > 5 || decisionFiles.reduce((sum, file) => sum + file.size, 0) > 50 * 1024 * 1024} isLoading={delivery.busy}>{decision === 'CERRADA_CONFORME' ? 'Confirmar cierre conforme' : 'Confirmar derivación'}</Button></div></fieldset></form>}
         </Card>
       )}
     </section>

@@ -8,6 +8,12 @@ import { InspectionExchangePanel } from '../../pages/inspecciones/InspectionExch
 import type { InspectionExchangeTimeline } from '../../types/inspection';
 import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 
+const localCommands = vi.hoisted(() => new Map<string, unknown>());
+vi.mock('../../services/indexeddb', () => ({
+  getOffline: async (_store: string, key: string) => localCommands.get(key) || null,
+  updateOffline: async (_store: string, key: string, update: (old: unknown) => unknown) => { const next = update(localCommands.get(key) || null); if (next) localCommands.set(key, next); else localCommands.delete(key); return next; },
+}));
+
 const auth = vi.hoisted(() => ({
   currentUser: {
     id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [],
@@ -67,7 +73,7 @@ function renderPanel() {
 describe('InspectionExchangePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+    localStorage.clear(); localCommands.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     auth.currentUser = { id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [] };
     mocks.getExchanges.mockResolvedValue(timeline);
@@ -143,6 +149,7 @@ describe('InspectionExchangePanel', () => {
     await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
     await waitFor(() => expect(mocks.presentExchange).toHaveBeenCalledOnce());
     expect(mocks.removeDraft).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
     await act(async () => finishWrite());
     await waitFor(() => expect(mocks.removeDraft).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument());
@@ -158,6 +165,7 @@ describe('InspectionExchangePanel', () => {
     await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
     await user.type(screen.getByLabelText('Contenido'), 'Respuesta enviada antes de completar una lectura local demorada.');
     await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
+    await user.click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
     await waitFor(() => expect(mocks.removeDraft).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument());
     await act(async () => finishLoad({ draft: { tipo: 'DESCARGO', respondeAId: 'exchange-1', asunto: 'Respuesta vieja', cuerpo: 'Borrador ya presentado', plazoRespuestaAt: '' }, files: [], savedAt: '2026-10-20T10:00:00Z' }));
@@ -282,7 +290,7 @@ describe('InspectionExchangePanel', () => {
   });
 
   it('keeps the linked response and attachment editable after a rejected presentation', async () => {
-    mocks.presentExchange.mockRejectedValueOnce(new Error('La versión del expediente cambió'));
+    mocks.presentExchange.mockRejectedValueOnce({ response: { data: { code: 'INSPECTION_COMMAND_NOT_APPLIED', message: 'La versión del expediente cambió' } } });
     const user = userEvent.setup();
     renderPanel();
     await user.click(await screen.findByRole('button', { name: 'Responder esta actuación' }));
@@ -292,11 +300,25 @@ describe('InspectionExchangePanel', () => {
     await user.upload(screen.getByLabelText(/Adjuntos probatorios/), file);
     await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
     await waitFor(() => expect(mocks.presentExchange).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole('button', { name: 'Revisar presentación' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Presentar en expediente' })).toBeEnabled());
     expect(screen.getByRole('textbox', { name: 'Contenido' })).toHaveValue(content);
     expect(screen.getByText('constancia-conservada.pdf')).toBeInTheDocument();
     expect(screen.getByText(/Antecedente: presentación #1/)).toBeInTheDocument();
     expect(mocks.removeDraft).not.toHaveBeenCalled();
+  });
+
+  it('retains the draft without sending a file exceeding the per-file limit', async () => {
+    const user = userEvent.setup(); renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder esta actuación' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Texto conservado cuando un archivo supera el límite individual.');
+    const file = new File(['%PDF'], 'exceeds-limit.pdf', { type: 'application/pdf' });
+    Object.defineProperty(file, 'size', { value: 26 * 1024 * 1024 });
+    await user.upload(screen.getByLabelText(/Adjuntos probatorios/), file);
+    await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Contenido')).toHaveValue('Texto conservado cuando un archivo supera el límite individual.');
+    expect(screen.getByText('exceeds-limit.pdf')).toBeInTheDocument();
   });
 
   it.each(['CERRADA_CONFORME', 'DERIVADA_LEGALES'])('does not offer a new response on a %s dossier', async (estado) => {
@@ -333,8 +355,9 @@ describe('InspectionExchangePanel', () => {
     await user.type(screen.getByRole('textbox', { name: 'Fundamento de la decisión' }), reason);
     await user.click(submit);
     await waitFor(() => expect(mocks.decideExchange).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(submit).toBeEnabled());
-    expect(screen.getByRole('textbox', { name: 'Fundamento de la decisión' })).toHaveValue(reason);
+    expect(await screen.findByRole('button', { name: 'Reintentar confirmación' })).toBeEnabled();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Fundamento de la decisión' })).not.toBeInTheDocument();
     expect(mocks.decideExchange).toHaveBeenCalledWith('inspection-1', expect.objectContaining({ decision: 'CERRADA_CONFORME', fundamento: reason }));
   });
   it('does not keep an overdue absence warning after the linked actor response', async () => {

@@ -191,6 +191,29 @@ export async function replaceOffline(store: StoreName, previousKey: string, repl
   });
 }
 
+/** Read/modify/write in one transaction, including across browser tabs.
+ * The updater is synchronous so the transaction cannot become inactive.
+ */
+export async function updateOffline<T>(store: StoreName, key: string, update: (current: T | null) => T | null): Promise<T | null> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const records = tx.objectStore(store);
+    let result: T | null = null;
+    let failure: unknown;
+    const request = records.get(key);
+    request.onsuccess = () => {
+      try {
+        result = update(request.result ?? null);
+        if (result === null) records.delete(key); else records.put(result);
+      } catch (error) { failure = error; tx.abort(); }
+    };
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(failure || tx.error || new Error('No se confirmó la copia del envío.'));
+    tx.onabort = () => reject(failure || tx.error || new Error('No se confirmó la copia del envío.'));
+  });
+}
+
 // ========================================
 // SYNC QUEUE
 // ========================================

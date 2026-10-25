@@ -250,6 +250,14 @@ export async function obtenerIntercambiosInspeccion(req: AuthRequest, res: Respo
   } catch (error) { next(error); }
 }
 
+// Only after the row lock and replay lookup establish that this exact command
+// was never applied. Clients may then unlock its immutable local copy.
+function commandNotApplied(message: string, status: number) {
+  const error = new AppError(message, status);
+  error.code = 'INSPECTION_COMMAND_NOT_APPLIED';
+  return error;
+}
+
 export async function presentarIntercambioInspeccion(req: AuthRequest, res: Response, next: NextFunction) {
   const storedKeys: string[] = [];
   let transactionMayHaveCommitted = false;
@@ -272,14 +280,18 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
     const command: ReplayCommand = { ...input, parte: party, autorId: req.user.id };
     const existing = await findExchangeReplay(prisma, inspection.id, input.clienteId, command, files);
     if (existing) return res.json({ success: true, data: existing, message: 'La presentación ya estaba incorporada.' });
-    if (!isInspectionExchangeOpen(inspection.estado)) throw new AppError('El intercambio formal se encuentra cerrado', 409);
-    if (input.plazoRespuestaAt && new Date(input.plazoRespuestaAt).getTime() <= Date.now()) throw new AppError('El plazo debe ser posterior al momento actual', 400);
 
     const storedFiles: Array<{ file: Express.Multer.File; stored: StoredInspectionEvidence }> = [];
-    for (const file of files) {
-      const stored = await persistInspectionEvidence(file, inspection.id);
-      storedKeys.push(stored.storageKey);
-      storedFiles.push({ file, stored });
+    let evidenceValidationError: AppError | null = null;
+    try {
+      for (const file of files) {
+        const stored = await persistInspectionEvidence(file, inspection.id);
+        storedKeys.push(stored.storageKey);
+        storedFiles.push({ file, stored });
+      }
+    } catch (error) {
+      if (!(error instanceof AppError) || error.statusCode !== 400) throw error;
+      evidenceValidationError = error;
     }
 
     const created = await prisma.$transaction(async (tx) => {
@@ -288,9 +300,10 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
       if (assertExchangeAccess(req.user, locked) !== party) throw new AppError('El contexto del expediente cambió. Volvé a abrir el requerimiento.', 403);
       const replay = await findExchangeReplay(tx, inspection.id, input.clienteId, command, files);
       if (replay) return { full: replay, replayed: true };
-      if (locked.version !== input.version) throw new AppError('El expediente cambió en otro dispositivo. Actualice antes de presentar.', 409);
-      if (!isInspectionExchangeOpen(locked.estado)) throw new AppError('El intercambio formal se encuentra cerrado', 409);
-      if (input.plazoRespuestaAt && new Date(input.plazoRespuestaAt).getTime() <= Date.now()) throw new AppError('El plazo debe ser posterior al momento actual', 400);
+      if (evidenceValidationError) throw commandNotApplied(evidenceValidationError.message, 400);
+      if (locked.version !== input.version) throw commandNotApplied('El expediente cambió en otro dispositivo. Actualice antes de presentar.', 409);
+      if (!isInspectionExchangeOpen(locked.estado)) throw commandNotApplied('El intercambio formal se encuentra cerrado', 409);
+      if (input.plazoRespuestaAt && new Date(input.plazoRespuestaAt).getTime() <= Date.now()) throw commandNotApplied('El plazo debe ser posterior al momento actual', 400);
 
       const previous = await tx.intercambioInspeccion.findFirst({
         where: { inspeccionId: inspection.id },
@@ -303,12 +316,12 @@ export async function presentarIntercambioInspeccion(req: AuthRequest, res: Resp
           select: replyContextSelect,
         })
         : null;
-      if (input.respondeAId && !parent) throw new AppError('La presentación respondida no pertenece a este expediente', 400);
+      if (input.respondeAId && !parent) throw commandNotApplied('La presentación respondida no pertenece a este expediente', 400);
       if (party === 'INSPECCIONADO' && (!parent || parent.parte !== 'AUTORIDAD')) {
-        throw new AppError('El descargo debe responder a una presentación previa de la autoridad', 400);
+        throw commandNotApplied('El descargo debe responder a una presentación previa de la autoridad', 400);
       }
       if (party === 'AUTORIDAD' && input.tipo !== 'REQUERIMIENTO' && (!parent || parent.parte !== 'INSPECCIONADO')) {
-        throw new AppError('La respuesta o pronunciamiento debe vincularse a una presentación del inspeccionado', 400);
+        throw commandNotApplied('La respuesta o pronunciamiento debe vincularse a una presentación del inspeccionado', 400);
       }
 
       const secuencia = (previous?.secuencia || 0) + 1;
@@ -443,13 +456,18 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
     const command: ReplayCommand = { version: input.version, autorId: req.user.id, parte: 'AUTORIDAD', tipo, asunto, cuerpo, decision: input };
     const existing = await findExchangeReplay(prisma, inspection.id, input.clienteId, command, files);
     if (existing) return res.json({ success: true, data: existing, message: 'La decisión ya estaba incorporada.' });
-    if (!isInspectionExchangeOpen(inspection.estado)) throw new AppError('El expediente no admite esta decisión', 409);
 
     const storedFiles: Array<{ file: Express.Multer.File; stored: StoredInspectionEvidence }> = [];
-    for (const file of files) {
-      const stored = await persistInspectionEvidence(file, inspection.id);
-      storedKeys.push(stored.storageKey);
-      storedFiles.push({ file, stored });
+    let evidenceValidationError: AppError | null = null;
+    try {
+      for (const file of files) {
+        const stored = await persistInspectionEvidence(file, inspection.id);
+        storedKeys.push(stored.storageKey);
+        storedFiles.push({ file, stored });
+      }
+    } catch (error) {
+      if (!(error instanceof AppError) || error.statusCode !== 400) throw error;
+      evidenceValidationError = error;
     }
 
     const created = await prisma.$transaction(async (tx) => {
@@ -458,14 +476,15 @@ export async function decidirIntercambioInspeccion(req: AuthRequest, res: Respon
       if (!canDecideInspectionExchange(req.user, locked)) throw new AppError('Sólo el administrador competente puede cerrar o derivar el expediente', 403);
       const replay = await findExchangeReplay(tx, inspection.id, input.clienteId, command, files);
       if (replay) return { full: replay, replayed: true };
-      if (locked.version !== input.version) throw new AppError('El expediente cambió en otro dispositivo. Actualice antes de decidir.', 409);
-      if (!isInspectionExchangeOpen(locked.estado)) throw new AppError('El expediente no admite esta decisión', 409);
+      if (evidenceValidationError) throw commandNotApplied(evidenceValidationError.message, 400);
+      if (locked.version !== input.version) throw commandNotApplied('El expediente cambió en otro dispositivo. Actualice antes de decidir.', 409);
+      if (!isInspectionExchangeOpen(locked.estado)) throw commandNotApplied('El expediente no admite esta decisión', 409);
       const previous = await tx.intercambioInspeccion.findFirst({
         where: { inspeccionId: inspection.id },
         orderBy: { secuencia: 'desc' },
         select: { secuencia: true, hashCadena: true },
       });
-      if (!previous) throw new AppError('Debe existir al menos una presentación formal antes de cerrar el intercambio', 409);
+      if (!previous) throw commandNotApplied('Debe existir al menos una presentación formal antes de cerrar el intercambio', 409);
       const secuencia = previous.secuencia + 1;
       const createdAt = new Date();
       const digests = buildInspectionExchangeDigests({

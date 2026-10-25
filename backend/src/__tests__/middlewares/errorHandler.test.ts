@@ -76,6 +76,17 @@ describe('errorHandler middleware', () => {
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
+  it.each(['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT', 'PRIVATE_INTERNAL_CODE'])('exposes only safe PSIP recovery codes: %s', code => {
+    process.env.NODE_ENV = 'production';
+    const { req, res, next } = createMocks();
+    const err = new AppError('Revise la presentación', 409);
+    err.code = code;
+    errorHandler(err, req, res, next);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: code === 'PRIVATE_INTERNAL_CODE' ? undefined : code,
+    }));
+  });
+
   it.each(['test', 'production'])('returns a safe 400 for schema validation in %s', (environment) => {
     process.env.NODE_ENV = environment;
     const { req, res, next } = createMocks();

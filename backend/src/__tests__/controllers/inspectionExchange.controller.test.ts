@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
+import { AppError } from '../../middlewares/errorHandler';
 
 const mocks = vi.hoisted(() => ({
   inspection: vi.fn(),
@@ -77,6 +78,20 @@ function committed(body = retryBody, extra: Record<string, unknown> = {}) {
 }
 
 describe('inspection participant exchange controller', () => {
+  it.each(['presentation', 'decision'])('confirms a rejected attachment was not applied only after replay lookup (%s)', async operation => {
+    mocks.persist.mockRejectedValueOnce(new AppError('Formato no permitido', 400));
+    const res = response(), next = vi.fn();
+    await (operation === 'presentation' ? presentarIntercambioInspeccion : decidirIntercambioInspeccion)({
+      params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' },
+      body: { ...retryBody, decision: 'CERRADA_CONFORME', fundamento: 'Se revisó la constancia para una decisión artificial.' },
+      files: [{ originalname: 'invalid.pdf', size: 4, buffer: Buffer.from('fake') }],
+    } as any, res as any, next);
+    expect(mocks.lock).toHaveBeenCalledOnce();
+    expect(mocks.lockedReplay).toHaveBeenCalledOnce();
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: 'INSPECTION_COMMAND_NOT_APPLIED', statusCode: 400 }));
+    expect(mocks.createExchange).not.toHaveBeenCalled();
+    expect(mocks.notices).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.inspection.mockResolvedValue(actorInspection);
@@ -345,14 +360,15 @@ describe('inspection participant exchange controller', () => {
     expect(res.json).not.toHaveBeenCalled();
     expect(mocks.finalExchange).not.toHaveBeenCalled();
   });
-  it('still rejects a new request with a past deadline before storing any evidence', async () => {
+  it('confirms a new past-deadline request was not applied under the row lock', async () => {
     const res = response(), next = vi.fn();
     await presentarIntercambioInspeccion({ params: { id: 'inspection-1' }, user: { id: 'admin', rol: 'ADMIN' }, body: {
       version: 7, clienteId: 'new_expired_1234', tipo: 'REQUERIMIENTO', asunto: 'Pedido nuevo con fecha pasada',
       cuerpo: 'Una nueva presentación no puede registrar ahora un plazo ya vencido.', plazoRespuestaAt: '2020-01-01T12:00:00Z',
     } } as any, res as any, next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
-    expect(mocks.persist).not.toHaveBeenCalled(); expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.persist).not.toHaveBeenCalled(); expect(mocks.transaction).toHaveBeenCalledOnce();
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: 'INSPECTION_COMMAND_NOT_APPLIED' }));
   });
 
   it.each([-1, 0, 1])('marks the response late only after the exact timestamp (%s ms)', async offset => {
