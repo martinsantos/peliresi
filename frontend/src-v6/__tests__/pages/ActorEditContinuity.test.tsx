@@ -113,6 +113,24 @@ for (const actor of actors) describe(actor.role + ' edit continuity', () => {
     expect(mock.navigate).not.toHaveBeenCalled();
     expect(mock.draft.mock.calls.at(-1)![2].form.telefono).toBe('456');
   });
+  if (actor.role !== 'TRANSPORTISTA') it('retains all previously omitted Y codes when a saved ficha becomes a recovered draft', async () => {
+    const original = mock.actor;
+    const missing = ['Y1', 'Y2', 'Y3', 'Y15', 'Y19', 'Y28', 'Y43', 'Y44', 'Y45'];
+    mock.actor = { ...original, corrientesY: missing.join('/'), corrientesControl: missing.join(';') };
+    try {
+      open();
+      const saved = mock.draft.mock.calls.at(-1)![2];
+      expect(saved.selectedY).toEqual(missing);
+      act(() => mock.restore(saved));
+      expect(mock.draft.mock.calls.at(-1)![2].selectedY).toEqual(missing);
+      fireEvent.change(screen.getByRole('combobox', { name: 'Paso del registro' }), { target: { value: actor.last } });
+      fireEvent.click(screen.getByRole('button', { name: 'Guardar Cambios' }));
+      await waitFor(() => expect(mock.update).toHaveBeenCalledOnce());
+      const payload = mock.update.mock.calls[0][0].data;
+      const codes = String(payload[actor.role === 'OPERADOR' ? 'corrientesY' : 'corrientesControl']).split(/[,; /]+/);
+      expect([...codes].sort()).toEqual([...missing].sort());
+    } finally { mock.actor = original; }
+  });
   it('saves once, explicitly clears optional coordinates, and returns to the ficha', async () => {
     const list = open();
     fireEvent.change(screen.getByLabelText('Telefono'), { target: { value: '456' } });

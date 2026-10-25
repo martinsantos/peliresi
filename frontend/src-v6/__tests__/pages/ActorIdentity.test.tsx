@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,18 @@ vi.mock('../../hooks/useActores', () => ({
 }));
 
 describe('Actor fichas use the same identity as operational maps', () => {
+  it.each([
+    ['operador', OperadorDetallePage], ['transportista', TransportistaDetallePage],
+  ] as const)('%s summary belongs to the overview and does not displace documents', (actor, Component) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/actors/qa']}><Routes><Route path="/actors/:id" element={<Component />} /></Routes></MemoryRouter></QueryClientProvider>);
+    expect(screen.getByRole('region', { name: 'Resumen del ' + actor })).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: 'Documentos', exact: true }));
+    expect(screen.queryByRole('region', { name: 'Resumen del ' + actor })).toBeNull();
+    expect(screen.getByRole('tabpanel', { name: 'Documentos', exact: true })).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: 'Información General', exact: true }));
+    expect(screen.getByRole('region', { name: 'Resumen del ' + actor })).toBeVisible();
+  });
   it('shows saved operator contact data instead of the historical import', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/actors/qa']}><Routes><Route path="/actors/:id" element={<OperadorDetallePage />} /></Routes></MemoryRouter></QueryClientProvider>);

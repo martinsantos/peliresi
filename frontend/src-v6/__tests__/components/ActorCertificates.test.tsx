@@ -4,7 +4,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mock = vi.hoisted(() => ({ get: vi.fn(), download: vi.fn(), role: 'GENERADOR' }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'account', rol: mock.role } }) }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get } }));
-vi.mock('../../services/generador-fiscal.service', () => ({ generadorFiscalService: { downloadDocumento: mock.download } }));
+vi.mock('../../services/generador-fiscal.service', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../services/generador-fiscal.service')>();
+  return { ...actual, generadorFiscalService: { ...actual.generadorFiscalService, downloadDocumento: mock.download } };
+});
 import ActorCertificates from '../../components/ActorCertificates';
 const certificate = { id: 'official', tipo: 'CERTIFICADO_AMBIENTAL', estado: 'APROBADO', anio: 2026, nombre: 'CAA oficial.pdf', createdAt: '2026-10-08T12:00:00Z' };
 function open() {

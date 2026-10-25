@@ -48,6 +48,6 @@ it('a failed read remains explicit and can be retried without an empty success s
   mock.transport.mockRejectedValueOnce(new Error('offline')); open();
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron consultar');
   expect(screen.queryByRole('button', { name: 'Adjuntar' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar documentos' }));
   await screen.findByText('transporte.pdf'); expect(mock.transport).toHaveBeenCalledTimes(2);
 });

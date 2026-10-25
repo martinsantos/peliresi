@@ -37,6 +37,7 @@ import { generadorFiscalService, documentoIdentityService, type PagoTEF, type De
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
+import { ActorSummary } from '../../components/ActorSummary';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 
 // ===== Inline CRUD Modal =====
@@ -342,13 +343,11 @@ const GeneradorDetallePage: React.FC = () => {
 
       {detailTabs.activeTab === 'info' && <section aria-label="Resumen del generador" className="space-y-3">
         <QueryContent query={pagosQuery} loading="Cargando situación fiscal…" error="No pudimos consultar la situación fiscal." retryLabel="Reintentar situación fiscal">
-        <Card className="p-4">
-          <dl className="grid grid-cols-3 gap-3">
-            <div className="min-w-0"><dt className="text-sm text-neutral-600">Corrientes Y</dt><dd className="mt-1 text-lg font-bold text-neutral-900">{categorias.length}</dd></div>
-            <div className="min-w-0"><dt className="text-sm text-neutral-600">TEF{lastPago && <span> · {lastPago.anio}</span>}</dt><dd className="mt-1 font-semibold text-neutral-900">{!lastPago ? 'Sin registro' : tefAlDia ? 'Al día' : 'Pendiente'}</dd></div>
-            <div className="min-w-0"><dt className="break-words text-sm text-neutral-600">Habilitación</dt><dd className="mt-1 font-semibold text-neutral-900">{habilitado == null ? 'Sin registro' : habilitado ? 'Sí' : 'No'}</dd></div>
-          </dl>
-        </Card>
+        <ActorSummary items={[
+          { key: 'corrientes', label: 'Corrientes Y', value: categorias.length },
+          { key: 'tef', label: <>TEF{lastPago && <span> · {lastPago.anio}</span>}</>, value: !lastPago ? 'Sin registro' : tefAlDia ? 'Al día' : 'Pendiente' },
+          { key: 'habilitacion', label: 'Habilitación', value: habilitado == null ? 'Sin registro' : habilitado ? 'Sí' : 'No' },
+        ]} />
         </QueryContent>
       </section>}
 

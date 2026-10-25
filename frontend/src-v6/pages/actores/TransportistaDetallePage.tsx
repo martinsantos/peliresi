@@ -56,6 +56,7 @@ import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
+import { ActorSummary } from '../../components/ActorSummary';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
 import { MapCategorySymbol } from '../../components/ui/MapLayerToggle';
 
@@ -375,17 +376,12 @@ const TransportistaDetallePage: React.FC = () => {
       {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="TRANSPORTISTA" actorId={id || ''} />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Card className="p-4">
-          <p className="text-sm text-neutral-500">Vehículos</p>
-          <p className="text-3xl font-bold text-neutral-900">{transportista.flota.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-neutral-500">Conductores</p>
-          <p className="text-3xl font-bold text-neutral-900">{transportista.conductores.length}</p>
-        </Card>
-      </div>
+      {detailTabs.activeTab === 'info' && <section aria-label="Resumen del transportista">
+        <ActorSummary items={[
+          { key: 'vehiculos', label: 'Vehículos', value: transportista.flota.length },
+          { key: 'conductores', label: 'Conductores', value: transportista.conductores.length },
+        ]} />
+      </section>}
 
       {/* Tabs */}
       <Tabs {...detailTabs} variant="default">

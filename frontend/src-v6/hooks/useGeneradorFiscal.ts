@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { generadorFiscalService, operadorFiscalService, type PagoTEF, type DeclaracionJurada } from '../services/generador-fiscal.service';
+import { refreshActorDocuments, useActorDocuments } from './useActorDocuments';
 
 const KEYS = {
   pagos: (genId: string) => ['generador-pagos', genId] as const,
   ddjj: (genId: string) => ['generador-ddjj', genId] as const,
-  documentos: (genId: string) => ['generador-documentos', genId] as const,
 };
 
 // ===== PAGOS TEF =====
@@ -81,11 +81,7 @@ export function useDeleteDDJJ() {
 
 // ===== DOCUMENTOS =====
 export function useDocumentos(generadorId: string) {
-  return useQuery({
-    queryKey: KEYS.documentos(generadorId),
-    queryFn: () => generadorFiscalService.getDocumentos(generadorId),
-    enabled: !!generadorId,
-  });
+  return useActorDocuments('GENERADOR', generadorId);
 }
 
 export function useUploadDocumento() {
@@ -94,7 +90,7 @@ export function useUploadDocumento() {
     mutationFn: ({ generadorId, file, tipo, anio, observaciones }: {
       generadorId: string; file: File; tipo: string; anio?: number; observaciones?: string;
     }) => generadorFiscalService.uploadDocumento(generadorId, file, tipo, anio, observaciones),
-    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: KEYS.documentos(vars.generadorId) }),
+    onSuccess: (_d, vars) => refreshActorDocuments(qc, 'GENERADOR', vars.generadorId),
   });
 }
 
@@ -104,7 +100,7 @@ export function useRevisarDocumento() {
     mutationFn: ({ docId, estado, observaciones, generadorId }: {
       docId: string; estado: 'APROBADO' | 'RECHAZADO'; observaciones?: string; generadorId: string;
     }) => generadorFiscalService.revisarDocumento(docId, estado, observaciones),
-    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: KEYS.documentos(vars.generadorId) }),
+    onSuccess: (_d, vars) => refreshActorDocuments(qc, 'GENERADOR', vars.generadorId),
   });
 }
 
@@ -113,7 +109,7 @@ export function useDeleteDocumento() {
   return useMutation({
     mutationFn: ({ docId, generadorId }: { docId: string; generadorId: string }) =>
       generadorFiscalService.deleteDocumento(docId),
-    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: KEYS.documentos(vars.generadorId) }),
+    onSuccess: (_d, vars) => refreshActorDocuments(qc, 'GENERADOR', vars.generadorId),
   });
 }
 
@@ -122,7 +118,6 @@ export function useDeleteDocumento() {
 const OP_KEYS = {
   pagos: (opId: string) => ['operador-pagos', opId] as const,
   ddjj: (opId: string) => ['operador-ddjj', opId] as const,
-  documentos: (opId: string) => ['operador-documentos', opId] as const,
 };
 
 export function useOperadorPagosTEF(operadorId: string) {
@@ -196,11 +191,7 @@ export function useDeleteOperadorDDJJ() {
 }
 
 export function useOperadorDocumentos(operadorId: string) {
-  return useQuery({
-    queryKey: OP_KEYS.documentos(operadorId),
-    queryFn: () => operadorFiscalService.getDocumentos(operadorId),
-    enabled: !!operadorId,
-  });
+  return useActorDocuments('OPERADOR', operadorId);
 }
 
 export function useUploadOperadorDocumento() {
@@ -209,6 +200,6 @@ export function useUploadOperadorDocumento() {
     mutationFn: ({ operadorId, file, tipo, anio, observaciones }: {
       operadorId: string; file: File; tipo: string; anio?: number; observaciones?: string;
     }) => operadorFiscalService.uploadDocumento(operadorId, file, tipo, anio, observaciones),
-    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: OP_KEYS.documentos(vars.operadorId) }),
+    onSuccess: (_d, vars) => refreshActorDocuments(qc, 'OPERADOR', vars.operadorId),
   });
 }

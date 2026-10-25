@@ -48,6 +48,7 @@ import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
 import ActorCertificates from '../../components/ActorCertificates';
+import { ActorSummary } from '../../components/ActorSummary';
 import { OperadorDocuments } from '../../components/OperadorDocuments';
 import { AdministrativeTEF } from '../../components/AdministrativeTEF';
 import { ActorInspectionsPanel } from '../inspecciones/ActorInspectionsPanel';
@@ -218,17 +219,12 @@ const OperadorDetallePage: React.FC = () => {
         corrientesY={enriched?.corrientes || []}
         tieneISO={false} />
 
-      {/* Stats — only real data */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <Card className="p-4">
-          <p className="text-sm text-neutral-500">Corrientes Y</p>
-          <p className="text-3xl font-bold text-neutral-900">{enriched?.corrientes.length || 0}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-neutral-500">Tecnologías</p>
-          <p className="text-3xl font-bold text-neutral-900">{tecnologiasParsed.length}</p>
-        </Card>
-      </div>
+      {detailTabs.activeTab === 'info' && <section aria-label="Resumen del operador">
+        <ActorSummary items={[
+          { key: 'corrientes', label: 'Corrientes Y', value: enriched?.corrientes.length || 0 },
+          { key: 'tecnologias', label: 'Tecnologías', value: tecnologiasParsed.length },
+        ]} />
+      </section>}
 
       {/* Tabs — only real data */}
       <Tabs {...detailTabs} variant="default">
