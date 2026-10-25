@@ -34,12 +34,13 @@ export function PendingEvidenceThumbnail({ evidence, actions }: { evidence: Pend
       <p className="break-words text-xs font-bold text-[#10213A]">{evidence.fileName}</p>
       <p className="flex items-start gap-1 text-xs font-bold text-amber-900"><CloudUpload size={14} className="shrink-0" />{evidence.uploaded ? 'Recibida; falta confirmar la copia local' : evidence.failureKind === 'terminal' ? 'Requiere corrección o revisión' : 'Pendiente de sincronizar'}</p>
       {evidence.lastError && <p role="alert" className="break-words text-xs leading-relaxed text-error-800">{evidence.lastError}</p>}
+      {evidence.recoveredManually && !evidence.uploaded && <p className="text-xs text-amber-950">Recuperada de una versión anterior. Revisá el archivo antes de cargarlo; no se enviará automáticamente.</p>}
       {evidence.fields.descripcion && <p className="break-words text-xs text-neutral-700">{evidence.fields.descripcion}</p>}
       {evidence.attempts >= 3 && !evidence.uploaded && <p className="text-xs text-amber-950">Los intentos automáticos están pausados. Revisá el error y reintentá cuando esté resuelto.</p>}
       <a href={url} download={evidence.fileName} className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-xs font-bold text-primary-800"><Download size={14} />Descargar copia original</a>
       {!actions && <a href="#evidencias" className="inline-flex min-h-10 items-center px-2 text-xs font-bold text-primary-800">Revisar pendiente en Evidencias</a>}
       {actions && <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={disabled || !actions.online} onClick={() => void run(() => actions.onRetry(evidence.id))} className="min-h-10 rounded-md border border-amber-400 bg-white px-2 text-xs font-bold text-amber-950 disabled:opacity-50">{evidence.uploaded ? 'Confirmar sincronización' : 'Reintentar carga'}</button>
+        <button type="button" disabled={disabled || !actions.online} onClick={() => void run(() => actions.onRetry(evidence.id))} className="min-h-11 rounded-md border border-amber-400 bg-white px-2 text-xs font-bold text-amber-950 disabled:opacity-50">{evidence.uploaded ? 'Confirmar sincronización' : evidence.recoveredManually ? 'Guardar y cargar archivo' : 'Reintentar carga'}</button>
         {!evidence.uploaded && <>
           {evidence.failureKind === 'terminal' && <button type="button" disabled={disabled} onClick={() => setConfirm('replace')} className="min-h-10 rounded-md border border-neutral-300 bg-white px-2 text-xs font-bold">Corregir archivo</button>}
           <button type="button" disabled={disabled} onClick={() => setConfirm('discard')} className="min-h-10 rounded-md px-2 text-xs font-bold text-error-800">Descartar pendiente</button>

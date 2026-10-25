@@ -47,6 +47,14 @@ function pending(overrides: Partial<PendingInspectionEvidence> = {}): PendingIns
 }
 
 describe('inspection offline evidence queue adversarial invariants', () => {
+  it('never sends or removes an explicitly recovered legacy file on automatic sync', async () => {
+    indexedDbMocks.getAllOffline.mockResolvedValue([pending({ recoveredManually: true }), pending({ id: 'received', recoveredManually: true, uploaded: true })]);
+    const upload = vi.fn();
+    const result = await syncPendingInspectionEvidence({ inspectionId: 'inspection-1', userId: 'inspector-1', owner: 'context-A', upload });
+    expect(result).toEqual({ synchronized: 0, failed: 0, skipped: 2 });
+    expect(upload).not.toHaveBeenCalled();
+    expect(indexedDbMocks.removeOffline).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     indexedDbMocks.getAllOffline.mockResolvedValue([]);

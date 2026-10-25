@@ -14,7 +14,7 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ currentUser: { id: 'qa-inspector', rol: 'GENERADOR', esInspector: true, nombre: 'QA inspector' } }),
 }));
 vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: service }));
-vi.mock('../../services/indexeddb', () => ({ saveOffline: vi.fn().mockResolvedValue(undefined), getOffline: vi.fn() }));
+vi.mock('../../services/indexeddb', () => ({ saveOffline: vi.fn().mockResolvedValue(undefined), getOffline: vi.fn(), getAllOffline: vi.fn().mockResolvedValue([]) }));
 vi.mock('../../services/inspectionOfflineEvidence', () => ({
   listPendingInspectionEvidence: vi.fn().mockResolvedValue([]),
   syncPendingInspectionEvidence: vi.fn().mockResolvedValue({ synchronized: 0, failed: 0 }),
@@ -109,6 +109,37 @@ afterEach(async () => {
 });
 
 describe('inspection process restart with real asynchronous draft ownership', () => {
+  it('offers an explicit authorized review of old unscoped text without replacing the active draft', async () => {
+    const legacyKey = 'sitrep_inspection_draft_qa-inspector_qa-case';
+    const raw = JSON.stringify({ version: 1, observaciones: 'Trabajo anterior pendiente' });
+    localStorage.setItem(legacyKey, raw);
+    mount();
+    const input = await editor();
+    fireEvent.change(input, { target: { value: 'Trabajo de esta actividad' } });
+    fireEvent.click(screen.getByText('Copias de versiones anteriores'));
+    const search = screen.getByRole('button', { name: 'Buscar copias anteriores' });
+    await waitFor(() => expect(search).toBeEnabled());
+    fireEvent.click(search);
+    fireEvent.click(await screen.findByRole('button', { name: 'Revisar texto guardado' }));
+    expect(await screen.findByText('Dispositivo: Trabajo anterior pendiente')).toBeVisible();
+    expect(input).toHaveValue('Trabajo de esta actividad');
+    expect(service.saveDraft).not.toHaveBeenCalled();
+    expect(localStorage.getItem(legacyKey)).toBe(raw);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Trabajo anterior pendiente/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar selección (1)' }));
+    await waitFor(() => expect(input).toHaveValue('Trabajo anterior pendiente'));
+    expect(localStorage.getItem(legacyKey)).toBe(raw);
+    expect(service.saveDraft).not.toHaveBeenCalled();
+    const recovered = localStorage.getItem(key)!;
+    expect(JSON.parse(recovered).manualReview).toBe(true);
+    cleanup(); await act(async () => { await Promise.resolve(); });
+    checkpoint.read.mockImplementation(async (requestedKey: string) => requestedKey === key ? recovered : undefined);
+    mount();
+    expect(await editor()).toHaveValue('Trabajo anterior pendiente');
+    fireEvent(window, new Event('offline')); fireEvent(window, new Event('online'));
+    await act(async () => { await Promise.resolve(); });
+    expect(service.saveDraft).not.toHaveBeenCalled();
+  });
   it.each([false, true])('does not discard unproven legacy edits alongside a durable snapshot (edited=%s)', async edited => {
     const tree = mount(); await editor(); fireEvent(window, new Event('pagehide'));
     const journal = JSON.parse(localStorage.getItem(key)!);

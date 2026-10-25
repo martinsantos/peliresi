@@ -1,4 +1,5 @@
 import { inspectionContextKey, inspectionFieldDraftKey, inspectionReturnTarget, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { warmInspectionShell } from '../../services/warmInspectionShell';
 
@@ -47,6 +48,7 @@ import { inspectionActorRoute, inspectionDate, inspectionErrorMessage, isTrainin
 import { OfflineDictation } from './OfflineDictation';
 import { appendDictatedText } from './appendDictatedText';
 import { InspectionLocationField } from './InspectionLocationField';
+import { InspectionLegacyRecovery } from './InspectionLegacyRecovery';
 import { inspectionLocationSuggestions } from './inspectionLocations';
 import { readInspectionFieldCheckpoint, writeInspectionFieldCheckpoint } from '../../services/inspectionFieldCheckpoint';
 
@@ -166,6 +168,9 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const pendingEvidence = pendingEvidenceEntries.filter((entry) => entry.inspectionId === id && entry.userId === String(currentUser?.id) && entry.owner === owner);
   const [pendingEvidenceReadFailed, setPendingEvidenceReadFailed] = useState(true);
   const [staleDraft, setStaleDraft] = useState<Draft | null>(null);
+  const [legacyReview, setLegacyReview] = useState(false);
+  const [recoveringDraft, setRecoveringDraft] = useState(false);
+  const manualRecoveryRef = useRef(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [leavingDraft, setLeavingDraft] = useState(false);
   const [serverFingerprint, setServerFingerprint] = useState('');
@@ -220,7 +225,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       // Persist provenance together with the fields, not in a second key that
       // could reach disk at a different time or belong to another inspection.
       checkpointTimeRef.current = Math.max(Date.now(), checkpointTimeRef.current + 1);
-      const raw = JSON.stringify({ ...draft, baseFingerprint: serverFingerprintRef.current, checkpointAt: checkpointTimeRef.current });
+      const raw = JSON.stringify({ ...draft, baseFingerprint: serverFingerprintRef.current, checkpointAt: checkpointTimeRef.current, manualReview: manualRecoveryRef.current });
       localStorage.setItem(draftKey, raw);
       const sequence = ++checkpointSequenceRef.current;
       const scope = evidenceScopeRef.current;
@@ -253,11 +258,12 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     if (!active) return;
     const latest = currentDraftRef.current;
     const inMemory = continuing && latest && draftFingerprint(latest) !== serverFingerprintRef.current
-      ? JSON.stringify({ ...latest, version: confirmedVersionRef.current, baseFingerprint: serverFingerprintRef.current }) : null;
+      ? JSON.stringify({ ...latest, version: confirmedVersionRef.current, baseFingerprint: serverFingerprintRef.current, manualReview: manualRecoveryRef.current }) : null;
     recoveredDraftNeedsSyncRef.current = false;
     confirmedVersionRef.current = inspection.version;
     setServerFingerprint(draftFingerprint(draft));
     setStaleDraft(null);
+    setLegacyReview(false);
     if (draftKey) {
       const journal = localStorage.getItem(draftKey);
       let raw = inMemory || (durable === undefined ? journal : durable);
@@ -279,10 +285,11 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       if (raw !== null) {
         if (raw === undefined) throw new Error('Copia local inválida');
         const stored = reconcileStoredDraft(JSON.parse(raw), draft);
+        manualRecoveryRef.current = JSON.parse(raw).manualReview === true;
         const timestamp = JSON.parse(raw).checkpointAt;
         if (typeof timestamp === 'number' && Number.isFinite(timestamp)) checkpointTimeRef.current = Math.max(checkpointTimeRef.current, timestamp);
         if (stored.compatible) {
-          recoveredDraftNeedsSyncRef.current = !continuing && draftFingerprint(stored.draft) !== draftFingerprint(draft);
+          recoveredDraftNeedsSyncRef.current = !continuing && !manualRecoveryRef.current && draftFingerprint(stored.draft) !== draftFingerprint(draft);
           Object.assign(draft, stored.draft);
           if (!continuing) setLocalFingerprint(draftFingerprint(stored.draft));
         } else {
@@ -401,6 +408,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
 
   const syncEvidence = useCallback(async (manual = false, onlyId?: string) => {
     if (!navigator.onLine || !id || !currentUser?.id || syncingRef.current || savingDraftRef.current || transitionInFlight.current || staleDraft || !canEdit || !canWriteDraft()) return;
+    if (!manual && manualRecoveryRef.current) return;
     syncingRef.current = true; setSyncingEvidence(true);
     try {
     const entries = await listPendingInspectionEvidence(id, String(currentUser.id), owner);
@@ -447,6 +455,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const save = async (fromSync = false): Promise<boolean> => {
     const submitted = currentDraftRef.current;
     if (!submitted || !draftReady || !canWriteDraft() || staleDraft || savingDraftRef.current || (!fromSync && (syncingRef.current || transitionInFlight.current))) return false;
+    manualRecoveryRef.current = false;
     const journaled = storeDraft(submitted);
     if (!isOnline || !navigator.onLine) {
       const locallyProtected = journaled && await checkpointConfirmationRef.current;
@@ -638,17 +647,18 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     comparaciones: comparisons,
   }) : null, [comparisons, datosActa, informeTecnico, inspection, items, numeroActa, observaciones, plazoRespuestaAt]);
 
-  const recoverStaleDraft = (selectedKeys: string[]) => {
-    if (!inspection || !staleDraft || !canWriteDraft()) return;
+  const recoverStaleDraft = async (selectedKeys: string[]) => {
+    if (!inspection || !staleDraft || !canWriteDraft() || recoveringDraft) return;
     const selected = new Set(selectedKeys);
-    const server = draftFromInspection(inspection);
+    // Explicit legacy import preserves unselected edits already in this activity.
+    const server = legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection);
     const savedItems = new Map((staleDraft.items || []).map((item) => [item.id, item]));
     const savedComparisons = new Map((staleDraft.comparaciones || []).map((row) => [row.id, row]));
-    const recoveredItems = inspection.items.map((current) => {
+    const recoveredItems = server.items.map((current) => {
       const saved = savedItems.get(current.id);
       return saved && selected.has(`item:${current.id}`) ? { ...current, resultado: saved.resultado, observacion: saved.observacion } : current;
     });
-    const recoveredComparisons = inspection.comparaciones.map((current) => {
+    const recoveredComparisons = server.comparaciones.map((current) => {
       const saved = savedComparisons.get(current.id);
       return saved && selected.has(`comparison:${current.id}`) ? { ...current, resultado: saved.resultado, valorObservado: saved.valorObservado, observacion: saved.observacion } : current;
     });
@@ -667,14 +677,20 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       items: recoveredItems,
       comparaciones: recoveredComparisons,
     };
+    setRecoveringDraft(true);
+    if (legacyReview) manualRecoveryRef.current = true;
+    const saved = storeDraft(recovered) && await checkpointConfirmationRef.current;
+    setRecoveringDraft(false);
+    if (!saved || !canWriteDraft()) { toast.error('Recuperación sin confirmar', 'La copia anterior se conserva. Reintentá sin cerrar esta pantalla.'); return; }
     setObservaciones(recovered.observaciones); setNumeroActa(recovered.numeroActa); setUbicacion(recovered.ubicacion); setPlazoRespuestaAt(recovered.plazoRespuestaAt); setDatosActa(recovered.datosActa); setInformeTecnico(recovered.informeTecnico); setItems(recovered.items); setComparisons(recovered.comparaciones);
-    storeDraft(recovered);
     setStaleDraft(null);
-    toast.warning('Conflicto conciliado', selected.size ? `${selected.size} cambios del dispositivo quedaron listos para revisar y guardar.` : 'Se mantuvo la versión del servidor.');
+    setLegacyReview(false);
+    toast.info(legacyReview ? 'Copia recuperada en esta actividad' : 'Conflicto conciliado', 'Revisá los campos antes de guardar en el expediente.');
   };
 
   const discardStaleDraft = async () => {
-    if (!canWriteDraft()) return;
+    if (!canWriteDraft() || recoveringDraft) return;
+    if (legacyReview) { setStaleDraft(null); setLegacyReview(false); return; }
     try { if (draftKey) { await writeInspectionFieldCheckpoint(draftKey, null); localStorage.removeItem(draftKey); } }
     catch { toast.error('No se confirmó el descarte local', 'El borrador sigue disponible. Reintentá sin cerrar esta pantalla.'); return; }
     setStaleDraft(null);
@@ -728,7 +744,7 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
     : savingDraft
     ? { tone: 'neutral', message: 'Guardando cambios en el servidor…' }
     : staleDraft
-      ? { tone: 'error', message: 'Hay versiones en conflicto. Revisá el borrador anterior antes de guardar.' }
+      ? { tone: legacyReview ? 'warning' : 'error', message: legacyReview ? 'Revisando la copia anterior · elegí qué recuperar.' : 'Hay versiones en conflicto. Revisá el borrador anterior antes de guardar.' }
       : currentFingerprint === serverFingerprint
         ? { tone: 'success', message: 'Guardado en servidor.' }
         : storageFailed
@@ -873,7 +889,22 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
       </div>
     </details>}
     {recording && <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800"><span>Grabando audio de campo</span><Button variant="danger" size="sm" onClick={toggleRecording} leftIcon={<Square size={14} />}>Detener grabación</Button></div>}
-    {staleDraft && <StaleDraftNotice serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
+    {fieldEditAllowed && <InspectionLegacyRecovery userId={String(currentUser!.id)} inspectionId={inspection.id} owner={owner} destination={`${currentUser!.nombre || 'Mi cuenta'} · ${workspaceRoleLabel(currentUser!.rol)}${currentUser!.empresaContexto ? ' · ' + currentUser!.empresaContexto.razonSocial + ' · ' + (currentUser!.empresaContexto.establecimiento?.nombre || 'Todas las sedes') : ''} · ${inspection.numero}`} disabled={!canEdit || !isOnline || savingDraft || syncingEvidence || changingStage || recoveringDraft} verifyAccess={async () => {
+      const scope = evidenceScopeRef.current;
+      const fresh = await inspeccionService.get(inspection.id);
+      if (!scope || scope !== evidenceScopeRef.current || !canWriteDraft()) throw new Error('El contexto cambió. Volvé a abrir el expediente.');
+      const authorized = currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${fresh.tipoActor}` || (currentUser?.esInspector && String(fresh.inspectorId) === String(currentUser.id));
+      if (!authorized || !['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(fresh.estado)) throw new Error('Este contexto ya no puede editar la visita. Actualizá el expediente.');
+      if (fresh.version !== inspection.version) { void query.refetch(); throw new Error('El expediente cambió. Revisá la versión actual antes de recuperar.'); }
+    }} onReview={async raw => {
+      const current = currentDraftRef.current;
+      if (!current || !canWriteDraft()) return;
+      const saved = storeDraft(current) && await checkpointConfirmationRef.current;
+      if (!saved || !canWriteDraft()) throw new Error('Primero debe confirmarse la copia del trabajo actual.');
+      setStaleDraft(reconcileStoredDraft(JSON.parse(raw), current).draft); setLegacyReview(true);
+    }} onRecoveredFile={refreshPendingEvidence} />}
+    {staleDraft && <StaleDraftNotice legacy={legacyReview} busy={recoveringDraft} serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(legacyReview && currentDraftRef.current ? currentDraftRef.current : draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
+    {manualRecoveryRef.current && !staleDraft && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">Texto recuperado sólo en este dispositivo. Revisalo y elegí Guardar cambios para incorporarlo al expediente.</p>}
     <fieldset disabled={changingStage} className="min-h-0 min-w-0 flex-1"><InspectionWorkspace key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} saveAction={guided && canWriteDraft() ?
       <div data-testid="inspection-field-save-bar" className="flex min-w-0 items-center gap-2 sm:gap-4">
         <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-1 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
@@ -887,20 +918,22 @@ const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   </div>;
 };
 
-function StaleDraftNotice({ serverVersion, draftVersion, conflicts, onRecover, onDiscard }: { serverVersion: number; draftVersion: number; conflicts: DraftConflict[]; onRecover: (selectedKeys: string[]) => void; onDiscard: () => void }) {
+function StaleDraftNotice({ serverVersion, draftVersion, conflicts, onRecover, onDiscard, legacy = false, busy = false }: { serverVersion: number; draftVersion: number; conflicts: DraftConflict[]; onRecover: (selectedKeys: string[]) => void; onDiscard: () => void; legacy?: boolean; busy?: boolean }) {
   const [selected, setSelected] = useState<string[]>([]);
+  const review = useRef<HTMLElement>(null);
+  useEffect(() => { if (legacy) review.current?.focus(); }, [legacy]);
   const toggle = (key: string) => setSelected((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
-  return <section role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
+  return <section ref={review} tabIndex={-1} role="alert" aria-label={legacy ? 'Revisión de copia anterior' : 'Conciliar borrador anterior'} className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800">
     <div className="flex items-start gap-3">
       <History size={19} className="mt-0.5 shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-extrabold">Hay un borrador anterior sin conciliar</p>
-        <p className="mt-1 text-xs leading-relaxed">{draftVersion === serverVersion ? 'El dispositivo conserva un borrador de formato anterior o incompleto.' : `El dispositivo conserva cambios de la versión ${draftVersion}; el servidor está en la versión ${serverVersion}.`} No se descartó ni fusionó nada automáticamente.</p>
-        <p className="mt-1 text-xs font-semibold">Elegí campo por campo qué cambios del dispositivo querés conservar. Lo no seleccionado mantiene el valor del servidor.</p>
-        {conflicts.length > 0 ? <div className="mt-3 max-h-72 space-y-2 overflow-y-auto rounded-lg border border-amber-200 bg-white p-2">{conflicts.map((conflict) => <label key={conflict.key} className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-amber-50"><input type="checkbox" checked={selected.includes(conflict.key)} onChange={() => toggle(conflict.key)} className="mt-1 h-4 w-4 accent-amber-900" /><span className="min-w-0 text-xs"><strong className="block text-sm">{conflict.label}</strong><span className="mt-1 block text-neutral-600">Servidor: {conflict.serverValue}</span><span className="block font-semibold text-amber-900">Dispositivo: {conflict.localValue}</span></span></label>)}</div> : <p className="mt-3 rounded-lg border border-amber-200 bg-white p-3 text-xs">No se detectaron valores diferentes; el conflicto corresponde al formato anterior del borrador.</p>}
+        <p className="text-sm font-extrabold">{legacy ? 'Elegí qué recuperar en esta actividad' : 'Hay un borrador anterior sin conciliar'}</p>
+        <p className="mt-1 text-xs leading-relaxed">{legacy ? 'El original se conserva. Recuperar no envía cambios al expediente.' : draftVersion === serverVersion ? 'El dispositivo conserva un borrador de formato anterior o incompleto.' : `El dispositivo conserva cambios de la versión ${draftVersion}; el servidor está en la versión ${serverVersion}.`}{!legacy && ' No se descartó ni fusionó nada automáticamente.'}</p>
+        <p className="mt-1 text-xs font-semibold">Elegí los campos a recuperar. Los demás mantienen {legacy ? 'tu trabajo actual' : 'el valor del servidor'}.</p>
+        {conflicts.length > 0 ? <div className="mt-3 max-h-72 space-y-2 overflow-y-auto rounded-lg border border-amber-200 bg-white p-2">{conflicts.map((conflict) => <label key={conflict.key} className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-amber-50"><input type="checkbox" disabled={busy} checked={selected.includes(conflict.key)} onChange={() => toggle(conflict.key)} className="mt-1 h-4 w-4 accent-amber-900" /><span className="min-w-0 break-words text-xs"><strong className="block text-sm">{conflict.label}</strong><span className="mt-1 block text-neutral-600">{legacy ? 'Trabajo actual' : 'Servidor'}: {conflict.serverValue}</span><span className="block font-semibold text-amber-900">Dispositivo: {conflict.localValue}</span></span></label>)}</div> : <p className="mt-3 rounded-lg border border-amber-200 bg-white p-3 text-xs">No se detectaron valores diferentes.</p>}
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => onRecover(selected)} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-amber-900 px-3 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"><RotateCcw size={15} />Aplicar selección ({selected.length})</button>
-          <button type="button" onClick={onDiscard} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-amber-400 bg-white px-3 text-xs font-bold text-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"><Trash2 size={15} />Descartar borrador anterior</button>
+          <button type="button" disabled={busy || (legacy && selected.length === 0)} onClick={() => onRecover(selected)} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-amber-900 px-3 text-xs font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 disabled:opacity-60"><RotateCcw size={15} />Aplicar selección ({selected.length})</button>
+          <button type="button" disabled={busy} onClick={onDiscard} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-400 bg-white px-3 text-xs font-bold text-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 disabled:opacity-60">{legacy ? <><ArrowLeft size={15} />Volver sin recuperar</> : <><Trash2 size={15} />Descartar borrador anterior</>}</button>
         </div>
       </div>
     </div>

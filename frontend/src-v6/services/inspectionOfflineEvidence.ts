@@ -29,6 +29,7 @@ export interface PendingInspectionEvidence {
   failureKind?: 'retryable' | 'terminal';
   nextRetryAt?: string;
   uploaded?: boolean;
+  recoveredManually?: boolean;
 }
 
 const STORE = 'inspection_evidence_queue' as const;
@@ -183,6 +184,8 @@ export function syncPendingInspectionEvidence(options: SyncOptions): Promise<Ins
     for (const entry of entries) {
       if (options.isActive?.() === false || !navigator.onLine) break;
       if (options.onlyId && entry.id !== options.onlyId) continue;
+      // Recovery is a local review, not consent to upload or erase a receipt.
+      if (entry.recoveredManually && !options.manual) { result.skipped += 1; continue; }
       if (!entry.uploaded && !options.manual && (entry.failureKind === 'terminal' || entry.attempts >= MAX_AUTO_ATTEMPTS || (entry.nextRetryAt && Date.parse(entry.nextRetryAt) > Date.now()))) {
         result.skipped += 1;
         continue;
