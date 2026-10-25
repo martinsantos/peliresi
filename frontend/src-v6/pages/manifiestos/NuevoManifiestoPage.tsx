@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
+import { DraftConflictNotice } from '../../components/DraftConflictNotice';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { toast } from '../../components/ui/Toast';
@@ -435,7 +436,7 @@ const NuevoManifiestoForm: React.FC = () => {
         </div>
       </header>
 
-      {draft.conflict && <div role="alert" className="mb-3 rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900"><p>Otra pestaña cambió este borrador. Tu texto sigue aquí; elegí qué versión conservar antes de crear el manifiesto.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={draft.reload}>Cargar la otra versión</Button><Button variant="outline" onClick={draft.overwrite}>Conservar mi versión</Button></div></div>}
+      {draft.conflict && <div className="mb-3"><DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload} onKeep={draft.overwrite} /></div>}
       {(draft.saved || draft.error) && <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-primary-50 px-3 text-sm text-primary-900" aria-label="Borrador del manifiesto">
         <p role={draft.error ? 'alert' : 'status'} className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : <>{draft.restored ? 'Borrador recuperado' : 'Borrador guardado'}<span className="block text-xs text-neutral-600">En este dispositivo</span></>}</p>
         {!discardDraft && <button type="button" aria-label="Descartar borrador" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar</button>}

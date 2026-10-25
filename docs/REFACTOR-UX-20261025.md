@@ -58,6 +58,7 @@ Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativ
 | UX11 | Alta | Cerrar adenda pierde hallazgo/motivo; reintentar desde otra sesión puede duplicar comando | Recuperar por contexto, conservar clave de envío y resolver conflicto entre pestañas | Unitarias + cierre/reapertura web/app comprobados |
 | UX12 | Alta | Otra pestaña reemplaza silenciosamente un manifiesto en edición | Conservar texto propio, bloquear envío y ofrecer elección de versión | Regresión y conflicto web/app comprobados (8 kg frente a 9 kg); sin crear manifiesto |
 | UX13 | Media | Nuevo manifiesto repite el título del encabezado en escritorio | Un único título de pantalla en web y app | Duplicación retirada |
+| UX14 | Alta | Cerrar las dos pestañas con un conflicto sin elegir descarta la copia local | Guardar cada copia separadamente, recuperarla al reabrir y no permitir enviar hasta elegir | Corregido; 158 regresiones y cierre/reapertura real web/app de manifiesto y motivo de adenda comprobados |
 
 ## Evidencias y sesiones
 
@@ -83,7 +84,13 @@ Todavía no hay participantes observados ni métricas humanas de esta tanda.
 2. Android físico: suspensión real, permisos/GPS y cierre del proceso. La app en navegador no sustituye esa prueba.
 3. Completar barrido de todos los estados en cinco anchos, ampliación de texto, lector de pantalla y recuperación ante red lenta/sesión vencida/adjuntos rechazados. La evidencia actual sólo cubre los recorridos detallados arriba.
 4. Terminar la consolidación general de metadatos de navegación, ayuda/regreso y componentes en tandas 2–4. No se presenta este corte operativo como refactor total finalizado.
-5. Conflictos de borrador: ambas copias se conservan durante navegación interna; el cierre del navegador advierte. La copia en conflicto aún requiere elegir una versión para quedar guardada de forma durable. Falta probar el cierre forzado del proceso en Android; no se considera recuperable sin esa elección.
+5. Android físico sigue pendiente también para conflictos de borrador: el cierre/reapertura de las pestañas web/app ya recupera ambas versiones sin elegir previamente. Falta comprobar el cierre forzado del proceso y las políticas de almacenamiento del dispositivo real.
+
+### Continuación: conflictos durables
+
+Primer corte técnico conservado en `9bb62969`. La continuación guarda cada copia en conflicto en una clave propia, aislada por cuenta, rol y registro. Resolver una copia no elimina una revisión más reciente ni las copias de otras pestañas. Se revisan una por vez. Un fallo de cuota mantiene el texto en pantalla y muestra que no hay recuperación garantizada.
+
+Evidencias: `uiux-continuity-20261025`. Sin registros nuevos: borrador de manifiesto con 11 frente a 22 kg; cierre de ambas pestañas; recuperación en web y app; elección de 22 kg persistida. Motivo de adenda `2026-000142`: dos textos, cierre, recuperación del texto local y decisión bloqueada hasta elegir. No se envió ninguna resolución. También se compactó el resumen documental para no mostrar tres contadores en cero y se subió el conflicto junto al encabezado.
 
 ### Guion de la primera sesión (sin intervenir salvo bloqueo)
 

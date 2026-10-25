@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { Card } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
+import { DraftConflictNotice } from '../../components/DraftConflictNotice';
 import { Input } from '../../components/ui/Input';
 import { OperatorFindingSummary } from '../../components/manifiestos/OperatorFindingSummary';
 import type { OperatorFinding } from '../../types/inspectionIntake';
@@ -106,25 +107,31 @@ function AddendumContext({scope}:{scope:string}) {
   const blocked = busy || draft.conflict || query.isError;
   return <section className="mx-auto w-full max-w-[960px] space-y-4" aria-label="Adendas del manifiesto">
     <Link to={mp(`/manifiestos/${id}`)} className="inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"><ArrowLeft size={18} aria-hidden="true"/>Volver al manifiesto</Link>
-    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Adendas · {data?.manifiesto.numero || 'Manifiesto'}</h2>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Manifiesto {data?.manifiesto.numero || ''}</h2>
       {data?.puedeRegistrar && !creating && <Button disabled={query.isError||draft.conflict} onClick={() => { if(hasFinding){setCreating(true);return;} setRectificaId(undefined); pending.current = undefined; setMotivo(''); setCreating(true); setSaved(''); setWastes(data.manifiesto.residuos?.map(row => ({ ...row })) || [emptyWaste()]); }}>{hasFinding?'Retomar informe':data.puedeInformarHallazgo ? 'Informar hallazgo' : 'Registrar diferencia'}</Button>}
     </div>
+    {draft.conflict&&<DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={()=>{draft.reload();pending.current=undefined;}} onKeep={()=>draft.overwrite()} />}
     {selected && <div role="status" className="flex flex-wrap items-center gap-3 text-sm"><span>Adenda del aviso</span><Button variant="outline" onClick={() => { setPage(1); setParams({}); }}>Ver todas las adendas</Button></div>}
-    {data && <p className="text-sm text-neutral-600">Operación: {formatEstado(data.manifiesto.estado)}. La revisión de adendas no detiene el circuito.</p>}
+    {data && <p className="text-sm text-neutral-600">Operación: {formatEstado(data.manifiesto.estado)}</p>}
     {data?.finalLiberado && <p role="status" className="rounded border border-neutral-200 p-3">El operador ya liberó la disposición final{currentUser?.training ? ' CAP' : ''}. Se conservan el certificado y las adendas revisadas; este expediente queda en consulta.</p>}
-    {data?.documental && data.total > 0 && <Card className="p-4 space-y-1" role="region" aria-label="Control documental">
-      <h2 className="flex items-center gap-2 font-semibold"><ClipboardCheck size={20} className="text-primary-700" aria-hidden="true" />Control documental</h2>
-      <p>{data.documental.pendientes} {data.documental.pendientes === 1 ? 'pendiente' : 'pendientes'} · {data.documental.observadas} {data.documental.observadas === 1 ? 'observada' : 'observadas'} · {data.documental.rechazadas} {data.documental.rechazadas === 1 ? 'rechazada' : 'rechazadas'}</p>
-      <p className="text-sm text-neutral-600">{data.total === 0 ? 'Sin adendas registradas.' : data.documental.estado === 'ADENDAS_REVISADAS' ? 'Adendas revisadas. No acredita el cierre documental del expediente.' : 'Hay revisiones por atender. El cierre operativo no las aprueba.'}</p>
-    </Card>}
-    <details className="text-sm text-neutral-600"><summary className="min-h-11 cursor-pointer py-3 font-medium text-primary-800 focus-visible:ring-2 focus-visible:ring-primary-700">Cómo se revisa una adenda</summary><p className="pb-3">Cada revisión expresa la decisión de su autor. La última revisión indica el estado actual; no representa unanimidad ni cierre documental.</p></details>
+    {data?.documental && data.total > 0 && <div className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white p-3 text-sm" role="region" aria-label="Control documental">
+      <ClipboardCheck size={20} className="shrink-0 text-primary-700" aria-hidden="true" />
+      <div className="space-y-1">
+        {data.documental.estado !== 'ADENDAS_REVISADAS' && <p className="font-semibold">{[
+          data.documental.pendientes ? `${data.documental.pendientes} ${data.documental.pendientes === 1 ? 'pendiente' : 'pendientes'}` : '',
+          data.documental.observadas ? `${data.documental.observadas} ${data.documental.observadas === 1 ? 'observada' : 'observadas'}` : '',
+          data.documental.rechazadas ? `${data.documental.rechazadas} ${data.documental.rechazadas === 1 ? 'rechazada' : 'rechazadas'}` : '',
+        ].filter(Boolean).join(' · ')}</p>}
+        <p className="text-neutral-600">{data.documental.estado === 'ADENDAS_REVISADAS' ? 'Adendas revisadas. No acredita el cierre documental del expediente.' : 'Hay revisiones por atender. El cierre operativo no las aprueba.'}</p>
+      </div>
+    </div>}
+    <details className="text-sm text-neutral-600"><summary className="min-h-11 cursor-pointer py-3 font-medium text-primary-800 focus-visible:ring-2 focus-visible:ring-primary-700">Cómo se revisa una adenda</summary><p className="pb-3">La revisión de adendas no detiene el circuito operativo. Cada revisión expresa la decisión de su autor. La última revisión indica el estado actual; no representa unanimidad ni cierre documental.</p></details>
     {query.isPending && <p role="status">Cargando adendas…</p>}
     {query.isError && <p role="alert">No se pudieron cargar las adendas. <Button variant="outline" onClick={() => void query.refetch()}>Reintentar carga</Button></p>}
     {error && <p role="alert" className="text-error-700">{error} <Button variant="outline" onClick={() => void query.refetch()}>Actualizar revisiones</Button></p>}
     {saved && <p role="status">{saved}</p>}
     {draft.saved&&(hasFinding||Object.keys(notes).length>0)&&<div className="flex flex-wrap items-center justify-between gap-2 text-sm text-neutral-600"><p role="status">{draft.restored?'Borrador recuperado':'Borrador guardado'} en este dispositivo · todavía no enviado.</p>{!discarding?<button type="button" className="min-h-11 underline underline-offset-2" onClick={()=>setDiscarding(true)}>Descartar borrador</button>:<div className="flex flex-wrap items-center gap-2"><span>¿Descartar lo no enviado?</span><Button variant="outline" onClick={()=>setDiscarding(false)}>Conservar</Button><Button variant="outline" onClick={()=>{if(draft.clear()){pending.current=undefined;setDiscarding(false);}}}>Sí, descartar</Button></div>}</div>}
     {draft.error&&<p role="alert" className="text-sm text-error-800">No se pudo guardar el borrador en este dispositivo. Conservá esta pantalla abierta.</p>}
-    {draft.conflict&&<div role="alert" className="rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm"><p>Otra pestaña cambió este borrador. Tu texto sigue aquí; elegí qué versión conservar antes de enviarlo.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={()=>{draft.reload();pending.current=undefined;}}>Cargar la otra versión</Button><Button variant="outline" onClick={()=>draft.overwrite()}>Conservar mi versión</Button></div></div>}
     {creating && <Card className="p-4"><form className="space-y-4" onSubmit={e => { e.preventDefault(); void send(endpoint, { motivo, residuos: wastes, ...(rectificaId ? { rectificaId } : {}) }); }}>
       {data&&!data.puedeRegistrar&&<p role="status" className="text-sm text-neutral-700">Se conserva tu borrador, pero el expediente ya no permite registrar una adenda.</p>}
       <h2 className="flex items-center gap-2 font-semibold"><FileSearch size={20} className="text-primary-700" aria-hidden="true" />{rectificaId ? 'Rectificar mediante una nueva adenda' : data?.puedeInformarHallazgo ? 'Informe de hallazgo dentro de la adenda' : 'Carga observada completa'}</h2>

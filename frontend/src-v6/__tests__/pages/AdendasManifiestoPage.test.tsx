@@ -207,7 +207,7 @@ it('requires a deliberate choice before replacing another tab’s draft',async()
  const key=Object.keys(localStorage).find(k=>k.startsWith('sitrep:adenda-form:'))!;
  const other=JSON.parse(localStorage.getItem(key)!);other.revision='other-tab';other.value.notes[record.id]='Texto de la otra pestaña';
  localStorage.setItem(key,JSON.stringify(other));fireEvent(window,new StorageEvent('storage',{key}));
- expect(await screen.findByRole('alert')).toHaveTextContent('Otra pestaña cambió este borrador');
+ expect(await screen.findByRole('alert')).toHaveTextContent('Guardamos ambas versiones en este dispositivo');
  expect(screen.getByLabelText('Motivo de resolución')).toHaveValue('Texto local');expect(screen.getByRole('button',{name:'Observar'})).toBeDisabled();expect(mock.post).not.toHaveBeenCalled();
  page.unmount();view();expect(await screen.findByLabelText('Motivo de resolución')).toHaveValue('Texto local');expect(screen.getByRole('button',{name:'Observar'})).toBeDisabled();
  fireEvent.click(screen.getByRole('button',{name:'Cargar la otra versión'}));expect(screen.getByLabelText('Motivo de resolución')).toHaveValue('Texto de la otra pestaña');
