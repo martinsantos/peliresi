@@ -7,6 +7,34 @@ const sha = 'a'.repeat(64);
 const analysis: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: 'ATM ARTIFICIAL', alcance: 'QA', aviso: null,
   pago: { revision: 'PENDIENTE', coincidencia: false, propuesta: { campos: { emisor: 'ATM_TASAS', idComprobante: 'QA123', codigoTasa: '162', importe: '12500.00', fechaPago: '2026-10-20' }, conflictos: [] } } };
 describe('reviewing payment identity', () => {
+  it('keeps an incomplete OCR review local and focuses the first missing field', async () => {
+    const save = vi.fn();
+    render(<PaymentIdentityReview sha256={sha} cuit="30900000011" referencia="QA-ALTA" onConfirm={save} />);
+    fireEvent.click(screen.getByText('Identificar y reservar pago ATM'));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar y reservar pago' }));
+    expect(save).not.toHaveBeenCalled();
+    const id = screen.getByLabelText('ID Comprobante ATM');
+    expect(id).toHaveFocus(); expect(id).toHaveAttribute('aria-invalid', 'true');
+    expect(id).toHaveAccessibleDescription('Completá id comprobante atm según el original.');
+    expect(screen.getByLabelText('Transacción (si figura)')).toHaveAttribute('aria-invalid', 'false');
+    for (const [name, value] of [['ID Comprobante ATM','QA123'],['Código de tasa','162'],['Fecha de pago','2026-10-20'],['Importe pagado (ARS)','12500,00']]) {
+      fireEvent.change(screen.getByLabelText(name), { target: { value } });
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar y reservar pago' }));
+    await waitFor(() => expect(save).toHaveBeenCalledOnce());
+    expect(save.mock.calls[0][0]).toMatchObject({ importe:'12500,00', expectedSha256:sha });
+  });
+  it('identifies the mismatched taxpayer without erasing the original values', () => {
+    const save = vi.fn();
+    render(<PaymentIdentityReview analysis={analysis} sha256={sha} cuit="30900000011" referencia="QA" onConfirm={save} />);
+    fireEvent.click(screen.getByText('Identificar y reservar pago ATM'));
+    fireEvent.change(screen.getByLabelText('CUIT del obligado'), { target:{value:'30900000022'} });
+    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', {name:'Confirmar y reservar pago'}));
+    expect(save).not.toHaveBeenCalled(); expect(screen.getByLabelText('CUIT del obligado')).toHaveFocus();
+    expect(screen.getByLabelText('CUIT del obligado')).toHaveAccessibleDescription('El CUIT debe coincidir con el obligado de este trámite.');
+    expect(screen.getByLabelText('ID Comprobante ATM')).toHaveValue('QA123');
+  });
   it('requires a reviewed original, sends the exact immutable file hash, and keeps fields on conflict', async () => {
     const save = vi.fn().mockRejectedValue({ response: { data: { message: 'Este pago ya está vinculado a otro trámite.' } } });
     render(<PaymentIdentityReview analysis={analysis} sha256={sha} cuit="30900000011" referencia="QA-ALTA" onConfirm={save} />);

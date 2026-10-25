@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { api } from '../../services/api';
-import { companyHeaders,saveCompanyContext,type CompanyChoice } from '../../services/companyContext';
+import { companyCacheScope,companyHeaders,saveCompanyContext,type CompanyChoice } from '../../services/companyContext';
 import { clearOfflineSession } from '../../services/offlineSession';
 import { catalogoService } from '../../services/catalogo.service';
 import { Input } from '../../components/ui/Input';
@@ -22,18 +22,23 @@ const labels:Record<string,string>={GENERADOR:'Generador',TRANSPORTISTA:'Transpo
 const request=async(route:string,method='GET',body?:unknown)=>(await api.request({url:'/empresas'+route,method,data:body})).data.data;
 const message=(e:unknown)=>(e as any)?.response?.data?.message||'No se pudo guardar. Tus datos siguen en el formulario.';
 export default function EmpresasPage(){
+ const {currentUser}=useAuth();
+ const scope=JSON.stringify([currentUser?.id,currentUser?.rol,currentUser?.actorId,companyCacheScope(currentUser?.empresaContexto||null),currentUser?.empresaContexto?.autorizacionId,currentUser?.empresaContexto?.revision,!!currentUser?.training,!!currentUser?.esInspector]);
+ return <CompanyWorkspace key={scope} scope={scope}/>;
+}
+function CompanyWorkspace({scope}:{scope:string}){
  const {currentUser}=useAuth(),[choice,setChoice]=useState<Company>(),[page,setPage]=useState(1),[search,setSearch]=useState(''),mp=useMobilePrefix();
  const temporary=Boolean(useContext(ImpersonationContext)?.impersonationData);
  const requestedId=new URLSearchParams(window.location.search).get('empresa');
  const requested=requestedId&&/^[a-zA-Z0-9_-]{1,100}$/.test(requestedId)?requestedId:undefined;
- const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',currentUser?.id,currentUser?.rol,temporary,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:!temporary&&import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
+ const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',scope,temporary,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:!!currentUser&&!temporary&&import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
  // Pin the initial choice too: editing its name may change the server sort order.
  useEffect(()=>{if(!choice&&!requested&&list.data?.empresas[0])setChoice(list.data.empresas[0]);},[choice,list.data,requested]);
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true')return <p>Funcionalidad no disponible.</p>;
  if(temporary)return <div className="mx-auto max-w-3xl space-y-4"><Link to={mp('/mi-perfil')} className="inline-flex min-h-11 items-center text-primary-800 underline">Volver a Mi perfil</Link><Card><h2 className="text-lg font-semibold">Gestión desde la cuenta responsable</h2><p className="mt-2 text-sm text-neutral-600">La gestión de empresas se realiza desde la cuenta del responsable. La vista temporal permite consultar la ficha del actor.</p></Card></div>;
  const selected=choice||(!requested?list.data?.empresas[0]:undefined);
  return <div className="mx-auto w-full max-w-5xl space-y-5 pb-6">
-  <div><Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Mi perfil</Link><h1 className="text-2xl font-bold text-neutral-900">Empresas y establecimientos</h1></div>
+  <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Volver a Mi perfil</Link>
   {(list.data && (list.data.empresas.length>0 || !!selected || !!search || page>1))&&<CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
    onChoose={id=>setChoice(list.data?.empresas.find(c=>c.id===id)||selected)}
    onPage={next=>{setChoice(selected);setPage(next);}}
@@ -41,8 +46,8 @@ export default function EmpresasPage(){
   {list.isPending&&<Card><p role="status">Consultando empresas…</p></Card>}
   {list.isSuccess&&!list.data.empresas.length&&!search&&!selected&&!requested&&<Card><h2 className="font-semibold">No hay empresas vinculadas a esta cuenta</h2><p className="mt-2 text-sm text-neutral-600">Los datos de tu actividad están en Mi perfil.</p></Card>}
   {list.isError&&<div role="alert"><p>No pudimos consultar las empresas.</p><Button onClick={()=>void list.refetch()}>Reintentar</Button></div>}
-  {(selected||requested)&&<CompanyDetail key={selected?.id||requested} id={(selected?.id||requested)!} reloadList={()=>list.refetch()}/>}
-  {list.data?.puedeValidar&&<details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold">Registrar empresa</summary><CompanyCreate done={async c=>{setChoice(c);await list.refetch();}}/></details>}
+  {(selected||requested)&&<CompanyDetail key={selected?.id||requested} scope={scope} id={(selected?.id||requested)!} reloadList={()=>list.refetch()}/>}
+  {list.data?.puedeValidar&&!list.isError&&<details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold">Registrar empresa</summary><CompanyCreate done={async c=>{setChoice(c);await list.refetch();}}/></details>}
  </div>;
 }
 function CompanyCreate({done}:{done:(c:Company)=>Promise<void>}){
@@ -52,16 +57,36 @@ function CompanyCreate({done}:{done:(c:Company)=>Promise<void>}){
   {error&&<p role="alert" className="sm:col-span-2 text-error-700">{error}</p>}<Button type="submit" disabled={busy}>Registrar empresa</Button>
  </form>;
 }
-function CompanyDetail({id,reloadList}:{id:string;reloadList:()=>Promise<unknown>}){
- const {currentUser}=useAuth();const [tab,setTab]=useState('empresa'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
+function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:()=>Promise<unknown>}){
+ const [tab,setTab]=useState('empresa'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
+ const confirmedWrite=useRef<{after?:()=>void}|null>(null),[awaitingRead,setAwaitingRead]=useState(false);
+ const recoveryNotice=useRef<HTMLDivElement>(null);
  const [openedTabs,setOpenedTabs]=useState<Record<string,boolean>>({empresa:true});
  const [savedForms,setSavedForms]=useState<Record<string,number>>({});
  const resetForm=(key:string)=>setSavedForms(current=>({...current,[key]:(current[key]||0)+1}));
- const query=useQuery<Details>({queryKey:['empresa',currentUser?.id,id],queryFn:()=>request('/'+id),retry:false});
- async function run(action:()=>Promise<unknown>,after?:()=>void){if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');try{await action();await Promise.all([query.refetch(),reloadList()]);after?.();setNotice('Cambios guardados');}catch(e){setError(message(e));if((e as any)?.response?.status===409)void query.refetch();}finally{setBusy(false);lock.current=false;}}
+ const query=useQuery<Details>({queryKey:['empresa',scope,id],queryFn:()=>request('/'+id),retry:false});
+ useEffect(()=>{
+  if(awaitingRead&&query.isError&&!query.isFetching){recoveryNotice.current?.focus();recoveryNotice.current?.scrollIntoView?.({block:'center'});}
+ },[awaitingRead,query.isError,query.isFetching]);
+ useEffect(()=>{
+  if(!busy&&query.isSuccess&&!query.isFetching&&confirmedWrite.current){
+   const saved=confirmedWrite.current;confirmedWrite.current=null;setAwaitingRead(false);saved.after?.();setNotice('Cambios guardados');
+  }
+ },[busy,query.isSuccess,query.isFetching,query.dataUpdatedAt]);
+ async function run(action:()=>Promise<unknown>,after?:()=>void){
+  if(lock.current||query.isError||confirmedWrite.current)return;
+  lock.current=true;setBusy(true);setError('');setNotice('');
+  try{await action();confirmedWrite.current={after};setAwaitingRead(true);await Promise.all([query.refetch(),reloadList()]);}
+  catch(e){setError(message(e));if((e as any)?.response?.status===409)void query.refetch();}
+  finally{setBusy(false);lock.current=false;}
+ }
+ const unavailable=[401,403,404].includes((query.error as any)?.response?.status);
+ if(unavailable)return <Card><p role="alert">Ya no está disponible el acceso a esta empresa en el contexto actual.</p><Button onClick={()=>void query.refetch()}>Reintentar empresa</Button></Card>;
  if(!query.data)return query.isError?<div role="alert"><p>No pudimos abrir la empresa.</p><Button onClick={()=>void query.refetch()}>Reintentar empresa</Button></div>:<p role="status">Cargando empresa…</p>;
  const d=query.data;
  return <>
+  {query.isError&&<div ref={recoveryNotice} tabIndex={-1} role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 focus:outline-none focus:ring-2 focus:ring-primary-700"><p>{awaitingRead?'El cambio fue registrado, pero no pudimos actualizar la empresa. Reintentá la consulta; no vuelvas a enviar el cambio.':'No pudimos actualizar la empresa. Conservamos lo escrito; reintentá la consulta antes de continuar.'}</p><Button variant="outline" disabled={query.isFetching} onClick={()=>void query.refetch()}>Reintentar empresa</Button></div>}
+  <fieldset disabled={busy||query.isError||awaitingRead} className="min-w-0 space-y-5">
   <WorkspaceChoices choices={d.contextos||[]}/>
   <nav className="flex gap-2 overflow-x-auto border-b border-neutral-200" aria-label="Secciones de empresa">{[['empresa','Empresa'],['sedes','Establecimientos'],['personas','Personas autorizadas'],['historial','Historial']].filter(([key])=>d.puedeGestionar||!['personas','historial'].includes(key)).map(([key,title])=><button type="button" key={key} className={'min-h-11 shrink-0 border-b-2 px-3 font-medium '+(tab===key?'border-primary-700 text-primary-800':'border-transparent text-neutral-600')} aria-current={tab===key?'page':undefined} onClick={()=>{setOpenedTabs(opened=>({...opened,[key]:true}));setTab(key);}}>{title}</button>)}</nav>
   {error&&<p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-error-800">{error}</p>}{notice&&<p role="status" className="text-primary-800">{notice}</p>}
@@ -71,12 +96,12 @@ function CompanyDetail({id,reloadList}:{id:string;reloadList:()=>Promise<unknown
    {!d.establecimientos.length&&<p>No hay establecimientos cargados.</p>}{d.puedeGestionar&&<Card><h2 className="font-semibold">Agregar establecimiento</h2><SiteForm key={savedForms.newSite||0} busy={busy} save={data=>run(()=>request('/'+id+'/establecimientos','POST',data),()=>resetForm('newSite'))}/></Card>}</Activity>}
   {openedTabs.personas&&d.puedeGestionar&&<Activity mode={tab==='personas'?'visible':'hidden'}><People id={id} details={d} busy={busy} run={run}/></Activity>}
   {tab==='historial'&&d.puedeGestionar&&<Card><h2 className="font-semibold mb-3">Últimos 50 cambios</h2><ol className="divide-y divide-neutral-100">{d.eventos.map(e=><li className="py-3 break-words" key={e.id}><p className="font-medium">{e.tipo.replaceAll('_',' ')}</p><p className="text-sm">{new Date(e.createdAt).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza'})} · Persona: {e.usuarioId}</p>{e.datos?.motivo&&<p>{e.datos.motivo}</p>}</li>)}</ol>{!d.eventos.length&&<p>Sin cambios registrados.</p>}</Card>}
- </>;
+ </fieldset></>;
 }
 function WorkspaceChoices({choices}:{choices:CompanyChoice[]}){
- const {currentUser}=useAuth(),mp=useMobilePrefix();const [selection,setSelection]=useState(''),[site,setSite]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
+ const {currentUser}=useAuth(),mp=useMobilePrefix();const [selection,setSelection]=useState(currentUser?.empresaContexto?.actividadId||''),[site,setSite]=useState(currentUser?.empresaContexto?.establecimientoId||''),[error,setError]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
  const choice=choices.find(c=>c.actividadId===selection)||choices[0];
- const siteId=site||choice?.establecimientos[0]?.id||'';
+ const siteId=choice?.establecimientos.find(s=>s.id===site)?.id||choice?.establecimientos[0]?.id||'';
  async function choose(personal=false){if(!currentUser||lock.current)return;lock.current=true;setBusy(true);setError('');try{
   if(personal)saveCompanyContext(String(currentUser.id),null);
   else if(choice){const next={empresaId:choice.empresaId,actividadId:choice.actividadId,...(siteId?{establecimientoId:siteId}:{})};const result=await api.get('/auth/profile',{headers:companyHeaders(next)});if(result.data.data.user.empresaContexto?.empresaId!==next.empresaId)throw new Error('Contexto incompatible');saveCompanyContext(String(currentUser.id),next);}

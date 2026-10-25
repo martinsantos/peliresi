@@ -222,8 +222,10 @@ const SolicitudDetallePage: React.FC = () => {
       {/* Back + Header */}
       <div className="flex items-center gap-4">
         <button
+          type="button"
+          aria-label="Volver a solicitudes de inscripción"
           onClick={() => navigate('/admin/solicitudes')}
-          className="p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
         >
           <ArrowLeft size={20} className="text-neutral-500" />
         </button>
@@ -430,16 +432,18 @@ const SolicitudDetallePage: React.FC = () => {
           <div className="px-4 py-3 border-t border-neutral-200 flex gap-2">
             <input
               type="text"
+              aria-label="Mensaje sobre la solicitud"
               value={messageText}
               onChange={e => setMessageText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-              className="flex-1 h-9 px-3 rounded-lg border border-neutral-200 text-sm focus:border-primary-500 focus:outline-none"
+              className="min-w-0 flex-1 min-h-11 px-3 rounded-lg border border-neutral-200 text-base focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-700"
               placeholder="Escribe un mensaje..."
             />
             <Button
               variant="primary"
               size="sm"
               onClick={handleSendMessage}
+              aria-label="Enviar mensaje sobre la solicitud"
               disabled={!messageText.trim() || enviarMensaje.isPending}
               isLoading={enviarMensaje.isPending}
             >

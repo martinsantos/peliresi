@@ -3,14 +3,14 @@ import { render,screen,fireEvent,waitFor,cleanup,act,within } from '@testing-lib
 import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import EmpresasPage from './EmpresasPage';
-const mocks=vi.hoisted(()=>({request:vi.fn()}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'person-qa',rol:'GENERADOR'}})}));
+const mocks=vi.hoisted(()=>({request:vi.fn(),user:{id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'} as {id:string;rol:string;actorId:string;empresaContexto?:any}}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:mocks.user})}));
 vi.mock('../../services/api',()=>({api:{request:mocks.request}}));
-afterEach(()=>{cleanup();vi.unstubAllEnvs();mocks.request.mockReset();});
+afterEach(()=>{cleanup();vi.unstubAllEnvs();mocks.request.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
 const company=(id:string,razonSocial:string)=>({id,cuit:'30712345671',razonSocial,revision:0,domicilioLegal:{calle:'Legal '+id,localidad:'Mendoza',departamento:'Capital'}});
 function setup(extra:Record<string,unknown>={}){
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
- const first=company('first','Alfa'),other=company('other','Beta');let changed=false,failSearch=false;
+ const first=company('first','Alfa'),other=company('other','Beta');let changed=false,failSearch=false,detailFailure=0;
  mocks.request.mockImplementation(async({url,method,data})=>{
   if(method==='PUT'){changed=true;return {data:{data:{empresa:{...first,...data,revision:1}}}};}
   if(url.startsWith('/empresas?')){
@@ -19,13 +19,64 @@ function setup(extra:Record<string,unknown>={}){
    const companies=params.get('search')||params.get('page')==='2'?[]:changed?[other,{...first,razonSocial:'Zeta',revision:1}]:[first,other];
    return {data:{data:{empresas:companies,pagination:{page:Number(params.get('page')),limit:25,total:companies.length,totalPages:1},puedeValidar:false}}};
   }
+  if(detailFailure)throw {response:{status:detailFailure}};
   const c=url.endsWith('/first')?{...first,...(changed?{razonSocial:'Zeta',revision:1}:{})}:other;
   return {data:{data:{empresa:c,contextos:[],actividades:[],establecimientos:[],autorizaciones:[],responsables:[],eventos:[],invitaciones:[],personas:[],puedeGestionar:true,puedeValidar:false,...extra}}};
  });
  const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
- render(<QueryClientProvider client={client}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>);
- return {client,externalChange:()=>{changed=true;},failSearch:()=>{failSearch=true;}};
+ const view=()=> <QueryClientProvider client={client}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>;
+ const ui=render(view());
+ return {client,externalChange:()=>{changed=true;},failSearch:()=>{failSearch=true;},failDetail:(status=503)=>{detailFailure=status;},recover:()=>{detailFailure=0;},rerender:()=>ui.rerender(view())};
 }
+test('a successful write followed by a failed read preserves its form and retry never submits twice',async()=>{
+ const state=setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Razón social'),{target:{value:'Zeta'}});
+ fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'Cambio artificial QA'}});
+ state.failDetail();fireEvent.click(screen.getByRole('button',{name:'Guardar datos legales'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('El cambio fue registrado');
+ expect(screen.getByRole('alert')).toHaveFocus();
+ expect(screen.getByLabelText('Razón social')).toHaveValue('Zeta');
+ expect(screen.getByLabelText('Motivo del cambio legal')).toHaveValue('Cambio artificial QA');
+ expect(screen.getByRole('button',{name:'Guardar datos legales'})).toBeDisabled();
+ expect(screen.queryByText('Cambios guardados')).not.toBeInTheDocument();
+ state.recover();fireEvent.click(screen.getByRole('button',{name:'Reintentar empresa'}));
+ await screen.findByText('Cambios guardados');
+ expect(screen.getByLabelText('Motivo del cambio legal')).toHaveValue('');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method==='PUT')).toHaveLength(1);
+});
+test('stale details disable edits until a fresh read while preserving unsaved input',async()=>{
+ const state=setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Pendiente QA'}});
+ state.failDetail();await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ expect(await screen.findByRole('alert')).toHaveTextContent('Conservamos lo escrito');
+ expect(screen.getByLabelText('Calle legal')).toBeDisabled();
+ state.recover();fireEvent.click(screen.getByRole('button',{name:'Reintentar empresa'}));
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).not.toBeDisabled());
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('Pendiente QA');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('a revoked company access never exposes cached management controls',async()=>{
+ const state=setup();await screen.findByLabelText('Calle legal');
+ state.failDetail(403);await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ expect(await screen.findByRole('alert')).toHaveTextContent('Ya no está disponible el acceso');
+ expect(screen.queryByLabelText('Calle legal')).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Personas autorizadas'})).not.toBeInTheDocument();
+});
+test('changing the active role does not inherit the previous role draft or cached permissions',async()=>{
+ const state=setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Borrador generador'}});
+ const previousReads=mocks.request.mock.calls.filter(([r])=>r.url==='/empresas/first').length;
+ mocks.user={...mocks.user,rol:'OPERADOR',actorId:'operator-qa'};state.rerender();
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
+ expect(mocks.request.mock.calls.filter(([r])=>r.url==='/empresas/first').length).toBeGreaterThan(previousReads);
+});
+test.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('the company selector reflects the active %s context and establishment instead of the first result',async role=>{
+ mocks.user={...mocks.user,rol:role,empresaContexto:{empresaId:'first',actividadId:role,establecimientoId:'site-b',autorizacionId:'qa-grant',revision:1}};
+ setup({contextos:['GENERADOR','TRANSPORTISTA','OPERADOR'].map(rol=>({empresaId:'first',actividadId:rol,rol,autorizacionId:'qa-grant',revision:1,todosEstablecimientos:true,establecimientos:[{id:'site-a',nombre:'Sede A',codigo:'A'},{id:'site-b',nombre:'Sede B',codigo:'B'}]}))});
+ await screen.findByLabelText('Actividad autorizada');
+ expect(screen.getByLabelText('Actividad autorizada')).toHaveValue(role);
+ expect(screen.getByLabelText('Establecimiento para operar')).toHaveValue('site-b');
+});
 test('a background company notice preserves dirty values and requires reconciliation before saving the current revision',async()=>{
  const state=setup();await screen.findByLabelText('Calle legal');
  fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Mi domicilio pendiente'}});
@@ -200,6 +251,6 @@ test('empty account explains where its actor information is without a useless se
  mocks.request.mockResolvedValue({data:{data:{empresas:[],pagination:{page:1,limit:25,total:0,totalPages:1},puedeValidar:false}}});
  render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>);
  expect(await screen.findByText('No hay empresas vinculadas a esta cuenta')).toBeVisible();
- expect(screen.getByRole('link',{name:'Mi perfil'})).toHaveAttribute('href','/mi-perfil');
+ expect(screen.getByRole('link',{name:'Volver a Mi perfil'})).toHaveAttribute('href','/mi-perfil');
  expect(screen.queryByLabelText('Buscar empresa')).toBeNull();
 });

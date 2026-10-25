@@ -261,9 +261,14 @@ const InscripcionWizardPage: React.FC = () => {
       const local = readRegistrationDraft(accountAtStart, `public:${tipoActor}:${pending.id}`);
       const localForm = local?.data.form && typeof local.data.form === 'object' && !Array.isArray(local.data.form)
         ? Object.fromEntries(Object.entries(local.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : null;
-      const hasLocalChanges = localForm && JSON.stringify(localForm) !== JSON.stringify(persistedForm);
+      // Account identity is appended by the server/save contract, not edited
+      // in this form. JSON object order is also not an unsaved user change.
+      const accountFields = new Set(['nombre', 'cuit', 'email']);
+      const hasLocalChanges = localForm && [...new Set([...Object.keys(localForm), ...Object.keys(persistedForm)])]
+        .some(field => !accountFields.has(field) && localForm[field] !== persistedForm[field]);
       const serverChanged = hasLocalChanges && local?.data.serverRevision !== solicitud.updatedAt;
-      if (hasLocalChanges && !serverChanged) { persistedForm = localForm; setDirty(true); }
+      if (hasLocalChanges && !serverChanged) persistedForm = localForm;
+      setDirty(Boolean(hasLocalChanges && !serverChanged));
       setLocalConflict(serverChanged ? localForm : null);
       setMissingLocalFiles(Array.isArray(local?.data.files) ? local.data.files.filter(value => typeof value === 'string') as string[] : []);
       setOwner(accountAtStart);

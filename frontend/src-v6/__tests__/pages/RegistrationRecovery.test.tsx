@@ -27,6 +27,31 @@ beforeEach(() => {
 afterEach(() => { cleanup(); queryClient.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('a real registration UI protects the current step and account boundary', () => {
+  it.each(['generador', 'transportista', 'operador'])('%s reopens a confirmed save without declaring or resending identical fields as pending', async type => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA alta', domicilio: 'QA 123' });
+    mock.get.mockImplementation(async () => response);
+    mock.put.mockImplementation(async (_path, body) => {
+      response.data.data.solicitud.datosActor = JSON.stringify(body.datosActor);
+      response.data.data.solicitud.updatedAt = '2026-10-09T10:01:00.000Z';
+      return response;
+    });
+    await open(type);
+    fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA guardado' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Borrador guardado en SITREP'));
+    cleanup(); mock.put.mockClear();
+    // PostgreSQL JSON may return keys in a different order; identity fields
+    // are appended by persistDraft but absent from the device's original form.
+    const stored = JSON.parse(response.data.data.solicitud.datosActor);
+    response.data.data.solicitud.datosActor = JSON.stringify(Object.fromEntries(Object.entries(stored).reverse()));
+    await open(type);
+    expect(screen.getByLabelText('Domicilio')).toHaveValue('QA guardado');
+    expect(screen.getByRole('status')).toHaveTextContent('Borrador guardado en SITREP');
+    expect(screen.queryByText(/pendientes de guardar en SITREP/)).toBeNull();
+    vi.useFakeTimers(); await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
   it('automatically saves typing paused by an in-flight licence upload once the upload finishes', async () => {
     const response = request(); response.data.data.solicitud.tipoActor = 'TRANSPORTISTA';
     response.data.data.solicitud.datosActor = JSON.stringify({ _sitrepDraftStep: 3, razonSocial: 'QA transporte', domicilio: 'QA 123', choferesJson: [{ key: 'driver-qa', nombre: 'QA inicial', dni: '000001', vencimiento: '2027-12-31' }] });
