@@ -75,6 +75,21 @@ describe('notification inbox states and interaction', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Nuevo requerimiento', exact: true }));
     expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
   });
+  it('keeps secondary controls behind explicit options without changing read state', async () => {
+    setup('/app/notificaciones');
+    await screen.findByText(notice.titulo);
+    expect(screen.queryByText('Tus avisos')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Marcar todas leídas', exact: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: `Eliminar aviso: ${notice.titulo}`, exact: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones de avisos', exact: true }));
+    expect(screen.getByRole('button', { name: 'Opciones de avisos', exact: true })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Marcar todas leídas', exact: true })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: `Opciones del aviso: ${notice.titulo}`, exact: true }));
+    expect(screen.getByRole('button', { name: `Eliminar aviso: ${notice.titulo}`, exact: true })).toBeVisible();
+    expect(service.marcarLeida).not.toHaveBeenCalled();
+    expect(service.marcarTodasLeidas).not.toHaveBeenCalled();
+    expect(service.eliminar).not.toHaveBeenCalled();
+  });
   it('does not reuse a supposedly fresh minute-old workflow state when reopening the inbox', async () => {
     const client = setup();
     await screen.findByText(notice.titulo);
@@ -131,6 +146,7 @@ describe('notification inbox states and interaction', () => {
     setup();
     expect(await screen.findByText('Aviso general')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Abrir aviso: Aviso general', exact: true })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones del aviso: Aviso general', exact: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Marcar como leída: Aviso general', exact: true }));
     await waitFor(() => expect(service.marcarLeida).toHaveBeenCalledWith('notice'));
     expect(screen.getByTestId('location')).toHaveTextContent('/notificaciones');
@@ -141,7 +157,7 @@ describe('notification inbox states and interaction', () => {
     service.list.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
     setup();
     expect(screen.getByRole('status')).toHaveTextContent('Cargando avisos');
-    expect(screen.queryByText('No hay notificaciones')).toBeNull();
+    expect(screen.queryByText('Todavía no recibiste avisos')).toBeNull();
     await act(async () => finish(response));
     expect(await screen.findByText(notice.titulo)).toBeVisible();
   });
@@ -150,7 +166,7 @@ describe('notification inbox states and interaction', () => {
     service.list.mockRejectedValue(new Error('offline'));
     setup();
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar los avisos');
-    expect(screen.queryByText('No hay notificaciones')).toBeNull();
+    expect(screen.queryByText('Todavía no recibiste avisos')).toBeNull();
     service.list.mockResolvedValue(response);
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar', exact: true }));
     expect(await screen.findByText(notice.titulo)).toBeVisible();
@@ -159,7 +175,7 @@ describe('notification inbox states and interaction', () => {
   it('shows the global unread count and navigates to older real pages', async () => {
     service.list.mockImplementation(async (filters: { page?: number }) => ({ ...response, page: filters.page ?? 1, items: [{ ...notice, titulo: filters.page === 2 ? 'Aviso anterior' : notice.titulo }] }));
     setup();
-    expect(await screen.findByRole('button', { name: 'No leídas (31)', exact: true })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Sin leer (31)', exact: true })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente página', exact: true }));
     expect(await screen.findByText('Aviso anterior')).toBeVisible();
     expect(service.list).toHaveBeenLastCalledWith({ page: 2, limit: 20, leida: undefined });
@@ -171,7 +187,7 @@ describe('notification inbox states and interaction', () => {
   it('resets pagination when switching to unread and preserves back navigation', async () => {
     setup('/notificaciones?pagina=2');
     await screen.findByText(notice.titulo);
-    fireEvent.click(screen.getByRole('button', { name: 'No leídas (31)', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sin leer (31)', exact: true }));
     await waitFor(() => expect(service.list).toHaveBeenLastCalledWith({ page: 1, limit: 20, leida: false }));
     expect(screen.getByTestId('location')).toHaveTextContent('avisos=sin-leer');
     expect(screen.getByTestId('location')).not.toHaveTextContent('pagina=2');
@@ -188,7 +204,8 @@ describe('notification inbox states and interaction', () => {
   it('reports mutation failure and keeps the notice available', async () => {
     service.marcarLeida.mockRejectedValue(new Error('offline'));
     setup();
-    fireEvent.click(await screen.findByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: `Opciones del aviso: ${notice.titulo}`, exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo guardar el cambio');
     expect(screen.getByText(notice.titulo)).toBeVisible();
   });
@@ -196,7 +213,7 @@ describe('notification inbox states and interaction', () => {
   it('only shows empty after a successful response', async () => {
     service.list.mockResolvedValue({ ...response, items: [], total: 0, noLeidas: 0, totalPages: 0 });
     setup();
-    expect(await screen.findByText('No hay notificaciones')).toBeVisible();
+    expect(await screen.findByText('Todavía no recibiste avisos')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Marcar todas leídas', exact: true })).toBeNull();
   });
 
@@ -208,9 +225,10 @@ describe('notification inbox states and interaction', () => {
     }));
     service.marcarLeida.mockImplementation(async () => { read = true; });
     setup('/notificaciones?avisos=sin-leer&pagina=2');
-    fireEvent.click(await screen.findByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: `Opciones del aviso: ${notice.titulo}`, exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: `Marcar como leída: ${notice.titulo}`, exact: true }));
     await waitFor(() => expect(service.list).toHaveBeenLastCalledWith({ page: 1, limit: 20, leida: false }));
-    expect(screen.queryByText('No hay notificaciones')).toBeNull();
+    expect(screen.queryByText('Todavía no recibiste avisos')).toBeNull();
     expect(screen.getByTestId('location')).not.toHaveTextContent('pagina=2');
   });
 });

@@ -130,6 +130,7 @@ Continuación de altas y documentos (`uiux-admission-documents-20261025`):
 | UX74 | Media | Factura con valores contradictorios muestra No leído, igual que un dato ausente | Identificar el campo en conflicto sin elegir un valor ni modificar HP/TEF | Corregido y comprobado técnicamente en preview; ver cierre uiux-admission-documents-20261025 |
 | UX75 | Media | Tres columnas estrechas comprimen el formulario ATM en escritorio; el botón de lectura desaparece mientras procesa | Dar ancho suficiente al documento y mantener progreso visible con acciones bloqueadas | Corregido y comprobado técnicamente en preview; ver cierre uiux-admission-documents-20261025 |
 | UX76 | Alta | La caché de lista/contador no distingue cuenta y actividad; campana/poller sólo distinguían cuenta | Aislar consultas por contexto completo y retirar acciones flotantes anteriores al cambiar | Corregido; seis regresiones inicialmente fallidas, 113 pruebas finales y transiciones de cuenta/actividad en web/app. No se afirma una fuga observada en producción |
+| UX77 | Media | Encabezado repetido, canal apagado y acciones secundarias desplazan los avisos fuera del primer pantallazo | Priorizar filtros, motivo y destino; opciones explícitas sin ejecutar acciones al desplegar | Corregido; 119 regresiones, teclado y recorrido web/app; diez medidas entre 320 y 1920 px |
 
 Directorio de esta ejecución: `uiux-integral-20261025` dentro del workspace de evidencias del hilo. `baseline/` conserva capturas anteriores a los cambios; `verified/` contiene resultados comprobados. No reutilizar una captura histórica como prueba actual.
 
@@ -556,3 +557,20 @@ Navegador del preview: administrador con 252 avisos sin leer → titular multiro
 El manual de avisos explica la reconsulta y el cambio de contexto, y separa los requisitos de correo y push. Texto servido y enlaces web/app verificados en preview. Capturas de escritorio y móvil conservadas; esto no constituye una auditoría visual completa ni prueba de Android físico.
 
 Auditoría 22:58 UTC: 526 manifiestos, cero correos intentados o enviados, CAP cerrado, push apagado y dos procesos normales del preview. Sin producción, main, workflows, migraciones ni datos reales. La revisión integral, Android y la observación con participantes siguen pendientes; no se espera a participantes para continuar el trabajo técnico.
+
+
+## Continuación: bandeja de Avisos con prioridad al contenido — 25/10/2026
+
+Sobre `4b8e457e`, sólo preview; evidencia en `uiux-inbox-layout-20261025`. Se eliminan el segundo encabezado Tus avisos y el regreso indeterminado de la página raíz; la navegación principal mantiene Avisos activo. Todos y Sin leer quedan al comienzo. Opciones reúne el estado del canal del dispositivo y la acción masiva; cada aviso despliega Marcar leída y Eliminar con su propio botón de opciones. Abrir estas opciones no modifica estados ni pide permiso de notificaciones.
+
+Título, motivo completo, prioridad, lectura, fecha relativa y destino permanecen visibles. Se compactan los metadatos y se elimina el segundo indicador de apertura. Un aviso sin enlace conserva su contenido y acciones, sin prometer un destino. Los estados vacío, carga, error y fallo de mutación mantienen tratamiento separado. No cambian destinatarios, permisos ni reglas de negocio.
+
+119 pruebas frontend únicas en siete archivos: bandeja, campana, sondeo, aislamiento, detalle/enlaces y control de dispositivo. Se añadió comprobación de opciones sin efectos y se adaptaron las regresiones de marcado explícito. TypeScript y builds web/app aprobados. La marca individual, masiva y eliminación conservan sus servicios; en navegador se abrió un único aviso artificial, no se probó eliminación.
+
+La referencia es la segunda persona de la entidad artificial multirol, con tres avisos propios. App de 393 px: primer botón de aviso de y=543 a y=231; primera fila de 319,25 a 211,25 px. Se conserva el mensaje completo, sin truncamiento. Es una medida de distribución de pantalla, no de tiempo ni facilidad humana. Web muestra los tres avisos sin el bloque introductorio. Diez lecturas DOM a 320/393/768/1365/1920 px: un h1, sin desborde horizontal y botones medidos de al menos 44 px. No acredita auditoría completa de accesibilidad ni Android.
+
+Web: opciones generales y de fila con Enter, foco de 2 px y Tab hasta Marcar leída; filtro Sin leer. App: actualización PWA conserva ruta, opciones muestran canal apagado; apertura de aviso llega a la entidad autorizada. El regreso del navegador mantiene el filtro Sin leer y el contador pasa de tres a dos. No se autorizan personas ni se cambian datos de la entidad. El manual incorpora el recorrido y una captura de app del preview.
+
+Pendientes del plan: auditoría visual de los demás tipos/estados de avisos y cuentas, comunicaciones y documentos restantes, participantes y Android físico. Este corte no acredita toda la experiencia ni entrega externa. Sin producción, main, workflows, migraciones ni datos reales; se mantiene CAP cerrado y correos/push apagados.
+
+Auditoría final 23:10 UTC: 526 manifiestos, cero correos enviados o intentados, dos procesos normales; CAP cerrado y push apagado. Consola del recorrido sin advertencias ni errores capturados. Queda detectado para seguimiento que los avisos de autorización de actividad usan textos indistinguibles entre actividades; no se corrigió su contrato ni contenido en esta tanda.
