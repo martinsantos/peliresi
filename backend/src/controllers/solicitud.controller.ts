@@ -1,3 +1,4 @@
+import { applicationNoticeContent } from '../services/applicationNotice.service';
 import { verifiedCuit } from '../domain/conciliacionExterna';
 import { linkApprovedRegistration } from '../services/companyRegistration.service';
 import { Request, Response, NextFunction } from 'express';
@@ -419,14 +420,8 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
         data: {
           usuarioId: admin.id,
           tipo: 'SOLICITUD_ENVIADA',
-          titulo: 'Nueva solicitud de inscripcion',
-          mensaje: `${solicitud.usuario.nombre} envio una solicitud de inscripcion como ${solicitud.tipoActor}.`,
+          ...applicationNoticeContent('SOLICITUD_ENVIADA', solicitud),
           prioridad: 'ALTA',
-          datos: JSON.stringify({
-            tipo: 'solicitud_enviada',
-            solicitudId: id,
-            tipoActor: solicitud.tipoActor,
-          }),
         },
       })
     ));
@@ -722,10 +717,8 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
         data: {
           usuarioId: solicitud.usuarioId,
           tipo: 'SOLICITUD_MENSAJE',
-          titulo: 'Nuevo mensaje en tu solicitud',
-          mensaje: 'Un administrador envio un mensaje sobre tu solicitud de inscripcion.',
+          ...applicationNoticeContent('SOLICITUD_MENSAJE', solicitud),
           prioridad: 'NORMAL',
-          datos: JSON.stringify({ tipo: 'solicitud_mensaje', solicitudId: id }),
         },
       });
     } else {
@@ -739,10 +732,8 @@ export const crearMensaje = async (req: AuthRequest, res: Response, next: NextFu
           data: {
             usuarioId: admin.id,
             tipo: 'SOLICITUD_MENSAJE',
-            titulo: 'Nuevo mensaje en solicitud',
-            mensaje: `${solicitud.usuario.nombre} envio un mensaje en su solicitud de inscripcion.`,
+            ...applicationNoticeContent('SOLICITUD_MENSAJE', solicitud),
             prioridad: 'NORMAL',
-            datos: JSON.stringify({ tipo: 'solicitud_mensaje', solicitudId: id }),
           },
         })
       ));
@@ -900,10 +891,8 @@ export const observarSolicitud = async (req: AuthRequest, res: Response, next: N
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_OBSERVADA',
-        titulo: 'Solicitud observada',
-        mensaje: 'Tu solicitud de inscripcion tiene observaciones. Revisa los comentarios y corrige lo necesario.',
+        ...applicationNoticeContent('SOLICITUD_OBSERVADA', solicitud),
         prioridad: 'ALTA',
-        datos: JSON.stringify({ tipo: 'solicitud_observada', solicitudId: id }),
       },
     });
 
@@ -1035,10 +1024,8 @@ export const aprobarSolicitud = async (req: AuthRequest, res: Response, next: Ne
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_APROBADA',
-        titulo: 'Solicitud aprobada',
-        mensaje: 'Tu solicitud de inscripcion fue aprobada. Ya podes ingresar a SITREP.',
+        ...applicationNoticeContent('SOLICITUD_APROBADA', solicitud),
         prioridad: 'ALTA',
-        datos: JSON.stringify({ tipo: 'solicitud_aprobada', solicitudId: id }),
       },
       });
       return updated;
@@ -1095,10 +1082,8 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response, next: N
       data: {
         usuarioId: solicitud.usuarioId,
         tipo: 'SOLICITUD_RECHAZADA',
-        titulo: 'Solicitud rechazada',
-        mensaje: `Tu solicitud de inscripcion fue rechazada. Motivo: ${motivoRechazo.trim()}`,
+        ...applicationNoticeContent('SOLICITUD_RECHAZADA', solicitud),
         prioridad: 'ALTA',
-        datos: JSON.stringify({ tipo: 'solicitud_rechazada', solicitudId: id, motivoRechazo: motivoRechazo.trim() }),
       },
     });
 

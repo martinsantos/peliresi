@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationInboxReturnState, notificationInboxReturnPath } from '../../utils/notificationNavigation';
 import type { Notificacion } from '../../types/models';
 import { QueryClient } from '@tanstack/react-query';
 
@@ -51,8 +51,8 @@ describe('resolveNotificationPath', () => {
   });
   it('opens the exact entity on web and app and refreshes the open company record', () => {
     const notice={...base,datos:JSON.stringify({tipo:'representacion_empresa',version:1,empresaId:'entity-1',evento:'PERSONA_AUTORIZADA',url:'/wrong'})};
-    expect(resolveNotificationPath(notice)).toBe('/empresas?empresa=entity-1');
-    expect(resolveNotificationPath(notice,'/app')).toBe('/app/empresas?empresa=entity-1');
+    expect(resolveNotificationPath(notice)).toBe('/empresas?empresa=entity-1&origen=avisos');
+    expect(resolveNotificationPath(notice,'/app')).toBe('/app/empresas?empresa=entity-1&origen=avisos');
     expect(notificationActionLabel(resolveNotificationPath(notice))).toBe('Ver entidad y acceso →');
     const invalidateQueries=vi.fn();refreshInspectionNotification(notice,{invalidateQueries} as any);
     expect(invalidateQueries).toHaveBeenCalledWith({queryKey:['empresa']});
@@ -181,4 +181,16 @@ it.each(['//other.invalid', '/\\other.invalid', '/x/%2f../other', '/\nother'])('
 });
 it('selects the exact addendum even when the legacy URL omits it',()=>{
   expect(resolveNotificationPath({...base,manifiestoId:'m',datos:'{"tipo":"adenda_manifiesto","adendaId":"a","url":"/manifiestos/m/adendas"}'},'/app')).toBe('/app/manifiestos/m/adendas?adenda=a');
+});
+
+describe('return to the notification inbox',()=>{
+ it('preserves only valid filters for the same account/activity',()=>{
+  const state=notificationInboxReturnState('?avisos=sin-leer&pagina=3&returnTo=https://bad.invalid','owner-G');
+  expect(notificationInboxReturnPath(state,'owner-G')).toBe('/notificaciones?avisos=sin-leer&pagina=3');
+  expect(notificationInboxReturnPath(state,'owner-O')).toBe('/notificaciones');
+  expect(notificationInboxReturnPath(state,'other-G')).toBe('/notificaciones');
+ });
+ it.each([null,{}, {notificationInboxReturn:{owner:'o',search:'avisos=invalid&pagina=-1'}}, {notificationInboxReturn:{owner:'o',search:'pagina=NaN'}}, {notificationInboxReturn:{owner:'o',search:'https://bad.invalid'}}])('never interprets a return payload as a redirect: %j',state=>{
+  expect(notificationInboxReturnPath(state,'o')).toBe('/notificaciones');
+ });
 });

@@ -3,6 +3,22 @@ import { safeLocalRedirect } from './authRedirect';
 import { cataloguePath } from './alertCatalogue';
 import type { QueryClient } from '@tanstack/react-query';
 
+/** Keep only inbox presentation filters, tied to the verified account/activity.
+ * A return target never comes from an arbitrary URL supplied by a notice. */
+export function notificationInboxReturnState(search: string, owner: string) {
+  const raw = new URLSearchParams(search), params = new URLSearchParams();
+  if (raw.get('avisos') === 'sin-leer') params.set('avisos', 'sin-leer');
+  const page = Number(raw.get('pagina'));
+  if (Number.isSafeInteger(page) && page > 1) params.set('pagina', String(page));
+  return { notificationInboxReturn: { owner, search: params.toString() } };
+}
+export function notificationInboxReturnPath(state: unknown, owner: string): string {
+  const entry = (state as { notificationInboxReturn?: { owner?: string; search?: unknown } } | null)?.notificationInboxReturn;
+  const search = owner && entry?.owner === owner && typeof entry.search === 'string'
+    ? notificationInboxReturnState(entry.search, owner).notificationInboxReturn.search : '';
+  return '/notificaciones' + (search ? '?' + search : '');
+}
+
 function parseNotificationData(raw: string | null): Record<string, unknown> {
   if (!raw) return {};
   try {
@@ -92,7 +108,7 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   }
   if (data.tipo === 'representacion_empresa') {
     return withBasePath(data.version === 1 && typeof data.empresaId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.empresaId) && !String(data.evento).includes('REVOCAD')
-      ? '/empresas?empresa=' + encodeURIComponent(data.empresaId) : '/notificaciones', basePath);
+      ? '/empresas?empresa=' + encodeURIComponent(data.empresaId) + '&origen=avisos' : '/notificaciones', basePath);
   }
   if (data.tipo === 'manifiesto_eventual') {
     return withBasePath(data.version === 1 && typeof data.registroId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.registroId)

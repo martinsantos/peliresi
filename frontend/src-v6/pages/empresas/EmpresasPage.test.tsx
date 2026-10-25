@@ -1,3 +1,5 @@
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { notificationInboxReturnState } from '../../utils/notificationNavigation';
 import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { render,screen,fireEvent,waitFor,cleanup,act,within } from '@testing-library/react';
 import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
@@ -9,7 +11,7 @@ vi.mock('../../services/api',()=>({api:{request:mocks.request}}));
 beforeEach(()=>{localStorage.clear();sessionStorage.clear();});
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();mocks.request.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
 const company=(id:string,razonSocial:string)=>({id,cuit:'30712345671',razonSocial,revision:0,domicilioLegal:{calle:'Legal '+id,localidad:'Mendoza',departamento:'Capital'}});
-function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;admin?:boolean}={}){
+function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;admin?:boolean;entry?:any;base?:string}={}){
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
  const first=company('first','Alfa'),other=company('other','Beta');let changed=false,failSearch=false,detailFailure=0;
  mocks.request.mockImplementation(async({url,method,data})=>{
@@ -25,7 +27,7 @@ function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;adm
   return {data:{data:{empresa:c,contextos:[],actividades:[],establecimientos:[],autorizaciones:[],responsables:[],eventos:[],invitaciones:[],personas:[],puedeGestionar:true,puedeValidar:false,...extra}}};
  });
  const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
- const view=()=> <QueryClientProvider client={client}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>;
+ const view=()=> <QueryClientProvider client={client}><MemoryRouter basename={listOptions.base} initialEntries={[listOptions.entry||'/empresas']}><EmpresasPage/></MemoryRouter></QueryClientProvider>;
  const ui=render(view());
  return {client,externalChange:()=>{changed=true;},failSearch:()=>{failSearch=true;},failDetail:(status=503)=>{detailFailure=status;},recover:()=>{detailFailure=0;},rerender:()=>ui.rerender(view()),unmount:()=>ui.unmount()};
 }
@@ -395,4 +397,25 @@ test('a filtered directory never collapses into a single-company context',async(
  await screen.findByText('Sin coincidencias');
  expect(screen.getByRole('button',{name:'Limpiar búsqueda'})).toBeVisible();
  expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('first');
+});
+
+test('a company notice offers an explicit inbox return and avoids a one-company picker',async()=>{
+ setup({}, {single:true,entry:'/empresas?empresa=first&origen=avisos'});
+ await screen.findByLabelText('Calle legal');
+ expect(screen.getByRole('link',{name:'Volver a Avisos'})).toHaveAttribute('href','/notificaciones');
+ expect(screen.queryByRole('link',{name:'Volver a Mi perfil'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('searchbox',{name:'Buscar empresa'})).not.toBeInTheDocument();
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first');
+});
+test('ordinary profile access keeps its profile return',async()=>{
+ setup();await screen.findByLabelText('Calle legal');
+ expect(screen.getByRole('link',{name:'Volver a Mi perfil'})).toHaveAttribute('href','/mi-perfil');
+});
+
+test.each(['','/app'])('explicit return preserves inbox filters in %s and drops them after a context change',async base=>{
+ const entry={pathname:base+'/empresas',search:'?empresa=first&origen=avisos',state:notificationInboxReturnState('?avisos=sin-leer&pagina=2',inspectionWorkspaceOwner(mocks.user))};
+ const view=setup({}, {single:true,entry,base});await screen.findByLabelText('Calle legal');
+ expect(screen.getByRole('link',{name:'Volver a Avisos'})).toHaveAttribute('href',base+'/notificaciones?avisos=sin-leer&pagina=2');
+ mocks.user={...mocks.user,rol:'OPERADOR',actorId:'operator'};view.rerender();await screen.findByLabelText('Calle legal');
+ expect(screen.getByRole('link',{name:'Volver a Avisos'})).toHaveAttribute('href',base+'/notificaciones');
 });

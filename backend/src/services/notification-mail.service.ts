@@ -1,3 +1,4 @@
+import { applicationNoticeMessage, withApplicationNoticeContext } from './applicationNotice.service';
 import { ADDENDUM_AUTHORITY_ROLES } from '../domain/addendumAuthority';
 import { designatedReviewAccount } from '../domain/manifestReviewAuthority';
 import { companyNoticeMessage, validCompanyNotice, companyNoticeEligible, withCompanyNoticeContext } from './companyNotice.service';
@@ -238,7 +239,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   if (data.tipo === 'ADENDA_POST_FACTO' && (data.correoVersion !== 1 || typeof data.adendaId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.adendaId))) return null;
   let family: string, path: string, title: string;
   if (notice.tipo === 'INFO_GENERAL' && validCompanyNotice(data)) {
-    family = 'representacion'; title = 'Novedad en tu representación'; path = String(data.evento).includes('REVOCAD') ? '/notificaciones/' + encodeURIComponent(notice.id) : '/empresas?empresa=' + encodeURIComponent(String(data.empresaId));
+    family = 'representacion'; title = 'Novedad en tu representación'; path = String(data.evento).includes('REVOCAD') ? '/notificaciones/' + encodeURIComponent(notice.id) : '/empresas?empresa=' + encodeURIComponent(String(data.empresaId)) + '&origen=avisos';
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     family = 'certificados'; title = 'Certificado ambiental disponible';
     path = '/mi-perfil';
@@ -336,7 +337,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   };
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
   const renewalMessage = family === 'padron' && validRenewalNotice(data) ? RENEWAL_NOTICE_LABELS[notice.tipo] : undefined;
-  const message = renewalMessage || (validCompanyNotice(data) ? companyNoticeMessage(data) || fallback
+  const message = applicationNoticeMessage(notice.tipo, data) || renewalMessage || (validCompanyNotice(data) ? companyNoticeMessage(data) || fallback
     : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
     : data.tipo === 'recordatorio_firma' && data.version === 1 ? [data.fase === 'SEMANA' ? 'Se acercan los 30 días desde la firma' : '30 días desde la firma del manifiesto', 'Revisá el estado actual y coordiná las acciones pendientes con las partes. El aviso conserva la fecha de firma; no determina una infracción.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
@@ -380,7 +381,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;
-  for (const notice of await withCompanyNoticeContext(prisma, notices)) {
+  for (const notice of await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, notices))) {
     const content = notificationMailContent(notice);
     const trainingOrMissing = Boolean(content && !await notificationSourceEligible(notice, content.family));
     const eligible = content && families.includes(content.family) && !trainingOrMissing && await recipientEligible(notice, content.family);

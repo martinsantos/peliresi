@@ -11,7 +11,8 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { useNotificaciones, useMarcarLeida, useMarcarTodasLeidas, useEliminarNotificacion } from '../../hooks/useNotificaciones';
 import { formatRelativeTime } from '../../utils/formatters';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationActorRole } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationActorRole, notificationInboxReturnState } from '../../utils/notificationNavigation';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { notificationFollowup } from '../../utils/notificationFollowup';
 import type { Notificacion } from '../../types/models';
 import { useAuth } from '../../contexts/AuthContext';
@@ -77,7 +78,7 @@ const NotificacionesPage: React.FC = () => {
     refreshInspectionNotification(notice, queryClient);
     if (!notice.leida) mark.mutate(notice.id);
     // Opening the expediente must not depend on a successful acknowledgement.
-    navigate(resolveNotificationPath(notice, mp(''), currentUser?.rol));
+    navigate(resolveNotificationPath(notice, mp(''), currentUser?.rol), { state: notificationInboxReturnState(params.toString(), inspectionWorkspaceOwner(currentUser)) });
   };
 
   return (

@@ -3,7 +3,9 @@ import { CompanyPeopleSummary, type CompanyCapacity } from '../../components/Com
 import ImpersonationContext from '../../contexts/ImpersonationContext';
 import { ChevronDown } from 'lucide-react';
 import { Activity,useContext,useEffect,useRef,useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { notificationInboxReturnPath } from '../../utils/notificationNavigation';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
@@ -32,17 +34,21 @@ export default function EmpresasPage(){
 function CompanyWorkspace({scope}:{scope:string}){
  const {currentUser}=useAuth(),[choice,setChoice]=useState<Company>(),[page,setPage]=useState(1),[search,setSearch]=useState(''),mp=useMobilePrefix();
  const temporary=Boolean(useContext(ImpersonationContext)?.impersonationData);
- const requestedId=new URLSearchParams(window.location.search).get('empresa');
+ const location=useLocation(), params=new URLSearchParams(location.search);
+ const fromInbox=params.get('origen')==='avisos';
+ const backPath=fromInbox?notificationInboxReturnPath(location.state,inspectionWorkspaceOwner(currentUser)):'/mi-perfil';
+ const backLabel=fromInbox?'Volver a Avisos':'Volver a Mi perfil';
+ const requestedId=params.get('empresa');
  const requested=requestedId&&/^[a-zA-Z0-9_-]{1,100}$/.test(requestedId)?requestedId:undefined;
  const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',scope,temporary,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:!!currentUser&&!temporary&&import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
  // Pin the initial choice too: editing its name may change the server sort order.
  useEffect(()=>{if(!choice&&!requested&&list.data?.empresas[0])setChoice(list.data.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data.empresas[0]);},[choice,list.data,requested]);
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true')return <p>Funcionalidad no disponible.</p>;
- if(temporary)return <div className="mx-auto max-w-3xl space-y-4"><Link to={mp('/mi-perfil')} className="inline-flex min-h-11 items-center text-primary-800 underline">Volver a Mi perfil</Link><Card><h2 className="text-lg font-semibold">Gestión desde la cuenta responsable</h2><p className="mt-2 text-sm text-neutral-600">La gestión de empresas se realiza desde la cuenta del responsable. La vista temporal permite consultar la ficha del actor.</p></Card></div>;
- const selected=choice||(!requested?list.data?.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data?.empresas[0]:undefined);
+ if(temporary)return <div className="mx-auto max-w-3xl space-y-4"><Link to={mp(backPath)} className="inline-flex min-h-11 items-center text-primary-800 underline">{backLabel}</Link><Card><h2 className="text-lg font-semibold">Gestión desde la cuenta responsable</h2><p className="mt-2 text-sm text-neutral-600">La gestión de empresas se realiza desde la cuenta del responsable. La vista temporal permite consultar la ficha del actor.</p></Card></div>;
+ const selected=choice||(requested?list.data?.empresas.find(c=>c.id===requested):list.data?.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data?.empresas[0]);
  const singleCompany=!search&&page===1&&!list.data?.puedeValidar&&list.data?.pagination.total===1&&list.data.empresas.length===1&&selected?.id===list.data.empresas[0].id;
  return <div className="mx-auto w-full max-w-5xl space-y-5 pb-6">
-  <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Volver a Mi perfil</Link>
+  <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp(backPath)}>{backLabel}</Link>
   {(!singleCompany && ((list.data?.empresas.length||0)>0 || !!selected || !!search || page>1))&&<CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
    onChoose={id=>setChoice(list.data?.empresas.find(c=>c.id===id)||selected)}
    onPage={next=>{setChoice(selected);setPage(next);}}

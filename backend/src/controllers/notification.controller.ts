@@ -1,3 +1,4 @@
+import { withApplicationNoticeContext } from '../services/applicationNotice.service';
 import { Request, Response, NextFunction } from 'express';
 import { EventoAlerta, EstadoAlerta, TipoAnomalia, SeveridadAnomalia, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
@@ -94,7 +95,7 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
         const stateByCase = new Map(cases.map(item => [item.id, item.estado]));
         const caseByNotice = new Map(linked.map(item => [item.noticeId, item.id]));
 
-        const contextualNotices = await withCompanyNoticeContext(prisma, await withInspectionActivity(notificaciones));
+        const contextualNotices = await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity(notificaciones)));
         res.json({
             success: true,
             data: {
@@ -119,7 +120,7 @@ export const getNotificacion = async (req: Request, res: Response, next: NextFun
             include: { manifiesto: { select: { numero: true, estado: true } } } });
         if (!notice) throw new AppError('Aviso no disponible para esta cuenta', 404);
         res.setHeader('Cache-Control', 'private, no-store');
-        res.json({ success: true, data: (await withCompanyNoticeContext(prisma, await withInspectionActivity([notice])))[0] });
+        res.json({ success: true, data: (await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity([notice]))))[0] });
     } catch (error) { next(error); }
 };
 
