@@ -46,7 +46,9 @@ export function readActorActivity(token: string | null): string | null {
 }
 export function saveActorActivity(owner: string, activity: string) {
   if (!owner || !isActorActivity(activity)) throw new Error('Actividad inválida');
-  sessionStorage.removeItem('sitrep_company:' + owner);
+  // Explicit personal activity supersedes the remembered company on reopen.
+  sessionStorage.setItem('sitrep_company:' + owner, 'null');
+  try { localStorage.setItem('sitrep_company:' + owner, 'null'); } catch { /* Session choice remains pinned. */ }
   sessionStorage.setItem(activityKey(owner), activity);
   rememberActivity(owner, activity);
 }

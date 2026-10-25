@@ -10,6 +10,18 @@ const manifest: ManifestDraft = { step: 1, form: { generador: '', generadorId: '
 beforeEach(() => { vi.restoreAllMocks(); localStorage.clear(); sessionStorage.clear(); });
 
 describe('durable unresolved drafts', () => {
+  it('acknowledges a confirmed write without changing visible inputs or resurrecting them on reopen', () => {
+    const key = 'acknowledged-company';
+    const page = renderHook(() => useRecoverableForm(key, initial, valid));
+    act(() => page.result.current.update({ text: 'Cambio confirmado' }));
+    act(() => { expect(page.result.current.acknowledge()).toBe(true); });
+    expect(page.result.current.value.text).toBe('Cambio confirmado');
+    expect(JSON.parse(localStorage.getItem(key)!).value).toBeNull();
+    page.unmount();
+    const reopened = renderHook(() => useRecoverableForm(key, { text: 'Resultado actual del servidor' }, valid));
+    expect(reopened.result.current.value.text).toBe('Resultado actual del servidor');
+    expect(reopened.result.current.restored).toBe(false);
+  });
   it('restores a manifest conflict using only storage after a fresh process', () => {
     const scope = 'cold-manifest';
     const key = 'sitrep:manifest-form:v1:' + scope;

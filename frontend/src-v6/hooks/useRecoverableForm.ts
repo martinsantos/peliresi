@@ -81,9 +81,15 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
       resolveConflict();
     } catch { setError(true); }
   };
-  const clear = () => {
+  // A confirmed server write must invalidate the recovery copy immediately,
+  // while the UI may still need its values until the follow-up read succeeds.
+  const acknowledge = () => {
     if (!persist(null)) return false;
-    current.current = initial; edited.current = false; setValue(initial); setRestored(false); return true;
+    edited.current = false; setRestored(false); return true;
+  };
+  const clear = () => {
+    if (!acknowledge()) return false;
+    current.current = initial; setValue(initial); return true;
   };
   useEffect(() => {
     const receive = (event: StorageEvent) => {
@@ -103,5 +109,5 @@ export function useRecoverableForm<T>(key: string, initial: T, validate: (value:
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [error, conflict, conflictSaved]);
-  return { value, update, clear, saved, error, restored, conflict, conflictSaved, conflictCount, reload, overwrite: () => persist(current.current, true) };
+  return { value, update, clear, acknowledge, saved, error, restored, conflict, conflictSaved, conflictCount, reload, overwrite: () => persist(current.current, true) };
 }

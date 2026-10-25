@@ -11,8 +11,8 @@ export function DraftConflictNotice({ durable, count, onReload, onKeep }: {
       : 'Tu texto sigue aquí, pero no pudimos guardar esta copia. Mantené esta pantalla abierta hasta resolverlo.'}</p>
     {count > 1 && <p className="mt-1">Quedan {count} copias pendientes de revisar, una por vez.</p>}
     <div className="mt-2 flex flex-wrap gap-2">
-      <Button variant="outline" onClick={onReload}>Cargar la otra versión</Button>
-      <Button variant="outline" onClick={onKeep}>Conservar mi versión</Button>
+      <Button type="button" variant="outline" onClick={onReload}>Cargar la otra versión</Button>
+      <Button type="button" variant="outline" onClick={onKeep}>Conservar mi versión</Button>
     </div>
   </div>;
 }

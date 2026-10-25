@@ -1,4 +1,4 @@
-import { afterEach,expect,test,vi } from 'vitest';
+import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { render,screen,fireEvent,waitFor,cleanup,act,within } from '@testing-library/react';
 import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -6,7 +6,8 @@ import EmpresasPage from './EmpresasPage';
 const mocks=vi.hoisted(()=>({request:vi.fn(),user:{id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'} as {id:string;rol:string;actorId:string;empresaContexto?:any}}));
 vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:mocks.user})}));
 vi.mock('../../services/api',()=>({api:{request:mocks.request}}));
-afterEach(()=>{cleanup();vi.unstubAllEnvs();mocks.request.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
+beforeEach(()=>{localStorage.clear();sessionStorage.clear();});
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();mocks.request.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
 const company=(id:string,razonSocial:string)=>({id,cuit:'30712345671',razonSocial,revision:0,domicilioLegal:{calle:'Legal '+id,localidad:'Mendoza',departamento:'Capital'}});
 function setup(extra:Record<string,unknown>={}){
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
@@ -26,8 +27,121 @@ function setup(extra:Record<string,unknown>={}){
  const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
  const view=()=> <QueryClientProvider client={client}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>;
  const ui=render(view());
- return {client,externalChange:()=>{changed=true;},failSearch:()=>{failSearch=true;},failDetail:(status=503)=>{detailFailure=status;},recover:()=>{detailFailure=0;},rerender:()=>ui.rerender(view())};
+ return {client,externalChange:()=>{changed=true;},failSearch:()=>{failSearch=true;},failDetail:(status=503)=>{detailFailure=status;},recover:()=>{detailFailure=0;},rerender:()=>ui.rerender(view()),unmount:()=>ui.unmount()};
 }
+test.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('%s recovers its legal draft after a fresh mount, and discarding never writes to the server',async rol=>{
+ mocks.user={...mocks.user,rol,actorId:rol};
+ const first=setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Calle sin aplicar '+rol}});
+ fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'Revisar evidencia'}});
+ first.unmount();sessionStorage.clear();
+ setup();await screen.findByText('Borrador recuperado en este dispositivo · cambios sin aplicar');
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('Calle sin aplicar '+rol);
+ expect(screen.getByLabelText('Motivo del cambio legal')).toHaveValue('Revisar evidencia');
+ fireEvent.click(screen.getByRole('button',{name:'Descartar borrador de domicilio legal'}));
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('reopening recovers independent establishment and people drafts without submitting either',async()=>{
+ const first=setup({actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}]});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Establecimientos'}));
+ fireEvent.change(screen.getByLabelText('Código de establecimiento'),{target:{value:'QA-SEDE'}});
+ fireEvent.change(screen.getByLabelText('Domicilio productivo'),{target:{value:'Pendiente de verificar'}});
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'draft@qa.invalid'}});
+ fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'o'}});
+ fireEvent.change(screen.getByLabelText('Motivo de revocación'),{target:{value:'Sólo borrador'}});
+ first.unmount();sessionStorage.clear();
+ setup({actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}]});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('draft@qa.invalid');
+ expect(screen.getByLabelText('Rol en esta empresa')).toHaveValue('o');
+ expect(screen.getByLabelText('Motivo de revocación')).toHaveValue('Sólo borrador');
+ fireEvent.click(screen.getByRole('button',{name:'Establecimientos'}));
+ expect(screen.getByLabelText('Código de establecimiento')).toHaveValue('QA-SEDE');
+ expect(screen.getByLabelText('Domicilio productivo')).toHaveValue('Pendiente de verificar');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('account and role changes isolate persisted drafts and restore them only on return',async()=>{
+ const state=setup();await screen.findByLabelText('Calle legal');const owner={...mocks.user};
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Privado generador'}});
+ mocks.user={...owner,rol:'OPERADOR',actorId:'operator-qa'};state.rerender();
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Privado operador'}});
+ mocks.user={...owner,id:'second-person'};state.rerender();
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
+ mocks.user=owner;state.rerender();
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Privado generador'));
+ mocks.user={...owner,rol:'OPERADOR',actorId:'operator-qa'};state.rerender();
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Privado operador'));
+});
+test('fresh permission denial does not render a previously saved private draft',async()=>{
+ const first=setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Privado pendiente'}});first.unmount();
+ setup({puedeGestionar:false});await screen.findByText(/^Legal first ·/);
+ expect(screen.queryByDisplayValue('Privado pendiente')).not.toBeInTheDocument();
+ expect(screen.queryByLabelText('Calle legal')).not.toBeInTheDocument();
+ expect(screen.queryByText(/Borrador recuperado/)).not.toBeInTheDocument();
+});
+test('a confirmed write with failed follow-up read cannot resurrect on reopen',async()=>{
+ const first=setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Razón social'),{target:{value:'Zeta'}});
+ fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'Confirmado'}});
+ first.failDetail();fireEvent.click(screen.getByRole('button',{name:'Guardar datos legales'}));
+ await screen.findByText(/El cambio fue registrado/);first.unmount();
+ setup();await screen.findByLabelText('Calle legal');
+ expect(screen.getByLabelText('Motivo del cambio legal')).toHaveValue('');
+ expect(screen.queryByText(/Borrador recuperado/)).not.toBeInTheDocument();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method==='PUT')).toHaveLength(1);
+});
+test('blocked device storage retains input and explains that recovery is unavailable',async()=>{
+ setup();await screen.findByLabelText('Calle legal');
+ vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new Error('quota');});
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'No perder este texto'}});
+ expect(screen.getByRole('alert')).toHaveTextContent('No pudimos guardar este borrador');
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('No perder este texto');
+ expect(screen.queryByText('Borrador en este dispositivo · cambios sin aplicar')).not.toBeInTheDocument();
+});
+test('a recovered person draft retains its role when the server reorders activities',async()=>{
+ const first=setup({actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}]});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'scope@qa.invalid'}});first.unmount();
+ setup({actividades:[{id:'o',rol:'OPERADOR'},{id:'g',rol:'GENERADOR'}]});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(screen.getByLabelText('Rol en esta empresa')).toHaveValue('g');
+});
+test('a removed role in a recovered draft never falls back to a different authorization',async()=>{
+ const first=setup({actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}]});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'scope@qa.invalid'}});first.unmount();
+ setup({actividades:[{id:'o',rol:'OPERADOR'}]});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(screen.getByRole('alert')).toHaveTextContent('El rol guardado en el borrador ya no está disponible');
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'o'}});
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('scope@qa.invalid');
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeEnabled();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('an inactive recovered establishment must be removed explicitly before authorization',async()=>{
+ const extra={actividades:[{id:'g',rol:'GENERADOR'}],establecimientos:[{id:'s',nombre:'Sede QA',codigo:'QA',activo:true}]};
+ const first=setup(extra);await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'scope@qa.invalid'}});
+ fireEvent.click(screen.getByLabelText('Todos los establecimientos'));
+ fireEvent.click(screen.getByLabelText('Sede QA'));first.unmount();
+ extra.establecimientos[0].activo=false;
+ setup(extra);await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(screen.getByRole('alert')).toHaveTextContent('Un establecimiento del borrador ya no está activo');
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Quitar establecimientos no disponibles'}));
+ expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
+ fireEvent.click(screen.getByLabelText('Todos los establecimientos'));
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeEnabled();
+});
 test('a successful write followed by a failed read preserves its form and retry never submits twice',async()=>{
  const state=setup();await screen.findByLabelText('Calle legal');
  fireEvent.change(screen.getByLabelText('Razón social'),{target:{value:'Zeta'}});
@@ -82,7 +196,7 @@ test('a background company notice preserves dirty values and requires reconcilia
  fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Mi domicilio pendiente'}});
  fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'Evidencia local'}});
  state.externalChange();await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
- expect(await screen.findByText('Otra persona actualizó estos datos')).toBeVisible();
+ expect(await screen.findByText('Los datos de SITREP cambiaron')).toBeVisible();
  expect(screen.getByLabelText('Calle legal')).toHaveValue('Mi domicilio pendiente');
  expect(screen.getByLabelText('Motivo del cambio legal')).toHaveValue('Evidencia local');
  expect(screen.getByRole('button',{name:'Guardar datos legales'})).toBeDisabled();
@@ -98,7 +212,7 @@ test('choosing the server version explicitly replaces the draft and clears its r
  fireEvent.click(await screen.findByRole('button',{name:'Usar datos de SITREP'}));
  expect(screen.getByLabelText('Razón social')).toHaveValue('Zeta');
  expect(screen.getByLabelText('Motivo del cambio legal')).toHaveValue('');
- expect(screen.queryByText('Otra persona actualizó estos datos')).not.toBeInTheDocument();
+ expect(screen.queryByText('Los datos de SITREP cambiaron')).not.toBeInTheDocument();
  expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
 });
 test('an establishment changed remotely preserves its draft independently from the legal form',async()=>{
