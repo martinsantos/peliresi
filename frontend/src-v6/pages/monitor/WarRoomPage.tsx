@@ -6,6 +6,7 @@
  */
 
 import { useInspectionOperations } from '../../hooks/useInspectionOperations';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { useAuth } from '../../contexts/AuthContext';
 import { canUseInspectionOperations } from '../../services/inspectionOperations.service';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -46,7 +47,7 @@ const WarRoomPage: React.FC = () => {
   const [playbackDate, setPlaybackDate] = useState<string | null>(null);
   const [playbackDias, setPlaybackDias] = useState(1);
   const [forcedFlyTo, setForcedFlyTo] = useState<{ lat: number; lng: number } | null>(null);
-  const { panels, openPanel, closePanel, bringToFront, movePanel, minimizePanel } = useFloatingPanels();
+  const { panels, openPanel, closePanel, bringToFront, movePanel, minimizePanel } = useFloatingPanels(mode + ':' + inspectionWorkspaceOwner(currentUser));
 
   // Data hooks — only enabled for their respective modes
   const liveData = useWarRoomData(mode === 'LIVE');
@@ -411,6 +412,7 @@ const WarRoomPage: React.FC = () => {
       <div className="wr-layout-sidebar wr-enter-left">
 
         <DashboardPanels
+          now={now}
           mode={mode}
           liveData={liveData.data || null}
           forecastData={forecastData.data || null}
@@ -437,6 +439,9 @@ const WarRoomPage: React.FC = () => {
         {/* Floating panels — over the map, draggable */}
         <FloatingPanelLayer
           panels={panels}
+          liveTrips={mode === 'LIVE' ? liveData.data?.enTransito || [] : undefined}
+          liveCurrent={liveCurrent}
+          now={now}
           onClose={closePanel}
           onBringToFront={bringToFront}
           onMove={movePanel}
@@ -452,6 +457,7 @@ const WarRoomPage: React.FC = () => {
           </button>
         )}
         <WarRoomMap
+          now={now}
           inspections={mode === 'LIVE' ? inspections.data?.items || [] : []}
           cinemaMode={cinemaMode}
           actores={actores || null}

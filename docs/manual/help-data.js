@@ -775,6 +775,8 @@
       ], expected: 'El mapa reciente y el historial se interpretan sin confundir una ventana de consulta con todo el viaje.' },
       { title: 'Comprobar la recepción del GPS', body: [
         'Transporte mantiene la pantalla de seguimiento abierta y comprueba el envío recibido por SITREP. Administración revisa ese mismo número y la hora de la ubicación en Monitor o Centro de Control.',
+        'En Monitor, la lista y el detalle indican hace cuánto llegó la última posición. El detalle incluye fecha y hora de Mendoza y la velocidad registrada, también si fue cero. Esa lectura no demuestra que el teléfono siga conectado ni que esa sea su ubicación en este instante.',
+        'El panel abierto se actualiza con la próxima lectura, incluido el transporte del relevo. Si falla la consulta, conserva lo último recibido con Sin actualizar. Si el viaje deja de aparecer en una consulta exitosa, retira su posición del detalle: esa ausencia no confirma entrega ni finalización.',
         'Si todavía no llegó un punto del tramo vigente, revisen permiso de ubicación y conexión antes de continuar. GPS activo en el teléfono no demuestra por sí solo que la oficina haya recibido el envío.'
       ], expected: 'Las dos partes pueden distinguir la posición del teléfono del punto efectivamente recibido.', resources: [{ label: 'Resolver problemas de GPS', href: '/manual/tutorial.html?guide=resolver-gps' }] }
     ]

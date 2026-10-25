@@ -1,3 +1,4 @@
+import { MonitorPosition } from './MonitorPosition';
 /**
  * DashboardPanels — Left sidebar with Widget System
  * Layout: top zone (scrollable widgets) + drag divider + bottom zone (EventFeed).
@@ -205,6 +206,7 @@ const ManifiestoCard: React.FC<{
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
+  now?: number;
   inspections?: InspectionOperation[];
   inspectionTotal?: number;
   inspectionError?: boolean;
@@ -238,7 +240,7 @@ interface Props {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const DashboardPanels: React.FC<Props> = ({
-  inspections, inspectionTotal, inspectionError, inspectionLoading,
+  now, inspections, inspectionTotal, inspectionError, inspectionLoading,
   mode, liveData, forecastData, timelineData, playbackCounters, playbackEvents,
   currentEventId, enTransito = [], currentEvent, currentEventIndex = 0,
   totalEventCount = 0, onTripClick, onEventOpen, onViajeOpen,
@@ -403,6 +405,7 @@ export const DashboardPanels: React.FC<Props> = ({
                           </span>
                         )}
                       </div>
+                      {mode === 'LIVE' && <MonitorPosition position={v.ultimaPosicion} now={now} compact />}
                       {v.transportista && (
                         <p className="text-[10px] text-neutral-500 truncate">{v.transportista}</p>
                       )}

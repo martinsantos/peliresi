@@ -21,6 +21,7 @@ import { EVENT_COLORS } from '../utils/war-room-icons';
 import { ACTOR_ICONS } from '../../../utils/map-icons';
 import { MapCategorySymbol, type MapCategory } from '../../../components/ui/MapLayerToggle';
 import { MonitorPopupBounds } from './MonitorPopupBounds';
+import { MonitorPosition } from './MonitorPosition';
 
 // Keep the Monitor on the same keyless base map already used by SITREP's
 // other map views. The former CARTO endpoint now paints API KEY REQUIRED.
@@ -233,6 +234,7 @@ function EventFlash({ events }: { events: Array<{ lat: number; lng: number; tipo
 // ─── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
+  now?: number;
   inspections?: InspectionOperation[];
   cinemaMode: boolean;
   actores: { generadores: ActorPosition[]; transportistas: ActorPosition[]; operadores: ActorPosition[] } | null;
@@ -245,7 +247,7 @@ interface Props {
   playbackEvents?: Array<{ id: string; tipo: string; lat: number; lng: number; numero?: string }>;
 }
 
-export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
+export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode, actores, enTransito, mode, currentHour, playbackTrips, currentEvent, playbackEvents }) => {
 
   // Overlay día/noche — sutil, máx opacity 0.12
   const dayOverlayColor = useMemo(() => {
@@ -440,16 +442,8 @@ export const WarRoomMap: React.FC<Props> = ({ inspections = [], cinemaMode, acto
                         ))}
                       </div>
                     )}
-                    <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 11 }}>
-                      <div style={{ background: '#fef2f2', padding: '4px 6px', borderRadius: 4 }}>
-                        <div style={{ color: '#b91c1c', fontWeight: 700 }}>Velocidad</div>
-                        <div style={{ fontFamily: 'monospace' }}>{lastPos.velocidad != null ? `${lastPos.velocidad} km/h` : '—'}</div>
-                      </div>
-                      <div style={{ background: '#fef2f2', padding: '4px 6px', borderRadius: 4 }}>
-                        <div style={{ color: '#b91c1c', fontWeight: 700 }}>GPS</div>
-                        <div style={{ fontFamily: 'monospace' }}>{trip.ruta.length} pts</div>
-                      </div>
-                    </div>
+                    <MonitorPosition position={lastPos} now={now} />
+                    <p className="text-xs text-neutral-600">{trip.ruta.length} puntos incluidos en la consulta</p>
                   </LivePopup>
                 </Popup>
               </Marker>

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DashboardPanels } from '../../pages/monitor/components/DashboardPanels';
 import { FloatingPanelLayer, type ManifiestoFPData } from '../../pages/monitor/components/FloatingPanelLayer';
 import { EventFeed } from '../../pages/monitor/components/EventFeed';
+import { manifestEventLabel } from '../../utils/manifestEventPresentation';
 
 const event: ManifiestoFPData = { timestamp: '2026-10-03T01:00:00Z', eventoTipo: 'CREACION', manifiestoNumero: 'QA-READ',
   descripcion: 'Evento sintético de lectura', generador: { razonSocial: 'QA Origen' },
@@ -42,7 +43,7 @@ it('event names use a readable foreground for every event tint, in detail and ev
   for (const kind of ['CREACION', 'FIRMA', 'RETIRO', 'ENTREGA', 'RECEPCION', 'TRATAMIENTO', 'CIERRE']) {
     for (const open of [floating, sidebar, feed]) {
       const view = open({ ...event, eventoTipo: kind });
-      const badge = screen.getByText(kind, { exact: true });
+      const badge = screen.getByText(manifestEventLabel(kind), { exact: true });
       // Inline palette belongs to the component; the neutral foreground contract
       // is asserted here, and computed CSS contrast is measured in cloud E2E.
       const color = badge.style.color || (badge.classList.contains('text-neutral-800') ? 'rgb(38, 38, 38)' : 'rgb(0, 0, 0)');

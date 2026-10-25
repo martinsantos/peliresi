@@ -52,7 +52,7 @@ it('keeps full addresses and a measured zero speed rather than clipping or inven
   for (const line of screen.getAllByText(address)) {
     expect(line).toHaveStyle({ whiteSpace: 'normal', overflowWrap: 'anywhere' });
   }
-  expect(screen.getByText('0 km/h')).toBeVisible();
+  expect(screen.getByText('Velocidad registrada: 0 km/h')).toBeVisible();
   expect(screen.getByText('QA001')).toBeVisible();
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });
