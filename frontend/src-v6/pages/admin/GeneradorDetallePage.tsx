@@ -1,4 +1,4 @@
-import { useActorDetailNavigation } from '../../hooks/useActorDetailNavigation';
+import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
  * SITREP v6 - Generador Detail Page (5 tabs)
@@ -9,7 +9,7 @@ import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable'
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
+import { actorInspectionAccess } from '../../utils/actorReadAccess';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
@@ -177,13 +177,15 @@ const GeneradorDetallePage: React.FC = () => {
     fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
   } : null;
 
-  const backPath = actorReturnPath(location.state, mp(canEdit ? '/admin/actores/generadores' : '/dashboard'));
+  const actorNavigation = useActorNavigation();
+  const backPath = actorNavigation?.backPath || mp('/dashboard');
+  const backLabel = actorNavigation?.backLabel || 'Volver a Inicio';
 
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
         </div>
         <Card className="py-12">
           <div className="text-center">
@@ -195,7 +197,7 @@ const GeneradorDetallePage: React.FC = () => {
     );
   }
 
-  if (!generador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} />;
+  if (!generador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} backLabel={backLabel} />;
 
   const g = generador;
   const categoriaLabel = generador.categoria?.replaceAll('_', ' ') || 'Sin categoría';
@@ -307,7 +309,7 @@ const GeneradorDetallePage: React.FC = () => {
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
           <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={() => {
             if (generador) downloadCsv([{
               RazonSocial: generador.razonSocial, CUIT: generador.cuit,

@@ -1,5 +1,14 @@
 import { useLayoutEffect } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { actorWorkspaceNavigation } from '../utils/actorWorkspace';
+
+/** Share the same destination and wording with the web/app shell. */
+export function useActorNavigation() {
+  const location = useLocation();
+  const { currentUser } = useAuth();
+  return actorWorkspaceNavigation(location.pathname, currentUser, location.state);
+}
 
 /** Keep the ficha tab in the URL, including across edit and reload. */
 export function useActorDetailNavigation(tabs: string[]) {

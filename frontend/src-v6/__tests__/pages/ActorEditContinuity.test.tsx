@@ -27,6 +27,7 @@ vi.mock('../../hooks/useEnrichment', () => ({
 vi.mock('../../components/CalculadoraTEF', () => ({ default: () => null }));
 vi.mock('../../components/DocumentUpload', () => ({ default: () => null }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), error: vi.fn(), add: vi.fn() } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-admin', rol: 'ADMIN' } }) }));
 
 const actors = [
   { role: 'GENERADOR', plural: 'generadores', Page: NuevoGeneradorPage, last: 6 },
@@ -54,6 +55,16 @@ for (const actor of actors) describe(actor.role + ' edit continuity', () => {
     const list = open();
     fireEvent.click(screen.getByRole('button', { name: 'Volver a la ficha' }));
     expect(mock.navigate).toHaveBeenCalledWith(list+'/qa?tab=historial', { state: { actorReturn: list+'?search=QA&page=2' } });
+  });
+  it.each(['', '/app', '/mobile'])('preserves the originating manifest while returning from editing on %s', surface => {
+    const basename = surface === '/app' ? '/app' : '/';
+    const prefix = surface === '/mobile' ? '/mobile' : '';
+    const list = prefix + '/admin/actores/' + actor.plural;
+    const entry = prefix + '/manifiestos/m-qa#certificaciones';
+    render(<MemoryRouter basename={basename} initialEntries={[{ pathname: (surface === '/app' ? '/app' : '') + list+'/qa/editar', state: { actorReturn: entry, actorDetailReturn: list+'/qa?tab=historial' } }]}><Routes><Route path={list+'/:id/editar'} element={<actor.Page />} /></Routes></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a la ficha' }));
+    expect(mock.navigate).toHaveBeenCalledWith(list+'/qa?tab=historial', { state: { actorReturn: entry } });
+    expect(mock.update).not.toHaveBeenCalled();
   });
   it('does not revive cleared saved fields from historical imports', () => {
     const original = mock.actor;

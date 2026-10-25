@@ -9,6 +9,7 @@ const mock = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), uploadDoc: vi
 vi.mock('../../hooks/useActorRegistrationDraft', () => ({ useActorRegistrationDraft: () => ({ available: null, saved: false, error: null, restoring: false, checkpoint: vi.fn().mockResolvedValue(true), clear: vi.fn().mockResolvedValue(true), assertSession: vi.fn() }) }));
 vi.mock('../../services/generador-fiscal.service', () => ({ transportistaDocumentoService: { upload: mock.uploadDoc }, generadorFiscalService: { downloadDocumento: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: mock.success, error: mock.error } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-admin', rol: 'ADMIN' } }) }));
 vi.mock('../../hooks/useActores', () => {
   const create = () => ({ mutateAsync: mock.create, isPending: false });
   const update = () => ({ mutateAsync: mock.update, isPending: false });

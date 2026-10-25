@@ -75,7 +75,7 @@ const variantStyles: Record<ButtonVariant, string> = {
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'min-h-11 sm:min-h-9 px-3 py-2 text-sm gap-2 rounded-lg',
+  sm: 'min-h-11 px-3 py-2 text-sm gap-2 rounded-lg',
   base: 'min-h-11 px-4 py-2 text-sm gap-2 rounded-lg',
   lg: 'min-h-12 px-5 py-2.5 text-base gap-2.5 rounded-lg',
 };

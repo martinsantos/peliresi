@@ -1,4 +1,4 @@
-import { actorEditReturn } from '../../hooks/useActorDetailNavigation';
+import { actorEditReturn, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { PageToolbar } from '../../components/ui/PageToolbar';
 import { actorListReturn } from '../../hooks/useActorListNavigation';
 /**
@@ -264,7 +264,8 @@ const NuevoTransportistaPage: React.FC = () => {
   const listPath = mp('/admin/actores/transportistas');
   const listReturn = actorListReturn(location.state, listPath);
   const backPath = id ? actorEditReturn(location.state, listPath, id) : listReturn;
-  const goBack = () => id ? navigate(backPath, { state: { actorReturn: listReturn } }) : navigate(backPath);
+  const actorNavigation = useActorNavigation();
+  const goBack = () => id ? navigate(backPath, { state: actorNavigation?.returnState || { actorReturn: listReturn } }) : navigate(backPath);
   if (isEdit && loadingExisting) return <p role="status" className="p-6 text-neutral-700">Recuperando la ficha del transportista…</p>;
   if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del transportista. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(listReturn)}>Volver al padrón</Button></div></div>;
 

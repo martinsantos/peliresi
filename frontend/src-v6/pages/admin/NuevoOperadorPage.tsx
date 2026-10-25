@@ -1,4 +1,4 @@
-import { actorEditReturn } from '../../hooks/useActorDetailNavigation';
+import { actorEditReturn, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { PageToolbar } from '../../components/ui/PageToolbar';
 import { actorListReturn } from '../../hooks/useActorListNavigation';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
@@ -145,7 +145,8 @@ const NuevoOperadorPage: React.FC = () => {
   const listPath = mp('/admin/actores/operadores');
   const listReturn = actorListReturn(location.state, listPath);
   const backPath = id ? actorEditReturn(location.state, listPath, id) : listReturn;
-  const goBack = () => id ? navigate(backPath, { state: { actorReturn: listReturn } }) : navigate(backPath);
+  const actorNavigation = useActorNavigation();
+  const goBack = () => id ? navigate(backPath, { state: actorNavigation?.returnState || { actorReturn: listReturn } }) : navigate(backPath);
 
   useEffect(() => {
     initializedActor.current = null; setForm(INITIAL_FORM); setFormEdited(false); setAttempted(new Set()); setSubmitError(null); setStep(1); setSelectedY(new Set());

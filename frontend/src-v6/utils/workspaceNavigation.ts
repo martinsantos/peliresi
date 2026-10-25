@@ -6,6 +6,7 @@ import {
 import type { User } from '../contexts/AuthContext';
 import { canAccessMobilePath } from './mobileAccess';
 import { canUseCompanySection } from '../services/companyContext';
+import { actorWorkspaceNavigation, actorWorkspaceRoute } from './actorWorkspace';
 
 export type WorkspaceItem = { path: string; label: string; icon: LucideIcon; section: 'main' | 'admin' | 'tools' };
 /** Keep help in the header throughout actor lists, details and forms. */
@@ -51,13 +52,10 @@ export function workspaceNavigation(user: User | null | undefined): WorkspaceIte
   );
 }
 export function workspaceTitle(pathname: string): string {
+  const actor = actorWorkspaceRoute(pathname);
+  if (actor) return actor.stage === 'list' ? actor.plural : actor.stage === 'detail' ? `Ficha del ${actor.label}`
+    : `${actor.stage === 'create' ? 'Nuevo' : actor.stage === 'renew' ? 'Renovar' : 'Editar'} ${actor.label}`;
   const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
-  const actorForm = /^\/admin\/actores\/(generadores|transportistas|operadores)\/(nuevo|[^/]+\/(editar|renovar))\/?$/.exec(path);
-  if (actorForm) {
-    const actor = {generadores:'generador',transportistas:'transportista',operadores:'operador'}[actorForm[1]];
-    const action = actorForm[2] === 'nuevo' ? 'Nuevo' : actorForm[3] === 'renovar' ? 'Renovar' : 'Editar';
-    return `${action} ${actor}`;
-  }
   const details: Array<[RegExp, string]> = [
     [/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/, 'Requerimiento'],
     [/^\/inspecciones\//, 'Inspección'],
@@ -80,7 +78,11 @@ export function workspaceTitle(pathname: string): string {
 }
 
 /** Associate detail screens with the section that owns the work. */
-export function workspaceSectionPath(pathname: string): string {
+export function workspaceSectionPath(pathname: string, user?: User | null, state?: unknown): string {
+  if (user) {
+    const actor = actorWorkspaceNavigation(pathname, user, state);
+    if (actor) return actor.sectionPath;
+  }
   const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
   if (/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/.test(path)) return '/notificaciones';
   if (/^\/transporte\/(?:viaje|cargas)(?:\/|$)/.test(path)) return '/transporte/perfil';

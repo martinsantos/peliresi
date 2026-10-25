@@ -1,4 +1,4 @@
-import { useActorDetailNavigation } from '../../hooks/useActorDetailNavigation';
+import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
  * SITREP v6 - Transportista Detail Page
@@ -51,7 +51,7 @@ import {
 } from '../../hooks/useActores';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
+import { actorInspectionAccess } from '../../utils/actorReadAccess';
 import { toast } from '../../components/ui/Toast';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
@@ -158,7 +158,9 @@ const TransportistaDetallePage: React.FC = () => {
     return choferSort.direction === 'asc' ? <ChevronUp size={12} className="ml-1 text-primary-600 inline" /> : <ChevronDown size={12} className="ml-1 text-primary-600 inline" />;
   };
 
-  const backPath = actorReturnPath(location.state, mp(isAdmin || currentUser?.rol === 'ADMIN_TRANSPORTISTA' ? '/admin/actores/transportistas' : '/dashboard'));
+  const actorNavigation = useActorNavigation();
+  const backPath = actorNavigation?.backPath || mp('/dashboard');
+  const backLabel = actorNavigation?.backLabel || 'Volver a Inicio';
 
   const openCreateVehiculo = () => {
     if (!isAdmin) return;
@@ -309,7 +311,7 @@ const TransportistaDetallePage: React.FC = () => {
     return (
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
         </div>
         <Card className="py-12">
           <div className="text-center">
@@ -321,7 +323,7 @@ const TransportistaDetallePage: React.FC = () => {
     );
   }
 
-  if (!transportista) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} />;
+  if (!transportista) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} backLabel={backLabel} />;
 
   const habVencimiento = transportista.vencimientoHab !== '-' ? new Date(transportista.vencimientoHab) : null;
   const diasHastaVencimiento = habVencimiento ? Math.ceil((habVencimiento.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
@@ -347,7 +349,7 @@ const TransportistaDetallePage: React.FC = () => {
       {/* Header */}
       <div className="space-y-2">
         <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-          Volver
+          {backLabel}
         </Button>
         <div className="flex items-center gap-3">
           <MapCategorySymbol category="transportista" size="hero" />

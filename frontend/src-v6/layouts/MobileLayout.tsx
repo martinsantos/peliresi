@@ -165,7 +165,7 @@ export const MobileLayout: React.FC = () => {
   }, [currentUser?.id]);
 
   const navigation = useMemo(() => workspaceNavigation(currentUser), [currentUser]);
-  const selectedPath = currentNavigationItem(workspaceSectionPath(location.pathname), [...navigation, {path:'/mi-perfil'}])?.path;
+  const selectedPath = currentNavigationItem(workspaceSectionPath(location.pathname, currentUser, location.state), [...navigation, {path:'/mi-perfil'}])?.path;
   const bottomNavItems = useMemo(() => {
     const paths = ['/dashboard',
       isTransportista ? '/transporte/perfil' : currentUser?.esInspector ? '/inspecciones' : '/manifiestos',

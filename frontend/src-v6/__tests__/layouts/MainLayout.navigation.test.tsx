@@ -102,7 +102,13 @@ describe('Sidebar: one visible current destination',()=>{
   });
   it('keeps the section label on a detail route instead of the generic product title',()=>{
     show('/admin/actores/generadores/qa-actor');
-    expect(within(screen.getByRole('banner')).getByText('Generadores')).toBeVisible();
+    expect(within(screen.getByRole('banner')).getByText('Ficha del generador')).toBeVisible();
+  });
+  it('retains Manifiestos as the current section when consulting a linked ficha',()=>{
+    render(<MemoryRouter initialEntries={[{pathname:'/admin/actores/generadores/qa',state:{actorReturn:'/manifiestos/m-qa'}}]}><MainLayout/></MemoryRouter>);
+    expect(screen.getByRole('link',{name:'Manifiestos',exact:true})).toHaveAttribute('aria-current','page');
+    expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Ficha del generador'})).toBeVisible();
+    expect(document.querySelectorAll('aside a[aria-current="page"]')).toHaveLength(1);
   });
   it('provides stable hover/focus and a 44px touch target without animating geometry',()=>{
     show('/admin/actores/generadores');

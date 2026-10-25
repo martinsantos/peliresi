@@ -61,6 +61,13 @@ Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativ
 | UX14 | Alta | Cerrar las dos pestañas con un conflicto sin elegir descarta la copia local | Guardar cada copia separadamente, recuperarla al reabrir y no permitir enviar hasta elegir | Corregido; 158 regresiones y cierre/reapertura real web/app de manifiesto y motivo de adenda comprobados |
 | UX15 | Alta | Crear, perder la respuesta y repetir el mismo envío crea dos manifiestos y sus avisos. Reproducción API: 2026-000143 y 000144 | Conservar referencia y datos hasta confirmar; reintento y solicitudes simultáneas recuperan un único registro, incluso después de cerrar | Corregido; API G/T/O, cierre/reapertura UI web/app, 163 pruebas frontend y 91 backend aprobadas |
 | UX16 | Media | La entrada principal Crear un manifiesto todavía abría la guía histórica de firma única, con un aviso aclaratorio | El enlace habitual explica el acuerdo actual; no obliga a interpretar qué parte del tutorial está vigente | Guía unificada con el circuito de aprobación de las partes y el envío recuperable |
+| UX17 | Media | Manifiesto → ficha propia: título de padrón y ninguna sección activa. Referencia real en baseline-own-ficha-web.png | Título de ficha y sección del recorrido de origen señalada en web/app | Corregido con metadatos compartidos; recorrido G/T/O administrativo y generador propio comprobados |
+| UX18 | Alta | Manifiesto/inspección → ficha → editar → volver: se sustituye el origen por el padrón | Conservar ficha, pestaña y origen autorizado, sin abandonar la superficie ni aceptar enlaces externos | Corregido; regresión de las tres fichas y regreso real en web/app, incluida ancla de Comunicaciones |
+| UX19 | Media | Ayuda de una ficha indica completar y presentar un alta | Diferenciar consulta, edición y alta, según permisos | Corregido; manual de consulta propia y ayuda de edición comprobados |
+| UX20 | Media | Botón compacto de regreso baja a 37.25 px desde 768 px | Mínimo táctil de 44 px también en tablet y escritorio | Corregido en ButtonV2; medición final registrada en evidencia |
+| UX21 | Media | Ficha operador muestra vencimiento ISO completo; generador fecha de alta sin formato local | Fechas de calendario legibles y coherentes sin desplazar el día por zona horaria | Pendiente; observado en esta revisión |
+| UX22 | Media | Ficha generador repite categoría en cabecera y tarjeta; expediente conserva dos h1 | Consolidar jerarquía y resumen útil sin duplicar títulos/datos | Pendiente; observado en app a 393 px |
+| UX23 | Alta | Cerrar sesión de administrador desde expediente y entrar como generador abre el requerimiento ajeno bloqueado | Salida explícita no arrastra la tarea privada de la cuenta anterior; vencimiento de sesión conserva el enlace legítimo | Pendiente; API impide acceso y UI informa que no está disponible, pero el destino desorienta |
 
 ## Evidencias y sesiones
 
@@ -107,6 +114,16 @@ La prueba de app perdió realmente la respuesta cuando el proxy de fallos de QA 
 En web, el proxy corregido sustituyó una única respuesta 201 por 502 después del commit. Al cerrar y reabrir se conservó el envío; Comprobar envío abrió `2026-000149`, sin otro registro. El formulario anuncia el resultado incierto y enfoca su orientación; una respuesta 400/403/422 libera la edición conservando campos. Se probó además almacenamiento no disponible: no se despacha una solicitud sin conservar su referencia. El panel de recuperación tiene un solo título de pantalla, acción de 44 px y sin desborde horizontal en web a 320/393/768/1365/1920; app revisada a 393 px. Esto no sustituye la revisión de todos los estados ni Android físico.
 
 Pruebas únicas de este corte: 163 frontend y 91 backend, sin sumar repeticiones. TypeScript, backend y ambas compilaciones aprobados. La prueba HTTP reproducible queda en `frontend/cloud-qa/manifest-creation-retry.ts`; requiere el entorno artificial autorizado y rehúsa ejecutarse fuera de él.
+
+### Continuación: fichas dentro del recorrido
+
+Evidencias en `uiux-actor-navigation-20261025`. La ficha ya no se presenta como un padrón: el encabezado identifica al actor y la sección conserva el trabajo de origen. El regreso indica manifiesto, inspección, padrón o perfil. Editar conserva la pestaña de la ficha y su origen, con búsqueda/ancla; los destinos se limitan a entradas conocidas de la misma superficie y se revalidan contra el rol y contexto de empresa actuales. Esto orienta la navegación; el servidor conserva la autorización efectiva.
+
+Ayuda usa el mismo catálogo de rutas para distinguir consulta, alta, edición y renovación. Los actores ordinarios reciben instrucciones de consulta y una guía propia del manual, sin acceso al padrón ni al módulo de Inspecciones. Los fallos de carga conservan el destino de regreso.
+
+449 pruebas frontend únicas aprobadas, TypeScript y compilaciones web/app. Navegación real sin guardar: las tres fichas desde un manifiesto, selección de pestaña, entrada/salida de edición y regreso al mismo manifiesto, tanto web como app. Desde un expediente de app también se conserva el apartado Comunicaciones. Se comprobó la ficha propia del generador sin edición ni pestaña de Inspecciones; Ayuda cierra con Escape y devuelve el foco. Cinco anchos detectaron el botón compacto de 37.25 px, corregido en el componente común. Las medidas finales se conservan separadas de las iniciales.
+
+La tanda sigue abierta: los defectos UX21–23 se incorporan al mismo registro, no se ocultan por el resultado de las regresiones. No hubo participantes humanos ni Android físico.
 
 ### Guion de la primera sesión (sin intervenir salvo bloqueo)
 

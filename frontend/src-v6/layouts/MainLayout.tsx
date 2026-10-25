@@ -115,7 +115,7 @@ export const MainLayout: React.FC = () => {
   })();
 
   const navItems = navigation.filter(item => item.section === 'main');
-  const currentItem = currentNavigationItem(workspaceSectionPath(location.pathname), navigation);
+  const currentItem = currentNavigationItem(workspaceSectionPath(location.pathname, currentUser, location.state), navigation);
   const currentPage = workspaceTitle(location.pathname);
 
   return (

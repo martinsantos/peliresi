@@ -364,7 +364,7 @@ describe('MobileLayout Android shell', () => {
   it('identifies the generator category on its canonical detail route', () => {
     authState.currentUser = { ...authState.currentUser, rol: 'ADMIN' };
     renderMobileLayout('/admin/actores/generadores/qa-generator');
-    expect(screen.getByRole('banner')).toHaveTextContent('Generadores');
+    expect(screen.getByRole('banner')).toHaveTextContent('Ficha del generador');
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
     const link = screen.getByRole('link', { name: 'Generadores', exact: true });
     expect(link).toHaveAttribute('href', '/admin/actores/generadores');

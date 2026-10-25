@@ -1,7 +1,32 @@
+import { actorWorkspaceRoute } from './actorWorkspace';
 export type ContextGuide = { title: string; steps: string[]; manual: string };
 export function contextualGuidance(path: string, role: string, inspector = false): ContextGuide {
   path = path.replace(/^\/(?:app|mobile)(?=\/|$)/, '');
   const operator = role === 'OPERADOR', transport = role === 'TRANSPORTISTA', admin = role.startsWith('ADMIN');
+  const actor = actorWorkspaceRoute(path);
+  if (actor) {
+    const manage = role === 'ADMIN' || role === `ADMIN_${actor.role}`;
+    if (actor.stage === 'list') return { title: `Consultar ${actor.plural.toLowerCase()}`, manual: 'padrones-administrativos', steps: [
+      'Buscá por razón social o CUIT y combiná los filtros. Se aplican a todo el padrón, no sólo a la página visible.',
+      'Abrí una ficha para consultar sus datos. Al volver se conservan búsqueda, filtros y página.',
+      'Usá Nuevo sólo para un alta. Los datos de un actor existente se cambian desde Editar datos del padrón en su ficha.',
+    ] };
+    if (actor.stage === 'detail') return { title: `Consultar la ficha del ${actor.label}`, manual: manage || inspector || admin ? 'padrones-administrativos' : 'fichas-propias-actores', steps: [
+      'Verificá la razón social y el CUIT. Las pestañas reúnen sus datos, documentos e historial.',
+      manage ? 'Para modificar la ficha usá Editar datos del padrón. Consultar o cambiar de pestaña no guarda cambios.' : admin || inspector ? 'Esta ficha es de consulta. Tu función permite revisar al actor; editar su padrón requiere la administración correspondiente.' : 'Esta ficha es de consulta. No habilita editar el padrón ni acceder a fichas ajenas.',
+      'El botón Volver indica el destino: manifiesto, inspección, padrón o tu perfil. Conserva la pantalla desde la que entraste.',
+    ] };
+    if (actor.stage === 'edit' || actor.stage === 'renew') return { title: `Revisar cambios del ${actor.label}`, manual: 'padrones-administrativos', steps: [
+      'Comprobá que la razón social y el CUIT correspondan a la ficha que querés modificar.',
+      'El borrador conserva lo escrito; la ficha cambia cuando confirmás Guardar cambios. Corregí los campos señalados antes de confirmar.',
+      'Comprobá la confirmación y los adjuntos pendientes. Al volver recuperás la pestaña de la ficha y su pantalla de origen.',
+    ] };
+    return { title: `Dar de alta un ${actor.label}`, manual: 'padrones-administrativos', steps: [
+      'Completá los pasos y revisá los campos señalados. El borrador permite retomar sin crear todavía el actor.',
+      'Revisá los datos y adjuntos antes de confirmar el alta. No repitas el alta si la ficha se guardó y quedan archivos pendientes.',
+      'Comprobá el resultado del guardado y regresá al padrón con los filtros conservados.',
+    ] };
+  }
   if (/\/adendas(?:\/|$)/.test(path)) return { title: 'Revisar una adenda', manual: 'adendas-hallazgos-partes', steps: [operator ? 'Registrá la carga observada completa y el motivo del hallazgo. Conservá la declaración original.' : 'Compará lo declarado con lo observado y leé el motivo del hallazgo.', 'Aprobá u observá desde tu propia cuenta. Una decisión individual no representa a las otras partes.', 'El historial muestra qué revisiones faltan. Una corriente nueva puede requerir decisión de la autoridad.'] };
   if (/\/manifiestos\/nuevo|\/manifiestos\/[^/]+\/editar/.test(path)) return { title: 'Completar la propuesta', manual: 'manifiestos-tres-partes', steps: ['Revisá la actividad con la que trabajás y elegí las partes, la fecha prevista y los residuos.', 'Usá los vehículos y choferes registrados del transporte elegido. Corregí los campos señalados antes de avanzar.', 'Revisá el resumen. Crear la propuesta no inicia el viaje: cada parte debe aprobar.'] };
   if (/baja-intensidad/.test(path)) return { title: 'Declarar un eventual', manual: 'eventuales-aprobaciones-avisos', steps: ['Identificá los participantes y completá los datos disponibles.', 'Si falta un dato, indicá el motivo según el campo. La declaración no acredita habilitación.', 'Consultá las aprobaciones y la regularización pendiente en el registro.'] };

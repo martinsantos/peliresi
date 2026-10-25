@@ -1,4 +1,4 @@
-import { useActorDetailNavigation } from '../../hooks/useActorDetailNavigation';
+import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
  * SITREP v6 - Operador Detail Page
@@ -38,7 +38,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Tabs, TabList, Tab, TabPanel } from '../../components/ui/Tabs';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAccess';
+import { actorInspectionAccess } from '../../utils/actorReadAccess';
 import { useOperador } from '../../hooks/useActores';
 
 import type { OperadorEnriched } from '../../data/operadores-enrichment';
@@ -152,13 +152,15 @@ const OperadorDetallePage: React.FC = () => {
     [enriched]
   );
 
-  const backPath = actorReturnPath(location.state, mp(canViewCatalog ? '/admin/actores/operadores' : '/dashboard'));
+  const actorNavigation = useActorNavigation();
+  const backPath = actorNavigation?.backPath || mp('/dashboard');
+  const backLabel = actorNavigation?.backLabel || 'Volver a Inicio';
 
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
         </div>
         <Card className="py-12">
           <div className="text-center">
@@ -170,7 +172,7 @@ const OperadorDetallePage: React.FC = () => {
     );
   }
 
-  if (!operador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} />;
+  if (!operador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} backLabel={backLabel} />;
 
   const est = estadoConfig[operador.estado] || estadoConfig.ACTIVO;
 
@@ -179,7 +181,7 @@ const OperadorDetallePage: React.FC = () => {
       {/* Header */}
       <div className="space-y-2">
         <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>
-          Volver
+          {backLabel}
         </Button>
         <div className="flex items-center gap-3">
           <MapCategorySymbol category="operador" size="hero" />
