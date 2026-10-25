@@ -4,7 +4,10 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { useAdmissionContext } from '../../hooks/useAdmissionContext';
+import { applicationReturn } from '../../utils/admissionReview';
 import {
   ArrowLeft, FileText, CheckCircle, XCircle, AlertTriangle, Eye,
   Send, Download, MessageSquare, User, File, Clock,
@@ -89,6 +92,9 @@ function fieldLabel(key: string): string {
 const SolicitudDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation(), mp = useMobilePrefix();
+  const { owner } = useAdmissionContext();
+  const backToList = () => navigate(applicationReturn(location.state, mp('/admin/solicitudes'), owner), { state: { admissionSectionReturn: location.state?.admissionSectionReturn } });
   const { currentUser } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -204,7 +210,7 @@ const SolicitudDetallePage: React.FC = () => {
         <p>No se pudo cargar la solicitud.</p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void refetch()}>Reintentar</Button>
-          <Button variant="ghost" onClick={() => navigate('/admin/solicitudes')}>Volver a solicitudes</Button>
+          <Button variant="ghost" onClick={backToList}>Volver a solicitudes</Button>
         </div>
       </div></Card>
     );
@@ -224,7 +230,7 @@ const SolicitudDetallePage: React.FC = () => {
         <button
           type="button"
           aria-label="Volver a solicitudes de inscripción"
-          onClick={() => navigate('/admin/solicitudes')}
+          onClick={backToList}
           className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
         >
           <ArrowLeft size={20} className="text-neutral-500" />

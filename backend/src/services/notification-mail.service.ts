@@ -235,7 +235,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     path = '/mi-perfil';
   } else if (['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(notice.tipo) && typeof data.renovacionId === 'string' && data.renovacionId) {
     family = 'padron'; title = 'Novedad en una solicitud de padrón';
-    path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones' : '/notificaciones/' + encodeURIComponent(notice.id);
+    path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones?anio=&revision=' + encodeURIComponent(data.renovacionId) : '/notificaciones/' + encodeURIComponent(notice.id);
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'manifiesto_eventual' && validEventualMail(data)) {
     family = 'manifiestos'; title = 'Novedad en un eventual'; path = '/manifiestos/baja-intensidad?registro=' + encodeURIComponent(String(data.registroId));
   } else if (notice.tipo === 'INFO_GENERAL' && notice.manifiestoId && data.tipo === 'certificado_manifiesto' && data.version === 1 && typeof data.documentoId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.documentoId) && ['PARCIAL','FINAL'].includes(String(data.tipoCertificado))) {

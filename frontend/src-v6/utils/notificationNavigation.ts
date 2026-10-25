@@ -25,6 +25,9 @@ function withBasePath(path: string, basePath: string): string {
 /** Opening a workflow notice must refresh its linked expediente/application. */
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
+  if (typeof data.renovacionId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.renovacionId)) {
+    void queryClient.invalidateQueries({ queryKey: ['renovaciones'] });
+  }
   if(data.tipo === 'certificado_manifiesto' && data.version === 1) {
     for(const key of ['manifest-certificates','manifiestos']) void queryClient.invalidateQueries({queryKey:[key]});
   }
@@ -97,7 +100,7 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
 
   if (explicitPath?.startsWith('/')) return withBasePath(explicitPath, basePath);
   if (data.tipo === 'nuevo_registro') return withBasePath('/admin/usuarios', basePath);
-  if (String(notificacion.tipo) === 'MODIFICACION_SOLICITADA' && typeof data.renovacionId === 'string') return withBasePath('/admin/renovaciones', basePath);
+  if (String(notificacion.tipo) === 'MODIFICACION_SOLICITADA' && safeId(data.renovacionId)) return withBasePath('/admin/renovaciones?anio=&revision=' + data.renovacionId, basePath);
   if (data.tipo === 'certificado_ambiental' && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     return withBasePath('/mi-perfil', basePath);
   }

@@ -167,7 +167,7 @@ export const aprobarRenovacion = async (req: AuthRequest, res: Response, next: N
                 where: { id, estado: 'PENDIENTE' },
                 data: {
                     estado: 'APROBADA', revisadoPor: req.user.id, fechaRevision: new Date(),
-                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : null,
+                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : undefined,
                 },
             });
             if (status.count !== 1) throw new AppError('La renovacion ya fue procesada por otro usuario', 409);
@@ -200,7 +200,7 @@ export const rechazarRenovacion = async (req: AuthRequest, res: Response, next: 
                 data: {
                     estado: 'RECHAZADA', revisadoPor: req.user.id, fechaRevision: new Date(),
                     motivoRechazo: motivoRechazo.trim().slice(0, 2_000),
-                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : null,
+                    observaciones: typeof observaciones === 'string' ? observaciones.slice(0, 5_000) : undefined,
                 },
             });
             if (status.count !== 1) throw new AppError('La renovacion ya fue procesada por otro usuario', 409);

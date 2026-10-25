@@ -18,6 +18,13 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app', '/mobile'])('opens the exact renewal and refreshes its state on %s', prefix => {
+    const n = { ...base, tipo: 'MODIFICACION_SOLICITADA' as Notificacion['tipo'], datos: JSON.stringify({ renovacionId: 'renewal-qa' }) };
+    expect(resolveNotificationPath(n, prefix)).toBe(prefix + '/admin/renovaciones?anio=&revision=renewal-qa');
+    const invalidateQueries = vi.fn();
+    refreshInspectionNotification(n, { invalidateQueries } as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['renovaciones'] });
+  });
   it.each(['', '/app', '/mobile'])('names the Inspecciones section consistently for %s notices', prefix => {
     expect(notificationActionLabel(prefix + '/inspecciones?vista=antecedentes')).toBe('Ver antecedentes en Inspecciones →');
   });

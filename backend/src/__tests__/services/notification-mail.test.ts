@@ -13,6 +13,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('links the reviewer to the exact renewal and the actor to their decision notice', () => {
+    const data = JSON.stringify({ renovacionId: 'renewal-qa' });
+    const review = notificationMailContent({ ...notice, tipo: 'MODIFICACION_SOLICITADA', datos: data })!;
+    expect(review.html).toContain('/admin/renovaciones?anio=&amp;revision=renewal-qa');
+    const result = notificationMailContent({ ...notice, tipo: 'MODIFICACION_APROBADA', rol: 'GENERADOR', datos: data })!;
+    expect(result.html).toContain('/notificaciones/qa-notice');
+  });
   it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'ADMIN'])('explains individual approval and separate certificate issuance for %s', rol => {
     const common = { ...notice, rol, manifiestoId: 'manifest' };
     const approved = notificationMailContent({ ...common, tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'adenda_manifiesto', evento: 'APROBADA', nota: 'PRIVATE', autorRol: '<PRIVATE>' }) })!;

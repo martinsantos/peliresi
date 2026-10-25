@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { solicitudService } from '../services/solicitud.service';
 import type { SolicitudFilters, IniciarSolicitudRequest, UpdateSolicitudRequest } from '../types/api';
+import { useAdmissionContext } from './useAdmissionContext';
 
 const KEYS = {
   solicitudes: (filters?: SolicitudFilters) => ['solicitudes', filters] as const,
@@ -10,9 +11,11 @@ const KEYS = {
 };
 
 export function useSolicitudes(filters?: SolicitudFilters) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.solicitudes(filters),
+    queryKey: [...KEYS.solicitudes(filters), owner],
     queryFn: () => solicitudService.list(filters),
+    enabled: ready,
   });
 }
 

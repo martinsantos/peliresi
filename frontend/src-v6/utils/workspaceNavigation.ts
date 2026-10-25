@@ -30,7 +30,7 @@ const catalog: WorkspaceItem[] = [
   {path:'/admin/actores/generadores', label:'Generadores', icon:Factory, section:'admin'},
   {path:'/admin/actores/transportistas', label:'Transportistas', icon:Truck, section:'admin'},
   {path:'/admin/actores/operadores', label:'Operadores', icon:FlaskConical, section:'admin'},
-  {path:'/admin/solicitudes', label:'Solicitudes de inscripción', icon:FileCheck, section:'admin'},
+  {path:'/admin/solicitudes', label:'Solicitudes', icon:FileCheck, section:'admin'},
   {path:'/admin/usuarios', label:'Usuarios', icon:Users, section:'admin'},
   {path:'/admin/vehiculos', label:'Vehículos', icon:Truck, section:'admin'},
   {path:'/admin/residuos', label:'Catálogo de residuos', icon:FlaskConical, section:'admin'},
@@ -70,6 +70,7 @@ export function workspaceTitle(pathname: string): string {
     [/^\/tracking/, 'Seguimiento GPS'],
     [/^\/estadisticas/, 'Estadísticas'],
     [/^\/admin\/renovaciones/, 'Renovaciones'],
+    [/^\/admin\/solicitudes/, 'Solicitudes de inscripción'],
     [/^\/switch-user/, 'Cuenta'],
   ];
   return details.find(([rule]) => rule.test(path))?.[1]
@@ -86,6 +87,7 @@ export function workspaceSectionPath(pathname: string, user?: User | null, state
   }
   const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
   if (/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/.test(path)) return '/notificaciones';
+  if (/^\/admin\/(?:solicitudes|renovaciones)(?:\/|$)/.test(path)) return '/admin/solicitudes';
   if (/^\/transporte\/(?:viaje|cargas)(?:\/|$)/.test(path)) return '/transporte/perfil';
   if (/^\/(?:empresas|mi-solicitud)(?:\/|$)/.test(path)) return '/mi-perfil';
   return path;
