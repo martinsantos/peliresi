@@ -6,6 +6,12 @@ export function inspectionWorkspaceOwner(user?: Context | null): string {
   return user?.id ? JSON.stringify([user.id, user.rol, user.actorId, companyCacheScope(user.empresaContexto || null), user.empresaContexto?.autorizacionId, user.empresaContexto?.revision, !!user.esInspector, !!user.training]) : '';
 }
 
+/** A cached document is reusable only under the complete authorization context.
+ * Keep the user prefix for logout cleanup, but never read the old unscoped key. */
+export function inspectionContextKey(userId: string | number, owner: string, inspectionId: string): string {
+  return userId && owner && inspectionId ? `${userId}:context-v2:${JSON.stringify([owner, inspectionId])}` : '';
+}
+
 export const INSPECTION_FILTER_KEYS = ['search', 'estado', 'etapa', 'tipoActor', 'tipoInspeccion', 'actorId', 'page', 'vista', 'filtros', 'agendaEstado', 'agendaDesde', 'agendaHasta', 'agendaPage', 'agendaFecha', 'agendaFiltros'] as const;
 
 export function inspectionPage(value: string | null): number {

@@ -31,6 +31,24 @@ export { notificationService } from '../services/notification-dispatcher.service
 
 // ============ CONTROLADOR DE NOTIFICACIONES ============
 
+/** Historical own-account notices did not carry their activity. Enrich the read
+ * in one bounded query, without rewriting the original notification/audit row. */
+async function withInspectionActivity<T extends { datos: string | null }>(notices: T[]): Promise<T[]> {
+    const references = notices.map(notice => {
+        try {
+            const data = JSON.parse(notice.datos || 'null');
+            return data?.version === 1 && ['intercambio_inspeccion', 'agenda_inspeccion'].includes(data.tipo)
+                && data.destino === 'participacion' && !data.tipoActor && typeof data.inspeccionId === 'string' ? data : null;
+        } catch { return null; }
+    });
+    const ids = [...new Set(references.filter(Boolean).map(data => data.inspeccionId as string))];
+    if (!ids.length) return notices;
+    const cases = await prisma.inspeccion.findMany({ where: { id: { in: ids } }, select: { id: true, tipoActor: true } });
+    const roles = new Map(cases.map(item => [item.id, item.tipoActor]));
+    return notices.map((notice, index) => references[index] && roles.get(references[index].inspeccionId)
+        ? { ...notice, datos: JSON.stringify({ ...references[index], tipoActor: roles.get(references[index].inspeccionId) }) } : notice);
+}
+
 // Obtener notificaciones del usuario actual
 export const getNotificaciones = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -75,10 +93,11 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
         const stateByCase = new Map(cases.map(item => [item.id, item.estado]));
         const caseByNotice = new Map(linked.map(item => [item.noticeId, item.id]));
 
+        const contextualNotices = await withInspectionActivity(notificaciones);
         res.json({
             success: true,
             data: {
-                notificaciones: notificaciones.map(notice => ({ ...notice,
+                notificaciones: contextualNotices.map(notice => ({ ...notice,
                     seguimientoEstado: stateByCase.get(caseByNotice.get(notice.id) || '') ?? null })),
                 total,
                 noLeidas,
@@ -99,7 +118,7 @@ export const getNotificacion = async (req: Request, res: Response, next: NextFun
             include: { manifiesto: { select: { numero: true, estado: true } } } });
         if (!notice) throw new AppError('Aviso no disponible para esta cuenta', 404);
         res.setHeader('Cache-Control', 'private, no-store');
-        res.json({ success: true, data: notice });
+        res.json({ success: true, data: (await withInspectionActivity([notice]))[0] });
     } catch (error) { next(error); }
 };
 

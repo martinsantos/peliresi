@@ -4,8 +4,7 @@ import { solicitudService } from '../services/solicitud.service';
 import type { SolicitudInscripcion } from '../types/api';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
-import { ACTIVITY_HEADER, saveActorActivity } from '../services/actorActivity';
-import { clearOfflineSession } from '../services/offlineSession';
+import { activateActorActivity } from '../services/activateActorActivity';
 import { useAuth } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { Card } from './ui/CardV2';
@@ -33,10 +32,7 @@ function ActivityChoices({ mode }: { mode: 'switch' | 'request' }) {
     try {
       if (approved) {
         // Confirm on server first. New navigation discards the previous role's in-memory queries.
-        const result = await api.get('/auth/profile', { headers: { [ACTIVITY_HEADER]: type } });
-        if (result.data.data.user.id !== currentUser.id || result.data.data.user.rol !== type) throw new Error('Actividad incompatible');
-        saveActorActivity(String(currentUser.id), type);
-        clearOfflineSession();
+        await activateActorActivity(currentUser.id, type);
         window.location.replace((window.location.pathname.startsWith('/app/') ? '/app' : '') + mp('/mi-perfil'));
       } else if (application) {
         navigate(['BORRADOR', 'OBSERVADA'].includes(application.estado)

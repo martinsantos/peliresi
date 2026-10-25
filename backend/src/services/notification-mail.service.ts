@@ -9,7 +9,7 @@ import prisma from '../lib/prisma';
 import { mailPolicy } from './email-policy';
 import { escapeMail, mailAction, mailShell } from './email-templates';
 import { isFullAccess } from '../utils/roleFilter';
-import { INSPECTION_EXCHANGE_LABELS } from './inspectionExchangeNotice.service';
+import { INSPECTION_EXCHANGE_LABELS, inspectionParticipantNoticeWhere } from './inspectionExchangeNotice.service';
 import { PARTICIPANT_VISIBLE_STATES } from './inspectionExchange.service';
 import { INSPECTION_AGENDA_LABELS } from './inspectionAgendaNotice.service';
 import { requirementSituation } from './alertCataloguePolicy.service';
@@ -135,10 +135,18 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
     if (!notice.usuarioId || typeof data.inspeccionId !== 'string' || !data.inspeccionId) return false;
     const inspection = await prisma.inspeccion.findUnique({ where: { id: data.inspeccionId }, select: {
       numeroActa: true, inspectorId: true, tipoActor: true, estado: true,
+      generadorId: true, transportistaId: true, operadorId: true,
       generador: { select: { usuarioId: true } }, transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
     } });
     if (!inspection || /^(?:ARP-?DEMO|DEMO)(?:[-/]|$)/i.test(inspection.numeroActa?.trim() || '')) return false;
-    const { authority, participant } = inspectionAudience(notice, inspection);
+    const { authority, participant: primaryParticipant } = inspectionAudience(notice, inspection);
+    let participant = primaryParticipant;
+    if (!participant && process.env.ACTOR_MULTIROLE_ENABLED === 'true' && data.destino === 'participacion'
+      && data.tipoActor === inspection.tipoActor && PARTICIPANT_VISIBLE_STATES.includes(inspection.estado)
+      && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(notice.rol)) {
+      const owner = inspectionParticipantNoticeWhere(inspection);
+      participant = !!owner && !!await prisma.usuario.findFirst({ where: { AND: [{ id: notice.usuarioId, activo: true }, owner] }, select: { id: true } });
+    }
     if (data.tipo === 'agenda_inspeccion') {
       if (!validAgendaMail(data)) return false;
       const event = await prisma.eventoInspeccion.findUnique({ where: { id: data.eventoId }, select: { inspeccionId: true, metadata: true } });
@@ -266,6 +274,9 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     const participant = ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) ? data.destino === 'participacion' : !notice.rol.startsWith('ADMIN') && !notice.esInspector;
     path = (participant ? '/requerimientos/' : '/inspecciones/') + encodeURIComponent(data.inspeccionId)
       + (!participant && data.tipo === 'intercambio_inspeccion' ? '#intercambios' : '');
+    // The account may reopen in another activity. The owned notice offers a
+    // confirmed role switch before entering the requirement, on web and app.
+    if (participant && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))) path = '/notificaciones/' + encodeURIComponent(notice.id);
   } else return null;
   // Only controlled event labels. Never copy free text, notes, attachments or amounts.
   const labels: Record<string, [string, string]> = {

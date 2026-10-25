@@ -13,6 +13,13 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
   }
 }
 
+export function notificationActorRole(notice: Notificacion): 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | null {
+  const data = parseNotificationData(notice.datos);
+  return ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1
+    && data.destino === 'participacion' && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))
+    ? data.tipoActor as 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' : null;
+}
+
 function withBasePath(path: string, basePath: string): string {
   const normalizedPath = safeLocalRedirect(path === '/perfil' ? '/mi-perfil' : path, '/notificaciones').replace(/^\/(?:app|mobile)(?=\/|$)/, '') || '/';
   const normalizedBase = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
@@ -89,6 +96,8 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   if (['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo))) {
     if (data.version !== 1 || typeof data.inspeccionId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.inspeccionId)
       || !['participacion', 'inspeccion'].includes(String(data.destino))) return withBasePath('/notificaciones', basePath);
+    const role = notificationActorRole(notificacion);
+    if (role && recipientRole && role !== recipientRole && safeId(notificacion.id)) return withBasePath(`/notificaciones/${notificacion.id}`, basePath);
     return withBasePath(data.destino === 'participacion' ? `/requerimientos/${data.inspeccionId}` : `/inspecciones/${data.inspeccionId}${data.tipo === 'intercambio_inspeccion' ? '#intercambios' : ''}`, basePath);
   }
   const target = cataloguePath(notificacion.datos, true);

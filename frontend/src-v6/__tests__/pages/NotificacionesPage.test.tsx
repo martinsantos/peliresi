@@ -6,7 +6,8 @@ import NotificacionesPage from '../../pages/notificaciones/NotificacionesPage';
 
 const service = vi.hoisted(() => ({ list: vi.fn(), marcarLeida: vi.fn(), marcarTodasLeidas: vi.fn(), eliminar: vi.fn() }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: service }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa', training: true } }) }));
+const auth = vi.hoisted(() => ({ user: { id: 'qa', training: true, rol: '' } }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: auth.user }) }));
 const notice = { id: 'notice', titulo: 'Inspección asignada · GRP-2026-00001', mensaje: 'Visita programada', leida: false, tipo: 'INFO_GENERAL', prioridad: 'NORMAL', createdAt: '2026-10-01T12:00:00Z', datos: JSON.stringify({ inspeccionId: 'assigned' }) };
 const response = { items: [notice], total: 45, noLeidas: 31, page: 1, limit: 20, totalPages: 3 };
 function Location() {
@@ -25,7 +26,7 @@ describe('notification inbox states and interaction', () => {
     ['/soporte/qa-ticket', 'Abrir consulta de soporte →'],
     ['/mi-perfil', 'Abrir mi ficha y documentos →'],
     ['/admin/usuarios', 'Revisar cuentas de usuarios →'],
-    ['/admin/renovaciones', 'Revisar solicitud de cambio →'],
+    ['/admin/renovaciones', 'Revisar renovación →'],
     ['/alertas', 'Revisar alerta →'],
     ['/otra-pantalla', 'Abrir detalle →'],
   ])(`names the actual destination %s on ${base || 'web'}`, async (path, label) => {
@@ -53,8 +54,17 @@ describe('notification inbox states and interaction', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/app/requerimientos/psip-1');
   });
   beforeEach(() => {
+    auth.user.rol = '';
     service.list.mockReset().mockResolvedValue(response);
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
+  });
+  it.each(['', '/app'])('identifies the receiving activity before opening its requirement on %s', async base => {
+    auth.user.rol = 'GENERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Nuevo requerimiento', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-operator', destino: 'participacion', tipoActor: 'OPERADOR' }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Ver aviso para Operador →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Nuevo requerimiento', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
   });
   it('does not reuse a supposedly fresh minute-old workflow state when reopening the inbox', async () => {
     const client = setup();

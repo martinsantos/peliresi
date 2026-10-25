@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Prisma, TipoActorInspeccion } from '@prisma/client';
+import { inspectionParticipantNoticeWhere } from './inspectionExchangeNotice.service';
 
 export const INSPECTION_AGENDA_LABELS = {
   CREADA: ['Nueva inspección', 'Revisá el responsable y prepará la visita.'],
@@ -36,11 +37,9 @@ export async function createInspectionAgendaNotices(tx: Prisma.TransactionClient
   }, select: { id: true } });
   const recipients = new Map(staff.map(user => [user.id, 'inspeccion']));
   if (['NOTIFICADA', 'EN_TRAMITE_LEGAL', 'FINALIZADA'].includes(input.evento) && inspection.tipoActor) {
-    const relation = inspection.tipoActor === 'GENERADOR' ? 'generador' : inspection.tipoActor === 'TRANSPORTISTA' ? 'transportista' : 'operador';
-    const actorId = inspection[`${relation}Id`];
-    if (actorId) {
-      const owners = await tx.usuario.findMany({ where: { activo: true, id: { not: input.autorId }, rol: inspection.tipoActor,
-        [relation]: { is: { id: actorId } } }, select: { id: true } });
+    const owner = inspectionParticipantNoticeWhere(inspection);
+    if (owner) {
+      const owners = await tx.usuario.findMany({ where: { AND: [{ activo: true, id: { not: input.autorId } }, owner] }, select: { id: true } });
       for (const user of owners) recipients.set(user.id, 'participacion');
     }
   }
@@ -50,7 +49,7 @@ export async function createInspectionAgendaNotices(tx: Prisma.TransactionClient
     id: createHash('sha256').update(`agenda:${input.eventoId}:${usuarioId}`).digest('hex'),
     usuarioId, tipo: 'INFO_GENERAL', titulo: `PSIP · ${title}`, mensaje: `${inspection.numero} · ${action}`,
     datos: JSON.stringify({ tipo: 'agenda_inspeccion', version: 1, correoVersion: 1, inspeccionId: inspection.id,
-      eventoId: input.eventoId, evento: input.evento, destino }),
+      eventoId: input.eventoId, evento: input.evento, destino, ...(destino === 'participacion' ? { tipoActor: inspection.tipoActor } : {}) }),
   })) });
 }
 

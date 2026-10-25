@@ -18,6 +18,11 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app', '/mobile'])('routes a requirement through its role explanation when another activity is active in %s', prefix => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino: 'participacion', tipoActor: 'OPERADOR' }) };
+    expect(resolveNotificationPath(notice, prefix, 'GENERADOR')).toBe(prefix + '/notificaciones/n-1');
+    expect(resolveNotificationPath(notice, prefix, 'OPERADOR')).toBe(prefix + '/requerimientos/case-1');
+  });
   it.each(['', '/app', '/mobile'])('opens renewal decisions as an exact owned notice in %s', prefix => {
     for (const tipo of ['MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA']) {
       const n = { ...base, tipo: tipo as Notificacion['tipo'], datos: '{"renovacionId":"renewal-qa"}' };

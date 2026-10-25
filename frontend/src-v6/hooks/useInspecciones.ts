@@ -8,8 +8,10 @@ import { isOfflineNetworkError } from '../services/offlineSession';
 import type { PaginatedInspections } from '../services/inspeccion.service';
 import { inspectionActor, inspectionTypeOf, type Inspection, type InspectionType } from '../types/inspection';
 import type { InspectionActorType, InspectionState } from '../types/inspection';
+import { inspectionContextKey, inspectionWorkspaceOwner } from '../utils/inspectionWorkspace';
 
 export interface InspectionListResult extends PaginatedInspections { offline?: true }
+type CachedInspection = { id: string; owner: string; inspection: Inspection };
 
 type InspectionListParams = { estado?: InspectionState; estados?: InspectionState[]; tipoInspeccion?: InspectionType; tipoActor?: InspectionActorType; actorId?: string; search?: string; page?: number; limit?: number };
 
@@ -32,8 +34,9 @@ export function filterCachedInspections(inspections: Inspection[], params?: Insp
 
 export function useInspections(params?: InspectionListParams) {
   const { currentUser } = useAuth();
+  const owner = inspectionWorkspaceOwner(currentUser);
   return useQuery({
-    queryKey: ['inspecciones', 'list', currentUser?.id, params],
+    queryKey: ['inspecciones', 'list', currentUser?.id, owner, params],
     networkMode: 'always',
     enabled: Boolean(currentUser?.id),
     retry: 1,
@@ -41,10 +44,13 @@ export function useInspections(params?: InspectionListParams) {
       try { return await inspeccionService.list(params); }
       catch (error) {
         if (!currentUser?.id || !isOfflineNetworkError(error)) throw error;
-        const cached = await getAllOffline<{ id: string; inspection: Inspection }>('inspection_cases').catch(() => null);
+        const cached = await getAllOffline<CachedInspection>('inspection_cases').catch(() => null);
         if (!cached) throw error;
-        const scope = `${currentUser.id}:`;
-        return filterCachedInspections(cached.filter((entry) => entry.id.startsWith(scope) && entry.inspection?.id === entry.id.slice(scope.length)).map((entry) => entry.inspection), params);
+        const scoped = cached.filter((entry) => entry.owner === owner && entry.inspection?.id
+          && entry.id === inspectionContextKey(currentUser.id, owner, entry.inspection.id));
+        // No authorized copy is a connection failure, never an empty registry.
+        if (!scoped.length) throw error;
+        return filterCachedInspections(scoped.map((entry) => entry.inspection), params);
       }
     },
     staleTime: 30_000,
@@ -53,14 +59,15 @@ export function useInspections(params?: InspectionListParams) {
 
 export function useInspection(id: string) {
   const { currentUser } = useAuth();
-  const cacheKey = currentUser?.id && id ? `${currentUser.id}:${id}` : '';
+  const owner = inspectionWorkspaceOwner(currentUser);
+  const cacheKey = inspectionContextKey(currentUser?.id || '', owner, id);
   const [offlineCacheStatus, setOfflineCacheStatus] = useState({ cacheKey, problem: false });
   const cacheAttempt = useRef(0);
   const activeCacheKey = useRef(cacheKey);
   activeCacheKey.current = cacheKey;
 
   const query = useQuery({
-    queryKey: ['inspecciones', 'detail', currentUser?.id, id],
+    queryKey: ['inspecciones', 'detail', currentUser?.id, id, owner],
     // Run the query even offline: its network-only catch reads the scoped
     // IndexedDB snapshot. React Query's default would pause before that catch.
     networkMode: 'always',
@@ -72,7 +79,7 @@ export function useInspection(id: string) {
         // A blocked IndexedDB upgrade must never hold an online dossier behind
         // the loading screen. The server copy is usable while the local backup
         // settles independently, and a failed backup is reported to the user.
-        void saveOffline('inspection_cases', { id: cacheKey, inspection })
+        void saveOffline('inspection_cases', { id: cacheKey, owner, inspection })
           .then(() => { if (activeCacheKey.current === cacheKey && cacheAttempt.current === attempt) setOfflineCacheStatus({ cacheKey, problem: false }); })
           .catch(() => { if (activeCacheKey.current === cacheKey && cacheAttempt.current === attempt) setOfflineCacheStatus({ cacheKey, problem: true }); });
         return inspection;
@@ -82,8 +89,8 @@ export function useInspection(id: string) {
         if (!isAxiosError(error) || error.response || !['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT'].includes(error.code ?? '')) {
           throw error;
         }
-        const cached = await getOffline<{ inspection: Inspection }>('inspection_cases', cacheKey).catch(() => null);
-        if (cached?.inspection) return cached.inspection;
+        const cached = await getOffline<CachedInspection>('inspection_cases', cacheKey).catch(() => null);
+        if (cached?.id === cacheKey && cached.owner === owner && cached.inspection?.id === id) return cached.inspection;
         throw error;
       }
     },

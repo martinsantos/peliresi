@@ -1,12 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-const db = vi.hoisted(() => ({ findFirst: vi.fn() }));
-vi.mock('../lib/prisma', () => ({ default: { notificacion: { findFirst: db.findFirst } } }));
+const db = vi.hoisted(() => ({ findFirst: vi.fn(), inspectionContexts: vi.fn() }));
+vi.mock('../lib/prisma', () => ({ default: { notificacion: { findFirst: db.findFirst }, inspeccion: { findMany: db.inspectionContexts } } }));
 import { mailAction, renderMail, renderDigest } from '../services/email-templates';
 import { notificationMailContent } from '../services/notification-mail.service';
 import { signatureReminderPhase } from '../jobs/manifestSignatureReminder.job';
 import { getNotificacion } from '../controllers/notification.controller';
 afterEach(() => vi.unstubAllEnvs());
 describe('communication links', () => {
+  it('enriches a historic own PSIP notice with its activity without rewriting the row', async () => {
+    const original = { id: 'mine', usuarioId: 'self', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, destino: 'participacion', inspeccionId: 'case-own' }) };
+    db.findFirst.mockResolvedValue(original); db.inspectionContexts.mockResolvedValue([{ id: 'case-own', tipoActor: 'OPERADOR' }]);
+    const json = vi.fn(), next = vi.fn();
+    await getNotificacion({ params: { id: 'mine' }, user: { id: 'self' } } as any, { json, setHeader: vi.fn() } as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(JSON.parse(json.mock.calls[0][0].data.datos).tipoActor).toBe('OPERADOR');
+    expect(JSON.parse(original.datos).tipoActor).toBeUndefined();
+    expect(db.inspectionContexts).toHaveBeenCalledWith({ where: { id: { in: ['case-own'] } }, select: { id: true, tipoActor: true } });
+  });
+  it('new PSIP participant mail opens the owned activity-aware notice in both surfaces', () => {
+    const content = notificationMailContent({ id: 'notice-role', tipo: 'INFO_GENERAL', rol: 'GENERADOR', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, correoVersion: 1, inspeccionId: 'case-1', intercambioId: 'entry-1', evento: 'REQUERIMIENTO', secuencia: 1, parte: 'AUTORIDAD', destino: 'participacion', tipoActor: 'OPERADOR' }) } as any)!;
+    expect(content.html).toContain('/app/notificaciones/notice-role');
+    expect(content.html).not.toContain('/requerimientos/case-1');
+  });
   it.each(['/manifiestos/m?certificado=c#certificaciones', '/manifiestos/m/adendas?adenda=a', '/mis-inspecciones/i#intercambios', '/soporte/s', '/mi-solicitud?solicitud=s', '/app/notificaciones/n'])('account preference plus identical explicit web/app alternatives: %s', path => {
     vi.stubEnv('FRONTEND_URL', 'https://sitrep.example.invalid');
     const html = mailAction(path, 'Abrir');

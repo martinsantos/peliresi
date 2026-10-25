@@ -6,6 +6,7 @@ import type { User } from '../../contexts/AuthContext';
 import { inspectionDeadlineDate } from '../../pages/inspecciones/inspectionProcess';
 import { InspectionExchangePanel } from '../../pages/inspecciones/InspectionExchangePanel';
 import type { InspectionExchangeTimeline } from '../../types/inspection';
+import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 
 const auth = vi.hoisted(() => ({
   currentUser: {
@@ -77,6 +78,42 @@ describe('InspectionExchangePanel', () => {
     mocks.removeDraft.mockResolvedValue(undefined);
   });
 
+  it('does not reuse another activity timeline or open draft for the same account and case', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => <QueryClientProvider client={client}><InspectionExchangePanel inspectionId="inspection-1" /></QueryClientProvider>;
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const view = render(tree());
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Borrador exclusivo del generador.');
+    auth.currentUser = { ...auth.currentUser, rol: 'OPERADOR' };
+    mocks.getExchanges.mockRejectedValue({ response: { status: 403 } });
+    view.rerender(tree());
+    expect(await screen.findByRole('alert')).toHaveTextContent('Requerimiento no disponible para esta cuenta');
+    expect(screen.queryByDisplayValue('Borrador exclusivo del generador.')).not.toBeInTheDocument();
+    expect(mocks.getExchanges).toHaveBeenCalledTimes(2);
+    auth.currentUser = { ...auth.currentUser, rol: 'GENERADOR' };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    view.rerender(tree());
+    expect(await screen.findByDisplayValue('Borrador exclusivo del generador.')).toBeVisible();
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+  });
+
+  it('does not leak a pending decision when the authorization revision changes', async () => {
+    auth.currentUser = { ...auth.currentUser, rol: 'ADMIN', empresaContexto: { empresaId: 'company-1', actividadId: 'activity-1', autorizacionId: 'grant-1', revision: 1 } as any };
+    mocks.getExchanges.mockResolvedValue({ ...timeline, parteActual: 'AUTORIDAD' });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = () => <QueryClientProvider client={client}><InspectionExchangePanel inspectionId="inspection-1" /></QueryClientProvider>;
+    const view = render(tree()), user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Derivar a Legales' }));
+    await user.type(screen.getByLabelText('Fundamento de la decisión'), 'Fundamento exclusivo de la autorización anterior.');
+    auth.currentUser = { ...auth.currentUser, empresaContexto: { ...auth.currentUser.empresaContexto!, revision: 2 } };
+    view.rerender(tree());
+    expect(await screen.findByRole('button', { name: 'Derivar a Legales' })).toBeVisible();
+    expect(screen.queryByDisplayValue('Fundamento exclusivo de la autorización anterior.')).not.toBeInTheDocument();
+    expect(mocks.decideExchange).not.toHaveBeenCalled();
+  });
+
   it('explains a different account or role without offering administrative access', async () => {
     mocks.getExchanges.mockRejectedValue({ response: { status: 403 } });
     renderPanel();
@@ -109,7 +146,7 @@ describe('InspectionExchangePanel', () => {
     await act(async () => finishWrite());
     await waitFor(() => expect(mocks.removeDraft).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument());
-    expect(localStorage.getItem('sitrep_exchange_draft_actor-user-1_inspection-1')).toBeNull();
+    expect(localStorage.getItem('sitrep_exchange_draft_v2_' + inspectionContextKey(auth.currentUser.id, inspectionWorkspaceOwner(auth.currentUser), 'inspection-1'))).toBeNull();
   });
 
   it('does not restore a late-loading stale draft after the user has submitted the response', async () => {
@@ -237,6 +274,7 @@ describe('InspectionExchangePanel', () => {
     await waitFor(() => expect(mocks.saveDraft).toHaveBeenCalledWith(
       'actor-user-1',
       'inspection-1',
+      inspectionWorkspaceOwner(auth.currentUser),
       expect.objectContaining({ respondeAId: 'exchange-1' }),
       [file],
     ));

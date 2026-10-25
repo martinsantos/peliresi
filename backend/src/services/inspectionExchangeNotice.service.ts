@@ -4,6 +4,22 @@ import type { InspectionExchangeAccessTarget } from './inspectionExchange.servic
 type NoticeInspection = InspectionExchangeAccessTarget & { id: string; numero: string };
 type NoticeExchange = { id: string; secuencia: number; tipo: TipoIntercambioInspeccion; parte: ParteIntercambioInspeccion; autorId: string; plazoRespuestaAt?: Date | null };
 
+/** A secondary activity must have its own approved registration. An associated
+ * actor row alone does not authorize a different role on the account. */
+export function inspectionParticipantNoticeWhere(inspection: InspectionExchangeAccessTarget): Prisma.UsuarioWhereInput | null {
+  if (!inspection.tipoActor) return null;
+  const relation = inspection.tipoActor === 'GENERADOR' ? 'generador' : inspection.tipoActor === 'TRANSPORTISTA' ? 'transportista' : 'operador';
+  const field = `${relation}Id`, actorId = inspection[field as 'generadorId' | 'transportistaId' | 'operadorId'];
+  if (!actorId) return null;
+  const owner = { [relation]: { is: { id: actorId } } };
+  if (process.env.ACTOR_MULTIROLE_ENABLED !== 'true') return { rol: inspection.tipoActor, ...owner };
+  return { ...owner, OR: [
+    { rol: inspection.tipoActor },
+    { rol: { in: ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'] }, [relation]: { is: { id: actorId, activo: true } },
+      solicitudes: { some: { estado: 'APROBADA', tipoActor: inspection.tipoActor, [field]: actorId } } },
+  ] };
+}
+
 export const INSPECTION_EXCHANGE_LABELS: Record<TipoIntercambioInspeccion, [string, string]> = {
   REQUERIMIENTO: ['Nuevo requerimiento', 'Abrí este aviso para revisar el pedido, su plazo y responder.'],
   RESPUESTA: ['Nueva respuesta', 'Abrí el intercambio para leer la respuesta y revisar qué sigue.'],
@@ -27,13 +43,9 @@ export async function createInspectionExchangeNotices(
   let recipientWhere: Prisma.UsuarioWhereInput;
   const participant = exchange.parte === 'AUTORIDAD';
   if (participant) {
-    if (inspection.tipoActor === 'GENERADOR' && inspection.generadorId) {
-      recipientWhere = { rol: 'GENERADOR', generador: { is: { id: inspection.generadorId } } };
-    } else if (inspection.tipoActor === 'TRANSPORTISTA' && inspection.transportistaId) {
-      recipientWhere = { rol: 'TRANSPORTISTA', transportista: { is: { id: inspection.transportistaId } } };
-    } else if (inspection.tipoActor === 'OPERADOR' && inspection.operadorId) {
-      recipientWhere = { rol: 'OPERADOR', operador: { is: { id: inspection.operadorId } } };
-    } else return; // Free-text contacts never grant portal access or receive a notice.
+    const owner = inspectionParticipantNoticeWhere(inspection);
+    if (!owner) return; // Free-text contacts never grant portal access or receive a notice.
+    recipientWhere = owner;
   } else {
     const roles: Rol[] = ['ADMIN'];
     if (inspection.tipoActor) roles.push(`ADMIN_${inspection.tipoActor}` as Rol);
@@ -49,12 +61,13 @@ export async function createInspectionExchangeNotices(
   await tx.notificacion.createMany({ data: ids.map(usuarioId => ({
     usuarioId, tipo: 'INFO_GENERAL', prioridad: 'NORMAL',
     titulo: `PSIP · ${title}`,
-    mensaje: `${inspection.numero} · Actuación #${exchange.secuencia}. ${action}${exchange.plazoRespuestaAt ? ' Plazo para responder: ' + exchange.plazoRespuestaAt.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) + '.' : ''}`,
+    mensaje: `${participant ? ({ GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' }[inspection.tipoActor!] + ' · ') : ''}${inspection.numero} · Actuación #${exchange.secuencia}. ${action}${exchange.plazoRespuestaAt ? ' Plazo para responder: ' + exchange.plazoRespuestaAt.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) + '.' : ''}`,
     datos: JSON.stringify({
       tipo: 'intercambio_inspeccion', version: 1,
       inspeccionId: inspection.id, numero: inspection.numero,
       intercambioId: exchange.id, secuencia: exchange.secuencia, evento: exchange.tipo,
       parte: exchange.parte, destino: participant ? 'participacion' : 'inspeccion',
+      ...(participant ? { tipoActor: inspection.tipoActor } : {}),
       // New notices explicitly support the opt-in relay. Historic soloCampana
       // rows remain excluded; provider/family/cutoff/recipient gates still apply.
       correoVersion: 1,

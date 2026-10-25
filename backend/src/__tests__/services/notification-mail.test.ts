@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier } } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), exchange: vi.fn() }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier }, usuario: { findFirst: mocks.account }, intercambioInspeccion: { findUnique: mocks.exchange } } }));
 import { notificationMailContent, notificationSourceEligible, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 import { mailText } from '../../services/email-templates';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
@@ -13,6 +13,20 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('rechecks an approved secondary PSIP activity at delivery and rejects its revocation without sending', async () => {
+    vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'true');
+    const n = { ...notice, usuarioId: 'owner', rol: 'GENERADOR', tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, correoVersion: 1, inspeccionId: 'case', intercambioId: 'exchange', secuencia: 2, evento: 'REQUERIMIENTO', parte: 'AUTORIDAD', destino: 'participacion', tipoActor: 'OPERADOR' }) };
+    mocks.inspection.mockResolvedValue({ numeroActa: null, inspectorId: 'admin', tipoActor: 'OPERADOR', estado: 'EN_DESCARGO', operadorId: 'operator-own', operador: { usuarioId: 'owner' } });
+    mocks.account.mockResolvedValue({ id: 'owner' });
+    mocks.exchange.mockResolvedValue({ inspeccionId: 'case', secuencia: 2, tipo: 'REQUERIMIENTO', parte: 'AUTORIDAD', autorId: 'admin' });
+    expect(await notificationSourceEligible(n, 'inspecciones')).toBe(true);
+    expect(mocks.account).toHaveBeenCalledWith(expect.objectContaining({ where: { AND: [
+      { id: 'owner', activo: true }, expect.objectContaining({ operador: { is: { id: 'operator-own' } }, OR: expect.arrayContaining([expect.objectContaining({ solicitudes: { some: { estado: 'APROBADA', tipoActor: 'OPERADOR', operadorId: 'operator-own' } } })]) }),
+    ] } }));
+    mocks.account.mockResolvedValue(null);
+    expect(await notificationSourceEligible(n, 'inspecciones')).toBe(false);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['GENERADOR', 'OPERADOR'].flatMap(tipoActor => ['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].map(tipo => ({ tipoActor, tipo }))))('renders bounded renewal context and the next action for $tipoActor / $tipo without private notes', ({ tipoActor, tipo }) => {
     const content = notificationMailContent({ ...notice, tipo, datos: JSON.stringify({
       tipo: 'renovacion_padron', version: 1, renovacionId: 'renewal-qa', tipoActor, actorNombre: 'Empresa <QA> & Asociados', anio: 2027,

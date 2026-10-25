@@ -23,6 +23,7 @@ import { Card } from '../../components/ui/CardV2';
 import { InspectionLegalProgress } from './InspectionLegalProgress';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { inspeccionService } from '../../services/inspeccion.service';
 import { loadOfflineExchangeDraft, removeOfflineExchangeDraft, saveOfflineExchangeDraft } from '../../services/inspectionOfflineExchange';
 import type {
@@ -237,11 +238,19 @@ export interface InspectionExchangePanelProps {
   compact?: boolean;
 }
 
-export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = ({ inspectionId, compact = false }) => {
+export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (props) => {
+  const { currentUser } = useAuth();
+  const owner = inspectionWorkspaceOwner(currentUser);
+  // Reset the entire editor synchronously, including decision/files and in-flight
+  // local reads. Effects alone would expose the previous role for one render.
+  return <ScopedInspectionExchangePanel key={JSON.stringify([owner, props.inspectionId])} {...props} owner={owner} />;
+};
+
+const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { owner: string }> = ({ inspectionId, compact = false, owner }) => {
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const draftKey = currentUser?.id ? `sitrep_exchange_draft_${currentUser.id}_${inspectionId}` : '';
+  const draftKey = currentUser?.id && owner ? `sitrep_exchange_draft_v2_${inspectionContextKey(currentUser.id, owner, inspectionId)}` : '';
   const [restoredDraft] = useState<ExchangeDraft | null>(() => storedExchangeDraft(draftKey));
   const [online, setOnline] = useState(navigator.onLine);
   const [now, setNow] = useState(() => Date.now());
@@ -258,9 +267,10 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   const draftSaveEpoch = useRef(0);
   const draftInteraction = useRef(0);
   const [persistenceRevision, setPersistenceRevision] = useState(0);
+  const [draftStorageError, setDraftStorageError] = useState(false);
 
   const exchangeQuery = useQuery({
-    queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId],
+    queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId, owner],
     queryFn: () => inspeccionService.getExchanges(inspectionId),
     enabled: Boolean(inspectionId && currentUser?.id),
     staleTime: 15_000,
@@ -286,7 +296,10 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
   useEffect(() => {
     if (!draftKey || !composeOpen) return;
     const epoch = draftSaveEpoch.current;
-    const timer = window.setTimeout(() => { if (!persistenceBlocked.current && epoch === draftSaveEpoch.current) localStorage.setItem(draftKey, JSON.stringify(draft)); }, 250);
+    const timer = window.setTimeout(() => {
+      if (persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      try { localStorage.setItem(draftKey, JSON.stringify(draft)); } catch { setDraftStorageError(true); }
+    }, 250);
     return () => window.clearTimeout(timer);
   }, [composeOpen, draft, draftKey, persistenceRevision]);
 
@@ -294,15 +307,15 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
     if (!currentUser?.id || !inspectionId) return;
     let cancelled = false;
     const interaction = draftInteraction.current;
-    void loadOfflineExchangeDraft(String(currentUser.id), inspectionId).then((saved) => {
+    void loadOfflineExchangeDraft(String(currentUser.id), inspectionId, owner).then((saved) => {
       if (cancelled || !saved || persistenceBlocked.current || interaction !== draftInteraction.current) return;
       setDraft(saved.draft);
       setFiles(saved.files);
       setRestoredAt(saved.savedAt);
       setComposeOpen(true);
-    }).catch(() => undefined);
+    }).catch(() => { if (!cancelled) setDraftStorageError(true); });
     return () => { cancelled = true; };
-  }, [currentUser?.id, inspectionId]);
+  }, [currentUser?.id, inspectionId, owner]);
 
   useEffect(() => {
     if (!composeOpen || !currentUser?.id || !inspectionId) return;
@@ -310,11 +323,29 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
     const timer = window.setTimeout(() => {
       if (persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
       // Acknowledgement must wait for every queued write before removing the draft.
-      draftWrites.current = draftWrites.current.catch(() => undefined)
-        .then(() => saveOfflineExchangeDraft(String(currentUser.id), inspectionId, draft, files)).catch(() => undefined);
+      draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, draft, files)
+        .catch(() => { setDraftStorageError(true); });
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [composeOpen, currentUser?.id, draft, files, inspectionId, persistenceRevision]);
+  }, [composeOpen, currentUser?.id, draft, files, inspectionId, owner, persistenceRevision]);
+
+  const departingDraft = useRef({ draft, files, composeOpen });
+  departingDraft.current = { draft, files, composeOpen };
+  useEffect(() => {
+    // A role change or close can happen before debounce. Flush only the old
+    // editor's key; never carry its values into the new account/context.
+    const flush = () => {
+      const snapshot = departingDraft.current;
+      if (!snapshot.composeOpen || persistenceBlocked.current || !currentUser?.id || !draftKey) return;
+      try { localStorage.setItem(draftKey, JSON.stringify(snapshot.draft)); } catch { setDraftStorageError(true); }
+      draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, snapshot.draft, snapshot.files)
+        .catch(() => { setDraftStorageError(true); });
+    };
+    const hidden = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', hidden);
+    return () => { flush(); window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', hidden); };
+  }, [currentUser?.id, draftKey, inspectionId, owner]);
 
   const refresh = async () => {
     await Promise.all([
@@ -343,9 +374,9 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
     onSuccess: async () => {
       persistenceBlocked.current = true;
       setComposeOpen(false);
-      if (draftKey) localStorage.removeItem(draftKey);
+      if (draftKey) { try { localStorage.removeItem(draftKey); } catch { setDraftStorageError(true); } }
       await draftWrites.current;
-      if (currentUser?.id) await removeOfflineExchangeDraft(String(currentUser.id), inspectionId).catch(() => undefined);
+      if (currentUser?.id) await removeOfflineExchangeDraft(String(currentUser.id), inspectionId, owner).catch(() => { setDraftStorageError(true); });
       setDraft(initialDraft(party));
       setFiles([]);
       setComposeOpen(false);
@@ -464,6 +495,7 @@ export const InspectionExchangePanel: React.FC<InspectionExchangePanelProps> = (
 
   return (
     <section className={compact ? 'space-y-4' : 'space-y-5'} aria-labelledby="inspection-exchange-title">
+      {draftStorageError && <Card role="alert" className="border-warning-200 bg-warning-50 text-sm text-warning-900">No pudimos confirmar la copia local del borrador. Conservá esta pantalla abierta hasta guardar con conexión.</Card>}
       <Card className="overflow-hidden !p-0">
         <div className="border-b border-neutral-200 bg-[#F8FAF8] px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
