@@ -1,5 +1,8 @@
 import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
+import { formatActorCalendarDate, formatActorEventDate } from '../../utils/actorCalendarDate';
+import { QueryContent } from '../../components/ui/QueryContent';
+import { LoadingIndicator } from '../../components/ui/LoadingState';
 /**
  * SITREP v6 - Generador Detail Page (5 tabs)
  * ============================================
@@ -156,9 +159,12 @@ const GeneradorDetallePage: React.FC = () => {
   const GENERADORES_DATA = enrichmentData?.generadores || {};
 
   const { data: apiGenerador, isLoading, refetch } = useGenerador(id || '');
-  const { data: pagos = [] } = usePagosTEF(id || '');
-  const { data: ddjjList = [] } = useDDJJ(id || '');
-  const { data: documentos = [], refetch: refetchDocumentos } = useDocumentos(id || '');
+  const pagosQuery = usePagosTEF(id || '');
+  const ddjjQuery = useDDJJ(id || '');
+  const documentosQuery = useDocumentos(id || '');
+  const { data: pagos = [] } = pagosQuery;
+  const { data: ddjjList = [] } = ddjjQuery;
+  const { data: documentos = [], refetch: refetchDocumentos } = documentosQuery;
 
   const createPago = useCreatePago();
   const updatePago = useUpdatePago();
@@ -174,7 +180,7 @@ const GeneradorDetallePage: React.FC = () => {
     ...apiGenerador,
     estado: apiGenerador.activo !== false ? 'activo' : 'inactivo',
     inscripcionDGFA: apiGenerador.numeroInscripcion || '-',
-    fechaAlta: apiGenerador.createdAt ? new Date(apiGenerador.createdAt).toISOString().split('T')[0] : '-',
+    fechaAlta: formatActorEventDate(apiGenerador.createdAt),
   } : null;
 
   const actorNavigation = useActorNavigation();
@@ -188,10 +194,7 @@ const GeneradorDetallePage: React.FC = () => {
           <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
         </div>
         <Card className="py-12">
-          <div className="text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full mx-auto mb-4" />
-            <p className="text-neutral-500">Cargando generador...</p>
-          </div>
+          <LoadingIndicator label="Cargando generador…" />
         </Card>
       </div>
     );
@@ -210,8 +213,7 @@ const GeneradorDetallePage: React.FC = () => {
   const currentYear = new Date().getFullYear();
   const lastPago = pagos.find(p => p.anio === currentYear - 1) || pagos.find(p => p.anio === currentYear);
   const tefAlDia = lastPago?.fechaPago != null;
-  const ddjjRecent = ddjjList.filter(d => d.anio >= currentYear - 1 && d.presentada);
-  const habilitado = lastPago?.habilitado ?? false;
+  const habilitado = lastPago?.habilitado;
 
   // Pago handlers
   const handleSavePago = async (data: any) => {
@@ -302,7 +304,7 @@ const GeneradorDetallePage: React.FC = () => {
   };
 
   const fmtMoney = (v: number | null) => v != null ? `$ ${v.toLocaleString('es-AR', { minimumFractionDigits: 0 })}` : '-';
-  const fmtDate = (v: string | null) => v ? new Date(v).toLocaleDateString('es-AR') : '-';
+  const fmtDate = formatActorCalendarDate;
 
   return (
     <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
@@ -338,31 +340,17 @@ const GeneradorDetallePage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="min-w-0 p-4" aria-label="Categoría del generador">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Categoria</p>
-          <p className="text-base sm:text-lg font-bold text-neutral-900 mt-1 break-words">{categoriaLabel}</p>
-        </Card>
+      {detailTabs.activeTab === 'info' && <section aria-label="Resumen del generador" className="space-y-3">
+        <QueryContent query={pagosQuery} loading="Cargando situación fiscal…" error="No pudimos consultar la situación fiscal." retryLabel="Reintentar situación fiscal">
         <Card className="p-4">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Corrientes Y</p>
-          <p className="text-2xl font-bold text-neutral-900 mt-1">{categorias.length}</p>
+          <dl className="grid grid-cols-3 gap-3">
+            <div className="min-w-0"><dt className="text-sm text-neutral-600">Corrientes Y</dt><dd className="mt-1 text-lg font-bold text-neutral-900">{categorias.length}</dd></div>
+            <div className="min-w-0"><dt className="text-sm text-neutral-600">TEF{lastPago && <span> · {lastPago.anio}</span>}</dt><dd className="mt-1 font-semibold text-neutral-900">{!lastPago ? 'Sin registro' : tefAlDia ? 'Al día' : 'Pendiente'}</dd></div>
+            <div className="min-w-0"><dt className="break-words text-sm text-neutral-600">Habilitación</dt><dd className="mt-1 font-semibold text-neutral-900">{habilitado == null ? 'Sin registro' : habilitado ? 'Sí' : 'No'}</dd></div>
+          </dl>
         </Card>
-        <Card className="p-4">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">TEF</p>
-          <div className="flex items-center gap-2 mt-1">
-            <div className={`w-2.5 h-2.5 rounded-full ${tefAlDia ? 'bg-success-500' : 'bg-error-500'}`} />
-            <p className="text-lg font-bold text-neutral-900">{tefAlDia ? 'Al dia' : 'Pendiente'}</p>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-neutral-500 uppercase tracking-wider">Habilitacion</p>
-          <div className="flex items-center gap-2 mt-1">
-            <div className={`w-2.5 h-2.5 rounded-full ${habilitado ? 'bg-success-500' : 'bg-warning-500'}`} />
-            <p className="text-lg font-bold text-neutral-900">{habilitado ? 'Si' : 'No'}</p>
-          </div>
-        </Card>
-      </div>
+        </QueryContent>
+      </section>}
 
       {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="GENERADOR" actorId={id || ''} />
@@ -397,7 +385,7 @@ const GeneradorDetallePage: React.FC = () => {
                   {g.certificacionISO && (
                     <InfoRow icon={<Award size={16} />} label="Certificacion ISO" value={
                       <Badge variant="soft" color={new Date(g.certificacionISO) > new Date() ? 'success' : 'error'}>
-                        {new Date(g.certificacionISO).toLocaleDateString('es-AR')}
+                        {formatActorCalendarDate(g.certificacionISO)}
                       </Badge>
                     } />
                   )}
@@ -482,6 +470,7 @@ const GeneradorDetallePage: React.FC = () => {
 
         {/* ===== Tab 3: Situacion Fiscal (Pagos TEF) ===== */}
         <TabPanel id="fiscal">
+          <QueryContent query={pagosQuery} loading="Cargando pagos…" error="No pudimos consultar la situación fiscal." retryLabel="Reintentar pagos">
           <div className="space-y-6">
             {/* KPI mini-cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -582,6 +571,7 @@ const GeneradorDetallePage: React.FC = () => {
               </Card>
             )}
           </div>
+          </QueryContent>
         </TabPanel>
 
         {/* ===== Tab 4: DDJJ y Documentos ===== */}
@@ -589,10 +579,11 @@ const GeneradorDetallePage: React.FC = () => {
           <div className="space-y-8">
             {/* DDJJ Table */}
             <Card>
-              <CardHeader className="flex-col sm:flex-row" title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit ? <Button leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
+              <CardHeader className="flex-col sm:flex-row" title="Declaraciones Juradas" icon={<ClipboardList size={20} />} action={canEdit && !ddjjQuery.isPending && !ddjjQuery.isError ? <Button leftIcon={<Plus size={14} />} onClick={() => setDdjjModal({ open: true })}>
                   Registrar DDJJ
                 </Button> : undefined} />
               <CardContent>
+                <QueryContent query={ddjjQuery} loading="Cargando declaraciones juradas…" error="No pudimos consultar las declaraciones juradas." retryLabel="Reintentar declaraciones">
                 {ddjjList.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -630,6 +621,7 @@ const GeneradorDetallePage: React.FC = () => {
                 ) : (
                   <p className="text-sm text-neutral-400 text-center py-6">Sin DDJJ registradas</p>
                 )}
+                </QueryContent>
               </CardContent>
             </Card>
 
@@ -637,6 +629,7 @@ const GeneradorDetallePage: React.FC = () => {
             <Card>
               <CardHeader title="Documentos" icon={<FileText size={20} />} />
               <CardContent>
+                <QueryContent query={documentosQuery} loading="Cargando documentos…" error="No pudimos consultar los documentos." retryLabel="Reintentar documentos">
                 <DocumentUpload
                   documentos={documentos}
                   onUpload={handleUploadDoc}
@@ -649,6 +642,7 @@ const GeneradorDetallePage: React.FC = () => {
                   readOnly={!canEdit}
                   isPending={uploadDoc.isPending}
                 />
+                </QueryContent>
               </CardContent>
             </Card>
           </div>

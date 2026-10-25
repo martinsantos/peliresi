@@ -13,7 +13,7 @@ vi.mock('../../components/TrazabilidadTimeline', () => ({ default: () => null })
 vi.mock('../../services/api', () => ({ default: { get: vi.fn().mockResolvedValue({ data: { data: { documentos: [] } } }) } }));
 vi.mock('../../hooks/useActores', () => ({
   useTransportista: () => ({ data: { id: 'qa', razonSocial: 'QA Transporte', cuit: 'QA', activo: true, vehiculos: [], choferes: [] }, isLoading: false }),
-  useOperador: () => ({ data: { id: 'qa', razonSocial: 'QA Operador', cuit: 'QA', activo: true, tratamientos: [], telefono: 'Teléfono guardado', email: 'guardado@night-qa.invalid', corrientesY: '' }, isLoading: false }),
+  useOperador: () => ({ data: { id: 'qa', razonSocial: 'QA Operador', cuit: 'QA', activo: true, tratamientos: [], telefono: 'Teléfono guardado', email: 'guardado@night-qa.invalid', corrientesY: '', vencimientoHabilitacion: '2030-01-01T00:00:00.000Z' }, isLoading: false }),
   useCreateVehiculo: () => ({}), useCreateChofer: () => ({}), useUpdateVehiculo: () => ({}), useDeleteVehiculo: () => ({}),
   useUpdateChofer: () => ({}), useDeleteChofer: () => ({}),
 }));
@@ -26,6 +26,8 @@ describe('Actor fichas use the same identity as operational maps', () => {
     expect(screen.getByText('guardado@night-qa.invalid')).toBeVisible();
     expect(screen.queryByText('Teléfono histórico')).toBeNull();
     expect(screen.queryByText('historico@night-qa.invalid')).toBeNull();
+    expect(screen.getByText('01/01/2030')).toBeVisible();
+    expect(screen.queryByText('2030-01-01T00:00:00.000Z')).toBeNull();
   });
   it.each([
     ['transportista', 'QA Transporte', 'truck', '#ea580c', TransportistaDetallePage],

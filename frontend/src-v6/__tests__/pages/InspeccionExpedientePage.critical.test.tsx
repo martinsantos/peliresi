@@ -156,6 +156,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
   it('names the return destination before the dossier identity, without nesting it in the title', async () => {
     renderPage(inspectionFixture({ estado: 'EN_CAMPO' }), true, '#checklist');
     const heading = await screen.findByRole('heading', { name: 'I-2026-000001', exact: true });
+    expect(heading.tagName).toBe('H2'); // The shared shell owns the page's single h1.
     const header = heading.closest('header')!;
     const back = screen.getByRole('button', { name: 'Volver a Inspecciones', exact: true });
     expect(header.firstElementChild).toContainElement(back);

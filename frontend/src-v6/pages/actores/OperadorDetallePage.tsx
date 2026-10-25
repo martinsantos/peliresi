@@ -1,5 +1,6 @@
 import { useActorDetailNavigation, useActorNavigation } from '../../hooks/useActorDetailNavigation';
 import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
+import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 /**
  * SITREP v6 - Operador Detail Page
  * =================================
@@ -115,7 +116,7 @@ const OperadorDetallePage: React.FC = () => {
     direccion: apiOperador.domicilio || '-',
     estado: apiOperador.activo !== false ? 'ACTIVO' : 'INACTIVO',
     habilitacion: apiOperador.numeroHabilitacion || '-',
-    vencimientoHab: apiOperador.vencimientoHabilitacion || '-',
+    vencimientoHab: formatActorCalendarDate(apiOperador.vencimientoHabilitacion),
     residuosAceptados: [],
     certificaciones: [],
   } : null;

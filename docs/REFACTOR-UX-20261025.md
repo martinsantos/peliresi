@@ -18,7 +18,7 @@ Objetivos de las sesiones: al menos 90% de tareas sin intervención, facilidad m
 |---|---|---|
 | 0 | Rutas, roles, estados, referencia visual y defectos | Referencia operativa registrada; inventario del resto continúa en sus tandas |
 | 1 | Inicio, creación G/T/O, aprobaciones, coordinación, retiro, viajes/relevos, recepción, adenda, tratamiento, certificados | Primer corte implementado y probado en preview. Sesión humana y controles pendientes abajo; no cerrada |
-| 2 | Padrones, altas, fichas, renovación, ATM/electricidad, documentos, multirol, representantes | Correcciones previas en base; auditoría integral pendiente |
+| 2 | Padrones, altas, fichas, renovación, ATM/electricidad, documentos, multirol, representantes | En curso: navegación y fichas, errores fiscales, fechas y jerarquía corregidos; resto del circuito pendiente |
 | 3 | Inspecciones, plazos, requerimientos desde Avisos, Monitor y campo | Pendiente; actores sin módulo de Inspecciones |
 | 4 | Campana, alertas, correos simulados, enlaces, PDFs, reportes y manual | Pendiente; ningún envío real |
 
@@ -65,9 +65,12 @@ Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativ
 | UX18 | Alta | Manifiesto/inspección → ficha → editar → volver: se sustituye el origen por el padrón | Conservar ficha, pestaña y origen autorizado, sin abandonar la superficie ni aceptar enlaces externos | Corregido; regresión de las tres fichas y regreso real en web/app, incluida ancla de Comunicaciones |
 | UX19 | Media | Ayuda de una ficha indica completar y presentar un alta | Diferenciar consulta, edición y alta, según permisos | Corregido; manual de consulta propia y ayuda de edición comprobados |
 | UX20 | Media | Botón compacto de regreso baja a 37.25 px desde 768 px | Mínimo táctil de 44 px también en tablet y escritorio | Corregido en ButtonV2; medición final registrada en evidencia |
-| UX21 | Media | Ficha operador muestra vencimiento ISO completo; generador fecha de alta sin formato local | Fechas de calendario legibles y coherentes sin desplazar el día por zona horaria | Pendiente; observado en esta revisión |
-| UX22 | Media | Ficha generador repite categoría en cabecera y tarjeta; expediente conserva dos h1 | Consolidar jerarquía y resumen útil sin duplicar títulos/datos | Pendiente; observado en app a 393 px |
+| UX21 | Media | Ficha operador muestra vencimiento ISO completo; generador fecha de alta sin formato local | Fechas de calendario legibles y coherentes sin desplazar el día por zona horaria | Corregido; fechas visibles en web/app y 14 casos de calendario/instante/ausencia. Vencimiento 01/01/2030 conservado |
+| UX22 | Media | Ficha generador repite categoría en cabecera y tarjeta; expediente conserva dos h1 | Consolidar jerarquía y resumen útil sin duplicar títulos/datos | Corregido; categoría única y resumen sólo en Información general. Cinco anchos en web/app sin desborde y con controles de 44 px; expediente h2 bajo el único h1 de la sección |
 | UX23 | Alta | Cerrar sesión de administrador desde expediente y entrar como generador abre el requerimiento ajeno bloqueado | Salida explícita no arrastra la tarea privada de la cuenta anterior; vencimiento de sesión conserva el enlace legítimo | Corregido en contexto, guardas y menús; cambio real ADMIN→G y enlaces después de login en web/app. Borrador propio recuperado; cuenta ajena aislada |
+| UX24 | Alta | La ficha de generador descarta estados de carga/error de pagos, DDJJ y documentos; produce pendientes y vacíos aparentes | Consultas diferenciadas, reintento por recurso y ausencia de conclusiones fiscales sin datos comprobados | Corregido; 503 reproducido en la app anterior, errores y recuperación en web/app real. Foco de teclado queda en el resultado; ausencia de registro no afirma deuda ni denegación |
+| UX25 | Media | Recuperar Documentos no actualiza Certificado ambiental anual: ambas secciones leen el mismo endpoint con claves separadas y una conserva su error anterior | Consulta documental coherente por cuenta/rol/actor e invalidación compartida tras carga/revisión | Pendiente; observado durante recuperación web y confirmado en componentes |
+| UX26 | Media | Ficha operador sintético muestra Y1/Y2/Y3 y otras corrientes como Sin descripción | Resolver descripciones desde catálogo autorizado, sin inventar datos regulatorios | Pendiente; observado en web/app; requiere revisar cobertura del catálogo |
 
 ## Evidencias y sesiones
 
@@ -135,7 +138,7 @@ La corrección final distingue salida explícita y vencimiento en el contexto de
 
 En UI real: ADMIN sale desde el expediente de prueba del operador; G ingresa a su Inicio, tanto web como app. Tras salir, abrir el enlace del manifiesto `2026-000145?origen=aviso#certificaciones` pide login y recupera el bloque Certificaciones en ambas superficies. La salida desde el menú lateral y el menú de cuenta web también se comprobó. Se guardaron 23 kg como borrador de G, se entró como O sin recibirlo, y se recuperaron paso y cantidad al volver como G en web y app. No se creó un manifiesto ni se envió una decisión. El vencimiento se comprobó en integración de componentes; no se simuló un vencimiento real de reloj en el navegador en este corte.
 
-UX21 y UX22 continúan pendientes. El plan integral, Android físico y sesiones observadas siguen abiertos.
+UX21 y UX22 quedaban pendientes en ese corte; se resolvieron en la continuación de fichas. El plan integral, Android físico y sesiones observadas siguen abiertos.
 
 ### Guion de la primera sesión (sin intervenir salvo bloqueo)
 
@@ -149,3 +152,15 @@ UX21 y UX22 continúan pendientes. El plan integral, Android físico y sesiones 
 | Operador y contraparte | Emitir una parcial y después la final; localizar el documento recibido | Distingue cierre, emisión y descarga del mismo documento |
 
 Registro por intento: código anónimo, rol, superficie, tarea, hora inicial/final, resultado sin ayuda/con ayuda/fallo, errores, facilidad 1–7 y comentario literal. No cargar nombres, correos ni documentos reales. Cada defecto vuelve al registro UX y al ciclo de corrección.
+
+### Continuación: fichas y consultas fiscales confiables
+
+Evidencias en `uiux-fiscal-states-20261025`. Se reproduce el defecto anterior con GET 503 sobre pagos, DDJJ y documentos de `QA Generador 1` en el proxy privado del preview. La app anterior seguía mostrando TEF pendiente, habilitación no y DDJJ vacías; las respuestas fallidas quedan registradas junto a la captura. El simulador no altera respuestas de creación, permisos ni datos.
+
+La ficha diferencia carga, error y ausencia de registro. Cada lectura fallida ofrece reintento; un refresco fallido tampoco conserva cifras anteriores como vigentes. Una respuesta vacía no afirma deuda ni denegación. Documentos informa su vacío después de consultar. La categoría aparece una sola vez, y el resumen compacto sólo en Información general. El vencimiento del operador conserva el día calendario; la fecha de alta usa el día del instante en Mendoza. El número de expediente usa h2 bajo el título único de la sección.
+
+64 pruebas únicas (9 archivos), TypeScript y builds web/app aprobados. Los 61 y 62 casos de iteraciones anteriores no se suman. Se incluyen consulta lenta, fallo inicial, fallo con datos en caché, reintento, respuesta vacía, permisos de consulta y foco: tras reintentar con teclado se enfoca el resultado; si la persona pasó a otro control no se le quita el foco. La fecha de vencimiento 01/01/2030 y la jerarquía del expediente se comprobaron en UI de web y app.
+
+Recuperación real de pagos, declaraciones y documentos comprobada en web/app. En app, Enter recuperó las tres consultas y el foco terminó en su resultado visible (resumen fiscal: 86 px de alto y contorno de foco de 2 px). La ficha de G se midió en 320, 393, 768, 1365 y 1920 px en ambas superficies: una categoría, un h1, sin desborde de página/contenedor principal y controles del contenido de 44 px. No equivale a auditoría completa de todas las pantallas, lector de pantalla ni ampliación de texto.
+
+UX25 y UX26 permanecen en el registro: consulta compartida entre certificados/documentos y descripciones faltantes del catálogo Y. No se cierra la tanda ni se atribuyen resultados humanos. Android continúa pendiente.

@@ -132,6 +132,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
       </>}
       {/* Documents list */}
+      {documentos.length === 0 && <p className="text-sm text-neutral-600">Sin documentos adjuntos</p>}
       {documentos.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium text-neutral-700">{documentos.length} documento{documentos.length !== 1 ? 's' : ''}</p>
