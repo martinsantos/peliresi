@@ -6,7 +6,7 @@
  * Version didactica: siempre visible, explicaciones claras por seccion.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useId } from 'react';
 import { Calculator, MapPin, Building2, ShieldAlert, FlaskConical, Truck, ClipboardList, Eye, Wrench, Users, Award, Info, HelpCircle } from 'lucide-react';
 import { Card, CardHeader, CardContent } from './ui/CardV2';
 import {
@@ -75,6 +75,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
   const [potenciaHP, setPotenciaHP] = useState(initialInputs?.potenciaHP || 0);
   const [superficieM2, setSuperficieM2] = useState(initialInputs?.superficieM2 || 0);
   const [showHelp, setShowHelp] = useState<string | null>(null);
+  const helpId = useId();
 
   const result = useMemo(() => {
     return calcularTEF({
@@ -244,19 +245,21 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
               <div key={key} className="bg-white rounded-xl border border-neutral-200 p-3 hover:border-amber-300 transition-colors">
                 <div className="flex items-start gap-2 mb-2">
                   <Icon size={14} className="text-amber-600 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <span className="text-[11px] font-bold text-neutral-800 uppercase leading-tight">{A_LABELS[key]}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-neutral-800 leading-snug">{A_LABELS[key]}</span>
                     <button
                       type="button"
                       aria-label={`Ayuda sobre ${A_LABELS[key]}`}
+                      aria-expanded={showHelp === key}
+                      aria-controls={`${helpId}-${key}`}
                       onClick={() => setShowHelp(showHelp === key ? null : key)}
-                      className="text-neutral-300 hover:text-amber-600 ml-1 align-middle"
+                      className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-amber-50 hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
                     >
-                      <HelpCircle size={11} />
+                      <HelpCircle size={18} />
                     </button>
-                    {showHelp === key && (
-                      <p className="text-[10px] text-neutral-500 mt-0.5">{help}</p>
-                    )}
+                    </div>
+                    <p id={`${helpId}-${key}`} hidden={showHelp !== key} className="mt-2 text-sm text-neutral-600">{help}</p>
                   </div>
                   <span className="text-xs font-mono font-bold text-amber-700 shrink-0">{coefA[key]}</span>
                 </div>

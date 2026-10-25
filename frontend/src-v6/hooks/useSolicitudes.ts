@@ -20,25 +20,31 @@ export function useSolicitudes(filters?: SolicitudFilters) {
 }
 
 export function useSolicitud(id: string) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.solicitud(id),
+    queryKey: [...KEYS.solicitud(id), owner],
     queryFn: () => solicitudService.getById(id),
-    enabled: !!id,
+    enabled: !!id && ready,
+    staleTime: 0,
   });
 }
 
 export function useMisSolicitudes() {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.misSolicitudes,
+    queryKey: [...KEYS.misSolicitudes, owner],
+    enabled: ready,
     queryFn: () => solicitudService.misSolicitudes(),
   });
 }
 
 export function useMensajesSolicitud(id: string) {
+  const { owner, ready } = useAdmissionContext();
   return useQuery({
-    queryKey: KEYS.mensajes(id),
+    queryKey: [...KEYS.mensajes(id), owner],
     queryFn: () => solicitudService.getMensajes(id),
-    enabled: !!id,
+    enabled: !!id && ready,
+    staleTime: 0,
     refetchInterval: 30000,
   });
 }
@@ -87,8 +93,8 @@ export function useDeleteDocumento() {
 export function useEnviarMensaje() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ solicitudId, contenido }: { solicitudId: string; contenido: string }) =>
-      solicitudService.enviarMensaje(solicitudId, contenido),
+    mutationFn: ({ solicitudId, contenido, clientMessageId }: { solicitudId: string; contenido: string; clientMessageId?: string }) =>
+      solicitudService.enviarMensaje(solicitudId, contenido, clientMessageId),
     onSuccess: (_, { solicitudId }) => qc.invalidateQueries({ queryKey: KEYS.mensajes(solicitudId) }),
   });
 }
@@ -96,7 +102,7 @@ export function useEnviarMensaje() {
 export function useRevisarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => solicitudService.revisar(id),
+    mutationFn: ({ id, expectedUpdatedAt }: { id: string; expectedUpdatedAt?: string }) => solicitudService.revisar(id, expectedUpdatedAt),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
   });
 }
@@ -104,8 +110,8 @@ export function useRevisarSolicitud() {
 export function useObservarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, mensaje }: { id: string; mensaje: string }) =>
-      solicitudService.observar(id, mensaje),
+    mutationFn: ({ id, mensaje, expectedUpdatedAt }: { id: string; mensaje: string; expectedUpdatedAt?: string }) =>
+      solicitudService.observar(id, mensaje, expectedUpdatedAt),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
   });
 }
@@ -113,7 +119,7 @@ export function useObservarSolicitud() {
 export function useAprobarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => solicitudService.aprobar(id),
+    mutationFn: ({ id, expectedUpdatedAt }: { id: string; expectedUpdatedAt?: string }) => solicitudService.aprobar(id, expectedUpdatedAt),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
   });
 }
@@ -121,8 +127,8 @@ export function useAprobarSolicitud() {
 export function useRechazarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, motivoRechazo }: { id: string; motivoRechazo: string }) =>
-      solicitudService.rechazar(id, motivoRechazo),
+    mutationFn: ({ id, motivoRechazo, expectedUpdatedAt }: { id: string; motivoRechazo: string; expectedUpdatedAt?: string }) =>
+      solicitudService.rechazar(id, motivoRechazo, expectedUpdatedAt),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
   });
 }

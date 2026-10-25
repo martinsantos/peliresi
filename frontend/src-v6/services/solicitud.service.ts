@@ -79,8 +79,8 @@ export const solicitudService = {
     return data.data.mensajes;
   },
 
-  async enviarMensaje(id: string, contenido: string): Promise<MensajeSolicitud> {
-    const { data } = await api.post(`/solicitudes/${id}/mensajes`, { contenido });
+  async enviarMensaje(id: string, contenido: string, clientMessageId?: string): Promise<MensajeSolicitud> {
+    const { data } = await api.post(`/solicitudes/${id}/mensajes`, { contenido, clientMessageId });
     return data.data.mensaje;
   },
 
@@ -101,23 +101,23 @@ export const solicitudService = {
     };
   },
 
-  async revisar(id: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/revisar`);
+  async revisar(id: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/revisar`, { expectedUpdatedAt });
     return data.data.solicitud;
   },
 
-  async observar(id: string, mensaje: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/observar`, { observaciones: mensaje });
+  async observar(id: string, mensaje: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/observar`, { observaciones: mensaje, expectedUpdatedAt });
     return data.data.solicitud;
   },
 
-  async aprobar(id: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/aprobar`);
+  async aprobar(id: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/aprobar`, { expectedUpdatedAt });
     return data.data.solicitud;
   },
 
-  async rechazar(id: string, motivoRechazo: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/rechazar`, { motivoRechazo });
+  async rechazar(id: string, motivoRechazo: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/rechazar`, { motivoRechazo, expectedUpdatedAt });
     return data.data.solicitud;
   },
 
