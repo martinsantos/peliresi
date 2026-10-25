@@ -26,7 +26,8 @@ import { useInspectionExchangeCommand } from '../../hooks/useInspectionExchangeC
 import { useAuth } from '../../contexts/AuthContext';
 import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { inspeccionService } from '../../services/inspeccion.service';
-import { loadOfflineExchangeDraft, removeOfflineExchangeDraft, saveOfflineExchangeDraft } from '../../services/inspectionOfflineExchange';
+import { loadOfflineExchangeDraft, removeOfflineExchangeDraftRevision, saveOfflineExchangeDraft } from '../../services/inspectionOfflineExchange';
+import { isSentDraft, loadDraftAlternatives, preserveDraftAlternative, retireSentAlternatives } from '../../services/inspectionDraftAlternatives';
 import type {
   InspectionExchange,
   InspectionExchangeParty,
@@ -269,6 +270,9 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   const draftInteraction = useRef(0);
   const [persistenceRevision, setPersistenceRevision] = useState(0);
   const [draftStorageError, setDraftStorageError] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftReadyRef = useRef(false);
+  const [draftReadRevision, setDraftReadRevision] = useState(0);
 
   const exchangeQuery = useQuery({
     queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId, owner],
@@ -298,37 +302,39 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     if (!draftKey || !composeOpen) return;
     const epoch = draftSaveEpoch.current;
     const timer = window.setTimeout(() => {
-      if (persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      if (!draftReadyRef.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
       try { localStorage.setItem(draftKey, JSON.stringify(draft)); } catch { setDraftStorageError(true); }
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [composeOpen, draft, draftKey, persistenceRevision]);
+  }, [composeOpen, draft, draftKey, persistenceRevision, draftReady]);
 
   useEffect(() => {
     if (!currentUser?.id || !inspectionId) return;
     let cancelled = false;
     const interaction = draftInteraction.current;
     void loadOfflineExchangeDraft(String(currentUser.id), inspectionId, owner).then((saved) => {
-      if (cancelled || !saved || persistenceBlocked.current || interaction !== draftInteraction.current) return;
+      if (cancelled) return;
+      draftReadyRef.current = true; setDraftReady(true);
+      if (!saved || interaction !== draftInteraction.current) return;
       setDraft(saved.draft);
       setFiles(saved.files);
       setRestoredAt(saved.savedAt);
       setComposeOpen(true);
     }).catch(() => { if (!cancelled) setDraftStorageError(true); });
     return () => { cancelled = true; };
-  }, [currentUser?.id, inspectionId, owner]);
+  }, [currentUser?.id, inspectionId, owner, draftReadRevision]);
 
   useEffect(() => {
     if (!composeOpen || !currentUser?.id || !inspectionId) return;
     const epoch = draftSaveEpoch.current;
     const timer = window.setTimeout(() => {
-      if (persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      if (!draftReadyRef.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
       // Acknowledgement must wait for every queued write before removing the draft.
       draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, draft, files)
         .catch(() => { setDraftStorageError(true); });
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [composeOpen, currentUser?.id, draft, files, inspectionId, owner, persistenceRevision]);
+  }, [composeOpen, currentUser?.id, draft, files, inspectionId, owner, persistenceRevision, draftReady]);
 
   const departingDraft = useRef({ draft, files, composeOpen });
   departingDraft.current = { draft, files, composeOpen };
@@ -337,7 +343,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     // editor's key; never carry its values into the new account/context.
     const flush = () => {
       const snapshot = departingDraft.current;
-      if (!snapshot.composeOpen || persistenceBlocked.current || !currentUser?.id || !draftKey) return;
+      if (!draftReadyRef.current || !snapshot.composeOpen || persistenceBlocked.current || !currentUser?.id || !draftKey) return;
       try { localStorage.setItem(draftKey, JSON.stringify(snapshot.draft)); } catch { setDraftStorageError(true); }
       draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, snapshot.draft, snapshot.files)
         .catch(() => { setDraftStorageError(true); });
@@ -361,7 +367,26 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   const commandScope = useMemo(() => ({ userId: String(currentUser?.id || ''), inspectionId, owner }), [currentUser?.id, inspectionId, owner]);
   const delivery = useInspectionExchangeCommand(commandScope);
   const command = delivery.command;
-  const commandBlocked = !delivery.ready || delivery.busy || Boolean(command);
+  const [alternatives, setAlternatives] = useState<Awaited<ReturnType<typeof loadDraftAlternatives>>>([]);
+  const alternativesWrite = useRef<Promise<void>>(Promise.resolve());
+  const [recovering, setRecovering] = useState(false);
+  const commandBlocked = !draftReady || !delivery.ready || delivery.busy || Boolean(command);
+  useEffect(() => {
+    let live = true;
+    void loadDraftAlternatives(commandScope).then(saved => { if (live) setAlternatives(saved); }).catch(() => { if (live) setDraftStorageError(true); });
+    return () => { live = false; };
+  }, [commandScope, command]);
+  useEffect(() => {
+    if (!command || !composeOpen || draftInteraction.current === 0) return;
+    // Another tab can claim a send before this editor's debounce. Keep this
+    // editor's distinct text/files without overwriting any competing version.
+    alternativesWrite.current = alternativesWrite.current.catch(() => undefined)
+      .then(() => preserveDraftAlternative(commandScope, draft, files, command));
+    void alternativesWrite.current.catch(() => setDraftStorageError(true));
+  }, [command, commandScope, composeOpen, draft, files]);
+  useEffect(() => {
+    if (timeline && command?.status === 'pending' && !delivery.busy) void delivery.reconcile(timeline);
+  }, [timeline, command, delivery.busy]);
   const lastConfirmed = useRef<string | null>(null);
   useEffect(() => {
     if (command?.status !== 'confirmed' || lastConfirmed.current === command.input.clienteId) return;
@@ -375,10 +400,20 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   }, [delivery.busy, command]);
 
   const releaseCommand = () => void delivery.release(async saved => {
+    await alternativesWrite.current;
+    await draftWrites.current;
+    // Preserve both the visible editor and the last shared revision before any
+    // cleanup. Revision comparison protects a third tab writing during this read.
+    if (composeOpen && draftInteraction.current > 0) await preserveDraftAlternative(commandScope, draft, files, saved);
+    const shared = await loadOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner);
+    if (shared) await preserveDraftAlternative(commandScope, shared.draft, shared.files, saved);
+    const local = storedExchangeDraft(draftKey);
+    if (local && (!shared || JSON.stringify(local) !== JSON.stringify(shared.draft)) &&
+        JSON.stringify(local) !== JSON.stringify(draft)) await preserveDraftAlternative(commandScope, local, [], saved);
     if (saved.status === 'confirmed') {
-      await draftWrites.current;
-      if (draftKey) localStorage.removeItem(draftKey);
-      await removeOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner);
+      if (shared && await isSentDraft(saved, shared.draft, shared.files)) await removeOfflineExchangeDraftRevision(String(currentUser?.id), inspectionId, owner, shared.revision);
+      if (local && await isSentDraft(saved, local, saved.input.files || []) && localStorage.getItem(draftKey) === JSON.stringify(local)) localStorage.removeItem(draftKey);
+      await retireSentAlternatives(commandScope, saved);
       setComposeOpen(false); setDraft(initialDraft(party)); setFiles([]); setRestoredAt(null);
       setDecision(null); setFundamento(''); setExpedienteLegal(''); setDecisionFiles([]);
       if (fileRef.current) fileRef.current.value = '';
@@ -393,8 +428,28 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     }
     draftInteraction.current += 1;
     setPersistenceRevision(value => value + 1);
+    setAlternatives(await loadDraftAlternatives(commandScope));
     await refresh();
   });
+
+  const recoverAlternative = async (alternative: typeof alternatives[number]) => {
+    if (commandBlocked || recovering) return;
+    setRecovering(true);
+    try {
+      if (composeOpen) await preserveDraftAlternative(commandScope, draft, files);
+      await saveOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner, alternative.draft, alternative.files);
+      localStorage.setItem(draftKey, JSON.stringify(alternative.draft));
+      draftInteraction.current += 1;
+      setDraft(alternative.draft); setFiles(alternative.files); setComposeOpen(true); setRestoredAt(alternative.savedAt);
+      setAlternatives(await loadDraftAlternatives(commandScope));
+      window.setTimeout(() => {
+        const form = document.getElementById('inspection-exchange-form');
+        form?.scrollIntoView?.({ block: 'start' });
+        form?.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true });
+      }, 0);
+    } catch { setDraftStorageError(true); }
+    finally { setRecovering(false); }
+  };
 
   const parentById = useMemo(() => new Map((timeline?.intercambios || []).map((entry) => [entry.id, entry])), [timeline?.intercambios]);
   const exchangeCycles = useMemo(() => groupExchangeCycles(timeline?.intercambios || []), [timeline?.intercambios]);
@@ -483,19 +538,35 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     <section className={compact ? 'space-y-4' : 'space-y-5'} aria-labelledby="inspection-exchange-title">
       {!delivery.ready && <Card role="status" className="text-sm"><p>{delivery.error || 'Comprobando envíos guardados en este dispositivo…'}</p>{delivery.error && <Button className="mt-3" variant="outline" onClick={() => void delivery.reload()}>Revisar copia local</Button>}</Card>}
       {delivery.ready && !command && delivery.error && <Card role="alert" className="text-sm text-error-800">{delivery.error}</Card>}
-      {command && <Card role="status" aria-live="polite" className={command.status === 'confirmed' ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}>
+      {command && <Card padding="sm" role="status" aria-live="polite" className={command.status === 'confirmed' ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'}>
         <h3 className="text-base font-bold text-neutral-900">{command.status === 'confirmed' ? (command.kind === 'decision' ? 'Decisión registrada' : 'Presentación registrada') : command.status === 'rejected' ? 'El envío necesita revisión' : delivery.busy ? 'Confirmando el envío…' : 'Confirmación pendiente'}</h3>
         <p className="mt-2 text-sm leading-6 text-neutral-800">{command.status === 'confirmed' ? 'El servidor confirmó esta actuación. Podés consultarla en el historial.' : command.status === 'rejected' ? command.rejection : 'La copia original está guardada. Reintentá para confirmar el resultado sin crear una segunda actuación; conservamos el contenido y los adjuntos.'}</p>
-        <details className="mt-3 text-sm"><summary className="min-h-11 cursor-pointer font-semibold text-primary-800">Contenido del envío{command.input.files?.length ? ` · ${command.input.files.length} adjuntos` : ''}</summary>
+        <details className="mt-3 text-sm"><summary className="min-h-11 cursor-pointer font-semibold text-primary-800">Contenido del envío{command.input.files?.length ? ` · ${command.input.files.length} ${command.input.files.length === 1 ? 'adjunto' : 'adjuntos'}` : ''}</summary>
           <p className="break-words font-semibold">{command.kind === 'presentation' ? command.input.asunto : command.input.decision === 'CERRADA_CONFORME' ? 'Cierre conforme' : 'Derivación a Legales'}</p>
           <p className="mt-2 whitespace-pre-wrap break-words">{command.kind === 'presentation' ? command.input.cuerpo : command.input.fundamento}</p>
           {command.kind === 'decision' && command.input.expedienteLegal && <p className="mt-2 break-words">Expediente legal: {command.input.expedienteLegal}</p>}
           <ul className="mt-2 space-y-1">{command.input.files?.map((file, index) => <li className="break-words" key={index}>{file.name} · {formatBytes(file.size)}</li>)}</ul>
         </details>
         {delivery.error && <p className="mt-2 break-words text-sm text-error-800">{delivery.error}</p>}
-        <Button className="mt-3 w-full sm:w-auto" variant={command.status === 'confirmed' ? 'outline' : 'primary'} disabled={delivery.busy || (command.status === 'pending' && !online)} isLoading={delivery.busy} onClick={command.status === 'pending' ? () => void delivery.retry() : releaseCommand}>{command.status === 'confirmed' ? 'Continuar en el expediente' : command.status === 'rejected' ? 'Revisar presentación' : 'Reintentar confirmación'}</Button>
+        <Button className="mt-3 w-full sm:w-auto" variant={command.status === 'confirmed' ? 'outline' : 'primary'} disabled={!draftReady || delivery.busy || (command.status === 'pending' && !online)} isLoading={delivery.busy} onClick={command.status === 'pending' ? () => void delivery.retry() : releaseCommand}>{command.status === 'confirmed' ? 'Continuar en el expediente' : command.status === 'rejected' ? 'Revisar presentación' : 'Reintentar confirmación'}</Button>
       </Card>}
-      {draftStorageError && <Card role="alert" className="border-warning-200 bg-warning-50 text-sm text-warning-900">No pudimos confirmar la copia local del borrador. Conservá esta pantalla abierta hasta guardar con conexión.</Card>}
+      {!command && alternatives.length > 0 && <Card padding="sm" className="text-sm" aria-label="Borradores conservados">
+        <h3 className="font-bold">Borradores sin enviar</h3>
+        <p className="mt-1 text-neutral-700">Son versiones guardadas por separado. Revisalas antes de preparar otra presentación.</p>
+        <ul className="mt-3 space-y-3">{alternatives.map((alternative, index) => <li key={alternative.id} className="min-w-0 border-t border-neutral-200 pt-3">
+          <details><summary className="min-h-11 cursor-pointer break-words font-semibold">Borrador {index + 1} · {alternative.draft.asunto || 'Sin asunto'}</summary>
+            <p className="whitespace-pre-wrap break-words">{alternative.draft.cuerpo}</p>
+            {alternative.files.map((file, fileIndex) => <button key={fileIndex} type="button" className="mt-2 flex min-h-11 max-w-full items-center gap-2 break-all text-left text-primary-800 underline" onClick={() => {
+              const url = URL.createObjectURL(file), link = document.createElement('a');
+              link.href = url; link.download = file.name; link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }}><Download size={16} className="shrink-0" />{file.name}</button>)}
+          </details>
+          {open ? <Button className="mt-2" variant="outline" disabled={commandBlocked || recovering} onClick={() => void recoverAlternative(alternative)}>Recuperar borrador {index + 1}</Button>
+            : <p className="mt-2 text-neutral-600">El expediente ya no admite presentaciones. Podés consultar el texto y descargar sus adjuntos.</p>}
+        </li>)}</ul>
+      </Card>}
+      {!draftReady && !draftStorageError && <p role="status" className="text-sm text-neutral-700">Comprobando el borrador y sus adjuntos…</p>}
+      {draftStorageError && <Card role="alert" className="border-warning-200 bg-warning-50 text-sm text-warning-900">No pudimos confirmar la copia local del borrador. Conservá esta pantalla abierta hasta resolverlo.{!draftReady && <Button variant="outline" className="mt-3" onClick={() => { setDraftStorageError(false); setDraftReadRevision(value => value + 1); }}>Revisar borrador local</Button>}</Card>}
       <Card className="overflow-hidden !p-0">
         <div className="border-b border-neutral-200 bg-[#F8FAF8] px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -572,7 +643,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
       {open && !composeOpen && party === 'AUTORIDAD' && <Button disabled={commandBlocked} leftIcon={<FileCheck2 size={17} />} onClick={beginNew}>Nuevo requerimiento</Button>}
 
       {open && composeOpen && !command && (
-        <Card id="inspection-exchange-form" className="border-primary-200">
+        <Card padding="sm" id="inspection-exchange-form" className="border-primary-200">
           <form onSubmit={submitPresentation} onChange={() => { draftInteraction.current += 1; }} className="space-y-4">
             <fieldset disabled={commandBlocked} className="min-w-0 space-y-4"><div className="flex items-start justify-between gap-3 border-b border-neutral-200 pb-4">
               <div><p className="text-xs font-bold uppercase tracking-wide text-primary-700">Nueva presentación formal</p><h4 className="mt-1 text-lg font-extrabold text-[#10213A]">{draft.respondeAId ? 'Respuesta vinculada' : 'Requerimiento de la autoridad'}</h4></div>

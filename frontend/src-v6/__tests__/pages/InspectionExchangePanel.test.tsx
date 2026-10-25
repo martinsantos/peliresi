@@ -7,6 +7,9 @@ import { inspectionDeadlineDate } from '../../pages/inspecciones/inspectionProce
 import { InspectionExchangePanel } from '../../pages/inspecciones/InspectionExchangePanel';
 import type { InspectionExchangeTimeline } from '../../types/inspection';
 import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { webcrypto } from 'node:crypto';
+import { claimExchangeCommand } from '../../services/inspectionExchangeCommand';
+import { loadDraftAlternatives } from '../../services/inspectionDraftAlternatives';
 
 const localCommands = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('../../services/indexeddb', () => ({
@@ -34,7 +37,7 @@ vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: mocks }
 vi.mock('../../services/inspectionOfflineExchange', () => ({
   loadOfflineExchangeDraft: mocks.loadDraft,
   saveOfflineExchangeDraft: mocks.saveDraft,
-  removeOfflineExchangeDraft: mocks.removeDraft,
+  removeOfflineExchangeDraftRevision: mocks.removeDraft,
 }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 
@@ -73,6 +76,7 @@ function renderPanel() {
 describe('InspectionExchangePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(crypto, 'subtle', { configurable: true, value: webcrypto.subtle });
     localStorage.clear(); localCommands.clear();
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     auth.currentUser = { id: 'actor-user-1', rol: 'GENERADOR', nombre: 'Responsable', email: '', sector: '', avatar: '', telefono: '', ubicacion: '', permisos: [] };
@@ -82,6 +86,56 @@ describe('InspectionExchangePanel', () => {
     mocks.loadDraft.mockResolvedValue(null);
     mocks.saveDraft.mockResolvedValue(undefined);
     mocks.removeDraft.mockResolvedValue(undefined);
+  });
+
+  it('acknowledges a matching timeline after reopening without posting again', async () => {
+    const scope = { userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' };
+    const original = timeline.intercambios[1];
+    await claimExchangeCommand(scope, { kind: 'presentation', input: { clienteId: 'reopened-send', version: 8,
+      tipo: original.tipo, asunto: original.asunto, cuerpo: original.cuerpo, respondeAId: original.respondeAId!, files: [] } });
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0], { ...original, clienteId: 'reopened-send' }] });
+    renderPanel();
+    expect(await screen.findByText('Presentación registrada')).toBeVisible();
+    expect(screen.queryByText('Confirmación pendiente')).not.toBeInTheDocument();
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+  });
+
+  it('does not archive the text-only fallback again when the full alternative has attachments', async () => {
+    const scope = { userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' };
+    const original = timeline.intercambios[1];
+    const other = { tipo: 'DESCARGO' as const, asunto: 'Versión pendiente', cuerpo: 'Texto alternativo con documentación.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    localStorage.setItem('sitrep_exchange_draft_v2_' + inspectionContextKey(scope.userId, scope.owner, scope.inspectionId), JSON.stringify(other));
+    mocks.loadDraft.mockResolvedValue({ draft: other, files: [new File(['pdf'], 'otro.pdf')], revision: 'alternative', savedAt: '' });
+    await claimExchangeCommand(scope, { kind: 'presentation', input: { clienteId: 'reopened-send', version: 8,
+      tipo: original.tipo, asunto: original.asunto, cuerpo: original.cuerpo, respondeAId: original.respondeAId!, files: [] } });
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0], { ...original, clienteId: 'reopened-send' }] });
+    renderPanel();
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
+    await screen.findByRole('button', { name: 'Recuperar borrador 1' });
+    expect(screen.queryByRole('button', { name: 'Recuperar borrador 2' })).toBeNull();
+    expect((await loadDraftAlternatives(scope))[0].files).toHaveLength(1);
+  });
+
+  it('retains a different shared draft and restores it after acknowledging and reopening', async () => {
+    const user = userEvent.setup();
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const view = renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Contenido enviado desde la primera pestaña.');
+    await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
+    const other = { tipo: 'DESCARGO' as const, asunto: 'Otra pestaña', cuerpo: 'Contenido distinto que todavía no fue enviado.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    mocks.loadDraft.mockResolvedValue({ revision: 'other-revision', draft: other, files: [new File(['pdf alternativo'], 'alternativo.pdf')], savedAt: '2026-10-25T12:00:00Z' });
+    await user.click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
+    expect(await screen.findByRole('button', { name: 'Recuperar borrador 1' })).toBeVisible();
+    expect(mocks.removeDraft).not.toHaveBeenCalled();
+    view.unmount(); mocks.loadDraft.mockResolvedValue(null);
+    renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Recuperar borrador 1' }));
+    expect(await screen.findByLabelText('Contenido')).toHaveValue(other.cuerpo);
+    expect(screen.getByLabelText('Asunto')).toHaveValue(other.asunto);
+    expect(mocks.saveDraft).toHaveBeenLastCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), other, [expect.objectContaining({ name: 'alternativo.pdf', size: 15 })]);
+    expect(mocks.presentExchange).toHaveBeenCalledOnce();
+    expect(await loadDraftAlternatives({ userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' })).toHaveLength(1);
   });
 
   it('does not reuse another activity timeline or open draft for the same account and case', async () => {
@@ -149,28 +203,45 @@ describe('InspectionExchangePanel', () => {
     await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
     await waitFor(() => expect(mocks.presentExchange).toHaveBeenCalledOnce());
     expect(mocks.removeDraft).not.toHaveBeenCalled();
+    const sent = mocks.presentExchange.mock.calls[0][1];
+    mocks.loadDraft.mockResolvedValue({ revision: 'sent-revision', draft: { ...sent, respondeAId: sent.respondeAId || '', plazoRespuestaAt: '' }, files: [] });
     await user.click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
     await act(async () => finishWrite());
-    await waitFor(() => expect(mocks.removeDraft).toHaveBeenCalledOnce());
+    await waitFor(() => expect(mocks.removeDraft).toHaveBeenCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), 'sent-revision'));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument());
     expect(localStorage.getItem('sitrep_exchange_draft_v2_' + inspectionContextKey(auth.currentUser.id, inspectionWorkspaceOwner(auth.currentUser), 'inspection-1'))).toBeNull();
   });
 
-  it('does not restore a late-loading stale draft after the user has submitted the response', async () => {
+  it('never autosaves the text-only fallback or allows sending before attachment recovery completes', async () => {
     let finishLoad!: (value: unknown) => void;
     mocks.loadDraft.mockImplementationOnce(() => new Promise((resolve) => { finishLoad = resolve; }));
     mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
-    const user = userEvent.setup();
+    const draft = { tipo: 'DESCARGO', respondeAId: 'exchange-1', asunto: 'Constancia guardada', cuerpo: 'Borrador con adjunto pendiente de recuperar.', plazoRespuestaAt: '' };
+    localStorage.setItem('sitrep_exchange_draft_v2_' + inspectionContextKey(auth.currentUser.id, inspectionWorkspaceOwner(auth.currentUser), 'inspection-1'), JSON.stringify(draft));
     renderPanel();
-    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
-    await user.type(screen.getByLabelText('Contenido'), 'Respuesta enviada antes de completar una lectura local demorada.');
-    await user.click(screen.getByRole('button', { name: 'Presentar en expediente' }));
-    await user.click(await screen.findByRole('button', { name: 'Continuar en el expediente' }));
-    await waitFor(() => expect(mocks.removeDraft).toHaveBeenCalledOnce());
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument());
-    await act(async () => finishLoad({ draft: { tipo: 'DESCARGO', respondeAId: 'exchange-1', asunto: 'Respuesta vieja', cuerpo: 'Borrador ya presentado', plazoRespuestaAt: '' }, files: [], savedAt: '2026-10-20T10:00:00Z' }));
-    expect(screen.queryByText('Borrador local recuperado')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Presentar en expediente' })).not.toBeInTheDocument();
+    expect(await screen.findByLabelText('Contenido')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Presentar en expediente' })).toBeDisabled();
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 450)); });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); });
+    expect(mocks.saveDraft).not.toHaveBeenCalled();
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+    await act(async () => finishLoad({ draft, files: [new File(['pdf'], 'guardado.pdf')], savedAt: '2026-10-20T10:00:00Z' }));
+    expect(screen.getByLabelText('Contenido')).toBeEnabled();
+    expect(screen.getByText('guardado.pdf')).toBeVisible();
+    await waitFor(() => expect(mocks.saveDraft).toHaveBeenCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), draft, [expect.objectContaining({ name: 'guardado.pdf' })]));
+    expect(mocks.removeDraft).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unreadable local copy intact and retries the read explicitly', async () => {
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    mocks.loadDraft.mockRejectedValueOnce(new Error('IndexedDB unavailable')).mockResolvedValue(null);
+    renderPanel();
+    await screen.findByRole('button', { name: 'Revisar borrador local' });
+    expect(screen.getByRole('button', { name: 'Responder requerimiento #1' })).toBeDisabled();
+    expect(mocks.saveDraft).not.toHaveBeenCalled();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Revisar borrador local' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Responder requerimiento #1' })).toBeEnabled());
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
   });
 
   it('retains the historical deadline when the real closure clears the active deadline', async () => {

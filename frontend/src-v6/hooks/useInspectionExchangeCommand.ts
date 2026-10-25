@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { inspeccionService } from '../services/inspeccion.service';
+import { matchingExchangeReceipt } from '../services/inspectionCommandReceipt';
+import type { InspectionExchangeTimeline } from '../types/inspection';
 import {
   claimExchangeCommand, exchangeCommandKey, loadExchangeCommand, releaseExchangeCommand, settleExchangeCommand,
   type ExchangeCommand, type ExchangeCommandInput, type ExchangeCommandScope,
@@ -101,5 +103,19 @@ export function useInspectionExchangeCommand(scope: ExchangeCommandScope) {
     } catch (failure) { if (alive.current) setError(messageOf(failure)); }
     finally { inFlight.current = false; if (alive.current) setBusy(false); }
   };
-  return { command, ready, busy, error, reload, submit: run, retry: () => run(), release };
+  const reconcile = async (timeline: InspectionExchangeTimeline) => {
+    if (inFlight.current || !command || command.status !== 'pending' || timeline.inspeccion.id !== scope.inspectionId) return;
+    const read = generation.current;
+    try {
+      const receipt = await matchingExchangeReceipt(command, timeline.intercambios, timeline.parteActual);
+      if (!receipt || !alive.current || inFlight.current || read !== generation.current) return;
+      const recorded = await settleExchangeCommand(scope, command.input.clienteId, { status: 'confirmed', receipt });
+      if (!alive.current || read !== generation.current) return;
+      setCommand(recorded); setError(''); announce();
+    } catch {
+      // A failed read/comparison cannot declare the command absent or change it.
+      if (alive.current && read === generation.current) setError('No pudimos cotejar la confirmación guardada. Conservamos el envío para reintentar.');
+    }
+  };
+  return { command, ready, busy, error, reload, submit: run, retry: () => run(), release, reconcile };
 }
