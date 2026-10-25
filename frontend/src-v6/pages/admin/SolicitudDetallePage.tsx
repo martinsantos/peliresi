@@ -167,9 +167,11 @@ const SolicitudReview: React.FC = () => {
     () => revisarDocumento.mutateAsync({ solicitudId: id!, docId, estado }),
     () => {}, estado === 'APROBADO' ? 'Documento aprobado.' : 'Documento rechazado.');
 
+  const feedbackPanel = feedback && <p ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={'rounded-lg border p-3 text-sm ' + (feedback.error ? 'border-error-200 bg-error-50 text-error-900' : 'border-primary-200 bg-primary-50 text-primary-900')}>{feedback.text}</p>;
   // A failed fresh read must hide cached private data and decision controls.
   if (detail.isPending || detail.isError || !solicitud) return <div className="space-y-4">
     <Button variant="outline" onClick={backToList}>Volver a solicitudes</Button>
+    {feedbackPanel}
     <QueryContent query={detail} loading="Cargando solicitud" error="No pudimos verificar la solicitud. Tus borradores se conservan; las decisiones esperan una consulta actualizada." retryLabel="Actualizar solicitud">
       {!solicitud && <p role="alert">Solicitud no disponible.</p>}
     </QueryContent>
@@ -180,7 +182,6 @@ const SolicitudReview: React.FC = () => {
   const declaredDrivers = fleetRows(datosActor.choferesJson, EMPTY_DRIVER);
   const documentos = solicitud.documentos || [];
   const statusText = APPLICATION_STATES[solicitud.estado]?.next || 'Estado por verificar';
-  const feedbackPanel = feedback && <p ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={'rounded-lg border p-3 text-sm ' + (feedback.error ? 'border-error-200 bg-error-50 text-error-900' : 'border-primary-200 bg-primary-50 text-primary-900')}>{feedback.text}</p>;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -439,7 +440,7 @@ const SolicitudReview: React.FC = () => {
       </div>
 
       {/* Action Bar */}
-      {editingData && reviewer && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor key={solicitud.id} application={solicitud} readOnly={!fresh || busy} onClose={() => setEditingData(false)} onSaved={async () => { const current = await refetch(); if (current.isError) throw current.error; }} />}
+      {editingData && reviewer && solicitud.estado === 'EN_REVISION' && <RegistrationReviewEditor key={solicitud.id} application={solicitud} readOnly={!fresh || busy} onClose={() => setEditingData(false)} onConfirmed={() => setFeedback({ error: false, text: 'Corrección guardada. Los datos se actualizaron; la solicitud sigue en revisión.' })} onSaved={async () => { const current = await refetch(); if (current.isError) throw current.error; }} />}
       {reviewer && solicitud.estado === 'EN_REVISION' && (
         <Card className="!bg-neutral-50 flex items-center justify-end gap-3 flex-wrap">
           <Button

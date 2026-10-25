@@ -143,7 +143,7 @@ const NotificacionesPage: React.FC = () => {
             const day=(date:string)=>new Date(date).toLocaleDateString('es-AR',{timeZone:'America/Argentina/Mendoza',day:'numeric',month:'long'});
             const dateLabel=day(notice.createdAt);
             const groupStart=index===0||day(items[index-1].createdAt)!==dateLabel;
-            const Icon = warning ? AlertTriangle : /\/soporte\//.test(path) ? LifeBuoy : /\/(?:mis-)?inspecciones(?:[/?#]|$)/.test(path) ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
+            const Icon = warning ? AlertTriangle : /\/soporte\//.test(path) ? LifeBuoy : /\/(?:requerimientos|(?:mis-)?inspecciones)(?:[/?#]|$)/.test(path) ? ClipboardCheck : success ? CheckCircle2 : notice.manifiestoId ? FileText : Info;
             return (
               <li key={notice.id} className={notice.leida ? 'border-l-4 border-l-transparent opacity-80' : 'border-l-4 border-l-primary-600 bg-primary-50/40'}>
                 {groupStart && <p className="border-b border-neutral-200 bg-neutral-100 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-600">{dateLabel}</p>}

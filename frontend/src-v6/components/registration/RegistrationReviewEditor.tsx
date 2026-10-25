@@ -17,7 +17,7 @@ import type { SolicitudInscripcion } from '../../types/api';
 
 /** Edits declarations, not credentials or approval. The API rechecks sector,
  * current state and exact revision and commits before/after history atomically. */
-export function RegistrationReviewEditor({ application, onClose, onSaved, readOnly = false }: { application: SolicitudInscripcion; onClose: () => void; onSaved: () => void | Promise<unknown>; readOnly?: boolean }) {
+export function RegistrationReviewEditor({ application, onClose, onSaved, onConfirmed, readOnly = false }: { application: SolicitudInscripcion; onClose: () => void; onSaved: () => void | Promise<unknown>; onConfirmed?: () => void; readOnly?: boolean }) {
   const { owner } = useAdmissionContext();
   const initial = useMemo(() => {
     try {
@@ -64,6 +64,7 @@ export function RegistrationReviewEditor({ application, onClose, onSaved, readOn
       // acknowledged correction against the previous revision.
       recovery.clear();
       onClose();
+      onConfirmed?.();
       try { await onSaved(); }
       catch { toast.warning('Corrección guardada', 'No se pudo actualizar la vista. Recargá la solicitud antes de continuar.'); }
     }

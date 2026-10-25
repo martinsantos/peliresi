@@ -47,7 +47,7 @@ function getTypeIcon(type: NotificationType, notice: Notificacion) {
   if (type === 'info' && resolveNotificationPath(notice).includes('/soporte/')) {
     return <LifeBuoy size={16} className="text-primary-700 shrink-0" />;
   }
-  if (type === 'info' && /\/(?:mis-)?inspecciones\//.test(resolveNotificationPath(notice))) {
+  if (type === 'info' && /\/(?:requerimientos|(?:mis-)?inspecciones)\//.test(resolveNotificationPath(notice))) {
     return <ClipboardCheck size={16} className="text-primary-700 shrink-0" />;
   }
   switch (type) {

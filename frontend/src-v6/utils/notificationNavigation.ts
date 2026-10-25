@@ -60,7 +60,8 @@ export function notificationActionLabel(path: string): string {
   if (pathname === '/empresas') return 'Revisar entidad y personas →';
   if (pathname === '/mi-perfil') return 'Abrir mi ficha y documentos →';
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
-  if (pathname === '/admin/renovaciones') return 'Revisar solicitud de cambio →';
+  if (pathname === '/admin/renovaciones') return 'Revisar renovación →';
+  if (/^\/notificaciones\/[^/]+$/.test(pathname)) return 'Ver aviso y resultado →';
   if (pathname === '/alertas') return 'Revisar alerta →';
   if (/^\/manifiestos\/[^/]+\/adendas$/.test(pathname)) return 'Abrir adenda y revisiones →';
   if (/^\/manifiestos\/[^/]+$/.test(pathname) && new URLSearchParams(query).has('certificado')) return 'Ver certificación y descargar →';
@@ -101,6 +102,7 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   if (explicitPath?.startsWith('/')) return withBasePath(explicitPath, basePath);
   if (data.tipo === 'nuevo_registro') return withBasePath('/admin/usuarios', basePath);
   if (String(notificacion.tipo) === 'MODIFICACION_SOLICITADA' && safeId(data.renovacionId)) return withBasePath('/admin/renovaciones?anio=&revision=' + data.renovacionId, basePath);
+  if (['MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(String(notificacion.tipo)) && safeId(data.renovacionId) && safeId(notificacion.id)) return withBasePath('/notificaciones/' + notificacion.id, basePath);
   if (data.tipo === 'certificado_ambiental' && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     return withBasePath('/mi-perfil', basePath);
   }

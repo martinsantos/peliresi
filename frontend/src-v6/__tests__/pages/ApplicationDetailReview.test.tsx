@@ -15,7 +15,7 @@ vi.mock('../../hooks/useSolicitudes', () => ({
 }));
 vi.mock('../../components/AdministrativeTEF', () => ({ AdministrativeTEF: () => null }));
 vi.mock('../../components/registration/RegistrationFleetSummary', () => ({ RegistrationFleetSummary: () => null }));
-vi.mock('../../components/registration/RegistrationReviewEditor', () => ({ RegistrationReviewEditor: () => null }));
+vi.mock('../../components/registration/RegistrationReviewEditor', () => ({ RegistrationReviewEditor: ({ onClose, onConfirmed, onSaved }: any) => <button onClick={async () => { onClose(); onConfirmed(); await onSaved().catch(() => {}); }}>Simular corrección confirmada</button> }));
 vi.mock('../../components/DocumentAnalysis', () => ({ DocumentAnalysis: () => null }));
 vi.mock('../../components/PaymentIdentityReview', () => ({ PaymentIdentityReview: () => <input aria-label="Identidad del pago" defaultValue="" /> }));
 import SolicitudDetallePage from '../../pages/admin/SolicitudDetallePage';
@@ -28,6 +28,17 @@ beforeEach(() => {
   for (const fn of [state.send,state.review,state.observe,state.approve,state.reject,state.document]) fn.mockResolvedValue({});
 });
 afterEach(cleanup);
+it.each(['', '/app'])('keeps a confirmed correction visible and focused when its subsequent read fails (%s)', async prefix => {
+ const view = render(tree(prefix));
+ fireEvent.click(screen.getByRole('button', { name: 'Corregir datos' }));
+ state.detail.refetch.mockImplementation(async () => { state.detail.isError = true; return { isError: true, error: new Error('offline') }; });
+ await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Simular corrección confirmada' })); });
+ view.rerender(tree(prefix));
+ expect(screen.getByRole('status')).toHaveTextContent('Corrección guardada');
+ expect(screen.getByRole('status')).toHaveFocus();
+ expect(screen.queryByText('Empresa QA')).toBeNull();
+ expect(screen.getByRole('button', { name: 'Actualizar solicitud' })).toBeEnabled();
+});
 it.each(['','/app'])('opening ENVIADA does not mutate; explicit review begins the work (%s)', async prefix => {
  state.detail.data.estado = 'ENVIADA'; render(tree(prefix));
  expect(state.review).not.toHaveBeenCalled(); expect(screen.queryByRole('button',{name:'Aprobar',exact:true})).toBeNull();

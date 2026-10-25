@@ -43,6 +43,8 @@ describe('Shared web/app workspace contract',()=>{
   expect(workspaceTitle(prefix+'/manifiestos/abc')).toBe('Manifiestos');
   expect(workspaceTitle(prefix+'/requerimientos/abc')).toBe('Requerimiento');
   expect(workspaceTitle(prefix+'/notificaciones')).toBe('Avisos');
+  expect(workspaceTitle(prefix+'/notificaciones/qa')).toBe('Aviso recibido');
+  expect(workspaceSectionPath(prefix+'/notificaciones/qa')).toBe('/notificaciones');
  });
  it('recovers old mail links and avoids login into an inaccessible inspection directory',()=>{
   expect(postLoginDestination('/inspecciones','OPERADOR')).toBe('/dashboard');

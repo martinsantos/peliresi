@@ -1,4 +1,4 @@
-import { workspaceNavigation, workspaceTitle, workspaceSectionPath, workspaceRoleLabel, isActorWorkspace } from '../utils/workspaceNavigation';
+import { workspaceNavigation, workspaceTitle, workspaceSectionPath, workspaceRoleLabel, isActorWorkspace, isNoticeWorkspace } from '../utils/workspaceNavigation';
 import { TrainingBanner } from '../components/TrainingBanner';
 /**
  * SITREP v6 - Main Layout
@@ -68,7 +68,7 @@ export const MainLayout: React.FC = () => {
   useEffect(() => { setSidebarOpen(false); setUserMenuOpen(false); }, [location.pathname]);
   const isInspectionCase = /\/inspecciones\/[^/]+/.test(location.pathname);
   const isActorInspection = /^\/(?:(?:app|mobile)\/)?(?:mis-inspecciones|requerimientos)(?:\/|$)/.test(location.pathname);
-  const inlineSupport = isActorWorkspace(location.pathname) || /^(?:\/(?:app|mobile))?\/dashboard\/?$/.test(location.pathname) || isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:admin\/(?:solicitudes(?:\/[^/]+)?|renovaciones)|mi-solicitud|empresas|manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
+  const inlineSupport = isNoticeWorkspace(location.pathname) || isActorWorkspace(location.pathname) || /^(?:\/(?:app|mobile))?\/dashboard\/?$/.test(location.pathname) || isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:admin\/(?:solicitudes(?:\/[^/]+)?|renovaciones)|mi-solicitud|empresas|manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();

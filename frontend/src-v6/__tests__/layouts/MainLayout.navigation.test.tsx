@@ -67,8 +67,8 @@ describe('Sidebar: one visible current destination',()=>{
   it.each(['ADMIN_GENERADOR','ADMIN_OPERADOR','ADMIN_TRANSPORTISTA'])('provides the authorized registration desk for %s without a hidden-route dead end',rol=>{
     authState.rol=rol;
     show('/admin/solicitudes');
-    expect(screen.getByRole('link',{name:'Solicitudes de inscripción',exact:true})).toHaveAttribute('href','/admin/solicitudes');
-    expect(screen.getByRole('link',{name:'Solicitudes de inscripción',exact:true})).toHaveAttribute('aria-current','page');
+    expect(screen.getByRole('link',{name:'Solicitudes',exact:true})).toHaveAttribute('href','/admin/solicitudes');
+    expect(screen.getByRole('link',{name:'Solicitudes',exact:true})).toHaveAttribute('aria-current','page');
     expect(screen.queryByRole('link',{name:'Usuarios',exact:true})).not.toBeInTheDocument();
   });
   it('exposes contextual technical help without requiring navigation to the desk',()=>{
@@ -94,6 +94,12 @@ describe('Sidebar: one visible current destination',()=>{
     expect(help.closest('header')).toBe(screen.getByRole('banner'));
     expect(help.parentElement).not.toHaveClass('fixed');
     expect(screen.queryByRole('button',{name:'Ver tour de ayuda',exact:true})).not.toBeInTheDocument();
+  });
+  it.each(['/notificaciones', '/notificaciones/qa', '/app/notificaciones/qa'])('keeps notice help in the header and its section identifiable on %s', path => {
+    show(path);
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true }).closest('header')).toBe(screen.getByRole('banner'));
+    expect(screen.queryByRole('button', { name: 'Ver tour de ayuda', exact: true })).toBeNull();
+    expect(within(screen.getByRole('banner')).getByRole('heading', { level: 1 })).toHaveTextContent(path.endsWith('/qa') ? 'Aviso recibido' : 'Avisos');
   });
   it('keeps the base role outside the inspection workspace',()=>{
     authState.rol='GENERADOR';authState.esInspector=true;

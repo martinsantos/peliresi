@@ -18,9 +18,17 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app', '/mobile'])('opens renewal decisions as an exact owned notice in %s', prefix => {
+    for (const tipo of ['MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA']) {
+      const n = { ...base, tipo: tipo as Notificacion['tipo'], datos: '{"renovacionId":"renewal-qa"}' };
+      expect(resolveNotificationPath(n, prefix)).toBe(prefix + '/notificaciones/n-1');
+      expect(notificationActionLabel(resolveNotificationPath(n, prefix))).toBe('Ver aviso y resultado →');
+    }
+  });
   it.each(['', '/app', '/mobile'])('opens the exact renewal and refreshes its state on %s', prefix => {
     const n = { ...base, tipo: 'MODIFICACION_SOLICITADA' as Notificacion['tipo'], datos: JSON.stringify({ renovacionId: 'renewal-qa' }) };
     expect(resolveNotificationPath(n, prefix)).toBe(prefix + '/admin/renovaciones?anio=&revision=renewal-qa');
+    expect(notificationActionLabel(resolveNotificationPath(n, prefix))).toBe('Revisar renovación →');
     const invalidateQueries = vi.fn();
     refreshInspectionNotification(n, { invalidateQueries } as any);
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['renovaciones'] });

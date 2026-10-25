@@ -13,6 +13,27 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each(['GENERADOR', 'OPERADOR'].flatMap(tipoActor => ['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].map(tipo => ({ tipoActor, tipo }))))('renders bounded renewal context and the next action for $tipoActor / $tipo without private notes', ({ tipoActor, tipo }) => {
+    const content = notificationMailContent({ ...notice, tipo, datos: JSON.stringify({
+      tipo: 'renovacion_padron', version: 1, renovacionId: 'renewal-qa', tipoActor, actorNombre: 'Empresa <QA> & Asociados', anio: 2027,
+      motivoRechazo: 'PRIVATE', observaciones: 'PRIVATE', importe: 'PRIVATE',
+    }) })!;
+    expect(content.subject).toContain('Renovación');
+    expect(content.html).toContain('Empresa &lt;QA&gt; &amp; Asociados');
+    expect(mailText(content.html)).toContain('Período 2027');
+    expect(mailText(content.html)).toContain(tipoActor === 'GENERADOR' ? 'Generador' : 'Operador');
+    expect(content.html).toContain(tipo === 'MODIFICACION_SOLICITADA' ? 'Revisar renovación' : 'Ver resultado');
+    expect(content.html).toContain(tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones?anio=&amp;revision=renewal-qa' : '/notificaciones/qa-notice');
+    expect(content.html).not.toMatch(/PRIVATE|<QA>/);
+  });
+  it.each([{ anio: '2027' }, { anio: 2101 }, { version: 2 }, { actorNombre: 'a'.repeat(201) }, { tipoActor: 'TRANSPORTISTA' }, { actorNombre: '' }])('does not invent a renewal reference from invalid metadata %j', invalid => {
+    const content = notificationMailContent({ ...notice, tipo: 'MODIFICACION_SOLICITADA', datos: JSON.stringify({
+      tipo: 'renovacion_padron', version: 1, renovacionId: 'renewal-qa', tipoActor: 'GENERADOR', actorNombre: 'QA Fallback', anio: 2027, ...invalid,
+    }) })!;
+    expect(content.subject).toBe('[SITREP] Cambio de padrón pendiente de revisión');
+    expect(content.html).not.toContain('Período');
+    expect(content.html).toContain('/admin/renovaciones?anio=&amp;revision=renewal-qa');
+  });
   it('links the reviewer to the exact renewal and the actor to their decision notice', () => {
     const data = JSON.stringify({ renovacionId: 'renewal-qa' });
     const review = notificationMailContent({ ...notice, tipo: 'MODIFICACION_SOLICITADA', datos: data })!;

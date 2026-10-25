@@ -9,23 +9,26 @@ const application = { id: 'qa-request', tipoActor: 'TRANSPORTISTA', updatedAt: '
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); sessionStorage.clear(); mock.owner = 'admin'; });
 describe('administrative declaration correction acknowledgement', () => {
   it('sends the edited declaration with its original revision and never confuses a failed refresh with a failed write', async () => {
-    const close = vi.fn(), refresh = vi.fn().mockRejectedValue(new Error('QA refresh failed'));
+    const close = vi.fn(), confirmed = vi.fn(), refresh = vi.fn().mockRejectedValue(new Error('QA refresh failed'));
     mock.save.mockResolvedValue({});
-    render(<RegistrationReviewEditor application={application as never} onClose={close} onSaved={refresh} />);
+    render(<RegistrationReviewEditor application={application as never} onClose={close} onSaved={refresh} onConfirmed={confirmed} />);
     fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA dirección corregida' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
     await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    expect(confirmed).toHaveBeenCalledOnce();
+    expect(confirmed.mock.invocationCallOrder[0]).toBeLessThan(refresh.mock.invocationCallOrder[0]);
     expect(mock.save).toHaveBeenCalledWith('qa-request', expect.objectContaining({ domicilio: 'QA dirección corregida' }), application.updatedAt);
     await waitFor(() => expect(mock.warning).toHaveBeenCalledWith('Corrección guardada', expect.any(String)));
     expect(mock.save).toHaveBeenCalledOnce(); expect(screen.queryByText(/No se confirmó la corrección/)).not.toBeInTheDocument();
   });
   it('keeps rejected edits visible and rereads for reconciliation without closing or implying approval', async () => {
-    const close = vi.fn(), refresh = vi.fn(); mock.save.mockRejectedValue(new Error('QA versión conflictiva'));
-    render(<RegistrationReviewEditor application={application as never} onClose={close} onSaved={refresh} />);
+    const close = vi.fn(), refresh = vi.fn(), confirmed = vi.fn(); mock.save.mockRejectedValue(new Error('QA versión conflictiva'));
+    render(<RegistrationReviewEditor application={application as never} onClose={close} onSaved={refresh} onConfirmed={confirmed} />);
     fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA todavía sin guardar' } });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('QA versión conflictiva'));
     expect(screen.getByLabelText('Domicilio')).toHaveValue('QA todavía sin guardar'); expect(close).not.toHaveBeenCalled(); expect(refresh).toHaveBeenCalledOnce();
+    expect(confirmed).not.toHaveBeenCalled();
   });
   it('does not substitute a malformed saved fleet with an empty form', () => {
     render(<RegistrationReviewEditor application={{ ...application, datosActor: JSON.stringify({ razonSocial: 'QA', choferesJson: '{invalid' }) } as never} onClose={vi.fn()} onSaved={vi.fn()} />);

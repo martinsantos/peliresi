@@ -12,6 +12,7 @@ export type WorkspaceItem = { path: string; label: string; icon: LucideIcon; sec
 /** Keep help in the header throughout actor lists, details and forms. */
 export const isActorWorkspace = (pathname: string) => /^\/(?:(?:app|mobile)\/)?(?:admin\/)?actores(?:\/|$)/.test(pathname)
   || /^\/(?:(?:app|mobile)\/)?admin\/(?:generadores|operadores)(?:\/|$)/.test(pathname);
+export const isNoticeWorkspace = (pathname: string) => /^\/(?:(?:app|mobile)\/)?notificaciones(?:\/|$)/.test(pathname);
 export const ADMIN_ROLES = ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'];
 export const isInspectionStaff = (user: Pick<User, 'rol' | 'esInspector'> | null | undefined) =>
   Boolean(user && (user.esInspector || ADMIN_ROLES.includes(user.rol)));
@@ -57,6 +58,7 @@ export function workspaceTitle(pathname: string): string {
     : `${actor.stage === 'create' ? 'Nuevo' : actor.stage === 'renew' ? 'Renovar' : 'Editar'} ${actor.label}`;
   const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
   const details: Array<[RegExp, string]> = [
+    [/^\/notificaciones\//, 'Aviso recibido'],
     [/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/, 'Requerimiento'],
     [/^\/inspecciones\//, 'Inspección'],
     [/^\/manifiestos\/nuevo/, 'Nuevo manifiesto'],
@@ -87,6 +89,7 @@ export function workspaceSectionPath(pathname: string, user?: User | null, state
   }
   const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
   if (/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/.test(path)) return '/notificaciones';
+  if (isNoticeWorkspace(path)) return '/notificaciones';
   if (/^\/admin\/(?:solicitudes|renovaciones)(?:\/|$)/.test(path)) return '/admin/solicitudes';
   if (/^\/transporte\/(?:viaje|cargas)(?:\/|$)/.test(path)) return '/transporte/perfil';
   if (/^\/(?:empresas|mi-solicitud)(?:\/|$)/.test(path)) return '/mi-perfil';

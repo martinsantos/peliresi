@@ -100,6 +100,8 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="monitor" element={<div>Monitor</div>} />
           <Route path="actores" element={<div>Consulta de actores</div>} />
           <Route path="notificaciones" element={<div>Bandeja de avisos</div>} />
+          <Route path="notificaciones/:id" element={<div>Resultado del aviso</div>} />
+          <Route path="app/notificaciones/:id" element={<div>Resultado del aviso app</div>} />
           <Route path="manifiestos" element={<div>Listado de manifiestos</div>} />
           <Route path="app/manifiestos" element={<div>Listado app</div>} />
           <Route path="mobile/manifiestos" element={<div>Listado móvil</div>} />
@@ -333,6 +335,11 @@ describe('MobileLayout Android shell', () => {
     expect(help.closest('header')).toBe(screen.getByRole('banner'));
     expect(help.parentElement).not.toHaveClass('fixed');
     expect(help).toHaveClass('h-11', 'w-11');
+  });
+  it.each(['/notificaciones', '/notificaciones/qa', '/app/notificaciones/qa'])('keeps notice help in the header and one screen title on %s', path => {
+    renderMobileLayout(path);
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true }).closest('header')).toBe(screen.getByRole('banner'));
+    expect(screen.getByRole('banner').querySelector('h1')).toHaveTextContent(path.endsWith('/qa') ? 'Aviso recibido' : 'Avisos');
   });
   it('does not reinterpret the actor own inspection route as inspector work', () => {
     authState.currentUser = { ...authState.currentUser, rol: 'GENERADOR', esInspector: true };

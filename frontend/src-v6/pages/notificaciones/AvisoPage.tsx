@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { Bell, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
@@ -14,10 +14,10 @@ export default function AvisoPage() {
   const query = useQuery({ queryKey: ['notificaciones', 'detail', currentUser?.id, id],
     queryFn: async () => (await api.get('/notificaciones/' + encodeURIComponent(id || ''))).data.data as Notificacion,
     retry: false, staleTime: 0 });
-  const notice = query.data;
+  const notice = !query.isError && !query.isPending ? query.data : undefined;
   const target = notice ? resolveNotificationPath(notice, '', currentUser?.rol) : '/notificaciones';
-  return <section className="mx-auto max-w-2xl space-y-4 py-6" aria-label="Aviso recibido">
-    <h1 className="flex items-center gap-3 text-xl font-semibold"><Bell aria-hidden="true" className="text-primary-700" />Aviso recibido</h1>
+  return <section className="mx-auto max-w-2xl space-y-4" aria-label="Aviso recibido">
+    <Link className="inline-flex min-h-11 items-center gap-2 text-primary-800 underline" to={mp('/notificaciones')}><ArrowLeft size={18} aria-hidden="true" />Volver a Avisos</Link>
     {query.isPending && <p role="status">Buscando tu aviso…</p>}
     {query.isError && <div role="alert" className="rounded-lg border border-neutral-200 bg-white p-4 space-y-3">
       <p>No se pudo abrir este aviso. Ingresá con la cuenta que recibió el correo. Si el aviso fue eliminado, consultá el trámite desde tus listados.</p>
@@ -26,8 +26,7 @@ export default function AvisoPage() {
     {notice && <article className="rounded-xl border border-primary-200 bg-white p-5 space-y-4">
       <h2 className="text-lg font-semibold">{notice.titulo}</h2><p className="whitespace-pre-wrap break-words">{notice.mensaje}</p>
       <p className="text-sm text-neutral-600">Aviso del {new Date(notice.createdAt).toLocaleString('es-AR')}. Consultá el estado actual antes de actuar.</p>
-      {target !== '/notificaciones' && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}>{notificationActionLabel(target)}<ArrowRight size={18} aria-hidden="true" /></Link>}
+      {target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}>{notificationActionLabel(target)}<ArrowRight size={18} aria-hidden="true" /></Link>}
     </article>}
-    <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/notificaciones')}>Ver todos mis avisos</Link>
   </section>;
 }

@@ -22,7 +22,7 @@ describe('assignment notification delivery', () => {
     const title = await screen.findByText('PSIP · Nuevo requerimiento');
     expect(title.closest('button')?.querySelector('svg.lucide-clipboard-check')).not.toBeNull();
     fireEvent.click(title);
-    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/app/mis-inspecciones/case-psip'));
+    await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/app/requerimientos/case-psip'));
   });
   beforeEach(() => { service.restricted = false; service.list.mockReset().mockResolvedValue({ items: [], noLeidas: 0 }); service.marcarLeida.mockReset().mockResolvedValue({}); });
   it('does not mount an unusable inbox or query full-access notices for a restricted applicant', () => {

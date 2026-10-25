@@ -15,6 +15,7 @@ import { INSPECTION_AGENDA_LABELS } from './inspectionAgendaNotice.service';
 import { requirementSituation } from './alertCataloguePolicy.service';
 import { EVENTUAL_NOTICE_LABELS, eventualNoticeAudience, eventualNoticeEvent } from './eventualNotice.service';
 import { manifestFeatureEnabled } from '../lib/manifestTraining';
+import { RENEWAL_NOTICE_LABELS, renewalNoticeReference, validRenewalNotice } from '../domain/renewalNotice';
 
 export type NoticeForMail = {
   id: string; tipo: string; datos: string | null; createdAt: Date;
@@ -323,7 +324,8 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     RECHAZADA: ['Adenda rechazada', 'La resolución y el anexo original siguen disponibles en el manifiesto.'],
   };
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
-  const message = validCompanyNotice(data) ? COMPANY_NOTICE_LABELS[String(data.evento)]
+  const renewalMessage = family === 'padron' && validRenewalNotice(data) ? RENEWAL_NOTICE_LABELS[notice.tipo] : undefined;
+  const message = renewalMessage || (validCompanyNotice(data) ? COMPANY_NOTICE_LABELS[String(data.evento)]
     : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
     : data.tipo === 'recordatorio_firma' && data.version === 1 ? [data.fase === 'SEMANA' ? 'Se acercan los 30 días desde la firma' : '30 días desde la firma del manifiesto', 'Revisá el estado actual y coordiná las acciones pendientes con las partes. El aviso conserva la fecha de firma; no determina una infracción.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
@@ -340,14 +342,15 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     : data.tipo === 'relevo_transporte' ? ['Cambio de transporte en tránsito', 'La transportista de origen registró un relevo. Revisá el tramo y su seguimiento en SITREP.']
     : family === 'soporte' && Object.prototype.hasOwnProperty.call(supportEvents, event) ? supportEvents[event]
     : family === 'inspecciones' && event === 'ASIGNADA' ? ['Tenés una inspección asignada', 'Revisá la ubicación, la agenda y los controles antes de iniciar la visita.']
-    : labels[notice.tipo] || fallback;
+    : labels[notice.tipo] || fallback);
   title = message[0];
   const deadline = data.tipo === 'intercambio_inspeccion' && validExchangeMail(data) && typeof data.plazoRespuestaAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(data.plazoRespuestaAt) && Number.isFinite(Date.parse(data.plazoRespuestaAt))
     ? '<p><strong>Plazo para responder:</strong> ' + escapeMail(new Date(data.plazoRespuestaAt).toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza' })) + ' (hora de Mendoza). Consultá el expediente por respuestas o cambios posteriores.</p>' : '';
   const reference = data.tipo === 'recordatorio_firma' && data.version === 1 && typeof data.fechaFirma === 'string' && Number.isFinite(Date.parse(data.fechaFirma))
     ? '<p><strong>Firma:</strong> ' + escapeMail(new Date(data.fechaFirma).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }))
       + '<br><strong>30 días desde la firma:</strong> ' + escapeMail(new Date(Date.parse(data.fechaFirma) + 30 * 86400000).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' })) + '.</p>' : '';
-  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">${escapeMail(title)}</h1><p>${escapeMail(message[1])}</p>${deadline}${reference}${mailAction(path, fallback[2])}<p style="font-size:13px;color:#526359;margin-top:20px">Ingresá con tu cuenta para ver los detalles.</p>`) };
+  const renewalReference = renewalMessage && validRenewalNotice(data) ? '<p><strong>' + escapeMail(renewalNoticeReference(data)) + '</strong></p>' : '';
+  return { family, subject: '[SITREP] ' + title, html: mailShell(`<h1 style="color:#1B5E3C;font-size:22px;line-height:1.3;margin:0 0 16px">${escapeMail(title)}</h1>${renewalReference}<p>${escapeMail(message[1])}</p>${deadline}${reference}${mailAction(path, renewalMessage?.[2] || fallback[2])}<p style="font-size:13px;color:#526359;margin-top:20px">Ingresá con tu cuenta para ver los detalles.</p>`) };
 }
 
 export async function queueCommittedNotificationEmails(): Promise<number> {
