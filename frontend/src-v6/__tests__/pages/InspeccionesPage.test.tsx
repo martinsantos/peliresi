@@ -37,7 +37,7 @@ function NavigationProbe() {
 
 describe('InspeccionesPage', () => {
   beforeEach(() => {
-    localStorage.clear();
+    localStorage.clear(); sessionStorage.clear();
     mocks.useInspections.mockReturnValue({ data: { items: [], total: 0 }, isLoading: false, isError: false, refetch: mocks.refetch });
   });
 
@@ -62,6 +62,19 @@ describe('InspeccionesPage', () => {
     expect(screen.queryByRole('region', { name: 'Antecedentes para inspección' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso de antecedente' }));
     expect(antecedentes).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('separates agenda from the full list and restores list filters when returning', () => {
+    render(<MemoryRouter initialEntries={['/inspecciones?search=QA&etapa=SEGUIMIENTO&page=2']}><InspeccionesPage /><NavigationProbe /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('link', { name: 'Agenda', exact: true }));
+    expect(screen.getByRole('link', { name: 'Agenda', exact: true })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('region', { name: 'Operación de inspecciones' })).toBeVisible();
+    expect(screen.queryByLabelText('Buscar inspección')).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Etapas PSIP' })).toBeNull();
+    fireEvent.click(screen.getByRole('link', { name: 'Expedientes', exact: true }));
+    expect(screen.getByLabelText('Buscar inspección')).toHaveValue('QA');
+    expect(mocks.useInspections).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, search: 'QA' }));
+    expect(screen.queryByRole('region', { name: 'Operación de inspecciones' })).toBeNull();
   });
 
   it('opens a notice directly in the selected section and retains navigation after re-entry', () => {

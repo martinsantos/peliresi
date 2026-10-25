@@ -71,6 +71,10 @@ describe('Sidebar: one visible current destination',()=>{
     expect(screen.getByRole('link',{name:'Solicitudes',exact:true})).toHaveAttribute('aria-current','page');
     expect(screen.queryByRole('link',{name:'Usuarios',exact:true})).not.toBeInTheDocument();
   });
+  it('keeps help in the header on the inspection registry and agenda', () => {
+    show('/inspecciones?vista=agenda');
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true }).closest('header')).toBe(screen.getByRole('banner'));
+  });
   it('exposes contextual technical help without requiring navigation to the desk',()=>{
     show('/inspecciones/qa-expediente');
     expect(screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true})).toBeVisible();
@@ -151,7 +155,7 @@ describe('Sidebar: one visible current destination',()=>{
     expect(title).toHaveClass('min-w-0','whitespace-normal','break-words','sm:truncate');
     expect(title).toHaveAttribute('title',label);
     expect(title.parentElement).toHaveClass('min-w-0','flex-1');
-    const help=within(header).getByRole('button',{name:path.startsWith('/admin/actores')?'Ayuda y soporte técnico':'Ver tour de ayuda',exact:true});
+    const help=within(header).getByRole('button',{name:path.startsWith('/admin/actores') || path === '/inspecciones' ? 'Ayuda y soporte técnico':'Ver tour de ayuda',exact:true});
     expect(help).toHaveClass('h-11','w-11');
     expect(help.parentElement).toHaveClass('shrink-0');
   });

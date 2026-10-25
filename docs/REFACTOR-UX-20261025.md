@@ -110,6 +110,10 @@ Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativ
 | UX63 | Media | Resultado de un aviso repite título, agrega márgenes y conserva Ayuda flotante | Un encabezado, regreso a Avisos y Ayuda integrada, sin enlace circular al mismo aviso | Corregido; diez medidas web/app entre 320 y 1920 px, retorno y Ayuda con teclado |
 | UX64 | Media | Campana y bandeja detectan el ícono de requerimiento mediante rutas históricas de Inspecciones | Reconocer el destino limitado /requerimientos sin reabrir el módulo de Inspecciones a actores | Corregido en ambos componentes; regresión de destino autorizado e ícono |
 
+| UX65 | Media | Agenda pierde estado/fechas/página al abrir expediente y volver; repite el listado y ocupa el móvil con filtros | Agenda separada, regreso identificado, URL por contexto y filtros plegables | Corregido; 193 regresiones únicas, regreso web/app, recarga y diez medidas responsive; evidencia en uiux-inspection-agenda-20261025 |
+| UX66 | Alta | Respuesta o decisión PSIP genera clienteId nuevo en cada intento; borrar/editar después de un resultado incierto puede duplicar la actuación | Comando durable, reintento idéntico y confirmación diferenciada de recarga | Detectado en InspectionExchangePanel y contrato de idempotencia del controlador; pendiente de reproducción y corrección integral |
+| UX67 | Alta | Caché y borrador de expediente/intercambio distinguen cuenta/caso pero no toda la actividad, empresa y autorización | Aislar los datos y borradores en cada contexto, sin borrar trabajo recuperable | Detectado en claves de useInspecciones/InspectionExchangePanel/inspectionOfflineExchange; pendiente. La corrección UX65 sólo cubre filtros y consulta de agenda |
+
 ## Evidencias y sesiones
 
 Directorio de esta ejecución: `uiux-integral-20261025` dentro del workspace de evidencias del hilo. `baseline/` conserva capturas anteriores a los cambios; `verified/` contiene resultados comprobados. No reutilizar una captura histórica como prueba actual.
@@ -344,3 +348,18 @@ La confirmación de corrección se conserva al fallar la consulta posterior y no
 El manual incorpora la confirmación de corrección, el contenido de los avisos y una captura completa del resultado móvil artificial. ATM, OCR eléctrico, tres actividades y cupo global de dos personas conservaron su integración anterior en `uiux-onboarding-20261025`; aquí se repitieron sus regresiones backend, no sus 141 solicitudes HTTP. La evaluación TEF sigue siendo simulación pendiente de conciliación normativa y no acredita pagos. No se declaran cubiertos todos los modelos históricos de factura.
 
 Auditoría del preview: 526 manifiestos, cero correos enviados y cero intentos, CAP cerrado, push apagado y dos procesos normales verificados. Sin producción, main, workflows, migraciones ni nuevas dependencias. UX54, UX62–UX64 quedan corregidos técnicamente; el plan integral, Android físico y la comprensión con participantes siguen abiertos. No se espera a participantes para continuar las mejoras técnicas.
+
+
+## Continuación: agenda de Inspecciones y regreso — 25/10/2026
+
+Corte posterior a 799df6e4, sólo preview. UX65 se reprodujo en app: elegir En descargo, entrar al expediente y volver descartaba filtro y apertura de agenda. Ahora Expedientes, Agenda y Antecedentes son vistas integradas y excluyentes. Los filtros de agenda y listado se conservan por separado en la URL, incluyendo página y apertura del panel móvil. El expediente identifica su destino de regreso, también en sus salidas y errores recuperables. Sólo acepta destinos conocidos del mismo contexto; cambiar cuenta/rol/actor/empresa/autorización restablece filtros. La consulta de operaciones incluye ese contexto en su clave; esto no acredita por sí solo aislamiento de las otras cachés (UX67).
+
+Agenda muestra sus filtros plegados en móvil con resumen del alcance. En escritorio siguen visibles. Un período inverso detiene la consulta y explica el campo a corregir. Ayuda permanece en la cabecera. La revisión visual inicial detectó exceso de altura por filtros y se ajustó antes de las capturas finales.
+
+193 pruebas frontend únicas: 86 de agenda/expediente/continuidad/plazos y 107 de layouts. Las repeticiones después de los ajustes no se suman. Tipos y builds web/app aprobados en el contenedor existente, 1 CPU/2 GiB/swap0, un worker. Una expectativa anterior buscaba el tour en lugar de Ayuda contextual; se actualizó sin relajar permisos. Persisten advertencias conocidas de act() en pruebas y tamaño de bundles.
+
+Navegador real del preview: agenda → expediente → regreso en web/app; búsqueda de listado → expediente → regreso en web; filtros abiertos recuperados en app; período inválido conservado al recargar; actualización de PWA conservando vista/estado. En fechas se usó el control nativo porque fill no modificaba el valor en este navegador. Diez medidas finales web/app × 320/393/768/1365/1920: un h1, sin desbordes de página, controles de filtros de 44 px y secciones de 48 px. Las primeras capturas con transición de sidebar se sustituyeron por capturas estables. Ayuda abre con Enter, cierra con Escape y devuelve foco. Son observaciones técnicas, no sesiones con participantes ni Android físico.
+
+El manual incorpora el recorrido y una captura app sintética del 25/10. Auditoría: 526 manifiestos, cero correos enviados/intentos, CAP cerrado, push apagado y dos procesos normales. En este corte no se escribió ningún expediente ni manifiesto; se usaron los casos artificiales existentes para navegación. Sin producción, main, workflows, migraciones ni nuevas dependencias.
+
+No cierra la tanda 3. UX66 (reintento durable de comunicaciones/decisiones) y UX67 (contexto completo de cachés/borradores) permanecen abiertos con prioridad alta; requieren reproducción adversarial y corrección propia. Siguen pendientes el resto del plan, Android físico y comprensión con personas. La falta de participantes no detiene las correcciones técnicas.

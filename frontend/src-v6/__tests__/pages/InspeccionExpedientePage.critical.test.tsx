@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../hooks/useCatalogos', () => ({ useCatalogoGeneradores: () => ({ data: [] }), useCatalogoOperadores: () => ({ data: [] }), useCatalogoTransportistas: () => ({ data: [] }) }));
 import type { Inspection, InspectionTechnicalReport } from '../../types/inspection';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
+
+import { inspectionReturnState, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+function ReturnProbe() { const location = useLocation(); return <output aria-label="Destino de regreso">{location.pathname + location.search}</output>; }
 
 const useInspectionMock = vi.hoisted(() => vi.fn());
 vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined), writeInspectionFieldCheckpoint: vi.fn().mockResolvedValue(undefined) }));
@@ -151,6 +154,17 @@ describe('InspeccionExpedientePage critical review UX', () => {
     listPendingEvidenceMock.mockResolvedValue([]);
     draftOwnershipMock.mockReturnValue({ status: 'owned', canWrite: () => true, retry: vi.fn() });
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it.each(['/inspecciones', '/mobile/inspecciones'])('returns to the selected agenda from the actual dossier at %s', async path => {
+    const inspection = inspectionFixture();
+    useInspectionMock.mockReturnValue({ data: inspection, isLoading: false, refetch: vi.fn() });
+    const target = path + '?vista=agenda&agendaEstado=EN_DESCARGO&agendaPage=2';
+    const state = inspectionReturnState(target, inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }));
+    render(<MemoryRouter initialEntries={[{ pathname: path + '/inspection-1', state }]}><Routes><Route path={path + '/:id'} element={<InspeccionExpedientePage />} /><Route path={path} element={<ReturnProbe />} /></Routes></MemoryRouter>);
+    const button = await screen.findByRole('button', { name: 'Volver a Agenda de inspecciones' });
+    fireEvent.click(button);
+    expect(await screen.findByLabelText('Destino de regreso')).toHaveTextContent(target);
   });
 
   it('names the return destination before the dossier identity, without nesting it in the title', async () => {

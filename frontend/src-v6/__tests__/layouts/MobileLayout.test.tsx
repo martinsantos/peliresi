@@ -118,6 +118,7 @@ function renderMobileLayout(initialPath = '/dashboard') {
           <Route path="admin/actores/generadores/:id" element={<div>Ficha del generador</div>} />
           <Route path="admin/actores/transportistas/:id" element={<div>Ficha del transportista</div>} />
           <Route path="admin/actores/operadores/:id" element={<div>Ficha del operador</div>} />
+          <Route path="inspecciones" element={<div>Agenda de inspecciones</div>} />
           <Route path="inspecciones/:id" element={<div>Expediente de campo<textarea aria-label="Observación QA" /></div>} />
           <Route path="mis-inspecciones/:id" element={<div>Inspección del actor</div>} />
           <Route path="soporte/:id" element={<div>Ticket confirmado</div>} />
@@ -216,6 +217,10 @@ describe('MobileLayout Android shell', () => {
     expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
     expect(screen.queryByRole('button', { name: 'Ayuda y soporte técnico', exact: true })).not.toBeInTheDocument();
+  });
+  it('keeps help outside the inspection agenda fields', () => {
+    renderMobileLayout('/inspecciones?vista=agenda');
+    expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true }).closest('header')).toBe(screen.getByRole('banner'));
   });
   it('moves inspection help into the header rather than over the save bar', () => {
     renderMobileLayout('/inspecciones/qa-expediente');

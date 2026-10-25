@@ -1,3 +1,4 @@
+import { inspectionReturnTarget, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { warmInspectionShell } from '../../services/warmInspectionShell';
 
@@ -147,6 +148,8 @@ function draftConflicts(server: Draft, local: Draft): DraftConflict[] {
 
 const InspeccionExpedientePage: React.FC = () => {
   const { id = '' } = useParams(); const navigate = useNavigate(); const location = useLocation(); const mobile = location.pathname.startsWith('/mobile'); const { currentUser } = useAuth();
+  const workspaceReturn = inspectionReturnTarget(location.state, inspectionWorkspaceOwner(currentUser), mobile);
+  const returnToWorkspace = () => navigate(workspaceReturn.to);
   const query = useInspection(id); const inspection = query.data;
   const [items, setItems] = useState<InspectionItem[]>([]); const [comparisons, setComparisons] = useState<InspectionComparison[]>([]);
   const [observaciones, setObservaciones] = useState(''); const [numeroActa, setNumeroActa] = useState(''); const [ubicacion, setUbicacion] = useState(''); const [plazoRespuestaAt, setPlazoRespuestaAt] = useState('');
@@ -666,13 +669,13 @@ const InspeccionExpedientePage: React.FC = () => {
 
   const scopeReady = inspection && draftReadyKey.startsWith(`${draftKey}:${inspection.id}:`);
   if (query.isLoading || (inspection && !scopeReady && !storageFailed)) return <p className="p-8 text-center text-sm text-neutral-500">Cargando expediente y copia local…</p>;
-  if (inspection && !draftReady && storageFailed) return <Card role="alert" className="mx-auto max-w-xl p-6"><h2 className="text-lg font-bold text-neutral-900">No se pudo verificar la copia local</h2><p className="mt-2 text-sm text-neutral-600">No se reemplazó tu trabajo con la versión del servidor. Reintentá la lectura antes de editar.</p><div className="mt-5 flex flex-wrap gap-2"><Button onClick={() => { setStorageFailed(false); setDraftReadAttempt(value => value + 1); }}>Reintentar copia local</Button><Button variant="outline" onClick={() => navigate((mobile ? '/mobile' : '') + '/inspecciones')}>Volver al listado</Button></div></Card>;
+  if (inspection && !draftReady && storageFailed) return <Card role="alert" className="mx-auto max-w-xl p-6"><h2 className="text-lg font-bold text-neutral-900">No se pudo verificar la copia local</h2><p className="mt-2 text-sm text-neutral-600">No se reemplazó tu trabajo con la versión del servidor. Reintentá la lectura antes de editar.</p><div className="mt-5 flex flex-wrap gap-2"><Button onClick={() => { setStorageFailed(false); setDraftReadAttempt(value => value + 1); }}>Reintentar copia local</Button><Button variant="outline" onClick={() => returnToWorkspace()}>Volver al listado</Button></div></Card>;
   if (query.isError) {
     const status = isAxiosError(query.error) ? query.error.response?.status : undefined;
     const offlineMissing = isOfflineNetworkError(query.error);
     const title = status === 404 ? 'Expediente no encontrado' : status === 403 ? 'Sin acceso a este expediente' : offlineMissing ? 'Sin conexión y sin copia local' : 'No se pudo abrir el expediente';
     const detail = status === 404 ? 'Comprobá el enlace o regresá al listado.' : status === 403 ? 'Tu cuenta no tiene permiso para consultar esta inspección.' : offlineMissing ? 'Para usarlo sin conexión, primero abrí el expediente en este dispositivo mientras tengas red.' : 'No se pudo recuperar la información. El trabajo guardado en este dispositivo no fue eliminado.';
-    return <Card role="alert" className="mx-auto max-w-xl p-6"><h2 className="text-lg font-bold text-neutral-900">{title}</h2><p className="mt-2 text-sm text-neutral-600">{detail}</p><div className="mt-5 flex flex-wrap gap-2"><Button onClick={() => void query.refetch()}>Reintentar</Button><Button variant="outline" onClick={() => navigate((mobile ? '/mobile' : '') + '/inspecciones')}>Volver al listado</Button></div></Card>;
+    return <Card role="alert" className="mx-auto max-w-xl p-6"><h2 className="text-lg font-bold text-neutral-900">{title}</h2><p className="mt-2 text-sm text-neutral-600">{detail}</p><div className="mt-5 flex flex-wrap gap-2"><Button onClick={() => void query.refetch()}>Reintentar</Button><Button variant="outline" onClick={() => returnToWorkspace()}>Volver al listado</Button></div></Card>;
   }
   if (!inspection) return <Card><p className="font-semibold text-neutral-900">Inspección no encontrada</p></Card>;
   const actor = inspectionActor(inspection);
@@ -810,12 +813,12 @@ const InspeccionExpedientePage: React.FC = () => {
       const item = items.find((entry) => 'checklist/' + entry.codigo === anchor);
       saveInspectionResume(currentUser.id, inspection.id, '#' + anchor, 'Recorrido de campo · ' + (item?.etiqueta || anchor));
     }
-    navigate((mobile ? '/mobile' : '') + '/inspecciones');
+    returnToWorkspace();
   };
   return <div className="inspection-case flex h-full min-h-0 min-w-0 flex-col gap-4" data-operational-page>
     <header data-testid="inspection-case-header" className="relative flex shrink-0 flex-col gap-3">
         <div data-testid="inspection-case-actions" className="flex min-h-11 shrink-0 items-center justify-between gap-2">
-          <Button variant="ghost" aria-label="Volver a Inspecciones" title="Volver a Inspecciones" leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; navigate((mobile ? '/mobile' : '') + '/inspecciones'); }} disabled={dictating} className="shrink-0">Inspecciones</Button>
+          <Button variant="ghost" aria-label={`Volver a ${workspaceReturn.label}`} title={`Volver a ${workspaceReturn.label}`} leftIcon={<ArrowLeft size={18} />} onClick={() => { if (dictating) return; if (guided && canWriteDraft()) { pauseFieldWork(); return; } if (!flushDraft()) return; returnToWorkspace(); }} disabled={dictating} className="shrink-0">{workspaceReturn.label}</Button>
           <div className="flex shrink-0 items-center gap-1">
           <Button variant="outline" aria-label="Descargar expediente" title={currentUser?.training ? 'Capacitación: sin documentos oficiales' : 'Descargar expediente'} disabled={Boolean(currentUser?.training)} className="max-lg:w-11 max-lg:px-0" leftIcon={<Download size={18} />} isLoading={pdfMutation.isPending} onClick={() => pdfMutation.mutate('expediente')}><span className="sr-only lg:not-sr-only">Descargar expediente</span></Button>
           <DropdownMenu>
