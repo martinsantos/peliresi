@@ -71,6 +71,7 @@ export interface ChangePasswordRequest {
 // ========================================
 
 export interface CreateManifiestoRequest {
+  idempotencyKey?: string;
   generadorId: string;
   transportistaId?: string;
   vehiculoId?: string;

@@ -12,6 +12,7 @@ import { generarNumeroManifiesto } from '../utils/manifiestoNumber';
 import { canAccessManifiesto } from '../utils/roleFilter';
 import { Prisma } from '@prisma/client';
 import { prepareTransportAssignment } from '../domain/manifiestoTransportAssignment';
+import { manifestCreationIntent, readManifestCreationReceipt, recordManifestCreation } from '../domain/manifestCreationIntent';
 
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
@@ -20,6 +21,7 @@ export { actualizarUbicacion, getViajeActual } from './manifiesto-gps.controller
 
 // Zod schemas for input validation
 const createManifiestoSchema = z.object({
+  idempotencyKey: z.string().uuid('La referencia del envío no es válida').optional(),
   generadorId: z.string().min(1, 'El generador es requerido').optional(),
   transportistaId: z.string().min(1, 'El transportista es requerido').optional(),
   vehiculoId: z.string().min(1).max(100).optional(),
@@ -113,7 +115,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       throw new AppError(parsed.error.issues[0].message, 400);
     }
 
-    const { generadorId: bodyGeneradorId, transportistaId, vehiculoId, choferId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
+    const { idempotencyKey, generadorId: bodyGeneradorId, transportistaId, vehiculoId, choferId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro } = parsed.data;
     const userId = req.user.id;
 
     // Verificar que el usuario es un generador o admin
@@ -142,39 +144,40 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     if (modalidad === 'FIJO' && !transportistaId) {
       throw new AppError('Se requiere transportista para modalidad FIJO', 400);
     }
-    if (modalidad === 'IN_SITU') {
-      if (transportistaId) {
-        throw new AppError('No se debe asignar transportista para modalidad IN_SITU', 400);
-      }
-      const op = await prisma.operador.findUnique({ where: { id: operadorId }, select: { modalidades: true } });
-      if (!op?.modalidades?.includes('IN_SITU')) {
-        throw new AppError('El operador no está habilitado para trabajar in situ', 400);
-      }
-    }
-
-    // Validate operador can handle all selected residuos
-    const tipoResiduoIds = residuos.map((r: { tipoResiduoId: string }) => r.tipoResiduoId);
-    const operador = await prisma.operador.findUnique({
-      where: { id: operadorId },
-      include: { tratamientos: { where: { activo: true } } },
-    });
-    if (operador) {
-      const operadorResiduoIds = new Set(operador.tratamientos.map((t: any) => t.tipoResiduoId));
-      const unsupported = tipoResiduoIds.filter((id: string) => !operadorResiduoIds.has(id));
-      if (unsupported.length > 0) {
-        const tipos = await prisma.tipoResiduo.findMany({ where: { id: { in: unsupported } }, select: { codigo: true, nombre: true } });
-        const names = tipos.map((t: any) => `${t.codigo} - ${t.nombre}`).join(', ');
-        throw new AppError(`El operador no está habilitado para tratar: ${names}`, 400);
-      }
-    }
+    if (modalidad === 'IN_SITU' && transportistaId) throw new AppError('No se debe asignar transportista para modalidad IN_SITU', 400);
+    const intent = idempotencyKey ? manifestCreationIntent(idempotencyKey, userId, req.user.rol, req.user.empresaContexto, {
+      generadorId, transportistaId, vehiculoId, choferId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro,
+    }) : null;
+    const include = { generador: true, transportista: true, operador: true, residuos: { include: { tipoResiduo: true } } } as const;
 
     // Reserve the number and insert record/event under one database lock.
     // A process-local mutex would not protect both production PM2 workers.
     let pushIds:string[]=[];
+    let replayed = false;
     const manifiesto = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(836272)::text AS "lock"`;
+      if (intent) {
+        const existingId = await readManifestCreationReceipt(tx, intent);
+        if (existingId) {
+          const existing = await tx.manifiesto.findUnique({ where: { id: existingId }, include });
+          if (!existing || !canAccessManifiesto(req.user, existing)) throw new AppError('El envío ya fue procesado, pero el manifiesto no está disponible en este contexto.', 409);
+          replayed = true; return existing;
+        }
+      }
+      // Replays return the committed result even if a catalogue changed afterwards.
+      // New requests still validate every current permission and compatibility rule.
+      const operador = await tx.operador.findUnique({ where: { id: operadorId }, include: { tratamientos: { where: { activo: true } } } });
+      if (modalidad === 'IN_SITU' && !operador?.modalidades?.includes('IN_SITU')) throw new AppError('El operador no está habilitado para trabajar in situ', 400);
+      if (operador) {
+        const supported = new Set(operador.tratamientos.map(t => t.tipoResiduoId));
+        const unsupported = residuos.map(r => r.tipoResiduoId).filter(id => !supported.has(id));
+        if (unsupported.length) {
+          const tipos = await tx.tipoResiduo.findMany({ where: { id: { in: unsupported } }, select: { codigo: true, nombre: true } });
+          throw new AppError(`El operador no está habilitado para tratar: ${tipos.map(t => `${t.codigo} - ${t.nombre}`).join(', ')}`, 400);
+        }
+      }
       if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: modalidad === 'IN_SITU' ? null : transportistaId!, operadorId });
       const asignacionTransporte = await prepareTransportAssignment(tx, { modalidad, transportistaId, vehiculoId, choferId });
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(836272)::text AS "lock"`;
       const numero = await generarNumeroManifiesto(tx);
 
     // Crear manifiesto con residuos
@@ -235,12 +238,13 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         descripcion: JSON.stringify({ version: 1, modalidad, generadorId, transportistaId: modalidad === 'IN_SITU' ? null : transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
       } });
       if (partyProposal) pushIds=await notifyManifestParties(tx, created, 'creada', userId);
+      if (intent) await recordManifestCreation(tx, intent, created.id);
       return created;
     });
     scheduleCommittedManifestPush(pushIds);
-    res.status(201).json({
+    res.status(replayed ? 200 : 201).json({
       success: true,
-      data: { manifiesto }
+      data: { manifiesto, replayed }
     });
   } catch (error) {
     next(error);

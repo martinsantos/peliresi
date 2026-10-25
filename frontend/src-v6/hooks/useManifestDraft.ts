@@ -7,7 +7,7 @@ export interface ManifestFormData {
   fechaRetiro: string; observaciones: string;
   residuos: Array<{ tipo: string; cantidad: string; unidad: string }>;
 }
-export interface ManifestDraft { step: number; form: ManifestFormData }
+export interface ManifestDraft { step: number; form: ManifestFormData; pendingCreate?: { id: string; form: ManifestFormData } }
 type DraftOwner = { id: number | string; rol: string; actorId?: string; training?: boolean; empresaContexto?: { empresaId: string; actividadId: string; establecimientoId?: string } };
 export function manifestDraftScope(user: DraftOwner | null) {
   return user ? JSON.stringify([user.id, user.rol, user.actorId || '', !!user.training, user.empresaContexto?.empresaId || '', user.empresaContexto?.actividadId || '', user.empresaContexto?.establecimientoId || '']) : '';
@@ -18,13 +18,17 @@ type StoredDraft = { version: 1; savedAt: number; draft: ManifestDraft | null };
 const pendingDrafts = new Map<string, StoredDraft>();
 // Memory fallback is used only if saving the separate conflict copy fails.
 const pendingConflicts = new Map<string, StoredDraft>();
-function validDraft(value: unknown): value is ManifestDraft {
-  if (!value || typeof value !== 'object') return false;
-  const { step, form } = value as ManifestDraft;
-  return [1, 2, 3].includes(step) && !!form && ['FIJO', 'IN_SITU'].includes(form.modalidad)
+function validForm(form: ManifestFormData): boolean {
+  return !!form && ['FIJO', 'IN_SITU'].includes(form.modalidad)
     && ['generador', 'generadorId', 'transportista', 'vehiculoId', 'choferId', 'operador', 'fechaRetiro', 'observaciones'].every(key => typeof form[key as keyof ManifestFormData] === 'string')
     && Array.isArray(form.residuos) && form.residuos.length > 0 && form.residuos.length <= 1000
     && form.residuos.every(row => row && ['tipo', 'cantidad', 'unidad'].every(key => typeof row[key as keyof typeof row] === 'string'));
+}
+function validDraft(value: unknown): value is ManifestDraft {
+  if (!value || typeof value !== 'object') return false;
+  const { step, form, pendingCreate } = value as ManifestDraft;
+  return [1, 2, 3].includes(step) && validForm(form) && (pendingCreate === undefined ||
+    !!pendingCreate && typeof pendingCreate.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(pendingCreate.id) && validForm(pendingCreate.form));
 }
 
 function parseRecord(raw: string | null): StoredDraft | null {
@@ -122,6 +126,7 @@ export function useManifestDraft(scope: string, initial: ManifestDraft) {
     if (loaded.migrate && loaded.record?.draft) persist(loaded.record.draft, true);
   }, [loaded, persist]);
   const update = useCallback((change: SetStateAction<ManifestDraft>) => {
+    if (current.current.pendingCreate) return; // Recover the result before changing the submitted payload.
     let previous = current.current;
     if (!errorRef.current && !edited.current) {
       try {
@@ -134,6 +139,20 @@ export function useManifestDraft(scope: string, initial: ManifestDraft) {
     current.current = next; edited.current = true; setDraft(next); setDirty(true);
     persist(next);
   }, [key, persist]);
+  const prepareCreate = useCallback(() => {
+    if (conflicted.current) return null;
+    const pendingCreate = current.current.pendingCreate || { id: crypto.randomUUID(), form: structuredClone(current.current.form) };
+    const next = { ...current.current, pendingCreate };
+    current.current = next; edited.current = true; setDraft(next); setDirty(true);
+    if (persist(next)) return pendingCreate;
+    // Keep the identity in memory on storage failure, but never dispatch until
+    // this exact command is durably saved. Do not replace a newly found conflict.
+    return null;
+  }, [persist]);
+  const releaseCreate = useCallback(() => {
+    const next = { ...current.current }; delete next.pendingCreate;
+    current.current = next; setDraft(next); return persist(next);
+  }, [persist]);
   const clear = useCallback(() => {
     // A tombstone also invalidates copies still open in other tabs.
     if (!persist(null)) return false;
@@ -174,5 +193,5 @@ export function useManifestDraft(scope: string, initial: ManifestDraft) {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [dirty, error, conflict, conflictSaved]);
-  return { draft, update, clear, saved, restored, error, dirty, conflict, conflictSaved, conflictCount, checkConflict, reload, overwrite: () => persist(current.current, true) };
+  return { draft, update, clear, saved, restored, error, dirty, conflict, conflictSaved, conflictCount, checkConflict, reload, prepareCreate, releaseCreate, overwrite: () => persist(current.current, true) };
 }

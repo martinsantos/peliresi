@@ -59,6 +59,8 @@ Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativ
 | UX12 | Alta | Otra pestaña reemplaza silenciosamente un manifiesto en edición | Conservar texto propio, bloquear envío y ofrecer elección de versión | Regresión y conflicto web/app comprobados (8 kg frente a 9 kg); sin crear manifiesto |
 | UX13 | Media | Nuevo manifiesto repite el título del encabezado en escritorio | Un único título de pantalla en web y app | Duplicación retirada |
 | UX14 | Alta | Cerrar las dos pestañas con un conflicto sin elegir descarta la copia local | Guardar cada copia separadamente, recuperarla al reabrir y no permitir enviar hasta elegir | Corregido; 158 regresiones y cierre/reapertura real web/app de manifiesto y motivo de adenda comprobados |
+| UX15 | Alta | Crear, perder la respuesta y repetir el mismo envío crea dos manifiestos y sus avisos. Reproducción API: 2026-000143 y 000144 | Conservar referencia y datos hasta confirmar; reintento y solicitudes simultáneas recuperan un único registro, incluso después de cerrar | Corregido; API G/T/O, cierre/reapertura UI web/app, 163 pruebas frontend y 91 backend aprobadas |
+| UX16 | Media | La entrada principal Crear un manifiesto todavía abría la guía histórica de firma única, con un aviso aclaratorio | El enlace habitual explica el acuerdo actual; no obliga a interpretar qué parte del tutorial está vigente | Guía unificada con el circuito de aprobación de las partes y el envío recuperable |
 
 ## Evidencias y sesiones
 
@@ -91,6 +93,20 @@ Todavía no hay participantes observados ni métricas humanas de esta tanda.
 Primer corte técnico conservado en `9bb62969`. La continuación guarda cada copia en conflicto en una clave propia, aislada por cuenta, rol y registro. Resolver una copia no elimina una revisión más reciente ni las copias de otras pestañas. Se revisan una por vez. Un fallo de cuota mantiene el texto en pantalla y muestra que no hay recuperación garantizada.
 
 Evidencias: `uiux-continuity-20261025`. Sin registros nuevos: borrador de manifiesto con 11 frente a 22 kg; cierre de ambas pestañas; recuperación en web y app; elección de 22 kg persistida. Motivo de adenda `2026-000142`: dos textos, cierre, recuperación del texto local y decisión bloqueada hasta elegir. No se envió ninguna resolución. También se compactó el resumen documental para no mostrar tres contadores en cero y se subió el conflicto junto al encabezado.
+
+### Continuación: envío recuperable
+
+Ante una respuesta incierta, el formulario conserva la referencia y una copia inmutable de lo enviado. Comprobar envío recupera el resultado existente o completa ese mismo envío. No se permite editar o descartar una solicitud pendiente desde el formulario. Si el servidor rechaza explícitamente los datos, se puede corregir y volver a presentar. Si el navegador no logra conservar la referencia, no se envía.
+
+El backend guarda la referencia en la auditoría existente, en la misma transacción que el manifiesto, eventos y avisos; no hay migración. La referencia está aislada por persona, rol, empresa, actividad y establecimiento. Un contenido distinto con la misma referencia recibe conflicto. Los clientes históricos sin referencia conservan su contrato; la garantía de reintento requiere web/app actualizadas.
+
+Evidencia: `uiux-creation-retry-20261025`. La reproducción anterior produjo dos registros sintéticos. Con la corrección, dos solicitudes simultáneas por cada rol producen un registro por rol: `2026-000145`, `000146`, `000147`. Cada uno tiene un evento de creación y tres destinatarios; las repeticiones no agregan avisos. Los 521 registros previos conservaron su huella durante esa integración.
+
+La prueba de app perdió realmente la respuesta cuando el proxy de fallos de QA no pudo decodificar una respuesta comprimida y se detuvo después del commit. Se corrigió el simulador para solicitar respuesta sin compresión, se recuperó el preview y se conservó esa incidencia en la evidencia. Al reingresar se recuperó la ruta y el envío `2026-000148`. No se atribuye el fallo del simulador al producto.
+
+En web, el proxy corregido sustituyó una única respuesta 201 por 502 después del commit. Al cerrar y reabrir se conservó el envío; Comprobar envío abrió `2026-000149`, sin otro registro. El formulario anuncia el resultado incierto y enfoca su orientación; una respuesta 400/403/422 libera la edición conservando campos. Se probó además almacenamiento no disponible: no se despacha una solicitud sin conservar su referencia. El panel de recuperación tiene un solo título de pantalla, acción de 44 px y sin desborde horizontal en web a 320/393/768/1365/1920; app revisada a 393 px. Esto no sustituye la revisión de todos los estados ni Android físico.
+
+Pruebas únicas de este corte: 163 frontend y 91 backend, sin sumar repeticiones. TypeScript, backend y ambas compilaciones aprobados. La prueba HTTP reproducible queda en `frontend/cloud-qa/manifest-creation-retry.ts`; requiere el entorno artificial autorizado y rehúsa ejecutarse fuera de él.
 
 ### Guion de la primera sesión (sin intervenir salvo bloqueo)
 

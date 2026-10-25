@@ -152,6 +152,7 @@ const NuevoManifiestoForm: React.FC = () => {
     navigate(returnTo);
   };
   const [discardDraft, setDiscardDraft] = useState(false);
+  const pendingSendNotice = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!focusError.current) return;
@@ -333,33 +334,49 @@ const NuevoManifiestoForm: React.FC = () => {
 
   const handleSubmit = async () => {
     if (submitting.current || draft.conflict || draft.checkConflict()) return;
-    if (!validateForm()) {
+    if (!draft.draft.pendingCreate && !validateForm()) {
       return;
     }
+    const pending = draft.prepareCreate();
+    if (!pending) {
+      toast.error('Todavía no se envió', 'No pudimos conservar la referencia del envío. Mantené esta pantalla abierta y revisá el almacenamiento del navegador.');
+      return;
+    }
+    const submittedForm = pending.form;
 
     submitting.current = true;
     setSubmitError(undefined);
     try {
       const result = await createManifiesto.mutateAsync({
-        generadorId: formData.generadorId || formData.generador,
-        ...(formData.modalidad !== 'IN_SITU' && { transportistaId: formData.transportista }),
-        ...(formData.modalidad !== 'IN_SITU' && formData.vehiculoId ? { vehiculoId: formData.vehiculoId } : {}),
-        ...(formData.modalidad !== 'IN_SITU' && formData.choferId ? { choferId: formData.choferId } : {}),
-        operadorId: formData.operador,
-        modalidad: formData.modalidad,
-        fechaEstimadaRetiro: formData.fechaRetiro || undefined,
-        observaciones: formData.observaciones || undefined,
-        residuos: formData.residuos.map((r) => ({
+        idempotencyKey: pending.id,
+        generadorId: submittedForm.generadorId || submittedForm.generador,
+        ...(submittedForm.modalidad !== 'IN_SITU' && { transportistaId: submittedForm.transportista }),
+        ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.vehiculoId ? { vehiculoId: submittedForm.vehiculoId } : {}),
+        ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.choferId ? { choferId: submittedForm.choferId } : {}),
+        operadorId: submittedForm.operador,
+        modalidad: submittedForm.modalidad,
+        fechaEstimadaRetiro: submittedForm.fechaRetiro || undefined,
+        observaciones: submittedForm.observaciones || undefined,
+        residuos: submittedForm.residuos.map((r) => ({
           tipoResiduoId: r.tipo,
           cantidad: Number(r.cantidad),
           unidad: r.unidad,
         })),
       });
 
-      toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? (formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas.':'Generador, transporte y operador deben aprobar desde sus cuentas.') : 'Todavía falta la firma del generador para continuar.'}`);
+      if (result.creationRecovered) toast.success('Manifiesto recuperado', `${result.numero || result.id}. El envío ya se había guardado; no se creó otro ni se repitieron avisos.`);
+      else toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? (submittedForm.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas.':'Generador, transporte y operador deben aprobar desde sus cuentas.') : 'Todavía falta la firma del generador para continuar.'}`);
       if (!draft.clear()) toast.error('Manifiesto creado', 'No se pudo borrar la copia de este dispositivo. No vuelvas a enviar el formulario anterior.');
       navigate(mp(`/manifiestos/${result.id}`), { state: { manifestListReturn: returnTo } });
     } catch (err: any) {
+      // These responses definitively reject creation. Ambiguous/network failures
+      // retain the original payload and key until the person checks that same send.
+      const rejected = [400, 403, 422].includes(err?.response?.status);
+      if (rejected) draft.releaseCreate();
+      else {
+        pendingSendNotice.current?.focus({ preventScroll: true });
+        pendingSendNotice.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
       const fields = manifestPartyErrors(err);
       if (Object.keys(fields).length) {
         setServerPartyIssues(fields);
@@ -372,8 +389,9 @@ const NuevoManifiestoForm: React.FC = () => {
       // The API client explains 429 with its retry time. Keep all fields and
       // avoid a second, contradictory toast; only the user repeats the write.
       if (err?.response?.status !== 429) toast.error(
-        'Error al crear manifiesto',
-        getApiErrorMessage(err, 'No se pudo guardar. Revisá la conexión y reintentá; los datos siguen en pantalla.')
+        rejected ? 'Revisá los datos del manifiesto' : 'Envío sin confirmar',
+        rejected ? getApiErrorMessage(err, 'Revisá los datos indicados; el formulario sigue cargado.')
+          : 'Revisá la conexión y usá Comprobar envío. Recuperaremos el mismo manifiesto si ya se guardó.'
       );
     } finally {
       submitting.current = false;
@@ -437,10 +455,15 @@ const NuevoManifiestoForm: React.FC = () => {
       </header>
 
       {draft.conflict && <div className="mb-3"><DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload} onKeep={draft.overwrite} /></div>}
-      {(draft.saved || draft.error) && <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-primary-50 px-3 text-sm text-primary-900" aria-label="Borrador del manifiesto">
+      {draft.draft.pendingCreate && <div ref={pendingSendNotice} tabIndex={-1} role="status" className="mb-3 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+        <p className="font-semibold">{createManifiesto.isPending ? 'Enviando manifiesto…' : 'Envío sin confirmar'}</p>
+        <p className="mt-1">Conservamos el envío original. Comprobarlo recupera el manifiesto si ya se guardó, sin crear otro ni repetir avisos.</p>
+        <Button className="mt-3" onClick={handleSubmit} disabled={createManifiesto.isPending || draft.conflict}>Comprobar envío</Button>
+      </div>}
+      {((draft.saved && !draft.draft.pendingCreate) || draft.error) && <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-primary-50 px-3 text-sm text-primary-900" aria-label="Borrador del manifiesto">
         <p role={draft.error ? 'alert' : 'status'} className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : <>{draft.restored ? 'Borrador recuperado' : 'Borrador guardado'}<span className="block text-xs text-neutral-600">En este dispositivo</span></>}</p>
-        {!discardDraft && <button type="button" aria-label="Descartar borrador" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar</button>}
-        {discardDraft && <div className="flex flex-wrap items-center gap-3 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span><Button size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button><Button size="sm" variant="outline" onClick={() => { if (draft.clear()) { setValidationErrors({}); setServerPartyIssues({}); setSubmitError(undefined); setConfirmWithoutTransport(false); setDiscardDraft(false); } }}>Sí, descartar</Button></div>}
+        {!discardDraft && !draft.draft.pendingCreate && <button type="button" aria-label="Descartar borrador" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar</button>}
+        {discardDraft && !draft.draft.pendingCreate && <div className="flex flex-wrap items-center gap-3 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span><Button size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button><Button size="sm" variant="outline" onClick={() => { if (draft.clear()) { setValidationErrors({}); setServerPartyIssues({}); setSubmitError(undefined); setConfirmWithoutTransport(false); setDiscardDraft(false); } }}>Sí, descartar</Button></div>}
       </div>}
 
       <ol aria-label="Etapas del formulario" className="mb-3 grid grid-cols-3 gap-2 text-sm text-neutral-600">
@@ -453,7 +476,7 @@ const NuevoManifiestoForm: React.FC = () => {
         <Button variant="outline" className="mt-2" disabled={refreshingParties} onClick={refreshPartyStates}>{refreshingParties ? 'Actualizando estados…' : 'Actualizar estados'}</Button>
       </div>}
 
-      <fieldset className="min-w-0" disabled={refreshingParties} aria-busy={refreshingParties}>
+      <fieldset className="min-w-0" disabled={refreshingParties || !!draft.draft.pendingCreate} aria-busy={refreshingParties || createManifiesto.isPending}>
         {/* Step 1: Datos del Generador */}
         {step === 1 && (
           <Card className="p-4 sm:p-5">

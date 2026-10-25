@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import NuevoManifiestoPage from '../../pages/manifiestos/NuevoManifiestoPage';
+import { toast } from '../../components/ui/Toast';
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), refreshError: false, availability: {} as Record<string, unknown> }));
 
@@ -146,9 +147,41 @@ describe('manifest transport compatibility after changing residues', () => {
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Vehículo (opcional)')).toHaveTextContent('QA002');
     expect(screen.getByLabelText('Chofer (opcional)')).toHaveTextContent('QA Dos');
-    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Envío sin confirmar', expect.stringContaining('Comprobar envío')));
+    expect(screen.getByText('Envío sin confirmar').closest('[role="status"]')).toHaveFocus();
+    expect(screen.getByLabelText('Observaciones')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Descartar borrador' })).not.toBeInTheDocument();
+    cleanup(); sessionStorage.clear();
+    render(<MemoryRouter><NuevoManifiestoPage /></MemoryRouter>);
+    mocks.create.mockResolvedValueOnce({ id: 'manifest-1', numero: 'QA-1', creationRecovered: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar envío' }));
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2));
     expect(mocks.create.mock.calls[1][0]).toEqual(mocks.create.mock.calls[0][0]);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Manifiesto recuperado', expect.stringContaining('no se creó otro')));
+  });
+
+  it('blocks an unrecorded send rather than losing its identity if the app closes', async () => {
+    prepareDestination(/^Transporte Y8$/);
+    const failure = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Todavía no se envió', expect.any(String));
+    failure.mockRestore();
+    fireEvent.click(screen.getByRole('button', { name: 'Comprobar envío' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+  });
+
+  it('releases the form after a definitive validation rejection, preserving fields', async () => {
+    prepareDestination(/^Transporte Y8$/);
+    mocks.create.mockRejectedValueOnce({ response: { status: 400, data: { message: 'Revisá los datos' } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    await waitFor(() => expect(screen.getByLabelText('Observaciones')).toBeEnabled());
+    const original = mocks.create.mock.calls[0][0];
+    fireEvent.change(screen.getByLabelText('Observaciones'), { target: { value: 'Corregido' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear Manifiesto' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2));
+    expect(mocks.create.mock.calls[1][0]).toMatchObject({ observaciones: 'Corregido', residuos: original.residuos });
+    expect(mocks.create.mock.calls[1][0].idempotencyKey).not.toBe(original.idempotencyKey);
   });
 
   it('requires a new compatible transport instead of submitting the hidden previous selection', async () => {

@@ -525,17 +525,22 @@
     ]
   };
 
-  // Keep the existing guide and visual treatment; align its order with the three-step form.
+  // Existing links keep their guide ID, but use the current agreement flow.
+  // Do not leave the old generator-only approval as the default creation tutorial.
   var createGuide = window.SITREP_HELP.guides.find(function (guide) { return guide.id === 'generador-crear-manifiesto'; });
-  var actorStep = createGuide.steps[1];
-  createGuide.steps[1] = createGuide.steps[2];
-  createGuide.steps[2] = actorStep;
-  actorStep.image = S + 'desktop/training-fleet-20261018.png';
-  actorStep.caption = 'Datos sintéticos · preview aislado · 18/10/2026. No acredita Android físico.';
-  actorStep.alt = 'Vehículo y chofer de la nómina del transportista CAP seleccionados';
-  actorStep.body.push('En Destino, elegí el vehículo y el chofer ya registrados del transportista. Si cambiás de transportista, volvé a seleccionarlos. Después de crear, verificá Transporte asignado en el detalle.');
-  createGuide.steps[3].body = ['Revisá los datos y pulsá Crear Manifiesto. Se guarda como BORRADOR.', 'Reabrí el detalle antes de firmar; si necesitás corregirlo, hacelo mientras siga en borrador.'];
-  createGuide.steps[4].body = ['Abrí el borrador validado y pulsá Firmar Manifiesto.', 'Dibujá la firma → Usar firma → Confirmar y Firmar. Comprobá APROBADO antes de pasar el turno al transportista.'];
+  var proposalGuide = window.SITREP_HELP.guides.find(function (guide) { return guide.id === 'manifiestos-tres-partes'; });
+  var pendingSendStep = { title: 'Comprobar un envío sin confirmación', body: [
+    'Si se corta la respuesta al crear, no empieces otro manifiesto. Envío sin confirmar conserva los datos originales y ofrece Comprobar envío. Si el servidor ya lo guardó, recuperás ese mismo número; no se repiten el manifiesto ni sus avisos.',
+    'Podés cerrar y reabrir web o app en este dispositivo con la misma cuenta, rol y contexto. Mientras falta confirmar el resultado, los campos quedan protegidos. Si el servidor rechaza los datos, se habilita corregirlos sin perder lo cargado.',
+    'Si aparece Todavía no se envió porque no se pudo guardar la referencia en el navegador, conservá la pantalla abierta y revisá el almacenamiento. Comprobar envío vuelve a intentar conservarla antes de enviar. No se asegura recuperación si borrás los datos del navegador.'
+  ], image: S + 'mobile/form-retry-20261025.png', alt: 'App reabierta con Envío sin confirmar y la acción Comprobar envío', caption: 'Preview · datos artificiales · 25/10/2026 · app en navegador, no Android físico.', expected: 'Un reintento recupera el resultado del mismo envío. Crear una propuesta sigue requiriendo la aprobación posterior de las partes.' };
+  proposalGuide.steps.splice(1, 0, pendingSendStep);
+  createGuide.summary = proposalGuide.summary;
+  createGuide.safety = proposalGuide.safety;
+  createGuide.duration = proposalGuide.duration;
+  createGuide.steps = proposalGuide.steps.map(function (step, index) {
+    return Object.assign({}, step, index === 0 ? { title: 'Iniciar un manifiesto' } : {});
+  });
 
   // Classroom links identify existing synthetic records; they never switch
   // identity, enable training, create records or bypass the application's ACL.

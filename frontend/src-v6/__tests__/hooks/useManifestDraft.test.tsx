@@ -5,6 +5,44 @@ import { manifestDraftScope, useManifestDraft, type ManifestDraft } from '../../
 const initial: ManifestDraft = { step: 1, form: { generador: '', generadorId: '', modalidad: 'FIJO', transportista: '', operador: '', vehiculoId: '', choferId: '', fechaRetiro: '2026-10-23', observaciones: '', residuos: [{ tipo: '', cantidad: '', unidad: 'kg' }] } };
 beforeEach(() => { vi.restoreAllMocks(); sessionStorage.clear(); localStorage.clear(); });
 describe('manifest form continuity', () => {
+  it('recovers the exact pending submission after closing and keeps its original payload immutable', () => {
+    const first = renderHook(() => useManifestDraft('pending-send', initial));
+    act(() => first.result.current.update({ ...initial, step: 3, form: { ...initial.form, observaciones: 'Original' } }));
+    let pending: ManifestDraft['pendingCreate'];
+    act(() => { pending = first.result.current.prepareCreate()!; });
+    expect(pending?.id).toMatch(/^[a-f0-9-]{36}$/);
+    act(() => first.result.current.update(previous => ({ ...previous, form: { ...previous.form, observaciones: 'Changed' } })));
+    expect(first.result.current.draft.form.observaciones).toBe('Original');
+    first.unmount(); sessionStorage.clear();
+    const reopened = renderHook(() => useManifestDraft('pending-send', initial));
+    act(() => expect(reopened.result.current.prepareCreate()).toEqual(pending));
+    expect(renderHook(() => useManifestDraft('another-role', initial)).result.current.draft.pendingCreate).toBeUndefined();
+    act(() => reopened.result.current.clear());
+    reopened.unmount();
+    expect(renderHook(() => useManifestDraft('pending-send', initial)).result.current.draft.pendingCreate).toBeUndefined();
+  });
+  it('does not authorize dispatch when storage is unavailable, and retries persistence with the same identity', () => {
+    const hook = renderHook(() => useManifestDraft('send-storage-failure', initial));
+    const failure = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    act(() => expect(hook.result.current.prepareCreate()).toBeNull());
+    const id = hook.result.current.draft.pendingCreate?.id;
+    act(() => expect(hook.result.current.prepareCreate()).toBeNull());
+    expect(hook.result.current.draft.pendingCreate?.id).toBe(id);
+    failure.mockRestore();
+    act(() => expect(hook.result.current.prepareCreate()?.id).toBe(id));
+    expect(hook.result.current.saved).toBe(true);
+    act(() => hook.result.current.clear());
+  });
+  it('allows correction and a new request only after a definitive rejection', () => {
+    const hook = renderHook(() => useManifestDraft('rejected-send', initial));
+    act(() => hook.result.current.prepareCreate());
+    const old = hook.result.current.draft.pendingCreate!.id;
+    act(() => hook.result.current.releaseCreate());
+    act(() => hook.result.current.update(previous => ({ ...previous, form: { ...previous.form, observaciones: 'Corrected' } })));
+    act(() => hook.result.current.prepareCreate());
+    expect(hook.result.current.draft.pendingCreate?.id).not.toBe(old);
+    expect(hook.result.current.draft.pendingCreate?.form.observaciones).toBe('Corrected');
+  });
   it('recovers all fields and the step after leaving and mounting again without a server write', () => {
     const first = renderHook(() => useManifestDraft('account:role:actor', initial));
     act(() => first.result.current.update({ ...initial, step: 3, form: { ...initial.form, generadorId: 'g', transportista: 't', operador: 'o', vehiculoId: 'v', choferId: 'c', observaciones: 'Texto con ñ', residuos: [{ tipo: 'y8', cantidad: '1.5', unidad: 'kg' }] } }));

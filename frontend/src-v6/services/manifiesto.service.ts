@@ -30,9 +30,9 @@ export const manifiestoService = {
     return data.data?.manifiesto || data.data;
   },
 
-  async create(req: CreateManifiestoRequest): Promise<Manifiesto> {
+  async create(req: CreateManifiestoRequest): Promise<Manifiesto & { creationRecovered?: boolean }> {
     const { data } = await api.post('/manifiestos', req);
-    return data.data?.manifiesto || data.data;
+    return { ...(data.data?.manifiesto || data.data), creationRecovered: data.data?.replayed === true };
   },
 
   async update(id: string, req: Partial<CreateManifiestoRequest>): Promise<Manifiesto> {
