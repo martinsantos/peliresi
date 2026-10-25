@@ -7,6 +7,18 @@ const sha = 'a'.repeat(64);
 const analysis: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: 'ATM ARTIFICIAL', alcance: 'QA', aviso: null,
   pago: { revision: 'PENDIENTE', coincidencia: false, propuesta: { campos: { emisor: 'ATM_TASAS', idComprobante: 'QA123', codigoTasa: '162', importe: '12500.00', fechaPago: '2026-10-20' }, conflictos: [] } } };
 describe('reviewing payment identity', () => {
+  it.each(['0', '-1', '12,345', 'un mil', '1,000.50'])('keeps invalid amount %s local and points to the field', value => {
+    const save = vi.fn();
+    render(<PaymentIdentityReview analysis={analysis} sha256={sha} cuit="30900000011" referencia="QA" onConfirm={save} />);
+    fireEvent.click(screen.getByText('Identificar y reservar pago ATM'));
+    fireEvent.change(screen.getByLabelText('Importe pagado (ARS)'), {target:{value}});
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', {name:'Confirmar y reservar pago'}));
+    expect(save).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Importe pagado (ARS)')).toHaveFocus();
+    expect(screen.getByLabelText('Importe pagado (ARS)')).toHaveAccessibleDescription('Ingresá un importe mayor que cero, con hasta dos decimales. Por ejemplo: 12.500,50.');
+    expect(screen.getByLabelText('ID Comprobante ATM')).toHaveValue('QA123');
+  });
   it('keeps an incomplete OCR review local and focuses the first missing field', async () => {
     const save = vi.fn();
     render(<PaymentIdentityReview sha256={sha} cuit="30900000011" referencia="QA-ALTA" onConfirm={save} />);
@@ -59,5 +71,7 @@ describe('reviewing payment identity', () => {
     render(<ElectricityEvidence reading={{ version: 1, distribuidora: 'EDEMSA', nombreDistribuidora: 'EDEMSA', campos: { categoriaTarifaria: 'T1R3', consumoKwh: '1200', potenciaContratadaKw: '25' }, evidencias: [{ campo: 'categoriaTarifaria', texto: 'TARIFA T1-R3' }], conflictos: ['suministro'], aviso: 'No reemplaza la potencia instalada en HP ni cambia la TEF.' }} />);
     expect(screen.getByLabelText('Lectura de factura eléctrica')).toHaveTextContent('T1R3'); expect(screen.getByText('1200 kWh')).toBeVisible(); expect(screen.getByText('25 kW')).toBeVisible();
     expect(screen.getByRole('alert')).toHaveTextContent('contradictorios'); expect(screen.getByText('No reemplaza la potencia instalada en HP ni cambia la TEF.')).toBeVisible();
+    expect(screen.getByText('Suministro').parentElement).toHaveTextContent('Lecturas distintas: revisar original');
+    expect(screen.getByText('Período').parentElement).toHaveTextContent('No leído');
   });
 });

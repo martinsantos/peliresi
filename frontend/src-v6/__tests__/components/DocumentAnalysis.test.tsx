@@ -5,6 +5,22 @@ import type { ReceiptAnalysis } from '../../types/documentAnalysis';
 const analysis: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: 'RECIBO QA · 12500', alcance: 'Página 1.', aviso: null };
 
 describe('receipt feedback is readable evidence, never a payment certification', () => {
+  it.each(['receipt', 'electricity', 'license'] as const)('offers an explicit first reading of a saved %s without analysis', kind => {
+    const retry = vi.fn();
+    const view = render(<DocumentAnalysis kind={kind} onRetry={retry} />);
+    expect(screen.getByRole('status')).toHaveTextContent('El original sigue guardado');
+    expect(retry).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', {name: 'Leer documento', exact: true}));
+    expect(retry).toHaveBeenCalledOnce();
+    view.rerender(<DocumentAnalysis kind={kind} onRetry={retry} retrying />);
+    expect(screen.getByRole('button')).toBeDisabled();
+  });
+  it('never promises a saved original for a local preview or offers OCR for unsupported documents', () => {
+    const retry = vi.fn(), view = render(<DocumentAnalysis kind="electricity" onRetry={retry} persisted={false} />);
+    expect(screen.getByRole('status')).toHaveTextContent('todavía no está guardado');
+    view.rerender(<DocumentAnalysis kind="document" onRetry={retry} />);
+    expect(screen.queryByRole('button')).toBeNull();
+  });
   it('does not invent an indicator when analysis is absent', () => {
     const result = render(<DocumentAnalysis />); expect(result.container).toBeEmptyDOMElement();
   });

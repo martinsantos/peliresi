@@ -120,6 +120,16 @@ Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativ
 
 ## Evidencias y sesiones
 
+Continuación de altas y documentos (`uiux-admission-documents-20261025`):
+
+| ID | Gravedad | Reproducción | Criterio de cierre | Estado |
+|---|---|---|---|---|
+| UX71 | Media | Panel abierto de Monitor conserva la primera posición aunque se refresque la consulta | Reflejar lectura actual, antigüedad y fallo sin afirmar entrega | Trabajo previo conservado; 71 regresiones y builds aprobados. Revisión visual pendiente; fuera del cierre de altas |
+| UX72 | Alta | Adjunto guardado sin análisis no muestra acción de lectura en alta o revisión | Leer el mismo original autorizado sin reemplazarlo; nunca leer otro archivo mientras hay reemplazo pendiente | Corregido y comprobado técnicamente en preview; ver cierre uiux-admission-documents-20261025 |
+| UX73 | Media | Importe ATM inválido llega al servidor y devuelve faltantes genéricos | Señalar y enfocar importe/fecha inválidos, conservar los otros campos | Corregido y comprobado técnicamente en preview; ver cierre uiux-admission-documents-20261025 |
+| UX74 | Media | Factura con valores contradictorios muestra No leído, igual que un dato ausente | Identificar el campo en conflicto sin elegir un valor ni modificar HP/TEF | Corregido y comprobado técnicamente en preview; ver cierre uiux-admission-documents-20261025 |
+| UX75 | Media | Tres columnas estrechas comprimen el formulario ATM en escritorio; el botón de lectura desaparece mientras procesa | Dar ancho suficiente al documento y mantener progreso visible con acciones bloqueadas | Corregido y comprobado técnicamente en preview; ver cierre uiux-admission-documents-20261025 |
+
 Directorio de esta ejecución: `uiux-integral-20261025` dentro del workspace de evidencias del hilo. `baseline/` conserva capturas anteriores a los cambios; `verified/` contiene resultados comprobados. No reutilizar una captura histórica como prueba actual.
 
 Ficha por tarea observada: rol, contexto, variante web/app, fecha, participante anónimo, objetivo, resultado sin ayuda/con ayuda/fallo, tiempo, errores, facilidad 1–7, comentario literal y defecto vinculado. Tareas: crear propuesta; aprobar desde aviso; identificar espera; coordinar/retiro; recibir y declarar diferencia; resolver adenda; emitir/descargar certificado. Registrar referencia anterior y nueva con la misma tarea.
@@ -501,3 +511,20 @@ Diez mediciones del DOM web/app a 320, 393, 768, 1365 y 1920 px: un h1, sin desb
 Cobertura técnica: 99 pruebas frontend únicas en ocho archivos, incluyendo permiso revocado, copia incompleta, reemplazo de archivo con mismo nombre/tamaño, original preservado, contexto desmontado, conflicto transaccional, foco y acuse sin aviso contradictorio. Las ejecuciones anteriores de 94/95 casos y la reproducción fallida del foco no se suman al total. TypeScript y builds web/app se verifican sobre las fuentes finales; backend de producto sin cambios en este corte. El manual PSIP incorpora búsqueda, revisión y recuperación de respuestas antiguas.
 
 La auditoría de las 21:59 UTC confirmó 526 manifiestos, cero correos intentados o enviados, CAP cerrado, push apagado y dos procesos normales del preview. No se modificó producción, main, workflows, migraciones ni datos reales. Altas G/T/O, ATM, OCR eléctrico y límite total de dos representantes conservan sus evidencias previas y no se contabilizan como repetidos aquí. El resto del plan, revisión de otras cachés, Android y observación con participantes permanecen pendientes.
+
+
+## Continuación: altas, documentos ATM y electricidad, multirol y representantes — 25/10/2026
+
+Sobre `1de61c50`, sólo preview; evidencia en `uiux-admission-documents-20261025`. Se continuó el trabajo pedido sin esperar participantes. La integración nueva ejecutó 141 solicitudes HTTP en siete grupos: altas G/T/O, documentación requerida, observación/corrección, reserva ATM, aprobación y acceso operativo. Una entidad obtuvo las tres actividades sin duplicar su persona; la segunda persona tuvo acceso autorizado a las tres y una tercera fue rechazada. Una foto diferente del mismo pago, presentada por otro CUIT, devolvió conflicto. OCR nativo leyó facturas artificiales de EDEMSA y Cooperativa de Godoy Cruz; no acredita todos los formatos reales ni fondos ante ATM.
+
+Se corrigió la ausencia de acceso a lectura para archivos guardados sin análisis. Leer documento procesa el original autorizado sin reemplazarlo. Mientras hay un reemplazo local pendiente no se ofrece leer el original anterior. Sólo los tipos admitidos ofrecen esa acción. El modo prueba no afirma que su archivo esté guardado. La app conserva Leyendo documento durante la petición y bloquea decisiones; la prueba de navegador había mostrado que ese control desaparecía al comenzar.
+
+Se añadieron validaciones de importe positivo, formato decimal y fecha de calendario a la revisión ATM. La regla de servidor sigue vigente. El importe cero reprodujo en navegador el mensaje genérico anterior; la corrección señala y enfoca el campo conservando los otros valores. Una factura distingue datos no leídos de lecturas contradictorias junto a cada campo, sin elegir un valor ni cambiar la declaración de potencia. La revisión administrativa deja las tres columnas estrechas: datos de actor al lado de documentos con más ancho y conversación debajo. En 1365 px los campos ATM pasaron de unos 115 a 296 px.
+
+Web y app realizaron lectura real del mismo documento artificial tras preparar el caso sin análisis. Se recuperaron T2RBT, 1250 kWh y 45 kW. La verificación en servidor y disco conserva ID y SHA-256 del original y 120 HP declarados. No se aprobó el pago conflictivo. La actualización PWA se aplicó desde el aviso y conservó la solicitud abierta. El permiso del servidor y el modo de funcionamiento no se modificaron.
+
+Navegación visible: ingreso de la cuenta titular, Generador → Transporte en web, reapertura en app con Transporte, elección de Operador y Personas autorizadas. Ambas personas muestran sus tres actividades y el cupo permanece 2 de 2. Al escribir una tercera dirección artificial, Autorizar y Preparar invitación siguen deshabilitados. Cerrar app y abrir web conserva Operador y el borrador local de representante; no se presentó esa autorización ni se envió invitación. Esto comprueba superficies del mismo navegador, no Android físico ni transferencia entre dispositivos.
+
+Cobertura única: 397 pruebas frontend y 265 backend aprobadas, sin sumar repeticiones; las 78 de la suite focal final se combinan por archivo/nombre con la suite general. TypeScript y builds web/app aprobados. Diez medidas finales web/app a 320, 393, 768, 1365 y 1920 px: un h1, sin desborde de página y campos de 44 px. Foco de 2 px y activación con teclado comprobados; consola final sin errores o advertencias. Se inspeccionaron las capturas de ATM web/app y lectura eléctrica app. El manual incorpora lectura ausente, valores inválidos y captura nueva.
+
+Auditoría del preview a las 22:30 UTC: 526 manifiestos, cero correos enviados o intentados, CAP cerrado, push apagado y dos procesos normales. Los manifiestos existentes conservan su hash en la integración. Sin producción, main, workflows, migraciones ni datos reales. Los cambios anteriores de Monitor se conservan aparte, todavía sin cierre visual ni commit propio; no se presentan como validados en esta tanda. El plan integral y las pruebas humanas/Android siguen pendientes.

@@ -239,7 +239,7 @@ const SolicitudReview: React.FC = () => {
         tieneISO={!!datosActor.certificacionISO} />
 
       {/* Documents and correspondence retain one common workspace. */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
         {/* Column 1: Datos del Actor */}
         <Card padding="none">
           <div className="px-5 py-4 border-b border-neutral-200 flex flex-wrap items-center gap-2">
@@ -323,7 +323,7 @@ const SolicitudReview: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
-                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt} onRetry={canAct && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
+                    <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt || !fresh || busy} onRetry={reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
                     {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
 
                     <div className="flex items-center gap-1.5">
@@ -366,8 +366,8 @@ const SolicitudReview: React.FC = () => {
           </div>
         </Card>
 
-        {/* Column 3: Mensajes */}
-        <Card padding="none" className="flex flex-col">
+        {/* Correspondence follows the document review at full width. */}
+        <Card padding="none" className="flex min-w-0 flex-col xl:col-span-2">
           <div className="px-5 py-4 border-b border-neutral-200 flex items-center gap-2">
             <MessageSquare size={16} className="text-neutral-500" />
             <h3 className="font-semibold text-neutral-800">Mensajes</h3>

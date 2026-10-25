@@ -2,6 +2,7 @@ import { useId, useRef, useState } from 'react';
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
 import type { ConfirmPaymentInput, PaymentIdentity, ReceiptAnalysis } from '../types/documentAnalysis';
 import { getApiErrorMessage } from '../utils/api-error';
+import { validPaymentAmount, validPaymentDate } from '../utils/paymentReviewValidation';
 
 const fields: Array<[keyof Omit<PaymentIdentity, 'emisor'>, string, string]> = [
   ['idComprobante', 'ID Comprobante ATM', 'text'], ['cuit', 'CUIT del obligado', 'text'],
@@ -35,6 +36,8 @@ export function PaymentIdentityReview({ analysis, sha256, cuit, referencia, onCo
     if (values.codigoTasa.trim() && !/^\d+$/.test(values.codigoTasa.replace(/[ ._/-]/g, ''))) errors.codigoTasa = 'El código de tasa debe ser numérico.';
     const enteredCuit = values.cuit.replace(/[ -]/g, '');
     if (values.cuit.trim() && (!/^\d{11}$/.test(enteredCuit) || (cuit && enteredCuit !== cuit.replace(/\D/g, '')))) errors.cuit = 'El CUIT debe coincidir con el obligado de este trámite.';
+    if (values.importe.trim() && !validPaymentAmount(values.importe)) errors.importe = 'Ingresá un importe mayor que cero, con hasta dos decimales. Por ejemplo: 12.500,50.';
+    if (values.fechaPago.trim() && !validPaymentDate(values.fechaPago)) errors.fechaPago = 'Ingresá una fecha de pago válida según el original.';
     setInvalid(errors); setError('');
     const first = fields.find(([key]) => errors[key])?.[0];
     if (first) { inputs.current[first]?.focus(); return; }

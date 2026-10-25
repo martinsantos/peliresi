@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   owner: 'admin:one', role: 'ADMIN', detail: {} as any, messages: {} as any,
-  send: vi.fn(), review: vi.fn(), observe: vi.fn(), approve: vi.fn(), reject: vi.fn(), document: vi.fn(),
+  send: vi.fn(), review: vi.fn(), observe: vi.fn(), approve: vi.fn(), reject: vi.fn(), document: vi.fn(), read: vi.fn(),
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: state.owner, rol: state.role } }) }));
 vi.mock('../../hooks/useAdmissionContext', () => ({ useAdmissionContext: () => ({ owner: state.owner, role: state.role, ready: true }) }));
@@ -16,7 +16,7 @@ vi.mock('../../hooks/useSolicitudes', () => ({
 vi.mock('../../components/AdministrativeTEF', () => ({ AdministrativeTEF: () => null }));
 vi.mock('../../components/registration/RegistrationFleetSummary', () => ({ RegistrationFleetSummary: () => null }));
 vi.mock('../../components/registration/RegistrationReviewEditor', () => ({ RegistrationReviewEditor: ({ onClose, onConfirmed, onSaved }: any) => <button onClick={async () => { onClose(); onConfirmed(); await onSaved().catch(() => {}); }}>Simular corrección confirmada</button> }));
-vi.mock('../../components/DocumentAnalysis', () => ({ DocumentAnalysis: () => null }));
+vi.mock('../../services/solicitud.service', () => ({ solicitudService: { analizarDocumento: state.read } }));
 vi.mock('../../components/PaymentIdentityReview', () => ({ PaymentIdentityReview: () => <input aria-label="Identidad del pago" defaultValue="" /> }));
 import SolicitudDetallePage from '../../pages/admin/SolicitudDetallePage';
 const query = (data: unknown) => ({ data, isPending: false, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({}) });
@@ -25,9 +25,21 @@ beforeEach(() => {
   localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks(); state.owner = 'admin:one'; state.role = 'ADMIN';
   state.detail = query({ id: 's1', estado: 'EN_REVISION', tipoActor: 'GENERADOR', datosActor: '{"razonSocial":"Empresa QA"}', usuario: { nombre: 'Persona QA', email: 'qa@night-qa.invalid' }, documentos: [], createdAt: '2026-10-25', updatedAt: '2026-10-25T15:00:00.000Z' });
   state.messages = query([]);
-  for (const fn of [state.send,state.review,state.observe,state.approve,state.reject,state.document]) fn.mockResolvedValue({});
+  for (const fn of [state.send,state.review,state.observe,state.approve,state.reject,state.document,state.read]) fn.mockResolvedValue({});
 });
 afterEach(cleanup);
+it.each(['','/app'])('keeps the reading action and progress visible while the original is being analysed (%s)', async prefix => {
+ state.detail.data.documentos=[{id:'invoice',tipo:'FACTURA_ELECTRICA',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:'qa'}];
+ let finish!:()=>void; state.read.mockReturnValue(new Promise<void>(resolve=>{finish=resolve;}));
+ render(tree(prefix));
+ fireEvent.click(screen.getByRole('button',{name:'Leer documento',exact:true}));
+ const pending=screen.getByRole('button',{name:'Leyendo documento…',exact:true});
+ expect(pending).toBeDisabled(); fireEvent.click(pending);
+ expect(state.read).toHaveBeenCalledOnce(); expect(state.read).toHaveBeenCalledWith('s1','invoice');
+ expect(screen.getByRole('button',{name:'Aprobar',exact:true})).toBeDisabled();
+ await act(async()=>{finish();});
+ expect(screen.getByText('Lectura actualizada. Revisá el resultado del documento.')).toBeVisible();
+});
 it.each(['', '/app'])('keeps a confirmed correction visible and focused when its subsequent read fails (%s)', async prefix => {
  const view = render(tree(prefix));
  fireEvent.click(screen.getByRole('button', { name: 'Corregir datos' }));
