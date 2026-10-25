@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { inspectionWorkspaceOwner } from '../utils/inspectionWorkspace';
 import { useNavigate } from 'react-router-dom';
 import { Bell, AlertTriangle, Info, AlertCircle, CheckCircle2, X, MapPin, ClipboardCheck, LifeBuoy } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -115,7 +116,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
 
   // Fetch últimas 5 sin filtrar por leída; badge usa noLeidas del response
   const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['notificaciones', 'bell', currentUser?.id],
+    queryKey: ['notificaciones', 'bell', currentUser?.id, inspectionWorkspaceOwner(currentUser)],
     queryFn: () => notificacionService.list({ limit: 5 }),
     refetchInterval: hasToken ? 30_000 : false,
     staleTime: 15_000,

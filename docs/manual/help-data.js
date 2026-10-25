@@ -713,14 +713,15 @@
     steps: [
       { title: 'Abrir el aviso de tu manifiesto', body: [
         'Con la app abierta, una novedad aparece arriba y permite abrir el manifiesto relacionado. Activar sonido habilita el sonido de los avisos dentro de esa sesión.',
-        'La campana conserva el aviso después. Leerlo no aprueba una propuesta ni resuelve una adenda: abrí el registro y decidí desde tu rol.'
+        'La campana conserva el aviso después. Leerlo no aprueba una propuesta ni resuelve una adenda: abrí el registro y decidí desde tu rol.',
+        'Al cambiar de cuenta o actividad, SITREP vuelve a consultar los avisos y retira los mensajes flotantes del contexto anterior. Una misma cuenta puede recibir avisos de sus distintas actividades: si un requerimiento corresponde a otro rol, el aviso lo identifica y pide confirmar ese contexto antes de abrirlo.'
       ], expected: 'Encontrás la acción pendiente y el historial sin adivinar qué cambió.', resources: [{label:'Mis avisos',path:'/notificaciones'}] },
       { title: 'Reconocer una aprobación, adenda o relevo', body: [
         'El aviso indica si hay una propuesta por aprobar, una aprobación de otra parte, unanimidad, coordinación iniciada o rechazo. Las tres aprobaciones siguen visibles como iconos en la agenda.',
         'Una adenda nueva o su resolución avisa a las otras partes vinculadas. Un relevo avisa a las partes y al C3; la transportista registrada de reemplazo lo consulta en su propio perfil.'
       ], expected: 'El aviso abre el registro que tu cuenta puede consultar; no otorga permisos adicionales.' },
       { title: 'Distinguir aviso dentro de SITREP, push y correo', body: [
-        'Cuando estén habilitados, abrí Avisos → Activar avisos del teléfono y aceptá el permiso para mostrar el push del sistema y el correo llega a la dirección verificada con la preferencia de email activa. El equipo debe comprobar cada canal en el dispositivo de uso.',
+        'Cuando el canal esté habilitado, abrí Avisos → Activar avisos del teléfono y aceptá el permiso para recibir notificaciones del sistema. El correo requiere una dirección verificada y la preferencia de email activa. El equipo debe comprobar cada canal en el dispositivo de uso.',
         'Al tocar el push de la app se abre la app; el de la web abre la web. Si un canal está apagado, el aviso sigue disponible en la campana. No uses el correo como prueba de aprobación ni de recepción legal.'
       ], image:S+'mobile/device-notifications-20261019.png',alt:'Avisos del dispositivo informa que el canal está apagado y mantiene la campana',caption:'Datos sintéticos · preview aislado · canal push apagado; no acredita envío externo · 19/10/2026.',expected: 'Sabés dónde consultar el estado real, aunque no llegue un aviso externo.' }
     ]

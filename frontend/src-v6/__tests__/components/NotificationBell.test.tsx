@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { NotificationBell } from '../../components/NotificationBell';
 
 const service = vi.hoisted(() => ({ list: vi.fn(), marcarLeida: vi.fn(), restricted: false }));
@@ -41,7 +42,7 @@ describe('assignment notification delivery', () => {
 
   it('refreshes on opening so a newly assigned visit does not wait for the polling interval', async () => {
     const client = setup();
-    await waitFor(() => expect(client.getQueryState(['notificaciones', 'bell', 'inspector'])?.status).toBe('success'));
+    await waitFor(() => expect(client.getQueryState(['notificaciones', 'bell', 'inspector', inspectionWorkspaceOwner({ id: 'inspector' })])?.status).toBe('success'));
     service.list.mockResolvedValue({ items: [notice], noLeidas: 1 });
     fireEvent.click(screen.getByRole('button', { name: 'Notificaciones', exact: true }));
     expect(await screen.findByText(notice.titulo)).toBeVisible();

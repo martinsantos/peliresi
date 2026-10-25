@@ -8,16 +8,18 @@ import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { toast } from './ui/Toast';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useAuth } from '../contexts/AuthContext';
+import { inspectionWorkspaceOwner } from '../utils/inspectionWorkspace';
 
 // Muestra toast para notificaciones nuevas que llegan vía polling
 // (complementa el push nativo — cubre el caso en que el push no llegó)
 export function NotificacionesPoller() {
   const { currentUser, isRestricted } = useAuth();
   if(currentUser?.training && !isRestricted)return <TrainingLiveNotices key={currentUser.id} userId={currentUser.id}/>;
-  return currentUser && !isRestricted ? <AuthorizedNotificationsPoller key={currentUser.id} userId={currentUser.id} userRole={currentUser.rol} /> : null;
+  const owner = inspectionWorkspaceOwner(currentUser);
+  return currentUser && !isRestricted ? <AuthorizedNotificationsPoller key={owner} owner={owner} userId={currentUser.id} userRole={currentUser.rol} /> : null;
 }
 
-function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | number; userRole: string }) {
+function AuthorizedNotificationsPoller({ userId, userRole, owner }: { userId: string | number; userRole: string; owner: string }) {
   usePushNotifications();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
@@ -28,7 +30,7 @@ function AuthorizedNotificationsPoller({ userId, userRole }: { userId: string | 
   const latestReceivedAt = useRef(Number.NEGATIVE_INFINITY);
 
   const { data } = useQuery({
-    queryKey: ['notificaciones', 'poll', userId],
+    queryKey: ['notificaciones', 'poll', userId, owner],
     queryFn: () => notificacionService.list({ limit: 20, leida: false }),
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
