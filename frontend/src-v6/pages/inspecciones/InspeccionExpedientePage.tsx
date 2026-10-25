@@ -1,4 +1,4 @@
-import { inspectionReturnTarget, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { inspectionContextKey, inspectionFieldDraftKey, inspectionReturnTarget, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { warmInspectionShell } from '../../services/warmInspectionShell';
 
@@ -147,6 +147,13 @@ function draftConflicts(server: Draft, local: Draft): DraftConflict[] {
 }
 
 const InspeccionExpedientePage: React.FC = () => {
+  const { id = '' } = useParams();
+  const { currentUser } = useAuth();
+  const owner = inspectionWorkspaceOwner(currentUser);
+  return <ScopedInspectionExpediente key={inspectionContextKey(currentUser?.id || '', owner, id)} owner={owner} />;
+};
+
+const ScopedInspectionExpediente: React.FC<{ owner: string }> = ({ owner }) => {
   const { id = '' } = useParams(); const navigate = useNavigate(); const location = useLocation(); const mobile = location.pathname.startsWith('/mobile'); const { currentUser } = useAuth();
   const workspaceReturn = inspectionReturnTarget(location.state, inspectionWorkspaceOwner(currentUser), mobile);
   const returnToWorkspace = () => navigate(workspaceReturn.to);
@@ -156,7 +163,7 @@ const InspeccionExpedientePage: React.FC = () => {
   const [datosActa, setDatosActa] = useState<InspectionActData>({}); const [informeTecnico, setInformeTecnico] = useState<InspectionTechnicalReport>({});
   const [isOnline, setIsOnline] = useState(navigator.onLine); const [recording, setRecording] = useState(false); const [dictating, setDictating] = useState(false); const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
   const [pendingEvidenceEntries, setPendingEvidence] = useState<PendingInspectionEvidence[]>([]); const [syncingEvidence, setSyncingEvidence] = useState(false);
-  const pendingEvidence = pendingEvidenceEntries.filter((entry) => entry.inspectionId === id && entry.userId === String(currentUser?.id));
+  const pendingEvidence = pendingEvidenceEntries.filter((entry) => entry.inspectionId === id && entry.userId === String(currentUser?.id) && entry.owner === owner);
   const [pendingEvidenceReadFailed, setPendingEvidenceReadFailed] = useState(true);
   const [staleDraft, setStaleDraft] = useState<Draft | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -186,23 +193,23 @@ const InspeccionExpedientePage: React.FC = () => {
   const [organizationPending, setOrganizationPending] = useState(false);
   const syncEvidenceRef = useRef<() => Promise<void>>(async () => undefined);
   const saveForSyncRef = useRef<() => Promise<boolean>>(async () => false);
-  const evidenceScope = JSON.stringify([String(currentUser?.id || ''), id]);
+  const evidenceScope = inspectionContextKey(currentUser?.id || '', owner, id);
   const evidenceScopeRef = useRef(evidenceScope);
   evidenceScopeRef.current = evidenceScope;
   useEffect(() => { void warmInspectionShell(); }, []);
   useEffect(() => () => { evidenceScopeRef.current = ''; }, []);
-  const draftKey = currentUser?.id && id ? `sitrep_inspection_draft_${currentUser.id}_${id}` : '';
+  const draftKey = inspectionFieldDraftKey(currentUser?.id || '', owner, id);
   const isAdmin = Boolean(inspection && (currentUser?.rol === 'ADMIN' || currentUser?.rol === `ADMIN_${inspection.tipoActor}`));
-  const isAssignedInspector = Boolean(inspection && currentUser && String(inspection.inspectorId) === String(currentUser.id));
-  const fieldEditAllowed = Boolean(inspection && ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(inspection.estado) && (isAdmin || isAssignedInspector));
-  const reportEditAllowed = Boolean(inspection && (fieldEditAllowed || (inspection.estado === 'EN_REVISION' && (isAdmin || isAssignedInspector))));
+  const isAssignedInspector = Boolean(inspection && currentUser?.esInspector && String(inspection.inspectorId) === String(currentUser.id));
+  const fieldEditAllowed = Boolean(!query.isError && inspection && ['BORRADOR', 'PLANIFICADA', 'EN_CAMPO'].includes(inspection.estado) && (isAdmin || isAssignedInspector));
+  const reportEditAllowed = Boolean(!query.isError && inspection && (fieldEditAllowed || (inspection.estado === 'EN_REVISION' && (isAdmin || isAssignedInspector))));
   const draftOwnership = useInspectionDraftOwnership(draftKey, fieldEditAllowed || reportEditAllowed);
   const canWriteDraft = draftOwnership.canWrite;
   const hydrationKey = `${draftKey}:${inspection?.id || ''}:${inspection?.version || 0}:${draftOwnership.status}`;
   const readyKey = `${draftKey}:${inspection?.id || ''}:${draftOwnership.status}`;
   const draftReady = draftReadyKey === readyKey;
-  const canEdit = fieldEditAllowed && draftOwnership.status === 'owned' && draftReady;
-  const canEditReport = reportEditAllowed && draftOwnership.status === 'owned' && draftReady;
+  const canEdit = fieldEditAllowed && draftOwnership.status === 'owned' && draftReady && !staleDraft;
+  const canEditReport = reportEditAllowed && draftOwnership.status === 'owned' && draftReady && !staleDraft;
   const currentDraft: Draft | null = inspection ? { version: Math.max(inspection.version, confirmedVersionRef.current), observaciones, numeroActa, ubicacion, plazoRespuestaAt, datosActa, informeTecnico, items, comparaciones: comparisons } : null;
   currentDraftRef.current = currentDraft;
   const currentFingerprint = currentDraft ? draftFingerprint(currentDraft) : '';
@@ -310,6 +317,13 @@ const InspeccionExpedientePage: React.FC = () => {
     document.addEventListener('visibilitychange', onHidden);
     return () => { window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', onHidden); };
   }, [canEdit, canEditReport, staleDraft, storeDraft]);
+  // Layout cleanup runs before the passive ownership hook releases the lock.
+  // Preserve the last keystroke on route/context changes, even before debounce.
+  const departingFieldDraft = useRef<() => void>(() => undefined);
+  departingFieldDraft.current = () => {
+    if (!staleDraft && currentDraftRef.current && (canEdit || canEditReport)) storeDraft(currentDraftRef.current);
+  };
+  useLayoutEffect(() => () => departingFieldDraft.current(), []);
   useEffect(() => {
     const protectUpdate = (event: Event) => {
       if (!inspection || !(fieldEditAllowed || reportEditAllowed)) return;
@@ -333,7 +347,7 @@ const InspeccionExpedientePage: React.FC = () => {
   const refreshPendingEvidence = useCallback(async () => {
     if (!id || !currentUser?.id) return;
     try {
-      const entries = await listPendingInspectionEvidence(id, String(currentUser.id));
+      const entries = await listPendingInspectionEvidence(id, String(currentUser.id), owner);
       if (evidenceScopeRef.current === evidenceScope) { setPendingEvidence(entries); setPendingEvidenceReadFailed(false); }
     } catch (error) {
       if (evidenceScopeRef.current === evidenceScope) setPendingEvidenceReadFailed(true);
@@ -389,7 +403,7 @@ const InspeccionExpedientePage: React.FC = () => {
     if (!navigator.onLine || !id || !currentUser?.id || syncingRef.current || savingDraftRef.current || transitionInFlight.current || staleDraft || !canEdit || !canWriteDraft()) return;
     syncingRef.current = true; setSyncingEvidence(true);
     try {
-    const entries = await listPendingInspectionEvidence(id, String(currentUser.id));
+    const entries = await listPendingInspectionEvidence(id, String(currentUser.id), owner);
     const hasStoredDraft = Boolean(currentDraftRef.current && serverFingerprintRef.current && draftFingerprint(currentDraftRef.current) !== serverFingerprintRef.current);
     if (!entries.length && !hasStoredDraft) return;
     let synchronized = 0;
@@ -397,7 +411,7 @@ const InspeccionExpedientePage: React.FC = () => {
         if (!await saveForSyncRef.current()) return;
       }
       if (!canWriteDraft() || evidenceScopeRef.current !== evidenceScope) return;
-      const result = await syncPendingInspectionEvidence({ inspectionId: id, userId: String(currentUser.id), manual, onlyId, isActive: () => evidenceScopeRef.current === evidenceScope && canWriteDraft(),
+      const result = await syncPendingInspectionEvidence({ inspectionId: id, userId: String(currentUser.id), owner, manual, onlyId, isActive: () => evidenceScopeRef.current === evidenceScope && canWriteDraft(),
         upload: async (entry) => {
           await inspeccionService.uploadEvidence(id, pendingEvidenceFile(entry), {
             ...entry.fields,
@@ -505,7 +519,7 @@ const InspeccionExpedientePage: React.FC = () => {
     if (fields?.itemId) setUploadingItemId(fields.itemId);
     let pending: PendingInspectionEvidence | null = null;
     try {
-      pending = await queueInspectionEvidence(id, String(currentUser.id), file, fields);
+      pending = await queueInspectionEvidence(id, String(currentUser.id), owner, file, fields);
       if (!canWriteDraft() || evidenceScopeRef.current !== evidenceScope) return;
       await refreshPendingEvidence();
       if (!isOnline || !navigator.onLine) {
@@ -517,7 +531,7 @@ const InspeccionExpedientePage: React.FC = () => {
       }
       if (staleDraft || !await save(true) || !canWriteDraft()) return;
       const evidenceAlreadyPresent = Boolean(inspection?.evidencias.some((evidence) => evidence.sha256 === pending?.sha256));
-      const result = await syncPendingInspectionEvidence({ inspectionId: id, userId: String(currentUser.id), manual: true, onlyId: pending.id, isActive: () => evidenceScopeRef.current === evidenceScope && canWriteDraft(),
+      const result = await syncPendingInspectionEvidence({ inspectionId: id, userId: String(currentUser.id), owner, manual: true, onlyId: pending.id, isActive: () => evidenceScopeRef.current === evidenceScope && canWriteDraft(),
         upload: (entry) => uploadMutation.mutateAsync({ file: pendingEvidenceFile(entry), fields: { ...entry.fields, clienteId: entry.id, capturadaAt: entry.capturedAt, clienteSha256: entry.sha256 || undefined } }),
       });
       // Además de la invalidación central, esperamos explícitamente la lectura fresca:
@@ -547,13 +561,13 @@ const InspeccionExpedientePage: React.FC = () => {
     onRetry: (evidenceId) => syncEvidence(true, evidenceId),
     onDiscard: async (evidenceId) => {
       if (!canWriteDraft() || syncingRef.current || evidenceScopeRef.current !== evidenceScope) throw new Error('Esperá a que finalice la operación o recuperá la edición en esta pestaña.');
-      await discardPendingInspectionEvidence(id, String(currentUser?.id), evidenceId);
+      await discardPendingInspectionEvidence(id, String(currentUser?.id), owner, evidenceId);
       await refreshPendingEvidence();
       toast.info('Copia pendiente descartada', 'Se quitó del dispositivo por tu confirmación. No se modificaron evidencias del servidor.');
     },
     onReplace: async (evidenceId, file) => {
       if (!canWriteDraft() || syncingRef.current || evidenceScopeRef.current !== evidenceScope) throw new Error('Esperá a que finalice la operación o recuperá la edición en esta pestaña.');
-      await replacePendingInspectionEvidence(id, String(currentUser?.id), evidenceId, file);
+      await replacePendingInspectionEvidence(id, String(currentUser?.id), owner, evidenceId, file);
       await refreshPendingEvidence();
       toast.info('Archivo corregido guardado en el dispositivo', 'Reintentá la carga para incorporarlo al expediente.');
     },
@@ -748,9 +762,9 @@ const InspeccionExpedientePage: React.FC = () => {
   </div>;
   const evidence = <EvidenceCard inspection={inspection} pendingEvidence={pendingEvidence} pendingActions={canEdit ? pendingEvidenceActions : undefined} editable={canEdit} recording={recording} onCamera={() => cameraRef.current?.click()} onFile={() => fileRef.current?.click()} onAudio={toggleRecording} onAnnul={annulEvidence} />;
   const report = <InspectionDocumentsPanel section="informe" actData={datosActa} report={informeTecnico} actEditable={false} reportEditable={canEditReport} onActDataChange={setDatosActa} onReportChange={setInformeTecnico} />;
-  const readiness = <>{canEdit ? <FieldReadinessPanel requiresComparison={Boolean(inspection.tipoActor)} state={inspection.estado} items={items} comparisons={comparisons} pendingEvidenceCount={pendingEvidence.length} /> : inspection.tipoActor && dossierReadiness ? <DossierReadinessPanel readiness={dossierReadiness} /> : null}
+  const readiness = <>{fieldEditAllowed ? <FieldReadinessPanel requiresComparison={Boolean(inspection.tipoActor)} state={inspection.estado} items={items} comparisons={comparisons} pendingEvidenceCount={pendingEvidence.length} /> : inspection.tipoActor && dossierReadiness ? <DossierReadinessPanel readiness={dossierReadiness} /> : null}
     {inspection.tipoActor && (inspection.estado === 'EN_REVISION' || inspection.estado === 'NOTIFICADA') && isAdmin && <label className="block text-sm font-semibold text-neutral-700">Plazo de respuesta<input aria-label="Plazo de respuesta" type="datetime-local" value={plazoRespuestaAt} onChange={(event) => setPlazoRespuestaAt(event.target.value)} className="mt-2 h-11 w-full max-w-sm rounded-lg border border-neutral-300 px-3 text-sm" /><span className="mt-2 block text-xs font-normal text-neutral-500">La aprobación no envía correos; deja el expediente preparado.</span></label>}
-    {guided && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4"><h3 className="text-sm font-bold text-neutral-900">{inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'Hallazgo en revisión · sin responsable identificado' : 'Cambio de etapa'}</h3><p role={inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'status' : undefined} className="mt-2 text-sm leading-relaxed text-neutral-600">{canEdit ? 'Enviar a revisión cierra la edición de campo. Los cambios y las evidencias deben estar guardados antes de continuar.' : inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'No hay destinatario para notificar ni plazo que fijar. Podés completar el informe técnico. Si identificás al responsable, devolvé a campo, vinculalo en Visita y contrastá sus datos antes de aprobar.' : 'El acta de campo está cerrada. Podés completar el informe técnico; los datos de campo requieren una devolución expresa.'}</p><div className="mt-4 flex flex-wrap gap-3">
+    {guided && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4"><h3 className="text-sm font-bold text-neutral-900">{inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'Hallazgo en revisión · sin responsable identificado' : 'Cambio de etapa'}</h3><p role={inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'status' : undefined} className="mt-2 text-sm leading-relaxed text-neutral-600">{fieldEditAllowed ? 'Enviar a revisión cierra la edición de campo. Los cambios y las evidencias deben estar guardados antes de continuar.' : inspection.estado === 'EN_REVISION' && !inspection.tipoActor ? 'No hay destinatario para notificar ni plazo que fijar. Podés completar el informe técnico. Si identificás al responsable, devolvé a campo, vinculalo en Visita y contrastá sus datos antes de aprobar.' : 'El acta de campo está cerrada. Podés completar el informe técnico; los datos de campo requieren una devolución expresa.'}</p><div className="mt-4 flex flex-wrap gap-3">
       {inspection.estado === 'EN_REVISION' && isAdmin && canWriteDraft() && <Button variant="outline" onClick={() => transition('EN_CAMPO')} disabled={!isOnline || Boolean(staleDraft) || transitionMutation.isPending}>Devolver a campo</Button>}
       {primaryAction && canWriteDraft() && <Button aria-label={primaryAction.label} aria-describedby={primaryAction.state === 'NOTIFICADA' ? 'approval-readiness-hint' : undefined} leftIcon={primaryAction.state === 'EN_REVISION' ? <Send size={17} /> : <ShieldCheck size={17} />} isLoading={transitionMutation.isPending} onClick={() => transition(primaryAction.state)} disabled={!isOnline || pendingEvidence.length > 0 || Boolean(staleDraft) || (primaryAction.state === 'NOTIFICADA' && (!plazoRespuestaAt || approvalBlocked))}>{primaryAction.label}</Button>}
     </div></div>}
@@ -761,7 +775,7 @@ const InspeccionExpedientePage: React.FC = () => {
     { id: 'checklist', label: 'Recorrido de campo', title: 'Recorrido de campo', description: 'Empezá por instalaciones, residuos u operación; registrá cada hallazgo y su evidencia en el lugar.', detail: completed + ' de ' + items.length + ' controles', complete: items.length > 0 && completed === items.length, anchors: orderedItems.map((item) => ({ id: item.codigo, label: item.etiqueta, group: item.categoria, reviewed: item.resultado !== 'PENDIENTE', detail: item.resultado === 'PENDIENTE' ? 'Pendiente' : 'Revisado · ' + (RESULTS.find((result) => result.value === item.resultado)?.label || item.resultado) })), content: <Checklist inspectionId={inspection.id} groups={fieldGroups} items={items} completed={completed} editable={canEdit} setItems={setItems} uploadingItemId={uploadingItemId} pendingEvidence={pendingEvidence} onEvidence={(file, item) => upload(file, { itemId: item.id, descripcion: item.observacion?.trim() || 'Evidencia vinculada al control ' + item.codigo })} onAnnul={annulEvidence} onDictationActiveChange={setDictating} onDictatedText={(itemId, text) => { const current = currentDraftRef.current; if (!current) return; const next = { ...current, items: current.items.map((item) => item.id === itemId ? { ...item, observacion: appendDictatedText(item.observacion || '', text) } : item) }; currentDraftRef.current = next; setItems(next.items); storeDraft(next); }} /> },
     { id: 'declaracion', label: 'Contraste con registros', title: 'Contraste con registros', description: 'Contrastá lo observado con la fotografía declarada. Los datos administrativos quedan al final como contexto.', detail: inspection.tipoActor ? reviewedComparisons + ' de ' + comparisons.length + ' contrastados' : 'Sin declaración vinculada', complete: !inspection.tipoActor || (comparisons.length > 0 && reviewedComparisons === comparisons.length), anchors: orderedComparisons.map((row) => ({ id: row.codigo, label: row.etiqueta, group: row.categoria, reviewed: row.resultado !== 'PENDIENTE', detail: row.resultado === 'PENDIENTE' ? 'Pendiente' : 'Revisado · ' + (COMPARISON_RESULT_LABELS[row.resultado] || row.resultado) })), content: !inspection.tipoActor ? <p className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 text-sm leading-relaxed">Este hallazgo todavía no tiene responsable identificado. Podés registrar lo observado y enviarlo a revisión sin contrastar una declaración. Si identificás al responsable, vinculalo desde «Preparar la inspección»; se incorporarán sus datos declarados.</p> : <InspectionComparisonPanel embedded inspectionId={inspection.id} comparisons={orderedComparisons} declaredDocuments={inspection.declaradoSnapshot?.documents} editable={canEdit} onSave={save} saving={savingDraft} saveStatus={saveStatus} saveDisabled={saveDisabled} onChange={(rowId, patch) => setComparisons((rows) => rows.map((row) => row.id === rowId ? { ...row, ...patch } : row))} onEvidence={(file, comparisonId) => upload(file, { comparacionId: comparisonId })} /> },
     { id: 'evidencias', label: 'Evidencias', title: 'Evidencias', description: 'Todas las evidencias del expediente. Las fotos de un hallazgo se agregan desde su control.', detail: pendingEvidence.length ? pendingEvidence.length + ' por sincronizar' : inspection.evidencias.filter((entry) => !entry.anuladaAt).length + ' archivos', content: evidence },
-    { id: 'acta', label: 'Acta de campo', title: 'Acta de campo', description: 'Registrá lo constatado, quién intervino y las formalidades. Una negativa o imposibilidad se documenta; no se presume.', detail: canEdit ? 'Registro de campo' : 'Campo cerrado · consulta', content: act },
+    { id: 'acta', label: 'Acta de campo', title: 'Acta de campo', description: 'Registrá lo constatado, quién intervino y las formalidades. Una negativa o imposibilidad se documenta; no se presume.', detail: fieldEditAllowed ? 'Registro de campo' : 'Campo cerrado · consulta', content: act },
     { id: 'informe-tecnico', label: 'Informe técnico para Legales', title: 'Informe técnico para Legales', description: 'Fundamentá la evaluación. Este documento complementa el acta de campo y no la reemplaza.', detail: reportCompleted + ' de 5 apartados' + (reportCompleted === 5 && !informeTecnico.expedienteElectronico?.trim() ? ' · falta expediente electrónico' : ''), complete: reportCompleted === 5 && Boolean(informeTecnico.expedienteElectronico?.trim()), content: report },
     { id: 'revision', label: inspection.tipoActor ? 'Revisar y enviar' : 'Revisar hallazgo', title: inspection.tipoActor ? 'Revisar y enviar' : 'Revisar hallazgo', description: inspection.tipoActor ? 'Verificá los pendientes y el informe consolidado antes de cambiar de etapa. Recorrer los pasos no aprueba ni envía la inspección.' : 'Conservá el informe y las evidencias. La notificación requiere identificar primero a un destinatario.', detail: LABELS[inspection.estado], complete: Boolean(inspection.tipoActor && dossierReadiness?.ready), content: readiness },
   ] : [
@@ -785,7 +799,7 @@ const InspeccionExpedientePage: React.FC = () => {
   const fieldSaveDetail = storageFailed ? 'Conservá esta pantalla abierta.'
     : organizationPending ? 'Usá Confirmar organización antes de salir.'
     : pendingEvidenceReadFailed ? 'Capturas locales sin verificar.'
-    : pendingEvidence.length ? `${pendingEvidence.length} capturas por enviar${!isOnline ? ' · sin conexión' : ''}`
+    : pendingEvidence.length ? `${pendingEvidence.length} ${pendingEvidence.length === 1 ? 'captura por enviar' : 'capturas por enviar'}${!isOnline ? ' · sin conexión' : ''}`
       : !isOnline ? 'Sin conexión · podés seguir registrando.'
         : '';
   const pauseFieldWork = async () => {
@@ -811,7 +825,7 @@ const InspeccionExpedientePage: React.FC = () => {
     const anchor = control?.dataset.inspectionAnchor;
     if (anchor && currentUser?.id) {
       const item = items.find((entry) => 'checklist/' + entry.codigo === anchor);
-      saveInspectionResume(currentUser.id, inspection.id, '#' + anchor, 'Recorrido de campo · ' + (item?.etiqueta || anchor));
+      saveInspectionResume(currentUser.id, inspection.id, '#' + anchor, 'Recorrido de campo · ' + (item?.etiqueta || anchor), owner);
     }
     returnToWorkspace();
   };
@@ -840,7 +854,7 @@ const InspeccionExpedientePage: React.FC = () => {
     </header>
     {currentUser?.training && <p className="text-xs text-neutral-600">Capacitación: sin documentos oficiales.</p>}
     {(query.offlineCacheProblem || (guided && draftOwnership.status !== 'owned') || (pendingEvidenceReadFailed && guided) || !isOnline || pendingEvidence.length > 0 || storageFailed) && <details data-testid="inspection-storage-status" className="rounded-lg border border-neutral-200 bg-white px-4 text-sm">
-      <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 font-medium text-neutral-700"><span>{storageFailed ? 'Guardado local no confirmado · no cierres esta pantalla' : guided && draftOwnership.status !== 'owned' ? draftOwnership.status === 'blocked' ? 'Solo lectura · otra pestaña está editando' : draftOwnership.status === 'checking' ? 'Comprobando disponibilidad de edición' : 'Solo lectura · edición no disponible en este navegador' : query.offlineCacheProblem ? 'No se pudo preparar la copia sin conexión.' : pendingEvidenceReadFailed && guided ? 'Capturas locales sin verificar · cierre de campo no disponible' : !isOnline ? 'Sin conexión · trabajando en este dispositivo' : pendingEvidence.length + ' capturas pendientes de enviar'}</span><ChevronDown size={16} className="shrink-0" /></summary>
+      <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 font-medium text-neutral-700"><span>{storageFailed ? 'Guardado local no confirmado · no cierres esta pantalla' : guided && draftOwnership.status !== 'owned' ? draftOwnership.status === 'blocked' ? 'Solo lectura · otra pestaña está editando' : draftOwnership.status === 'checking' ? 'Comprobando disponibilidad de edición' : 'Solo lectura · edición no disponible en este navegador' : query.offlineCacheProblem ? 'No se pudo preparar la copia sin conexión.' : pendingEvidenceReadFailed && guided ? 'Capturas locales sin verificar · cierre de campo no disponible' : !isOnline ? 'Sin conexión · trabajando en este dispositivo' : pendingEvidence.length + (pendingEvidence.length === 1 ? ' captura pendiente de enviar' : ' capturas pendientes de enviar')}</span><ChevronDown size={16} className="shrink-0" /></summary>
       <div className="space-y-2 pb-2">
     {query.offlineCacheProblem && <div role="alert" className="border-t border-neutral-200 py-3 text-sm text-amber-950">
       <p className="font-bold">No se pudo preparar la copia sin conexión.</p>
@@ -854,18 +868,18 @@ const InspeccionExpedientePage: React.FC = () => {
       {draftOwnership.status !== 'checking' && <Button variant="outline" onClick={draftOwnership.retry}>Reintentar edición</Button>}
     </div>}
     {pendingEvidenceReadFailed && guided && <div role="status" className="border-t border-neutral-200 py-3 text-sm text-amber-950"><p>No se confirmó la lectura de las capturas locales. El cambio de etapa queda bloqueado.</p><button type="button" className="mt-2 min-h-11 font-semibold" onClick={() => void refreshPendingEvidence().catch(() => toast.error('Cola local no disponible', 'Conservá tus archivos originales y no cierres la pantalla.'))}>Reintentar lectura de capturas</button></div>}
-    {(!isOnline || pendingEvidence.length > 0 || storageFailed) && <div role="status" className="flex flex-col gap-2 border-t border-neutral-200 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2">{isOnline ? <CloudUpload size={18} className="shrink-0" /> : <CloudOff size={18} className="shrink-0" />}{storageFailed ? 'No hay copia local confirmada; no cierres esta pantalla. Guardá en el servidor con conexión.' : !isOnline ? 'Sin conexión · revisá la confirmación de guardado local junto a cada comentario. Las capturas pendientes se muestran por separado.' : pendingEvidence.length + ' capturas pendientes de sincronización'}</span>{isOnline && pendingEvidence.length > 0 && <button type="button" onClick={() => void syncEvidence(true)} disabled={syncingEvidence || !canWriteDraft()} className="min-h-11 w-fit rounded-lg border border-amber-400 bg-white px-3 text-xs font-bold disabled:opacity-60">{syncingEvidence ? 'Sincronizando…' : 'Sincronizar ahora'}</button>}</div>}
+    {(!isOnline || pendingEvidence.length > 0 || storageFailed) && <div role="status" className="flex flex-col gap-2 border-t border-neutral-200 py-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-2">{isOnline ? <CloudUpload size={18} className="shrink-0" /> : <CloudOff size={18} className="shrink-0" />}{storageFailed ? 'No hay copia local confirmada; no cierres esta pantalla. Guardá en el servidor con conexión.' : !isOnline ? 'Sin conexión · revisá la confirmación de guardado local junto a cada comentario. Las capturas pendientes se muestran por separado.' : pendingEvidence.length + (pendingEvidence.length === 1 ? ' captura pendiente de sincronización' : ' capturas pendientes de sincronización')}</span>{isOnline && pendingEvidence.length > 0 && <button type="button" onClick={() => void syncEvidence(true)} disabled={syncingEvidence || !canWriteDraft()} className="min-h-11 w-fit rounded-lg border border-amber-400 bg-white px-3 text-xs font-bold disabled:opacity-60">{syncingEvidence ? 'Sincronizando…' : 'Sincronizar ahora'}</button>}</div>}
 
       </div>
     </details>}
     {recording && <div role="status" className="flex items-center justify-between gap-3 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-800"><span>Grabando audio de campo</span><Button variant="danger" size="sm" onClick={toggleRecording} leftIcon={<Square size={14} />}>Detener grabación</Button></div>}
     {staleDraft && <StaleDraftNotice serverVersion={inspection.version} draftVersion={staleDraft.version} conflicts={draftConflicts(draftFromInspection(inspection), staleDraft)} onRecover={recoverStaleDraft} onDiscard={discardStaleDraft} />}
-    <fieldset disabled={changingStage} className="min-h-0 min-w-0 flex-1"><InspectionWorkspace key={id} steps={steps} reference={reference} guided={guided} defaultStep={canEditReport && !canEdit ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id } : undefined} onBeforeNavigate={flushDraft} saveAction={guided && canWriteDraft() ?
+    <fieldset disabled={changingStage} className="min-h-0 min-w-0 flex-1"><InspectionWorkspace key={id} steps={steps} reference={reference} guided={guided} defaultStep={reportEditAllowed && !fieldEditAllowed ? 'informe-tecnico' : inspection.estado === 'EN_CAMPO' && fieldEditAllowed ? inspection.tipoActor ? 'checklist' : 'acta' : 'resumen'} resumeIdentity={currentUser?.id ? { userId: currentUser.id, inspectionId: inspection.id, owner } : undefined} onBeforeNavigate={flushDraft} saveAction={guided && canWriteDraft() ?
       <div data-testid="inspection-field-save-bar" className="flex min-w-0 items-center gap-2 sm:gap-4">
         <div className="flex min-h-11 min-w-0 flex-1 flex-col justify-center"><DraftSaveFeedback status={fieldSaveStatus} />{(dictating || fieldSaveDetail) && <p className="mt-1 text-xs leading-snug text-neutral-600">{dictating ? 'Dictado en curso · detenelo antes de salir.' : fieldSaveDetail}</p>}</div>
         {/* Keep the Android editor/keyboard in place until the ordinary click;
             moving focus on touch-down can move this footer before touch-up. */}
-        <Button aria-label={canEdit ? 'Guardar cambios' : 'Guardar informe'} className="shrink-0 max-sm:px-3" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onPointerDown={(event) => { if (event.pointerType === 'touch') event.preventDefault(); }} onClick={() => { void save(); }}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{canEdit ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
+        <Button aria-label={fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'} className="shrink-0 max-sm:px-3" leftIcon={<Save size={16} />} isLoading={savingDraft} disabled={saveDisabled || dictating || recording || saveStatus.tone === 'success'} onPointerDown={(event) => { if (event.pointerType === 'touch') event.preventDefault(); }} onClick={() => { void save(); }}><span className="sm:hidden">Guardar</span><span className="hidden sm:inline">{fieldEditAllowed ? 'Guardar cambios' : 'Guardar informe'}</span></Button>
         <Button variant="ghost" title="Salir y retomar" className="h-11 w-11 shrink-0 px-0 sm:w-auto sm:px-3" aria-label="Guardar y salir de la inspección" leftIcon={<ArrowLeft size={18} />} disabled={!draftReady || recording || dictating || uploadingItemId !== null || syncingEvidence || savingDraft || leavingDraft || changingStage || pendingEvidenceReadFailed} onClick={pauseFieldWork}><span className="hidden sm:inline">Salir y retomar</span></Button>
       </div> : undefined} /></fieldset>
     <input ref={cameraRef} aria-label="Tomar foto general" type="file" accept={INSPECTION_PHOTO_ACCEPT} capture="environment" className="hidden" onChange={uploadFromInput} />
@@ -1109,7 +1123,7 @@ export function EvidenceCard({ inspection, pendingEvidence, pendingActions, edit
         <Button variant="outline" size="sm" leftIcon={<Paperclip size={16} />} onClick={onFile}>Elegir archivo</Button>
       </div>}
     </div>
-    {inspection.evidencias.length === 0 ? <p className="rounded-lg bg-neutral-50 p-4 text-sm text-neutral-600">Aún no hay archivos en este expediente.</p> : <div className="space-y-2">{visible.map((evidence) => {
+    {inspection.evidencias.length === 0 ? <p className="rounded-lg bg-neutral-50 p-4 text-sm text-neutral-600">Aún no hay archivos incorporados al expediente.</p> : <div className="space-y-2">{visible.map((evidence) => {
       const linkedItem = evidence.itemId ? inspection.items.find((item) => item.id === evidence.itemId) : null;
       return <div key={evidence.id} className={`overflow-hidden rounded-xl border p-3 ${evidence.anuladaAt ? 'border-neutral-300 bg-neutral-100' : 'border-neutral-200 bg-white'}`}><div className="flex items-center gap-3">{evidence.tipo === 'FOTO' ? <div className="w-20 shrink-0 sm:w-24"><InspectionEvidenceImage inspectionId={inspection.id} evidenceId={evidence.id} alt={evidence.descripcion || evidence.nombreOriginal} preview className={`h-20 w-full rounded-lg object-cover ${evidence.anuladaAt ? 'grayscale opacity-60' : ''}`} /></div> : <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${evidence.tipo === 'AUDIO' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'} ${evidence.anuladaAt ? 'opacity-50' : ''}`}>{evidence.tipo === 'AUDIO' ? <FileAudio size={20} /> : <FileText size={20} />}</span>}<div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className={`min-w-0 break-words text-sm font-bold ${evidence.anuladaAt ? 'text-neutral-500 line-through' : 'text-[#10213A]'}`}>{evidence.nombreOriginal}</p>{evidence.anuladaAt && <span className="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-bold text-neutral-700">Anulada</span>}</div>{linkedItem && <p className="mt-1 w-fit rounded-full bg-primary-50 px-2 py-0.5 text-[10px] font-bold text-primary-800">Checklist · {linkedItem.codigo}</p>}{evidence.descripcion && <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-neutral-600">{evidence.descripcion}</p>}<p className="mt-1 text-xs text-neutral-500">{(evidence.bytes / 1024 / 1024).toFixed(1)} MB · {new Date(evidence.createdAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</p></div></div>{evidence.anuladaAt && <p className="mt-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-xs leading-relaxed text-neutral-700"><span className="font-bold">Motivo de anulación:</span> {evidence.motivoAnulacion || 'Sin motivo informado'}</p>}{editable && !evidence.anuladaAt && <EvidenceAnnulControl evidence={evidence} onAnnul={onAnnul} />}</div>;
     })}{inspection.evidencias.length > 5 && <button type="button" onClick={() => setShowAll((value) => !value)} className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-bold text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{showAll ? <ChevronUp size={15} /> : <ChevronDown size={15} />}{showAll ? 'Mostrar menos' : `Ver las ${inspection.evidencias.length} evidencias`}</button>}</div>}

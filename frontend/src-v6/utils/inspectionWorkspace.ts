@@ -12,6 +12,11 @@ export function inspectionContextKey(userId: string | number, owner: string, ins
   return userId && owner && inspectionId ? `${userId}:context-v2:${JSON.stringify([owner, inspectionId])}` : '';
 }
 
+export function inspectionFieldDraftKey(userId: string | number, owner: string, inspectionId: string): string {
+  const context = inspectionContextKey(userId, owner, inspectionId);
+  return context ? `sitrep_inspection_draft_${context}` : '';
+}
+
 export const INSPECTION_FILTER_KEYS = ['search', 'estado', 'etapa', 'tipoActor', 'tipoInspeccion', 'actorId', 'page', 'vista', 'filtros', 'agendaEstado', 'agendaDesde', 'agendaHasta', 'agendaPage', 'agendaFecha', 'agendaFiltros'] as const;
 
 export function inspectionPage(value: string | null): number {

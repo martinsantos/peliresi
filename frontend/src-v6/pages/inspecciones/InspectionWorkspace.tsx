@@ -22,7 +22,7 @@ interface Props {
   defaultStep: string;
   saveAction?: React.ReactNode;
   onBeforeNavigate: () => boolean | void;
-  resumeIdentity?: { userId: string | number; inspectionId: string };
+  resumeIdentity?: { userId: string | number; inspectionId: string; owner: string };
 }
 
 const sections = [
@@ -61,6 +61,7 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   const editableSection = steps.some((step) => step.id === active.id);
   const resumeUserId = resumeIdentity?.userId;
   const resumeInspectionId = resumeIdentity?.inspectionId;
+  const resumeOwner = resumeIdentity?.owner;
 
   // On Android, the keyboard can pan/shrink visualViewport while h-full/dvh
   // still describe the larger layout viewport. Keep the ordinary flex footer
@@ -105,9 +106,9 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   }, []);
 
   useEffect(() => {
-    if (!resumeUserId || !resumeInspectionId) return;
-    saveInspectionResume(resumeUserId, resumeInspectionId, location.hash || '#' + active.id, resumeLabel);
-  }, [resumeUserId, resumeInspectionId, location.hash, active.id, resumeLabel]);
+    if (!resumeUserId || !resumeInspectionId || !resumeOwner) return;
+    saveInspectionResume(resumeUserId, resumeInspectionId, location.hash || '#' + active.id, resumeLabel, resumeOwner);
+  }, [resumeUserId, resumeInspectionId, resumeOwner, location.hash, active.id, resumeLabel]);
 
   // Each section owns its reading position; the shell and tabs never scroll.
   useLayoutEffect(() => {
@@ -124,7 +125,7 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
   // Remember the actual visible field, without changing browser history or
   // adding another navigation bar. This also covers manual long-list scrolling.
   useEffect(() => {
-    if (!resumeUserId || !resumeInspectionId || !active.anchors?.length) return;
+    if (!resumeUserId || !resumeInspectionId || !resumeOwner || !active.anchors?.length) return;
     let frame = 0;
     const remember = () => {
       cancelAnimationFrame(frame);
@@ -137,13 +138,13 @@ export function InspectionWorkspace({ steps, reference, defaultStep, saveAction,
         const current = candidates.find((element) => element.getBoundingClientRect().top >= edge - 8) || candidates[0];
         const point = current?.dataset.inspectionAnchor;
         const entry = active.anchors?.find((anchor) => point === active.id + '/' + anchor.id);
-        if (point && entry) saveInspectionResume(resumeUserId, resumeInspectionId, '#' + point, active.label + ' · ' + entry.label);
+        if (point && entry) saveInspectionResume(resumeUserId, resumeInspectionId, '#' + point, active.label + ' · ' + entry.label, resumeOwner);
       });
     };
     const region = scrollRef.current;
     region?.addEventListener('scroll', remember);
     return () => { region?.removeEventListener('scroll', remember); cancelAnimationFrame(frame); };
-  }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId, constrainedViewport]);
+  }, [active.id, active.anchors, active.label, resumeUserId, resumeInspectionId, resumeOwner, constrainedViewport]);
 
   const go = (event: React.MouseEvent<HTMLAnchorElement>, step: InspectionWorkspaceStep) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;

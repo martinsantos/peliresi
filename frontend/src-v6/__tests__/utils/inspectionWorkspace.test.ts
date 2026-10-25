@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inspectionDateFilter, inspectionPage, inspectionReturnState, inspectionReturnTarget, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { inspectionDateFilter, inspectionFieldDraftKey, inspectionPage, inspectionReturnState, inspectionReturnTarget, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 
 const admin = { id: 'one', rol: 'ADMIN' };
 describe('inspection workspace continuity', () => {
@@ -25,5 +25,15 @@ describe('inspection workspace continuity', () => {
   it('separates account, role, inspector permission and CAP context', () => {
     const contexts = [admin, { ...admin, id: 'two' }, { ...admin, rol: 'ADMIN_OPERADOR' }, { ...admin, esInspector: true }, { ...admin, training: true }];
     expect(new Set(contexts.map(inspectionWorkspaceOwner)).size).toBe(contexts.length);
+  });
+
+  it('never reuses a field draft after actor, establishment or authorization changes', () => {
+    const company = { empresaId: 'company', actividadId: 'activity', establecimientoId: 'site', razonSocial: 'QA', rol: 'GENERADOR', actorId: 'actor', autorizacionId: 'auth', revision: 1, todasSedes: false, domicilioLegal: { calle: 'QA', localidad: 'QA', departamento: 'QA' } };
+    const base = { ...admin, actorId: 'actor', empresaContexto: company };
+    const contexts = [base, { ...base, actorId: 'other' }, ...[{ establecimientoId: 'other' }, { autorizacionId: 'other' }, { revision: 2 }].map(change => ({ ...base, empresaContexto: { ...company, ...change } }))];
+    const keys = contexts.map(user => inspectionFieldDraftKey(user.id, inspectionWorkspaceOwner(user), 'case'));
+    expect(new Set(keys).size).toBe(contexts.length);
+    expect(keys).not.toContain('sitrep_inspection_draft_one_case');
+    expect(inspectionFieldDraftKey('one', '', 'case')).toBe('');
   });
 });

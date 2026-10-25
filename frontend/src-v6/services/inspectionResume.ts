@@ -4,29 +4,30 @@ export interface InspectionResume {
   updatedAt: number;
 }
 
-const PREFIX = 'sitrep_inspection_resume_v1_';
+const PREFIX = 'sitrep_inspection_resume_v2_';
 
-function key(userId: string | number, inspectionId: string): string {
-  return `${PREFIX}${encodeURIComponent(String(userId))}_${encodeURIComponent(inspectionId)}`;
+function key(userId: string | number, inspectionId: string, owner: string): string {
+  return `${PREFIX}${encodeURIComponent(String(userId))}_${encodeURIComponent(JSON.stringify([owner, inspectionId]))}`;
 }
 
 /** Navigation only: never store a finding, actor data, or authentication here. */
-export function saveInspectionResume(userId: string | number, inspectionId: string, hash: string, label: string): void {
-  if (!userId || !inspectionId || !/^#[a-z-]+(?:\/[A-Za-z0-9_.~%+-]+)?$/.test(hash)) return;
+export function saveInspectionResume(userId: string | number, inspectionId: string, hash: string, label: string, owner: string): void {
+  if (!userId || !owner || !inspectionId || !/^#[a-z-]+(?:\/[A-Za-z0-9_.~%+-]+)?$/.test(hash)) return;
   try {
-    localStorage.setItem(key(userId, inspectionId), JSON.stringify({ hash, label: label.slice(0, 100), updatedAt: Date.now() } satisfies InspectionResume));
+    localStorage.setItem(key(userId, inspectionId, owner), JSON.stringify({ hash, label: label.slice(0, 100), updatedAt: Date.now() } satisfies InspectionResume));
   } catch { /* Private mode or storage pressure must not interrupt field work. */ }
 }
 
-export function readInspectionResume(userId: string | number, inspectionId: string): InspectionResume | null {
-  if (!userId || !inspectionId) return null;
+export function readInspectionResume(userId: string | number, inspectionId: string, owner: string): InspectionResume | null {
+  if (!userId || !owner || !inspectionId) return null;
   try {
-    const value = JSON.parse(localStorage.getItem(key(userId, inspectionId)) || 'null') as InspectionResume | null;
+    const value = JSON.parse(localStorage.getItem(key(userId, inspectionId, owner)) || 'null') as InspectionResume | null;
     return value && /^#[a-z-]+(?:\/[A-Za-z0-9_.~%+-]+)?$/.test(value.hash)
       && typeof value.label === 'string' && Number.isFinite(value.updatedAt) ? value : null;
   } catch { return null; }
 }
 
-export function clearInspectionResume(userId: string | number, inspectionId: string): void {
-  try { localStorage.removeItem(key(userId, inspectionId)); } catch { /* Best effort. */ }
+export function clearInspectionResume(userId: string | number, inspectionId: string, owner: string): void {
+  if (!owner) return;
+  try { localStorage.removeItem(key(userId, inspectionId, owner)); } catch { /* Best effort. */ }
 }

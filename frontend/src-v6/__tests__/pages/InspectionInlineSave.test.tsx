@@ -1,3 +1,4 @@
+import { inspectionFieldDraftKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
@@ -29,7 +30,7 @@ vi.mock('../../pages/inspecciones/InspectionTimeline', () => ({ InspectionTimeli
 vi.mock('../../pages/inspecciones/InspectionVerificationBlock', () => ({ InspectionVerificationBlock: () => <div /> }));
 vi.mock('../../pages/inspecciones/InspectionReport', () => ({ InspectionReport: () => <div /> }));
 
-const key = 'sitrep_inspection_draft_inspector-1_inspection-1';
+const key = inspectionFieldDraftKey('inspector-1', inspectionWorkspaceOwner({ id: 'inspector-1', rol: 'ADMIN', training: false }), 'inspection-1');
 const fixture: Inspection = {
   id: 'inspection-1', numero: 'I-2026-000012', numeroActa: null, tipoActor: 'GENERADOR', estado: 'EN_CAMPO',
   inspectorId: 'inspector-1', inspector: { id: 'inspector-1', nombre: 'Inspectora' },
@@ -69,7 +70,7 @@ describe('shared explicit save for the complete inspection draft', () => {
     expect(inspeccionService.downloadPdf).not.toHaveBeenCalled();
     auth.training = false;
     view.rerender(page());
-    expect(screen.getByRole('button', { name: 'Descargar expediente' })).toBeEnabled();
+    expect(await screen.findByRole('button', { name: 'Descargar expediente' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Otras descargas' })).toBeEnabled();
   });
 

@@ -1,3 +1,4 @@
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -173,7 +174,7 @@ describe('InspeccionesPage', () => {
       inspector: { id: 'admin-1', nombre: 'Inspectora' }, generador: { id: 'actor-1', razonSocial: 'Planta QA', cuit: '30-12345678-9' },
       updatedAt: '2026-09-22T12:00:00.000Z', createdAt: '2026-09-22T12:00:00.000Z', items: [], comparaciones: [], evidencias: [], eventos: [],
     } as Inspection;
-    saveInspectionResume('admin-1', 'inspection-1', '#checklist/DOC-01', 'Checklist regulatorio · Documentación vigente');
+    saveInspectionResume('admin-1', 'inspection-1', '#checklist/DOC-01', 'Checklist regulatorio · Documentación vigente', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }));
     mocks.useInspections.mockReturnValue({ data: { items: [inspection], total: 1, totalPages: 1, offline: true }, isLoading: false, isError: false, refetch: mocks.refetch });
     render(<MemoryRouter initialEntries={['/inspecciones']}><InspeccionesPage /></MemoryRouter>);
     expect(screen.getByRole('status')).toHaveTextContent('Sin conexión · copias de este dispositivo');

@@ -5,7 +5,7 @@ vi.mock('../../hooks/useCatalogos', () => ({ useCatalogoGeneradores: () => ({ da
 import type { Inspection, InspectionTechnicalReport } from '../../types/inspection';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
 
-import { inspectionReturnState, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
+import { inspectionFieldDraftKey, inspectionReturnState, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 function ReturnProbe() { const location = useLocation(); return <output aria-label="Destino de regreso">{location.pathname + location.search}</output>; }
 
 const useInspectionMock = vi.hoisted(() => vi.fn());
@@ -13,10 +13,11 @@ vi.mock('../../services/inspectionFieldCheckpoint', () => ({ readInspectionField
 const listPendingEvidenceMock = vi.hoisted(() => vi.fn());
 const transitionMock = vi.hoisted(() => vi.fn());
 const draftOwnershipMock = vi.hoisted(() => vi.fn());
+const authContext = vi.hoisted(() => ({ rol: 'ADMIN' }));
 vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => draftOwnershipMock() }));
 
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ currentUser: { id: 'admin-1', rol: 'ADMIN', nombre: 'Admin' } }),
+  useAuth: () => ({ currentUser: { id: 'admin-1', rol: authContext.rol, nombre: 'Admin' } }),
 }));
 
 vi.mock('../../hooks/useInspecciones', () => ({
@@ -150,10 +151,26 @@ function renderPage(inspection: Inspection, mobile = false, hash = '') {
 describe('InspeccionExpedientePage critical review UX', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    authContext.rol = 'ADMIN';
     localStorage.clear();
     listPendingEvidenceMock.mockResolvedValue([]);
     draftOwnershipMock.mockReturnValue({ status: 'owned', canWrite: () => true, retry: vi.fn() });
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it('isolates unsaved field testimony when the same account changes role and recovers it on return', async () => {
+    const inspection = inspectionFixture({ estado: 'EN_CAMPO' });
+    useInspectionMock.mockReturnValue({ data: inspection, isLoading: false, refetch: vi.fn() });
+    const page = () => <MemoryRouter initialEntries={['/inspecciones/inspection-1#acta']}><Routes><Route path="/inspecciones/:id" element={<InspeccionExpedientePage />} /></Routes></MemoryRouter>;
+    const view = render(page());
+    const field = await waitFor(() => { const input = view.container.querySelector<HTMLTextAreaElement>('#inspection-observations'); expect(input).toBeEnabled(); return input!; });
+    fireEvent.change(field, { target: { value: 'Apunte exclusivo de administración general sin guardar aún.' } });
+    authContext.rol = 'ADMIN_GENERADOR';
+    view.rerender(page());
+    await waitFor(() => expect(view.container.querySelector('#inspection-observations')).toHaveValue(inspection.observaciones));
+    authContext.rol = 'ADMIN';
+    view.rerender(page());
+    await waitFor(() => expect(view.container.querySelector('#inspection-observations')).toHaveValue('Apunte exclusivo de administración general sin guardar aún.'));
   });
 
   it.each(['/inspecciones', '/mobile/inspecciones'])('returns to the selected agenda from the actual dossier at %s', async path => {
@@ -285,7 +302,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
 
   it('preserves an older local draft and lets the reviewer recover it explicitly', async () => {
     const inspection = inspectionFixture();
-    const key = `sitrep_inspection_draft_admin-1_${inspection.id}`;
+    const key = inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), inspection.id);
     const olderDraft = {
       version: inspection.version - 1,
       observaciones: 'Trabajo local todavía no conciliado.',
@@ -313,9 +330,22 @@ describe('InspeccionExpedientePage critical review UX', () => {
     expect(await screen.findByDisplayValue('Objetivo conservado en el borrador anterior.')).toBeInTheDocument();
   });
 
+  it('locks field editing until the older local copy has been reconciled', async () => {
+    const inspection = inspectionFixture({ estado: 'EN_CAMPO' });
+    const key = inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), inspection.id);
+    localStorage.setItem(key, JSON.stringify({ version: inspection.version - 1, observaciones: 'Texto pendiente que requiere elección.' }));
+    const view = renderPage(inspection, false, '#acta');
+    const choice = await screen.findByRole('checkbox', { name: /Observaciones generales/ });
+    expect(view.container.querySelector('#inspection-observations')).toBeDisabled();
+    fireEvent.click(choice);
+    fireEvent.click(screen.getByRole('button', { name: /aplicar selección \(1\)/i }));
+    await waitFor(() => expect(view.container.querySelector('#inspection-observations')).toBeEnabled());
+    expect(view.container.querySelector('#inspection-observations')).toHaveValue('Texto pendiente que requiere elección.');
+  });
+
   it.each([false, true])('does not block a saved case before local acknowledgment (JSON key reorder: %s)', async (reorderKeys) => {
     const inspection = inspectionFixture({ estado: 'EN_CAMPO', plazoRespuestaAt: null });
-    const key = `sitrep_inspection_draft_admin-1_${inspection.id}`;
+    const key = inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), inspection.id);
     localStorage.setItem(key, JSON.stringify({
       version: inspection.version - 1, observaciones: inspection.observaciones,
       numeroActa: inspection.numeroActa, ubicacion: inspection.ubicacion, plazoRespuestaAt: '',
@@ -337,7 +367,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
 
   it('removes an older local draft only after an explicit discard action', async () => {
     const inspection = inspectionFixture();
-    const key = `sitrep_inspection_draft_admin-1_${inspection.id}`;
+    const key = inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), inspection.id);
     localStorage.setItem(key, JSON.stringify({
       version: inspection.version - 1,
       observaciones: 'Borrador a descartar por decisión humana.',
@@ -414,7 +444,7 @@ describe('InspeccionExpedientePage critical review UX', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
     fireEvent.click(screen.getByRole('link', { name: 'Datos declarados', exact: true }));
     expect(await screen.findByTestId('comparison-editor')).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem('sitrep_inspection_draft_admin-1_inspection-1') || '{}')).toMatchObject({ ubicacion: 'Ubicación validada en campo' });
+    expect(JSON.parse(localStorage.getItem(inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), 'inspection-1')) || '{}')).toMatchObject({ ubicacion: 'Ubicación validada en campo' });
     fireEvent.click(screen.getByRole('link', { name: 'Visita', exact: true }));
     expect(await screen.findByLabelText('Ubicación', { exact: true })).toHaveValue('Ubicación validada en campo');
     expect(screen.getByTestId('comparison-editor')).not.toBeVisible();
@@ -432,6 +462,6 @@ describe('InspeccionExpedientePage critical review UX', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Usar domicilio declarado: Registro fotografiado 100' }));
     expect(location).toHaveValue('Registro fotografiado 100');
     fireEvent.click(screen.getByRole('link', { name: 'Controles', exact: true }));
-    expect(JSON.parse(localStorage.getItem('sitrep_inspection_draft_admin-1_inspection-1') || '{}')).toMatchObject({ ubicacion: 'Registro fotografiado 100' });
+    expect(JSON.parse(localStorage.getItem(inspectionFieldDraftKey('admin-1', inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }), 'inspection-1')) || '{}')).toMatchObject({ ubicacion: 'Registro fotografiado 100' });
   });
 });

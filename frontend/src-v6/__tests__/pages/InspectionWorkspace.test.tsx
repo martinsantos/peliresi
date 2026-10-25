@@ -7,7 +7,7 @@ import { readInspectionResume } from '../../services/inspectionResume';
 function setup(hash = '') {
   const onBeforeNavigate = vi.fn();
   render(<MemoryRouter initialEntries={['/inspecciones/qa' + hash]}>
-    <InspectionWorkspace guided defaultStep="contexto" onBeforeNavigate={onBeforeNavigate} resumeIdentity={{ userId: 'inspector-1', inspectionId: 'qa' }}
+    <InspectionWorkspace guided defaultStep="contexto" onBeforeNavigate={onBeforeNavigate} resumeIdentity={{ userId: 'inspector-1', inspectionId: 'qa', owner: 'context-A' }}
       saveAction={<button>Guardar borrador</button>}
       steps={[
         { id: 'contexto', label: 'Contexto', title: 'Preparar visita', description: 'Datos generales', content: <input aria-label="Ubicación QA" defaultValue="" /> },
@@ -67,13 +67,13 @@ describe('InspectionWorkspace navigation contract', () => {
   it('keeps a mobile navigation landmark and exposes direct links to field points', () => {
     setup('#checklist/DOC-01');
     expect(screen.getByTestId('inspection-navigation')).toHaveClass('sticky', 'top-0');
-    expect(readInspectionResume('inspector-1', 'qa')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
+    expect(readInspectionResume('inspector-1', 'qa', 'context-A')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
     expect(screen.getByRole('region', { name: 'Controles' })).toBeVisible();
   });
 
   it('remembers the exact selected control for the next visit', () => {
     setup('#checklist/DOC-01');
-    expect(readInspectionResume('inspector-1', 'qa')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
+    expect(readInspectionResume('inspector-1', 'qa', 'context-A')).toMatchObject({ hash: '#checklist/DOC-01', label: 'Checklist · Documento' });
   });
 
   it('does not leave the current section when protecting the draft fails', () => {
