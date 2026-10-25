@@ -9,7 +9,7 @@ vi.mock('../../services/api',()=>({api:{request:mocks.request}}));
 beforeEach(()=>{localStorage.clear();sessionStorage.clear();});
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();mocks.request.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
 const company=(id:string,razonSocial:string)=>({id,cuit:'30712345671',razonSocial,revision:0,domicilioLegal:{calle:'Legal '+id,localidad:'Mendoza',departamento:'Capital'}});
-function setup(extra:Record<string,unknown>={}){
+function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;admin?:boolean}={}){
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
  const first=company('first','Alfa'),other=company('other','Beta');let changed=false,failSearch=false,detailFailure=0;
  mocks.request.mockImplementation(async({url,method,data})=>{
@@ -17,8 +17,8 @@ function setup(extra:Record<string,unknown>={}){
   if(url.startsWith('/empresas?')){
    const params=new URLSearchParams(url.split('?')[1]);
    if(failSearch&&params.get('search'))throw new Error('QA network unavailable');
-   const companies=params.get('search')||params.get('page')==='2'?[]:changed?[other,{...first,razonSocial:'Zeta',revision:1}]:[first,other];
-   return {data:{data:{empresas:companies,pagination:{page:Number(params.get('page')),limit:25,total:companies.length,totalPages:1},puedeValidar:false}}};
+   const companies=params.get('search')||params.get('page')==='2'?[]:changed?[other,{...first,razonSocial:'Zeta',revision:1}]:listOptions.single?[first]:[first,other];
+   return {data:{data:{empresas:companies,pagination:{page:Number(params.get('page')),limit:25,total:companies.length,totalPages:1},puedeValidar:!!listOptions.admin}}};
   }
   if(detailFailure)throw {response:{status:detailFailure}};
   const c=url.endsWith('/first')?{...first,...(changed?{razonSocial:'Zeta',revision:1}:{})}:other;
@@ -367,4 +367,32 @@ test('empty account explains where its actor information is without a useless se
  expect(await screen.findByText('No hay empresas vinculadas a esta cuenta')).toBeVisible();
  expect(screen.getByRole('link',{name:'Volver a Mi perfil'})).toHaveAttribute('href','/mi-perfil');
  expect(screen.queryByLabelText('Buscar empresa')).toBeNull();
+});
+
+test('one unfiltered company skips search while current role and changes remain accessible',async()=>{
+ mocks.user={...mocks.user,empresaContexto:{empresaId:'first',actividadId:'o',rol:'OPERADOR'}};
+ const choices=[{empresaId:'first',actividadId:'g',rol:'GENERADOR',establecimientos:[],todosEstablecimientos:true},{empresaId:'first',actividadId:'o',rol:'OPERADOR',establecimientos:[],todosEstablecimientos:true}];
+ setup({contextos:choices},{single:true});await screen.findByLabelText('Calle legal');
+ expect(screen.queryByRole('region',{name:'Buscar y seleccionar empresa'})).toBeNull();
+ const details=screen.getByLabelText('Cambiar contexto de trabajo');expect(details).not.toHaveAttribute('open');
+ expect(screen.getByText('Cambiar actividad o sede')).toBeVisible();
+ expect(screen.getByLabelText('Actividad autorizada')).toHaveValue('o');
+ fireEvent.click(screen.getByText('Cambiar actividad o sede'));
+ expect(screen.getByLabelText('Actividad autorizada')).toBeVisible();
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Pendiente sin cerrar'}});
+ fireEvent.click(screen.getByText('Cambiar actividad o sede'));
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('Pendiente sin cerrar');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('public administrators keep directory search even with a single matching company',async()=>{
+ setup({}, {single:true,admin:true});await screen.findByLabelText('Calle legal');
+ expect(screen.getByRole('region',{name:'Buscar y seleccionar empresa'})).toBeVisible();
+});
+test('a filtered directory never collapses into a single-company context',async()=>{
+ setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Buscar empresa'),{target:{value:'Sin coincidencias QA'}});
+ fireEvent.click(screen.getByRole('button',{name:'Buscar'}));
+ await screen.findByText('Sin coincidencias');
+ expect(screen.getByRole('button',{name:'Limpiar búsqueda'})).toBeVisible();
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('first');
 });

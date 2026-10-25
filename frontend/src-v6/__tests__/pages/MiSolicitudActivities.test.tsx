@@ -20,14 +20,14 @@ it('opens the requested own application from the activity button', () => {
   vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true');
   render(<MemoryRouter initialEntries={['/mi-solicitud?solicitud=o']}><MiSolicitudPage /></MemoryRouter>);
   expect(screen.getByLabelText('Solicitud por actividad')).toHaveValue('o');
-  expect(screen.getByText('Tipo: OPERADOR')).toBeVisible();
+  expect(screen.getByText('Inscripción de Operador')).toBeVisible();
 });
 it('keeps unsent conversations separate when selecting another application', () => {
   vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true');
   render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
   fireEvent.change(screen.getByPlaceholderText('Escribe un mensaje...'), { target: { value: 'Consulta del generador sin enviar' } });
   fireEvent.change(screen.getByLabelText('Solicitud por actividad'), { target: { value: 'o' } });
-  expect(screen.getByText('Tipo: OPERADOR')).toBeVisible();
+  expect(screen.getByText('Inscripción de Operador')).toBeVisible();
   expect(screen.getByPlaceholderText('Escribe un mensaje...')).toHaveValue('');
   fireEvent.change(screen.getByPlaceholderText('Escribe un mensaje...'), { target: { value: 'Consulta del operador sin enviar' } });
   fireEvent.change(screen.getByLabelText('Solicitud por actividad'), { target: { value: 'g' } });

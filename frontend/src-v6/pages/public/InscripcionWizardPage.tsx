@@ -43,6 +43,7 @@ import {
 } from './inscripcion/shared';
 
 // Step components
+import { RegistrationFrame } from './inscripcion/RegistrationFrame';
 import { StepCuenta } from './inscripcion/steps/StepCuenta';
 import { StepEmpresa } from './inscripcion/steps/StepEmpresa';
 import { StepDocumentos } from './inscripcion/steps/StepDocumentos';
@@ -70,6 +71,13 @@ function receivedState(value: unknown): value is ReceivedState {
 // ========================================
 
 const InscripcionWizardPage: React.FC = () => {
+  const { tipo } = useParams<{ tipo: string }>();
+  const labels: Record<string,string> = { generador: 'Generador', transportista: 'Transportista', operador: 'Operador' };
+  const label = labels[tipo || ''];
+  return <RegistrationFrame title={label ? `Inscripción como ${label}` : 'Inscripción'}><InscripcionWizardContent /></RegistrationFrame>;
+};
+
+const InscripcionWizardContent: React.FC = () => {
   const { tipo } = useParams<{ tipo: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -700,7 +708,7 @@ const InscripcionWizardPage: React.FC = () => {
 
   if (!isGenerador && !isOperador && !isTransportista) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
+      <div className="flex items-start justify-center">
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-8 max-w-md text-center">
           <AlertCircle size={48} className="text-error-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-neutral-900 mb-2">Tipo invalido</h2>
@@ -719,7 +727,7 @@ const InscripcionWizardPage: React.FC = () => {
     const receipt = confirmedState ? RECEIVED_STATES[confirmedState] : RECEIVED_STATES.ENVIADA;
     const CompletionIcon = isReviewMode || confirmedState === 'APROBADA' ? Check : confirmedState === 'RECHAZADA' ? AlertCircle : Send;
     return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
+      <div className="flex items-start justify-center">
         <div className="min-w-0 w-full bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 sm:p-8 max-w-lg text-center">
           <div className="w-16 h-16 bg-[#0D8A4F]/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <CompletionIcon size={32} className={confirmedState === 'RECHAZADA' ? 'text-error-700' : 'text-[#0D8A4F]'} />
@@ -780,13 +788,10 @@ const InscripcionWizardPage: React.FC = () => {
   const isLastStep = step === totalSteps;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 px-3 py-5 sm:px-4 sm:py-8">
-      <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6" data-testid="registration-wizard">
+    <div className="min-w-0">
+      <div className="w-full space-y-4 sm:space-y-6" data-testid="registration-wizard">
         {/* Header */}
         <header className="space-y-3" data-testid="registration-identity">
-          <h2 className="text-xl font-bold text-neutral-900 sm:text-2xl">
-            Inscripción como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
-          </h2>
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <div aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
@@ -798,8 +803,8 @@ const InscripcionWizardPage: React.FC = () => {
               </div>
               <p className="text-sm leading-5 text-neutral-600">Paso {step} de {totalSteps} · {steps[step - 1]?.label}</p>
             </div>
-            <button type="button" onClick={() => navigate(-1)} aria-label="Volver a la pantalla anterior" className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
-              <ArrowLeft size={16} aria-hidden="true" /> Volver
+            <button type="button" onClick={() => navigate(owner ? "/mi-solicitud" : "/login")} aria-label={owner ? "Volver a Mi solicitud" : "Volver al acceso"} className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+              <ArrowLeft size={16} aria-hidden="true" /> {owner ? "Mi solicitud" : "Acceso"}
             </button>
           </div>
         </header>
@@ -822,7 +827,7 @@ const InscripcionWizardPage: React.FC = () => {
                     }`}>
                       {hasErr ? <AlertCircle size={16} /> : s.id}
                     </div>
-                    <span className={`block max-w-full text-center text-xs font-medium leading-tight ${
+                    <span className={`block max-w-full text-center text-sm font-medium leading-tight ${
                       hasErr ? 'text-error-700' : isActive ? 'text-primary-800' : isDone ? 'text-primary-700' : 'text-neutral-600'
                     }`}>{s.label}</span>
                   </button>

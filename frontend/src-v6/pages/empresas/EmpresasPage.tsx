@@ -1,6 +1,7 @@
 import { CompanyDraftNotice, CompanyRevisionNotice, companyDraftKey, useCompanyRevisionDraft } from '../../components/CompanyRevisionDraft';
 import { CompanyPeopleSummary, type CompanyCapacity } from '../../components/CompanyPeopleSummary';
 import ImpersonationContext from '../../contexts/ImpersonationContext';
+import { ChevronDown } from 'lucide-react';
 import { Activity,useContext,useEffect,useRef,useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -35,13 +36,14 @@ function CompanyWorkspace({scope}:{scope:string}){
  const requested=requestedId&&/^[a-zA-Z0-9_-]{1,100}$/.test(requestedId)?requestedId:undefined;
  const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',scope,temporary,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:!!currentUser&&!temporary&&import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
  // Pin the initial choice too: editing its name may change the server sort order.
- useEffect(()=>{if(!choice&&!requested&&list.data?.empresas[0])setChoice(list.data.empresas[0]);},[choice,list.data,requested]);
+ useEffect(()=>{if(!choice&&!requested&&list.data?.empresas[0])setChoice(list.data.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data.empresas[0]);},[choice,list.data,requested]);
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true')return <p>Funcionalidad no disponible.</p>;
  if(temporary)return <div className="mx-auto max-w-3xl space-y-4"><Link to={mp('/mi-perfil')} className="inline-flex min-h-11 items-center text-primary-800 underline">Volver a Mi perfil</Link><Card><h2 className="text-lg font-semibold">Gestión desde la cuenta responsable</h2><p className="mt-2 text-sm text-neutral-600">La gestión de empresas se realiza desde la cuenta del responsable. La vista temporal permite consultar la ficha del actor.</p></Card></div>;
- const selected=choice||(!requested?list.data?.empresas[0]:undefined);
+ const selected=choice||(!requested?list.data?.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data?.empresas[0]:undefined);
+ const singleCompany=!search&&page===1&&!list.data?.puedeValidar&&list.data?.pagination.total===1&&list.data.empresas.length===1&&selected?.id===list.data.empresas[0].id;
  return <div className="mx-auto w-full max-w-5xl space-y-5 pb-6">
   <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Volver a Mi perfil</Link>
-  {(list.data && (list.data.empresas.length>0 || !!selected || !!search || page>1))&&<CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
+  {(!singleCompany && ((list.data?.empresas.length||0)>0 || !!selected || !!search || page>1))&&<CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
    onChoose={id=>setChoice(list.data?.empresas.find(c=>c.id===id)||selected)}
    onPage={next=>{setChoice(selected);setPage(next);}}
    onSearch={value=>{setChoice(selected);setPage(1);setSearch(value);}}/>}
@@ -91,7 +93,7 @@ function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:
  return <>
   {query.isError&&<div ref={recoveryNotice} tabIndex={-1} role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 focus:outline-none focus:ring-2 focus:ring-primary-700"><p>{awaitingRead?'El cambio fue registrado, pero no pudimos actualizar la empresa. Reintentá la consulta; no vuelvas a enviar el cambio.':'No pudimos actualizar la empresa. Conservamos lo escrito; reintentá la consulta antes de continuar.'}</p><Button variant="outline" disabled={query.isFetching} onClick={()=>void query.refetch()}>Reintentar empresa</Button></div>}
   <fieldset disabled={busy||query.isError||awaitingRead} className="min-w-0 space-y-5">
-  <WorkspaceChoices choices={d.contextos||[]}/>
+  <WorkspaceChoices key={id} choices={d.contextos||[]}/>
   <nav className="flex gap-2 overflow-x-auto border-b border-neutral-200" aria-label="Secciones de empresa">{[['empresa','Empresa'],['sedes','Establecimientos'],['personas','Personas autorizadas'],['historial','Historial']].filter(([key])=>d.puedeGestionar||!['personas','historial'].includes(key)).map(([key,title])=><button type="button" key={key} className={'min-h-11 shrink-0 border-b-2 px-3 font-medium '+(tab===key?'border-primary-700 text-primary-800':'border-transparent text-neutral-600')} aria-current={tab===key?'page':undefined} onClick={()=>{setOpenedTabs(opened=>({...opened,[key]:true}));setTab(key);}}>{title}</button>)}</nav>
   {error&&<p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-error-800">{error}</p>}{notice&&<p role="status" className="text-primary-800">{notice}</p>}
   {/* Keep visited forms mounted; hidden sections pause effects and stay out of keyboard navigation. */}
@@ -111,9 +113,11 @@ function WorkspaceChoices({choices}:{choices:CompanyChoice[]}){
   else if(choice){const next={empresaId:choice.empresaId,actividadId:choice.actividadId,...(siteId?{establecimientoId:siteId}:{})};const result=await api.get('/auth/profile',{headers:companyHeaders(next)});if(result.data.data.user.empresaContexto?.empresaId!==next.empresaId)throw new Error('Contexto incompatible');saveCompanyContext(String(currentUser.id),next);}
   clearOfflineSession();window.location.replace((window.location.pathname.startsWith('/app/')?'/app':'')+mp('/dashboard'));
  }catch(e){setError(message(e));setBusy(false);lock.current=false;}}
- return <Card><h2 className="font-semibold mb-3">Actuar por esta empresa</h2>{choice?<div className="grid gap-3 sm:grid-cols-2"><NativeSelect label="Actividad autorizada" value={choice.actividadId} onChange={v=>{setSelection(v);setSite('');}}>{choices.map(c=><option key={c.actividadId} value={c.actividadId}>{labels[c.rol]||c.rol}</option>)}</NativeSelect><NativeSelect label="Establecimiento para operar" value={siteId} onChange={setSite}>{!choice.establecimientos.length&&<option value="">Sin establecimiento cargado</option>}{choice.establecimientos.map(s=><option key={s.id} value={s.id}>{s.nombre} · {s.codigo}</option>)}</NativeSelect><Button disabled={busy||!choice.todosEstablecimientos&&!siteId} onClick={()=>void choose()}>Usar empresa y establecimiento</Button></div>:<p>La validación como responsable permite gestionar la empresa. Para operar necesitás una actividad autorizada.</p>}
+ const active=currentUser?.empresaContexto;
+ const inThisCompany=choices.some(c=>c.empresaId===active?.empresaId);
+ return <details open={!inThisCompany||undefined} className="group rounded-xl border border-neutral-200 bg-white px-4" aria-label="Cambiar contexto de trabajo"><summary className="flex min-h-11 cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 font-medium text-primary-800"><span className="flex items-center gap-2"><ChevronDown size={16} aria-hidden="true" className="shrink-0 group-open:rotate-180"/>{inThisCompany?'Cambiar actividad o sede':'Actuar por esta empresa'}</span>{inThisCompany&&<span className="text-sm font-normal text-neutral-700">{labels[active!.rol]||active!.rol}{active?.establecimiento?' · '+active.establecimiento.nombre:''}</span>}</summary><div className="border-t border-neutral-200 py-4">{choice?<div className="grid gap-3 sm:grid-cols-2"><NativeSelect label="Actividad autorizada" value={choice.actividadId} onChange={v=>{setSelection(v);setSite('');}}>{choices.map(c=><option key={c.actividadId} value={c.actividadId}>{labels[c.rol]||c.rol}</option>)}</NativeSelect><NativeSelect label="Establecimiento para operar" value={siteId} onChange={setSite}>{!choice.establecimientos.length&&<option value="">Sin establecimiento cargado</option>}{choice.establecimientos.map(s=><option key={s.id} value={s.id}>{s.nombre} · {s.codigo}</option>)}</NativeSelect><Button disabled={busy||!choice.todosEstablecimientos&&!siteId} onClick={()=>void choose()}>Usar empresa y establecimiento</Button></div>:<p>La validación como responsable permite gestionar la empresa. Para operar necesitás una actividad autorizada.</p>}
   {currentUser?.empresaContexto&&<Button className="mt-3" variant="outline" disabled={busy} onClick={()=>void choose(true)}>Volver a mi cuenta personal</Button>}{error&&<p role="alert" className="mt-2 text-error-700">{error}</p>}
- </Card>;
+ </div></details>;
 }
 type CompanyFormProps={company:Company;manage:boolean;busy:boolean;save:CompanySave;draftKey:string};
 function CompanyForm(props:CompanyFormProps){

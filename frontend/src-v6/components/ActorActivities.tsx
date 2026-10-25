@@ -12,12 +12,12 @@ import { Card } from './ui/CardV2';
 import { Button } from './ui/ButtonV2';
 
 const labels = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' };
-export default function ActorActivities() {
+export default function ActorActivities({ mode = 'switch' }: { mode?: 'switch' | 'request' }) {
   const { currentUser } = useAuth();
   if (import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED !== 'true' || !currentUser || currentUser.empresaContexto || !(currentUser.rol in labels)) return null;
-  return <ActivityChoices key={currentUser.id} />;
+  return <ActivityChoices key={currentUser.id} mode={mode} />;
 }
-function ActivityChoices() {
+function ActivityChoices({ mode }: { mode: 'switch' | 'request' }) {
   const { currentUser, isRestricted } = useAuth();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
@@ -56,8 +56,10 @@ function ActivityChoices() {
       setError(failure.response?.data?.message || 'No se pudo confirmar la actividad. Tu sesión sigue igual.');
     } finally { lock.current = false; setBusy(false); }
   }
-  return <Card><h2 className="font-semibold mb-3">Roles de mi cuenta</h2><p className="mb-3 text-sm text-neutral-600">Elegí el rol con el que vas a trabajar.</p>
-    <div className="flex flex-wrap gap-2">{(Object.keys(labels) as Array<keyof typeof labels>).map(type => {
+  const choices = (Object.keys(labels) as Array<keyof typeof labels>).filter(type => mode !== 'request' || (!activities.includes(type) && !applications.data?.some(item => item.tipoActor === type && item.estado !== 'RECHAZADA')));
+  if (mode === 'request' && applications.isSuccess && !choices.length) return null;
+  return <Card><h2 className="font-semibold mb-3">{mode === 'request' ? 'Sumar otra actividad' : 'Roles de mi cuenta'}</h2><p className="mb-3 text-sm text-neutral-600">{mode === 'request' ? 'Con la misma cuenta y CUIT. Cada actividad requiere aprobación.' : 'Elegí el rol con el que vas a trabajar.'}</p>
+    <div className="flex flex-wrap gap-2">{choices.map(type => {
       const approved = activities.includes(type);
       const inUse = !isRestricted && currentUser.rol === type;
       const application = applications.data?.find(item => item.tipoActor === type && item.estado !== 'RECHAZADA');

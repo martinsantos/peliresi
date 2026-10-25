@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import AuthLayout from '../../layouts/AuthLayout';
 import InscripcionWizardPage from '../../pages/public/InscripcionWizardPage';
 
 const requests = vi.hoisted(() => ({ getRequirements: vi.fn(), put: vi.fn(), post: vi.fn() }));
@@ -31,12 +32,13 @@ describe('Shared registration navigation keeps identity, steps and data stable',
   ] as const)('%s does not indent its title or move the viewport while typing', async (type, label, total, secondStep) => {
     await act(async () => {
       render(<MemoryRouter initialEntries={[`/inscripcion/${type}?modo=revision`]}><Routes>
-        <Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} />
+        <Route element={<AuthLayout/>}><Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} /></Route>
       </Routes></MemoryRouter>);
     });
     const identity = screen.getByTestId('registration-identity');
-    expect(identity.firstElementChild).toBe(screen.getByRole('heading', { name: `Inscripción como ${label}` }));
-    expect(within(identity).getByRole('button', { name: 'Volver a la pantalla anterior' })).toHaveTextContent('Volver');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: `Inscripción como ${label}` })).toBeVisible();
+    expect(within(identity).getByRole('button', { name: 'Volver al acceso' })).toHaveTextContent('Acceso');
     expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'instant' });
     expect(railScroll).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'center', behavior: 'instant' });
     const rail = screen.getByRole('navigation', { name: 'Etapas de la inscripción' });

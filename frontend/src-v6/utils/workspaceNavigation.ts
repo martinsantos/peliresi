@@ -65,6 +65,7 @@ export function workspaceTitle(pathname: string): string {
     [/^\/transporte\/cargas/, 'GPS de mis viajes'],
     [/^\/transporte\/viaje\//, 'Viaje en curso'],
     [/^\/mi-perfil/, 'Mi perfil'],
+    [/^\/mi-solicitud(?:\/|$)/, 'Mi solicitud'],
     [/^\/empresas/, 'Empresas y establecimientos'],
     [/^\/tracking/, 'Seguimiento GPS'],
     [/^\/estadisticas/, 'Estadísticas'],
@@ -86,7 +87,7 @@ export function workspaceSectionPath(pathname: string, user?: User | null, state
   const path = pathname.replace(/^\/(?:app|mobile)(?=\/)/, '');
   if (/^\/(?:requerimientos|mis-inspecciones)(?:\/|$)/.test(path)) return '/notificaciones';
   if (/^\/transporte\/(?:viaje|cargas)(?:\/|$)/.test(path)) return '/transporte/perfil';
-  if (/^\/empresas(?:\/|$)/.test(path)) return '/mi-perfil';
+  if (/^\/(?:empresas|mi-solicitud)(?:\/|$)/.test(path)) return '/mi-perfil';
   return path;
 }
 

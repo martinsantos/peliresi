@@ -5,7 +5,7 @@ import { identityCuit } from '../../../../utils/identityCuit';
 import React, { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowRight, Factory, FlaskConical, Truck, Eye, EyeOff,
+  ArrowLeft, ArrowRight, Eye, EyeOff,
 } from 'lucide-react';
 import { Button } from '../../../../components/ui/ButtonV2';
 import axios from 'axios';
@@ -36,8 +36,6 @@ interface StepCuentaProps {
 
 export const StepCuenta: React.FC<StepCuentaProps> = ({
   tipoActor,
-  isGenerador,
-  isOperador,
   reg,
   onRegChange,
   onPhase2,
@@ -107,29 +105,13 @@ export const StepCuenta: React.FC<StepCuentaProps> = ({
   const rErr = regAttempted ? regErrors() : {};
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
-            {isGenerador
-              ? <Factory size={28} className="text-purple-600" />
-              : isOperador ? <FlaskConical size={28} className="text-blue-600" />
-              : <Truck size={28} className="text-orange-600" />
-            }
-          </div>
-          <h1 className="text-2xl font-bold text-neutral-900">
-            Inscripcion como {isGenerador ? 'Generador' : isOperador ? 'Operador' : 'Transportista'}
-          </h1>
-          <p className="text-sm text-neutral-500 mt-1">
-            Registro Provincial de {isGenerador ? 'Generadores' : isOperador ? 'Operadores' : 'Transportistas'} de RRPP - Ley 5917
-          </p>
-        </div>
-
+    <div className="w-full max-w-lg space-y-4">
+      <Button variant="outline" leftIcon={<ArrowLeft size={16}/>} onClick={() => navigate('/login')}>Volver al acceso</Button>
+      <div>
         {/* Registration Form */}
         <RegisteredAccount type={tipoActor}>
-        <form noValidate onSubmit={event => { event.preventDefault(); void handleRegistration(); }} className="bg-white rounded-2xl border border-neutral-200 shadow-lg p-6 space-y-4">
-          <h3 className="text-base font-semibold text-neutral-800">Crear cuenta</h3>
+        <form noValidate onSubmit={event => { event.preventDefault(); void handleRegistration(); }} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-neutral-800">Crear cuenta</h2>
 
           <div>
             <label htmlFor="registration-name" className={labelCls}>Nombre completo *</label>

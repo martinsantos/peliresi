@@ -10,6 +10,8 @@ export const AuthLayout: React.FC = () => {
   const location = useLocation();
   const isRegistrationWizard = location.pathname.startsWith('/inscripcion/');
 
+  if (isRegistrationWizard) return <><DemoEnvironmentBanner /><Outlet /></>;
+
   return (
     <div className="min-h-screen flex flex-col">
       <DemoEnvironmentBanner />

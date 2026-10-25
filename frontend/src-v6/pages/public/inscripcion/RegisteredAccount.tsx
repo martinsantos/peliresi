@@ -26,7 +26,7 @@ export function RegisteredAccount({ type, children }: { type: TipoActor; childre
   }, [type]);
   if (!actor) return children;
   return <section className="rounded-2xl border border-neutral-200 bg-white p-6 space-y-4" aria-label="Datos de tu padrón">
-    <h3 className="text-lg font-semibold text-neutral-900">Ya estás en el padrón</h3>
+    <h2 className="text-lg font-semibold text-neutral-900">Ya estás en el padrón</h2>
     <dl className="space-y-2 text-sm"><div><dt className="text-neutral-600">Razón social</dt><dd className="font-semibold text-neutral-900">{actor.razonSocial}</dd></div><div><dt className="text-neutral-600">CUIT</dt><dd className="text-neutral-900">{actor.cuit}</dd></div><div><dt className="text-neutral-600">Domicilio registrado</dt><dd className="text-neutral-900">{actor.domicilio || 'Sin domicilio registrado'}</dd></div></dl>
     <p className="text-sm leading-6 text-neutral-700">Estos datos provienen de tu cuenta verificada. No hace falta crear otra cuenta ni duplicar la ficha.</p>
     <Button fullWidth onClick={() => navigate(type === 'TRANSPORTISTA' ? '/mi-perfil' : '/mi-perfil/solicitar-cambios')}>{type === 'TRANSPORTISTA' ? 'Revisar mi ficha y documentación' : 'Revisar mis datos precargados'}</Button>

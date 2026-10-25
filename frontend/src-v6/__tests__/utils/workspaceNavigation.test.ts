@@ -38,6 +38,8 @@ describe('Shared web/app workspace contract',()=>{
  });
  it.each(['','/mobile','/app'])('uses consistent titles on %s',prefix=>{
   expect(workspaceTitle(prefix+'/empresas')).toBe('Empresas y establecimientos');
+  expect(workspaceTitle(prefix+'/mi-solicitud')).toBe('Mi solicitud');
+  expect(workspaceSectionPath(prefix+'/mi-solicitud')).toBe('/mi-perfil');
   expect(workspaceTitle(prefix+'/manifiestos/abc')).toBe('Manifiestos');
   expect(workspaceTitle(prefix+'/requerimientos/abc')).toBe('Requerimiento');
   expect(workspaceTitle(prefix+'/notificaciones')).toBe('Avisos');

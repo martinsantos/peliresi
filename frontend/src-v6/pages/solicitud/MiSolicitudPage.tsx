@@ -30,22 +30,16 @@ const ESTADO_CONFIG: Record<EstadoSolicitud, {
   label: string;
   color: 'neutral' | 'info' | 'warning' | 'success' | 'error';
   icon: typeof Clock;
-  stepIndex: number;
 }> = {
-  BORRADOR:    { label: 'Borrador',     color: 'neutral',  icon: FileText,      stepIndex: 0 },
-  ENVIADA:     { label: 'Enviada',      color: 'info',     icon: Send,          stepIndex: 1 },
-  EN_REVISION: { label: 'En Revision',  color: 'warning',  icon: Eye,           stepIndex: 2 },
-  OBSERVADA:   { label: 'Observada',    color: 'warning',  icon: AlertTriangle, stepIndex: 2 },
-  APROBADA:    { label: 'Aprobada',     color: 'success',  icon: CheckCircle,   stepIndex: 3 },
-  RECHAZADA:   { label: 'Rechazada',    color: 'error',    icon: XCircle,       stepIndex: 3 },
+  BORRADOR:    { label: 'Borrador',     color: 'neutral',  icon: FileText },
+  ENVIADA:     { label: 'Enviada',      color: 'info',     icon: Send },
+  EN_REVISION: { label: 'En revisión',  color: 'warning',  icon: Eye },
+  OBSERVADA:   { label: 'Observada',    color: 'warning',  icon: AlertTriangle },
+  APROBADA:    { label: 'Aprobada',     color: 'success',  icon: CheckCircle },
+  RECHAZADA:   { label: 'Rechazada',    color: 'error',    icon: XCircle },
 };
 
-const STEPS = [
-  { key: 'BORRADOR',    label: 'Borrador' },
-  { key: 'ENVIADA',     label: 'Enviada' },
-  { key: 'EN_REVISION', label: 'En Revision' },
-  { key: 'RESULTADO',   label: 'Resultado' },
-];
+const ACTOR_LABELS: Record<string,string> = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' };
 
 // ── Component ──
 
@@ -93,7 +87,7 @@ const MiSolicitudPage: React.FC = () => {
     setSelectedId(requestedId);
   }, [requestedId, selectedId, solicitudes]);
 
-  const { data: mensajes } = useMensajesSolicitud(solicitud?.id || '');
+  const { data: mensajes, isLoading: loadingMessages, isError: messageError, refetch: retryMessages } = useMensajesSolicitud(solicitud?.id || '');
   const enviarMensaje = useEnviarMensaje();
   const enviarSolicitud = useEnviarSolicitud();
 
@@ -161,44 +155,31 @@ const MiSolicitudPage: React.FC = () => {
   if (!solicitud) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-100 rounded-xl">
-            <FileText size={22} className="text-primary-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-neutral-900">Mi Solicitud de Inscripcion</h2>
-        </div>
         <Card className="text-center !py-16">
           <FileText size={48} className="text-neutral-300 mx-auto mb-4" />
-          <p className="text-neutral-600 mb-2">No tienes solicitudes de inscripcion</p>
-          <p className="text-sm text-neutral-400 mb-6">Inicia tu tramite para registrarte como Generador u Operador</p>
-          <Button variant="primary" onClick={() => navigate('/inscripcion/generador')}>
-            Iniciar Solicitud
-          </Button>
+          <p className="text-neutral-600 mb-2">Todavía no tenés solicitudes</p>
+          <p className="text-sm text-neutral-400 mb-6">Elegí la actividad que querés inscribir. Podés sumar otras con la misma cuenta.</p>
+          <div className="flex flex-wrap justify-center gap-2">{Object.entries(ACTOR_LABELS).map(([role,label])=><Button key={role} variant="outline" onClick={() => navigate('/inscripcion/'+role.toLowerCase())}>{label}</Button>)}</div>
         </Card>
       </div>
     );
   }
 
   const cfg = ESTADO_CONFIG[solicitud.estado];
-  const currentStep = cfg.stepIndex;
   const sentAt = solicitud.fechaEnvio ? new Date(solicitud.fechaEnvio) : null;
   const sentDate = sentAt && Number.isFinite(sentAt.getTime())
     ? sentAt.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) : null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary-100 rounded-xl">
-          <FileText size={22} className="text-primary-600" />
+    <div className="mx-auto w-full max-w-[960px] space-y-6 animate-fade-in">
+      <div className="flex flex-wrap items-start justify-between gap-3" aria-label="Solicitud seleccionada">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-neutral-900">Inscripción de {ACTOR_LABELS[solicitud.tipoActor] || solicitud.tipoActor}</h2>
+          {sentDate && <p className="mt-1 text-sm text-neutral-600">Enviada {sentDate}</p>}
         </div>
-        <div>
-          <h2 className="text-2xl font-bold text-neutral-900">Mi Solicitud de Inscripcion</h2>
-          <p className="text-sm text-neutral-500">
-            Tipo: {solicitud.tipoActor}{sentDate ? <> &middot; Enviada {sentDate}</> : null}
-          </p>
-        </div>
+        <Badge variant="soft" color={cfg.color} size="lg"><cfg.icon size={16} aria-hidden="true" />{cfg.label}</Badge>
       </div>
+      {isError && <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-800">No pudimos actualizar el estado. Conservamos lo escrito; revisá la conexión.<Button variant="outline" onClick={()=>void refetch()}>Actualizar solicitud</Button></div>}
 
       {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <>
         {(solicitudes?.length || 0) > 1 && <div>
@@ -208,66 +189,12 @@ const MiSolicitudPage: React.FC = () => {
               setSelectedId(event.target.value);
               setParams({ solicitud: event.target.value }, { replace: true });
             }}>
-            {solicitudes?.map(item => <option key={item.id} value={item.id}>{item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
+            {solicitudes?.map(item => <option key={item.id} value={item.id}>{ACTOR_LABELS[item.tipoActor] || item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
           </select>
         </div>}
       </>}
-      {solicitud.estado === 'BORRADOR' && <Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>Continuar borrador</Button>}
-      {/* Stepper */}
-      <Card>
-        <div className="flex items-center justify-between">
-          {STEPS.map((step, i) => {
-            const isActive = i === currentStep;
-            const isDone = i < currentStep;
-            const isFailed = i === 3 && solicitud.estado === 'RECHAZADA';
-
-            return (
-              <React.Fragment key={step.key}>
-                {i > 0 && (
-                  <div className={`flex-1 h-0.5 mx-2 rounded ${isDone ? 'bg-primary-500' : 'bg-neutral-200'}`} />
-                )}
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                    isFailed
-                      ? 'bg-error-100 text-error-600 ring-2 ring-error-300'
-                      : isActive
-                        ? 'bg-primary-100 text-primary-700 ring-2 ring-primary-300'
-                        : isDone
-                          ? 'bg-primary-500 text-white'
-                          : 'bg-neutral-100 text-neutral-400'
-                  }`}>
-                    {isDone ? <CheckCircle size={16} /> : isFailed ? <XCircle size={16} /> : i + 1}
-                  </div>
-                  <span className={`text-xs font-medium ${
-                    isActive ? 'text-primary-700' : isFailed ? 'text-error-600' : isDone ? 'text-primary-600' : 'text-neutral-400'
-                  }`}>
-                    {step.label}
-                  </span>
-                </div>
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* Status Badge */}
-      <div className="flex items-center gap-3">
-        <Badge
-          variant="default"
-          color={cfg.color}
-          size="lg"
-          dot={solicitud.estado === 'OBSERVADA'}
-          pulse={solicitud.estado === 'OBSERVADA'}
-        >
-          <cfg.icon size={14} />
-          {cfg.label}
-        </Badge>
-        {solicitud.fechaRevision && (
-          <span className="text-xs text-neutral-500">
-            Revisada el {new Date(solicitud.fechaRevision).toLocaleDateString('es-AR')}
-          </span>
-        )}
-      </div>
+      {solicitud.estado === 'BORRADOR' && <Card><p className="mb-3 text-neutral-700">Completá los datos y documentos para enviar tu inscripción a revisión.</p><Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>Continuar borrador</Button></Card>}
+      {(solicitud.estado === 'ENVIADA' || solicitud.estado === 'EN_REVISION') && <Card><p className="font-semibold text-neutral-900">Administración revisa tu solicitud</p><p className="mt-2 text-neutral-700">{solicitud.estado === 'ENVIADA' ? 'Recibimos tu presentación. Te avisaremos cuando haya una decisión o algo que corregir.' : 'Tu presentación está en revisión. Te avisaremos si necesitás completar algo.'}</p><p className="mt-2 text-sm text-neutral-600">No hace falta volver a enviarla. Podés consultar a administración en Mensajes.</p></Card>}
 
       {/* OBSERVADA Banner */}
       {solicitud.estado === 'OBSERVADA' && (
@@ -285,11 +212,12 @@ const MiSolicitudPage: React.FC = () => {
                 Corregir datos y documentos
               </Button>
               <div>
-                <label className="block text-sm font-medium text-amber-800 mb-1">Tu respuesta</label>
+                <label htmlFor="application-observation-reply" className="block text-sm font-medium text-amber-800 mb-1">Tu respuesta</label>
                 <textarea
+                  id="application-observation-reply"
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-amber-300 bg-white focus:border-primary-500 focus:outline-none text-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-amber-300 bg-white focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-700 text-sm"
                   rows={3}
                   placeholder="Escribe tu respuesta a las observaciones..."
                 />
@@ -310,14 +238,13 @@ const MiSolicitudPage: React.FC = () => {
 
       {/* APROBADA Card */}
       {solicitud.estado === 'APROBADA' && (
-        <Card className="!border-green-300 !bg-green-50 text-center !py-8">
-          <div className="text-4xl mb-3">&#127881;</div>
-          <h3 className="text-xl font-bold text-green-800 mb-2">Tu inscripcion fue aprobada</h3>
+        <Card className="!border-green-300 !bg-green-50">
+          <h3 className="text-xl font-bold text-green-800 mb-2">Tu inscripción fue aprobada</h3>
           <p className="text-sm text-green-700 mb-6">
-            Tu inscripción como {solicitud.tipoActor} fue aprobada. {isRestricted ? 'Ingresá nuevamente con tu cuenta habilitada y verificada para empezar.' : 'Ya podés continuar en SITREP.'}
+            Tu inscripción como {ACTOR_LABELS[solicitud.tipoActor] || solicitud.tipoActor} fue aprobada. {isRestricted ? 'Ingresá nuevamente con tu cuenta habilitada y verificada para empezar.' : 'Ya podés continuar en SITREP.'}
           </p>
           <Button variant="primary" isLoading={entering} rightIcon={<ArrowRight size={16} />} onClick={() => void enterSystem()}>
-            {isRestricted ? 'Ingresar con mi cuenta' : 'Ir al Dashboard'}
+            {isRestricted ? 'Ingresar con mi cuenta' : 'Ir a Inicio'}
           </Button>
           {entryError && <p role="alert" className="mt-3 text-sm text-error-700">{entryError}</p>}
         </Card>
@@ -350,25 +277,25 @@ const MiSolicitudPage: React.FC = () => {
         </div>
 
         <div ref={messagesPanelRef} role="region" aria-label="Mensajes de la solicitud" className="max-h-80 overflow-y-auto p-4 space-y-3">
-          {(!mensajes || mensajes.length === 0) ? (
-            <p className="text-center text-sm text-neutral-400 py-6">No hay mensajes aun</p>
+          {messageError ? <div role="alert" className="space-y-2 text-sm text-neutral-800"><p>No pudimos consultar los mensajes.</p><Button variant="outline" onClick={()=>void retryMessages()}>Reintentar mensajes</Button></div> : loadingMessages && !mensajes ? <p role="status">Consultando mensajes…</p> : (!mensajes || mensajes.length === 0) ? (
+            <p className="text-center text-sm text-neutral-600 py-6">Todavía no hay mensajes</p>
           ) : (
             mensajes.map((msg: MensajeSolicitud) => {
-              const isAdmin = msg.autorRol === 'ADMIN';
+              const isAdmin = msg.autorRol === 'ADMIN' || msg.autorRol.startsWith('ADMIN_');
               return (
                 <div key={msg.id} className={`flex ${isAdmin ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`max-w-[75%] rounded-xl px-4 py-2.5 ${
+                  <div className={`max-w-[90%] break-words rounded-xl sm:max-w-[75%] px-4 py-2.5 ${
                     isAdmin
                       ? 'bg-primary-50 border border-primary-100 rounded-bl-sm'
                       : 'bg-neutral-100 border border-neutral-200 rounded-br-sm'
                   }`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-[10px] font-semibold uppercase ${
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+                      <span className={`text-xs font-semibold ${
                         isAdmin ? 'text-primary-600' : 'text-neutral-500'
                       }`}>
-                        {isAdmin ? 'Administrador' : 'Tu'}
+                        {isAdmin ? 'Administración' : 'Vos'}
                       </span>
-                      <span className="text-[10px] text-neutral-400">
+                      <span className="text-xs text-neutral-600">
                         {new Date(msg.createdAt).toLocaleDateString('es-AR', {
                           day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
                         })}
@@ -392,7 +319,7 @@ const MiSolicitudPage: React.FC = () => {
               onChange={e => setMessageText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
               aria-label="Mensaje a administración"
-              className="min-w-0 flex-1 min-h-11 px-3 rounded-lg border border-neutral-200 text-sm focus:border-primary-500 focus:outline-none"
+              className="min-w-0 flex-1 min-h-11 px-3 rounded-lg border border-neutral-200 text-sm focus:border-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-700"
               placeholder="Escribe un mensaje..."
             />
             <Button
@@ -408,7 +335,7 @@ const MiSolicitudPage: React.FC = () => {
         </div>
         )}
       </Card>
-      {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities />}
+      {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities mode="request" />}
     </div>
   );
 };

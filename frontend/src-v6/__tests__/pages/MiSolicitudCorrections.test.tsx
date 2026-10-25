@@ -23,7 +23,7 @@ it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('%s explicitly renews the li
 });
 it('an already operational session opens the dashboard without logging out again', () => {
   state.restricted = false; state.applications = [{ id: 'owned', tipoActor: 'GENERADOR', estado: 'APROBADA' }]; open();
-  fireEvent.click(screen.getByRole('button', { name: 'Ir al Dashboard', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ir a Inicio', exact: true }));
   expect(screen.getByText('Destino: /dashboard')).toBeVisible(); expect(state.logout).not.toHaveBeenCalled();
 });
 it('keeps the approved result and a retry if closing the limited session fails', async () => {
@@ -32,7 +32,7 @@ it('keeps the approved result and a retry if closing the limited session fails',
   fireEvent.click(screen.getByRole('button', { name: 'Ingresar con mi cuenta', exact: true }));
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo renovar el acceso');
   expect(screen.getByRole('button', { name: 'Ingresar con mi cuenta', exact: true })).toBeEnabled();
-  expect(screen.getByRole('heading', { name: 'Tu inscripcion fue aprobada', exact: true })).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Tu inscripción fue aprobada', exact: true })).toBeVisible();
 });
 it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('%s resumes its owned draft with multirole disabled', type => {
   state.applications = [{ id: 'owned', tipoActor: type, estado: 'BORRADOR' }]; open();
@@ -58,4 +58,11 @@ it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('%s rejected result does not
   expect(screen.queryByRole('button', { name: 'Crear nueva solicitud' })).not.toBeInTheDocument();
   expect(screen.queryByPlaceholderText('Escribe un mensaje...')).not.toBeInTheDocument();
   expect(screen.getByText(/podés consultar los mensajes, pero no enviar respuestas/)).toBeVisible();
+});
+
+it.each(['Generador','Transportista','Operador'])('an empty account may start %s without being forced into Generador',role=>{
+  state.applications=[];open();
+  fireEvent.click(screen.getByRole('button',{name:role,exact:true}));
+  expect(screen.getByText('Destino: /inscripcion/'+role.toLowerCase())).toBeVisible();
+  expect(state.message).not.toHaveBeenCalled();
 });
