@@ -35,6 +35,7 @@ export interface ActionButtonsProps {
   operatorCertificates?: boolean;
   immutableProposal?: boolean;
   pickupBlocked?: boolean;
+  pesajePendiente?: boolean;
   isCancelling: boolean;
   mutations: {
     firmar: MutationState;
@@ -71,6 +72,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   operatorCertificates,
   immutableProposal,
   pickupBlocked,
+  pesajePendiente = true,
   isCancelling,
   mutations,
   onOpenFirmaModal,
@@ -179,6 +181,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       {estado === EstadoManifiesto.RECIBIDO && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth
+          variant={pesajePendiente ? 'primary' : 'outline'}
           leftIcon={<Scale size={16} />}
           onClick={onOpenPesajeModal}
           disabled={isActionPending}
@@ -190,6 +193,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       {estado === EstadoManifiesto.RECIBIDO && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth
+          variant={pesajePendiente ? 'outline' : 'primary'}
           leftIcon={<Beaker size={16} />}
           onClick={onOpenTratamientoModal}
           disabled={isActionPending}
@@ -201,10 +205,10 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
       {(estado === EstadoManifiesto.EN_TRATAMIENTO || estado === EstadoManifiesto.RECIBIDO) && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth
+          variant={estado === EstadoManifiesto.EN_TRATAMIENTO ? 'primary' : 'outline'}
           leftIcon={mutations.cerrar.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
           onClick={onCerrar}
           disabled={isActionPending}
-          className="enabled:bg-primary-800 enabled:text-white enabled:hover:bg-primary-900"
         >
           Cerrar Manifiesto
         </Button>

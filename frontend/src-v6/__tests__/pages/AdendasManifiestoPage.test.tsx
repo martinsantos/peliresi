@@ -3,9 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AdendasManifiestoPage from '../../pages/manifiestos/AdendasManifiestoPage';
-const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), training: false }));
+const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), training: false,role:'OPERADOR' }));
 vi.mock('../../services/api', () => ({ api: mock }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user', training: mock.training } }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'qa-user',rol:mock.role, training: mock.training } }) }));
 const record = { id: 'qa-adenda', motivo: 'Diferencia de carga', rectificaId: null, version: 0, estadoRevision: 'PENDIENTE', puedeResolver: false,
   creadoPorId: 'qa-carrier', createdAt: '2026-10-15T00:00:00Z', residuos: [{ corriente: 'Y2', cantidad: 12, unidad: 'kg' }],
   declaracion: { numero: 'QA-1', residuos: [{ corriente: 'Y1', cantidad: 10, unidad: 'kg' }] }, revisiones: [] };
@@ -15,12 +15,12 @@ function view() {
     <MemoryRouter initialEntries={['/manifiestos/qa-id/adendas']}><Routes><Route path="/manifiestos/:id/adendas" element={<AdendasManifiestoPage />} /></Routes></MemoryRouter>
   </QueryClientProvider>);
 }
-beforeEach(() => { mock.training = false; vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true'); mock.get.mockResolvedValue({ data: { data } }); });
+beforeEach(() => { localStorage.clear();mock.role='OPERADOR';mock.training = false; vi.clearAllMocks(); vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'true'); mock.get.mockResolvedValue({ data: { data } }); });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 it('flag off makes no request', () => { vi.stubEnv('VITE_MANIFEST_ADDENDA_ENABLED', 'false'); view(); expect(mock.get).not.toHaveBeenCalled(); });
 it('keeps original and observed loads separate; read-only participant has no write controls', async () => {
   view(); await screen.findByText('Y1 · 10 kg'); expect(screen.getByText('Y2 · 12 kg')).toBeVisible();
-  expect(screen.getByText(/Operación: TRATADO/)).toBeVisible();
+  expect(screen.getByText(/Operación: Tratado/)).toBeVisible();
   expect(screen.getByText('Pendiente de revisión')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Aprobar post facto' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Registrar diferencia' })).not.toBeInTheDocument();
@@ -136,11 +136,13 @@ it('requires explicit correction of an unsupported historical unit instead of si
  expect(mock.post).not.toHaveBeenCalled();
 });
 
-it('closing a rectification then starting an independent report does not reuse its reference', async () => {
+it('explicitly discarding a rectification then starting an independent report does not reuse its reference', async () => {
   mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: true, manifiesto: { ...data.manifiesto, residuos: record.declaracion.residuos } } } });
   mock.post.mockResolvedValue({ data: {} }); view();
   fireEvent.click(await screen.findByRole('button', { name: 'Agregar rectificación' }));
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar formulario' }));
+  expect(screen.getByRole('button',{name:'Retomar informe'})).toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:'Descartar borrador'}));fireEvent.click(screen.getByRole('button',{name:'Sí, descartar'}));
   fireEvent.click(screen.getByRole('button', { name: 'Registrar diferencia' }));
   fireEvent.change(screen.getByLabelText('Motivo de la adenda'), { target: { value: 'Otro hallazgo independiente' } });
   fireEvent.click(screen.getByRole('button', { name: 'Guardar y solicitar revisión' }));
@@ -153,6 +155,7 @@ it('shows the author and latest individual review without claiming agreement by 
   view(); expect(await screen.findByText('Operador · QA Operador')).toBeVisible();
   expect(screen.getByLabelText('Última revisión')).toHaveTextContent('Generador · QA Generador');
   expect(screen.getByLabelText('Última revisión')).toHaveTextContent('Verificar pesaje recibido');
+  fireEvent.click(screen.getByText('Cómo se revisa una adenda'));
   expect(screen.getByText(/no representa unanimidad ni cierre documental/)).toBeVisible();
 });
 
@@ -176,4 +179,48 @@ it('operational final certificate never labels the closed record as CAP', async 
   mock.get.mockResolvedValue({ data: { data: { ...data, finalLiberado: true } } }); view();
   expect(await screen.findByText(/El operador ya liberó la disposición final\./)).toBeVisible();
   expect(screen.queryByText(/disposición final CAP/)).not.toBeInTheDocument();
+});
+
+it('recovers an unsent finding after reopening without mixing another role',async()=>{
+ mock.get.mockResolvedValue({data:{data:{...data,puedeRegistrar:true}}});let page=view();
+ fireEvent.click(await screen.findByRole('button',{name:'Registrar diferencia'}));
+ fireEvent.change(screen.getByLabelText('Corriente observada 1'),{target:{value:'Y21'}});
+ fireEvent.change(screen.getByLabelText('Cantidad observada 1'),{target:{value:'12'}});
+ fireEvent.change(screen.getByLabelText('Motivo de la adenda'),{target:{value:'Hallazgo que debo conservar'}});page.unmount();
+ mock.role='GENERADOR';page=view();await screen.findByText('Y1 · 10 kg');expect(screen.queryByLabelText('Motivo de la adenda')).toBeNull();page.unmount();
+ mock.role='OPERADOR';page=view();await screen.findByLabelText('Motivo de la adenda');
+ expect(screen.getByLabelText('Motivo de la adenda')).toHaveValue('Hallazgo que debo conservar');expect(screen.getByLabelText('Cantidad observada 1')).toHaveValue(12);
+ expect(mock.post).not.toHaveBeenCalled();
+});
+
+it('keeps the same request id after a failed decision and app reopen',async()=>{
+ mock.get.mockResolvedValue({data:{data:{...data,adendas:[{...record,puedeResolver:true}]}}});mock.post.mockRejectedValue(new Error('Offline'));
+ const page=view();fireEvent.change(await screen.findByLabelText('Motivo de resolución'),{target:{value:'Mi decisión conservada'}});
+ fireEvent.click(screen.getByRole('button',{name:'Observar'}));await screen.findByRole('alert');const first=mock.post.mock.calls[0][1];page.unmount();
+ view();expect(await screen.findByLabelText('Motivo de resolución')).toHaveValue('Mi decisión conservada');
+ fireEvent.click(screen.getByRole('button',{name:'Observar'}));await waitFor(()=>expect(mock.post).toHaveBeenCalledTimes(2));expect(mock.post.mock.calls[1][1]).toEqual(first);
+});
+
+it('requires a deliberate choice before replacing another tab’s draft',async()=>{
+ mock.get.mockResolvedValue({data:{data:{...data,adendas:[{...record,puedeResolver:true}]}}});const page=view();
+ fireEvent.change(await screen.findByLabelText('Motivo de resolución'),{target:{value:'Texto local'}});
+ const key=Object.keys(localStorage).find(k=>k.startsWith('sitrep:adenda-form:'))!;
+ const other=JSON.parse(localStorage.getItem(key)!);other.revision='other-tab';other.value.notes[record.id]='Texto de la otra pestaña';
+ localStorage.setItem(key,JSON.stringify(other));fireEvent(window,new StorageEvent('storage',{key}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Otra pestaña cambió este borrador');
+ expect(screen.getByLabelText('Motivo de resolución')).toHaveValue('Texto local');expect(screen.getByRole('button',{name:'Observar'})).toBeDisabled();expect(mock.post).not.toHaveBeenCalled();
+ page.unmount();view();expect(await screen.findByLabelText('Motivo de resolución')).toHaveValue('Texto local');expect(screen.getByRole('button',{name:'Observar'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Cargar la otra versión'}));expect(screen.getByLabelText('Motivo de resolución')).toHaveValue('Texto de la otra pestaña');
+ expect(screen.getByRole('button',{name:'Observar'})).toBeEnabled();
+});
+
+it('reuses the other tab’s attempted request after deliberately loading that draft',async()=>{
+ mock.get.mockResolvedValue({data:{data:{...data,adendas:[{...record,puedeResolver:true}]}}});mock.post.mockRejectedValue(new Error('Offline'));view();
+ fireEvent.change(await screen.findByLabelText('Motivo de resolución'),{target:{value:'Texto local'}});
+ const key=Object.keys(localStorage).find(k=>k.startsWith('sitrep:adenda-form:'))!;
+ const other=JSON.parse(localStorage.getItem(key)!);other.revision='other-request';other.value.notes[record.id]='Texto externo';
+ other.value.pending={id:'qa-stable-request',signature:JSON.stringify({path:'/manifiestos/qa-id/adendas/qa-adenda/revisiones',body:{version:0,decision:'OBSERVADA',nota:'Texto externo'}})};
+ localStorage.setItem(key,JSON.stringify(other));fireEvent(window,new StorageEvent('storage',{key}));
+ fireEvent.click(await screen.findByRole('button',{name:'Cargar la otra versión'}));fireEvent.click(screen.getByRole('button',{name:'Observar'}));
+ await waitFor(()=>expect(mock.post).toHaveBeenCalledTimes(1));expect(mock.post.mock.calls[0][1].id).toBe('qa-stable-request');
 });

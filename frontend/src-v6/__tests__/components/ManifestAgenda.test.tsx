@@ -4,9 +4,9 @@ import {MemoryRouter} from 'react-router-dom';
 import {afterEach,expect,it,vi} from 'vitest';
 const mock=vi.hoisted(()=>({get:vi.fn()}));
 vi.mock('../../services/api',()=>({api:mock}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'cap-user',training:true}})}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'cap-user',rol:'OPERADOR',training:true}})}));
 import {ManifestAgenda} from '../../pages/manifiestos/components/ManifestAgenda';
-afterEach(()=>{cleanup();vi.clearAllMocks();});
+afterEach(()=>{cleanup();vi.clearAllMocks();sessionStorage.clear();});
 it('reaches scheduled records beyond the first 50 and resets to page one when searching',async()=>{
  mock.get.mockImplementation((_url,{params})=>Promise.resolve({data:{data:{total:params.search?1:51,items:[{id:params.search?'found':String(params.page),numero:params.search||`CAP-PAGE-${params.page}`,fechaEstimadaRetiro:'2026-10-20T12:00:00Z'}]}}}));
  render(<MemoryRouter><QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><ManifestAgenda/></QueryClientProvider></MemoryRouter>);
@@ -15,4 +15,22 @@ it('reaches scheduled records beyond the first 50 and resets to page one when se
  fireEvent.change(screen.getByLabelText('Buscar manifiesto programado'),{target:{value:'CAP-NEW'}});await screen.findByText(/CAP-NEW/);
  await waitFor(()=>expect(mock.get).toHaveBeenLastCalledWith('/manifiestos/agenda-partes',{params:{page:1,search:'CAP-NEW'}}));
  expect(screen.getByRole('link',{name:/CAP-NEW/})).toHaveAttribute('href','/manifiestos/found');
+});
+
+it('shows route participants without fetching a second record and keeps app links',async()=>{
+ mock.get.mockResolvedValue({data:{data:{total:1,items:[{id:'scheduled',numero:'QA-RUTA',fechaEstimadaRetiro:'2099-10-20T12:00:00Z',generador:{razonSocial:'Origen artificial'},operador:{razonSocial:'Destino artificial'}}]}}});
+ const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter basename="/app" initialEntries={['/app/manifiestos?vista=programados']}><QueryClientProvider client={q}><ManifestAgenda/></QueryClientProvider></MemoryRouter>);
+ const link=await screen.findByRole('link',{name:/QA-RUTA/});
+ expect(link).toHaveTextContent('Origen artificial → Destino artificial');expect(link).toHaveAttribute('href','/app/manifiestos/scheduled');
+ expect(mock.get).toHaveBeenCalledTimes(1);q.clear();
+});
+
+it('drops another context’s agenda filters before fetching',async()=>{
+ mock.get.mockResolvedValue({data:{data:{total:0,items:[]}}});
+ const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter initialEntries={[{pathname:'/manifiestos',search:'?vista=programados&programado=OTHER&paginaProgramados=8',state:{filterOwners:{'manifest-agenda':'other-context'}}}]}><QueryClientProvider client={q}><ManifestAgenda/></QueryClientProvider></MemoryRouter>);
+ await screen.findByText('Sin retiros aprobados para esta búsqueda.');
+ expect(mock.get).toHaveBeenCalledWith('/manifiestos/agenda-partes',{params:{page:1,search:''}});
+ expect(screen.getByLabelText('Buscar manifiesto programado')).toHaveValue('');q.clear();
 });

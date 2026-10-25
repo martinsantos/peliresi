@@ -7,6 +7,7 @@ import { ManifestProposalApprovals } from './ManifestProposalApprovals';
  * UI delegated to ActionButtons and ActionModals.
  */
 
+import { ManifestNextStep } from '../../../components/ManifestNextStep';
 import { ClipboardCheck } from 'lucide-react';
 import React, { useState } from 'react';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
@@ -101,7 +102,9 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             <p className="mt-1">{isInSitu ? 'Después de la firma, el operador podrá registrar la recepción in situ.' : 'Este borrador conserva el circuito anterior; no es una propuesta enviada para tres aprobaciones.'}</p>
           </section>}
           {m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
+          {['EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','CANCELADO','RECHAZADO'].includes(m.estado || '') && <div className="mb-4"><ManifestNextStep work={{estado:m.estado,modalidad:m.modalidad,pesajePendiente:m.residuos?.some(r=>!r.cantidadRecibida)}} role={userRol}/></div>}
           <ActionButtons
+            pesajePendiente={m.residuos?.some(r=>!r.cantidadRecibida) ?? true}
             estado={m.estado}
             isAdmin={isAdmin}
             userRol={userRol}

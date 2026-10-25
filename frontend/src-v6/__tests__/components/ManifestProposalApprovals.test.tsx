@@ -1,5 +1,5 @@
 import {afterEach,expect,it,vi} from 'vitest';
-import {cleanup,render,screen,waitFor,act} from '@testing-library/react';
+import {cleanup,render,screen,waitFor,act,fireEvent} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 const mock=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}));
 vi.mock('../../services/api',()=>({api:mock}));
@@ -44,6 +44,16 @@ it('shows only generator and operator for in-situ, with no transport approval or
  expect(screen.getByLabelText('Generador: Aprobado')).toBeVisible();
  expect(screen.getByLabelText('Operador: Aprobado')).toBeVisible();
  expect(screen.queryByLabelText(/^Transporte:/)).not.toBeInTheDocument();
- expect(screen.getByText('El operador confirma la recepción en origen. No hay viaje ni GPS.')).toBeVisible();
+ fireEvent.click(screen.getByText('Cómo continuar'));
+ expect(screen.getByText('Coordiná la recepción en origen con la otra parte. No hay viaje ni GPS.')).toBeVisible();
  client.clear();
+});
+
+it('preserves a readable rejected proposal when legacy rejection text is not JSON',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'CANCELADO',rechazo:'No tenemos capacidad',inicio:null,puedeIniciar:false,puedeAprobar:null,partes:[{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:false},{rol:'OPERADOR',aprobada:true}]}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="legacy-rejected" onSign={()=>{}}/></QueryClientProvider>);
+ expect(await screen.findByText(/Propuesta rechazada: No tenemos capacidad/)).toBeVisible();
+ expect(screen.queryByRole('button',{name:'Iniciar coordinación'})).not.toBeInTheDocument();client.clear();
 });

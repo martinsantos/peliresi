@@ -12,7 +12,7 @@ export function OperatorFindingSummary({ finding }: { finding: OperatorFinding }
         <p className="text-neutral-700">Declarado: {['Y_OMITIDA', 'UNIDAD_DIFERENTE'].includes(row.tipo) ? 'sin dato en esta unidad' : `${row.declarado} ${row.unidad}`} · Observado: {row.tipo === 'NO_OBSERVADA' ? 'no informado' : `${row.observado} ${row.unidad}`}</p></div>
     </li>)}</ul>
     {!finding.diferencias.length && <p className="text-sm text-neutral-700">Sin diferencias medibles respecto de la declaración.</p>}
-    <div className="border-t border-amber-200 pt-2 text-sm"><p className="font-semibold">Ficha del operador</p><p className="text-neutral-700">{finding.alcanceOperador.valorOriginal || 'Sin corrientes verificables: requiere revisión de la ficha.'}</p>
+    <div className="border-t border-amber-200 pt-2 text-sm"><details><summary className="min-h-11 cursor-pointer py-3 font-semibold focus-visible:ring-2 focus-visible:ring-primary-700">Ficha del operador</summary><p className="break-words pb-2 text-neutral-700">{finding.alcanceOperador.valorOriginal || 'Sin corrientes verificables: requiere revisión de la ficha.'}</p></details>
       {finding.alcanceOperador.corrientesNoRegistradas.length > 0 && <p className="mt-1 font-semibold text-amber-950">No constan en esa ficha: {finding.alcanceOperador.corrientesNoRegistradas.join(', ')}</p>}
     </div>
     <p className="text-xs text-neutral-600">Antecedente para evaluar en PSIP. No acredita infracción ni modifica la declaración o la habilitación.</p>

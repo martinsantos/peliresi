@@ -15,7 +15,6 @@ import {
   Trash2,
   Truck,
   AlertTriangle,
-  CheckCircle2,
   Loader2,
   Info,
   MapPin,
@@ -99,7 +98,6 @@ const NuevoManifiestoForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const mp = useMobilePrefix();
-  const hasMobileHeader = import.meta.env.BASE_URL === '/app/' || location.pathname.startsWith('/mobile');
   const { currentUser, isAdmin, isGenerador } = useAuth();
   const proposalsAvailable = manifestProposalsVisible(currentUser) && ['GENERADOR','TRANSPORTISTA','OPERADOR','ADMIN'].includes(currentUser?.rol || '');
   const carrierProposal = proposalsAvailable && currentUser?.rol === 'TRANSPORTISTA';
@@ -333,7 +331,7 @@ const NuevoManifiestoForm: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (submitting.current) return;
+    if (submitting.current || draft.conflict || draft.checkConflict()) return;
     if (!validateForm()) {
       return;
     }
@@ -433,16 +431,14 @@ const NuevoManifiestoForm: React.FC = () => {
             >
               Manifiestos
             </Button>
-            {!hasMobileHeader && <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">Nuevo Manifiesto</h1>
-            </div>}
           </div>
         </div>
       </header>
 
+      {draft.conflict && <div role="alert" className="mb-3 rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-warning-900"><p>Otra pestaña cambió este borrador. Tu texto sigue aquí; elegí qué versión conservar antes de crear el manifiesto.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={draft.reload}>Cargar la otra versión</Button><Button variant="outline" onClick={draft.overwrite}>Conservar mi versión</Button></div></div>}
       {(draft.saved || draft.error) && <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-primary-50 px-3 text-sm text-primary-900" aria-label="Borrador del manifiesto">
-        <p role="status" className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : draft.restored ? 'Borrador recuperado · guardado en este dispositivo' : 'Borrador guardado en este dispositivo'}</p>
-        {!discardDraft && <button type="button" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar borrador</button>}
+        <p role={draft.error ? 'alert' : 'status'} className="py-2">{draft.error ? 'No se pudo guardar aquí. Conservá esta pestaña abierta.' : <>{draft.restored ? 'Borrador recuperado' : 'Borrador guardado'}<span className="block text-xs text-neutral-600">En este dispositivo</span></>}</p>
+        {!discardDraft && <button type="button" aria-label="Descartar borrador" className="min-h-11 font-semibold underline underline-offset-2" onClick={() => setDiscardDraft(true)}>Descartar</button>}
         {discardDraft && <div className="flex flex-wrap items-center gap-3 pb-2" role="group" aria-label="Confirmar descarte"><span>¿Borrar lo cargado?</span><Button size="sm" variant="outline" onClick={() => setDiscardDraft(false)}>Conservar</Button><Button size="sm" variant="outline" onClick={() => { if (draft.clear()) { setValidationErrors({}); setServerPartyIssues({}); setSubmitError(undefined); setConfirmWithoutTransport(false); setDiscardDraft(false); } }}>Sí, descartar</Button></div>}
       </div>}
 
@@ -527,17 +523,16 @@ const NuevoManifiestoForm: React.FC = () => {
         {step === 2 && (
           <Card className="p-4 sm:p-5">
             <CardHeader 
-              title="Residuos a Transportar" 
+              title="Residuos declarados"
             />
             <CardContent className="space-y-4">
               {hasDeclaredResidueMatch && (
-                <div className="flex items-center gap-2 p-2.5 bg-primary-50 border border-primary-200 rounded-xl text-xs text-primary-700">
-                  <CheckCircle2 size={14} className="shrink-0" />
-                  <span>
-                    <strong>{residuosFiltrados.length}</strong> residuos inscriptos para {(selectedGenerador as any)?.razonSocial || 'el generador'}
-                    <span className="ml-1 text-primary-500">({genCorrientes.join(', ')})</span>
-                  </span>
-                </div>
+                <details className="group rounded-lg border border-neutral-200 text-sm">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-3 text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+                    <span>{residuosFiltrados.length} tipos de residuos disponibles</span><ChevronDown size={16} className="shrink-0 group-open:rotate-180" aria-hidden="true"/>
+                  </summary>
+                  <p className="px-3 pb-3 text-neutral-700">Corrientes declaradas por el generador: {genCorrientes.join(', ')}.</p>
+                </details>
               )}
               {genCorrientes.length > 0 && !hasDeclaredResidueMatch && (
                 <div className="flex items-center gap-2 p-2.5 bg-warning-50 border border-warning-200 rounded-xl text-xs text-warning-700">
@@ -845,7 +840,7 @@ const NuevoManifiestoForm: React.FC = () => {
                 <Button
                   leftIcon={createManifiesto.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                   onClick={handleSubmit}
-                  disabled={createManifiesto.isPending || refreshingParties}
+                  disabled={createManifiesto.isPending || refreshingParties || draft.conflict}
                 >
                   {createManifiesto.isPending ? 'Guardando...' : 'Crear Manifiesto'}
                 </Button>

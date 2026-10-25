@@ -81,7 +81,7 @@ describe('manifest form continuity', () => {
     expect(reopened.result.current.draft).toEqual(initial);
     expect(reopened.result.current.restored).toBe(false);
   });
-  it('keeps web and app tabs in sync and clears another tab after success', () => {
+  it('syncs an untouched tab but preserves locally edited input when another tab clears', () => {
     const key = 'sitrep:manifest-form:v1:tabs';
     const hook = renderHook(() => useManifestDraft('tabs', initial));
     const other = { ...initial, step: 3, form: { ...initial.form, observaciones: 'Desde la otra pestaña' } };
@@ -95,8 +95,31 @@ describe('manifest form continuity', () => {
     act(() => hook.result.current.update(previous => ({ ...previous, form: { ...previous.form, fechaRetiro: '2026-10-30' } })));
     expect(hook.result.current.draft.form.observaciones).toBe(other.form.observaciones);
     act(() => emit(null));
+    expect(hook.result.current.draft.form.fechaRetiro).toBe('2026-10-30');
+    expect(hook.result.current.conflict).toBe(true);
+    act(() => hook.result.current.reload());
     expect(hook.result.current.draft).toEqual(initial);
     expect(hook.result.current.saved).toBe(false);
+  });
+  it('detects a concurrent edit before its storage event and requires a deliberate overwrite', () => {
+    const key = 'sitrep:manifest-form:v1:concurrent';
+    const hook = renderHook(() => useManifestDraft('concurrent', initial));
+    act(() => hook.result.current.update({...initial,form:{...initial.form,observaciones:'Mi texto'}}));
+    const other=JSON.stringify({version:1,savedAt:Date.now(),draft:{...initial,form:{...initial.form,observaciones:'Otro texto'}}});
+    localStorage.setItem(key,other);
+    act(() => expect(hook.result.current.checkConflict()).toBe(true));
+    act(() => hook.result.current.update(previous=>({...previous,step:2})));
+    expect(hook.result.current.draft.form.observaciones).toBe('Mi texto');
+    expect(localStorage.getItem(key)).toBe(other);
+    act(() => expect(hook.result.current.clear()).toBe(false));
+    hook.unmount();
+    const reopened=renderHook(()=>useManifestDraft('concurrent',initial));
+    expect(reopened.result.current.conflict).toBe(true);
+    expect(reopened.result.current.draft.form.observaciones).toBe('Mi texto');
+    expect(reopened.result.current.saved).toBe(false);
+    act(() => reopened.result.current.overwrite());
+    expect(reopened.result.current.conflict).toBe(false);
+    expect(JSON.parse(localStorage.getItem(key)!).draft.form.observaciones).toBe('Mi texto');
   });
   it('reads the latest other-tab fields even before the storage event arrives', () => {
     const key = 'sitrep:manifest-form:v1:before-event';

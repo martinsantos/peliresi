@@ -1,14 +1,14 @@
 import {fireEvent,render,screen,cleanup,within,waitFor} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
-import {MemoryRouter} from 'react-router-dom';
+import {MemoryRouter,Route,Routes,useNavigate} from 'react-router-dom';
 import {afterEach,expect,it,vi} from 'vitest';
-const mock=vi.hoisted(()=>({get:vi.fn(),training:true,rol:'OPERADOR',create:vi.fn()}));
+const mock=vi.hoisted(()=>({get:vi.fn(),training:true,id:'u',rol:'OPERADOR',actorId:'o',empresaId:'e',establecimientoId:'s',create:vi.fn()}));
 vi.mock('../../services/api',()=>({api:mock}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'u',training:mock.training,rol:mock.rol}})}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:mock.id,training:mock.training,rol:mock.rol,actorId:mock.actorId,empresaContexto:{empresaId:mock.empresaId,establecimientoId:mock.establecimientoId}}})}));
 vi.mock('../../services/manifiesto.service',()=>({manifiestoService:{create:mock.create}}));
 import {useCreateManifiesto} from '../../hooks/useManifiestoWorkflow';
 import {TrainingTaskQueue} from '../../components/TrainingTaskQueue';
-afterEach(()=>{vi.unstubAllEnvs();cleanup();mock.training=true;mock.rol='OPERADOR';vi.clearAllMocks();vi.useRealTimers();});
+afterEach(()=>{vi.unstubAllEnvs();cleanup();sessionStorage.clear();Object.assign(mock,{training:true,id:'u',rol:'OPERADOR',actorId:'o',empresaId:'e',establecimientoId:'s'});vi.clearAllMocks();vi.useRealTimers();});
 const partes=[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:true},{rol:'OPERADOR',aprobada:true}];
 const items=[{id:'a',numero:'CAP-NEW',estado:'PENDIENTE_APROBACION',requiereMiAprobacion:true,partes,fechaEstimadaRetiro:'2099-10-20T12:00:00Z'},{id:'b',numero:'CAP-TRIP',estado:'EN_TRANSITO',partes:partes.map(p=>({...p,aprobada:true})),fechaEstimadaRetiro:'2020-10-20T12:00:00Z'}];
 function reply(records:any[], options:any={params:{}}){
@@ -125,4 +125,40 @@ it('includes a draft with its next responsible party without inventing three app
  expect(row).toHaveTextContent('Tratamiento en origen · sin transporte');
  expect(within(row).queryByLabelText('Transporte: Aprobado')).not.toBeInTheDocument();
  client.clear();
+});
+
+function ReturnHome(){const navigate=useNavigate();return <button onClick={()=>navigate(-1)}>Volver</button>;}
+it.each(['id','rol','actorId','empresaId','establecimientoId'] as const)('discards filters before the first request after changing %s',async field=>{
+ mock.get.mockImplementation(async(_url,options)=>reply(items,options));
+ const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const tree=()=> <MemoryRouter initialEntries={['/dashboard?pendientes=progress&buscarPendiente=CAP-TRIP&paginaPendientes=2']}><QueryClientProvider client={q}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>;
+ const view=render(tree());await waitFor(()=>expect(mock.get).toHaveBeenCalled());
+ mock.get.mockClear();mock[field]=field==='rol'?'GENERADOR':'different-context';view.rerender(tree());
+ await screen.findByText('CAP-NEW');
+ expect(mock.get.mock.calls[0][1].params).toMatchObject({filter:'all',search:'',page:1});
+ expect(screen.getByRole('button',{name:'Todos'})).toHaveAttribute('aria-pressed','true');q.clear();
+});
+
+it('discards another account’s unowned login return URL, but preserves a same-account reopen',async()=>{
+ mock.get.mockImplementation(async(_url,options)=>reply(items,options));
+ const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const mountUrl=()=>render(<MemoryRouter initialEntries={['/dashboard?pendientes=progress&buscarPendiente=CAP-TRIP']}><QueryClientProvider client={q}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+ let view=mountUrl();await screen.findByText('CAP-TRIP');view.unmount();
+ view=mountUrl();await screen.findByText('CAP-TRIP');expect(screen.queryByText('CAP-NEW')).toBeNull();view.unmount();
+ mock.id='another-account';mock.get.mockClear();view=mountUrl();await screen.findByText('CAP-NEW');
+ expect(mock.get.mock.calls[0][1].params).toMatchObject({filter:'all',search:'',page:1});q.clear();
+});
+
+it('restores filters after opening a record and returning on the same surface',async()=>{
+ mock.get.mockImplementation(async(_url,options)=>reply(items,options));
+ const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<MemoryRouter basename="/app" initialEntries={['/app/dashboard?pendientes=progress&periodo=all']}><QueryClientProvider client={q}><Routes>
+   <Route path="/dashboard" element={<TrainingTaskQueue/>}/>
+   <Route path="/manifiestos/:id" element={<ReturnHome/>}/>
+ </Routes></QueryClientProvider></MemoryRouter>);
+ const row=await screen.findByRole('link',{name:/CAP-TRIP/});
+ expect(screen.queryByText('CAP-NEW')).not.toBeInTheDocument();
+ fireEvent.click(row);await screen.findByText('Volver');fireEvent.click(screen.getByText('Volver'));
+ expect(await screen.findByRole('button',{name:'En curso'})).toHaveAttribute('aria-pressed','true');
+ expect(await screen.findByText('CAP-TRIP')).toBeVisible();expect(screen.queryByText('CAP-NEW')).not.toBeInTheDocument();q.clear();
 });

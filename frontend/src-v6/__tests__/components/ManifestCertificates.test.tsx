@@ -31,3 +31,31 @@ it('turning off emission preserves downloadable documents and explains the restr
 it('an unresolved addendum disables final emission without disabling partials',async()=>{
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:1}});show();expect(await screen.findByRole('button',{name:'Emitir certificación final total'})).toBeDisabled();expect(screen.getByRole('button',{name:'Emitir certificación parcial'})).toBeEnabled();
 });
+
+it('never carries a certificate form or cached documents into another role of the same account',async()=>{
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0}});
+ const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ const tree=()=> <MemoryRouter><QueryClientProvider client={q}><TrainingCertificates manifest={m}/></QueryClientProvider></MemoryRouter>;
+ const view=render(tree());fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación parcial'}));
+ fireEvent.change(screen.getByLabelText('Observaciones del certificado (opcional)'),{target:{value:'Nota del operador'}});
+ mocks.user={...mocks.user,rol:'GENERADOR',actorId:'g'};mocks.get.mockReturnValue(new Promise(()=>{}));view.rerender(tree());
+ expect(screen.queryByLabelText('Observaciones del certificado (opcional)')).toBeNull();
+ expect(screen.queryByText('Lista para firmar')).toBeNull();expect(screen.getByRole('status')).toHaveTextContent('Comprobando certificados');
+ expect(mocks.post).not.toHaveBeenCalled();q.clear();
+});
+
+it('blocks issue after a refresh failure and preserves entered data until retry succeeds',async()=>{
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0}});show();
+ fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación final total'}));
+ fireEvent.change(screen.getByLabelText('Observaciones del certificado (opcional)'),{target:{value:'Mi nota conservada'}});
+ fireEvent.click(screen.getByText('Use QA signature'));
+ mocks.get.mockRejectedValue(new Error('Offline'));
+ fireEvent.click(screen.getByRole('button',{name:'Actualizar certificados'}));
+ await screen.findByText(/No se pudieron comprobar los certificados/);
+ expect(screen.getByRole('button',{name:'Firmar y publicar certificación'})).toBeDisabled();expect(mocks.post).not.toHaveBeenCalled();
+ expect(screen.getByLabelText('Observaciones del certificado (opcional)')).toHaveValue('Mi nota conservada');
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0}});
+ fireEvent.click(screen.getByRole('button',{name:'Reintentar certificados'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Firmar y publicar certificación'})).toBeEnabled());
+ expect(screen.getByLabelText('Observaciones del certificado (opcional)')).toHaveValue('Mi nota conservada');
+});
