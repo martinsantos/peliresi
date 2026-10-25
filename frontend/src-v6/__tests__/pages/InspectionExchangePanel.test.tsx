@@ -9,7 +9,7 @@ import type { InspectionExchangeTimeline } from '../../types/inspection';
 import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { webcrypto } from 'node:crypto';
 import { claimExchangeCommand } from '../../services/inspectionExchangeCommand';
-import { loadDraftAlternatives } from '../../services/inspectionDraftAlternatives';
+import { loadDraftAlternatives, preserveDraftAlternative } from '../../services/inspectionDraftAlternatives';
 
 const localCommands = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('../../services/indexeddb', () => ({
@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   attachmentUrl: vi.fn(),
   loadDraft: vi.fn(),
   saveDraft: vi.fn(),
+  replaceDraft: vi.fn(),
   removeDraft: vi.fn(),
 }));
 
@@ -37,6 +38,7 @@ vi.mock('../../services/inspeccion.service', () => ({ inspeccionService: mocks }
 vi.mock('../../services/inspectionOfflineExchange', () => ({
   loadOfflineExchangeDraft: mocks.loadDraft,
   saveOfflineExchangeDraft: mocks.saveDraft,
+  replaceOfflineExchangeDraft: mocks.replaceDraft,
   removeOfflineExchangeDraftRevision: mocks.removeDraft,
 }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
@@ -85,19 +87,75 @@ describe('InspectionExchangePanel', () => {
     mocks.decideExchange.mockResolvedValue({ id: 'exchange-3' });
     mocks.loadDraft.mockResolvedValue(null);
     mocks.saveDraft.mockResolvedValue(undefined);
+    mocks.replaceDraft.mockImplementation((...args: unknown[]) => mocks.saveDraft(...args.slice(0, 5)));
     mocks.removeDraft.mockResolvedValue(undefined);
   });
 
   it('acknowledges a matching timeline after reopening without posting again', async () => {
     const scope = { userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' };
     const original = timeline.intercambios[1];
+    mocks.loadDraft.mockResolvedValue({ revision: 'recovered-before-send', savedAt: '2026-10-25T18:00:00Z', files: [],
+      draft: { tipo: original.tipo, asunto: original.asunto, cuerpo: original.cuerpo, respondeAId: original.respondeAId, plazoRespuestaAt: '' } });
     await claimExchangeCommand(scope, { kind: 'presentation', input: { clienteId: 'reopened-send', version: 8,
       tipo: original.tipo, asunto: original.asunto, cuerpo: original.cuerpo, respondeAId: original.respondeAId!, files: [] } });
     mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0], { ...original, clienteId: 'reopened-send' }] });
     renderPanel();
     expect(await screen.findByText('Presentación registrada')).toBeVisible();
     expect(screen.queryByText('Confirmación pendiente')).not.toBeInTheDocument();
+    expect(screen.queryByText('Borrador local recuperado')).not.toBeInTheDocument();
+    expect(screen.queryByText(/todavía no integra el expediente/)).not.toBeInTheDocument();
     expect(mocks.presentExchange).not.toHaveBeenCalled();
+  });
+
+  it('blocks autosave after a recovery conflict and explicitly reloads the newer draft', async () => {
+    const scope = { userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' };
+    const old = { tipo: 'DESCARGO' as const, asunto: 'Alternativa antigua', cuerpo: 'Texto antiguo conservado.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    await preserveDraftAlternative(scope, old, []);
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const user = userEvent.setup(); renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Texto actual sin enviar.');
+    mocks.replaceDraft.mockRejectedValueOnce(new Error('Otra pestaña cambió el borrador.'));
+    await user.click(screen.getByRole('button', { name: 'Recuperar borrador 1' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Otra pestaña cambió');
+    const writes = mocks.saveDraft.mock.calls.length;
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 400)); });
+    expect(mocks.saveDraft).toHaveBeenCalledTimes(writes);
+    expect(screen.getByRole('button', { name: 'Presentar en expediente' })).toBeDisabled();
+    mocks.loadDraft.mockResolvedValue({ revision: 'new', draft: { ...old, cuerpo: 'Versión más nueva de otra pestaña.' }, files: [], savedAt: '' });
+    await user.click(screen.getByRole('button', { name: 'Revisar borrador local' }));
+    await waitFor(() => expect(screen.getByLabelText('Contenido')).toHaveValue('Versión más nueva de otra pestaña.'));
+    expect(mocks.presentExchange).not.toHaveBeenCalled();
+    expect((await loadDraftAlternatives(scope)).some(item => item.draft.cuerpo === 'Texto actual sin enviar.')).toBe(true);
+  });
+
+  it('recovers a legacy response with its file while preserving current work and the original, without posting', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:original'); URL.revokeObjectURL = vi.fn();
+    const old = { tipo: 'DESCARGO' as const, asunto: 'Respuesta anterior', cuerpo: 'Texto de una versión anterior con su documento.', respondeAId: 'exchange-1', plazoRespuestaAt: '' };
+    const original = { id: 'actor-user-1:inspection-1', userId: 'actor-user-1', inspectionId: 'inspection-1', draft: old,
+      savedAt: '2026-10-24T12:00:00Z', files: [{ name: 'original.pdf', type: 'application/pdf', lastModified: 1, blob: new Blob(['original']) }] };
+    localCommands.set(original.id, original);
+    localStorage.setItem('sitrep_exchange_draft_actor-user-1_inspection-1', JSON.stringify(old));
+    mocks.getExchanges.mockResolvedValue({ ...timeline, intercambios: [timeline.intercambios[0]] });
+    const user = userEvent.setup(); const view = renderPanel();
+    await user.click(await screen.findByRole('button', { name: 'Responder requerimiento #1' }));
+    await user.type(screen.getByLabelText('Contenido'), 'Trabajo nuevo que debe conservarse.');
+    await user.click(screen.getByText('Copias de respuestas anteriores'));
+    const search = screen.getByRole('button', { name: 'Buscar respuestas guardadas' });
+    await waitFor(() => expect(search).toBeEnabled()); await user.click(search);
+    await user.click(await screen.findByRole('button', { name: 'Recuperar para revisar' }));
+    await waitFor(() => expect(screen.getByLabelText('Contenido')).toHaveValue(old.cuerpo));
+    await waitFor(() => expect(screen.getByLabelText('Contenido')).toHaveFocus());
+    expect(mocks.saveDraft).toHaveBeenCalledWith('actor-user-1', 'inspection-1', inspectionWorkspaceOwner(auth.currentUser), old, [expect.objectContaining({ name: 'original.pdf', size: 8 })]);
+    const alternatives = await loadDraftAlternatives({ userId: auth.currentUser.id, owner: inspectionWorkspaceOwner(auth.currentUser), inspectionId: 'inspection-1' });
+    expect(alternatives.some(item => item.draft.cuerpo === 'Trabajo nuevo que debe conservarse.')).toBe(true);
+    expect(localCommands.get(original.id)).toBe(original);
+    expect(localStorage.getItem('sitrep_exchange_draft_actor-user-1_inspection-1')).toBe(JSON.stringify(old));
+    view.unmount();
+    mocks.loadDraft.mockResolvedValue({ draft: old, files: [new File(['original'], 'original.pdf')], savedAt: original.savedAt });
+    renderPanel();
+    expect(await screen.findByLabelText('Contenido')).toHaveValue(old.cuerpo);
+    expect(mocks.presentExchange).not.toHaveBeenCalled(); expect(mocks.decideExchange).not.toHaveBeenCalled();
   });
 
   it('does not archive the text-only fallback again when the full alternative has attachments', async () => {

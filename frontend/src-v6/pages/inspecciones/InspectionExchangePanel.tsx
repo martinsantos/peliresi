@@ -21,12 +21,14 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
 import { InspectionLegalProgress } from './InspectionLegalProgress';
+import { InspectionLegacyExchangeRecovery } from './InspectionLegacyExchangeRecovery';
+import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
 import { toast } from '../../components/ui/Toast';
 import { useInspectionExchangeCommand } from '../../hooks/useInspectionExchangeCommand';
 import { useAuth } from '../../contexts/AuthContext';
 import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { inspeccionService } from '../../services/inspeccion.service';
-import { loadOfflineExchangeDraft, removeOfflineExchangeDraftRevision, saveOfflineExchangeDraft } from '../../services/inspectionOfflineExchange';
+import { loadOfflineExchangeDraft, removeOfflineExchangeDraftRevision, replaceOfflineExchangeDraft, saveOfflineExchangeDraft } from '../../services/inspectionOfflineExchange';
 import { isSentDraft, loadDraftAlternatives, preserveDraftAlternative, retireSentAlternatives } from '../../services/inspectionDraftAlternatives';
 import type {
   InspectionExchange,
@@ -270,9 +272,13 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   const draftInteraction = useRef(0);
   const [persistenceRevision, setPersistenceRevision] = useState(0);
   const [draftStorageError, setDraftStorageError] = useState(false);
+  const [draftStorageMessage, setDraftStorageMessage] = useState('');
   const [draftReady, setDraftReady] = useState(false);
   const draftReadyRef = useRef(false);
+  const recoveryInFlight = useRef(false);
   const [draftReadRevision, setDraftReadRevision] = useState(0);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const exchangeQuery = useQuery({
     queryKey: ['inspecciones', 'intercambios', currentUser?.id, inspectionId, owner],
@@ -302,7 +308,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     if (!draftKey || !composeOpen) return;
     const epoch = draftSaveEpoch.current;
     const timer = window.setTimeout(() => {
-      if (!draftReadyRef.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      if (!draftReadyRef.current || recoveryInFlight.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
       try { localStorage.setItem(draftKey, JSON.stringify(draft)); } catch { setDraftStorageError(true); }
     }, 250);
     return () => window.clearTimeout(timer);
@@ -328,7 +334,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     if (!composeOpen || !currentUser?.id || !inspectionId) return;
     const epoch = draftSaveEpoch.current;
     const timer = window.setTimeout(() => {
-      if (!draftReadyRef.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
+      if (!draftReadyRef.current || recoveryInFlight.current || persistenceBlocked.current || epoch !== draftSaveEpoch.current) return;
       // Acknowledgement must wait for every queued write before removing the draft.
       draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, draft, files)
         .catch(() => { setDraftStorageError(true); });
@@ -343,7 +349,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
     // editor's key; never carry its values into the new account/context.
     const flush = () => {
       const snapshot = departingDraft.current;
-      if (!draftReadyRef.current || !snapshot.composeOpen || persistenceBlocked.current || !currentUser?.id || !draftKey) return;
+      if (!draftReadyRef.current || recoveryInFlight.current || !snapshot.composeOpen || persistenceBlocked.current || !currentUser?.id || !draftKey) return;
       try { localStorage.setItem(draftKey, JSON.stringify(snapshot.draft)); } catch { setDraftStorageError(true); }
       draftWrites.current = saveOfflineExchangeDraft(String(currentUser.id), inspectionId, owner, snapshot.draft, snapshot.files)
         .catch(() => { setDraftStorageError(true); });
@@ -370,7 +376,15 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   const [alternatives, setAlternatives] = useState<Awaited<ReturnType<typeof loadDraftAlternatives>>>([]);
   const alternativesWrite = useRef<Promise<void>>(Promise.resolve());
   const [recovering, setRecovering] = useState(false);
-  const commandBlocked = !draftReady || !delivery.ready || delivery.busy || Boolean(command);
+  const focusRecoveredDraft = useRef(false);
+  const commandBlocked = !draftReady || !delivery.ready || delivery.busy || Boolean(command) || recovering;
+  useEffect(() => {
+    if (!focusRecoveredDraft.current || commandBlocked || !composeOpen) return;
+    const form = document.getElementById('inspection-exchange-form');
+    form?.scrollIntoView?.({ block: 'start' });
+    form?.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true });
+    focusRecoveredDraft.current = false;
+  }, [commandBlocked, composeOpen, recovering, persistenceRevision]);
   useEffect(() => {
     let live = true;
     void loadDraftAlternatives(commandScope).then(saved => { if (live) setAlternatives(saved); }).catch(() => { if (live) setDraftStorageError(true); });
@@ -433,22 +447,46 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
   });
 
   const recoverAlternative = async (alternative: typeof alternatives[number]) => {
-    if (commandBlocked || recovering) return;
+    if (commandBlocked || recoveryInFlight.current || !mounted.current) return false;
+    recoveryInFlight.current = true;
+    draftSaveEpoch.current += 1;
     setRecovering(true);
     try {
       if (composeOpen) await preserveDraftAlternative(commandScope, draft, files);
-      await saveOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner, alternative.draft, alternative.files);
+      // Also preserve the shared revision: another tab may have edited it while
+      // this editor was reviewing an older copy.
+      await draftWrites.current;
+      const shared = await loadOfflineExchangeDraft(commandScope.userId, inspectionId, owner);
+      if (shared) await preserveDraftAlternative(commandScope, shared.draft, shared.files);
+      if (!mounted.current) return false;
+      await preserveDraftAlternative(commandScope, alternative.draft, alternative.files);
+      await replaceOfflineExchangeDraft(String(currentUser?.id), inspectionId, owner, alternative.draft, alternative.files, shared?.revision);
       localStorage.setItem(draftKey, JSON.stringify(alternative.draft));
+      if (!mounted.current) return false;
+      focusRecoveredDraft.current = true;
       draftInteraction.current += 1;
       setDraft(alternative.draft); setFiles(alternative.files); setComposeOpen(true); setRestoredAt(alternative.savedAt);
       setAlternatives(await loadDraftAlternatives(commandScope));
-      window.setTimeout(() => {
-        const form = document.getElementById('inspection-exchange-form');
-        form?.scrollIntoView?.({ block: 'start' });
-        form?.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true });
-      }, 0);
-    } catch { setDraftStorageError(true); }
-    finally { setRecovering(false); }
+      return true;
+    } catch (failure) {
+      if (mounted.current) {
+        // Do not resume autosave over a revision that another tab changed.
+        draftReadyRef.current = false; setDraftReady(false); setDraftStorageError(true);
+        setDraftStorageMessage(failure instanceof Error ? failure.message : 'No pudimos recuperar la copia. El original sigue disponible.');
+      }
+      return false;
+    }
+    finally { recoveryInFlight.current = false; if (mounted.current) { setRecovering(false); setPersistenceRevision(value => value + 1); } }
+  };
+
+  const verifyLegacyAccess = async () => {
+    const fresh = await inspeccionService.getExchanges(inspectionId);
+    if (!mounted.current || !timeline || fresh.inspeccion.id !== inspectionId || fresh.parteActual !== timeline.parteActual) throw new Error('Cambió el acceso al requerimiento. Volvé a abrirlo desde Avisos.');
+    if (fresh.inspeccion.version !== timeline.inspeccion.version) {
+      void exchangeQuery.refetch();
+      throw new Error('El expediente cambió. Revisá el historial actualizado y buscá otra vez la copia.');
+    }
+    return fresh;
   };
 
   const parentById = useMemo(() => new Map((timeline?.intercambios || []).map((entry) => [entry.id, entry])), [timeline?.intercambios]);
@@ -566,7 +604,11 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
         </li>)}</ul>
       </Card>}
       {!draftReady && !draftStorageError && <p role="status" className="text-sm text-neutral-700">Comprobando el borrador y sus adjuntos…</p>}
-      {draftStorageError && <Card role="alert" className="border-warning-200 bg-warning-50 text-sm text-warning-900">No pudimos confirmar la copia local del borrador. Conservá esta pantalla abierta hasta resolverlo.{!draftReady && <Button variant="outline" className="mt-3" onClick={() => { setDraftStorageError(false); setDraftReadRevision(value => value + 1); }}>Revisar borrador local</Button>}</Card>}
+      {draftStorageError && <Card role="alert" className="border-warning-200 bg-warning-50 text-sm text-warning-900">{draftStorageMessage || 'No pudimos confirmar la copia local del borrador. Conservá esta pantalla abierta hasta resolverlo.'}{!draftReady && <Button variant="outline" className="mt-3" onClick={() => { setDraftStorageError(false); setDraftStorageMessage(''); setDraftReadRevision(value => value + 1); }}>Revisar borrador local</Button>}</Card>}
+      <InspectionLegacyExchangeRecovery userId={commandScope.userId} inspectionId={inspectionId}
+        destination={`${currentUser?.nombre || 'Tu cuenta'} · ${workspaceRoleLabel(currentUser?.rol || '')}${currentUser?.empresaContexto ? ' · ' + currentUser.empresaContexto.razonSocial + ' · ' + (currentUser.empresaContexto.establecimiento?.nombre || 'Todas las sedes') : ''} · ${timeline.inspeccion.numero}`}
+        disabled={commandBlocked || recovering || !online} verifyAccess={verifyLegacyAccess}
+        onRecover={copy => copy.draft ? recoverAlternative({ id: 'legacy-' + copy.id, draft: copy.draft, files: copy.files, savedAt: copy.savedAt }) : Promise.resolve(false)} />
       <Card className="overflow-hidden !p-0">
         <div className="border-b border-neutral-200 bg-[#F8FAF8] px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -613,7 +655,7 @@ const ScopedInspectionExchangePanel: React.FC<InspectionExchangePanelProps & { o
       {timeline.inspeccion.estado === 'FINALIZADA' && timeline.resultadoAdministrativo && <Card data-testid="inspection-public-result" className="space-y-3"><h3 className="flex items-center gap-2 text-lg font-bold text-neutral-900"><FileCheck2 size={21} className="shrink-0 text-primary-800" aria-hidden="true" />Resultado administrativo registrado</h3><p className="whitespace-pre-wrap break-words text-sm leading-6 text-neutral-800">{timeline.resultadoAdministrativo.detalle || 'La administración registró la finalización sin un resumen público adicional.'}</p><p className="text-xs text-neutral-600">{inspectionDeadlineDate(timeline.resultadoAdministrativo.createdAt)} · Mendoza. El registro no acredita por sí solo sanción ni firmeza.</p></Card>}
 
       {!online && <div role="status" className="flex items-start gap-3 rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-sm text-warning-900"><WifiOff className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Sin conexión: no se enviará ninguna actuación.</p><p className="mt-0.5 leading-5">El texto y los adjuntos seleccionados se conservan en el almacenamiento local del navegador de este dispositivo. Al reconectar, revise la versión y confirme manualmente; SITREP nunca autoenvía un descargo.</p></div></div>}
-      {restoredAt && composeOpen && <div role="status" className="flex items-start gap-3 rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900"><FileCheck2 className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Borrador local recuperado</p><p className="mt-0.5 leading-5">Guardado {inspectionDate(restoredAt, true)} con {files.length} {files.length === 1 ? 'adjunto' : 'adjuntos'}. Revíselo antes de presentar; todavía no integra el expediente.</p></div></div>}
+      {restoredAt && composeOpen && !command && <div role="status" className="flex items-start gap-3 rounded-xl border border-info-200 bg-info-50 px-4 py-3 text-sm text-info-900"><FileCheck2 className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">Borrador local recuperado</p><p className="mt-0.5 leading-5">Guardado {inspectionDate(restoredAt, true)} con {files.length} {files.length === 1 ? 'adjunto' : 'adjuntos'}. Revíselo antes de presentar; todavía no integra el expediente.</p></div></div>}
       {deadlineExpired && open && <div data-testid="inspection-overdue" className="flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-900"><AlertTriangle className="mt-0.5 shrink-0" size={18} /><div><p className="font-bold">{followUp.overdue} {followUp.overdue === 1 ? 'requerimiento vencido sin respuesta' : 'requerimientos vencidos sin respuesta'}</p><p className="mt-0.5">Se admiten presentaciones; la marca fuera de plazo depende del pedido al que respondés. La autoridad debe evaluar lo presentado; no se aplica una decisión automática.</p></div></div>}
 
       {timeline.intercambios.length === 0 ? (

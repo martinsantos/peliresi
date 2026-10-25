@@ -82,6 +82,25 @@ export async function loadOfflineExchangeDraft(userId: string, inspectionId: str
   };
 }
 
+/** Explicit recovery may replace only the revision the user just inspected.
+ * Another tab's newer draft must remain untouched, including its attachments. */
+export async function replaceOfflineExchangeDraft(userId: string, inspectionId: string, owner: string, draft: OfflineExchangeDraftData, files: File[], expectedRevision?: string): Promise<void> {
+  if (!userId || !inspectionId || !owner) throw new Error('No se identificó el contexto del borrador.');
+  const id = inspectionContextKey(userId, owner, inspectionId);
+  const replacement: StoredExchangeDraft = { id, userId, owner, inspectionId, revision: crypto.randomUUID(), savedAt: new Date().toISOString(), draft,
+    files: files.map(file => ({ name: file.name, type: file.type, lastModified: file.lastModified, blob: file.slice(0, file.size, file.type) })) };
+  const write = (pendingWrites.get(id) || Promise.resolve()).catch(() => undefined).then(async () => {
+    await updateOffline<StoredExchangeDraft>('inspection_exchange_drafts', id, current => {
+      if (current ? !expectedRevision || current.revision !== expectedRevision || current.userId !== userId || current.owner !== owner || current.inspectionId !== inspectionId : Boolean(expectedRevision)) {
+        throw new Error('Otra pestaña cambió el borrador. Se conservaron las versiones; revisalas antes de recuperar.');
+      }
+      return replacement;
+    });
+  });
+  pendingWrites.set(id, write);
+  try { await write; } finally { if (pendingWrites.get(id) === write) pendingWrites.delete(id); }
+}
+
 /** Acknowledge only the exact revision we inspected, never another tab's write. */
 export async function removeOfflineExchangeDraftRevision(userId: string, inspectionId: string, owner: string, revision: string | undefined): Promise<void> {
   if (!revision) return; // Preserve legacy records whose identity cannot be proven.

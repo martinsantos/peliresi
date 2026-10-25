@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), get: vi.fn(), remove: vi.fn() }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), get: vi.fn(), remove: vi.fn(), update: vi.fn() }));
 vi.mock('../../services/indexeddb', () => ({
   saveOffline: mocks.save,
   getOffline: mocks.get,
   removeOffline: mocks.remove,
+  updateOffline: mocks.update,
 }));
 
 import {
   loadOfflineExchangeDraft,
   removeOfflineExchangeDraft,
   saveOfflineExchangeDraft,
+  replaceOfflineExchangeDraft,
 } from '../../services/inspectionOfflineExchange';
 import { inspectionContextKey } from '../../utils/inspectionWorkspace';
 
@@ -84,5 +86,26 @@ describe('inspection exchange offline draft', () => {
     expect(mocks.get).not.toHaveBeenCalled();
     finish(); await write; await read;
     expect(mocks.get).toHaveBeenCalledWith('inspection_exchange_drafts', id);
+  });
+
+  it('allows only one replacement of an inspected revision across concurrent recoveries', async () => {
+    let stored: any = { id, owner, userId: 'actor-1', inspectionId: 'inspection-1', revision: 'read-version', draft, files: [] };
+    mocks.update.mockImplementation(async (_store, _key, update) => { stored = update(stored); });
+    const results = await Promise.allSettled([
+      replaceOfflineExchangeDraft('actor-1', 'inspection-1', owner, { ...draft, cuerpo: 'First' }, [], 'read-version'),
+      replaceOfflineExchangeDraft('actor-1', 'inspection-1', owner, { ...draft, cuerpo: 'Second' }, [], 'read-version'),
+    ]);
+    expect(results.map(item => item.status)).toEqual(['fulfilled', 'rejected']); expect(stored.draft.cuerpo).toBe('First');
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it('does not replace a newer draft, an unknown legacy revision, or a removed inspected draft', async () => {
+    for (const stored of [{ id, owner, userId: 'actor-1', inspectionId: 'inspection-1', revision: 'new' }, { id, owner, userId: 'actor-1', inspectionId: 'inspection-1' }, null]) {
+      mocks.update.mockImplementation(async (_store, _key, update) => update(stored));
+      await expect(replaceOfflineExchangeDraft('actor-1', 'inspection-1', owner, draft, [], 'old')).rejects.toThrow('Otra pestaña');
+    }
+  });
+  it('propagates an aborted durable replacement without declaring success', async () => {
+    mocks.update.mockRejectedValueOnce(new Error('transaction aborted'));
+    await expect(replaceOfflineExchangeDraft('actor-1', 'inspection-1', owner, draft, [])).rejects.toThrow('transaction aborted');
   });
 });
