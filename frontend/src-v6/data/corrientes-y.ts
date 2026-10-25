@@ -54,9 +54,8 @@ export const CORRIENTES_Y_CODES = Object.keys(CORRIENTES_Y);
  */
 export function parseCorrientes(str: string | null | undefined): string[] {
   if (!str) return [];
-  return str
-    .split(',')
-    .flatMap(part => part.split('-'))
-    .map(s => s.trim())
-    .filter(Boolean);
+  return [...new Set(str
+    .split(/[,;/\s-]+/)
+    .map(s => s.trim().toUpperCase())
+    .filter(Boolean))];
 }

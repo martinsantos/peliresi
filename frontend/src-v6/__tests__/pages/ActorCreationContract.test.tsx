@@ -129,7 +129,7 @@ describe('actor creation contract', () => {
       step(name);
       expect(screen.queryByRole('button', { name: 'Agregar' })).not.toBeInTheDocument();
       expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/admin/actores/transportistas/qa');
+      expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/admin/actores/transportistas/qa?tab=flota');
       expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('target', '_blank');
     }
     expect(mock.update).not.toHaveBeenCalled();
@@ -147,7 +147,7 @@ describe('actor creation contract', () => {
   it('keeps the fleet destination inside the app basename', () => {
     mock.existing = { id: 'qa', razonSocial: 'QA Transporte', cuit: '30-12345678-9', email: 'qa@night-qa.invalid', vehiculos: [], choferes: [] };
     open('transportista', true, '/app'); step('Vehiculos');
-    expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/app/admin/actores/transportistas/qa');
+    expect(screen.getByRole('link', { name: /Administrar flota/ })).toHaveAttribute('href', '/app/admin/actores/transportistas/qa?tab=flota');
   });
   it.each(['generador', 'operador', 'transportista'] as const)('%s never edits an unavailable or mismatched registry record', type => {
     mock.existing = { id: 'wrong-actor', razonSocial: 'Do not reuse', cuit: '30-12345678-9', email: 'qa@night-qa.invalid' };

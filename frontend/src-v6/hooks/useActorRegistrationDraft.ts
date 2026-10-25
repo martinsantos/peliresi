@@ -12,6 +12,7 @@ export function useActorRegistrationDraft(type: 'GENERADOR' | 'OPERADOR' | 'TRAN
   const owner = registrationSessionOwner(getAccessToken());
   const scope = `admin:${type}:${actorId || 'new'}`;
   const [verified, setVerified] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
   const [available, setAvailable] = useState<RegistrationDraft | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,9 +34,9 @@ export function useActorRegistrationDraft(type: 'GENERADOR' | 'OPERADOR' | 'TRAN
   useEffect(() => {
     generation.current++;remote.current=null;known.current=false;conflictRef.current=false;uploaded.current={};synced.current='';pendingWrite.current=null;
     setCloudSaved(false);setConflict(false);setSaving(false);setRestoring(false);
-    let cancelled = false; setVerified(null); setAvailable(null); setSaved(false); setError(null); paused.current = false;
+    let cancelled = false; setChecking(true); setVerified(null); setAvailable(null); setSaved(false); setError(null); paused.current = false;
     if (previousOwner.current !== owner) { restoreRef.current({}); previousOwner.current = owner; }
-    if (!owner) return;
+    if (!owner) { setChecking(false); return; }
     api.get('/auth/profile').then(async response => {
       if (cancelled || registrationSessionOwner(getAccessToken()) !== owner) return;
       if (response.data?.data?.user?.id !== owner) throw new Error('La sesión no corresponde al borrador');
@@ -47,7 +48,8 @@ export function useActorRegistrationDraft(type: 'GENERADOR' | 'OPERADOR' | 'TRAN
       remote.current=server;known.current=true;
       setAvailable(local&&(!server||local.savedAt>Date.parse(server.savedAt))?local:server?{version:1,owner,scope,savedAt:Date.parse(server.savedAt),data:server.data}:null);
       setSyncTick(tick=>tick+1);
-    }).catch(() => { if (!cancelled) setError('No se pudo consultar el borrador de SITREP. Conservamos los datos de este dispositivo; reintentá la conexión antes de continuar.'); });
+    }).catch(() => { if (!cancelled) setError('No se pudo consultar el borrador de SITREP. Conservamos los datos de este dispositivo; reintentá la conexión antes de continuar.'); })
+      .finally(() => { if (!cancelled) setChecking(false); });
     return () => { cancelled = true; generation.current++; };
   }, [owner, scope]);
   const assertSession = () => {
@@ -156,6 +158,6 @@ export function useActorRegistrationDraft(type: 'GENERADOR' | 'OPERADOR' | 'TRAN
       setAvailable(server?{version:1,owner,scope,savedAt:Date.parse(server.savedAt),data:server.data}:readRegistrationDraft(owner,scope));setSyncTick(tick=>tick+1);
     }catch(failure){if(current===generation.current)setError(getApiErrorMessage(failure,'No se pudo consultar la versión guardada.'));}
   };
-  return { owner, available, saved, error, restoring, checkpoint, restore, discard, clear, assertSession, cloudSaved,saving,conflict,reviewRemote,
+  return { owner, available, saved, error, restoring, checking, checkpoint, restore, discard, clear, assertSession, cloudSaved,saving,conflict,reviewRemote,
     blocked: ownership.status === 'blocked' || (verified === owner && ownership.status === 'unavailable'), retry: ownership.retry };
 }

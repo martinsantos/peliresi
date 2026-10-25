@@ -11,6 +11,17 @@ const session = (id: string) => `qa.${btoa(JSON.stringify({ id }))}.qa`;
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); mock.token = session('admin'); mock.canWrite.mockReturnValue(true);mock.server=null;mock.read.mockImplementation(async()=>mock.server);mock.save.mockImplementation(async(_scope,version,data)=>{if(version!==(mock.server?.version||0))throw {response:{status:409}};return mock.server={version:version+1,data,savedAt:new Date().toISOString(),files:[]};});mock.remove.mockResolvedValue(undefined);
   mock.get.mockResolvedValue({ data: { data: { user: { id: 'admin' } } } }); });
 describe('all administrative actor drafts use a verified account and actual saved documents', () => {
+  it('remains checking until both the session and the remote draft are known', async () => {
+    let finish!: (value: unknown) => void;
+    mock.read.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const view = renderHook(() => useActorRegistrationDraft('GENERADOR', 'qa-actor', {}, vi.fn(), false));
+    expect(view.result.current.checking).toBe(true);
+    await waitFor(() => expect(mock.read).toHaveBeenCalledOnce());
+    expect(view.result.current.checking).toBe(true);
+    await act(async () => finish(null));
+    await waitFor(() => expect(view.result.current.checking).toBe(false));
+    expect(view.result.current.error).toBeNull();
+  });
   it.each(['GENERADOR', 'OPERADOR', 'TRANSPORTISTA'] as const)('%s persists and recovers without a password or actor creation', async type => {
     const restore = vi.fn(), data = { form: { razonSocial: 'QA', cuit: '30-12345678-9', password: 'DO-NOT-STORE' }, step: 2 };
     const first = renderHook(() => useActorRegistrationDraft(type, undefined, data, restore, true));

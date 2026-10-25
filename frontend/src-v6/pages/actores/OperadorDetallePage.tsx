@@ -1,3 +1,5 @@
+import { useActorDetailNavigation } from '../../hooks/useActorDetailNavigation';
+import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
  * SITREP v6 - Operador Detail Page
  * =================================
@@ -40,7 +42,7 @@ import { actorInspectionAccess, actorReturnPath } from '../../utils/actorReadAcc
 import { useOperador } from '../../hooks/useActores';
 
 import type { OperadorEnriched } from '../../data/operadores-enrichment';
-import { CORRIENTES_Y } from '../../data/corrientes-y';
+import { CORRIENTES_Y, parseCorrientes } from '../../data/corrientes-y';
 import { useOperadoresEnrichment } from '../../hooks/useEnrichment';
 import TrazabilidadTimeline from '../../components/TrazabilidadTimeline';
 import HistorialCambiosActor from '../../components/HistorialCambiosActor';
@@ -96,6 +98,7 @@ const OperadorDetallePage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const mp = useMobilePrefix();
+  const detailTabs = useActorDetailNavigation(["info","tratamientos","documentos","historial"].concat(actorInspectionAccess(currentUser, 'OPERADOR', id) ? ['inspecciones'] : []));
   const showInspections = Boolean(actorInspectionAccess(currentUser, 'OPERADOR', id));
   const canViewCatalog = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_OPERADOR';
   const location = useLocation();
@@ -104,7 +107,7 @@ const OperadorDetallePage: React.FC = () => {
   const { data: enrichmentData } = useOperadoresEnrichment();
   const OPERADORES_DATA = enrichmentData?.operadores || {};
 
-  const { data: apiOperador, isLoading } = useOperador(id || '');
+  const { data: apiOperador, isLoading, refetch } = useOperador(id || '');
 
   const operador: OperadorViewModel | null = apiOperador ? {
     ...apiOperador,
@@ -118,7 +121,20 @@ const OperadorDetallePage: React.FC = () => {
   } : null;
 
   // CSV enrichment lookup by CUIT
-  const enriched: OperadorEnriched | null = operador?.cuit ? (OPERADORES_DATA[operador.cuit] || null) : null;
+  const legacyEnriched: OperadorEnriched | null = operador?.cuit ? (OPERADORES_DATA[operador.cuit] || null) : null;
+  // The saved ficha is authoritative; the historical import only fills missing fields.
+  const enriched = apiOperador ? {
+    ...legacyEnriched,
+    telefono: apiOperador.telefono ?? legacyEnriched?.telefono ?? '',
+    mail: apiOperador.email ?? legacyEnriched?.mail ?? '',
+    tipoOperador: apiOperador.tipoOperador ?? legacyEnriched?.tipoOperador ?? '',
+    certificado: apiOperador.certificadoNumero ?? legacyEnriched?.certificado ?? '',
+    expediente: apiOperador.expedienteInscripcion ?? legacyEnriched?.expediente ?? '',
+    tecnologia: apiOperador.tecnologia ?? legacyEnriched?.tecnologia ?? '',
+    corrientes: apiOperador.corrientesY != null
+      ? parseCorrientes(apiOperador.corrientesY)
+      : legacyEnriched?.corrientes ?? [],
+  } : null;
   const realAddress = {
     calle: apiOperador?.domicilioRealCalle ?? enriched?.domicilioReal?.calle ?? '',
     localidad: apiOperador?.domicilioRealLocalidad ?? enriched?.domicilioReal?.localidad ?? '',
@@ -154,7 +170,7 @@ const OperadorDetallePage: React.FC = () => {
     );
   }
 
-  if (!operador) return null;
+  if (!operador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} />;
 
   const est = estadoConfig[operador.estado] || estadoConfig.ACTIVO;
 
@@ -193,10 +209,10 @@ const OperadorDetallePage: React.FC = () => {
         </div>
       </div>
 
-      {canViewCatalog && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/operadores/${id}/editar`), { state: { actorReturn: backPath } })}>Editar datos del padrón</Button>}
+      {canViewCatalog && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/operadores/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="OPERADOR" actorId={id || ''} />
       <AdministrativeTEF actorType="OPERADOR" identity={operador.id} declaration={apiOperador}
-        corrientesY={(apiOperador?.corrientesY || enriched?.corrientes.join(',') || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
+        corrientesY={enriched?.corrientes || []}
         tieneISO={false} />
 
       {/* Stats — only real data */}
@@ -212,7 +228,7 @@ const OperadorDetallePage: React.FC = () => {
       </div>
 
       {/* Tabs — only real data */}
-      <Tabs defaultTab="info" variant="default">
+      <Tabs {...detailTabs} variant="default">
         <TabList>
           <Tab id="info" icon={<FlaskConical size={16} />}>Información General</Tab>
           <Tab id="tratamientos" icon={<Beaker size={16} />}>Tratamientos</Tab>
@@ -492,7 +508,7 @@ const OperadorDetallePage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 leftIcon={<BarChart3 size={14} />}
-                onClick={() => navigate('/admin/tratamientos')}
+                onClick={() => navigate(mp('/admin/tratamientos'))}
               >
                 Ver catálogo completo de tratamientos
               </Button>

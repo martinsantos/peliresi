@@ -1,3 +1,4 @@
+import { actorEditReturn } from '../../hooks/useActorDetailNavigation';
 import { PageToolbar } from '../../components/ui/PageToolbar';
 import { actorListReturn } from '../../hooks/useActorListNavigation';
 /**
@@ -67,6 +68,7 @@ const NuevoTransportistaPage: React.FC = () => {
   const validationRef = useRegistrationValidationFocus(attempted);
   const submitInFlight = useRef(false);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [formEdited, setFormEdited] = useState(false);
   const [vehiculos, setVehiculos] = useState<VehiculoForm[]>([]);
   const [choferes, setChoferes] = useState<ChoferForm[]>([]);
   const [pendingDocuments, setPendingDocuments] = useState<Record<string, { file: File; anio?: number }>>({});
@@ -79,16 +81,17 @@ const NuevoTransportistaPage: React.FC = () => {
   const draft = useActorRegistrationDraft('TRANSPORTISTA', id, draftData, (data, restoredFiles = {}) => {
     setPendingDocuments(restoredFiles); setDocumentError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
+    setFormEdited(Boolean(data.form)); setAttempted(new Set());
     setVehiculos(fleetRows(data.vehiculos, EMPTY_VEHICULO));
     setChoferes(fleetRows(data.choferes, EMPTY_CHOFER));
     setSavedActorId(typeof data.savedActorId === 'string' ? data.savedActorId : null);
     setSavedDocuments(Array.isArray(data.savedDocuments) ? data.savedDocuments : []);
     setStep(data.savedActorId ? STEPS.length : Math.min(STEPS.length, Math.max(1, Number(data.step) || 1)));
     setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
-  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || vehiculos.length > 0 || choferes.length > 0 || Boolean(savedActorId), pendingDocuments);
+  }, (isEdit ? formEdited : formEdited || JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || vehiculos.length > 0 || choferes.length > 0) || Boolean(savedActorId), pendingDocuments);
 
   useEffect(() => {
-    initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setVehiculos([]); setChoferes([]);
+    initializedActor.current = null; setForm(INITIAL_FORM); setFormEdited(false); setAttempted(new Set()); setDocumentError(null); setStep(1); setVehiculos([]); setChoferes([]);
     setPendingDocuments({}); setSavedActorId(null); setSavedDocuments([]); setMissingFiles([]);
   }, [id, draft.owner]);
 
@@ -131,7 +134,7 @@ const NuevoTransportistaPage: React.FC = () => {
     }
   }, [existing, isEdit, id, draft.owner]);
 
-  const up = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+  const up = (field: string, value: string) => { setFormEdited(true); setForm(prev => ({ ...prev, [field]: value })); };
 
   const passwordError = initialPasswordError(form.password, form.cuit);
   const getStepErrors = (s: number) => {
@@ -176,17 +179,17 @@ const NuevoTransportistaPage: React.FC = () => {
 
     const payload: any = {
       razonSocial: form.razonSocial, cuit: form.cuit,
-      domicilio: form.domicilio, localidad: form.localidad || undefined,
+      domicilio: form.domicilio, localidad: form.localidad || (isEdit ? "" : undefined),
       telefono: form.telefono, email: form.email,
       numeroHabilitacion: form.numeroHabilitacion,
-      vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
-      ...(parseActorCoordinates(form.coordenadas) || {}),
-      corrientesAutorizadas: form.corrientesAutorizadas || undefined,
-      expedienteDPA: form.expedienteDPA || undefined,
-      resolucionDPA: form.resolucionDPA || undefined,
-      resolucionSSP: form.resolucionSSP || undefined,
-      actaInspeccion: form.actaInspeccion || undefined,
-      actaInspeccion2: form.actaInspeccion2 || undefined,
+      vencimientoHabilitacion: form.vencimientoHabilitacion || (isEdit ? null : undefined),
+      ...(parseActorCoordinates(form.coordenadas) || (isEdit ? { latitud: null, longitud: null } : {})),
+      corrientesAutorizadas: form.corrientesAutorizadas || (isEdit ? "" : undefined),
+      expedienteDPA: form.expedienteDPA || (isEdit ? "" : undefined),
+      resolucionDPA: form.resolucionDPA || (isEdit ? "" : undefined),
+      resolucionSSP: form.resolucionSSP || (isEdit ? "" : undefined),
+      actaInspeccion: form.actaInspeccion || (isEdit ? "" : undefined),
+      actaInspeccion2: form.actaInspeccion2 || (isEdit ? "" : undefined),
     };
 
     if (!isEdit) {
@@ -246,9 +249,11 @@ const NuevoTransportistaPage: React.FC = () => {
         setDocumentError(`Transportista guardado. Quedan adjuntos pendientes: ${failed.join(', ')}. Reintentá sin repetir el alta.`);
         return;
       }
-      if (!await draft.clear()) return; navigate(backPath);
+      if (!await draft.clear()) return; goBack();
     } catch (err: any) {
-      toast.error('Error', err?.response?.data?.message || 'No se pudo guardar');
+      const message = err?.response?.data?.message || err?.message || 'No se pudo guardar. Tus cambios siguen en el formulario.';
+      setDocumentError(message);
+      toast.error('Error al guardar', message);
     } finally {
       submitInFlight.current = false;
       setSavingDocuments(false);
@@ -256,18 +261,21 @@ const NuevoTransportistaPage: React.FC = () => {
   };
 
   const isPending = savingDocuments || createMutation.isPending || updateMutation.isPending;
-  const backPath = actorListReturn(location.state, mp('/admin/actores/transportistas'));
+  const listPath = mp('/admin/actores/transportistas');
+  const listReturn = actorListReturn(location.state, listPath);
+  const backPath = id ? actorEditReturn(location.state, listPath, id) : listReturn;
+  const goBack = () => id ? navigate(backPath, { state: { actorReturn: listReturn } }) : navigate(backPath);
   if (isEdit && loadingExisting) return <p role="status" className="p-6 text-neutral-700">Recuperando la ficha del transportista…</p>;
-  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del transportista. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
+  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del transportista. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(listReturn)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
+    <div ref={validationRef} onChangeCapture={event => { if ((event.target as HTMLElement).getAttribute("aria-label") !== "Paso del registro") setFormEdited(true); }} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto">
       <PageToolbar label="Acciones del formulario">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver a Transportistas</Button>
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => goBack()}>{isEdit ? 'Volver a la ficha' : 'Volver a Transportistas'}</Button>
         <h2 className="sr-only">{isEdit ? 'Editar transportista' : 'Nuevo transportista'}</h2>
       </PageToolbar>
 
-      <ActorRegistrationDraftBar draft={draft} />
+      <ActorRegistrationDraftBar draft={draft} mode={isEdit ? "edit" : "create"} />
       {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
 
       {/* Stepper */}
@@ -305,7 +313,7 @@ const NuevoTransportistaPage: React.FC = () => {
         {step === 1 && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2"><Truck size={20} className="text-orange-600" /> Datos Basicos</h3>
-            <ActorContactFields form={form} up={up} administrative attempted={attempted.has(1)} placeholder="Transporte S.A." identitySlot={<Input label="CUIT *" value={form.cuit} onChange={e => up("cuit", e.target.value)} errorMessage={attempted.has(1) && !form.cuit.trim() ? "El CUIT es obligatorio" : undefined} placeholder="30-12345678-9" />} />
+            <ActorContactFields form={form} up={up} administrative attempted={attempted.has(1)} placeholder="Transporte S.A." identitySlot={<Input label="CUIT *" readOnly={isEdit} helperText={isEdit ? "Identifica al actor; no se modifica desde esta edición." : undefined} value={form.cuit} onChange={e => up("cuit", e.target.value)} errorMessage={attempted.has(1) && !form.cuit.trim() ? "El CUIT es obligatorio" : undefined} placeholder="30-12345678-9" />} />
             {!isEdit && !savedActorId && <ActorRegistryLookup type="TRANSPORTISTA" cuit={form.cuit} />}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2"><Input label="Localidad" value={form.localidad} onChange={e => up("localidad", e.target.value)} placeholder="Godoy Cruz, Mendoza" /><Input label="Coordenadas" value={form.coordenadas} onChange={e => up("coordenadas", e.target.value)} placeholder="-32.89, -68.83" errorMessage={attempted.has(1) && parseActorCoordinates(form.coordenadas) === null ? COORDINATE_ERROR : undefined} /></div>
             {!isEdit && (
@@ -323,7 +331,7 @@ const NuevoTransportistaPage: React.FC = () => {
           <section className="space-y-4" aria-label="Vehículos registrados">
             <h3 className="text-lg font-bold text-neutral-900">Vehículos registrados</h3>
             <p className="text-sm text-neutral-700">Esta edición guarda los datos del transportista, no su flota. Los vehículos y choferes se administran desde la pestaña Flota y Conductores de su ficha.</p>
-            <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-4 font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/admin/actores/transportistas/' + id)} target="_blank" rel="noopener noreferrer">Administrar flota (nueva pestaña)</Link>
+            <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-4 font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/admin/actores/transportistas/' + id + '?tab=flota')} target="_blank" rel="noopener noreferrer">Administrar flota (nueva pestaña)</Link>
             <ul className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
               {vehiculos.map((item, i) => <li key={i} className="p-4 text-sm text-neutral-900">{item.patente} — {item.marca} {item.modelo} · {item.capacidad || '—'} kg</li>)}
             </ul>
@@ -339,7 +347,7 @@ const NuevoTransportistaPage: React.FC = () => {
           <section className="space-y-4" aria-label="Choferes registrados">
             <h3 className="text-lg font-bold text-neutral-900">Choferes registrados</h3>
             <p className="text-sm text-neutral-700">Esta edición guarda los datos del transportista, no su flota. Los vehículos y choferes se administran desde la pestaña Flota y Conductores de su ficha.</p>
-            <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-4 font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/admin/actores/transportistas/' + id)} target="_blank" rel="noopener noreferrer">Administrar flota (nueva pestaña)</Link>
+            <Link className="inline-flex min-h-11 items-center rounded-lg border border-primary-700 px-4 font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700" to={mp('/admin/actores/transportistas/' + id + '?tab=flota')} target="_blank" rel="noopener noreferrer">Administrar flota (nueva pestaña)</Link>
             <ul className="divide-y divide-neutral-200 rounded-xl border border-neutral-200">
               {choferes.map((item, i) => <li key={i} className="p-4 text-sm text-neutral-900">{item.nombre} {item.apellido} — DNI {item.dni}</li>)}
             </ul>
@@ -406,7 +414,7 @@ const NuevoTransportistaPage: React.FC = () => {
       {/* Navigation */}
       {documentError && <p role="alert" aria-label="Adjuntos pendientes" className="rounded-xl border border-error-300 bg-error-50 p-4 text-sm text-error-900">{documentError}</p>}
       <div className="flex items-center justify-between">
-        <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => step > 1 ? setStep(step - 1) : navigate(backPath)} disabled={isPending}>
+        <Button variant="outline" leftIcon={<ArrowLeft size={16} />} onClick={() => step > 1 ? setStep(step - 1) : goBack()} disabled={isPending}>
           {step === 1 ? 'Cancelar' : 'Anterior'}
         </Button>
         {step < STEPS.length ? (

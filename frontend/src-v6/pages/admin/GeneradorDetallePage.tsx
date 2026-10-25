@@ -1,3 +1,5 @@
+import { useActorDetailNavigation } from '../../hooks/useActorDetailNavigation';
+import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
  * SITREP v6 - Generador Detail Page (5 tabs)
  * ============================================
@@ -143,6 +145,7 @@ const GeneradorDetallePage: React.FC = () => {
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
   const canEdit = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_GENERADOR';
+  const detailTabs = useActorDetailNavigation(["info","residuos","fiscal","ddjj","historial"].concat(actorInspectionAccess(currentUser, 'GENERADOR', id) ? ['inspecciones'] : []));
   const showInspections = Boolean(actorInspectionAccess(currentUser, 'GENERADOR', id));
   // Removed isMobile — React Router handles basename
 
@@ -152,7 +155,7 @@ const GeneradorDetallePage: React.FC = () => {
   const { data: enrichmentData } = useGeneradoresEnrichment();
   const GENERADORES_DATA = enrichmentData?.generadores || {};
 
-  const { data: apiGenerador, isLoading } = useGenerador(id || '');
+  const { data: apiGenerador, isLoading, refetch } = useGenerador(id || '');
   const { data: pagos = [] } = usePagosTEF(id || '');
   const { data: ddjjList = [] } = useDDJJ(id || '');
   const { data: documentos = [], refetch: refetchDocumentos } = useDocumentos(id || '');
@@ -192,12 +195,12 @@ const GeneradorDetallePage: React.FC = () => {
     );
   }
 
-  if (!generador) return null;
+  if (!generador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} />;
 
   const g = generador;
   const categoriaLabel = generador.categoria?.replaceAll('_', ' ') || 'Sin categoría';
   const enriched = generador.cuit ? (GENERADORES_DATA[generador.cuit] || GENERADORES_DATA[generador.cuit.replace(/^(\d{2})(\d{8})(\d)$/, '$1-$2-$3')]) : null;
-  const categorias = g.corrientesControl
+  const categorias = g.corrientesControl != null
     ? parseCorrientes(g.corrientesControl)
     : (enriched?.categoriasControl || []);
 
@@ -359,11 +362,11 @@ const GeneradorDetallePage: React.FC = () => {
         </Card>
       </div>
 
-      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`), { state: { actorReturn: backPath } })}>Editar datos del padrón</Button>}
+      {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="GENERADOR" actorId={id || ''} />
 
       {/* 5 Tabs */}
-      <Tabs defaultTab="info" variant="default">
+      <Tabs {...detailTabs} variant="default">
         <TabList>
           <Tab id="info" icon={<Factory size={16} />}>Info General</Tab>
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>

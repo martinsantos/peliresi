@@ -1,5 +1,11 @@
 # SITREP - Sistema de Trazabilidad de Residuos Peligrosos
 
+## Fichas y edición — preview, 24/10/2026
+
+Tanda **sin publicar**, posterior a `59cecd11`. Generadores/Transportistas/Operadores: regreso a ficha/pestaña y filtros, errores recuperables, borrador de edición distinguido del guardado efectivo, CUIT sin edición, eliminación explícita de opcionales y recuperación de corrientes Y separadas. Los datos guardados prevalecen sobre importaciones históricas. Guardar espera la comprobación inicial de sesión y borrador. [Cierre y límites](docs/FICHAS-EDICION-20261024.md).
+
+**245 pruebas frontend, 21 comprobaciones HTTP sintéticas, tipos y builds web/app PASS**. Seis recorridos de navegador G/T/O × web/app, cierre/reapertura y guardado real en la base artificial; revisión adicional a 320 px. Android físico sigue pendiente. CAP cerrado, correos/push apagados, sin producción, main, workflows, migraciones ni datos reales. Manual de padrones actualizado. El detalle del runtime y las evidencias finales están en el cierre; no presentar esta tanda como desplegada.
+
 ## Publicación vigente — filtros y Ayuda de padrones, 24/10/2026
 
 **8fb6277e publicado en backend, web, app y manual a las 19:28:47 Mendoza.** Búsqueda/filtros/página/orden conservados al volver de ficha/alta; filtros globales de modalidad/corriente de Operadores y localidad de Transporte; Ayuda en encabezado sin tapar formularios. [Cierre, evidencias y reversión](docs/PADRONES-CONTINUIDAD-20261024.md).

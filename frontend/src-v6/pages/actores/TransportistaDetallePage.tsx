@@ -1,3 +1,5 @@
+import { useActorDetailNavigation } from '../../hooks/useActorDetailNavigation';
+import { ActorDetailUnavailable } from '../../components/ActorDetailUnavailable';
 /**
  * SITREP v6 - Transportista Detail Page
  * ======================================
@@ -67,6 +69,7 @@ const TransportistaDetallePage: React.FC = () => {
   // Removed isMobile — React Router handles basename
   const { isAdmin, currentUser } = useAuth();
   const mp = useMobilePrefix();
+  const detailTabs = useActorDetailNavigation(["info","flota","documentos","historial"].concat(actorInspectionAccess(currentUser, 'TRANSPORTISTA', id) ? ['inspecciones'] : []));
   const showInspections = Boolean(actorInspectionAccess(currentUser, 'TRANSPORTISTA', id));
 
   const [showVehiculoModal, setShowVehiculoModal] = useState(false);
@@ -81,7 +84,7 @@ const TransportistaDetallePage: React.FC = () => {
   const [flotaSort, setFlotaSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [choferSort, setChoferSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-  const { data: apiTransportista, isLoading } = useTransportista(id || '');
+  const { data: apiTransportista, isLoading, refetch } = useTransportista(id || '');
   const createVehiculo = useCreateVehiculo();
   const createChofer = useCreateChofer();
   const updateVehiculo = useUpdateVehiculo();
@@ -318,7 +321,7 @@ const TransportistaDetallePage: React.FC = () => {
     );
   }
 
-  if (!transportista) return null;
+  if (!transportista) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} />;
 
   const habVencimiento = transportista.vencimientoHab !== '-' ? new Date(transportista.vencimientoHab) : null;
   const diasHastaVencimiento = habVencimiento ? Math.ceil((habVencimiento.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
@@ -367,7 +370,7 @@ const TransportistaDetallePage: React.FC = () => {
         </div>
       </div>
 
-      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`), { state: { actorReturn: backPath } })}>Editar datos del padrón</Button>}
+      {(currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_TRANSPORTISTA') && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/transportistas/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
       <ActorCertificates type="TRANSPORTISTA" actorId={id || ''} />
 
       {/* Stats */}
@@ -383,7 +386,7 @@ const TransportistaDetallePage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultTab="info" variant="default">
+      <Tabs {...detailTabs} variant="default">
         <TabList>
           <Tab id="info" icon={<Truck size={16} />}>Información General</Tab>
           <Tab id="flota" icon={<Users size={16} />}>Flota y Conductores</Tab>

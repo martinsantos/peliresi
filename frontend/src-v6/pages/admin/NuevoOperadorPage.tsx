@@ -1,3 +1,4 @@
+import { actorEditReturn } from '../../hooks/useActorDetailNavigation';
 import { PageToolbar } from '../../components/ui/PageToolbar';
 import { actorListReturn } from '../../hooks/useActorListNavigation';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
@@ -110,6 +111,7 @@ const NuevoOperadorPage: React.FC = () => {
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [formEdited, setFormEdited] = useState(false);
   const [selectedY, setSelectedY] = useState<Set<string>>(new Set());
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const validationRef = useRegistrationValidationFocus(attempted);
@@ -125,13 +127,14 @@ const NuevoOperadorPage: React.FC = () => {
   const draft = useActorRegistrationDraft('OPERADOR', id, draftData, (data, restoredFiles = {}) => {
     setAdjuntos(Object.fromEntries(Object.entries(restoredFiles).map(([kind, item]) => [kind, item.file]))); setSubmitError(null);
     setForm(restoreRegistrationForm(INITIAL_FORM, data.form));
-    setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
+    setFormEdited(Boolean(data.form)); setAttempted(new Set());
+    setSelectedY(new Set(Array.isArray(data.selectedY) ? data.selectedY.flatMap(code => typeof code === 'string' ? parseCorrientes(code) : []).filter(code => CORRIENTES_Y_CODES.includes(code)) : []));
     setTefInputs(data.tefInputs ? tefDeclaredInputs({ tefInputs: data.tefInputs }).inputs : null);
     setSavedActorId(typeof data.savedActorId === 'string' ? data.savedActorId : null);
     setUploadedDocs(data.uploadedDocs && typeof data.uploadedDocs === 'object' ? data.uploadedDocs as Record<string, string> : {});
     setStep(data.savedActorId ? TOTAL_STEPS : Math.min(TOTAL_STEPS, Math.max(1, Number(data.step) || 1)));
     setMissingFiles(Array.isArray(data.files) ? data.files.filter(name => typeof name === 'string') : []);
-  }, JSON.stringify(form) !== JSON.stringify(INITIAL_FORM) || Boolean(savedActorId), Object.fromEntries(Object.entries(adjuntos).map(([kind, file]) => [kind, { file }])));
+  }, (isEdit ? formEdited : formEdited || JSON.stringify(form) !== JSON.stringify(INITIAL_FORM)) || Boolean(savedActorId), Object.fromEntries(Object.entries(adjuntos).map(([kind, file]) => [kind, { file }])));
 
   const { data: existing, isLoading: loadingExisting, refetch: reloadExisting } = useOperador(id || '');
   const initializedActor = useRef<string | null>(null);
@@ -139,10 +142,13 @@ const NuevoOperadorPage: React.FC = () => {
   const updateMutation = useUpdateOperador();
   const uploadDocMutation = useUploadOperadorDocumento();
 
-  const backPath = actorListReturn(location.state, mp('/admin/actores/operadores'));
+  const listPath = mp('/admin/actores/operadores');
+  const listReturn = actorListReturn(location.state, listPath);
+  const backPath = id ? actorEditReturn(location.state, listPath, id) : listReturn;
+  const goBack = () => id ? navigate(backPath, { state: { actorReturn: listReturn } }) : navigate(backPath);
 
   useEffect(() => {
-    initializedActor.current = null; setForm(INITIAL_FORM); setStep(1); setSelectedY(new Set());
+    initializedActor.current = null; setForm(INITIAL_FORM); setFormEdited(false); setAttempted(new Set()); setSubmitError(null); setStep(1); setSelectedY(new Set());
     setAdjuntos({}); setSavedActorId(null); setUploadedDocs({}); setTefInputs(null); setMissingFiles([]);
   }, [id, draft.owner]);
 
@@ -155,22 +161,22 @@ const NuevoOperadorPage: React.FC = () => {
 
     setForm({
       razonSocial: o.razonSocial || '', cuit: o.cuit || '',
-      domicilio: o.domicilio || '', telefono: o.telefono || csv?.telefono || '',
+      domicilio: o.domicilio || '', telefono: o.telefono ?? (csv?.telefono || ''),
       email: o.email || o.usuario?.email || csv?.mail || '', password: '',
       nombre: o.usuario?.nombre || '', numeroHabilitacion: o.numeroHabilitacion || '',
       categoria: o.categoria || '',
-      tipoOperador: o.tipoOperador || csv?.tipoOperador?.replace(/\s/g, '_').replace('/', '_') || '',
-      tecnologia: o.tecnologia || csv?.tecnologia || '',
-      corrientesY: o.corrientesY || (csv?.corrientes ? csv.corrientes.join(', ') : ''),
-      certificadoNumero: o.certificadoNumero || csv?.certificado || '',
-      expedienteInscripcion: o.expedienteInscripcion || csv?.expediente || '',
-      domicilioLegalCalle: o.domicilioLegalCalle || csv?.domicilioLegal?.calle || '',
-      domicilioLegalLocalidad: o.domicilioLegalLocalidad || csv?.domicilioLegal?.localidad || '',
-      domicilioLegalDepto: o.domicilioLegalDepto || csv?.domicilioLegal?.departamento || '',
-      domicilioRealCalle: o.domicilioRealCalle || csv?.domicilioReal?.calle || '',
-      domicilioRealLocalidad: o.domicilioRealLocalidad || csv?.domicilioReal?.localidad || '',
-      domicilioRealDepto: o.domicilioRealDepto || csv?.domicilioReal?.departamento || '',
-      domicilioRealIgual: !(o.domicilioRealCalle || csv?.domicilioReal?.calle),
+      tipoOperador: o.tipoOperador ?? (csv?.tipoOperador?.replace(/\s/g, '_').replace('/', '_') || ''),
+      tecnologia: o.tecnologia ?? (csv?.tecnologia || ''),
+      corrientesY: o.corrientesY ?? (csv?.corrientes ? csv.corrientes.join(', ') : ''),
+      certificadoNumero: o.certificadoNumero ?? (csv?.certificado || ''),
+      expedienteInscripcion: o.expedienteInscripcion ?? (csv?.expediente || ''),
+      domicilioLegalCalle: o.domicilioLegalCalle ?? (csv?.domicilioLegal?.calle || ''),
+      domicilioLegalLocalidad: o.domicilioLegalLocalidad ?? (csv?.domicilioLegal?.localidad || ''),
+      domicilioLegalDepto: o.domicilioLegalDepto ?? (csv?.domicilioLegal?.departamento || ''),
+      domicilioRealCalle: o.domicilioRealCalle ?? (csv?.domicilioReal?.calle || ''),
+      domicilioRealLocalidad: o.domicilioRealLocalidad ?? (csv?.domicilioReal?.localidad || ''),
+      domicilioRealDepto: o.domicilioRealDepto ?? (csv?.domicilioReal?.departamento || ''),
+      domicilioRealIgual: !(o.domicilioRealCalle ?? csv?.domicilioReal?.calle),
       coordenadas: o.latitud != null && o.longitud != null ? `${o.latitud}, ${o.longitud}` : '',
       representanteLegalNombre: o.representanteLegalNombre || '',
       representanteLegalDNI: o.representanteLegalDNI || '',
@@ -184,7 +190,7 @@ const NuevoOperadorPage: React.FC = () => {
       resolucionDPA: o.resolucionDPA || '',
     });
 
-    const corrientesStr = o.corrientesY || (csv?.corrientes ? csv.corrientes.join(', ') : '');
+    const corrientesStr = o.corrientesY ?? (csv?.corrientes ? csv.corrientes.join(', ') : '');
     if (corrientesStr) {
       setSelectedY(new Set(parseCorrientes(corrientesStr)));
     }
@@ -195,9 +201,10 @@ const NuevoOperadorPage: React.FC = () => {
   }, [existing, isEdit, id, draft.owner]);
 
   const up = (field: string, value: string | boolean) =>
-    setForm(prev => ({ ...prev, [field]: value }));
+    { setFormEdited(true); setForm(prev => ({ ...prev, [field]: value })); };
 
   const toggleY = (code: string) => {
+    setFormEdited(true);
     setSelectedY(prev => {
       const n = new Set(prev);
       n.has(code) ? n.delete(code) : n.add(code);
@@ -207,7 +214,7 @@ const NuevoOperadorPage: React.FC = () => {
 
   const corrientesCodes = useMemo(() => Array.from(selectedY).sort(), [selectedY]);
 
-  useEffect(() => { up('corrientesY', corrientesCodes.join(', ')); }, [corrientesCodes]);
+  useEffect(() => { setForm(prev => ({ ...prev, corrientesY: corrientesCodes.join(', ') })); }, [corrientesCodes]);
 
   const getStepErrors = (s: number): string[] => {
     const errs: string[] = [];
@@ -277,39 +284,39 @@ const NuevoOperadorPage: React.FC = () => {
     }
 
     const domicilioPayload = {
-      domicilioLegalCalle: form.domicilioLegalCalle || undefined,
-      domicilioLegalLocalidad: form.domicilioLegalLocalidad || undefined,
-      domicilioLegalDepto: form.domicilioLegalDepto || undefined,
+      domicilioLegalCalle: form.domicilioLegalCalle || (isEdit ? "" : undefined),
+      domicilioLegalLocalidad: form.domicilioLegalLocalidad || (isEdit ? "" : undefined),
+      domicilioLegalDepto: form.domicilioLegalDepto || (isEdit ? "" : undefined),
       domicilioRealCalle: form.domicilioRealIgual
-        ? form.domicilioLegalCalle || undefined
-        : form.domicilioRealCalle || undefined,
+        ? form.domicilioLegalCalle || (isEdit ? "" : undefined)
+        : form.domicilioRealCalle || (isEdit ? "" : undefined),
       domicilioRealLocalidad: form.domicilioRealIgual
-        ? form.domicilioLegalLocalidad || undefined
-        : form.domicilioRealLocalidad || undefined,
+        ? form.domicilioLegalLocalidad || (isEdit ? "" : undefined)
+        : form.domicilioRealLocalidad || (isEdit ? "" : undefined),
       domicilioRealDepto: form.domicilioRealIgual
-        ? form.domicilioLegalDepto || undefined
-        : form.domicilioRealDepto || undefined,
+        ? form.domicilioLegalDepto || (isEdit ? "" : undefined)
+        : form.domicilioRealDepto || (isEdit ? "" : undefined),
     };
 
     // Parse coordenadas "lat, long" back to separate fields for backend
-    const coordinates = parseActorCoordinates(form.coordenadas) || {};
+    const coordinates = parseActorCoordinates(form.coordenadas) || (isEdit ? { latitud: null, longitud: null } : {});
 
     const extra: Record<string, any> = {
-      tipoOperador: form.tipoOperador || undefined,
-      tecnologia: form.tecnologia || undefined,
-      corrientesY: corrientesCodes.join(', ') || undefined,
-      certificadoNumero: form.certificadoNumero || undefined,
-      expedienteInscripcion: form.expedienteInscripcion || undefined,
-      resolucionDPA: form.resolucionDPA || undefined,
-      vencimientoHabilitacion: form.vencimientoHabilitacion || undefined,
+      tipoOperador: form.tipoOperador || (isEdit ? "" : undefined),
+      tecnologia: form.tecnologia || (isEdit ? "" : undefined),
+      corrientesY: corrientesCodes.join(', ') || (isEdit ? "" : undefined),
+      certificadoNumero: form.certificadoNumero || (isEdit ? "" : undefined),
+      expedienteInscripcion: form.expedienteInscripcion || (isEdit ? "" : undefined),
+      resolucionDPA: form.resolucionDPA || (isEdit ? "" : undefined),
+      vencimientoHabilitacion: form.vencimientoHabilitacion || (isEdit ? null : undefined),
       ...coordinates,
       ...(tefInputs && { tefInputs }),
-      representanteLegalNombre: form.representanteLegalNombre || undefined,
-      representanteLegalDNI: form.representanteLegalDNI || undefined,
-      representanteLegalTelefono: form.representanteLegalTelefono || undefined,
-      representanteTecnicoNombre: form.representanteTecnicoNombre || undefined,
-      representanteTecnicoMatricula: form.representanteTecnicoMatricula || undefined,
-      representanteTecnicoTelefono: form.representanteTecnicoTelefono || undefined,
+      representanteLegalNombre: form.representanteLegalNombre || (isEdit ? "" : undefined),
+      representanteLegalDNI: form.representanteLegalDNI || (isEdit ? "" : undefined),
+      representanteLegalTelefono: form.representanteLegalTelefono || (isEdit ? "" : undefined),
+      representanteTecnicoNombre: form.representanteTecnicoNombre || (isEdit ? "" : undefined),
+      representanteTecnicoMatricula: form.representanteTecnicoMatricula || (isEdit ? "" : undefined),
+      representanteTecnicoTelefono: form.representanteTecnicoTelefono || (isEdit ? "" : undefined),
       ...domicilioPayload,
     };
 
@@ -385,7 +392,7 @@ const NuevoOperadorPage: React.FC = () => {
         setSubmitError(`Operador guardado. No se subieron: ${failed.join(', ')}. Reintentá los adjuntos pendientes; no se repetirá el alta.`);
         return;
       }
-      if (!await draft.clear()) return; navigate(backPath);
+      if (!await draft.clear()) return; goBack();
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Error desconocido al guardar';
       console.error('Submit error:', err);
@@ -408,16 +415,16 @@ const NuevoOperadorPage: React.FC = () => {
       </div>
     );
   }
-  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del operador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(backPath)}>Volver al padrón</Button></div></div>;
+  if (isEdit && (!existing || existing.id !== id)) return <div role="alert" className="rounded-xl border border-error-200 bg-error-50 p-4 text-error-800"><p>No se pudo verificar la ficha del operador. No editaremos campos vacíos ni datos de otra ficha.</p><div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" onClick={() => void reloadExisting()}>Reintentar carga</Button><Button variant="outline" onClick={() => navigate(listReturn)}>Volver al padrón</Button></div></div>;
 
   return (
-    <div ref={validationRef} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
+    <div ref={validationRef} onChangeCapture={event => { if ((event.target as HTMLElement).getAttribute("aria-label") !== "Paso del registro") setFormEdited(true); }} className="space-y-4 sm:space-y-6 animate-fade-in xl:max-w-4xl xl:mx-auto pb-8">
       <PageToolbar label="Acciones del formulario">
-        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>Volver a Operadores</Button>
+        <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => goBack()}>{isEdit ? 'Volver a la ficha' : 'Volver a Operadores'}</Button>
         <h2 className="sr-only">{isEdit ? 'Editar operador' : 'Nuevo operador'}</h2>
       </PageToolbar>
 
-      <ActorRegistrationDraftBar draft={draft} />
+      <ActorRegistrationDraftBar draft={draft} mode={isEdit ? "edit" : "create"} />
       {missingFiles.length > 0 && <p role="alert" className="text-sm text-amber-900">Volvé a seleccionar los archivos que estaban pendientes: {missingFiles.join(', ')}. No estaban subidos a SITREP.</p>}
 
       {/* Stepper */}
@@ -466,7 +473,7 @@ const NuevoOperadorPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ActorContactFields form={form} up={up} administrative domicile={false} attempted={attempted.has(1)} placeholder="Planta de Tratamiento S.A." identitySlot={<div><Input label="CUIT *" value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9" errorMessage={showError('cuit') ? 'El CUIT es obligatorio' : undefined} />{!isEdit && !savedActorId && <ActorRegistryLookup type="OPERADOR" cuit={form.cuit} />}</div>} />
+              <ActorContactFields form={form} up={up} administrative domicile={false} attempted={attempted.has(1)} placeholder="Planta de Tratamiento S.A." identitySlot={<div><Input label="CUIT *" readOnly={isEdit} helperText={isEdit ? "Identifica al actor; no se modifica desde esta edición." : undefined} value={form.cuit} onChange={e => up('cuit', e.target.value)} placeholder="30-12345678-9" errorMessage={showError('cuit') ? 'El CUIT es obligatorio' : undefined} />{!isEdit && !savedActorId && <ActorRegistryLookup type="OPERADOR" cuit={form.cuit} />}</div>} />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
@@ -766,7 +773,7 @@ const NuevoOperadorPage: React.FC = () => {
 
       {/* Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-        <Button variant="outline" disabled={isPending} leftIcon={<ArrowLeft size={16} />} onClick={savedActorId || step === 1 ? () => navigate(backPath) : goPrev}>
+        <Button variant="outline" disabled={isPending} leftIcon={<ArrowLeft size={16} />} onClick={savedActorId || step === 1 ? () => goBack() : goPrev}>
           {savedActorId ? 'Salir sin adjuntos pendientes' : step === 1 ? 'Cancelar' : 'Volver'}
         </Button>
         <div className="flex items-center gap-2">
