@@ -24,6 +24,8 @@ beforeEach(() => {
 });
 it('reads the actual nested operator response and calendar expiry, not empty or shifted fields', async () => {
   setup(); expect(await screen.findByText('QA establecimiento op-1')).toBeVisible();
+  // The layout owns the single page title, including for assistive technology.
+  expect(screen.queryByRole('heading', { name: /mi perfil/i })).not.toBeInTheDocument();
   expect(screen.getByText('99-00000001-0')).toBeVisible();
   expect(screen.getByText('03/10/2026')).toBeVisible();
   expect(screen.getByText('Vigencia hasta finalizar ese día en Mendoza.')).toBeVisible();

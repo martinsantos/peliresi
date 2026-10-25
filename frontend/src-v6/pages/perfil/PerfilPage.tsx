@@ -91,9 +91,6 @@ const PerfilPage: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Header */}
-      <h2 className="sr-only">Mi Perfil</h2>
-
       <ActorActivities />
       <CompanyAccessLink />
       {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y establecimiento en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}

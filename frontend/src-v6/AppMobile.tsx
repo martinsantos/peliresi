@@ -17,6 +17,7 @@ import { MobileLayout } from './layouts/MobileLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { canAccessMobilePath } from './utils/mobileAccess';
 import { postLoginDestination } from './utils/authRedirect';
+import AccessUnavailable from './components/AccessUnavailable';
 
 // Pages — shared lazy imports (single source of truth with App.tsx)
 import {
@@ -110,7 +111,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   }
 
   if (!canAccessMobilePath(currentUser, location.pathname)) {
-    return <Navigate to="/dashboard" replace />;
+    return <AccessUnavailable />;
   }
 
   return <>{children}</>;
