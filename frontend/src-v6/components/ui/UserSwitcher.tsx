@@ -198,7 +198,7 @@ export const UserSwitcher: React.FC<UserSwitcherProps> = ({
                   <Link to="/configuracion" onClick={() => setIsOpen(false)} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50">
                     <Settings size={16} aria-hidden="true" />Configuración
                   </Link>
-                  <button type="button" onClick={() => { setIsOpen(false); logout(); navigate('/login'); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-error-700 hover:bg-error-50">
+                  <button type="button" onClick={() => { setIsOpen(false); void logout(); navigate('/login', { replace: true, state: null }); }} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-sm font-medium text-error-700 hover:bg-error-50">
                     <LogOut size={16} aria-hidden="true" />Cerrar sesión
                   </button>
                 </div>

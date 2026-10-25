@@ -20,7 +20,7 @@ export function ApplicantLayout() {
             <h1 className="text-lg font-semibold text-neutral-900">Mi solicitud</h1>
           </div>
         </div>
-        <button type="button" onClick={() => { logout(); navigate(mp('/login'), { replace: true }); }}
+        <button type="button" onClick={() => { void logout(); navigate(mp('/login'), { replace: true, state: null }); }}
           className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
           <LogOut size={18} aria-hidden="true" />Salir
         </button>

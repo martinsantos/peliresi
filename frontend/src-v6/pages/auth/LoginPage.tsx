@@ -4,7 +4,7 @@
  * Pagina de inicio de sesion - autenticacion contra la API real
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Factory, Truck, FlaskConical, PlayCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,12 +19,18 @@ const LoginPage: React.FC = () => {
   const isPwaBuild = window.location.pathname.startsWith('/app/');
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, authError } = useAuth();
+  const { login, authError, signOutRedirectPending, finishSignOutRedirect } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signOutRedirectPending) return;
+    navigate(location.pathname, { replace: true, state: null });
+    finishSignOutRedirect();
+  }, [signOutRedirectPending, finishSignOutRedirect, navigate, location.pathname]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

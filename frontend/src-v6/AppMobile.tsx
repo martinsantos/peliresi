@@ -77,7 +77,7 @@ const ActiveTripGuard: React.FC = () => {
 
 /** Auth gate: single source of truth for public/private routing */
 export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, isLoading, isRestricted } = useAuth();
+  const { currentUser, isLoading, isRestricted, signOutRedirectPending } = useAuth();
   const location = useLocation();
 
   // Public routes that don't need auth
@@ -101,7 +101,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   // Private route without auth → redirect to login
   if (!currentUser) {
     const from = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to="/login" state={{ from }} replace />;
+    return <Navigate to="/login" state={signOutRedirectPending ? null : { from }} replace />;
   }
 
   // Keep the standalone PWA aligned with ProtectedRoute in the web build.

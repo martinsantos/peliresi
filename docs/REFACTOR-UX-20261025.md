@@ -67,7 +67,7 @@ Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativ
 | UX20 | Media | Botón compacto de regreso baja a 37.25 px desde 768 px | Mínimo táctil de 44 px también en tablet y escritorio | Corregido en ButtonV2; medición final registrada en evidencia |
 | UX21 | Media | Ficha operador muestra vencimiento ISO completo; generador fecha de alta sin formato local | Fechas de calendario legibles y coherentes sin desplazar el día por zona horaria | Pendiente; observado en esta revisión |
 | UX22 | Media | Ficha generador repite categoría en cabecera y tarjeta; expediente conserva dos h1 | Consolidar jerarquía y resumen útil sin duplicar títulos/datos | Pendiente; observado en app a 393 px |
-| UX23 | Alta | Cerrar sesión de administrador desde expediente y entrar como generador abre el requerimiento ajeno bloqueado | Salida explícita no arrastra la tarea privada de la cuenta anterior; vencimiento de sesión conserva el enlace legítimo | Pendiente; API impide acceso y UI informa que no está disponible, pero el destino desorienta |
+| UX23 | Alta | Cerrar sesión de administrador desde expediente y entrar como generador abre el requerimiento ajeno bloqueado | Salida explícita no arrastra la tarea privada de la cuenta anterior; vencimiento de sesión conserva el enlace legítimo | Corregido en contexto, guardas y menús; cambio real ADMIN→G y enlaces después de login en web/app. Borrador propio recuperado; cuenta ajena aislada |
 
 ## Evidencias y sesiones
 
@@ -123,7 +123,19 @@ Ayuda usa el mismo catálogo de rutas para distinguir consulta, alta, edición y
 
 449 pruebas frontend únicas aprobadas, TypeScript y compilaciones web/app. Navegación real sin guardar: las tres fichas desde un manifiesto, selección de pestaña, entrada/salida de edición y regreso al mismo manifiesto, tanto web como app. Desde un expediente de app también se conserva el apartado Comunicaciones. Se comprobó la ficha propia del generador sin edición ni pestaña de Inspecciones; Ayuda cierra con Escape y devuelve el foco. Cinco anchos detectaron el botón compacto de 37.25 px, corregido en el componente común. Las medidas finales se conservan separadas de las iniciales.
 
-La tanda sigue abierta: los defectos UX21–23 se incorporan al mismo registro, no se ocultan por el resultado de las regresiones. No hubo participantes humanos ni Android físico.
+La tanda sigue abierta: los defectos UX21–23 se incorporan al mismo registro, no se ocultan por el resultado de las regresiones. No hubo participantes humanos ni Android físico. Este corte quedó en `4f11f002`; UX23 se corrigió en la continuación siguiente.
+
+### Continuación: salida y reingreso con contexto correcto
+
+Evidencias en `uiux-session-exit-20261025`. La primera corrección sólo cambió el menú: superó pruebas aisladas, pero falló en el navegador porque la guarda de acceso volvía a capturar la ruta privada. Se conserva `first-ui-retest-failed.png`; no se cuenta ese intento como validación.
+
+La corrección final distingue salida explícita y vencimiento en el contexto de sesión. Ambas guardas descartan el destino anterior al salir y consumen esa indicación al llegar al login. Una visita posterior a un enlace nuevo conserva objeto, parámetros y ancla. Los menús reemplazan la entrada actual sin esperar una revocación remota lenta. No se cambian permisos, tokens concedidos ni reglas de negocio; los borradores siguen aislados por propietario y rol.
+
+210 pruebas únicas aprobadas en este corte, incluyendo seis ciclos completos con AuthProvider, login y guardas reales: web/app por salida explícita, vencimiento y nuevo enlace después de salir. Las repeticiones de 197 y 203 casos durante la corrección no se suman. TypeScript y builds web/app aprobados.
+
+En UI real: ADMIN sale desde el expediente de prueba del operador; G ingresa a su Inicio, tanto web como app. Tras salir, abrir el enlace del manifiesto `2026-000145?origen=aviso#certificaciones` pide login y recupera el bloque Certificaciones en ambas superficies. La salida desde el menú lateral y el menú de cuenta web también se comprobó. Se guardaron 23 kg como borrador de G, se entró como O sin recibirlo, y se recuperaron paso y cantidad al volver como G en web y app. No se creó un manifiesto ni se envió una decisión. El vencimiento se comprobó en integración de componentes; no se simuló un vencimiento real de reloj en el navegador en este corte.
+
+UX21 y UX22 continúan pendientes. El plan integral, Android físico y sesiones observadas siguen abiertos.
 
 ### Guion de la primera sesión (sin intervenir salvo bloqueo)
 

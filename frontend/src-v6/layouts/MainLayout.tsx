@@ -314,7 +314,7 @@ export const MainLayout: React.FC = () => {
                 </button>
                 <div className="border-t border-neutral-100 my-2" />
                 <button
-                  onClick={() => { logout(); navigate('/login'); }}
+                  onClick={() => { void logout(); navigate('/login', { replace: true, state: null }); }}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-error-600 hover:bg-error-50"
                 >
                   <LogOut size={16} />

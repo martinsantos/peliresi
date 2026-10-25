@@ -1,11 +1,12 @@
 import {render,screen,within,fireEvent} from '@testing-library/react';
-import {MemoryRouter} from 'react-router-dom';
+import {MemoryRouter,Route,Routes,useLocation,useNavigate} from 'react-router-dom';
 import {beforeEach,describe,it,expect,vi} from 'vitest';
 import {MainLayout} from '../../layouts/MainLayout';
 const authState=vi.hoisted(()=>({rol:'ADMIN',esInspector:false,training:false}));
 const attention=vi.hoisted(()=>({support:0,applicationPending:0}));
+const logout=vi.hoisted(()=>vi.fn());
 vi.mock('../../hooks/useAttentionCounts',()=>({useAttentionCounts:()=>attention}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa',training:authState.training,rol:authState.rol,esInspector:authState.esInspector,nombre:'QA',email:'qa@example.invalid',avatar:'QA',permisos:[]},isAdmin:authState.rol==='ADMIN',isAdminGenerador:authState.rol==='ADMIN_GENERADOR',isAdminOperador:authState.rol==='ADMIN_OPERADOR',isAdminTransportista:authState.rol==='ADMIN_TRANSPORTISTA',isLoading:false,canAccess:()=>true,logout:vi.fn()})}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa',training:authState.training,rol:authState.rol,esInspector:authState.esInspector,nombre:'QA',email:'qa@example.invalid',avatar:'QA',permisos:[]},isAdmin:authState.rol==='ADMIN',isAdminGenerador:authState.rol==='ADMIN_GENERADOR',isAdminOperador:authState.rol==='ADMIN_OPERADOR',isAdminTransportista:authState.rol==='ADMIN_TRANSPORTISTA',isLoading:false,canAccess:()=>true,logout})}));
 vi.mock('../../contexts/ImpersonationContext',()=>({useImpersonation:()=>({impersonationData:null,exitImpersonation:vi.fn()})}));
 vi.mock('../../components/GlobalSearchPanel',()=>({GlobalSearchPanel:()=>null}));
 vi.mock('../../components/NotificationBell',()=>({NotificationBell:()=>null}));
@@ -17,6 +18,22 @@ vi.mock('../../components/DemoAppOnboarding',()=>({DemoAppOnboarding:()=>null}))
 vi.mock('../../components/ui/Toast',()=>({ToastContainer:()=>null}));
 vi.mock('../../components/ui/UserSwitcher',()=>({UserSwitcher:()=>null}));
 function show(path:string){render(<MemoryRouter initialEntries={[path]}><MainLayout/></MemoryRouter>);}
+function SignedOutLocation(){
+  const location=useLocation(),navigate=useNavigate();
+  return <><output data-testid="signed-out-location">{location.pathname}:{JSON.stringify(location.state)}</output><button onClick={()=>navigate(-1)}>Atrás de prueba</button></>;
+}
+it('explicit web logout replaces the private location and drops its return state even while revocation is pending',()=>{
+  logout.mockReturnValueOnce(new Promise(()=>{}));
+  render(<MemoryRouter initialEntries={['/dashboard',{pathname:'/inspecciones/old-account',search:'?vista=plazos',hash:'#intercambios',state:{from:'/admin/usuarios'}}]}>
+    <Routes><Route path="/login" element={<SignedOutLocation/>}/><Route path="*" element={<MainLayout/>}/></Routes>
+  </MemoryRouter>);
+  fireEvent.click(screen.getByRole('button',{name:'Mi Cuenta qa@example.invalid'}));
+  fireEvent.click(screen.getByRole('button',{name:/cerrar sesión/i}));
+  expect(screen.getByTestId('signed-out-location')).toHaveTextContent('/login:null');
+  expect(logout).toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Atrás de prueba'}));
+  expect(within(screen.getByRole('banner')).getByRole('heading',{name:'Inicio',exact:true})).toBeVisible();
+});
 describe('Sidebar: one visible current destination',()=>{
   it.each(['generadores','transportistas','operadores'])('keeps %s creation help in the header',kind=>{
     show('/admin/actores/'+kind+'/nuevo');

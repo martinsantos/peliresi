@@ -437,7 +437,14 @@ export const MobileLayout: React.FC = () => {
             <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-neutral-100 bg-white space-y-2">
               <InstallPWAButton />
               <button
-                onClick={async () => { setIsMenuOpen(false); await logout(); }}
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  // Explicit sign-out must not turn the previous account's page
+                  // into the next account's login destination. Do not wait for
+                  // remote revocation: logout clears the local session at once.
+                  void logout();
+                  navigate(mp('/login'), { replace: true, state: null });
+                }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 text-error-600 hover:bg-error-50 rounded-xl transition-colors"
               >
                 <LogOut size={20} />

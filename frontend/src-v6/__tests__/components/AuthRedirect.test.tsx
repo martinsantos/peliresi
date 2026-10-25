@@ -106,7 +106,7 @@ describe('authenticated redirect destination', () => {
     loginMock.mockResolvedValue({ rol, esInspector: false });
     renderLogin('/inspecciones/INS-ASSIGNED?origen=correo#trazabilidad');
     await submitLogin();
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/mis-inspecciones/INS-ASSIGNED?origen=correo#trazabilidad'));
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/requerimientos/INS-ASSIGNED?origen=correo#trazabilidad'));
   });
 
   it.each([
@@ -221,7 +221,7 @@ describe('standalone PWA AuthGate redirect destination', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/mis-inspecciones/INS-PWA-1?origen=qr#trazabilidad',
+        '/requerimientos/INS-PWA-1?origen=qr#trazabilidad',
       );
     });
   });

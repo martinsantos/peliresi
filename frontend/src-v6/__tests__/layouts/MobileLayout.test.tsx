@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileLayout } from '../../layouts/MobileLayout';
 vi.mock('../../hooks/useAttentionCounts', () => ({ useAttentionCounts: () => ({ support: 0, applicationPending: 0 }) }));
@@ -25,6 +25,7 @@ const impersonationState = vi.hoisted(() => ({
   exit: vi.fn(),
 }));
 const notices = vi.hoisted(() => ({ unread: 0 }));
+const logout = vi.hoisted(() => vi.fn());
 const support = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../../services/support.service', () => ({ supportService: support, supportError: () => 'No se confirmó el ticket.' }));
 
@@ -37,7 +38,7 @@ vi.mock('../../contexts/AuthContext', () => ({
     currentUser: authState.currentUser,
     users: [authState.currentUser],
     switchUser: vi.fn(),
-    logout: vi.fn(),
+    logout,
     isAdmin: authState.currentUser.rol === 'ADMIN',
     isGenerador: authState.currentUser.rol === 'GENERADOR',
     isTransportista: authState.currentUser.rol === 'TRANSPORTISTA',
@@ -124,6 +125,32 @@ function renderMobileLayout(initialPath = '/dashboard') {
     </QueryClientProvider>
   );
 }
+
+function SignedOutLocation() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return <><output data-testid="signed-out-location">{location.pathname}:{JSON.stringify(location.state)}</output><button onClick={() => navigate(-1)}>Atrás de prueba</button></>;
+}
+
+it.each(['', '/app', '/mobile'])('explicit sign-out replaces the old private location without waiting for the server (%s)', async prefix => {
+  authState.currentUser.rol = 'ADMIN';
+  logout.mockReturnValueOnce(new Promise(() => {}));
+  const basename = prefix === '/app' ? '/app' : '/';
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter basename={basename} initialEntries={[prefix + '/dashboard', { pathname: prefix + '/inspecciones/old-account', search: '?vista=plazos', hash: '#intercambios', state: { from: '/admin/usuarios' } }]}>
+      <Routes>
+        <Route path={prefix === '/mobile' ? '/mobile/login' : '/login'} element={<SignedOutLocation />} />
+        <Route path="*" element={<MobileLayout />} />
+      </Routes>
+    </MemoryRouter>
+  </QueryClientProvider>);
+  fireEvent.click(screen.getByRole('button', { name: /abrir menu/i }));
+  fireEvent.click(screen.getByRole('button', { name: /cerrar sesi[oó]n/i }));
+  await waitFor(() => expect(screen.getByTestId('signed-out-location')).toHaveTextContent((prefix === '/mobile' ? '/mobile/login' : '/login') + ':null'));
+  expect(logout).toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Atrás de prueba' }));
+  expect(screen.getByRole('heading', { name: 'Inicio', exact: true })).toBeVisible();
+});
 
 describe('MobileLayout Android shell', () => {
   it.each(['generadores','transportistas','operadores'])('keeps %s creation help above the form',kind=>{

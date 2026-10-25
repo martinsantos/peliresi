@@ -57,7 +57,9 @@ export interface AuthContextType {
   isAnyAdmin: boolean;
   canAccess: (permission: string) => boolean;
   login: (email: string, password: string) => Promise<User>;
-  logout: () => Promise<void>;
+  logout: (options?: { reason: 'expired' }) => Promise<void>;
+  signOutRedirectPending: boolean;
+  finishSignOutRedirect: () => void;
   isRestricted: boolean;
   solicitudId: string | null;
   isDemo: boolean;
@@ -170,6 +172,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const validatedToken = useRef<string | null>(null);
   const sessionChanging = useRef(false);
   const [offlineExpiresAt, setOfflineExpiresAt] = useState<number | null>(null);
+  const [signOutRedirectPending, setSignOutRedirectPending] = useState(false);
+  const finishSignOutRedirect = useCallback(() => setSignOutRedirectPending(false), []);
 
   // A saved profile only restores the same, unexpired session after a transport
   // failure. Reconnect/focus always asks the server again before renewing it.
@@ -370,7 +374,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [qc]);
 
   // Logout
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (options?: { reason: 'expired' }) => {
+    // Route guards can render before a layout's explicit navigation settles.
+    // Tell them whether this is an intentional exit or a session to resume.
+    setSignOutRedirectPending(options?.reason !== 'expired');
     sessionChanging.current = true;
     setShowOnboarding(false);
     ++authGeneration.current;
@@ -403,6 +410,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     await confirmation;
   }, [currentUser, qc]);
+
+  const expireSession = useCallback(() => { void logout({ reason: 'expired' }); }, [logout]);
 
   const dismissOnboarding = useCallback(() => {
     setShowOnboarding(false);
@@ -482,6 +491,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     canAccess,
     login,
     logout,
+    signOutRedirectPending,
+    finishSignOutRedirect,
     isRestricted,
     solicitudId,
     isDemo: false,
@@ -489,7 +500,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authError,
     showOnboarding,
     dismissOnboarding,
-  }), [currentUser, users, switchUser, getUsersByRole, canAccess, login, logout, isRestricted, solicitudId, isLoading, authError, showOnboarding, dismissOnboarding]);
+  }), [currentUser, users, switchUser, getUsersByRole, canAccess, login, logout, signOutRedirectPending, finishSignOutRedirect, isRestricted, solicitudId, isLoading, authError, showOnboarding, dismissOnboarding]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -504,7 +515,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           onDismiss={dismissOnboarding}
         />
       )}
-      <SessionTimeoutGuard logout={logout} isAuthenticated={!!currentUser} />
+      <SessionTimeoutGuard logout={expireSession} isAuthenticated={!!currentUser} />
     </AuthContext.Provider>
   );
 };

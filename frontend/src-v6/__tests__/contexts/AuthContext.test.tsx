@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ========================================
@@ -82,6 +82,8 @@ vi.mock('../../components/OnboardingWizard', () => ({
 // Import AFTER mocks are declared
 import { AuthProvider, useAuth } from '../../contexts/AuthContext';
 import LoginPage from '../../pages/auth/LoginPage';
+import ProtectedRoute from '../../components/ProtectedRoute';
+import { AuthGate } from '../../AppMobile';
 import { authService } from '../../services/auth.service';
 import { api, clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
 import { clearSyncQueue } from '../../services/indexeddb';
@@ -135,11 +137,56 @@ function renderWithProviders() {
   );
 }
 
+function SessionRouteProbe() {
+  const location = useLocation(), navigate = useNavigate();
+  return <><output data-testid="session-location">{location.pathname + location.search + location.hash}</output>
+    <output data-testid="session-return">{(location.state as { from?: string } | null)?.from || ''}</output>
+    <button onClick={() => navigate('/manifiestos/new-target?origen=aviso#certificaciones')}>Abrir otro enlace recibido</button></>;
+}
+function SessionPrivatePage() {
+  const auth = useAuth();
+  return <><span data-testid="private-role">{auth.currentUser?.rol}</span>
+    <button onClick={() => { void auth.logout(); }}>Salir explícitamente</button>
+    <button onClick={() => { void auth.logout({ reason: 'expired' }); }}>Simular vencimiento</button></>;
+}
+
 // ========================================
 // Tests
 // ========================================
 
 describe('AuthContext', () => {
+  it.each(['web', 'app'].flatMap(surface => ['exit', 'expired', 'new-link-after-exit'].map(reason => ({ surface, reason }))))('routes the full session cycle: $surface / $reason', async ({ surface, reason }) => {
+    localStorage.setItem('sitrep_access_token', tokenFor());
+    vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
+    const prefix = surface === 'app' ? '/app' : '';
+    const requested = '/inspecciones/old-account?vista=plazos#intercambios';
+    const routes = <Routes><Route path="/login" element={<LoginPage />} />{surface === 'app'
+      ? <Route path="*" element={<SessionPrivatePage />} />
+      : <Route element={<ProtectedRoute />}><Route path="*" element={<SessionPrivatePage />} /></Route>}
+    </Routes>;
+    render(<QueryClientProvider client={createTestQueryClient()}><MemoryRouter basename={prefix || '/'} initialEntries={[prefix + requested]}><AuthProvider>
+      <SessionRouteProbe />{surface === 'app' ? <AuthGate>{routes}</AuthGate> : routes}
+    </AuthProvider></MemoryRouter></QueryClientProvider>);
+    await waitFor(() => expect(screen.getByTestId('private-role')).toHaveTextContent('AUDITOR'));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: reason === 'expired' ? 'Simular vencimiento' : 'Salir explícitamente' }));
+    await screen.findByLabelText('Correo electrónico o CUIT');
+    expect(screen.getByTestId('session-location')).toHaveTextContent('/login');
+    expect(screen.getByTestId('session-return').textContent).toBe(reason === 'expired' ? requested : '');
+    if (reason === 'new-link-after-exit') {
+      await user.click(screen.getByRole('button', { name: 'Abrir otro enlace recibido' }));
+      await waitFor(() => expect(screen.getByTestId('session-return')).toHaveTextContent('/manifiestos/new-target?origen=aviso#certificaciones'));
+    }
+    const nextUser = reason === 'expired' ? inspector : { ...inspector, id: 'generator-next', rol: 'GENERADOR', esInspector: false };
+    vi.mocked(authService.login).mockResolvedValueOnce({ user: nextUser as Usuario, accessToken: 'next-token', refreshToken: 'next-refresh' });
+    await user.type(screen.getByLabelText('Correo electrónico o CUIT'), 'next@qa.invalid');
+    await user.type(screen.getByLabelText('Contraseña', { exact: true }), 'synthetic');
+    await user.click(screen.getByRole('button', { name: 'Ingresar', exact: true }));
+    const expected = reason === 'expired' ? requested : reason === 'new-link-after-exit' ? '/manifiestos/new-target?origen=aviso#certificaciones' : '/dashboard';
+    await waitFor(() => expect(screen.getByTestId('session-location').textContent).toBe(expected));
+    expect(screen.getByTestId('private-role')).toHaveTextContent(nextUser.rol);
+  });
+
   it('restores a draft-only registration via its protected draft, without asking for a forbidden full profile', async () => {
     const token = `header.${btoa(JSON.stringify({ id: 'candidate', restricted: true, registrationDraft: 'draft-only' }))}.signature`;
     vi.mocked(getAccessToken).mockReturnValue(token);
@@ -569,10 +616,14 @@ describe('AuthContext', () => {
     vi.mocked(authService.getMe).mockResolvedValueOnce(inspector);
     renderWithProviders();
     await waitFor(()=>expect(screen.getByTestId('user')).toHaveTextContent('Inspectora Uno'));
+    const draftKey = 'sitrep:manifest-form:v1:' + JSON.stringify([inspector.id, 'AUDITOR', '', false, '', '', '']);
+    const savedDraft = JSON.stringify({ version: 1, savedAt: Date.now(), draft: { step: 2, form: { observaciones: 'Trabajo pendiente de la cuenta anterior' } } });
+    localStorage.setItem(draftKey, savedDraft);
     try {
       await userEvent.setup().click(screen.getByTestId('logout-btn'));
       expect(screen.getByTestId('user')).toHaveTextContent('null');
       expect(getAccessToken()).toBeNull();
+      expect(localStorage.getItem(draftKey)).toBe(savedDraft);
     } finally { await act(async()=>finish()); }
   });
 

@@ -28,7 +28,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   actorRead,
   redirectTo = '/login',
 }) => {
-  const { currentUser, isLoading, isRestricted } = useAuth();
+  const { currentUser, isLoading, isRestricted, signOutRedirectPending } = useAuth();
   const location = useLocation();
 
   // Show spinner while auth state is being determined
@@ -45,7 +45,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Not authenticated -> redirect to login (save origin for post-login redirect)
   if (!currentUser) {
     const from = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to={redirectTo} state={{ from }} replace />;
+    return <Navigate to={redirectTo} state={signOutRedirectPending ? null : { from }} replace />;
   }
 
   // Restricted users can only access /mi-solicitud
