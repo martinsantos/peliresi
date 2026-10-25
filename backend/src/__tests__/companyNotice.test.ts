@@ -1,13 +1,61 @@
 import { describe, it, expect, vi } from 'vitest';
-import { companyEventNotices, companyNoticeEligible, COMPANY_NOTICE_LABELS, validCompanyNotice } from '../services/companyNotice.service';
+import { companyEventNotices, companyNoticeEligible, COMPANY_NOTICE_LABELS, validCompanyNotice, companyNoticeMessage, withCompanyNoticeContext } from '../services/companyNotice.service';
 import { notificationMailContent } from '../services/notification-mail.service';
-const event={id:'event',empresaId:'company',tipo:'PERSONA_AUTORIZADA',datos:{despues:{usuarioId:'member'},motivo:'PRIVATE',token:'SECRET'}};
+const event={id:'event',empresaId:'company',tipo:'PERSONA_AUTORIZADA',datos:{despues:{usuarioId:'member',actividadId:'activity',todosEstablecimientos:false},motivo:'PRIVATE',token:'SECRET'}};
 const data={tipo:'representacion_empresa',version:1,empresaId:'company',eventoId:'event',evento:'PERSONA_AUTORIZADA'};
+function contextDb() {
+ return {
+  empresa:{findMany:vi.fn().mockResolvedValue([{id:'company',razonSocial:'Empresa de práctica'}])},
+  empresaActividad:{findMany:vi.fn().mockResolvedValue([{id:'activity',empresaId:'company',rol:'GENERADOR'}])},
+  usuario:{findMany:vi.fn().mockResolvedValue([{id:'owner',nombre:'Titular QA'},{id:'member',nombre:'Segunda persona QA'}])},
+  eventoEmpresa:{findMany:vi.fn().mockResolvedValue([event])},
+  invitacionEmpresa:{findMany:vi.fn().mockResolvedValue([])},
+ };
+}
 describe('company notices',()=>{
  it('deduplicates a responsible who is also the affected person, without secrets',async()=>{
-  const db={responsableEmpresa:{findMany:vi.fn().mockResolvedValue([{usuarioId:'owner'},{usuarioId:'member'}])},usuario:{findMany:vi.fn().mockResolvedValue([{id:'owner'},{id:'member'}])},notificacion:{createMany:vi.fn()}};
+  const db={...contextDb(),responsableEmpresa:{findMany:vi.fn().mockResolvedValue([{usuarioId:'owner'},{usuarioId:'member'}])},notificacion:{createMany:vi.fn()}};
   await companyEventNotices(db,event);expect(db.usuario.findMany.mock.calls[0][0].where.id.in).toEqual(['owner','member']);
-  const rows=db.notificacion.createMany.mock.calls[0][0].data;expect(rows).toHaveLength(2);expect(JSON.stringify(rows)).not.toMatch(/SECRET|PRIVATE/);expect(JSON.parse(rows[0].datos)).toEqual(data);
+  const rows=db.notificacion.createMany.mock.calls[0][0].data;expect(rows).toHaveLength(2);expect(JSON.stringify(rows)).not.toMatch(/SECRET|PRIVATE/);expect(JSON.parse(rows[0].datos)).toMatchObject(data);
+  expect(rows[0].titulo).toBe('Acceso autorizado · Generador');
+  expect(rows[0].mensaje).toContain('Empresa de práctica. El acceso de Segunda persona QA');
+  expect(rows[1].mensaje).toContain('Empresa de práctica. Tu acceso');
+  expect(rows[1].mensaje).toContain('Sólo los establecimientos seleccionados.');
+ });
+ it('projects old notices in batches without changing persisted content or other event families',async()=>{
+  const db=contextDb(), original=[{usuarioId:'member',datos:JSON.stringify(data),titulo:'Anterior',mensaje:'Anterior'}, {usuarioId:'owner',datos:JSON.stringify(data),titulo:'Anterior',mensaje:'Anterior'}, {usuarioId:'owner',datos:'bad json',titulo:'Otro',mensaje:'Otro'}];
+  const before=JSON.stringify(original), rows=await withCompanyNoticeContext(db,original);
+  expect(JSON.stringify(original)).toBe(before);expect(rows[2]).toBe(original[2]);
+  expect(rows[0].mensaje).toContain('Tu acceso');expect(rows[1].mensaje).toContain('Segunda persona QA');
+  expect(JSON.parse(rows[0].datos).contextoReconstruido).toBe(true);
+  for(const query of [db.empresa.findMany,db.empresaActividad.findMany,db.usuario.findMany,db.eventoEmpresa.findMany])expect(query).toHaveBeenCalledTimes(1);
+  expect(db.eventoEmpresa.findMany.mock.calls[0][0].where.OR[0]).toEqual({id:'event',empresaId:'company',tipo:'PERSONA_AUTORIZADA'});
+ });
+ it('does not enrich a mismatched event or borrow a role from another company',async()=>{
+  const db=contextDb(), notice={usuarioId:'member',datos:JSON.stringify({...data,empresaId:'different'})};
+  expect((await withCompanyNoticeContext(db,[notice]))[0]).toBe(notice);
+  db.empresaActividad.findMany.mockResolvedValue([{id:'activity',empresaId:'different',rol:'OPERADOR'}]);
+  const [row]=await withCompanyNoticeContext(db,[{usuarioId:'member',datos:JSON.stringify(data)}]);
+  expect(JSON.parse(row.datos).contexto.actividad).toBeUndefined();
+ });
+ it('preserves an existing snapshot and skips queries when no legacy company notice needs context',async()=>{
+  const notice={datos:JSON.stringify({...data,contexto:{empresa:'Original'}})};
+  expect((await withCompanyNoticeContext({},[notice]))[0]).toBe(notice);
+  expect(await withCompanyNoticeContext({},[{datos:null},{datos:'{"tipo":"other"}'}])).toHaveLength(2);
+ });
+ it('resolves invitation activity and person without exposing its email or token',async()=>{
+  const db=contextDb();db.eventoEmpresa.findMany.mockResolvedValue([{...event,tipo:'INVITACION_ACEPTADA',datos:{invitacionId:'inv'}}] as never);
+  db.invitacionEmpresa.findMany.mockResolvedValue([{id:'inv',empresaId:'company',actividadId:'activity',aceptadaPor:'member',todosEstablecimientos:true,email:'PRIVATE',tokenHash:'SECRET'}] as never);
+  const [row]=await withCompanyNoticeContext(db,[{usuarioId:'member',datos:JSON.stringify({...data,evento:'INVITACION_ACEPTADA'})}]);
+  expect(JSON.parse(row.datos).contexto).toMatchObject({actividad:'GENERADOR',persona:'Segunda persona QA',paraMi:true,alcance:'TODOS'});
+  expect(JSON.stringify(row)).not.toMatch(/PRIVATE|SECRET/);
+ });
+ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('renders %s mail with the same context, escaped names and no delivery',role=>{
+  const contextual={...data,contexto:{empresa:'QA <img src=x onerror=bad> & Cía',actividad:role,persona:'<script>bad</script>',paraMi:false,alcance:'TODOS'},motivo:'PRIVATE',token:'SECRET'};
+  const message=companyNoticeMessage(contextual)!;
+  const mail=notificationMailContent({id:'notice',tipo:'INFO_GENERAL',datos:JSON.stringify(contextual),createdAt:new Date(),email:'person@qa.invalid',activo:true,emailVerified:true,notifEmail:true,rol:'GENERADOR',usuarioId:'owner'});
+  expect(mail?.subject).toContain(message[0]);expect(mail?.html).toContain('QA &lt;img');expect(mail?.html).toContain('&lt;script&gt;');
+  expect(mail?.html).toContain('Todos los establecimientos.');expect(mail?.html).not.toMatch(/<script>|<img src=x|PRIVATE|SECRET/);
  });
  it('requires a known version, IDs and event',()=>{expect(validCompanyNotice(data)).toBe(true);for(const change of [{version:2},{empresaId:'//elsewhere'},{evento:'invented'},{eventoId:''}])expect(validCompanyNotice({...data,...change})).toBe(false);});
  it('suppresses stale access notices after revocation but retains the revocation notice for its owner',async()=>{

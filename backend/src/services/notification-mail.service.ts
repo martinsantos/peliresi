@@ -1,6 +1,6 @@
 import { ADDENDUM_AUTHORITY_ROLES } from '../domain/addendumAuthority';
 import { designatedReviewAccount } from '../domain/manifestReviewAuthority';
-import { COMPANY_NOTICE_LABELS, validCompanyNotice, companyNoticeEligible } from './companyNotice.service';
+import { companyNoticeMessage, validCompanyNotice, companyNoticeEligible, withCompanyNoticeContext } from './companyNotice.service';
 /** Relay committed in-app notices, never send from inside a business transaction.
  * Separate opt-in per family; SMTP still requires its own explicit activation.
  * No historic backfill: both source notices and queue are fenced by the cutoff.
@@ -336,7 +336,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   };
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
   const renewalMessage = family === 'padron' && validRenewalNotice(data) ? RENEWAL_NOTICE_LABELS[notice.tipo] : undefined;
-  const message = renewalMessage || (validCompanyNotice(data) ? COMPANY_NOTICE_LABELS[String(data.evento)]
+  const message = renewalMessage || (validCompanyNotice(data) ? companyNoticeMessage(data) || fallback
     : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
     : data.tipo === 'recordatorio_firma' && data.version === 1 ? [data.fase === 'SEMANA' ? 'Se acercan los 30 días desde la firma' : '30 días desde la firma del manifiesto', 'Revisá el estado actual y coordiná las acciones pendientes con las partes. El aviso conserva la fecha de firma; no determina una infracción.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']
@@ -380,7 +380,7 @@ export async function queueCommittedNotificationEmails(): Promise<number> {
     ORDER BY n."createdAt", n.id LIMIT 100
   `, policy.notBefore);
   let inserted = 0;
-  for (const notice of notices) {
+  for (const notice of await withCompanyNoticeContext(prisma, notices)) {
     const content = notificationMailContent(notice);
     const trainingOrMissing = Boolean(content && !await notificationSourceEligible(notice, content.family));
     const eligible = content && families.includes(content.family) && !trainingOrMissing && await recipientEligible(notice, content.family);

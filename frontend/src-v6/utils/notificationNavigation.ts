@@ -69,7 +69,7 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
   if (/^\/inspecciones\//.test(pathname)) return 'Abrir expediente y ver el intercambio →';
   if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';
   if (/^\/soporte(?:\/|$)/.test(pathname)) return 'Abrir consulta de soporte →';
-  if (pathname === '/empresas') return 'Revisar entidad y personas →';
+  if (pathname === '/empresas') return 'Ver entidad y acceso →';
   if (pathname === '/mi-perfil') return 'Abrir mi ficha y documentos →';
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
   if (pathname === '/admin/renovaciones') return 'Revisar renovación →';

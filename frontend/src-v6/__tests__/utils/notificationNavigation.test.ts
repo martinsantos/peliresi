@@ -53,7 +53,7 @@ describe('resolveNotificationPath', () => {
     const notice={...base,datos:JSON.stringify({tipo:'representacion_empresa',version:1,empresaId:'entity-1',evento:'PERSONA_AUTORIZADA',url:'/wrong'})};
     expect(resolveNotificationPath(notice)).toBe('/empresas?empresa=entity-1');
     expect(resolveNotificationPath(notice,'/app')).toBe('/app/empresas?empresa=entity-1');
-    expect(notificationActionLabel(resolveNotificationPath(notice))).toBe('Revisar entidad y personas →');
+    expect(notificationActionLabel(resolveNotificationPath(notice))).toBe('Ver entidad y acceso →');
     const invalidateQueries=vi.fn();refreshInspectionNotification(notice,{invalidateQueries} as any);
     expect(invalidateQueries).toHaveBeenCalledWith({queryKey:['empresa']});
     expect(invalidateQueries).toHaveBeenCalledWith({queryKey:['empresas']});
