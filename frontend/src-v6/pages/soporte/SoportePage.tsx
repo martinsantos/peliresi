@@ -145,12 +145,32 @@ function TicketDetail({ ticket, owner, refresh }: { ticket: SupportTicket; owner
     </details>
   </article>;
 }
+function ticketActions(ticket: SupportTicket) {
+  const actions: Array<{ value: SupportAction; label: string }> = [];
+  if (ticket.esAutor || (ticket.puedeAtender && ticket.estado !== 'CERRADO')) actions.push({ value: 'RESPONDER', label: ticket.estado === 'CERRADO' ? 'Responder y reabrir' : 'Respuesta visible al usuario' });
+  if (ticket.puedeAtender) actions.push({ value: 'NOTA', label: 'Nota interna de soporte' });
+  if (ticket.puedeAtender) actions.push({ value: 'CLASIFICAR', label: 'Clasificar ticket' });
+  if ((ticket.puedeAtender || (ticket.puedeGestionar && !ticket.responsableId)) && ticket.estado !== 'CERRADO') {
+    actions.push({ value: 'DERIVAR', label: 'Derivar a otro responsable' });
+    if (ticket.puedeAtender && !ticket.esAutor) actions.push({ value: 'ESPERAR', label: 'Solicitar respuesta al usuario' });
+  }
+  if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
+  return actions;
+}
+type ActionDraft = { body: string; files: File[]; audio: File | null };
+const emptyActionDraft = (): ActionDraft => ({ body: '', files: [], audio: null });
 function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owner: string; changed: () => Promise<void> }) {
   const [action, setAction] = useState<SupportAction>('RESPONDER');
-  const [body, setBody] = useState('');
+  const actions = ticketActions(ticket);
+  const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;
+  const [drafts, setDrafts] = useState<Partial<Record<SupportAction, ActionDraft>>>({});
+  const draftAction = selected || 'TOMAR';
+  const { body, files, audio } = drafts[draftAction] || emptyActionDraft();
+  const updateDraft = (patch: Partial<ActionDraft>) => setDrafts(previous => ({ ...previous, [draftAction]: { ...(previous[draftAction] || emptyActionDraft()), ...patch } }));
+  const setBody = (body: string) => updateDraft({ body });
+  const setFiles = (files: File[]) => updateDraft({ files });
+  const setAudio = (audio: File | null) => updateDraft({ audio });
   const [target, setTarget] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [audio, setAudio] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
   const [category, setCategory] = useState(ticket.categoria);
   const [type, setType] = useState<SupportType>(ticket.tipo || 'PROBLEMA');
@@ -177,23 +197,13 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
       setPending(frozen);
       await supportService.act(ticket.id, frozen.input, frozen.files, frozen.key);
       if (!supportSessionMatches(owner)) return;
-      setPending(null); setBody(''); setFiles([]); setAudio(null); if (fileInput.current) fileInput.current.value = ''; setTarget(''); setAction('RESPONDER'); await changed();
+      setPending(null); setDrafts(previous => ({ ...previous, [frozen.input.accion]: emptyActionDraft() })); if (fileInput.current) fileInput.current.value = ''; setTarget(''); setAction('RESPONDER'); await changed();
     } catch (failure) {
       setError(failure instanceof Error && failure.message.startsWith('Hasta 3 archivos') ? failure.message : supportError(failure));
       const status = (failure as { response?: { status?: number } }).response?.status;
       if ([400, 403, 409, 413, 422].includes(status || 0)) { setPending(null); if (status === 409) await changed(); }
     } finally { inFlight.current = false; setBusy(false); }
   };
-  const actions: Array<{ value: SupportAction; label: string }> = [];
-  if (ticket.esAutor || (ticket.puedeAtender && ticket.estado !== 'CERRADO')) actions.push({ value: 'RESPONDER', label: ticket.estado === 'CERRADO' ? 'Responder y reabrir' : 'Respuesta visible al usuario' });
-  if (ticket.puedeAtender) actions.push({ value: 'NOTA', label: 'Nota interna de soporte' });
-  if (ticket.puedeAtender) actions.push({ value: 'CLASIFICAR', label: 'Clasificar ticket' });
-  if ((ticket.puedeAtender || (ticket.puedeGestionar && !ticket.responsableId)) && ticket.estado !== 'CERRADO') {
-    actions.push({ value: 'DERIVAR', label: 'Derivar a otro responsable' });
-    if (ticket.puedeAtender && !ticket.esAutor) actions.push({ value: 'ESPERAR', label: 'Solicitar respuesta al usuario' });
-  }
-  if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
-  const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;
   const canTake = ticket.puedeGestionar && ticket.responsableId !== owner && (!ticket.responsableId || ticket.puedeAtender) && ticket.estado !== 'CERRADO';
   const optionalBody = selected === 'DERIVAR' || selected === 'CLASIFICAR';
   const recipients = (team.data || []).filter(user => user.id !== ticket.responsableId);
@@ -233,11 +243,15 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
       <p id="support-reply-help" className="text-sm text-neutral-600">{optionalBody ? 'Podés confirmar sin escribir un motivo. La acción y el responsable quedan en el historial.' : 'El audio puede acompañar tu mensaje.'}</p>
       <div hidden={selected !== 'RESPONDER' && selected !== 'NOTA'} className="space-y-2"><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
         <p className="text-sm text-neutral-600">Opcional · podés enviar sólo texto.</p>
-        <SupportAudioInput value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={busy || !!pending} />
-        <input ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={busy || !!pending}
+        <SupportAudioInput key={'audio:' + draftAction} value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={busy || !!pending} />
+        <input key={'files:' + draftAction} ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={busy || !!pending}
           className="block min-h-11 w-full text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900" onChange={event => {
-            const chosen = Array.from(event.target.files || []); if (chosen.length > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; setFiles([]); } else setFiles(chosen);
-          }} /></div>
+            const chosen = Array.from(event.target.files || []); if (chosen.length > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; } else setFiles(chosen);
+          }} />
+        {!!files.length && <ul aria-label="Archivos de esta acción" className="space-y-2">{files.map((file, index) => <li key={index + ':' + file.name} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-neutral-200 px-3 py-1">
+          <span className="min-w-0 break-all text-sm text-neutral-800">{file.name}</span><Button type="button" variant="ghost" className="shrink-0" aria-label={'Quitar ' + file.name} disabled={busy || !!pending} onClick={() => { setFiles(files.filter((_, position) => position !== index)); if (fileInput.current) fileInput.current.value = ''; }}>Quitar</Button>
+        </li>)}</ul>}
+      </div>
       {pending && <p className="text-sm text-neutral-700">Envío sin confirmar. El reintento conservará el contenido y la misma clave.</p>}
       <Button type="submit" isLoading={busy} disabled={recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{pending ? 'Reintentar mismo envío' : selected ? submitLabels[selected] : 'Confirmar acción'}</Button>
     </form>}

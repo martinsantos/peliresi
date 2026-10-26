@@ -144,3 +144,53 @@ it('offers assignment and direct routing for unassigned staff without opening re
   fireEvent.click(screen.getByRole('button', { name: 'Asignarme', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, { accion: 'TOMAR', cuerpo: '', version: 1 }, [], expect.any(String)));
 });
+
+it('keeps private notes and attachments separate from a public response while switching actions', async () => {
+  openDetail();
+  fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Respuesta pública pendiente' } });
+  const publicFile = new File(['public'], 'publico.png', { type: 'image/png' });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [publicFile] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('');
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Diagnóstico privado pendiente' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['private'], 'privado.png', { type: 'image/png' })] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Responder', exact: true }));
+  expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Respuesta pública pendiente');
+  expect(screen.getByText('publico.png', { exact: true })).toBeVisible();
+  expect(screen.queryByText('privado.png', { exact: true })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'RESPONDER', cuerpo: 'Respuesta pública pendiente' }), [publicFile], expect.any(String)));
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('Diagnóstico privado pendiente');
+  expect(screen.getByText('privado.png', { exact: true })).toBeVisible();
+  expect(screen.getAllByRole('button', { name: 'Grabar audio', exact: true })).toHaveLength(1);
+});
+it.each(['Derivar', 'Pedir respuesta', 'Cerrar', 'Clasificar'])('does not carry note text into %s or erase the note on return', async label => {
+  openDetail(); fireEvent.click(await screen.findByRole('button', { name: 'Nota interna', exact: true }));
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Sólo soporte: borrador reservado' } });
+  fireEvent.click(screen.getByRole('button', { name: label, exact: true }));
+  expect(screen.getByRole('textbox', { name: label === 'Derivar' || label === 'Clasificar' ? 'Nota interna / motivo' : 'Mensaje o resolución' })).toHaveValue('');
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('Sólo soporte: borrador reservado');
+  expect(calls.act).not.toHaveBeenCalled();
+});
+it('keeps a prepared public reply when a separate private note is confirmed', async () => {
+  openDetail(); fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Próxima respuesta pública' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Nota privada confirmada' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledOnce());
+  await waitFor(() => expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Próxima respuesta pública'));
+  fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('');
+});
+it('keeps previously chosen files after rejecting an oversized replacement and supports explicit removal', async () => {
+  openDetail(); const input = await screen.findByLabelText('Adjuntar captura o documento');
+  fireEvent.change(input, { target: { files: [new File(['public'], 'conservado.png', { type: 'image/png' })] } });
+  const large = new File(['invalid'], 'grande.png', { type: 'image/png' }); Object.defineProperty(large, 'size', { value: 6 * 1024 * 1024 });
+  fireEvent.change(input, { target: { files: [large] } });
+  expect(screen.getByRole('alert')).toHaveTextContent('Hasta 3 archivos de 5 MB cada uno.');
+  expect(screen.getByText('conservado.png', { exact: true })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar conservado.png', exact: true }));
+  expect(screen.queryByText('conservado.png', { exact: true })).toBeNull(); expect(calls.act).not.toHaveBeenCalled();
+});
