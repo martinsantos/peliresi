@@ -4,6 +4,8 @@
  * React Query hook for GET /api/centro-control/actividad
  */
 
+import { useAuth } from '../contexts/AuthContext';
+import { inspectionWorkspaceOwner } from '../utils/inspectionWorkspace';
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 
@@ -104,12 +106,14 @@ async function fetchActividad(params: CentroControlParams): Promise<CentroContro
 }
 
 export function useCentroControl(params: CentroControlParams = {}, refreshInterval: number | false = 30000, enabled = true) {
+  const { currentUser, isRestricted } = useAuth();
+  const owner = isRestricted ? '' : inspectionWorkspaceOwner(currentUser);
   return useQuery<CentroControlData>({
-    queryKey: ['centro-control', 'actividad', params.fechaDesde, params.fechaHasta, params.capas?.join(','), params.incluirTodos],
+    queryKey: ['centro-control', 'actividad', owner, params.fechaDesde, params.fechaHasta, params.capas?.join(','), params.incluirTodos],
     queryFn: () => fetchActividad(params),
     staleTime: 15000,
     refetchInterval: refreshInterval,
-    enabled,
+    enabled: enabled && !!owner,
     retry: 1,
   });
 }

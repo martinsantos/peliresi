@@ -27,6 +27,8 @@ interface KPI {
 }
 
 interface ExportConfig {
+  /** A context change can cancel a download while fonts/images are loading. */
+  canDownload?: () => boolean;
   titulo: string;
   subtitulo?: string;
   periodo: string;
@@ -184,5 +186,5 @@ export async function exportReportePDF(config: ExportConfig) {
 
   // Download
   const filename = `${config.titulo.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().split('T')[0]}.pdf`;
-  doc.save(filename);
+  if (!config.canDownload || config.canDownload()) doc.save(filename);
 }
