@@ -1,3 +1,4 @@
+import { clearPreparedInvitations } from '../services/preparedCompanyInvitations';
 /**
  * SITREP v6 - Auth Context
  * ========================
@@ -383,6 +384,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ++authGeneration.current;
     validatedToken.current = null;
     const confirmation = authService.logout().catch(() => {});
+    clearPreparedInvitations();
     clearTokens();
     const localConfirmation = confirmSessionCheckpoint();
     clearOfflineSession();

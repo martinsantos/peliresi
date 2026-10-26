@@ -1,3 +1,4 @@
+import { PREPARED_INVITATION_PREFIX, readPreparedInvitations, clearPreparedInvitations } from '../../services/preparedCompanyInvitations';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { notificationInboxReturnState } from '../../utils/notificationNavigation';
 import { beforeEach,afterEach,expect,test,vi } from 'vitest';
@@ -329,13 +330,13 @@ test('a live invitation blocks duplicates only for its own role and expiration r
  await waitFor(()=>expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled());
 });
 
-test('a prepared link only remains visible for its current person and role while it is usable',async()=>{
+test('a prepared link identifies its recipient and role independently of the next form and disappears on revocation',async()=>{
  const details={actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}],invitaciones:[] as Array<{id:string;email:string;actividadId:string;venceAt:string;revocadaAt?:string}>};
  setup(details);const original=mocks.request.getMockImplementation()!;
  mocks.request.mockImplementation(async request=>{
   if(request.method==='POST'&&request.url.endsWith('/invitaciones')){
    details.invitaciones=[{id:'new',email:request.data.email,actividadId:request.data.actividadId,venceAt:new Date(Date.now()+86400000).toISOString()}];
-   return {data:{data:{invitacion:{id:'new'},ruta:'/empresa-invitacion/qa-token'}}};
+   return {data:{data:{invitacion:{id:'new',venceAt:details.invitaciones[0].venceAt},ruta:'/empresa-invitacion/'+'a'.repeat(64)}}};
   }
   if(request.method==='POST'&&request.url.endsWith('/invitaciones/new/revocar')){
    details.invitaciones=details.invitaciones.map(i=>({...i,revocadaAt:new Date().toISOString()}));return {data:{data:{revocada:true}}};
@@ -345,10 +346,10 @@ test('a prepared link only remains visible for its current person and role while
  await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
  fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'two@qa.invalid'}});
  fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));
- expect(await screen.findByLabelText('Enlace de invitación')).toHaveValue(window.location.origin+'/empresa-invitacion/qa-token');
- fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'o'}});expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument();
+ expect(await screen.findByLabelText('Enlace de invitación')).toHaveValue(window.location.origin+'/empresa-invitacion/'+'a'.repeat(64));
+ fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'o'}});expect(screen.getByLabelText('Enlace de invitación')).toBeVisible();expect(screen.getByText('Generador · Invitación pendiente')).toBeVisible();
  fireEvent.change(screen.getByLabelText('Rol en esta empresa'),{target:{value:'g'}});expect(screen.getByLabelText('Enlace de invitación')).toBeVisible();
- fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'another@qa.invalid'}});expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'another@qa.invalid'}});expect(screen.getByLabelText('Enlace de invitación')).toBeVisible();
  fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'two@qa.invalid'}});
  fireEvent.click(screen.getByRole('button',{name:'Revocar invitación'}));
  await waitFor(()=>expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument());
@@ -418,4 +419,75 @@ test.each(['','/app'])('explicit return preserves inbox filters in %s and drops 
  expect(screen.getByRole('link',{name:'Volver a Avisos'})).toHaveAttribute('href',base+'/notificaciones?avisos=sin-leer&pagina=2');
  mocks.user={...mocks.user,rol:'OPERADOR',actorId:'operator'};view.rerender();await screen.findByLabelText('Calle legal');
  expect(screen.getByRole('link',{name:'Volver a Avisos'})).toHaveAttribute('href',base+'/notificaciones');
+});
+
+const savedInvitationPath='/empresa-invitacion/'+'b'.repeat(64);
+async function prepareRecoverableInvitation(){
+ const details={actividades:[{id:'g',rol:'GENERADOR'}],invitaciones:[] as any[]};
+ const state=setup(details),original=mocks.request.getMockImplementation()!;
+ mocks.request.mockImplementation(async request=>{
+  if(request.method==='POST'){
+   const invitation={id:'saved',email:request.data.email,actividadId:'g',venceAt:new Date(Date.now()+86400000).toISOString()};
+   details.invitaciones=[invitation];return {data:{data:{invitacion:invitation,ruta:savedInvitationPath}}};
+  }return original(request);
+ });
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'recover@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));await screen.findByLabelText('Enlace de invitación');
+ state.unmount();sessionStorage.clear();return details;
+}
+test.each(['','/app'])('reopening %s recovers a prepared link only after a fresh server read, without sending again',async base=>{
+ const details=await prepareRecoverableInvitation();mocks.request.mockClear();
+ setup(details,{base,entry:base+'/empresas'});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('');
+ fireEvent.click(screen.getByRole('button',{name:'Ver enlace de recover@qa.invalid'}));
+ expect(screen.getByLabelText('Enlace de invitación')).toHaveValue(window.location.origin+savedInvitationPath);
+ expect(mocks.request.mock.calls.every(([request])=>request.method==='GET')).toBe(true);
+});
+test.each(['account','role','company','permission','revoked','expired','accepted'])('recovery cannot reveal the link under a different or invalid %s',async kind=>{
+ const details=await prepareRecoverableInvitation();
+ if(kind==='account')mocks.user={...mocks.user,id:'someone-else'};
+ if(kind==='role')mocks.user={...mocks.user,rol:'OPERADOR',actorId:'operator-qa'};
+ if(kind==='revoked')details.invitaciones[0].revocadaAt=new Date().toISOString();
+ if(kind==='accepted')details.invitaciones[0].aceptadaAt=new Date().toISOString();
+ if(kind==='expired')details.invitaciones[0].venceAt=new Date(Date.now()-1000).toISOString();
+ setup({...details,...(kind==='permission'?{puedeGestionar:false}:{})},{entry:kind==='company'?'/empresas?empresa=other':'/empresas'});
+ if(kind==='permission'){await screen.findByText(/^Legal first ·/);}else{
+  await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ }
+ expect(screen.queryByRole('button',{name:'Ver enlace de recover@qa.invalid'})).not.toBeInTheDocument();
+ expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument();
+});
+test('failed refresh hides a recovered link until authority is checked again',async()=>{
+ const details=await prepareRecoverableInvitation(),state=setup(details);
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.click(screen.getByRole('button',{name:'Ver enlace de recover@qa.invalid'}));
+ state.failDetail();await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ await waitFor(()=>expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument());
+ state.recover();fireEvent.click(screen.getByRole('button',{name:'Reintentar empresa'}));
+ expect(await screen.findByLabelText('Enlace de invitación')).toBeVisible();
+});
+test('invalid local links are never restored, and signing out clears only prepared links',()=>{
+ const entry={id:'saved',path:savedInvitationPath,expiresAt:Date.now()+60000};
+ localStorage.setItem(PREPARED_INVITATION_PREFIX+'scope',JSON.stringify([entry,{...entry,path:'https://outside.invalid/token'},{...entry,expiresAt:Date.now()-1}]));
+ expect(readPreparedInvitations('scope')).toEqual([entry]);
+ localStorage.setItem('other-project','keep');clearPreparedInvitations();
+ expect(readPreparedInvitations('scope')).toEqual([]);expect(localStorage.getItem('other-project')).toBe('keep');
+});
+
+test('another tab signing out removes a displayed link without modifying the company',async()=>{
+ const details=await prepareRecoverableInvitation();mocks.request.mockClear();setup(details);
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.click(screen.getByRole('button',{name:'Ver enlace de recover@qa.invalid'}));
+ clearPreparedInvitations();fireEvent(window,new StorageEvent('storage',{key:null}));
+ expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument();
+ expect(mocks.request.mock.calls.every(([request])=>request.method==='GET')).toBe(true);
+});
+test('a recovered invitation disappears when its server expiry passes while the page stays open',async()=>{
+ const details=await prepareRecoverableInvitation();details.invitaciones[0].venceAt=new Date(Date.now()+500).toISOString();setup(details);
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.click(screen.getByRole('button',{name:'Ver enlace de recover@qa.invalid'}));
+ await waitFor(()=>expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument(),{timeout:2000});
+ expect(screen.getByText('Generador · Vencida')).toBeVisible();
 });
