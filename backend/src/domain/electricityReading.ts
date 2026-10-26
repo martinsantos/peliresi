@@ -35,7 +35,11 @@ function number(raw: string): string | undefined {
     if (!/^\d+(?:\.\d{3})*(?:,\d{1,4})?$/.test(value)) return;
     value = value.replace(/\./g, '').replace(',', '.');
   } else if (/^\d{1,3}(?:\.\d{3})+$/.test(value)) value = value.replace(/\./g, '');
-  return /^\d{1,12}(?:\.\d{1,4})?$/.test(value) ? value : undefined;
+  if (!/^\d{1,12}(?:\.\d{1,4})?$/.test(value)) return;
+  // Compare quantities, not typography. Preserve the original spelling in evidence.
+  const [integer, decimal] = value.split('.');
+  const fraction = decimal?.replace(/0+$/, '');
+  return integer.replace(/^0+(?=\d)/, '') + (fraction ? '.' + fraction : '');
 }
 
 // Explicit unit before/after a whole value on the same line. A rate (kWh/mes),
@@ -44,8 +48,11 @@ function amountRules(label: string, unit: string): RegExp[] {
   const gap = '[ \t\u00a0\u202f]*';
   const separator = `(?:[:=]${gap}|-[ \t]+)?`;
   const amount = '([+-]?\\d[\\d., \t\u00a0\u202f]*)';
+  // Do not turn a compound unit into a different physical quantity. A full stop
+  // ending the sentence remains valid; a dot joining a unit suffix does not.
+  const completeUnit = `${unit}\\b(?!${gap}(?:[/·⋅*−–-]|\\.[A-Z]))`;
   return [
-    new RegExp(`\\b${label}${gap}${separator}${amount}${unit}\\b(?!${gap}/)`, 'gm'),
+    new RegExp(`\\b${label}${gap}${separator}${amount}${completeUnit}`, 'gm'),
     new RegExp(`\\b${label}${gap}(?:\\(${gap}${unit}${gap}\\)|${unit})${gap}${separator}${amount}(?:${unit}${gap})?(?=\\r?$)`, 'gm'),
   ];
 }

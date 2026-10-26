@@ -61,4 +61,19 @@ describe('Mendoza electricity evidence, without inference or a fiscal update', (
     expect(result.campos).toMatchObject({ consumoKwh: '1250', potenciaContratadaKw: '45' });
     expect(electricityReading('Consumo: 250 kWh / mes').campos.consumoKwh).toBeUndefined();
   });
+  it.each(['kW-mes', 'kW · mes', 'kW.mes', 'kW–mes'])('does not truncate a compound power unit to kW: %s', unit => {
+    const result = electricityReading(`EDEMSA\nPotencia contratada: 15000 ${unit}`);
+    expect(result.campos.potenciaContratadaKw).toBeUndefined();
+  });
+  it('keeps a real consumption when another labelled line is a compound unit', () => {
+    const result = electricityReading('EDESTE\nConsumo: 420 kWh\nConsumo: 241 kWh-mes');
+    expect(result.campos.consumoKwh).toBe('420');
+    expect(result.conflictos).not.toContain('consumoKwh');
+  });
+  it('recognizes equal labelled values despite decimal precision and leading zeroes', () => {
+    const result = electricityReading('CECSAGAL\nConsumo: 1.250 kWh\nConsumo (kWh): 1250,00\nPotencia contratada: 025,50 kW\nPotencia contratada (kW): 25,5');
+    expect(result.campos).toMatchObject({ consumoKwh: '1250', potenciaContratadaKw: '25.5' });
+    expect(result.conflictos).toEqual([]);
+    expect(result.evidencias).toHaveLength(4);
+  });
 });

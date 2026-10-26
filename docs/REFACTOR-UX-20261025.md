@@ -22,6 +22,18 @@ Objetivos de las sesiones: al menos 90% de tareas sin intervención, facilidad m
 | 3 | Inspecciones, plazos, requerimientos desde Avisos, Monitor y campo | En curso: contexto, avisos, recuperación de actuaciones/campo y frescura del Monitor tienen evidencia en las continuaciones; barrido integral, Android y sesiones pendientes |
 | 4 | Campana, alertas, correos simulados, enlaces, PDFs, reportes y manual | En curso: aislamiento de bandeja, avisos de actividades/altas, enlaces y Reportes documentados; inventario integral y sesiones pendientes. Ningún envío real |
 
+## Puertas de cierre de la tanda de altas · revisión 26/10/2026
+
+Esta tabla consolida límites del registro, no suma ejecuciones nuevas a las evidencias anteriores. No se espera a participantes para continuar las puertas técnicas.
+
+| Recorrido | Evidencia disponible | Qué impide declarar cierre integral |
+|---|---|---|
+| Altas G/T/O, revisión y renovación | UX30–62, UX108–125: validaciones, documentos, corrección/reenvío, decisiones y recuperación; fixtures aprobados consultados de nuevo en UX128 | Resolver el circuito posterior a un rechazo sin alterar silenciosamente la regla de cierre; ampliar el barrido de estados/zoom/teclado |
+| ATM | UX30, UX72–75, UX87, UX98–99: identidad, reserva, conflicto, relectura y borrador; decisiones documentales UX122–123 | La identidad del pago no demuestra liquidación correcta; conciliación fiscal separada en CONCILIACION-TEF-20261026.md |
+| Electricidad | Catálogo de 11 distribuidores, cantidades/unidades, evidencia/conflictos y lectura de documentos artificiales; UX128 agrega equivalencia y unidades compuestas | El catálogo y los textos sintéticos no validan todas las facturas históricas ni todos los escaneos; faltan muestras representativas adicionales |
+| Multirol y representantes | Contexto y recuperación UX31–44; avisos/contextos posteriores; fixture con tres actividades y dos personas consultado en UX128 | No equivale a una nueva repetición de cada alta/invitación concurrente; mantener cubierta revocación, aislamiento y cupo en regresiones de cambios posteriores |
+| Comprensión y Android | Protocolo definido, pruebas técnicas web/app documentadas | Participantes y dispositivo todavía no disponibles; ninguna métrica humana ni Android se considera aprobada |
+
 ## Matriz inicial de superficies
 
 Las rutas de app agregan `/app`. Permisos del servidor siguen siendo autoritativos.
@@ -1299,3 +1311,20 @@ No cambian calcularTEF, fórmula, coeficientes, callbacks, entradas declaradas, 
 **Manual e integridad.** Guía de alta amplía la diferencia entre simulación, liquidación y comprobante; help-data 06d4e48cf0e7 en las tres entradas HTML, sincronizado por el build web. Auditoría 17:26:40 UTC: 528 manifiestos, cero intentos/envíos de correo, CAP cerrado, correos/push apagados y dos procesos normales. Sin producción, main, workflows, migraciones, datos reales ni flags modificados.
 
 Evidencias uiux-onboarding-recheck-20261025: tef-simulation-{baseline,final,manual,audit,widths}.json y capturas/estados before/web/app. Continúan abiertos la conciliación fiscal y los formatos eléctricos adicionales, junto con las demás pruebas pendientes del plan integral. El corte anterior UX126 fue progreso verificable: commit, corrección y evidencia; éste continúa el análisis de la presentación fiscal sin esperar participantes.
+
+
+## UX128 · Cantidades equivalentes y unidades completas en electricidad · 26/10/2026
+
+Sobre 1e9f67e5, exclusivamente preview. Se reprodujeron seis regresiones: cuatro variantes de unidad compuesta se truncaban a kW; una línea de kWh-mes invalidaba por falso conflicto el consumo explícito; y números equivalentes con ceros/precisión distinta se consideraban contradictorios. Referencia 101/107, final 107/107 en dominio, análisis y límites/controladores documentales.
+
+El lector verifica el final de la unidad: no transforma kW-mes, kW·mes, kW.mes o kW–mes en kW. La comparación elimina sólo ceros no significativos, sin aritmética de coma flotante ni conversión de unidades. Mantiene cada texto original como evidencia. No modifica tarifa, declaración, HP, TEF, identidad/reserva ATM ni reglas administrativas. Las lecturas ya guardadas no se reescriben: la corrección se aplica al leer/releer un documento.
+
+**Integración y navegador.** Dos PDF artificiales se analizaron por HTTP con persistido=false y motor PDF_TEXT. CECSAGAL con 1.250/1250,00 kWh y 025,50/25,5 kW devuelve 1250/25.5 sin conflictos; EDESTE con 420 kWh y líneas compuestas devuelve 420 kWh y ninguna potencia contratada. Conteos antes/después: 42 solicitudes, 91 documentos, 152 usuarios, 528 manifiestos. Ambos casos se repitieron en el alta de prueba real de Generador en web y app, sin presentar ni guardar documentos. El original completo conserva también las unidades excluidas. La reapertura explica que se deben volver a seleccionar archivos de prueba. El componente/analizador es compartido; este corte no atribuye nuevas cargas visuales para Transporte/Operador ni OCR de imágenes escaneadas.
+
+App medida a 320/393/768/1365/1920 sin desborde; web 1365 y app 393 inspeccionadas, evidencia desplegada, consola sin errores/advertencias. No acredita zoom, lector de pantalla ni Android. Backend build aprobado; frontend sin cambios de código, sin reconstrucción innecesaria. Manual/orientación 100/100 y help-data 9c92d73a83e2 sincronizado al preview.
+
+El primer HTTP de QA comenzó antes de que el backend reiniciado escuchara en 3037 y obtuvo ECONNREFUSED. Se comprobó el log de arranque y se repitió la integración con resultado aprobado; se registra como incidencia de secuenciación del runner, no como lectura aprobada en el intento fallido.
+
+**Cobertura y límites.** Rechequeo de los cinco trámites sintéticos existentes y contexto multirol: 12 consultas/autenticaciones, ninguna escritura de negocio; tres actividades y máximo dos personas conservados. No se cuenta como nueva creación, aprobación o invitación E2E. Auditoría final conserva 528 manifiestos, cero intentos/envíos de correo, CAP cerrado, correos/push apagados y dos procesos normales. Sin producción, main, workflows, migraciones ni datos reales. Se consolidan arriba las puertas de cierre de la tanda para no confundir esta corrección con todo el refactor concluido.
+
+Evidencias: uiux-onboarding-recheck-20261025/electric-units-{baseline,final,manual,http,onboarding,audit,widths}.json, backend-build.log, PDF artificiales y estados/capturas web/app. Continúan conciliación fiscal, formatos adicionales, accesibilidad integral y demás recorridos abiertos. El trabajo técnico no depende de participantes.
