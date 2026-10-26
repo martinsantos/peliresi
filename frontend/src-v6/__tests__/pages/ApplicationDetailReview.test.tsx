@@ -140,3 +140,21 @@ it('does not discard pending ATM fields while refreshing the application',()=>{
  expect(screen.getByLabelText('Identidad del pago')).toHaveValue('QA-123');expect(screen.getByLabelText('Identidad del pago')).toBeDisabled();
  state.detail.isFetching=false;view.rerender(tree());expect(screen.getByLabelText('Identidad del pago')).toBeEnabled();
 });
+
+it.each(['', '/app'])('presents declared power, zone and operator mode without technical keys (%s)', prefix => {
+ const raw = JSON.stringify({ razonSocial: 'Empresa QA', cuit: '30900000011', tefPotencia: '120', tefSuperficie: '1250', tefPersonal: '0', tefZona: 'zona_industrial', tipoOperador: 'IN_SITU', campoAnterior: 'VALOR_PREVIO' });
+ state.detail.data.datosActor = raw;
+ render(tree(prefix));
+ expect(screen.getByText('Potencia instalada (HP)')).toBeVisible();
+ expect(screen.getByText('120')).toBeVisible();
+ expect(screen.getByText('Superficie cubierta (m²)')).toBeVisible();
+ expect(screen.getByText('Personal en planta')).toBeVisible();
+ expect(within(screen.getByText('Personal en planta').parentElement!).getByText('0')).toBeVisible();
+ expect(screen.getByText('CUIT')).toBeVisible();
+ expect(screen.getByText('Zona Industrial Exclusiva')).toBeVisible();
+ expect(screen.getByText('Operador in situ')).toBeVisible();
+ expect(screen.getByText('VALOR_PREVIO')).toBeVisible();
+ expect(screen.queryByText('Tef Potencia')).toBeNull();
+ expect(screen.queryByText('IN_SITU')).toBeNull();
+ expect(state.detail.data.datosActor).toBe(raw);
+});

@@ -1,4 +1,5 @@
 import type { Renovacion, SolicitudInscripcion } from '../types/api';
+import { ZONAS } from './calculoTEF';
 
 export const ACTOR_NAMES: Record<string, string> = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' };
 export const APPLICATION_STATES = {
@@ -24,6 +25,23 @@ export function applicantName(s: SolicitudInscripcion): string {
 export function renewalActor(r: Renovacion): string { return r.generador?.razonSocial || r.operador?.razonSocial || 'Actor sin identificar'; }
 const labels: Record<string, string> = { razonSocial: 'Razón social', domicilio: 'Domicilio', telefono: 'Teléfono', email: 'Correo electrónico', actividad: 'Actividad', rubro: 'Rubro', corrientesControl: 'Corrientes Y', corrientesY: 'Corrientes Y', categoria: 'Categoría', numeroInscripcion: 'Número de inscripción', numeroHabilitacion: 'Número de habilitación', tipoOperador: 'Modalidad del operador', tecnologia: 'Tecnología' };
 const valueLabel = (v: unknown) => v == null || v === '' ? 'Sin declarar' : typeof v === 'string' || typeof v === 'number' ? String(v) : JSON.stringify(v);
+const applicationLabels: Record<string, string> = {
+  ...labels, cuit: 'CUIT', emailContacto: 'Correo de contacto', nombreFantasia: 'Nombre de fantasía',
+  tefPersonal: 'Personal en planta', tefPotencia: 'Potencia instalada (HP)', tefSuperficie: 'Superficie cubierta (m²)', tefZona: 'Zona del establecimiento',
+  corrientesAutorizadas: 'Corrientes Y autorizadas', vencimientoHabilitacion: 'Vencimiento de habilitación',
+  domicilioLegalCalle: 'Domicilio legal · calle', domicilioLegalLocalidad: 'Domicilio legal · localidad', domicilioLegalDepto: 'Domicilio legal · departamento',
+  domicilioRealCalle: 'Domicilio real · calle', domicilioRealLocalidad: 'Domicilio real · localidad', domicilioRealDepto: 'Domicilio real · departamento',
+};
+export function applicationFieldLabel(key: string): string {
+  return applicationLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').replace(/^\w/, c => c.toUpperCase()).trim();
+}
+/** Presentation only: retain unrecognized legacy values rather than guessing or dropping them. */
+export function applicationFieldValue(key: string, value: unknown): string {
+  if (key === 'tefZona') return ZONAS.find(zone => zone.id === value)?.label || valueLabel(value);
+  if (key === 'tipoOperador' && value === 'IN_SITU') return 'Operador in situ';
+  if (key === 'tipoOperador' && value === 'FIJO') return 'Planta fija';
+  return valueLabel(value);
+}
 /** Describe the stored proposal; malformed values are never interpreted as no changes. */
 export function renewalChanges(r: Renovacion) {
   if (r.modalidad === 'SIN_CAMBIOS') return { valid: true, rows: [] };

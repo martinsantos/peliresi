@@ -202,7 +202,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
                   </div>
                   </div>
                   {doc.analisis && <div className="col-span-2 w-full sm:basis-full"><DocumentAnalysis analysis={doc.analisis} /></div>}
-                  {!readOnly && isAdmin && doc.tipo === 'COMPROBANTE_PAGO' && onConfirmPayment && <div className="col-span-2 w-full sm:basis-full"><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} cuit={cuit} referencia={`Documento ${doc.id} · ${doc.anio || ''}`} onConfirm={input => onConfirmPayment(doc.id, input)} /></div>}
+                  {!readOnly && isAdmin && doc.tipo === 'COMPROBANTE_PAGO' && onConfirmPayment && <div className="col-span-2 w-full sm:basis-full"><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} estadoDocumento={doc.estado} cuit={cuit} referencia={`Documento ${doc.id} · ${doc.anio || ''}`} onConfirm={input => onConfirmPayment(doc.id, input)} /></div>}
                 </div>
               );
             })}

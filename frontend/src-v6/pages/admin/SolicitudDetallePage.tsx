@@ -1,3 +1,4 @@
+import { applicationFieldLabel as fieldLabel, applicationFieldValue } from '../../utils/admissionReview';
 /**
  * SITREP v6 - Solicitud Detalle Page (Admin)
  * Review a specific inscription solicitud
@@ -79,14 +80,6 @@ function parseDatosActor(json: string): Record<string, string> {
     }
   } catch { /* ignore */ }
   return {};
-}
-
-function fieldLabel(key: string): string {
-  return key
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/[_-]/g, ' ')
-    .replace(/^\w/, c => c.toUpperCase())
-    .trim();
 }
 
 // ── Component ──
@@ -254,7 +247,7 @@ const SolicitudReview: React.FC = () => {
               Object.entries(datosActor).filter(([key]) => !['choferesJson', 'vehiculosJson'].includes(key)).map(([key, value]) => (
                 <div key={key}>
                   <p className="text-xs text-neutral-500 mb-0.5">{fieldLabel(key)}</p>
-                  <p className="text-sm font-medium text-neutral-800 break-words">{value || '-'}</p>
+                  <p className="text-sm font-medium text-neutral-800 break-words">{applicationFieldValue(key, value)}</p>
                 </div>
               ))
             )}
@@ -267,7 +260,7 @@ const SolicitudReview: React.FC = () => {
                 {Object.entries(parseDatosActor(solicitud.datosResiduos)).map(([k, v]) => (
                   <div key={k} className="mb-2">
                     <p className="text-xs text-neutral-500">{fieldLabel(k)}</p>
-                    <p className="text-sm text-neutral-800 break-words">{v || '-'}</p>
+                    <p className="text-sm text-neutral-800 break-words">{applicationFieldValue(k, v)}</p>
                   </div>
                 ))}
               </div>
@@ -278,7 +271,7 @@ const SolicitudReview: React.FC = () => {
                 {Object.entries(parseDatosActor(solicitud.datosRegulatorio)).map(([k, v]) => (
                   <div key={k} className="mb-2">
                     <p className="text-xs text-neutral-500">{fieldLabel(k)}</p>
-                    <p className="text-sm text-neutral-800 break-words">{v || '-'}</p>
+                    <p className="text-sm text-neutral-800 break-words">{applicationFieldValue(k, v)}</p>
                   </div>
                 ))}
               </div>
@@ -324,7 +317,7 @@ const SolicitudReview: React.FC = () => {
                       </p>
                     )}
                     <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt || !fresh || busy} onRetry={reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
-                    {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
+                    {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} estadoDocumento={doc.estado} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
 
                     <div className="flex items-center gap-1.5">
                       <button

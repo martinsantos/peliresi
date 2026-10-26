@@ -7,6 +7,20 @@ const sha = 'a'.repeat(64);
 const analysis: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: 'ATM ARTIFICIAL', alcance: 'QA', aviso: null,
   pago: { revision: 'PENDIENTE', coincidencia: false, propuesta: { campos: { emisor: 'ATM_TASAS', idComprobante: 'QA123', codigoTasa: '162', importe: '12500.00', fechaPago: '2026-10-20' }, conflictos: [] } } };
 describe('reviewing payment identity', () => {
+  it.each([
+    ['PENDIENTE', 'Revisá el documento para aprobarlo o rechazarlo.'],
+    ['APROBADO', 'Documento aprobado.'],
+    ['RECHAZADO', 'Documento rechazado. La reserva no se libera para otro trámite.'],
+  ] as const)('reflects document state %s without confusing reservation with accreditation', (estado, message) => {
+    const reserved: ReceiptAnalysis = { ...analysis, pago: { ...analysis.pago!, revision: 'CONFIRMADO', sha256: sha } };
+    const { rerender } = render(<PaymentIdentityReview analysis={reserved} sha256={sha} estadoDocumento={estado} referencia="QA" onConfirm={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent(message);
+    expect(screen.getByRole('status')).toHaveTextContent('No acredita fondos ante ATM.');
+    expect(screen.getByRole('status')).not.toHaveTextContent('si está pendiente');
+    rerender(<PaymentIdentityReview analysis={reserved} sha256={sha} estadoDocumento="APROBADO" referencia="QA" onConfirm={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Documento aprobado.');
+    expect(screen.getByRole('status')).not.toHaveTextContent('Revisá el documento');
+  });
   it.each(['0', '-1', '12,345', 'un mil', '1,000.50'])('keeps invalid amount %s local and points to the field', value => {
     const save = vi.fn();
     render(<PaymentIdentityReview analysis={analysis} sha256={sha} cuit="30900000011" referencia="QA" onConfirm={save} />);
@@ -66,6 +80,8 @@ describe('reviewing payment identity', () => {
   it('shows the confirmed reservation without claiming ATM accreditation', () => {
     render(<PaymentIdentityReview analysis={{ ...analysis, pago: { ...analysis.pago!, revision: 'CONFIRMADO', sha256: sha } }} sha256={sha} referencia="QA" onConfirm={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent('reservado para este trámite'); expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByRole('status')).not.toHaveTextContent('Documento aprobado');
+    expect(screen.getByRole('status')).not.toHaveTextContent('Revisá el documento');
   });
   it('presents tariff, energy and power separately, with the labelled evidence and explicit conflicts', () => {
     render(<ElectricityEvidence reading={{ version: 1, distribuidora: 'EDEMSA', nombreDistribuidora: 'EDEMSA', campos: { categoriaTarifaria: 'T1R3', consumoKwh: '1200', potenciaContratadaKw: '25' }, evidencias: [{ campo: 'categoriaTarifaria', texto: 'TARIFA T1-R3' }], conflictos: ['suministro'], aviso: 'No reemplaza la potencia instalada en HP ni cambia la TEF.' }} />);

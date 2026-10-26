@@ -11,8 +11,9 @@ const fields: Array<[keyof Omit<PaymentIdentity, 'emisor'>, string, string]> = [
   ['referenciaLiquidacion', 'Referencia de liquidación o trámite', 'text'],
   ['transaccion', 'Transacción (si figura)', 'text'], ['control', 'Control (si figura)', 'text'],
 ];
-export function PaymentIdentityReview({ analysis, sha256, cuit, referencia, onConfirm }: {
+export function PaymentIdentityReview({ analysis, sha256, cuit, referencia, estadoDocumento, onConfirm }: {
   analysis?: ReceiptAnalysis | null; sha256?: string | null; cuit?: string; referencia: string;
+  estadoDocumento?: string;
   onConfirm: (data: ConfirmPaymentInput) => Promise<void>;
 }) {
   const control = useId(), inFlight = useRef(false);
@@ -46,7 +47,13 @@ export function PaymentIdentityReview({ analysis, sha256, cuit, referencia, onCo
     catch (failure) { setError(getApiErrorMessage(failure, 'No se pudo confirmar la identidad. Tus datos siguen aquí.')); }
     finally { inFlight.current = false; setPending(false); }
   };
-  if (confirmed) return <div role="status" className="mt-3 flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-900"><ShieldCheck size={18} aria-hidden="true" className="mt-0.5 shrink-0" /><p><strong>Pago reservado para este trámite.</strong> ID {analysis.pago?.identidad?.idComprobante}. La reserva se conserva aunque cambie la foto. Falta la decisión documental si está pendiente.</p></div>;
+  if (confirmed) return <div role="status" className="mt-3 flex items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm text-primary-900"><ShieldCheck size={18} aria-hidden="true" className="mt-0.5 shrink-0" /><div>
+    <p><strong>Pago reservado para este trámite.</strong>{analysis.pago?.identidad?.idComprobante && <> ID {analysis.pago.identidad.idComprobante}.</>}</p>
+    {estadoDocumento === 'PENDIENTE' && <p>Revisá el documento para aprobarlo o rechazarlo.</p>}
+    {estadoDocumento === 'APROBADO' && <p>Documento aprobado.</p>}
+    {estadoDocumento === 'RECHAZADO' && <p>Documento rechazado. La reserva no se libera para otro trámite.</p>}
+    <p>La reserva se conserva aunque cambie la foto. No acredita fondos ante ATM.</p>
+  </div></div>;
   return <details className="mt-3 rounded-lg border border-neutral-300 bg-white p-3" data-testid="payment-identity-review">
     <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-semibold text-primary-900"><LockKeyhole size={18} aria-hidden="true" />Identificar y reservar pago ATM</summary>
     <p className="my-2 text-sm leading-6 text-neutral-700">Revisá el ticket original para la repartición. El OCR propone datos; la reserva impide otro uso en SITREP y no acredita fondos ante ATM.</p>
