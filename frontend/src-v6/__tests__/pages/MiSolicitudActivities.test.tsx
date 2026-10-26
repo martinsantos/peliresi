@@ -1,12 +1,12 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const requests = vi.hoisted(() => ({ message: vi.fn(), resend: vi.fn() }));
-beforeEach(() => { localStorage.clear(); requests.message.mockReset(); requests.resend.mockReset(); });
+const requests = vi.hoisted(() => ({ message: vi.fn(), resend: vi.fn(), applications: null as null | Record<string, unknown>[] }));
+beforeEach(() => { localStorage.clear(); requests.message.mockReset(); requests.resend.mockReset(); requests.applications = null; });
 vi.mock('../../components/ActorActivities', () => ({ default: () => <h2>Mis actividades</h2> }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isRestricted: true, logout: vi.fn() }) }));
 vi.mock('../../hooks/useSolicitudes', () => ({
-  useMisSolicitudes: () => ({ data: [
+  useMisSolicitudes: () => ({ data: requests.applications || [
     { id: 'g', tipoActor: 'GENERADOR', estado: 'OBSERVADA', observaciones: 'Generador observado' },
     { id: 'o', tipoActor: 'OPERADOR', estado: 'OBSERVADA', observaciones: 'Operador observado' },
   ] }),
@@ -81,4 +81,35 @@ it('an unavailable linked application never silently displays a different owned 
   fireEvent.click(screen.getByRole('button',{name:'Elegir otra solicitud'}));
   expect(screen.getByText('Inscripción de Generador')).toBeVisible();
   expect(requests.message).not.toHaveBeenCalled();expect(requests.resend).not.toHaveBeenCalled();
+});
+
+for (const prefix of ['', '/app']) it(`distinguishes a closed application and opens the current same-role request explicitly in ${prefix || 'web'}`, () => {
+  vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true');
+  requests.applications = [
+    { id: 'current', tipoActor: 'OPERADOR', estado: 'BORRADOR', createdAt: '2026-10-26T13:00:00Z' },
+    { id: 'old', tipoActor: 'OPERADOR', estado: 'RECHAZADA', createdAt: '2026-10-20T01:00:00Z', motivoRechazo: 'Motivo del expediente anterior' },
+    { id: 'other', tipoActor: 'GENERADOR', estado: 'BORRADOR', createdAt: '2026-10-26T14:00:00Z' },
+  ];
+  render(<MemoryRouter initialEntries={[prefix + '/mi-solicitud?solicitud=old']}><MiSolicitudPage /></MemoryRouter>);
+  expect(screen.getByLabelText('Solicitud por actividad')).toHaveValue('old');
+  expect(screen.getByRole('option', {name: /Operador · Rechazada · 19\/10\/2026/})).toBeVisible();
+  expect(screen.getByText('Motivo: Motivo del expediente anterior')).toBeVisible();
+  expect(screen.queryByText(/Nueva solicitud inicia otro expediente/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', {name:'Ver solicitud vigente'}));
+  expect(screen.getByLabelText('Solicitud por actividad')).toHaveValue('current');
+  expect(screen.getByRole('button', {name:'Continuar borrador'})).toBeVisible();
+  expect(screen.queryByText('Motivo: Motivo del expediente anterior')).toBeNull();
+  fireEvent.change(screen.getByLabelText('Solicitud por actividad'), {target:{value:'old'}});
+  expect(screen.getByText('Motivo: Motivo del expediente anterior')).toBeVisible();
+  expect(requests.message).not.toHaveBeenCalled(); expect(requests.resend).not.toHaveBeenCalled();
+});
+it('keeps existing history accessible with multirole creation disabled and dates missing', () => {
+  vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'false');
+  requests.applications = ['a','b'].map(id=>({id, tipoActor:'GENERADOR', estado:'RECHAZADA', createdAt:'invalid'}));
+  render(<MemoryRouter><MiSolicitudPage /></MemoryRouter>);
+  const labels=screen.getAllByRole('option').map(option=>option.textContent);
+  expect(new Set(labels).size).toBe(2);
+  expect(labels.join(' ')).not.toMatch(/Invalid Date/);
+  fireEvent.change(screen.getByLabelText('Solicitud por actividad'), {target:{value:'b'}});
+  expect(screen.getByLabelText('Solicitud por actividad')).toHaveValue('b');
 });

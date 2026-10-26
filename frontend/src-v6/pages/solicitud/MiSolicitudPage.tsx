@@ -45,6 +45,16 @@ const ESTADO_CONFIG: Record<EstadoSolicitud, {
 
 const ACTOR_LABELS: Record<string,string> = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' };
 
+// Dates identify the presentation, not a new official application number.
+function creationDate(application: SolicitudInscripcion): string | null {
+  const date = application.createdAt ? new Date(application.createdAt) : null;
+  return date && Number.isFinite(date.getTime())
+    ? date.toLocaleString('es-AR', { timeZone: 'America/Argentina/Mendoza', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : null;
+}
+function applicationLabel(application: SolicitudInscripcion): string {
+  return `${ACTOR_LABELS[application.tipoActor] || application.tipoActor} · ${ESTADO_CONFIG[application.estado].label} · ${creationDate(application) || 'Sin fecha registrada'}`;
+}
+
 // ── Component ──
 
 type ConversationCommand = { id: string; text: string; version?: string; confirmed?: boolean };
@@ -217,33 +227,40 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
   }
 
   const cfg = ESTADO_CONFIG[solicitud.estado];
+  const createdDate = creationDate(solicitud);
+  const activeApplication = solicitudes?.filter(item => item.id !== solicitud.id && item.tipoActor === solicitud.tipoActor && item.estado !== 'RECHAZADA')
+    .sort((a, b) => (Date.parse(b.createdAt) || 0) - (Date.parse(a.createdAt) || 0))[0];
+  const selectApplication = (id: string) => {
+    setSelectedId(id);
+    setParams({ solicitud: id }, { replace: true });
+  };
   const sentAt = solicitud.fechaEnvio ? new Date(solicitud.fechaEnvio) : null;
   const sentDate = sentAt && Number.isFinite(sentAt.getTime())
     ? sentAt.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Mendoza' }) : null;
 
   return (
     <div className="mx-auto w-full max-w-[960px] space-y-6 animate-fade-in">
-      <div className="flex flex-wrap items-start justify-between gap-3" aria-label="Solicitud seleccionada">
+      <div className="flex flex-wrap items-start justify-between gap-3" aria-label="Solicitud seleccionada" aria-live="polite" aria-atomic="true">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-neutral-900">Inscripción de {ACTOR_LABELS[solicitud.tipoActor] || solicitud.tipoActor}</h2>
+          {createdDate && <p className="mt-1 text-sm text-neutral-600">Creada {createdDate}</p>}
           {sentDate && <p className="mt-1 text-sm text-neutral-600">Enviada {sentDate}</p>}
         </div>
         <Badge variant="soft" color={cfg.color} size="lg"><cfg.icon size={16} aria-hidden="true" />{cfg.label}</Badge>
       </div>
       {isError && <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-800">No pudimos actualizar el estado. Conservamos lo escrito; revisá la conexión.<Button variant="outline" onClick={()=>void refetch()}>Actualizar solicitud</Button></div>}
 
-      {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <>
-        {(solicitudes?.length || 0) > 1 && <div>
+      {(solicitudes?.length || 0) > 1 && <div>
           <label htmlFor="application-activity" className="block text-sm font-medium">Solicitud por actividad</label>
-          <select id="application-activity" className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base"
-            value={solicitud.id} onChange={event => {
-              setSelectedId(event.target.value);
-              setParams({ solicitud: event.target.value }, { replace: true });
-            }}>
-            {solicitudes?.map(item => <option key={item.id} value={item.id}>{ACTOR_LABELS[item.tipoActor] || item.tipoActor} · {ESTADO_CONFIG[item.estado].label}</option>)}
+          <select id="application-activity" className="mt-1 w-full min-w-0 max-w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base"
+            value={solicitud.id} onChange={event => selectApplication(event.target.value)}>
+            {solicitudes?.map(item => {
+              const label = applicationLabel(item);
+              const duplicate = solicitudes.some(other => other.id !== item.id && applicationLabel(other) === label);
+              return <option key={item.id} value={item.id}>{label}{duplicate ? ` · Ref. ${item.id}` : ''}</option>;
+            })}
           </select>
         </div>}
-      </>}
       {solicitud.estado === 'BORRADOR' && <Card><p className="mb-3 text-neutral-700">Completá los datos y documentos para enviar tu inscripción a revisión.</p><Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase() + '?solicitud=' + encodeURIComponent(solicitud.id))}>Continuar borrador</Button></Card>}
       {(solicitud.estado === 'ENVIADA' || solicitud.estado === 'EN_REVISION') && <Card><p className="font-semibold text-neutral-900">Administración revisa tu solicitud</p><p className="mt-2 text-neutral-700">{solicitud.estado === 'ENVIADA' ? 'Recibimos tu presentación. Te avisaremos cuando haya una decisión o algo que corregir.' : 'Tu presentación está en revisión. Te avisaremos si necesitás completar algo.'}</p><p className="mt-2 text-sm text-neutral-600">No hace falta volver a enviarla. Podés consultar a administración en Mensajes.</p></Card>}
 
@@ -321,7 +338,11 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
               {solicitud.motivoRechazo && (
                 <p className="whitespace-pre-wrap break-words text-sm text-red-700">Motivo: {solicitud.motivoRechazo}</p>
               )}
-              <p className="text-sm text-red-700">Trámite cerrado. Conservás el resultado y los mensajes.{import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' ? ' Nueva solicitud inicia otro expediente; no modifica éste.' : ' Para otra presentación, consultá a administración.'}</p>
+              <p className="text-sm text-red-700">Trámite cerrado. Conservás el resultado y los mensajes.{activeApplication ? '' : import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' ? ' Nueva solicitud inicia otro expediente; no modifica éste.' : ' Para otra presentación, consultá a administración.'}</p>
+              {activeApplication && <div className="space-y-2">
+                <p className="text-sm text-neutral-800">Tenés otra solicitud de {ACTOR_LABELS[activeApplication.tipoActor]}: {ESTADO_CONFIG[activeApplication.estado].label.toLowerCase()}.</p>
+                <Button variant="outline" onClick={() => selectApplication(activeApplication.id)}>Ver solicitud vigente</Button>
+              </div>}
             </div>
           </div>
         </Card>
