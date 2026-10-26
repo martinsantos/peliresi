@@ -22,13 +22,32 @@ export type ElectricityReading = {
   conflictos: string[];
   aviso: string;
 };
+/** Parse a complete labelled amount; never concatenate table columns or take a prefix. */
 function number(raw: string): string | undefined {
-  let value = raw.replace(/\s/g, '');
+  let value = raw.trim();
+  if (/[ \t\u00a0\u202f]/.test(value)) {
+    // One separator between groups of three is a written thousands separator.
+    // Tabs or repeated spaces are column boundaries, not part of a number.
+    if (!/^\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:,\d{1,4})?$/.test(value)) return;
+    value = value.replace(/[ \u00a0\u202f]/g, '');
+  }
   if (value.includes(',')) {
     if (!/^\d+(?:\.\d{3})*(?:,\d{1,4})?$/.test(value)) return;
     value = value.replace(/\./g, '').replace(',', '.');
   } else if (/^\d{1,3}(?:\.\d{3})+$/.test(value)) value = value.replace(/\./g, '');
   return /^\d{1,12}(?:\.\d{1,4})?$/.test(value) ? value : undefined;
+}
+
+// Explicit unit before/after a whole value on the same line. A rate (kWh/mes),
+// unknown unit or another column is not silently converted to a consumption.
+function amountRules(label: string, unit: string): RegExp[] {
+  const gap = '[ \t\u00a0\u202f]*';
+  const separator = `(?:[:=]${gap}|-[ \t]+)?`;
+  const amount = '([+-]?\\d[\\d., \t\u00a0\u202f]*)';
+  return [
+    new RegExp(`\\b${label}${gap}${separator}${amount}${unit}\\b(?!${gap}/)`, 'gm'),
+    new RegExp(`\\b${label}${gap}(?:\\(${gap}${unit}${gap}\\)|${unit})${gap}${separator}${amount}(?:${unit}${gap})?(?=\\r?$)`, 'gm'),
+  ];
 }
 export function electricityReading(text: string): ElectricityReading {
   const source = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
@@ -38,13 +57,6 @@ export function electricityReading(text: string): ElectricityReading {
     aviso: 'Lectura para revisar contra el original y el establecimiento. Tarifa, kWh y potencia contratada en kW no equivalen a potencia instalada en HP; no cambian la TEF.' };
   const rules: Array<[keyof ElectricityReading['campos'], RegExp, (value: string) => string | undefined]> = [
     ['categoriaTarifaria', /\b(?:TARIFA|CATEGORIA(?: TARIFARIA)?|ENCASILLAMIENTO)\s*[:=-]?\s*((?:T\s*)?[123]\s*[- .]?\s*(?:R\s*[123]?|NR|G|ES|RBT|B|BT|MT|AT|RE|ALP)(?:\s*[-.]?\s*(?:BT|MT(?:\s*\/\s*BT)?|AT(?:\s*\/\s*MT)?))?|T\s*[123]|T?RA(?:\s*(?:BT|MT))?|TP\s*(?:BT|MT(?:\s*\/\s*BT)?|AT(?:\s*\/\s*MT)?))\b/g, value => value.replace(/[\s.\-]/g, '').replace(/^(?=\d)/, 'T')],
-    ['consumoKwh', /\b(?:CONSUMO(?:\s+(?:TOTAL|FACTURADO|DEL PERIODO))?|ENERGIA ACTIVA(?: TOTAL)?)\s*(?:\(\s*KWH\s*\)|KWH)?\s*[:=-]?\s*(\d[\d., ]*)\s*KWH\b/g, number],
-    ['consumoKwh', /\bCONSUMO(?:\s+(?:TOTAL|FACTURADO|DEL PERIODO))?\s*\(\s*KWH\s*\)\s*[:=-]?\s*(\d[\d.,]*)/g, number],
-    ['consumoKwh', /\bCONSUMO(?:\s+(?:TOTAL|FACTURADO|DEL PERIODO))?\s+KWH\s*[:=-]\s*(\d[\d.,]*)/g, number],
-    ['potenciaContratadaKw', /\bPOTENCIA\s+(?:CONTRATADA|CONVENIDA)\s*(?:\(\s*KW\s*\))?\s*[:=-]?\s*(\d[\d., ]*)\s*KW\b/g, number],
-    ['potenciaRegistradaKw', /\bPOTENCIA\s+(?:REGISTRADA|MAXIMA REGISTRADA|MEDIDA)\s*(?:\(\s*KW\s*\))?\s*[:=-]?\s*(\d[\d., ]*)\s*KW\b/g, number],
-    ['potenciaContratadaKw', /\bPOTENCIA\s+(?:CONTRATADA|CONVENIDA)\s*\(\s*KW\s*\)\s*[:=-]?\s*(\d[\d.,]*)/g, number],
-    ['potenciaRegistradaKw', /\bPOTENCIA\s+(?:REGISTRADA|MAXIMA REGISTRADA|MEDIDA)\s*\(\s*KW\s*\)\s*[:=-]?\s*(\d[\d.,]*)/g, number],
     ['suministro', /\b(?:NIC|NIS|N[°º.]?\s*(?:DE\s*)?(?:SUMINISTRO|USUARIO)|SUMINISTRO)\s*[:=-]?\s*([0-9][0-9 .-]{3,25})\b/g, value => value.trim().replace(/[ .-]/g, '')],
     ['periodo', /\bPERIODO(?:\s+(?:FACTURADO|DE CONSUMO))?\s*[:=-]?\s*(\d{2,4}[/-]\d{2,4}(?:[/-]\d{2,4})?(?:\s+(?:AL|A|HASTA)\s+\d{2,4}[/-]\d{2,4}(?:[/-]\d{2,4})?)?)/g, value => value.trim()],
     ['nivelSubsidio', /\bNIVEL(?:\s+DE\s+(?:SUBSIDIO|INGRESOS))?\s*[:=-]?\s*([123])\b/g, value => 'N' + value],
@@ -56,8 +68,23 @@ export function electricityReading(text: string): ElectricityReading {
     const values = candidates.get(field) || new Set<string>(); values.add(value); candidates.set(field, values);
     result.evidencias.push({ campo: field, texto: match[0].trim().slice(0, 180) });
   }
+  const unreadable = new Set<string>();
+  const amounts: Array<[keyof ElectricityReading['campos'], string, string]> = [
+    ['consumoKwh', '(?:CONSUMO(?:[ \t]+(?:TOTAL|FACTURADO|DEL PERIODO))?|ENERGIA ACTIVA(?: TOTAL)?)', 'KWH'],
+    ['potenciaContratadaKw', 'POTENCIA[ \t]+(?:CONTRATADA|CONVENIDA)', 'KW'],
+    ['potenciaRegistradaKw', 'POTENCIA[ \t]+(?:REGISTRADA|MAXIMA REGISTRADA|MEDIDA)', 'KW'],
+  ];
+  for (const [field, label, unit] of amounts) for (const expression of amountRules(label, unit)) {
+    for (const match of source.matchAll(expression)) {
+      const value = number(match[1]);
+      result.evidencias.push({ campo: field, texto: match[0].trim().slice(0, 180) });
+      if (value === undefined) { unreadable.add(field); continue; }
+      const values = candidates.get(field) || new Set<string>();
+      values.add(value); candidates.set(field, values);
+    }
+  }
   for (const [field, values] of candidates) {
-    if (values.size === 1) result.campos[field as keyof ElectricityReading['campos']] = [...values][0];
+    if (values.size === 1 && !unreadable.has(field)) result.campos[field as keyof ElectricityReading['campos']] = [...values][0];
     else result.conflictos.push(field);
   }
   return result;

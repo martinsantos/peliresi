@@ -36,4 +36,29 @@ describe('Mendoza electricity evidence, without inference or a fiscal update', (
   it('keeps an unreadable invoice available with no invented category', () => {
     const result = electricityReading(''); expect(result.distribuidora).toBeNull(); expect(result.campos).toEqual({}); expect(result.aviso).toContain('no cambian la TEF');
   });
+  it.each(['1 234,5', '1\u00a0234,5', '1\u202f234,5'])('reads the whole grouped value with the unit before it: %s', value => {
+    const result = electricityReading(`CEGC\nConsumo (kWh): ${value}\nPotencia contratada (kW): 25,5`);
+    expect(result.campos.consumoKwh).toBe('1234.5');
+    expect(result.campos.potenciaContratadaKw).toBe('25.5');
+    expect(result.evidencias.find(item => item.campo === 'consumoKwh')?.texto).toContain(value);
+  });
+  it.each(['Consumo: 12 34 kWh', 'Consumo: 120  240 kWh', 'Consumo (kWh): 120\t240',
+    'Consumo (kWh): 25,12345', 'Consumo (kWh): 25 kVA', 'Consumo -250 kWh',
+    'Consumo (kWh) -250', 'Consumo (kWh): -250', 'Consumo: 250 kWh/mes'])('does not publish a truncated, signed or ambiguous amount: %s', line => {
+    const result = electricityReading(`EDEMSA\n${line}`);
+    expect(result.campos.consumoKwh).toBeUndefined();
+  });
+  it.each(['Potencia contratada (kW): 1 234,5', 'Potencia contratada: 1 234,5 kW'])('uses the same complete number rule for power: %s', line => {
+    expect(electricityReading(line).campos.potenciaContratadaKw).toBe('1234.5');
+  });
+  it('does not discard an unreadable competing labelled amount in favor of a clean one', () => {
+    const result = electricityReading('EDEMSA\nConsumo: 1234 kWh\nConsumo (kWh): 12 34');
+    expect(result.campos.consumoKwh).toBeUndefined();
+    expect(result.conflictos).toContain('consumoKwh');
+  });
+  it('keeps independent, explicitly labelled amounts on the same line', () => {
+    const result = electricityReading('Consumo: 1250 kWh   Potencia contratada: 45 kW');
+    expect(result.campos).toMatchObject({ consumoKwh: '1250', potenciaContratadaKw: '45' });
+    expect(electricityReading('Consumo: 250 kWh / mes').campos.consumoKwh).toBeUndefined();
+  });
 });
