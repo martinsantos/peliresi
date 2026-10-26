@@ -8,7 +8,7 @@ vi.mock('../../utils/logger',()=>({default:{error:vi.fn()}}));
 vi.mock('../../services/email.service',()=>({emailService:{sendEmailVerification:vi.fn()}}));
 vi.mock('../../controllers/auth.controller',()=>({generateTokens:vi.fn()}));
 vi.mock('fs',async original=>{const fs=await original<typeof import('fs')>();return {...fs,default:{...fs,existsSync:()=>true}};});
-import { getSolicitud,getMensajes,crearMensaje,enviarSolicitud,listarSolicitudes,revisarSolicitud,observarSolicitud,aprobarSolicitud,rechazarSolicitud,revisarDocumento,downloadDocumentoSolicitud } from '../../controllers/solicitud.controller';
+import { getMisSolicitudes,getSolicitud,getMensajes,crearMensaje,enviarSolicitud,listarSolicitudes,revisarSolicitud,observarSolicitud,aprobarSolicitud,rechazarSolicitud,revisarDocumento,downloadDocumentoSolicitud } from '../../controllers/solicitud.controller';
 const application=()=>({id:'s',tipoActor:'GENERADOR',estado:'EN_REVISION',usuarioId:'owner',usuario:{id:'owner',nombre:'QA solicitante'}});
 async function call(handler:any,role='ADMIN',body:unknown={},id='admin',query:unknown={},restricted=false) {
  const res={json:vi.fn(),status:vi.fn().mockReturnThis()}, next=vi.fn();
@@ -138,4 +138,9 @@ it('reviews the expected current original and trims its note without resolving t
 });
 it.each([null,[],{estado:'OTRO',sha256:null},{estado:'PENDIENTE',sha256:'broken'}])('invalid document reference cannot write (%#)',async expectedDocument=>{
  expect((await call(revisarDocumento,'ADMIN',{estado:'APROBADO',expectedDocument})).error).toMatchObject({statusCode:400});expect(m.docUpdate).not.toHaveBeenCalled();
+});
+
+it('own application summaries expose document observations without internal paths or another user scope',async()=>{
+ expect((await call(getMisSolicitudes,'GENERADOR',{},'owner')).error).toBeUndefined();
+ expect(m.list).toHaveBeenCalledWith(expect.objectContaining({where:{usuarioId:'owner'},include:expect.objectContaining({documentos:{select:{id:true,tipo:true,nombre:true,estado:true,observaciones:true,createdAt:true}}})}));
 });

@@ -65,7 +65,7 @@ export const solicitudService = {
     const { data } = await api.post(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(docId)}/identidad-pago`, input);
     return data.data.documento;
   },
-  async downloadDocumento(solicitudId: string, item: DocumentoSolicitud): Promise<void> {
+  async downloadDocumento(solicitudId: string, item: Pick<DocumentoSolicitud, 'id' | 'nombre'>): Promise<void> {
     const { data } = await api.get(`/solicitudes/${encodeURIComponent(solicitudId)}/documentos/${encodeURIComponent(item.id)}/download`, { responseType: 'blob' });
     const url = URL.createObjectURL(data);
     const link = document.createElement('a');

@@ -1,11 +1,12 @@
-import { applicationDeclarationGroups, applicationFieldLabel, applicationFieldValue, recordJson } from '../../utils/admissionReview';
+import { isApplicationDeclarationField, applicationDeclarationGroups, applicationFieldLabel, applicationFieldValue, recordJson } from '../../utils/admissionReview';
 import { Button } from '../ui/ButtonV2';
 
 /** Read-only representation of the original declaration, including historical fields. */
 export function ApplicationDeclarationSummary({ raw, title, grouped = false, onRetry, retrying = false }: {
   raw?: string; title: string; grouped?: boolean; onRetry: () => void; retrying?: boolean;
 }) {
-  const data = recordJson(raw);
+  const source = recordJson(raw);
+  const data = source && Object.fromEntries(Object.entries(source).filter(([key]) => isApplicationDeclarationField(key)));
   if (!data) return <div role="alert" className="space-y-2 rounded-lg border border-error-200 bg-error-50 p-3 text-sm text-error-900">
     <p>No pudimos interpretar {title.toLocaleLowerCase()}. No se reemplazaron por datos vacíos. La aprobación espera una declaración legible.</p>
     <Button variant="outline" size="sm" disabled={retrying} onClick={onRetry}>Actualizar {title.toLocaleLowerCase()}</Button>

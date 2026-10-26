@@ -268,3 +268,11 @@ it('an observed application explains that the applicant already owes a correctio
  expect(screen.getByRole('dialog')).toHaveTextContent('El solicitante ya debe corregir y reenviar');
  expect(screen.getByRole('dialog')).not.toHaveTextContent('usá Observar');expect(state.document).not.toHaveBeenCalled();
 });
+
+it('hides only known wizard metadata and retains unfamiliar historical declarations',()=>{
+ state.detail.data.datosActor=JSON.stringify({_sitrepDraftStep:6,razonSocial:'Empresa QA',campoAnterior:'Valor conservado',_datoHistorico:'Dato del actor'});render(tree());
+ expect(screen.queryByText('sitrep Draft Step')).toBeNull();expect(screen.getByText('Valor conservado')).toBeVisible();expect(screen.getByText('Dato del actor')).toBeVisible();
+});
+it('wizard recovery metadata alone is not a readable actor declaration',()=>{
+ state.detail.data.datosActor=JSON.stringify({_sitrepDraftStep:6});render(tree());expect(screen.getByRole('button',{name:'Aprobar',exact:true})).toBeDisabled();expect(screen.getByText(/Sin datos declarados en datos del actor/)).toBeVisible();
+});

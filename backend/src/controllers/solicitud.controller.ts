@@ -235,7 +235,7 @@ export const getMisSolicitudes = async (req: AuthRequest, res: Response, next: N
       where: { usuarioId: req.user!.id },
       orderBy: { createdAt: 'desc' },
       include: {
-        documentos: { select: { id: true, tipo: true, nombre: true, estado: true, createdAt: true } },
+        documentos: { select: { id: true, tipo: true, nombre: true, estado: true, observaciones: true, createdAt: true } },
         _count: { select: { mensajes: true } },
       },
     });

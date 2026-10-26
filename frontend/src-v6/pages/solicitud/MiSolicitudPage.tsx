@@ -21,6 +21,7 @@ import {
 } from '../../hooks/useSolicitudes';
 import type { EstadoSolicitud, SolicitudInscripcion, MensajeSolicitud } from '../../types/api';
 import ActorActivities from '../../components/ActorActivities';
+import { ApplicantDocuments } from '../../components/registration/ApplicantDocuments';
 import { useAdmissionContext } from '../../hooks/useAdmissionContext';
 import { useRecoverableForm } from '../../hooks/useRecoverableForm';
 import { DraftConflictNotice } from '../../components/DraftConflictNotice';
@@ -272,6 +273,9 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
       {solicitud.estado === 'OBSERVADA' && activeDraft?.replyCommand?.version && activeDraft.replyCommand.version !== solicitud.updatedAt && <div role="alert" className="space-y-2 rounded-xl bg-warning-50 p-4"><p>Los datos u observaciones cambiaron desde tu respuesta pendiente. Revisalos antes de continuar.</p><Button variant="outline" disabled={busy || draft.error || draft.conflict || isError} onClick={() => draft.update(previous => ({ ...previous, [solicitud.id]: { ...previous[solicitud.id], replyCommand: null } }))}>Preparar respuesta con los datos actuales</Button></div>}
       {replyText && solicitud.estado !== 'OBSERVADA' && <div className="rounded-xl border p-4"><p className="font-medium">Respuesta local conservada</p><p className="whitespace-pre-wrap break-words">{replyText}</p><p>El estado actual no admite reenviar esta respuesta.</p></div>}
 
+      {solicitud.estado === 'OBSERVADA' && <ApplicantDocuments key={solicitud.id} applicationId={solicitud.id} documents={solicitud.documentos}
+        fresh={!isError && !isFetching} onRetry={() => void refetch()} />}
+
       {/* OBSERVADA Banner */}
       {solicitud.estado === 'OBSERVADA' && (
         <Card className="!border-amber-300 !bg-amber-50">
@@ -349,6 +353,9 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
       )}
 
       {solicitud.estado === 'RECHAZADA' && import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities mode="request" />}
+
+      {solicitud.estado !== 'OBSERVADA' && <ApplicantDocuments key={solicitud.id} applicationId={solicitud.id} documents={solicitud.documentos}
+        fresh={!isError && !isFetching} onRetry={() => void refetch()} />}
 
       {/* Messages Thread */}
       <Card padding="none">

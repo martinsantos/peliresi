@@ -2,7 +2,7 @@ import { clearRegistrationDraft, writeRegistrationDraft } from '../../services/r
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ applications: [] as Array<Record<string, string>>, message: vi.fn(), resend: vi.fn(), restricted: true, logout: vi.fn() }));
+const state = vi.hoisted(() => ({ applications: [] as Array<Record<string, unknown>>, message: vi.fn(), resend: vi.fn(), restricted: true, logout: vi.fn() }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isRestricted: state.restricted, logout: state.logout }) }));
 vi.mock('../../components/ActorActivities', () => ({ default: () => <h2>Acciones de inscripción</h2> }));
 vi.mock('../../hooks/useSolicitudes', () => ({
@@ -103,4 +103,9 @@ it('places available new-application choices before the closed conversation afte
   const actions=screen.getByRole('heading',{name:'Acciones de inscripción'}),messages=screen.getByRole('heading',{name:'Mensajes'});
   expect(actions.compareDocumentPosition(messages) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getAllByRole('heading',{name:'Acciones de inscripción'})).toHaveLength(1);
+});
+
+it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('%s sees the selected application document decision and observation',type=>{
+ state.applications=[{id:'owned',tipoActor:type,estado:'OBSERVADA',documentos:[{id:'d',nombre:'Documento propio.png',estado:'RECHAZADO',observaciones:'Adjuntar página completa.'}]}];open();
+ const panel=screen.getByRole('button',{name:/Documentos presentados/});expect(panel.compareDocumentPosition(screen.getByLabelText('Tu respuesta')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();fireEvent.click(panel);expect(screen.getByText('Documento rechazado')).toBeVisible();expect(screen.getByText(/Adjuntar página completa/)).toBeVisible();expect(state.message).not.toHaveBeenCalled();expect(state.resend).not.toHaveBeenCalled();
 });

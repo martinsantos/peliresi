@@ -54,9 +54,11 @@ const declarationGroups = [
   { title: 'Actividad declarada', fields: ['actividad', 'rubro', 'categoria', 'categoriaIndividual', 'tipoOperador', 'tecnologia', 'corrientesControl', 'corrientesY', 'corrientesAutorizadas', 'libroOperatoria', 'certificacionISO', 'tefPersonal', 'tefSuperficie', 'tefPotencia', 'tefZona', 'tefCapacidad'] },
   { title: 'Representantes declarados', fields: ['representanteLegalNombre', 'representanteLegalDNI', 'representanteLegalTelefono', 'representanteTecnicoNombre', 'representanteTecnicoMatricula', 'representanteTecnicoTelefono'] },
 ];
-/** Group presentation only. Keep every unknown field; fleet has its own structured summary. */
+// This key belongs to wizard recovery, not the actor declaration. Keep it in storage.
+export const isApplicationDeclarationField = (key: string) => key !== '_sitrepDraftStep';
+/** Keep unknown business fields; fleet has its own structured summary. */
 export function applicationDeclarationGroups(data: Record<string, unknown>) {
-  const remaining = new Set(Object.keys(data).filter(key => !['choferesJson', 'vehiculosJson'].includes(key)));
+  const remaining = new Set(Object.keys(data).filter(key => isApplicationDeclarationField(key) && !['choferesJson', 'vehiculosJson'].includes(key)));
   const groups = declarationGroups.map(group => ({ title: group.title, rows: group.fields.filter(key => remaining.delete(key)).map(key => ({ key, value: data[key] })) }));
   groups.push({ title: 'Otros datos declarados', rows: [...remaining].map(key => ({ key, value: data[key] })) });
   return groups.filter(group => group.rows.length > 0);
@@ -64,7 +66,7 @@ export function applicationDeclarationGroups(data: Record<string, unknown>) {
 export function applicationDeclarationsReadable(s?: Pick<SolicitudInscripcion, 'datosActor' | 'datosResiduos' | 'datosRegulatorio'>) {
   if (!s) return false;
   const actor = recordJson(s.datosActor);
-  return !!actor && Object.keys(actor).length > 0 && [s.datosResiduos, s.datosRegulatorio].every(raw => !raw || recordJson(raw) !== null);
+  return !!actor && Object.keys(actor).some(isApplicationDeclarationField) && [s.datosResiduos, s.datosRegulatorio].every(raw => !raw || recordJson(raw) !== null);
 }
 /** Describe the stored proposal; malformed values are never interpreted as no changes. */
 export function renewalChanges(r: Renovacion) {
