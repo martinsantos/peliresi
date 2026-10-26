@@ -1,3 +1,4 @@
+import { useCertificateDraft } from '../../../hooks/useCertificateDraft';
 import { useImpersonation } from '../../../contexts/ImpersonationContext';
 import { useCertificateCommand } from '../../../hooks/useCertificateCommand';
 import { Award, FileCheck2, LockKeyhole, CheckCircle2, Download } from 'lucide-react';
@@ -30,21 +31,34 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
  const [searchParams]=useSearchParams();const selectedCertificate=searchParams.get('certificado');
  const scrolled=useRef('');
  useEffect(()=>{const target=selectedCertificate||id;if(query.data&&window.location.hash==='#certificaciones'&&scrolled.current!==target){(document.getElementById('certificado-'+selectedCertificate)||document.getElementById('certificaciones'))?.scrollIntoView({block:'start'});scrolled.current=target;}},[query.data,id,selectedCertificate]);
- const [kind,setKind]=useState<'PARCIAL'|'FINAL'|null>(null),[amounts,setAmounts]=useState<Record<string,string>>({}),[method,setMethod]=useState(''),[note,setNote]=useState(''),[signature,setSignature]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [capKind,setCapKind]=useState<'PARCIAL'|'FINAL'|null>(null),[capAmounts,setCapAmounts]=useState<Record<string,string>>({}),[capMethod,setCapMethod]=useState(''),[capNote,setCapNote]=useState(''),[signature,setSignature]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const lock=useRef(false),request=useRef<{id:string;body:string}|null>(null);
  const operator=currentUser?.rol==='OPERADOR'&&currentUser.actorId===manifest.operadorId&&!readOnly;
  const recovery=useCertificateCommand({userId:String(currentUser!.id),context:scope,manifestId:id},operator&&!training);
- const canRelease=operator&&!query.isError&&query.data?.enabled&&['EN_TRATAMIENTO','TRATADO'].includes(manifest.estado||'');
+ const draft=useCertificateDraft({userId:String(currentUser!.id),context:scope,manifestId:id},operator&&!training);
+ const [collapsed,setCollapsed]=useState(false),[discarding,setDiscarding]=useState(false);
+ const kind=training?capKind:draft.draft?.kind??null, amounts=training?capAmounts:draft.draft?.amounts??{}, method=training?capMethod:draft.draft?.method??'', note=training?capNote:draft.draft?.note??'';
+ const canEdit=training||draft.ready&&draft.ownership.status==='owned';
+ const setAmounts=(value:Record<string,string>)=>{setSignature('');if(training)setCapAmounts(value);else draft.update({amounts:value});};
+ const setMethod=(value:string)=>{setSignature('');if(training)setCapMethod(value);else draft.update({method:value});};
+ const setNote=(value:string)=>{setSignature('');if(training)setCapNote(value);else draft.update({note:value});};
+ const canRelease=operator&&!query.data?.documents.some(d=>d.documento.tipo==='FINAL')&&!query.isError&&query.data?.enabled&&['EN_TRATAMIENTO','TRATADO'].includes(manifest.estado||'');
+ const currentResidues=manifest.residuos||[];
+ const staleQuantities=!!kind&&(Object.keys(amounts).some(id=>!currentResidues.some(row=>row.id===id))||kind==='FINAL'&&currentResidues.some(row=>String(row.cantidadRecibida??'')!==amounts[row.id]));
+ function refreshQuantities(){setAmounts(Object.fromEntries(currentResidues.map(row=>[row.id,kind==='FINAL'?String(row.cantidadRecibida??''):amounts[row.id]||''])));}
  const final=query.data?.documents.some(d=>d.documento.tipo==='FINAL');
  function open(tipo:'PARCIAL'|'FINAL'){
-  setKind(tipo);setMethod((manifest as Partial<Manifiesto> & {tratamientoMetodo?:string}).tratamientoMetodo || '');setNote('');setAmounts(Object.fromEntries((manifest.residuos||[]).map(r=>[r.id,String(tipo==='FINAL'?(r.cantidadRecibida??''):Math.max(0,(r.cantidadRecibida??0)-(query.data?.documents.filter(d=>d.documento.tipo==='PARCIAL').flatMap(d=>d.documento.cantidades).filter(row=>row.residuoId===r.id).reduce((n,row)=>n+row.cantidad,0)??0))||'')])));setSignature('');setError('');
+  if(!canEdit||(!training&&!draft.canWrite()))return;
+  const value={kind:tipo,method:(manifest as Partial<Manifiesto> & {tratamientoMetodo?:string}).tratamientoMetodo||'',note:'',amounts:Object.fromEntries((manifest.residuos||[]).map(r=>[r.id,String(tipo==='FINAL'?(r.cantidadRecibida??''):Math.max(0,(r.cantidadRecibida??0)-(query.data?.documents.filter(d=>d.documento.tipo==='PARCIAL').flatMap(d=>d.documento.cantidades).filter(row=>row.residuoId===r.id).reduce((n,row)=>n+row.cantidad,0)??0))||'')]))};
+  if(training){setCapKind(tipo);setCapMethod(value.method);setCapNote('');setCapAmounts(value.amounts);}else void draft.replace(value);
+  setCollapsed(false);setSignature('');setError('');
  }
  async function release(e:React.FormEvent){
-  e.preventDefault();if(recovery.command||!recovery.ready||lock.current||!kind||!signature||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError)))return;lock.current=true;setBusy(true);setError('');
+  e.preventDefault();if(recovery.command||!recovery.ready||lock.current||!kind||!signature||staleQuantities||!canEdit||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError)))return;lock.current=true;setBusy(true);setError('');
   const body={tipo:kind,firma:signature,metodo:method,nota:note,cantidades:Object.entries(amounts).filter(([,v])=>v!=='').map(([residuoId,v])=>({residuoId,cantidad:Number(v)}))};
-  if(!training){await recovery.submit(body);lock.current=false;setBusy(false);return;}
+  if(!training){try{if(await draft.flush()&&draft.canWrite())await recovery.submit(body);}finally{lock.current=false;setBusy(false);}return;}
   const content=JSON.stringify(body);if(request.current?.body!==content)request.current={id:crypto.randomUUID(),body:content};
-  try{await api.post(endpoint,{id:request.current.id,...body});setKind(null);setSignature('');request.current=null;await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});await qc.invalidateQueries({queryKey:['training-tasks']});}
+  try{await api.post(endpoint,{id:request.current.id,...body});setCapKind(null);setSignature('');request.current=null;await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});await qc.invalidateQueries({queryKey:['training-tasks']});}
   catch(e:any){setError(e.response?.data?.message||'No se pudo liberar. Se conserva la carga para reintentar.');}
   finally{lock.current=false;setBusy(false);}
  }
@@ -64,29 +78,41 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
    })}</div>
    <ul className="space-y-2">{query.data?.documents.map((d,i)=><li key={d.id} id={`certificado-${d.id}`} data-certificate-id={d.id} className={`scroll-mt-32 rounded border p-3 ${selectedCertificate===d.id?'border-primary-400 bg-primary-50':'border-neutral-200'}`}><p className="font-semibold">{d.documento.tipo==='FINAL'?'Certificación final total':'Certificación parcial '+(i+1)} · Liberado</p><p className="text-xs text-neutral-600 break-words">{d.numero || manifest.numero} · {new Date(d.createdAt).toLocaleString('es-AR')}</p><p className="text-sm">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p><Button variant="outline" leftIcon={<Download size={16}/>} onClick={()=>void download(d)}>Descargar {d.documento.tipo==='FINAL'?'final':'parcial '+(i+1)}{training?' CAP':''}</Button></li>)}</ul>
   </>}
-  {canRelease&&recovery.ready&&!recovery.command&&!final&&!kind&&<div className="flex flex-wrap gap-2"><Button variant={manifest.estado==='TRATADO'&&unresolved===0?'outline':'primary'} onClick={()=>open('PARCIAL')}>Emitir certificación parcial</Button><Button disabled={manifest.estado!=='TRATADO'||unresolved!==0||checks.isError} onClick={()=>open('FINAL')}>Emitir certificación final total</Button></div>}
+  {canRelease&&canEdit&&recovery.ready&&!recovery.command&&!final&&!kind&&<div className="flex flex-wrap gap-2"><Button variant={manifest.estado==='TRATADO'&&unresolved===0?'outline':'primary'} onClick={()=>open('PARCIAL')}>Emitir certificación parcial</Button><Button disabled={manifest.estado!=='TRATADO'||unresolved!==0||checks.isError} onClick={()=>open('FINAL')}>Emitir certificación final total</Button></div>}
   {operator&&canRelease&&!final&&<p className="text-sm text-neutral-700">{manifest.estado!=='TRATADO'?'Para emitir la final total: cerrá el tratamiento cuando corresponda.':unresolved===null?'Comprobando revisiones antes de la certificación final…':unresolved>0?<>{unresolved} adenda(s) por resolver antes del final. <Link className="font-semibold text-primary-800 underline" to={mp(`/manifiestos/${id}/adendas`)}>Ver qué falta resolver</Link></>:'Todo listo para firmar la certificación final total.'}</p>}
   {checks.isError&&<p role="alert">No pudimos comprobar las adendas. <button onClick={()=>void checks.refetch()} className="underline">Reintentar</button></p>}
   {operator&&query.data&&!query.data.enabled&&<p className="text-sm">La emisión está deshabilitada. Los documentos emitidos siguen disponibles.</p>}
   {operator&&query.data?.enabled&&!canRelease&&!final&&<p className="text-sm">Primero: recepción → pesaje → tratamiento.</p>}
-  {kind&&!recovery.command&&<form onSubmit={release} className="space-y-3 border-t pt-3"><h3 className="font-semibold">{kind==='PARCIAL'?'Cantidad efectivamente tratada en este parcial':'Total tratado: incluye los parciales previos'}</h3>
+  {operator&&!training&&draft.ownership.status==='blocked'&&<div role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 space-y-2"><p>La certificación se está preparando en otra pestaña. Cerrala para continuar aquí con su borrador.</p><Button variant="outline" onClick={draft.ownership.retry}>Retomar edición aquí</Button></div>}
+  {operator&&!training&&draft.ownership.status==='unavailable'&&<div role="alert"><p>Este navegador no pudo proteger el borrador. Reintentá o usá un navegador actualizado.</p><Button variant="outline" onClick={draft.ownership.retry}>Reintentar protección</Button></div>}
+  {operator&&!training&&draft.ownership.status==='owned'&&!draft.ready&&<p role="status">Comprobando borrador… <Button variant="outline" onClick={()=>void draft.reload()}>Reintentar borrador</Button></p>}
+  {!training&&draft.error&&<div role="alert"><p>{draft.error}</p>{draft.ready&&<Button variant="outline" onClick={()=>void draft.flush()}>Reintentar guardado</Button>}</div>}
+  {kind&&canEdit&&!recovery.command&&!training&&<div className="max-w-[960px] rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-2">
+   <p role="status">{draft.saving?'Guardando borrador…':draft.error?'Borrador sin guardar':draft.restored?'Borrador recuperado en este dispositivo':'Borrador guardado en este dispositivo'}</p>
+   <p className="text-sm">Revisá las cantidades antes de firmar. La firma se pide de nuevo al reabrir; todavía no se emitió un documento.</p>
+   <div className="flex flex-wrap gap-2">{collapsed&&<Button onClick={()=>setCollapsed(false)}>Continuar borrador</Button>}<Button variant="ghost" disabled={busy||recovery.busy} onClick={()=>setDiscarding(true)}>Descartar borrador</Button></div>
+   {discarding&&<div className="space-y-2"><p>¿Descartar estas cantidades y observaciones guardadas? Los certificados emitidos se conservan.</p><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>setDiscarding(false)}>Conservar borrador</Button><Button disabled={busy||recovery.busy} onClick={()=>void draft.replace(null).then(ok=>{if(ok){setDiscarding(false);setSignature('');setCollapsed(false);}})}>Sí, descartar borrador</Button></div></div>}
+  </div>}
+  {kind&&!recovery.command&&final&&<p role="status">Ya existe una certificación final total. El borrador se conserva para consulta; no se puede emitir otro documento.</p>}
+  {kind&&canEdit&&!recovery.command&&staleQuantities&&<div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 space-y-2"><p>El pesaje o los residuos cambiaron desde este borrador. Revisá y actualizá las cantidades antes de firmar; conservamos método y observaciones.</p><Button variant="outline" onClick={refreshQuantities}>Actualizar cantidades del borrador</Button></div>}
+  {kind&&canEdit&&!collapsed&&!recovery.command&&<form onSubmit={release} className="max-w-[960px] space-y-3 border-t pt-3"><fieldset disabled={busy||recovery.busy} className="min-w-0 space-y-3"><h3 className="font-semibold">{kind==='PARCIAL'?'Cantidad efectivamente tratada en este parcial':'Total tratado: incluye los parciales previos'}</h3>
    {(manifest.residuos||[]).map(r=><Input key={r.id} label={`Cantidad a certificar ${r.tipoResiduo?.codigo||r.id} (${r.unidad})`} type="number" min="0.001" step="any" required={kind==='FINAL'} disabled={kind==='FINAL'} value={amounts[r.id]||''} onChange={e=>setAmounts({...amounts,[r.id]:e.target.value})} helperText={`Pesaje recibido: ${r.cantidadRecibida??'pendiente'} ${r.unidad}. En un parcial, dejá vacío lo que no se certifica.`}/>)}
    <p className="text-sm">Datos del manifiesto y pesaje ya incorporados. Revisá el método registrado y firmá.</p><Input label="Método de tratamiento certificado" required maxLength={200} value={method} onChange={e=>setMethod(e.target.value)}/>
    <Input label="Observaciones del certificado (opcional)" maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/>
    <p className="font-medium">Firma del operador</p>{signature?<div><img className="max-h-28" src={signature} alt="Firma del operador"/><Button type="button" variant="outline" onClick={()=>setSignature('')}>Volver a firmar</Button></div>:<SignaturePad onConfirm={setSignature}/>}
-   <div className="flex gap-2"><Button type="submit" disabled={busy||recovery.busy||!recovery.ready||!signature||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError))}>{busy?'Guardando...':'Firmar y publicar certificación'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>setKind(null)}>Cancelar</Button></div>
-  </form>}
+   <div className="flex flex-wrap gap-2"><Button type="submit" disabled={busy||recovery.busy||!recovery.ready||!signature||staleQuantities||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError))}>{busy?'Guardando...':'Firmar y publicar certificación'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>{if(training)setCapKind(null);else setCollapsed(true);}}>{training?'Cancelar':'Cerrar formulario'}</Button></div>
+  </fieldset></form>}
   {operator&&!training&&!recovery.ready&&<p role="status">Comprobando solicitudes guardadas… <Button variant="outline" onClick={()=>void recovery.reload()}>Reintentar copia local</Button></p>}
   {recovery.command&&<div className="rounded-lg border border-primary-200 bg-primary-50 p-3 space-y-3" aria-label="Recuperación de certificación">
    <p role="status" className="font-semibold">{recovery.command.status==='confirmed'?'Certificación emitida':recovery.command.status==='withdrawn'?'Solicitud retirada sin emitir':'Emisión pendiente de confirmación'}</p>
    <p className="text-sm">{recovery.command.input.tipo==='FINAL'?'Final total':'Parcial'} · {recovery.command.input.cantidades.map(row=>{const r=manifest.residuos?.find(r=>r.id===row.residuoId);return (r?.tipoResiduo?.codigo||row.residuoId)+': '+row.cantidad+' '+(r?.unidad||'');}).join(' · ')}</p>
    <p className="text-sm">{recovery.command.status==='pending'?'Conservamos el contenido firmado. Reintentar usa la misma solicitud; no genera otro certificado. Comprobar resultado confirma la emisión o retira el envío para poder corregirlo.':recovery.command.status==='confirmed'?recovery.command.receipt?.numero:'Podés corregir los datos y volver a firmar. El envío anterior ya no podrá emitir.'}</p>
    <div className="flex flex-wrap gap-2">{recovery.command.status==='pending'?<>
-    <Button disabled={recovery.busy||!canRelease} onClick={()=>void recovery.retry()}>Reintentar misma emisión</Button>
-    <Button variant="outline" disabled={recovery.busy} onClick={()=>void recovery.recover()}>Comprobar resultado</Button>
-   </>:<Button disabled={recovery.busy} onClick={()=>void recovery.release(async saved=>{
-    if(saved.status==='withdrawn'){setKind(saved.input.tipo);setMethod(saved.input.metodo);setNote(saved.input.nota);setAmounts(Object.fromEntries(saved.input.cantidades.map(r=>[r.residuoId,String(r.cantidad)])));setSignature('');}
-    else {setKind(null);setSignature('');await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});}
+    <Button disabled={recovery.busy||!canRelease||!canEdit} onClick={()=>void recovery.retry()}>Reintentar misma emisión</Button>
+    <Button variant="outline" disabled={recovery.busy||!canEdit} onClick={()=>void recovery.recover()}>Comprobar resultado</Button>
+   </>:<Button disabled={recovery.busy||!canEdit} onClick={()=>void recovery.release(async saved=>{
+    await draft.finish(saved);setCollapsed(false);setSignature('');
+    if(saved.status==='confirmed'){await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});}
    })}>{recovery.command.status==='confirmed'?'Continuar con certificados':'Corregir y volver a firmar'}</Button>}</div>
   </div>}
   {recovery.error&&<p role="alert">{recovery.error}</p>}
