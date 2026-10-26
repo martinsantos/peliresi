@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, it, vi } from 'vitest';
 const records = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('../../services/supportCommandStore', () => ({ readSupportCommandRecord: async (key: string) => records.get(key) || null, updateSupportCommandRecord: async (key: string, update: (value: unknown) => unknown) => { const next = update(records.get(key) || null); if (next) records.set(key, next); else records.delete(key); return next; } }));
-const calls = vi.hoisted(() => ({ access: vi.fn(), list: vi.fn(), get: vi.fn(), create: vi.fn(), team: vi.fn(), act: vi.fn() }));
+const calls = vi.hoisted(() => ({ access: vi.fn(), list: vi.fn(), get: vi.fn(), create: vi.fn(), team: vi.fn(), act: vi.fn(), recoverAction: vi.fn() }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', nombre: 'QA', rol: 'OPERADOR' } }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
 vi.mock('../../services/support.service', () => ({ supportService: calls, supportError: () => 'Error de prueba' }));
@@ -220,4 +220,26 @@ it.each(['RESPONDER', 'NOTA'])('recovers an uncertain %s in the real ticket comp
   fireEvent.click(screen.getByRole('button', { name: 'Reintentar mismo envío', exact: true }));
   await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
   expect(calls.act.mock.calls[1]).toEqual(calls.act.mock.calls[0]);
+});
+
+it.each(['RESPONDER', 'NOTA'])('restores a rejected %s and lets its attachment be removed before a new action', async action => {
+  openDetail(); await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
+  if (action === 'NOTA') fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  const label = action === 'NOTA' ? 'Nota interna / motivo' : 'Mensaje o resolución';
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'Texto conservado tras rechazo del archivo' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['invalid'], 'rechazado.pdf', { type: 'application/pdf' })] } });
+  calls.act.mockRejectedValueOnce({ response: { status: 400, data: { message: 'Archivo inválido' } } });
+  calls.recoverAction.mockResolvedValueOnce({ id: ticket.id, version: 1, status: 'rejected', replay: false });
+  fireEvent.click(screen.getByRole('button', { name: action === 'NOTA' ? 'Guardar nota interna' : 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Comprobar y corregir envío' })).toBeEnabled());
+  expect(screen.getByLabelText(label)).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Comprobar y corregir envío' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Actualizar ticket y recuperar contenido' }));
+  await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
+  expect(screen.getByLabelText(label)).toHaveValue('Texto conservado tras rechazo del archivo');
+  fireEvent.click(screen.getByRole('button', { name: 'Quitar rechazado.pdf' }));
+  expect(screen.queryByText('rechazado.pdf', { exact: true })).toBeNull(); expect(calls.act).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: action === 'NOTA' ? 'Guardar nota interna' : 'Enviar respuesta', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  expect(calls.act.mock.calls[1][2]).toEqual([]); expect(calls.act.mock.calls[1][3]).not.toEqual(calls.act.mock.calls[0][3]);
 });

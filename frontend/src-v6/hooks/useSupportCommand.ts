@@ -69,6 +69,26 @@ export function useSupportCommand(scope: SupportCommandScope) {
     } catch (failure) { if (active()) setError('No se envió esta solicitud: ' + message(failure)); }
     finally { inFlight.current = false; if (alive.current) setBusy(false); }
   };
+  const recover = async () => {
+    if (inFlight.current || !ready || !active()) return;
+    inFlight.current = true; generation.current += 1; setBusy(true); setError('');
+    try {
+      const saved = await loadSupportCommand(scope);
+      if (!active()) return;
+      setCommand(saved);
+      if (!saved || saved.status !== 'pending') return;
+      const result = await supportService.recoverAction(scope.ticketId, saved.key);
+      if (result.id !== scope.ticketId || !Number.isSafeInteger(result.version) || !['confirmed', 'rejected'].includes(result.status)) {
+        throw new Error('No pudimos verificar el resultado. Conservamos el envío sin cambios.');
+      }
+      const resolved = result.status === 'confirmed'
+        ? await confirmSupportCommand(scope, saved.key, result)
+        : await rejectSupportCommand(scope, saved.key, 'El servidor retiró este envío. Podés corregir el texto y los archivos.');
+      if (active()) setCommand(resolved);
+      announce();
+    } catch (failure) { if (active()) setError(message(failure)); }
+    finally { inFlight.current = false; if (alive.current) setBusy(false); }
+  };
   const release = async (beforeRelease: (saved: SupportCommand) => Promise<void>) => {
     if (inFlight.current || !active() || !command || command.status === 'pending') return;
     inFlight.current = true; generation.current += 1; setBusy(true); setError('');
@@ -82,5 +102,5 @@ export function useSupportCommand(scope: SupportCommandScope) {
     } catch (failure) { if (active()) setError(message(failure)); }
     finally { inFlight.current = false; if (alive.current) setBusy(false); }
   };
-  return { command, ready, busy, error, reload, submit: run, retry: () => run(), release };
+  return { command, ready, busy, error, reload, submit: run, retry: () => run(), recover, release };
 }

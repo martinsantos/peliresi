@@ -41,12 +41,12 @@ try {
   // Client deliberately ignores the first receipt, then repeats its original bytes/key.
   const replay = await send(key, body); assert.equal(replay.status, 200); assert.equal(replay.json.data.replay, true);
   const conflict = await send(key, body + ' distinto'); assert.equal(conflict.status, 409); assert.equal(conflict.json.code, undefined);
-  const stale = await send(randomUUID(), body + ' nueva acción desactualizada'); assert.equal(stale.status, 409); assert.equal(stale.json.code, 'SUPPORT_ACTION_NOT_APPLIED');
+  const stale = await send(randomUUID(), body + ' nueva acción desactualizada'); assert.equal(stale.status, 409); assert.equal(stale.json.code, undefined);
   const after = { manifests: await db.manifiesto.count(), messages: await db.mensajeSoporte.count({ where: { ticketId } }), events: await db.eventoSoporte.count({ where: { ticketId } }), notices: await db.notificacion.count() };
   assert.equal(after.manifests, before.manifests); assert.equal(after.messages, before.messages + 1); assert.equal(after.events, before.events + 1); assert.equal(after.notices, before.notices);
   const entry = await db.mensajeSoporte.findFirstOrThrow({ where: { ticketId, cuerpo: body }, include: { adjuntos: true } }); assert.equal(entry.interno, true); assert.equal(entry.adjuntos.length, 1); assert.equal(entry.adjuntos[0].bytes, image.length);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0); assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
-  const result = { at: new Date().toISOString(), ticketId, key, before, after, replay: true, hashConflictRetained: true, staleExplicitlyRejected: true, emails: 0, push: false };
+  const result = { at: new Date().toISOString(), ticketId, key, before, after, replay: true, hashConflictRetained: true, staleNeedsReconciliation: true, emails: 0, push: false };
   writeFileSync(process.env.QA_ARTIFACTS! + '/support-command-http.json', JSON.stringify(result, null, 2)); console.log(JSON.stringify(result));
   }
 } finally { await db.$disconnect(); }

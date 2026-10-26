@@ -9,6 +9,8 @@ import { describeSupportFile, discardSupportFiles, persistSupportFiles, resolveS
 const userSelect = { id: true, nombre: true, apellido: true } as const;
 const fileSelect = { id: true, nombre: true, mime: true, bytes: true, sha256: true } as const;
 const ticketInclude = { autor: { select: userSelect }, responsable: { select: userSelect }, registradoPor: { select: userSelect } } as const;
+// Technical receipt, never a ticket workflow transition or a conversation event.
+const WITHDRAWN_SEND = 'ENVIO_RETIRADO';
 type Db = Prisma.TransactionClient;
 async function staff(user: AuthRequest['user'], db: Db = prisma) {
   if (!user || user.restricted || user.activo === false) return false;
@@ -129,7 +131,7 @@ export async function obtenerTicket(req: AuthRequest, res: Response, next: NextF
     const [mensajes, eventos] = await Promise.all([
       prisma.mensajeSoporte.findMany({ where: { ticketId: ticket.id, ...(managing ? {} : { interno: false }) },
         include: { autor: { select: userSelect }, adjuntos: { select: fileSelect } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
-      prisma.eventoSoporte.findMany({ where: { ticketId: ticket.id, ...(managing ? {} : { interno: false }) },
+      prisma.eventoSoporte.findMany({ where: { ticketId: ticket.id, accion: { not: WITHDRAWN_SEND }, ...(managing ? {} : { interno: false }) },
         select: { id: true, accion: true, estadoAnterior: true, estadoNuevo: true, version: true, createdAt: true, responsableAnteriorId: true, responsableNuevoId: true,
           usuario: { select: userSelect }, detalle: managing }, orderBy: { version: 'asc' } }),
     ]);
@@ -182,10 +184,33 @@ export async function crearTicket(req: AuthRequest, res: Response, next: NextFun
   } catch (error) { next(error); }
   finally { if (!committed && stored.length) await discardSupportFiles(stored); }
 }
+/** Reconcile an uncertain send before editing. The tombstone shares the action
+ * lock and unique key, so an older request cannot commit after recovery. */
+export async function recuperarAccionTicket(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const clienteId = key(req);
+    await access(req);
+    const result = await prisma.$transaction(async db => {
+      await db.$queryRaw`SELECT id FROM tickets_soporte WHERE id = ${req.params.id} FOR UPDATE`;
+      const { ticket } = await access(req, db);
+      const previous = await db.eventoSoporte.findUnique({ where: { ticketId_usuarioId_clienteId: { ticketId: ticket.id, usuarioId: req.user.id, clienteId } } });
+      if (previous && previous.accion !== WITHDRAWN_SEND) {
+        return { id: ticket.id, version: previous.version, status: 'confirmed', replay: true };
+      }
+      if (!previous) await db.eventoSoporte.create({ data: {
+        ticketId: ticket.id, usuarioId: req.user.id, clienteId, huella: '', accion: WITHDRAWN_SEND,
+        estadoAnterior: ticket.estado, estadoNuevo: ticket.estado, version: ticket.version,
+        responsableAnteriorId: ticket.responsableId, responsableNuevoId: ticket.responsableId,
+        interno: true, detalle: { motivo: 'Recuperación solicitada por el autor del envío' },
+      } });
+      return { id: ticket.id, version: ticket.version, status: 'rejected', replay: !!previous };
+    });
+    res.json({ success: true, data: result });
+  } catch (error) { next(error); }
+}
 export async function accionarTicket(req: AuthRequest, res: Response, next: NextFunction) {
   let stored: SupportFile[] = [];
   let committed = false;
-  let absentUnderLock = false;
   try {
     const parsed = supportMutationInput.safeParse(inputBody(req));
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
@@ -203,8 +228,12 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
       await db.$queryRaw`SELECT id FROM tickets_soporte WHERE id = ${req.params.id} FOR UPDATE`;
       const { ticket, managing } = await access(req, db);
       const previous = await db.eventoSoporte.findUnique({ where: { ticketId_usuarioId_clienteId: { ticketId: ticket.id, usuarioId: req.user.id, clienteId } } });
-      if (previous) { checkHash(previous, huella); return { id: ticket.id, version: ticket.version, replay: true }; }
-      absentUnderLock = true;
+      if (previous?.accion === WITHDRAWN_SEND) {
+        const rejected = new AppError('Este envío se retiró para corregirlo. Recuperá el contenido antes de preparar otro.', 409);
+        rejected.code = 'SUPPORT_ACTION_NOT_APPLIED';
+        throw rejected;
+      }
+      if (previous) { checkHash(previous, huella); return { id: ticket.id, version: previous.version, replay: true }; }
       if (ticket.version !== input.version) throw new AppError('El ticket cambió. Actualizá antes de volver a actuar.', 409);
       const own = ticket.autorId === req.user.id;
       const assigned = managing && (ticket.responsableId === req.user.id || req.user.rol === 'ADMIN');
@@ -272,9 +301,8 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
     committed = !result.replay;
     res.json({ success: true, data: result });
   } catch (error) {
-    // Only a rolled-back transaction that checked this key under the ticket lock
-    // can prove absence. Auth failures, hash conflicts and uncertain 5xx cannot.
-    if (absentUnderLock && error instanceof AppError && error.statusCode !== undefined && error.statusCode >= 400 && error.statusCode < 500) error.code = 'SUPPORT_ACTION_NOT_APPLIED';
+    // Absence alone is not durable: another attempt may still be in flight.
+    // Only an existing withdrawal receipt proves this key cannot commit later.
     next(error);
   }
   finally { if (!committed && stored.length) await discardSupportFiles(stored); }

@@ -3,8 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { useSupportCommand } from '../../hooks/useSupportCommand';
 import { claimSupportCommand, confirmSupportCommand, loadSupportCommand, releaseSupportCommand, rejectSupportCommand, type SupportCommandInput } from '../../services/supportCommand';
 
-const mocks = vi.hoisted(() => ({ records: new Map<string, unknown>(), failWrite: false, gate: null as Promise<void> | null, act: vi.fn(), session: true, context: 'role-one' }));
-vi.mock('../../services/support.service', () => ({ supportService: { act: mocks.act } }));
+const mocks = vi.hoisted(() => ({ records: new Map<string, unknown>(), failWrite: false, gate: null as Promise<void> | null, act: vi.fn(), recover: vi.fn(), session: true, context: 'role-one' }));
+vi.mock('../../services/support.service', () => ({ supportService: { act: mocks.act, recoverAction: mocks.recover } }));
 vi.mock('../../utils/supportSession', () => ({ supportSessionMatches: () => mocks.session, supportRequestContext: () => mocks.context }));
 vi.mock('../../services/supportCommandStore', () => ({
   readSupportCommandRecord: async (key: string) => mocks.records.get(key) || null,
@@ -23,7 +23,7 @@ async function ready() {
   const hook = renderHook(() => useSupportCommand(scope));
   await waitFor(() => expect(hook.result.current.ready).toBe(true)); return hook;
 }
-beforeEach(() => { mocks.records.clear(); mocks.failWrite = false; mocks.gate = null; mocks.session = true; mocks.context = 'role-one'; mocks.act.mockReset().mockResolvedValue(receipt); });
+beforeEach(() => { mocks.records.clear(); mocks.failWrite = false; mocks.gate = null; mocks.session = true; mocks.context = 'role-one'; mocks.act.mockReset().mockResolvedValue(receipt); mocks.recover.mockReset().mockResolvedValue({ ...receipt, status: 'rejected' }); });
 it('does not send if the durable copy fails', async () => {
   const hook = await ready(); mocks.failWrite = true;
   await act(() => hook.result.current.submit(proposal()));
@@ -106,4 +106,38 @@ it('does not dispatch if activity changes for the same account before the stored
   mocks.gate = new Promise(resolve => { resume = resolve; }); let first!: Promise<void>;
   act(() => { first = hook.result.current.submit(proposal()); }); mocks.context = 'role-two';
   await act(async () => { resume(); await first; }); expect(mocks.act).not.toHaveBeenCalled();
+});
+
+it('recovers rejected files without retransmitting the multipart body', async () => {
+  mocks.act.mockRejectedValueOnce({ response: { status: 400, data: { message: 'Archivo no permitido' } } });
+  const hook = await ready(); await act(() => hook.result.current.submit(proposal()));
+  expect(hook.result.current.command?.status).toBe('pending');
+  await act(() => hook.result.current.recover());
+  expect(mocks.recover).toHaveBeenCalledWith('ticket', 'original');
+  expect(mocks.act).toHaveBeenCalledOnce();
+  expect(hook.result.current.command).toMatchObject({ status: 'rejected', input: proposal().input });
+  expect(hook.result.current.command?.files[0].name).toBe('prueba.pdf');
+  hook.unmount(); const reopened = await ready(); expect(reopened.result.current.command?.status).toBe('rejected');
+});
+it('shows confirmation instead of allowing edits when recovery discovers an applied action', async () => {
+  await claimSupportCommand(scope, proposal()); mocks.recover.mockResolvedValueOnce({ ...receipt, status: 'confirmed' });
+  const hook = await ready(); await act(() => hook.result.current.recover());
+  expect(hook.result.current.command?.status).toBe('confirmed'); expect(mocks.act).not.toHaveBeenCalled();
+});
+it('keeps uncertain content when recovery fails and retries the same recovery after reopening', async () => {
+  await claimSupportCommand(scope, proposal()); mocks.recover.mockRejectedValueOnce(new Error('timeout'));
+  const hook = await ready(); await act(() => hook.result.current.recover());
+  expect(hook.result.current.command?.status).toBe('pending'); hook.unmount();
+  const reopened = await ready(); await act(() => reopened.result.current.recover());
+  expect(mocks.recover.mock.calls).toEqual([['ticket', 'original'], ['ticket', 'original']]);
+  expect(reopened.result.current.command?.status).toBe('rejected');
+});
+it('does not unlock on a mismatched recovery receipt', async () => {
+  await claimSupportCommand(scope, proposal()); mocks.recover.mockResolvedValueOnce({ ...receipt, id: 'foreign', status: 'rejected' });
+  const hook = await ready(); await act(() => hook.result.current.recover());
+  expect(hook.result.current.command?.status).toBe('pending');
+});
+it('blocks recovery after the active account context changes', async () => {
+  await claimSupportCommand(scope, proposal()); const hook = await ready(); mocks.context = 'another';
+  await act(() => hook.result.current.recover()); expect(mocks.recover).not.toHaveBeenCalled();
 });
