@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ applications: [] as Array<Record<string, string>>, message: vi.fn(), resend: vi.fn(), restricted: true, logout: vi.fn() }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isRestricted: state.restricted, logout: state.logout }) }));
-vi.mock('../../components/ActorActivities', () => ({ default: () => null }));
+vi.mock('../../components/ActorActivities', () => ({ default: () => <h2>Acciones de inscripción</h2> }));
 vi.mock('../../hooks/useSolicitudes', () => ({
   useMisSolicitudes: () => ({ data: state.applications }),
   useMensajesSolicitud: () => ({ data: [] }),
@@ -96,4 +96,11 @@ it('updates the resend guard when another tab creates or resolves a pending file
   clearRegistrationDraft('candidate','public:GENERADOR:owned');fireEvent(window,new Event('focus'));
   expect(screen.getByRole('button',{name:'Responder y Re-enviar'})).toBeEnabled();
   expect(state.resend).not.toHaveBeenCalled();
+});
+
+it('places available new-application choices before the closed conversation after rejection',()=>{
+  vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED','true');state.applications=[{id:'closed',tipoActor:'GENERADOR',estado:'RECHAZADA'}];open();
+  const actions=screen.getByRole('heading',{name:'Acciones de inscripción'}),messages=screen.getByRole('heading',{name:'Mensajes'});
+  expect(actions.compareDocumentPosition(messages) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getAllByRole('heading',{name:'Acciones de inscripción'})).toHaveLength(1);
 });

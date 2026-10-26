@@ -72,9 +72,10 @@ function receivedState(value: unknown): value is ReceivedState {
 
 const InscripcionWizardPage: React.FC = () => {
   const { tipo } = useParams<{ tipo: string }>();
+  const [params] = useSearchParams();
   const labels: Record<string,string> = { generador: 'Generador', transportista: 'Transportista', operador: 'Operador' };
   const label = labels[tipo || ''];
-  return <RegistrationFrame title={label ? `Inscripción como ${label}` : 'Inscripción'}><InscripcionWizardContent /></RegistrationFrame>;
+  return <RegistrationFrame title={label ? `Inscripción como ${label}` : 'Inscripción'}><InscripcionWizardContent key={`${tipo}:${params.get('solicitud') || ''}:${params.get('modo') || ''}`} /></RegistrationFrame>;
 };
 
 const InscripcionWizardContent: React.FC = () => {
@@ -86,6 +87,8 @@ const InscripcionWizardContent: React.FC = () => {
   const isTransportista = tipo === 'transportista';
   const tipoActor: TipoActor = isGenerador ? 'GENERADOR' : isOperador ? 'OPERADOR' : 'TRANSPORTISTA';
   const isReviewMode = searchParams.get('modo') === 'revision';
+  const selectedApplication = searchParams.get('solicitud');
+  const recoveryDestination = `/inscripcion/${tipo}` + (selectedApplication ? '?solicitud=' + encodeURIComponent(selectedApplication) : '');
   const reviewFixture = isReviewMode ? getReviewFixture(tipoActor) : null;
   const steps = isGenerador ? STEPS_GENERADOR : isOperador ? STEPS_OPERADOR : STEPS_TRANSPORTISTA;
   const totalSteps = steps.length;
@@ -235,12 +238,15 @@ const InscripcionWizardContent: React.FC = () => {
     if (!hint && pending.owner !== registrationSessionOwner(token)) pending = {};
     if (hint) pending = { id: hint, tipoActor, step: pending.id === hint ? pending.step : 1 };
     if (pending.tipoActor !== tipoActor) pending = {};
-    if (!pending.id && !token) return undefined;
+    if (selectedApplication && token) pending = { id: selectedApplication, tipoActor, step: pending.id === selectedApplication ? pending.step : 1 };
+    if (!token) { if (selectedApplication) setResumeStatus('error'); return undefined; }
 
     let cancelled = false;
     setResumeStatus('loading');
     const accountAtStart = registrationSessionOwner(getAccessToken());
     const load = async () => {
+      // A URL selects a record, never grants access beyond a draft-only credential.
+      if (selectedApplication && (!/^[a-zA-Z0-9_-]{1,100}$/.test(selectedApplication) || (hint && hint !== selectedApplication))) throw new Error('Solicitud incompatible');
       if (!pending.id) {
         const response = await api.get('/solicitudes/mis-solicitudes');
         const candidates = response.data?.data?.solicitudes?.filter((item: { usuarioId: string; tipoActor: string }) => item.usuarioId === accountAtStart && item.tipoActor === tipoActor) || [];
@@ -309,7 +315,7 @@ const InscripcionWizardContent: React.FC = () => {
       if (!cancelled) setResumeStatus('error');
     });
     return () => { cancelled = true; };
-  }, [tipoActor, isReviewMode, resumeAttempt, totalSteps]);
+  }, [tipoActor, selectedApplication, isReviewMode, resumeAttempt, totalSteps]);
 
   // Persist the CURRENT step, not just a completed navigation. Only the account
   // validated by the server can read it back; passwords and file bytes never enter it.
@@ -799,8 +805,8 @@ const InscripcionWizardContent: React.FC = () => {
       return <div className="flex min-h-[60vh] items-center justify-center p-4">
         <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 text-center shadow-sm" role="alert">
           <h2 className="text-lg font-bold">No se pudo recuperar tu solicitud</h2>
-          <p className="mt-2 text-sm text-neutral-600">No se perdió el borrador. Revisá la conexión o iniciá sesión con la cuenta creada.</p>
-          {resumeStatus === 'error' && <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button><Button onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Iniciar sesión y recuperar</Button></div>}
+          <p className="mt-2 text-sm text-neutral-600">No pudimos abrir la solicitud elegida. Revisá la conexión o ingresá con la cuenta correspondiente; no abriremos otro trámite en su lugar.</p>
+          {resumeStatus === 'error' && <div className="mt-4 flex flex-wrap justify-center gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Reintentar</Button><Button onClick={() => navigate('/login', { state: { from: recoveryDestination } })}>Iniciar sesión y recuperar</Button></div>}
         </div>
       </div>;
     }
@@ -877,7 +883,7 @@ const InscripcionWizardContent: React.FC = () => {
             </summary>
             <div className="space-y-2 border-t border-amber-200 px-3 py-3 text-sm"><p className="whitespace-pre-wrap break-words">{observations}</p><p>Corregí lo solicitado y reenviá desde Resumen. Para agregar una respuesta, volvé a Mi solicitud.</p></div>
           </details>}
-          {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
+          {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: recoveryDestination } })}>Recuperar sesión</Button></div>}</div>}
           {validationError && validationError !== 'Recuperá o descartá los archivos pendientes antes de enviar.' && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
           {renderStepContent()}
         </div>

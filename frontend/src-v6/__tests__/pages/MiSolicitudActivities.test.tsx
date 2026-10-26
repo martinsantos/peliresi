@@ -72,3 +72,13 @@ for (const kind of ['message', 'reply'] as const) it.each([false, true])(`${kind
     expect(field()).toHaveValue('Texto nuevo todavía sin enviar');
   }
 });
+
+it('an unavailable linked application never silently displays a different owned request',()=>{
+  render(<MemoryRouter initialEntries={['/mi-solicitud?solicitud=missing']}><MiSolicitudPage/></MemoryRouter>);
+  expect(screen.getByRole('alert')).toHaveTextContent('No pudimos abrir la solicitud elegida con esta cuenta');
+  expect(screen.queryByText('Inscripción de Generador')).toBeNull();
+  expect(screen.queryByRole('button',{name:'Responder y Re-enviar'})).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Elegir otra solicitud'}));
+  expect(screen.getByText('Inscripción de Generador')).toBeVisible();
+  expect(requests.message).not.toHaveBeenCalled();expect(requests.resend).not.toHaveBeenCalled();
+});

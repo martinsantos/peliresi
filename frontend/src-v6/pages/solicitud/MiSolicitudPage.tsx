@@ -94,7 +94,8 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
 
   const { data: solicitudes, isLoading, isError, isFetching, refetch } = useMisSolicitudes();
   const [selectedId, setSelectedId] = useState('');
-  const solicitud = (solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
+  const requestedId = params.get('solicitud');
+  const solicitud = (requestedId ? solicitudes?.find(s => s.id === requestedId) : solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
   const missingFiles = solicitud ? pendingRegistrationFiles(solicitud.usuarioId, solicitud.tipoActor, solicitud.id) : [];
   const feedback = feedbackById[solicitud?.id || ''] || '';
   const setFeedback = (text: string) => { if (solicitud) setFeedbackById(previous => ({ ...previous, [solicitud.id]: text })); };
@@ -115,7 +116,6 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
   const setReplyText = (value: React.SetStateAction<string>) => updateConversation('reply', value);
   const setMessageText = (value: React.SetStateAction<string>) => updateConversation('message', value);
   useEffect(() => { if (!selectedId && solicitud) setSelectedId(solicitud.id); }, [selectedId, solicitud?.id]);
-  const requestedId = params.get('solicitud');
   useEffect(() => {
     if (!requestedId || requestedId === selectedId || !solicitudes?.some(s => s.id === requestedId)) return;
     setSelectedId(requestedId);
@@ -198,6 +198,11 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
     );
   }
 
+  if (!solicitud && requestedId) {
+    if (isFetching) return <FormSkeleton label="Buscando la solicitud elegida…" />;
+    return <Card><div role="alert" className="space-y-3"><p>No pudimos abrir la solicitud elegida con esta cuenta.</p><p className="text-sm text-neutral-600">Revisá el enlace o elegí otro de tus trámites.</p><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void refetch()}>Reintentar</Button><Button onClick={() => { setSelectedId(''); setParams({}, { replace: true }); }}>Elegir otra solicitud</Button></div></div></Card>;
+  }
+
   if (!solicitud) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -239,7 +244,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
           </select>
         </div>}
       </>}
-      {solicitud.estado === 'BORRADOR' && <Card><p className="mb-3 text-neutral-700">Completá los datos y documentos para enviar tu inscripción a revisión.</p><Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>Continuar borrador</Button></Card>}
+      {solicitud.estado === 'BORRADOR' && <Card><p className="mb-3 text-neutral-700">Completá los datos y documentos para enviar tu inscripción a revisión.</p><Button onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase() + '?solicitud=' + encodeURIComponent(solicitud.id))}>Continuar borrador</Button></Card>}
       {(solicitud.estado === 'ENVIADA' || solicitud.estado === 'EN_REVISION') && <Card><p className="font-semibold text-neutral-900">Administración revisa tu solicitud</p><p className="mt-2 text-neutral-700">{solicitud.estado === 'ENVIADA' ? 'Recibimos tu presentación. Te avisaremos cuando haya una decisión o algo que corregir.' : 'Tu presentación está en revisión. Te avisaremos si necesitás completar algo.'}</p><p className="mt-2 text-sm text-neutral-600">No hace falta volver a enviarla. Podés consultar a administración en Mensajes.</p></Card>}
 
       {feedback && <p role="status" className="rounded-xl border border-primary-200 bg-primary-50 p-4 text-primary-950">{feedback}</p>}
@@ -262,7 +267,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
                   {solicitud.observaciones || 'El administrador ha dejado observaciones. Revisa los mensajes y responde para continuar.'}
                 </p>
               </div>
-              <Button variant="primary" size="sm" leftIcon={<FileText size={16} />} onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase())}>
+              <Button variant="primary" size="sm" leftIcon={<FileText size={16} />} onClick={() => navigate('/inscripcion/' + solicitud.tipoActor.toLowerCase() + '?solicitud=' + encodeURIComponent(solicitud.id))}>
                 Corregir datos y documentos
               </Button>
               <div>
@@ -311,16 +316,18 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
         <Card className="!border-red-300 !bg-red-50">
           <div className="flex items-start gap-3">
             <XCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
-            <div className="space-y-2">
+            <div className="min-w-0 flex-1 space-y-2">
               <p className="font-semibold text-red-800">Tu solicitud fue rechazada</p>
               {solicitud.motivoRechazo && (
-                <p className="text-sm text-red-700">Motivo: {solicitud.motivoRechazo}</p>
+                <p className="whitespace-pre-wrap break-words text-sm text-red-700">Motivo: {solicitud.motivoRechazo}</p>
               )}
-              <p className="text-sm text-red-700">Este trámite finalizó. Conservás el resultado y sus mensajes. Para evaluar otra presentación, consultá a administración por los canales habituales.</p>
+              <p className="text-sm text-red-700">Trámite cerrado. Conservás el resultado y los mensajes.{import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' ? ' Nueva solicitud inicia otro expediente; no modifica éste.' : ' Para otra presentación, consultá a administración.'}</p>
             </div>
           </div>
         </Card>
       )}
+
+      {solicitud.estado === 'RECHAZADA' && import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities mode="request" />}
 
       {/* Messages Thread */}
       <Card padding="none">
@@ -394,7 +401,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
         </div>
         )}
       </Card>
-      {import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities mode="request" />}
+      {solicitud.estado !== 'RECHAZADA' && import.meta.env.VITE_ACTOR_MULTIROLE_ENABLED === 'true' && <ActorActivities mode="request" />}
     </div>
   );
 };

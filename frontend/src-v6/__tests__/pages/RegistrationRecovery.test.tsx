@@ -14,8 +14,8 @@ function session(owner: string) { return `qa.${btoa(JSON.stringify({ id: owner, 
 function request(owner = 'owner') { return { data: { data: { solicitud: { id: 'draft', usuarioId: owner, tipoActor: 'GENERADOR', estado: 'BORRADOR', datosActor: '{}', updatedAt: revision,
   usuario: { nombre: 'QA responsable', cuit: '30-70987654-3', email: 'qa@night-qa.invalid' }, documentos: [] } } } }; }
 function ReturnReceipt() { const location = useLocation(); return <p>Solicitud recuperada {location.search}</p>; }
-async function open(type = 'generador', prefix = '') {
-  await act(async () => { render(<MemoryRouter initialEntries={[`${prefix}/inscripcion/${type}`]}><Routes><Route path={`${prefix}/inscripcion/:tipo`} element={<InscripcionWizardPage />} /><Route path="/mi-solicitud" element={<ReturnReceipt />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
+async function open(type = 'generador', prefix = '', query = '') {
+  await act(async () => { render(<MemoryRouter initialEntries={[`${prefix}/inscripcion/${type}${query}`]}><Routes><Route path={`${prefix}/inscripcion/:tipo`} element={<InscripcionWizardPage />} /><Route path="/mi-solicitud" element={<ReturnReceipt />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); queryClient.clear(); mock.token = session('owner'); mock.canWrite.mockReturnValue(true);
@@ -383,4 +383,44 @@ describe('a failed replacement remains pending after closing the application', (
     expect(screen.queryByText('Recuperá o descartá los archivos pendientes antes de enviar.')).toBeNull();
     expect(screen.queryByText(/Hay archivos pendientes de recuperar/)).toBeNull();
   });
+});
+
+
+describe('explicit application selection', () => {
+  it.each(['generador','transportista','operador'].flatMap(type => ['', '/app'].map(prefix => [type,prefix])))('%s %s opens the selected application instead of an old local receipt', async (type,prefix) => {
+    mock.token=`qa.${btoa(JSON.stringify({id:'owner',restricted:true}))}.qa`;
+    localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({id:'old',owner:'owner',tipoActor:type.toUpperCase(),step:1}));
+    const selected=request(); selected.data.data.solicitud.id='selected'; selected.data.data.solicitud.tipoActor=type.toUpperCase(); selected.data.data.solicitud.datosActor=JSON.stringify({razonSocial:'Solicitud elegida QA',domicilio:'QA 123'});
+    mock.get.mockImplementation(async path => {
+      if(path==='/solicitudes/selected')return selected;
+      const old=request(); old.data.data.solicitud.id='old';old.data.data.solicitud.tipoActor=type.toUpperCase(); old.data.data.solicitud.estado='RECHAZADA';return old;
+    });
+    await open(type,prefix,'?solicitud=selected');
+    expect(await screen.findByLabelText('Razon Social *')).toHaveValue('Solicitud elegida QA');
+    expect(mock.get).toHaveBeenCalledWith('/solicitudes/selected');
+    expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/old');
+    expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('does not let a query parameter widen a draft-only credential', async () => {
+    await open('generador','','?solicitud=other');
+    expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/other');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No se pudo recuperar/);
+    expect(screen.queryByLabelText('Razon Social *')).toBeNull();
+  });
+  it('does not replace an unavailable selected application with another draft', async () => {
+    mock.token=`qa.${btoa(JSON.stringify({id:'owner',restricted:true}))}.qa`;
+    mock.get.mockRejectedValue(new Error('not available'));
+    await open('generador','','?solicitud=missing');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No se pudo recuperar/);
+    expect(mock.get).toHaveBeenCalledWith('/solicitudes/missing');
+    expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/mis-solicitudes');
+  });
+});
+
+it('an explicit application link without a session offers recovery, not a duplicate account', async () => {
+  mock.token=''; await open('generador','','?solicitud=selected');
+  expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos abrir la solicitud elegida');
+  expect(screen.queryByRole('button',{name:'Crear cuenta'})).toBeNull();
+  expect(screen.getByRole('button',{name:'Iniciar sesión y recuperar'})).toBeEnabled();
+  expect(mock.post).not.toHaveBeenCalled();
 });

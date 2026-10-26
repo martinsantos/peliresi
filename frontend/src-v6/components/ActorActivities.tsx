@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { solicitudService } from '../services/solicitud.service';
 import type { SolicitudInscripcion } from '../types/api';
 import { useNavigate } from 'react-router-dom';
@@ -20,6 +20,7 @@ function ActivityChoices({ mode }: { mode: 'switch' | 'request' }) {
   const { currentUser, isRestricted } = useAuth();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
+  const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const lock = useRef(false);
   const applications = useQuery({ queryKey: ['actor-activity-applications', currentUser?.id],
@@ -36,15 +37,16 @@ function ActivityChoices({ mode }: { mode: 'switch' | 'request' }) {
         window.location.replace((window.location.pathname.startsWith('/app/') ? '/app' : '') + mp('/mi-perfil'));
       } else if (application) {
         navigate(['BORRADOR', 'OBSERVADA'].includes(application.estado)
-          ? '/inscripcion/' + type.toLowerCase()
+          ? '/inscripcion/' + type.toLowerCase() + '?solicitud=' + encodeURIComponent(application.id)
           : mp('/mi-solicitud') + '?solicitud=' + encodeURIComponent(application.id));
       } else {
         const result = await api.post('/solicitudes/actividad-adicional', { tipoActor: type });
         const draft = result.data.data.solicitud;
         if (!draft?.id || draft.usuarioId !== currentUser.id) throw new Error('Solicitud incompatible');
-        // Existing wizard discovers the user's own draft; no identity or form is replaced.
+        await Promise.all([queryClient.invalidateQueries({ queryKey: ['solicitudes', 'mis'] }), queryClient.invalidateQueries({ queryKey: ['actor-activity-applications', currentUser.id] })]);
+        // Open exactly the draft returned by the server; never a remembered receipt.
         navigate(['BORRADOR', 'OBSERVADA'].includes(draft.estado)
-          ? '/inscripcion/' + type.toLowerCase()
+          ? '/inscripcion/' + type.toLowerCase() + '?solicitud=' + encodeURIComponent(draft.id)
           : mp('/mi-solicitud') + '?solicitud=' + encodeURIComponent(draft.id));
       }
     } catch (caught) {
@@ -54,12 +56,14 @@ function ActivityChoices({ mode }: { mode: 'switch' | 'request' }) {
   }
   const choices = (Object.keys(labels) as Array<keyof typeof labels>).filter(type => mode !== 'request' || (!activities.includes(type) && !applications.data?.some(item => item.tipoActor === type && item.estado !== 'RECHAZADA')));
   if (mode === 'request' && applications.isSuccess && !choices.length) return null;
-  return <Card><h2 className="font-semibold mb-3">{mode === 'request' ? 'Sumar otra actividad' : 'Roles de mi cuenta'}</h2><p className="mb-3 text-sm text-neutral-600">{mode === 'request' ? 'Con la misma cuenta y CUIT. Cada actividad requiere aprobación.' : 'Elegí el rol con el que vas a trabajar.'}</p>
+  const repeatApplication = mode === 'request' && choices.some(type => applications.data?.some(item => item.tipoActor === type && item.estado === 'RECHAZADA'));
+  return <Card><h2 className="font-semibold mb-3">{mode === 'request' ? repeatApplication ? 'Iniciar otra solicitud' : 'Sumar otra actividad' : 'Roles de mi cuenta'}</h2><p className="mb-3 text-sm text-neutral-600">{mode === 'request' ? 'Con la misma cuenta y CUIT. Cada actividad requiere aprobación.' : 'Elegí el rol con el que vas a trabajar.'}</p>
     <div className="flex flex-wrap gap-2">{choices.map(type => {
       const approved = activities.includes(type);
       const inUse = !isRestricted && currentUser.rol === type;
       const application = applications.data?.find(item => item.tipoActor === type && item.estado !== 'RECHAZADA');
-      const action = application ? (['BORRADOR', 'OBSERVADA'].includes(application.estado) ? 'Continuar ' : 'Ver solicitud de ') : 'Solicitar ';
+      const rejected = applications.data?.some(item => item.tipoActor === type && item.estado === 'RECHAZADA');
+      const action = application ? (['BORRADOR', 'OBSERVADA'].includes(application.estado) ? 'Continuar ' : 'Ver solicitud de ') : rejected ? 'Nueva solicitud de ' : 'Solicitar ';
       return <Button key={type} variant="outline" disabled={busy || inUse || (!approved && !applications.isSuccess)}
         onClick={() => void choose(type, approved, application)}>{inUse ? labels[type] + ' · En uso' : approved ? 'Usar ' + labels[type] : action + labels[type]}</Button>;
     })}</div>
