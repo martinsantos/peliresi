@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { generadorFiscalService, operadorFiscalService, type PagoTEF, type DeclaracionJurada } from '../services/generador-fiscal.service';
 import { refreshActorDocuments, useActorDocuments } from './useActorDocuments';
@@ -9,10 +10,11 @@ const KEYS = {
 
 // ===== PAGOS TEF =====
 export function usePagosTEF(generadorId: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.pagos(generadorId),
+    queryKey: [...KEYS.pagos(generadorId), owner],
     queryFn: () => generadorFiscalService.getPagos(generadorId),
-    enabled: !!generadorId,
+    enabled: Boolean(owner && generadorId),
   });
 }
 
@@ -45,10 +47,11 @@ export function useDeletePago() {
 
 // ===== DDJJ =====
 export function useDDJJ(generadorId: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.ddjj(generadorId),
+    queryKey: [...KEYS.ddjj(generadorId), owner],
     queryFn: () => generadorFiscalService.getDDJJ(generadorId),
-    enabled: !!generadorId,
+    enabled: Boolean(owner && generadorId),
   });
 }
 
@@ -121,10 +124,11 @@ const OP_KEYS = {
 };
 
 export function useOperadorPagosTEF(operadorId: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: OP_KEYS.pagos(operadorId),
+    queryKey: [...OP_KEYS.pagos(operadorId), owner],
     queryFn: () => operadorFiscalService.getPagos(operadorId),
-    enabled: !!operadorId,
+    enabled: Boolean(owner && operadorId),
   });
 }
 
@@ -156,10 +160,11 @@ export function useDeleteOperadorPago() {
 }
 
 export function useOperadorDDJJ(operadorId: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: OP_KEYS.ddjj(operadorId),
+    queryKey: [...OP_KEYS.ddjj(operadorId), owner],
     queryFn: () => operadorFiscalService.getDDJJ(operadorId),
-    enabled: !!operadorId,
+    enabled: Boolean(owner && operadorId),
   });
 }
 

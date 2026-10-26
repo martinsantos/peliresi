@@ -1,5 +1,6 @@
+import { useQueryOwner } from './useQueryOwner';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { useAuth, type User } from '../contexts/AuthContext';
+import type { User } from '../contexts/AuthContext';
 import { companyCacheScope } from '../services/companyContext';
 import { generadorFiscalService, operadorFiscalService, transportistaDocumentoService } from '../services/generador-fiscal.service';
 
@@ -21,10 +22,10 @@ export function actorDocumentScope(user: User | null) {
 
 /** Certificates and attachments are two views of the same authenticated response. */
 export function useActorDocuments(type: DocumentActorType, actorId: string) {
-  const { currentUser } = useAuth();
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: [...actorDocumentsKey(type, actorId), ...actorDocumentScope(currentUser)],
-    enabled: Boolean(currentUser?.id && actorId),
+    queryKey: [...actorDocumentsKey(type, actorId), owner],
+    enabled: Boolean(owner && actorId),
     retry: false,
     queryFn: () => {
       if (type === 'GENERADOR') return generadorFiscalService.getDocumentos(actorId);
