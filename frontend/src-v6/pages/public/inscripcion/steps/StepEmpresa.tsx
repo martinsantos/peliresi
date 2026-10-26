@@ -294,7 +294,7 @@ function renderTransportistaStep(
       </div>
     );
     case 2: return <div className="space-y-4"><SectionTitle icon={Shield} title="Habilitacion y Datos DPA" /><TransportAuthorizationFields form={form} up={up} /></div>;
-    case 3: return fleet;
+    case 3: return <div className="space-y-4"><SectionTitle icon={Truck} title="Choferes y vehículos" />{fleet}</div>;
     default: return null;
   }
 }

@@ -19,8 +19,8 @@ Objetivos de las sesiones: al menos 90% de tareas sin intervención, facilidad m
 | 0 | Rutas, roles, estados, referencia visual y defectos | Referencia operativa registrada; inventario del resto continúa en sus tandas |
 | 1 | Inicio, creación G/T/O, aprobaciones, coordinación, retiro, viajes/relevos, recepción, adenda, tratamiento, certificados | Primer corte implementado y probado en preview. Sesión humana y controles pendientes abajo; no cerrada |
 | 2 | Padrones, altas, fichas, renovación, ATM/electricidad, documentos, multirol, representantes | En curso: altas G/T/O, observación/corrección, ATM, OCR, tres actividades y cupo de dos personas probados en preview. Recuperación y errores corregidos; cobertura restante y sesiones humanas pendientes |
-| 3 | Inspecciones, plazos, requerimientos desde Avisos, Monitor y campo | Pendiente; actores sin módulo de Inspecciones |
-| 4 | Campana, alertas, correos simulados, enlaces, PDFs, reportes y manual | Pendiente; ningún envío real |
+| 3 | Inspecciones, plazos, requerimientos desde Avisos, Monitor y campo | En curso: contexto, avisos, recuperación de actuaciones/campo y frescura del Monitor tienen evidencia en las continuaciones; barrido integral, Android y sesiones pendientes |
+| 4 | Campana, alertas, correos simulados, enlaces, PDFs, reportes y manual | En curso: aislamiento de bandeja, avisos de actividades/altas, enlaces y Reportes documentados; inventario integral y sesiones pendientes. Ningún envío real |
 
 ## Matriz inicial de superficies
 
@@ -150,6 +150,8 @@ Continuación de altas y documentos (`uiux-admission-documents-20261025`):
 
 | UX92 | Media | Evaluación de un operador prioriza corrientesControl si coexisten campos de otras actividades | Usar exclusivamente el campo de corrientes del rol del trámite | Corregido; regresiones web/app aprobadas |
 | UX93 | Alta | Corrección de magnitudes no actualiza una simulación abierta y puede mezclar corrientes nuevas con números anteriores | Elegir explícitamente declaración actualizada o conservar una simulación anterior identificada | Corregido; regresiones y recorrido real web/app aprobados |
+
+| UX94 | Media | Siguiente cambia el alta pero deja foco al final; Tab salta fuera de los campos nuevos | Foco en el título de la etapa al navegar, validación en su campo y escritura sin interrupción | Corregido; seis regresiones y teclado G/T/O en web/app comprobados |
 
 Directorio de esta ejecución: `uiux-integral-20261025` dentro del workspace de evidencias del hilo. `baseline/` conserva capturas anteriores a los cambios; `verified/` contiene resultados comprobados. No reutilizar una captura histórica como prueba actual.
 
@@ -697,3 +699,15 @@ Recorrido real del preview: simulación local de 130 HP frente a declaración ar
 Diez medidas DOM con ancho efectivo confirmado: 320, 393, 768, 1365 y 1920 px por superficie. Sin desborde de página; los dos controles nuevos miden al menos 44 px de alto. Capturas revisadas y preservadas en `uiux-onboarding-recheck-20261025`, junto con resultados de pruebas y restauración. El manual incluye el paso Retomar la evaluación administrativa y una captura real; texto e imagen servidos en preview. No se afirma validación de toda la accesibilidad ni de todas las facturas eléctricas.
 
 Auditoría final 26/10 01:43 UTC: 526 manifiestos, cero correos intentados o enviados, CAP cerrado, correos/push apagados y dos procesos normales. Sin producción, main, workflows, migraciones ni datos reales. La conciliación normativa de la fórmula TEF sigue pendiente y se informa en pantalla; esta simulación no liquida ni acredita pagos. Android físico, participantes y el resto del plan integral permanecen pendientes; se continúa sin esperar participantes.
+
+## Continuación: orientación por teclado en altas — 25/10/2026
+
+Sobre `48e75816`, sólo preview. UX94 reproducido en navegador: al activar Siguiente, Datos Regulatorios aparecía pero el foco seguía en Siguiente; Tab llegaba al cuerpo de la página en vez de a los campos nuevos. La navegación explícita confirmada ahora enfoca el h2 de la etapa, con indicador visible y tabindex negativo, sin agregar una parada al tabulador. Escribir, consultar de nuevo o guardar sin cambiar de etapa no mueve el foco. Un cambio de etapa cuyo guardado falla conserva la etapa y lo escrito. Transporte incorpora el título Choferes y vehículos sobre sus dos grupos existentes.
+
+Referencia inicial: seis fallos de foco, uno por G/T/O y superficie; otros 49 casos aprobados. Final: 56 pruebas únicas en cuatro archivos aprobadas, incluidos guardado rechazado, recuperación, autoridades, práctica y flota. Tipos y builds web/app aprobados en QA remoto existente con 1 CPU, 2 GiB, swap cero y un worker. No se suman a las 56 pruebas TEF del corte anterior como si fueran casos nuevos de esa suite.
+
+Navegador: seis recorridos G/T/O × web/app con Enter y Tab; título de la etapa enfocado y siguiente Tab en el primer campo. Regreso comprobado en web y escritura sin cambio de foco en app. Flota comprobada en ambas superficies y diez anchos efectivos 320/393/768/1365/1920: sin desborde de página ni encabezado cortado; capturas conservadas. Estas pulsaciones usan los formularios reales del preview en modo prueba sin envío, no crean cuentas ni solicitudes. Ese modo permite recorrer etapas incompletas; un intento de comprobar allí el bloqueo por razón social vacía no acredita validación de envío. Se restauró el nombre artificial. Las validaciones del circuito autenticado y el rechazo del guardado se comprueban en las regresiones automatizadas; no se declara un alta completa nueva mediante UI en este corte.
+
+Manual actualizado con Recorrer las etapas con teclado y captura directa; texto e imagen comprobados servidos en preview. Se corrigió además la tabla general de cobertura: inspecciones y comunicaciones estaban descritas como Pendiente pese a las continuaciones técnicas ya documentadas; ambas quedan En curso, con sus límites explícitos. Evidencias en `uiux-onboarding-recheck-20261025` (registration-focus, final-registration-focus y manual-registration-keyboard). Consolas consultadas sin errores/advertencias.
+
+Auditoría final 26/10 01:56 UTC: 526 manifiestos, cero correos intentados o enviados, CAP cerrado y correos/push apagados. Sin producción, main, workflows, migraciones ni datos reales. El foco y la estructura semántica comprobados no equivalen a una sesión con lector de pantalla; ampliación de texto, Android físico, participantes y barrido integral siguen pendientes.

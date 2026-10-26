@@ -14,6 +14,16 @@ function Navigation() {
   return <><button onClick={() => go('/inscripcion/operador?modo=revision')}>Cambiar a operador QA</button><button onClick={() => go('/inscripcion/generador?modo=revision')}>Volver a generador QA</button><InscripcionWizardPage /></>;
 }
 describe('trial recovery is visible and isolated from real registration', () => {
+  it('orients the transport fleet stage with a focused heading without creating an extra tab stop', async () => {
+    await open('transportista');
+    fireEvent.click(screen.getByRole('button', { name: /^Paso 3 de 5:/ }));
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Choferes y vehículos' });
+    expect(heading).toHaveFocus(); expect(heading).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('heading', { name: 'Choferes', level: 3 })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Vehículos', level: 3 })).toBeVisible();
+    expect(requests.post).not.toHaveBeenCalled(); expect(requests.put).not.toHaveBeenCalled();
+  });
+
   it.each(['generador', 'operador', 'transportista'])('%s keeps help contextual without hiding save or local storage truth', async type => {
     await open(type);
     const help = screen.getByRole('button', { name: 'Información del modo prueba', exact: true });

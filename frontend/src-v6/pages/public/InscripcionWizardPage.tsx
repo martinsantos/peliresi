@@ -106,6 +106,7 @@ const InscripcionWizardContent: React.FC = () => {
   const [step, setStep] = useState(isReviewMode ? Math.min(totalSteps, Math.max(1, Number(trialInitial?.data.step) || 1)) : 1);
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const validationRef = useRegistrationValidationFocus(attempted);
+  const focusStep = useRef<number | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [observations, setObservations] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>(() => trialInitial?.data.form && typeof trialInitial.data.form === 'object'
@@ -173,6 +174,14 @@ const InscripcionWizardContent: React.FC = () => {
     activeStepRef.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' });
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [tipo, phase, step, submitSuccess]);
+
+  // Only a successful, explicit stage change moves keyboard focus. Refetches,
+  // draft recovery and autosaves must not interrupt the field being edited.
+  useEffect(() => {
+    if (focusStep.current !== step) return;
+    focusStep.current = null;
+    validationRef.current?.querySelector<HTMLElement>('h2[tabindex="-1"]')?.focus();
+  }, [step, validationRef]);
 
   const up = useCallback((field: string, value: string) => {
     setValidationError(null);
@@ -417,14 +426,14 @@ const InscripcionWizardContent: React.FC = () => {
       return;
     }
     if (isReviewMode) {
-      if (persistTrial(target)) setStep(target);
+      if (persistTrial(target)) { focusStep.current = target; setStep(target); }
       return;
     }
     if (!solicitudId) {
       setSaveError('No hay una solicitud activa. Volvé al inicio del alta para crearla.');
       return;
     }
-    if (await persistDraft(target)) setStep(target);
+    if (await persistDraft(target)) { focusStep.current = target; setStep(target); }
   };
 
   const goNext = () => { if (step < totalSteps) void goStep(step + 1); };

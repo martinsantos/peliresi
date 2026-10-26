@@ -13,8 +13,8 @@ const revision = '2026-10-09T10:00:00.000Z';
 function session(owner: string) { return `qa.${btoa(JSON.stringify({ id: owner, restricted: true, registrationDraft: 'draft' }))}.qa`; }
 function request(owner = 'owner') { return { data: { data: { solicitud: { id: 'draft', usuarioId: owner, tipoActor: 'GENERADOR', estado: 'BORRADOR', datosActor: '{}', updatedAt: revision,
   usuario: { nombre: 'QA responsable', cuit: '30-70987654-3', email: 'qa@night-qa.invalid' }, documentos: [] } } } }; }
-async function open(type = 'generador') {
-  await act(async () => { render(<MemoryRouter initialEntries={[`/inscripcion/${type}`]}><Routes><Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
+async function open(type = 'generador', prefix = '') {
+  await act(async () => { render(<MemoryRouter initialEntries={[`${prefix}/inscripcion/${type}`]}><Routes><Route path={`${prefix}/inscripcion/:tipo`} element={<InscripcionWizardPage />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); queryClient.clear(); mock.token = session('owner'); mock.canWrite.mockReturnValue(true);
@@ -27,6 +27,37 @@ beforeEach(() => {
 afterEach(() => { cleanup(); queryClient.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('a real registration UI protects the current step and account boundary', () => {
+  it.each(['generador', 'transportista', 'operador'].flatMap(type => ['', '/app'].map(prefix => [type, prefix])))('%s %s focuses the opened stage, keeps typing and manual saves in place, and returns predictably', async (type, prefix) => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA continuidad', domicilio: 'QA 123' });
+    mock.get.mockResolvedValue(response);
+    await open(type, prefix);
+    const next = screen.getByRole('button', { name: 'Siguiente', exact: true }); next.focus();
+    fireEvent.click(next);
+    const title = await screen.findByRole('heading', { level: 2, name: type === 'transportista' ? 'Habilitacion y Datos DPA' : 'Datos Regulatorios' });
+    await waitFor(() => expect(title).toHaveFocus());
+    expect(title).toHaveAttribute('tabindex', '-1');
+    const field = document.querySelector<HTMLInputElement>('input');
+    expect(field).not.toBeNull(); field!.focus(); fireEvent.change(field!, { target: { value: 'QA dato mantenido' } });
+    expect(field).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador', exact: true }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Borrador guardado en SITREP'));
+    expect(field).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Anterior', exact: true }));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: type === 'transportista' ? 'Datos del Transportista' : 'Datos del Establecimiento' })).toHaveFocus());
+    expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA continuidad');
+    expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('does not move to another stage or refocus its heading after a rejected save', async () => {
+    const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA continuidad', domicilio: 'QA 123' }); mock.get.mockResolvedValue(response);
+    mock.put.mockRejectedValue(new Error('QA disconnected'));
+    await open();
+    const next = screen.getByRole('button', { name: 'Siguiente', exact: true }); next.focus(); fireEvent.click(next);
+    await screen.findByText(/No se confirmó el guardado en SITREP/);
+    expect(next).toHaveFocus(); expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA continuidad');
+    expect(screen.queryByRole('heading', { name: 'Datos Regulatorios' })).toBeNull();
+  });
+
   it.each(['generador', 'transportista', 'operador'])('%s reopens a confirmed save without declaring or resending identical fields as pending', async type => {
     const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
     response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA alta', domicilio: 'QA 123' });
