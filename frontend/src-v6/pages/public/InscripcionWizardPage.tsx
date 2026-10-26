@@ -132,6 +132,7 @@ const InscripcionWizardContent: React.FC = () => {
   const serverRevisionRef = useRef<string | null>(null);
   const [localSaved, setLocalSaved] = useState(Boolean(trialInitial));
   const [localConflict, setLocalConflict] = useState<Record<string, string> | null>(null);
+  const pendingFilesNotice = useRef<HTMLDivElement>(null);
   const [missingLocalFiles, setMissingLocalFiles] = useState<string[]>(Array.isArray(trialInitial?.data.files) ? trialInitial.data.files.filter(item => typeof item === 'string') as string[] : []);
   const editRevision = useRef(0);
   const submitInFlight = useRef(false);
@@ -316,7 +317,7 @@ const InscripcionWizardContent: React.FC = () => {
     if (isReviewMode || submitSuccess || !owner || !solicitudId || localConflict || !ownership.canWrite()) return;
     if (registrationSessionOwner(getAccessToken()) !== owner) return;
     setLocalSaved(writeRegistrationDraft(owner, draftScope, {
-      form, step, serverRevision, files: [...new Set([...Object.keys(adjuntos), ...missingLocalFiles])].filter(type => !uploadedDocs[type]),
+      form, step, serverRevision, files: [...new Set([...Object.keys(adjuntos), ...missingLocalFiles])],
     }));
   }, [isReviewMode, submitSuccess, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
 
@@ -352,6 +353,12 @@ const InscripcionWizardContent: React.FC = () => {
   // ========================================
 
   const docStepNumber = isGenerador ? 6 : isOperador ? 7 : 4;
+  useEffect(() => {
+    if (step === docStepNumber && attempted.has(step) && missingLocalFiles.length) {
+      pendingFilesNotice.current?.focus();
+      pendingFilesNotice.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
+  }, [attempted, step, docStepNumber]);
 
   const getStepErrors = (s: number): string[] => {
     if (isReviewMode) return [];
@@ -370,6 +377,7 @@ const InscripcionWizardContent: React.FC = () => {
     }
     if (isTransportista && s === 3) errs.push(...fleetErrors(vehicles, drivers));
     if (s === docStepNumber) {
+      if (missingLocalFiles.length) errs.push('Recuperá o descartá los archivos pendientes antes de enviar.');
       if (requirementsStatus !== 'loaded') {
         errs.push('No se pudieron verificar los requisitos documentales vigentes');
       } else {
@@ -516,7 +524,8 @@ const InscripcionWizardContent: React.FC = () => {
     if (uploadsInFlight.current.has(tipo)) return;
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     const uploaded = uploadedDocs[tipo];
-    if (adjuntos[tipo] && uploaded) {
+    if ((adjuntos[tipo] || missingLocalFiles.includes(tipo)) && uploaded) {
+      setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
       setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
       return;
@@ -543,7 +552,7 @@ const InscripcionWizardContent: React.FC = () => {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo eliminar el archivo guardado.') }));
     } finally { uploadsInFlight.current.delete(tipo); }
-  }, [isReviewMode, solicitudId, uploadedDocs, adjuntos, assertDraftSession]);
+  }, [isReviewMode, solicitudId, uploadedDocs, adjuntos, missingLocalFiles, assertDraftSession]);
 
   // Submit
   const handleDownloadFile = async (tipo: string) => {
@@ -616,7 +625,7 @@ const InscripcionWizardContent: React.FC = () => {
       if (errs.length > 0) {
         setAttempted(prev => new Set(prev).add(s));
         setValidationError(s !== 1 && s !== 3 ? errs.join('. ') : null);
-        setStep(s);
+        focusStep.current = s; setStep(s);
         return;
       }
     }
@@ -684,6 +693,7 @@ const InscripcionWizardContent: React.FC = () => {
 
   const documentStep = <StepDocumentos
     reviewMode={isReviewMode}
+    missingFiles={missingLocalFiles}
     docs={[...requirements, ...licenseRequirements]}
     previewAnalyses={previewAnalyses}
     adjuntos={adjuntos}
@@ -711,19 +721,19 @@ const InscripcionWizardContent: React.FC = () => {
       if (step <= 4) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
       if (step === 5) return <StepActividad form={form} up={up} isOperador={false} />;
       if (step === 6) return documentStep;
-      if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 7) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} missingFiles={missingLocalFiles} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isOperador) {
       if (step <= 5) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} />;
       if (step === 6) return <StepActividad form={form} up={up} isOperador />;
       if (step === 7) return documentStep;
-      if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 8) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} missingFiles={missingLocalFiles} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     } else if (isTransportista) {
       if (step <= 3) return <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista}
         fleet={<><RegistrationFleetFields vehicles={vehicles} drivers={drivers} onVehicles={rows => up('vehiculosJson', JSON.stringify(rows))} onDrivers={rows => up('choferesJson', JSON.stringify(rows))} attempted={attempted.has(3)} onLicense={handleLicense}
           documents={Object.fromEntries(drivers.flatMap(driver => { const type = licenseDocumentType(driver.key), file = adjuntos[type], saved = uploadedDocs[type]; return file || saved ? [[driver.key, { name: file?.name || saved.nombre, status: saved ? 'Guardado en la solicitud' : isReviewMode ? 'Archivo de prueba · sólo en esta sesión' : 'Pendiente de guardar', error: uploadErrors[type] }]] : []; }))} />
         {(form.vehiculosDesc || form.choferesDesc) && <details className="mt-4"><summary className="min-h-11 cursor-pointer py-2 font-semibold text-neutral-800">Información previa en texto · conservada</summary><p className="whitespace-pre-wrap break-words text-sm text-neutral-700">{form.vehiculosDesc}\n{form.choferesDesc}</p></details>}</>} />;
       if (step === 4) return documentStep;
-      if (step === 5) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
+      if (step === 5) return <StepResumen reg={reg} form={form} adjuntos={adjuntos} uploadedDocs={uploadedDocs} missingFiles={missingLocalFiles} tipoActor={tipoActor} isGenerador={isGenerador} isOperador={isOperador} isTransportista={isTransportista} regError={regError} />;
     }
     return null;
   };
@@ -852,7 +862,13 @@ const InscripcionWizardContent: React.FC = () => {
           {!isReviewMode && ownership.status === 'blocked' && <div role="alert" className="mb-4 text-sm text-error-800">Este borrador está abierto en otra pestaña. No se sobrescribirá.<Button variant="outline" className="ml-2" onClick={ownership.retry}>Reintentar edición</Button></div>}
           {!isReviewMode && ownership.status === 'unavailable' && <p role="alert" className="mb-4 text-sm text-error-800">El navegador no pudo proteger el borrador frente a otra pestaña. Los datos siguen en pantalla; no se guardará una edición sin proteger.</p>}
           {localConflict && <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p>El borrador de SITREP cambió desde tu copia local. Elegí qué conservar; no mezclamos ni sobrescribimos automáticamente.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setForm(localConflict); setLocalConflict(null); setDirty(true); editRevision.current++; }}>Recuperar mis cambios locales</Button><Button variant="outline" onClick={() => { clearRegistrationDraft(owner!, draftScope); setLocalConflict(null); }}>Conservar versión de SITREP</Button></div></div>}
-          {missingLocalFiles.length > 0 && <p role="alert" className="mb-4 text-sm text-amber-900">{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : `Hay archivos que no llegaron a guardarse: ${missingLocalFiles.join(', ')}. Volvé a seleccionarlos en Documentos. Los originales ya guardados se recuperan.`}</p>}
+          {missingLocalFiles.length > 0 && <div ref={pendingFilesNotice} tabIndex={-1} role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <p>{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : 'Hay archivos pendientes de recuperar. Volvé a seleccionarlos en Documentos o descartá esa selección antes de enviar.'}</p>
+            {!isReviewMode && <ul className="mt-2 space-y-2">{missingLocalFiles.map(type => {
+              const name = [...requirements, ...licenseRequirements].find(doc => doc.tipo === type)?.nombre || type.replace(/_/g, ' ');
+              return <li key={type} className="flex flex-wrap items-center justify-between gap-2"><span>{name}</span><Button variant="outline" size="sm" disabled={saving || submitting} aria-label={uploadedDocs[type] ? `Conservar original de ${name}` : `Descartar selección pendiente de ${name}`} onClick={() => setMissingLocalFiles(previous => previous.filter(item => item !== type))}>{uploadedDocs[type] ? 'Conservar original' : 'Descartar selección pendiente'}</Button></li>;
+            })}</ul>}
+          </div>}
           {observations && <details className="group mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
             <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 [&::-webkit-details-marker]:hidden">
               <AlertCircle size={18} aria-hidden="true" className="shrink-0"/>
@@ -862,7 +878,7 @@ const InscripcionWizardContent: React.FC = () => {
             <div className="space-y-2 border-t border-amber-200 px-3 py-3 text-sm"><p className="whitespace-pre-wrap break-words">{observations}</p><p>Corregí lo solicitado y reenviá desde Resumen. Para agregar una respuesta, volvé a Mi solicitud.</p></div>
           </details>}
           {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
-          {validationError && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
+          {validationError && validationError !== 'Recuperá o descartá los archivos pendientes antes de enviar.' && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
           {renderStepContent()}
         </div>
 

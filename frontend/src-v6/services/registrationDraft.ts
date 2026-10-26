@@ -49,3 +49,11 @@ export function restoreRegistrationForm<T extends object>(initial: T, saved: unk
   }
   return restored;
 }
+
+
+/** Pending file bytes live only in the picker; never silently substitute a stored original. */
+export function pendingRegistrationFiles(owner: string, actorType: string, applicationId: string): string[] {
+  if (!owner || !actorType || !applicationId) return [];
+  const files = readRegistrationDraft(owner, `public:${actorType}:${applicationId}`)?.data.files;
+  return Array.isArray(files) ? [...new Set(files.filter((file): file is string => typeof file === 'string' && !!file))] : [];
+}

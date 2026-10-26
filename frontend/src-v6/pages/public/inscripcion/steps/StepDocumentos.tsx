@@ -13,6 +13,7 @@ import type { ReceiptAnalysis } from '../../../../types/documentAnalysis';
 
 interface StepDocumentosProps {
   reviewMode?: boolean;
+  missingFiles?: string[];
   docs: DocDef[];
   adjuntos: Record<string, File>;
   uploadedDocs: Record<string, DocumentoSolicitud>;
@@ -30,6 +31,7 @@ interface StepDocumentosProps {
 
 export const StepDocumentos: React.FC<StepDocumentosProps> = ({
   reviewMode = false,
+  missingFiles = [],
   docs,
   adjuntos,
   uploadedDocs,
@@ -96,7 +98,8 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           const attached = uploaded || pendingFile;
           const isBusy = state === 'uploading' || state === 'deleting' || state === 'reading' || state === 'downloading';
           const rejected = uploaded?.estado === 'RECHAZADO';
-          const approved = uploaded?.estado === 'APROBADO' && !pendingFile;
+          const missing = missingFiles.includes(doc.tipo);
+          const approved = uploaded?.estado === 'APROBADO' && !pendingFile && !missing;
           return (
             <div key={doc.tipo} data-testid={`registration-document-${doc.tipo}`} className={`rounded-xl border p-3 transition-colors ${state === 'error' || rejected ? 'border-error-200 bg-error-50/60' : approved ? 'border-emerald-200 bg-emerald-50/60' : 'border-neutral-200 bg-neutral-50'}`}>
               <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
@@ -109,7 +112,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                   {attached && (
                     <div className={`text-xs ${approved ? 'text-emerald-700' : 'text-neutral-600'}`}>
                       <p className="truncate" title={pendingFile?.name || uploaded?.nombre}>{pendingFile?.name || uploaded?.nombre}</p>
-                      <p>{((pendingFile?.size || uploaded?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : pendingFile ? (reviewMode ? 'Seleccionado para revisión' : 'Pendiente') : `Guardado · ${registrationDocumentReviewLabel(uploaded?.estado)}`}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
+                      <p>{((pendingFile?.size || uploaded?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : pendingFile ? (reviewMode ? 'Seleccionado para revisión' : 'Pendiente') : missing ? 'Original guardado · selección pendiente de recuperar' : `Guardado · ${registrationDocumentReviewLabel(uploaded?.estado)}`}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
                       {pendingFile && uploaded && <p className="text-neutral-700">Reemplazo pendiente. El original {uploaded.nombre} sigue guardado hasta confirmar la nueva carga.</p>}
                     </div>
                   )}
@@ -119,7 +122,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                 <div className="flex shrink-0 flex-wrap items-center justify-end">
                 {uploaded && <button type="button" disabled={isBusy} aria-label={`Reemplazar ${doc.nombre}`} onClick={() => triggerFileInput(doc.tipo)} className="min-h-11 rounded-lg px-2 text-sm font-semibold text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-40">Reemplazar</button>}
                 {uploaded && onDownloadFile && <button type="button" disabled={isBusy} aria-label={`Descargar ${uploaded.nombre}`} onClick={() => void onDownloadFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 disabled:opacity-40"><Download size={16} aria-hidden="true" /></button>}
-                <button type="button" disabled={isBusy} aria-label={pendingFile && uploaded ? `Descartar selección pendiente de ${doc.nombre}` : `Eliminar ${doc.nombre}`} onClick={() => void onRemoveFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-error-500 transition-colors hover:bg-error-100 disabled:opacity-40">
+                <button type="button" disabled={isBusy} aria-label={(pendingFile || missing) && uploaded ? `Descartar selección pendiente de ${doc.nombre}` : `Eliminar ${doc.nombre}`} onClick={() => void onRemoveFile(doc.tipo)} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-error-500 transition-colors hover:bg-error-100 disabled:opacity-40">
                   <X size={16} />
                 </button>
                 </div>

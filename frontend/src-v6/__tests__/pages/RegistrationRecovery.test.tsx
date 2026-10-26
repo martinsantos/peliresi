@@ -344,3 +344,43 @@ it.each(['generador','transportista','operador'].flatMap(type=>['', '/app'].map(
 it.each(['null','[]','true'])('ignores malformed local hint %s without breaking recovery',async value=>{
  localStorage.setItem('sitrep_pending_solicitud',value);await open();expect(screen.getByLabelText('Razon Social *')).toBeVisible();expect(mock.put).not.toHaveBeenCalled();
 });
+
+
+describe('a failed replacement remains pending after closing the application', () => {
+  it.each(['generador', 'operador', 'transportista'].flatMap(type => ['', '/app'].map(prefix => [type, prefix])))('%s %s keeps a failed replacement marker even with a saved original', async (type, prefix) => {
+    const response = request();
+    response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA reemplazo', domicilio: 'QA 123', _sitrepDraftStep: type === 'generador' ? 6 : type === 'operador' ? 7 : 4 });
+    Object.assign(response.data.data.solicitud, { documentos: [{ id: 'original', tipo: 'COMPROBANTE_PAGO', nombre: 'original.pdf', size: 100, estado: 'APROBADO' }] });
+    mock.get.mockResolvedValue(response); mock.requirements.mockResolvedValue({ documentos: [{ tipo: 'COMPROBANTE_PAGO', nombre: 'Comprobante ATM', required: false }], maxBytes: 10485760 });
+    mock.upload.mockRejectedValue(new Error('QA upload interrupted'));
+    await open(type, prefix);
+    fireEvent.click(screen.getByRole('button', { name: 'Reemplazar Comprobante ATM' }));
+    fireEvent.change(screen.getByLabelText('Adjuntar Comprobante ATM'), { target: { files: [new File(['replacement'], 'nuevo.pdf', { type: 'application/pdf' })] } });
+    await screen.findByText('QA upload interrupted');
+    await waitFor(() => expect(readRegistrationDraft('owner', `public:${type.toUpperCase()}:draft`)?.data.files).toEqual(['COMPROBANTE_PAGO']));
+    cleanup(); await open(type, prefix);
+    expect(screen.getByText(/Hay archivos pendientes de recuperar/)).toBeVisible();
+    expect(screen.getByTestId('registration-document-COMPROBANTE_PAGO')).not.toHaveTextContent('Documento aprobado');
+    expect(screen.getByTestId('registration-document-COMPROBANTE_PAGO')).toHaveTextContent('Original guardado');
+    fireEvent.click(screen.getByRole('button', { name: 'Conservar original de Comprobante ATM' }));
+    await waitFor(() => expect(readRegistrationDraft('owner', `public:${type.toUpperCase()}:draft`)?.data.files).toEqual([]));
+    expect(screen.queryByText(/Hay archivos pendientes de recuperar/)).toBeNull();
+    expect(mock.post).not.toHaveBeenCalled();
+    expect(mock.upload).toHaveBeenCalledOnce();
+  });
+  it('prevents submitting an optional missing replacement even if the saved original meets requirements', async () => {
+    const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial:'QA', domicilio:'QA', coordenadas:'-32.9, -68.8', _sitrepDraftStep:7 });
+    Object.assign(response.data.data.solicitud,{ documentos:[{id:'original',tipo:'FACTURA_ELECTRICA',nombre:'original.pdf',size:100,estado:'APROBADO'}] });
+    mock.get.mockResolvedValue(response);
+    writeRegistrationDraft('owner','public:GENERADOR:draft',{form:{razonSocial:'QA',domicilio:'QA',coordenadas:'-32.9, -68.8'},serverRevision:revision,step:7,files:['FACTURA_ELECTRICA']});
+    await open(); fireEvent.click(screen.getByRole('button',{name:'Enviar solicitud',exact:true}));
+    await waitFor(()=>expect(screen.getByRole('heading',{name:'Documentos',exact:true})).toBeVisible());
+    expect(screen.getByText(/Hay archivos pendientes de recuperar/).closest('[role="alert"]')).toHaveFocus();
+    expect(mock.post).not.toHaveBeenCalled(); expect(mock.put).not.toHaveBeenCalled();
+    expect(readRegistrationDraft('owner','public:GENERADOR:draft')?.data.files).toEqual(['FACTURA_ELECTRICA']);
+    fireEvent.click(screen.getByRole('button',{name:'Conservar original de FACTURA ELECTRICA'}));
+    expect(screen.queryByText('Recuperá o descartá los archivos pendientes antes de enviar.')).toBeNull();
+    expect(screen.queryByText(/Hay archivos pendientes de recuperar/)).toBeNull();
+  });
+});

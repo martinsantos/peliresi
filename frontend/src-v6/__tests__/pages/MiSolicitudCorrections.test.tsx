@@ -1,3 +1,4 @@
+import { clearRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -65,4 +66,34 @@ it.each(['Generador','Transportista','Operador'])('an empty account may start %s
   fireEvent.click(screen.getByRole('button',{name:role,exact:true}));
   expect(screen.getByText('Destino: /inscripcion/'+role.toLowerCase())).toBeVisible();
   expect(state.message).not.toHaveBeenCalled();
+});
+
+
+it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('%s does not resend from Mi solicitud with an unresolved local attachment', type => {
+  state.applications=[{id:'owned',usuarioId:'candidate',tipoActor:type,estado:'OBSERVADA'}];
+  writeRegistrationDraft('candidate',`public:${type}:owned`,{files:['COMPROBANTE_PAGO']}); open();
+  fireEvent.change(screen.getByLabelText('Tu respuesta'),{target:{value:'Corregí los documentos.'}});
+  expect(screen.getByText(/Hay archivos pendientes de recuperar/)).toBeVisible();
+  expect(screen.getByRole('button',{name:'Responder y Re-enviar'})).toBeDisabled();
+  expect(state.message).not.toHaveBeenCalled(); expect(state.resend).not.toHaveBeenCalled();
+});
+
+
+it('does not block this application with a pending file belonging to another role or person', () => {
+  state.applications=[{id:'owned',usuarioId:'candidate',tipoActor:'GENERADOR',estado:'OBSERVADA'}];
+  writeRegistrationDraft('other','public:GENERADOR:owned',{files:['COMPROBANTE_PAGO']});
+  writeRegistrationDraft('candidate','public:OPERADOR:owned',{files:['COMPROBANTE_PAGO']}); open();
+  fireEvent.change(screen.getByLabelText('Tu respuesta'),{target:{value:'Corrección revisada.'}});
+  expect(screen.queryByText(/Hay archivos pendientes de recuperar/)).toBeNull();
+  expect(screen.getByRole('button',{name:'Responder y Re-enviar'})).toBeEnabled();
+});
+it('updates the resend guard when another tab creates or resolves a pending file', () => {
+  state.applications=[{id:'owned',usuarioId:'candidate',tipoActor:'GENERADOR',estado:'OBSERVADA'}];open();
+  fireEvent.change(screen.getByLabelText('Tu respuesta'),{target:{value:'Corrección revisada.'}});
+  writeRegistrationDraft('candidate','public:GENERADOR:owned',{files:['COMPROBANTE_PAGO']});
+  fireEvent(window,new StorageEvent('storage'));
+  expect(screen.getByRole('button',{name:'Responder y Re-enviar'})).toBeDisabled();
+  clearRegistrationDraft('candidate','public:GENERADOR:owned');fireEvent(window,new Event('focus'));
+  expect(screen.getByRole('button',{name:'Responder y Re-enviar'})).toBeEnabled();
+  expect(state.resend).not.toHaveBeenCalled();
 });

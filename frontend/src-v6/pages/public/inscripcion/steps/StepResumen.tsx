@@ -11,6 +11,7 @@ import { registrationDocumentReviewLabel } from '../../../../utils/registrationD
 import { RegistrationFleetSummary } from '../../../../components/registration/RegistrationFleetSummary';
 
 interface StepResumenProps {
+  missingFiles?: string[];
   reg: RegistrationData;
   form: Record<string, string>;
   adjuntos: Record<string, File>;
@@ -23,6 +24,7 @@ interface StepResumenProps {
 }
 
 export const StepResumen: React.FC<StepResumenProps> = ({
+  missingFiles = [],
   reg,
   form,
   adjuntos,
@@ -172,13 +174,14 @@ export const StepResumen: React.FC<StepResumenProps> = ({
   }
 
   // Show the selected replacement without transferring the original's approval to it.
-  const documentTypes = [...new Set([...Object.keys(uploadedDocs), ...Object.keys(adjuntos)])];
+  const documentTypes = [...new Set([...Object.keys(uploadedDocs), ...Object.keys(adjuntos), ...missingFiles])];
   if (documentTypes.length > 0) {
     sections.push({
       label: 'Documentos adjuntos',
       fields: documentTypes.map(tipo => {
         const original = uploadedDocs[tipo];
         const pending = adjuntos[tipo];
+        if (missingFiles.includes(tipo)) return { label: tipo.replace(/_/g, ' '), value: `Selección pendiente de recuperar${original ? `; el original ${original.nombre} sigue guardado.` : '; volvé a adjuntar el archivo.'}` };
         const file = pending || { name: original.nombre, size: original.size };
         const status = pending
           ? original ? `Reemplazo pendiente; el original ${original.nombre} sigue guardado.` : 'Pendiente de carga'

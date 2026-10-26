@@ -25,6 +25,7 @@ import { useAdmissionContext } from '../../hooks/useAdmissionContext';
 import { useRecoverableForm } from '../../hooks/useRecoverableForm';
 import { DraftConflictNotice } from '../../components/DraftConflictNotice';
 import { getApiErrorMessage } from '../../utils/api-error';
+import { pendingRegistrationFiles } from '../../services/registrationDraft';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ── Status config ──
@@ -65,6 +66,12 @@ const MiSolicitudPage: React.FC = () => {
 const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
   const navigate = useNavigate();
   const { isRestricted, logout } = useAuth();
+  const [, refreshFileState] = useState(0);
+  useEffect(() => {
+    const refresh = () => refreshFileState(value => value + 1);
+    window.addEventListener('storage', refresh); window.addEventListener('focus', refresh);
+    return () => { window.removeEventListener('storage', refresh); window.removeEventListener('focus', refresh); };
+  }, []);
   const [entering, setEntering] = useState(false);
   const [entryError, setEntryError] = useState<string | null>(null);
   const enterSystem = async () => {
@@ -88,6 +95,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
   const { data: solicitudes, isLoading, isError, isFetching, refetch } = useMisSolicitudes();
   const [selectedId, setSelectedId] = useState('');
   const solicitud = (solicitudes?.find(s => s.id === selectedId) || solicitudes?.[0]) as SolicitudInscripcion | undefined;
+  const missingFiles = solicitud ? pendingRegistrationFiles(solicitud.usuarioId, solicitud.tipoActor, solicitud.id) : [];
   const feedback = feedbackById[solicitud?.id || ''] || '';
   const setFeedback = (text: string) => { if (solicitud) setFeedbackById(previous => ({ ...previous, [solicitud.id]: text })); };
   const replyText = conversations[solicitud?.id || '']?.reply || '';
@@ -135,6 +143,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
   const sendConversation = async (kind: 'reply' | 'message') => {
     if (!solicitud || sending.current || draft.conflict || draft.error || isError || isLoading || isFetching || messageError || loadingMessages) return;
     if (kind === 'reply' ? solicitud.estado !== 'OBSERVADA' : ['APROBADA', 'RECHAZADA'].includes(solicitud.estado)) return;
+    if (kind === 'reply' && pendingRegistrationFiles(solicitud.usuarioId, solicitud.tipoActor, solicitud.id).length) { setFeedback('Hay archivos pendientes de recuperar. Abrí Corregir datos y documentos antes de reenviar.'); return; }
     const row = conversations[solicitud.id] || emptyConversation();
     const command = row[kind + 'Command' as 'replyCommand'] || { id: crypto.randomUUID(), text: row[kind].trim(), version: solicitud.updatedAt };
     if (!command.text || (kind === 'reply' && command.version && command.version !== solicitud.updatedAt)) return;
@@ -148,6 +157,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
       if (kind === 'reply') {
         const checkpoint = draft.update(previous => ({ ...previous, [solicitud.id]: { ...(previous[solicitud.id] || emptyConversation()), replyCommand: { ...command, confirmed: true } } }));
         if (!checkpoint.saved || checkpoint.conflict) { setFeedback('La respuesta quedó registrada. No pudimos guardar la continuidad local; reintentá el guardado antes de reenviar.'); return; }
+        if (pendingRegistrationFiles(solicitud.usuarioId, solicitud.tipoActor, solicitud.id).length) { setFeedback('La respuesta quedó registrada. Hay archivos pendientes de recuperar; corregilos antes de reenviar.'); return; }
         await enviarSolicitud.mutateAsync({ id: solicitud.id, expectedUpdatedAt: command.version });
       }
       if (!alive.current) return;
@@ -256,6 +266,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
                 Corregir datos y documentos
               </Button>
               <div>
+                {missingFiles.length > 0 && <p role="alert" className="mb-3 text-sm font-medium text-amber-900">Hay archivos pendientes de recuperar. Abrí Corregir datos y documentos para volver a seleccionarlos o conservar los originales antes de reenviar.</p>}
                 <label htmlFor="application-observation-reply" className="block text-sm font-medium text-amber-800 mb-1">Tu respuesta</label>
                 <textarea
                   id="application-observation-reply"
@@ -271,7 +282,7 @@ const ApplicationWorkspace: React.FC<{ owner: string }> = ({ owner }) => {
                 variant="primary"
                 size="sm"
                 onClick={handleReplyAndResend}
-                disabled={Boolean(activeDraft?.replyCommand?.version && activeDraft.replyCommand.version !== solicitud.updatedAt) || (!replyText.trim() && !activeDraft?.replyCommand) || busy || draft.error || draft.conflict || isError || isFetching || messageError || loadingMessages}
+                disabled={missingFiles.length > 0 || Boolean(activeDraft?.replyCommand?.version && activeDraft.replyCommand.version !== solicitud.updatedAt) || (!replyText.trim() && !activeDraft?.replyCommand) || busy || draft.error || draft.conflict || isError || isFetching || messageError || loadingMessages}
                 isLoading={busy}
               >
                 {activeDraft?.replyCommand ? 'Reintentar respuesta y reenvío' : 'Responder y Re-enviar'}
