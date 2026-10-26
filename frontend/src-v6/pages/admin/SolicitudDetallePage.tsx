@@ -229,7 +229,7 @@ const SolicitudReview: React.FC = () => {
 
       <AdministrativeTEF actorType={solicitud.tipoActor} identity={solicitud.id}
         declaration={datosActor}
-        corrientesY={(datosActor.corrientesControl || datosActor.corrientesY || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
+        corrientesY={((solicitud.tipoActor === 'GENERADOR' ? datosActor.corrientesControl : solicitud.tipoActor === 'OPERADOR' ? datosActor.corrientesY : '') || '').split(/[,;/]/).map(value => value.trim().toUpperCase()).filter(value => /^Y\d+$/.test(value))}
         tieneISO={!!datosActor.certificacionISO} />
 
       {/* Documents and correspondence retain one common workspace. */}

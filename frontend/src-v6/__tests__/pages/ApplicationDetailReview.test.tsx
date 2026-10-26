@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   owner: 'admin:one', role: 'ADMIN', detail: {} as any, messages: {} as any,
-  send: vi.fn(), review: vi.fn(), observe: vi.fn(), approve: vi.fn(), reject: vi.fn(), document: vi.fn(), read: vi.fn(),
+  send: vi.fn(), review: vi.fn(), observe: vi.fn(), approve: vi.fn(), reject: vi.fn(), document: vi.fn(), read: vi.fn(), tef: vi.fn(),
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: state.owner, rol: state.role } }) }));
 vi.mock('../../hooks/useAdmissionContext', () => ({ useAdmissionContext: () => ({ owner: state.owner, role: state.role, ready: true }) }));
@@ -13,7 +13,7 @@ vi.mock('../../hooks/useSolicitudes', () => ({
  useObservarSolicitud: () => ({ mutateAsync: state.observe }), useAprobarSolicitud: () => ({ mutateAsync: state.approve }),
  useRechazarSolicitud: () => ({ mutateAsync: state.reject }), useRevisarDocumento: () => ({ mutateAsync: state.document }),
 }));
-vi.mock('../../components/AdministrativeTEF', () => ({ AdministrativeTEF: () => null }));
+vi.mock('../../components/AdministrativeTEF', () => ({ AdministrativeTEF: (props: unknown) => { state.tef(props); return null; } }));
 vi.mock('../../components/registration/RegistrationFleetSummary', () => ({ RegistrationFleetSummary: () => null }));
 vi.mock('../../components/registration/RegistrationReviewEditor', () => ({ RegistrationReviewEditor: ({ onClose, onConfirmed, onSaved }: any) => <button onClick={async () => { onClose(); onConfirmed(); await onSaved().catch(() => {}); }}>Simular corrección confirmada</button> }));
 vi.mock('../../services/solicitud.service', () => ({ solicitudService: { analizarDocumento: state.read } }));
@@ -28,6 +28,16 @@ beforeEach(() => {
   for (const fn of [state.send,state.review,state.observe,state.approve,state.reject,state.document,state.read]) fn.mockResolvedValue({});
 });
 afterEach(cleanup);
+it.each(['', '/app'])('uses only the current actor activity for administrative current inputs (%s)', prefix => {
+ state.detail.data.tipoActor='OPERADOR';
+ state.detail.data.datosActor=JSON.stringify({razonSocial:'Empresa QA',corrientesControl:'Y8',corrientesY:'Y12; y48',corrientesAutorizadas:'Y1'});
+ const view=render(tree(prefix));
+ expect(state.tef.mock.lastCall?.[0].corrientesY).toEqual(['Y12','Y48']);
+ state.detail.data.datosActor=JSON.stringify({razonSocial:'Empresa QA',corrientesControl:'Y8'});view.rerender(tree(prefix));
+ expect(state.tef.mock.lastCall?.[0].corrientesY).toEqual([]);
+ state.detail.data.tipoActor='GENERADOR';view.rerender(tree(prefix));
+ expect(state.tef.mock.lastCall?.[0].corrientesY).toEqual(['Y8']);
+});
 it.each(['', '/app'])('groups declarations without confusing current types or dropping historical fields (%s)', prefix => {
  state.detail.data.datosActor = JSON.stringify({ razonSocial:'Empresa QA', corrientesControl:'Y8', corrientesY:'Y12', corrientesAutorizadas:'Y48', tefPotencia:'120', domicilioLegalCalle:'Calle legal', campoAnterior:'Dato conservado', constructor:'Dato histórico adicional' });
  render(tree(prefix));
