@@ -49,6 +49,17 @@ describe('a real registration UI protects the current step and account boundary'
     expect(screen.getByLabelText('Razon Social *')).toHaveValue('QA continuidad');
     expect(mock.post).not.toHaveBeenCalled();
   });
+  it.each(['generador', 'transportista', 'operador'])('%s stage selector cannot bypass missing required data', async type => {
+    const response = request(); response.data.data.solicitud.tipoActor = type.toUpperCase();
+    response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: '', domicilio: '' });
+    mock.get.mockResolvedValue(response);
+    await open(type);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Etapa de la inscripción' }), { target: { value: '2' } });
+    await waitFor(() => expect(screen.getByLabelText('Razon Social *')).toHaveFocus());
+    expect(screen.getByRole('combobox', { name: 'Etapa de la inscripción' })).toHaveValue('1');
+    expect(mock.put).not.toHaveBeenCalled(); expect(mock.post).not.toHaveBeenCalled();
+  });
+
   it('does not move to another stage or refocus its heading after a rejected save', async () => {
     const response = request(); response.data.data.solicitud.datosActor = JSON.stringify({ razonSocial: 'QA continuidad', domicilio: 'QA 123' }); mock.get.mockResolvedValue(response);
     mock.put.mockRejectedValue(new Error('QA disconnected'));

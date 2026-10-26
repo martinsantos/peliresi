@@ -15,7 +15,7 @@ import React, { useState, useCallback, useRef, useEffect, useLayoutEffect } from
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Send, Check,
-  Factory, FlaskConical, AlertCircle, Loader2, Truck, Save,
+  AlertCircle, ChevronDown, Save,
 } from 'lucide-react';
 import { Button } from '../../components/ui/ButtonV2';
 import { FormSkeleton } from '../../components/ui/LoadingState';
@@ -144,7 +144,6 @@ const InscripcionWizardContent: React.FC = () => {
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const receiptInFlight = useRef(false);
   const [regError, setRegError] = useState<string | null>(null);
-  const activeStepRef = useRef<HTMLButtonElement>(null);
   const draftScope = `public:${tipoActor}:${solicitudId || ''}`;
   const ownership = useInspectionDraftOwnership(`registration:${owner}:${draftScope}`, Boolean(owner && solicitudId && !isReviewMode && !submitSuccess));
   const vehicles = fleetRows(form.vehiculosJson, EMPTY_VEHICLE);
@@ -169,9 +168,8 @@ const InscripcionWizardContent: React.FC = () => {
 
   // A committed navigation starts at its heading, not at the previous page's
   // footer. Typing, validation errors and asynchronous requirements do not move
-  // the viewport. Keep the active step visible within its own horizontal rail.
+  // the viewport. Stage navigation stays within the available width.
   useLayoutEffect(() => {
-    activeStepRef.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'instant' });
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [tipo, phase, step, submitSuccess]);
 
@@ -818,68 +816,51 @@ const InscripcionWizardContent: React.FC = () => {
   return (
     <div className="min-w-0">
       <div className="w-full space-y-4 sm:space-y-6" data-testid="registration-wizard">
-        {/* Header */}
         <header className="space-y-3" data-testid="registration-identity">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <div aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isGenerador ? 'bg-purple-100' : isOperador ? 'bg-blue-100' : 'bg-orange-100'}`}>
-              {isGenerador
-                ? <Factory size={18} className="text-purple-600" />
-                : isOperador ? <FlaskConical size={18} className="text-blue-600" />
-                : <Truck size={18} className="text-orange-600" />
-              }
-              </div>
-              <p className="text-sm leading-5 text-neutral-600">Paso {step} de {totalSteps} · {steps[step - 1]?.label}</p>
-            </div>
-            <button type="button" onClick={() => void returnToRequest()} disabled={saving || submitting} aria-label={owner ? "Volver a Mi solicitud" : "Volver al acceso"} className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
-              <ArrowLeft size={16} aria-hidden="true" /> {owner ? "Mi solicitud" : "Acceso"}
+            <label htmlFor="registration-stage" className="sr-only">Etapa de la inscripción</label>
+            <select id="registration-stage" value={step} onChange={event => void goStep(Number(event.target.value))} disabled={saving || submitting}
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-neutral-300 bg-white px-3 text-base text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 lg:hidden">
+              {steps.map(item => <option key={item.id} value={item.id}>{item.id} de {totalSteps} · {item.label}{attempted.has(item.id) && stepHasErrors(item.id) ? ' — Revisar' : ''}</option>)}
+            </select>
+            <p className="hidden text-sm text-neutral-600 lg:block">Etapa {step} de {totalSteps}</p>
+            <button type="button" onClick={() => void returnToRequest()} disabled={saving || submitting} aria-label={owner ? "Volver a Mi solicitud" : "Volver al acceso"} title={owner ? "Volver a Mi solicitud" : "Volver al acceso"} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+              <ArrowLeft size={18} aria-hidden="true" /><span className="hidden sm:inline">{owner ? "Mi solicitud" : "Acceso"}</span>
             </button>
           </div>
-        </header>
-
-        {/* Stepper */}
-        <nav className="overflow-x-auto rounded-xl border border-neutral-200 bg-white p-3 [scrollbar-width:thin] sm:p-4" aria-label="Etapas de la inscripción" data-testid="registration-stepper">
-          <div className="flex min-w-max items-start justify-center">
-            {steps.map((s, i) => {
-              const isActive = step === s.id;
-              const isDone = step > s.id;
-              const hasErr = attempted.has(s.id) && stepHasErrors(s.id);
-              return (
-                <React.Fragment key={s.id}>
-                  <button ref={isActive ? activeStepRef : undefined} type="button" onClick={() => void goStep(s.id)} disabled={saving || submitting} aria-current={isActive ? 'step' : undefined} aria-label={`Paso ${s.id} de ${totalSteps}: ${s.label}`} className="group flex min-h-11 min-w-[112px] shrink-0 flex-col items-center justify-start gap-1.5 rounded-lg px-2 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700">
-                    <div aria-hidden="true" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                      hasErr ? 'bg-error-100 text-error-600 ring-2 ring-error-300' :
-                      isActive ? 'bg-primary-700 text-white' :
-                      isDone ? 'bg-primary-50 text-primary-800' :
-                      'bg-neutral-100 text-neutral-700 group-hover:bg-neutral-200'
-                    }`}>
-                      {hasErr ? <AlertCircle size={16} /> : s.id}
-                    </div>
-                    <span className={`block max-w-full text-center text-sm font-medium leading-tight ${
-                      hasErr ? 'text-error-700' : isActive ? 'text-primary-800' : isDone ? 'text-primary-700' : 'text-neutral-600'
-                    }`}>{s.label}</span>
-                  </button>
-                  {i < steps.length - 1 && (
-                    <div className={`mx-0.5 mt-[18px] h-0.5 w-3 shrink-0 rounded sm:mx-1 sm:w-4 lg:flex-1 ${step > s.id ? 'bg-[#0D8A4F]/40' : 'bg-neutral-200'}`} />
-                  )}
-                </React.Fragment>
-              );
+          <nav className="hidden gap-1 rounded-xl border border-neutral-200 bg-white p-2 lg:grid" style={{ gridTemplateColumns: `repeat(${totalSteps}, minmax(0, 1fr))` }} aria-label="Etapas de la inscripción" data-testid="registration-stepper">
+            {steps.map(item => {
+              const active = step === item.id;
+              const invalid = attempted.has(item.id) && stepHasErrors(item.id);
+              return <button key={item.id} type="button" onClick={() => void goStep(item.id)} disabled={saving || submitting}
+                aria-current={active ? 'step' : undefined} aria-label={`Paso ${item.id} de ${totalSteps}: ${item.label}${invalid ? ' · Revisar' : ''}`}
+                className={`flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-2 text-center text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-700 ${active ? 'bg-primary-50 text-primary-900' : invalid ? 'bg-error-50 text-error-800' : 'text-neutral-600 hover:bg-neutral-50'}`}>
+                <span aria-hidden="true" className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${active ? 'bg-primary-700 text-white' : invalid ? 'text-error-700' : 'bg-neutral-100 text-neutral-700'}`}>{invalid ? <AlertCircle size={16}/> : item.id}</span>
+                <span className="min-w-0 whitespace-nowrap leading-5">{item.label}</span>
+              </button>;
             })}
-          </div>
-        </nav>
+          </nav>
+        </header>
 
         {/* Step Content */}
         <div ref={validationRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
           {isReviewMode && <RegistrationTrialDraftBar saved={localSaved} onSave={() => { persistTrial(step); }} />}
-          {!isReviewMode && <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 pb-3">
-            <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Cambios guardados en este dispositivo · pendientes de guardar en SITREP' : 'Cambios en pantalla · no se pudo guardar en este dispositivo') : observations ? 'Correcciones guardadas en SITREP · pendientes de reenviar a revisión' : 'Borrador guardado en SITREP · todavía no enviado'}</p>
-            <Button variant="outline" leftIcon={<Save size={16} />} isLoading={saving} disabled={submitting || Boolean(localConflict)} onClick={() => void persistDraft(step)}>Guardar borrador</Button>
+          {!isReviewMode && <div className="mb-3 flex items-center justify-between gap-3 border-b border-neutral-200 pb-3">
+            <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Guardado en este dispositivo · pendientes de guardar en SITREP' : 'No se pudo guardar en este dispositivo') : observations ? 'Guardado · pendiente de reenvío' : 'Borrador guardado en SITREP'}</p>
+            <Button aria-label="Guardar borrador" title="Guardar borrador" variant="ghost" className="shrink-0 !px-3" leftIcon={<Save size={18} />} isLoading={saving} disabled={submitting || Boolean(localConflict)} onClick={() => void persistDraft(step)}><span className="hidden sm:inline">Guardar</span></Button>
           </div>}
           {!isReviewMode && ownership.status === 'blocked' && <div role="alert" className="mb-4 text-sm text-error-800">Este borrador está abierto en otra pestaña. No se sobrescribirá.<Button variant="outline" className="ml-2" onClick={ownership.retry}>Reintentar edición</Button></div>}
           {!isReviewMode && ownership.status === 'unavailable' && <p role="alert" className="mb-4 text-sm text-error-800">El navegador no pudo proteger el borrador frente a otra pestaña. Los datos siguen en pantalla; no se guardará una edición sin proteger.</p>}
           {localConflict && <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p>El borrador de SITREP cambió desde tu copia local. Elegí qué conservar; no mezclamos ni sobrescribimos automáticamente.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setForm(localConflict); setLocalConflict(null); setDirty(true); editRevision.current++; }}>Recuperar mis cambios locales</Button><Button variant="outline" onClick={() => { clearRegistrationDraft(owner!, draftScope); setLocalConflict(null); }}>Conservar versión de SITREP</Button></div></div>}
           {missingLocalFiles.length > 0 && <p role="alert" className="mb-4 text-sm text-amber-900">{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : `Hay archivos que no llegaron a guardarse: ${missingLocalFiles.join(', ')}. Volvé a seleccionarlos en Documentos. Los originales ya guardados se recuperan.`}</p>}
-          {observations && <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Observaciones por corregir</p><p className="mt-1 whitespace-pre-wrap break-words">{observations}</p><p className="mt-2">Corregí lo solicitado. Podés reenviar desde el resumen o volver a Mi solicitud para acompañar los cambios con una respuesta.</p></div>}
+          {observations && <details className="group mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 [&::-webkit-details-marker]:hidden">
+              <AlertCircle size={18} aria-hidden="true" className="shrink-0"/>
+              <span className="min-w-0 flex-1"><strong className="block text-sm">Observaciones por corregir</strong><span aria-hidden="true" className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm group-open:hidden">{observations}</span></span>
+              <ChevronDown size={18} aria-hidden="true" className="shrink-0 transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none"/>
+            </summary>
+            <div className="space-y-2 border-t border-amber-200 px-3 py-3 text-sm"><p className="whitespace-pre-wrap break-words">{observations}</p><p>Corregí lo solicitado y reenviá desde Resumen. Para agregar una respuesta, volvé a Mi solicitud.</p></div>
+          </details>}
           {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
           {validationError && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
           {renderStepContent()}
@@ -897,11 +878,7 @@ const InscripcionWizardContent: React.FC = () => {
           </Button>
 
           <div className="flex items-center gap-2">
-            {saving && (
-              <span className="text-xs text-neutral-400 flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> Guardando...
-              </span>
-            )}
+
 
             {isLastStep ? (
               <Button
