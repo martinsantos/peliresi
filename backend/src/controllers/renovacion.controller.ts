@@ -103,7 +103,9 @@ export const createRenovacion = async (req: AuthRequest, res: Response, next: Ne
             throw new AppError('generadorId o operadorId requerido segun tipoActor', 400);
         }
 
-        const renovacion = await prisma.$transaction(async tx => {
+        let renovacion;
+        try {
+        renovacion = await prisma.$transaction(async tx => {
           const saved = await tx.renovacion.create({
             data: {
                 anio: Number(anio),
@@ -124,6 +126,29 @@ export const createRenovacion = async (req: AuthRequest, res: Response, next: Ne
           return saved;
         });
 
+        } catch (error: any) {
+          if (error.code !== 'P2002') throw error;
+          const existing = await prisma.renovacion.findFirst({ where: {
+            anio, tipoActor, ...(tipoActor === 'GENERADOR' ? { generadorId: actorId } : { operadorId: actorId }),
+          } });
+          // The existing actor/year constraint is the retry boundary. Only an exact
+          // proposal recovers its receipt; a different request must not overwrite it.
+          const canonical = (value: Record<string, unknown>) => JSON.stringify(Object.keys(value).sort().map(key => [key, value[key]]));
+          let sameChanges = false;
+          try {
+            const previous: unknown = JSON.parse(existing?.datosNuevos || '{}');
+            sameChanges = !!previous && typeof previous === 'object' && !Array.isArray(previous)
+              && canonical(previous as Record<string, unknown>) === canonical(sanitizedChanges);
+          } catch { /* Unreadable historical proposals require review. */ }
+          const sameNumber = (left: unknown, right: unknown) => left == null && right == null || left != null && right != null && Number(left) === Number(right);
+          if (existing && sameChanges && existing.modalidad === modalidad
+            && sameNumber(existing.tefAnterior, tefAnterior) && sameNumber(existing.tefNuevo, tefNuevo)
+            && (existing.observaciones ?? null) === (observaciones ?? null)) {
+            res.status(200).json({ success: true, data: { renovacion: existing } });
+            return;
+          }
+          throw new AppError('Ya existe una renovacion para este actor en ese ano. La propuesta guardada es diferente; consultá su resultado antes de presentar otros cambios.', 400);
+        }
         res.status(201).json({ success: true, data: { renovacion } });
     } catch (error: any) {
         if (error.code === 'P2002') {

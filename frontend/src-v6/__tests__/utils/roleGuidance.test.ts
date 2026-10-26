@@ -36,6 +36,7 @@ it.each(['', '/app', '/mobile'])('requester help stays scoped to the actual task
  const changes = contextualGuidance(prefix + '/mi-perfil/solicitar-cambios', 'GENERADOR');
  expect(changes.title).toBe('Solicitar cambios de tu ficha');
  expect(changes.steps.join(' ')).toContain('Administración');
- expect(changes.steps.join(' ')).not.toContain('Guardar borrador');
+ expect(changes.steps.join(' ')).toContain('por cuenta y actividad');
+ expect(changes.steps.join(' ')).toContain('sin duplicarla');
  expect(changes.steps.join(' ')).not.toContain('Adjuntá');
 });
