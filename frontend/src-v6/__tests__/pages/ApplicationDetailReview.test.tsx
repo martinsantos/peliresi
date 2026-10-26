@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   owner: 'admin:one', role: 'ADMIN', detail: {} as any, messages: {} as any,
-  send: vi.fn(), review: vi.fn(), observe: vi.fn(), approve: vi.fn(), reject: vi.fn(), document: vi.fn(), read: vi.fn(), tef: vi.fn(),
+  send: vi.fn(), review: vi.fn(), observe: vi.fn(), approve: vi.fn(), reject: vi.fn(), document: vi.fn(), read: vi.fn(), tef: vi.fn(), scroll: vi.fn(),
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: state.owner, rol: state.role } }) }));
 vi.mock('../../hooks/useAdmissionContext', () => ({ useAdmissionContext: () => ({ owner: state.owner, role: state.role, ready: true }) }));
@@ -22,7 +22,8 @@ import SolicitudDetallePage from '../../pages/admin/SolicitudDetallePage';
 const query = (data: unknown) => ({ data, isPending: false, isError: false, isFetching: false, refetch: vi.fn().mockResolvedValue({}) });
 function tree(prefix = '') { return <MemoryRouter basename={prefix || '/'} initialEntries={[prefix + '/admin/solicitudes/s1']}><Routes><Route path="/admin/solicitudes/:id" element={<SolicitudDetallePage />} /></Routes></MemoryRouter>; }
 beforeEach(() => {
-  localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks(); state.owner = 'admin:one'; state.role = 'ADMIN';
+  localStorage.clear(); sessionStorage.clear(); vi.clearAllMocks();
+  HTMLElement.prototype.scrollIntoView = state.scroll; state.owner = 'admin:one'; state.role = 'ADMIN';
   state.detail = query({ id: 's1', estado: 'EN_REVISION', tipoActor: 'GENERADOR', datosActor: '{"razonSocial":"Empresa QA"}', usuario: { nombre: 'Persona QA', email: 'qa@night-qa.invalid' }, documentos: [], createdAt: '2026-10-25', updatedAt: '2026-10-25T15:00:00.000Z' });
   state.messages = query([]);
   for (const fn of [state.send,state.review,state.observe,state.approve,state.reject,state.document,state.read]) fn.mockResolvedValue({});
@@ -81,6 +82,13 @@ it.each(['','/app'])('keeps the reading action and progress visible while the or
  expect(screen.getByRole('button',{name:'Aprobar',exact:true})).toBeDisabled();
  await act(async()=>{finish();});
  expect(screen.getByText('Lectura actualizada. Revisá el resultado del documento.')).toBeVisible();
+ const feedback = within(screen.getByRole('group',{name:'Documento: Factura artificial'})).getByText('Lectura actualizada. Revisá el resultado del documento.');
+ expect(feedback).toHaveAttribute('role', 'status');
+ expect(state.scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
+ expect(feedback).toHaveTextContent('Lectura actualizada');
+ expect(feedback).toHaveFocus();
+ expect(screen.getAllByText('Lectura actualizada. Revisá el resultado del documento.')).toHaveLength(1);
+
 });
 it.each(['', '/app'])('keeps a confirmed correction visible and focused when its subsequent read fails (%s)', async prefix => {
  const view = render(tree(prefix));
@@ -199,4 +207,16 @@ it.each(['', '/app'])('presents declared power, zone and operator mode without t
  expect(screen.queryByText('Tef Potencia')).toBeNull();
  expect(screen.queryByText('IN_SITU')).toBeNull();
  expect(state.detail.data.datosActor).toBe(raw);
+});
+
+it.each(['','/app'])('keeps a failed read beside its original with a retry and no success claim (%s)', async prefix => {
+ state.detail.data.documentos=[{id:'invoice',tipo:'FACTURA_ELECTRICA',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:'qa'}];
+ state.read.mockRejectedValue(new Error('Lectura interrumpida'));
+ render(tree(prefix));
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Leer documento',exact:true}));});
+ const feedback=within(screen.getByRole('group',{name:'Documento: Factura artificial'})).getByRole('alert');
+ expect(feedback).toHaveFocus();
+ expect(screen.queryByText('Lectura actualizada. Revisá el resultado del documento.')).toBeNull();
+ expect(screen.getByRole('button',{name:'Leer documento',exact:true})).toBeEnabled();
+ expect(state.document).not.toHaveBeenCalled();
 });

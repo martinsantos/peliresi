@@ -69,3 +69,27 @@ describe('receipt feedback is readable evidence, never a payment certification',
     expect(retry).not.toHaveBeenCalled(); expect(screen.getByRole('button')).toBeDisabled();
   });
 });
+
+describe('incomplete electricity evidence remains actionable', () => {
+  const electric = { ...analysis, documentKind: 'FACTURA_ELECTRICA' as const,
+    electricidad: { version: 1 as const, distribuidora: 'EDEMSA', nombreDistribuidora: 'EDEMSA',
+      campos: { categoriaTarifaria: 'T2', consumoKwh: '1250' }, conflictos: [], evidencias: [], aviso: 'Revisá el original.' } };
+  it('offers a retry when tariff is present but consumption was not read', () => {
+    render(<DocumentAnalysis analysis={{ ...electric, electricidad: { ...electric.electricidad, campos: { categoriaTarifaria: 'T2' } } }} onRetry={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Reintentar lectura' })).toBeEnabled();
+  });
+  it('offers a retry after a failed complementary pass despite retained fields', () => {
+    render(<DocumentAnalysis analysis={{ ...electric, aviso: 'No se pudo completar la nueva lectura.' }} onRetry={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent('No se pudo completar');
+    expect(screen.getByRole('button', { name: 'Reintentar lectura' })).toBeEnabled();
+  });
+  it('offers a retry for an unidentified distributor', () => {
+    render(<DocumentAnalysis analysis={{ ...electric, electricidad: { ...electric.electricidad, distribuidora: null, nombreDistribuidora: null } }} onRetry={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Reintentar lectura' })).toBeEnabled();
+  });
+  it('does not require optional power or subsidy fields to complete the reading', () => {
+    render(<DocumentAnalysis analysis={electric} onRetry={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Reintentar lectura' })).toBeNull();
+    expect(screen.getByText('1250 kWh')).toBeInTheDocument();
+  });
+});

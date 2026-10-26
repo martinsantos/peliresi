@@ -40,6 +40,35 @@ export function mergeReceiptRead(previous: unknown, next: ReceiptAnalysis): Rece
   return { ...next, duplicado, ...(old.pago?.revision === 'CONFIRMADO' ? { pago: old.pago } : {}) };
 }
 
+/* Re-read the same original while preserving earlier evidence and conflicts.
+ * The caller verifies the hash inside its transaction. Payment logic is separate.
+ */
+export function mergeElectricityRead(previous: unknown, next: ReceiptAnalysis): ReceiptAnalysis {
+  const candidate = previous && typeof previous === 'object' && !Array.isArray(previous)
+    ? previous as Partial<ReceiptAnalysis> : undefined;
+  const old = candidate?.version === 1 && candidate.lectura === 'LEIDO'
+    && typeof candidate.texto === 'string' && candidate.texto.trim() ? candidate : undefined;
+  let reading = next;
+  if (old) {
+    const keepPrevious = (aviso: string): ReceiptAnalysis => ({
+      version: 1, duplicado: old.duplicado === true || next.duplicado, lectura: 'LEIDO',
+      texto: old.texto!, motor: old.motor === 'PDF_TEXT' || old.motor === 'TESSERACT' ? old.motor : null,
+      alcance: typeof old.alcance === 'string' ? old.alcance : next.alcance, aviso,
+    });
+    if (next.lectura !== 'LEIDO' || !next.texto.trim()) {
+      reading = keepPrevious(next.aviso || 'No se obtuvieron nuevos datos. Se conserva la lectura anterior; revisá el original o reintentá.');
+    } else {
+      const text = [...new Set([old.texto!, next.texto].flatMap(value => value.split(/\r?\n/)).map(line => line.trim()).filter(Boolean))].join('\n');
+      // Never omit a competing value to make a reading look complete.
+      reading = text.length > 96_000
+        ? keepPrevious('La nueva lectura supera el límite de revisión. Se conserva la lectura anterior; revisá el original manualmente.')
+        : { ...next, duplicado: old.duplicado === true || next.duplicado, texto: text,
+          alcance: old.texto === next.texto ? next.alcance : 'Lecturas conservadas del mismo original. Los valores contradictorios requieren revisión.' };
+    }
+  }
+  return { ...reading, documentKind: 'FACTURA_ELECTRICA', electricidad: electricityReading(reading.texto) };
+}
+
 /** The original file is never normalized, rewritten, or treated as proof of payment. */
 export function describeDocument(file: { path: string; mimetype: string }) {
   const bytes = fs.readFileSync(file.path);

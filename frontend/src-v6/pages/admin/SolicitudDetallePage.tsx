@@ -117,9 +117,14 @@ const SolicitudReview: React.FC = () => {
   const [editingData, setEditingData] = useState(false);
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
-  const [feedback, setFeedback] = useState<{ error: boolean; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<{ error: boolean; text: string; documentId?: string } | null>(null);
   const feedbackRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => { if (feedback) feedbackRef.current?.focus(); }, [feedback]);
+  useEffect(() => {
+    const target = feedbackRef.current;
+    if (!feedback || !target) return;
+    target.focus({ preventScroll: Boolean(feedback.documentId) });
+    if (feedback.documentId) target.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+  }, [feedback]);
 
   const detail = useSolicitud(id || ''), messages = useMensajesSolicitud(id || '');
   const { data: solicitud, refetch } = detail;
@@ -134,17 +139,17 @@ const SolicitudReview: React.FC = () => {
   const canAct = fresh && reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud!.estado) && !busy;
   const canMessage = fresh && reviewer && !messages.isError && !messages.isPending && !messages.isFetching && !busy;
 
-  const run = async (allowed: boolean, action: () => Promise<unknown>, confirmed: () => void, success: string) => {
+  const run = async (allowed: boolean, action: () => Promise<unknown>, confirmed: () => void, success: string, documentId?: string) => {
     if (!allowed || running.current) return;
     running.current = true; setBusy(true); setFeedback(null);
-    try { await action(); confirmed(); setFeedback({ error: false, text: success }); }
-    catch (error) { setFeedback({ error: true, text: getApiErrorMessage(error, 'No pudimos confirmar la acción. Tus textos se conservan; revisá el estado actualizado antes de reintentar.') }); }
+    try { await action(); confirmed(); setFeedback({ error: false, text: success, documentId }); }
+    catch (error) { setFeedback({ error: true, documentId, text: getApiErrorMessage(error, 'No pudimos confirmar la acción. Tus textos se conservan; revisá el estado actualizado antes de reintentar.') }); }
     finally { await refetch(); running.current = false; setBusy(false); }
   };
   const handleRetryReading = (docId: string) => run(canAct, async () => {
     setReadingReceipt(true);
     try { await solicitudService.analizarDocumento(id!, docId); } finally { setReadingReceipt(false); }
-  }, () => {}, 'Lectura actualizada. Revisá el resultado del documento.');
+  }, () => {}, 'Lectura actualizada. Revisá el resultado del documento.', docId);
   const handleSendMessage = () => run(canMessage && !!messageText.trim() && !message.conflict,
     () => enviarMensaje.mutateAsync({ solicitudId: id!, contenido: messageText.trim(), clientMessageId: message.value.requestId }),
     () => { message.clear(); }, 'Mensaje enviado. Quedó registrado en la conversación.');
@@ -211,7 +216,7 @@ const SolicitudReview: React.FC = () => {
         </div>
       </div>
 
-      {!observarModal && !rechazarModal && !confirmarAprobar && feedbackPanel}
+      {!observarModal && !rechazarModal && !confirmarAprobar && (!feedback?.documentId || !documentos.some(doc => doc.id === feedback.documentId)) && feedbackPanel}
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary-100 bg-primary-50 p-4">
         <p className="min-w-0 flex-1 text-sm text-primary-900">{statusText}</p>
         {solicitud.estado === 'ENVIADA' && reviewer && <Button disabled={!fresh || busy} onClick={() => void run(fresh && reviewer, () => revisarSolicitud.mutateAsync({ id: id!, expectedUpdatedAt: solicitud?.updatedAt }), () => {}, 'Revisión iniciada. Podés revisar documentos y resolver la solicitud.')}>Iniciar revisión</Button>}
@@ -275,7 +280,7 @@ const SolicitudReview: React.FC = () => {
               documentos.map((doc: DocumentoSolicitud) => {
                 const dCfg = DOC_ESTADO_CONFIG[doc.estado] || DOC_ESTADO_CONFIG.PENDIENTE;
                 return (
-                  <div key={doc.id} className="border border-neutral-200 rounded-xl p-3 space-y-2">
+                  <div key={doc.id} role="group" aria-label={'Documento: ' + doc.nombre} className="border border-neutral-200 rounded-xl p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-neutral-800 truncate" title={doc.nombre}>
@@ -298,6 +303,7 @@ const SolicitudReview: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
+                    {feedback?.documentId === doc.id && feedbackPanel}
                     <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt || !fresh || busy} onRetry={reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
                     {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} estadoDocumento={doc.estado} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
 

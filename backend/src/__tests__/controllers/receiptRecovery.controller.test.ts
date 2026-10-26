@@ -70,3 +70,58 @@ describe('same receipt retry preserves original, legal state and duplicate warni
     expect((await invoke(analizarDocumentoSolicitud)).error).toMatchObject({ statusCode: 409 }); expect(m.update).not.toHaveBeenCalled();
   });
 });
+
+describe('electricity retry can improve a partial read without hiding evidence', () => {
+  const partial = { ...complete, texto: 'EDEMSA\nTarifa: T2', aviso: 'Lectura parcial del PDF.' };
+  beforeEach(() => { m.old.mockResolvedValue({ ...old, tipo: 'FACTURA_ELECTRICA', analisis: partial }); });
+  it('adds consumption recovered by the new pass while retaining the original tariff', async () => {
+    m.read.mockResolvedValue({ ...complete, motor: 'TESSERACT', texto: 'Consumo facturado: 1250 kWh' });
+    const { error, saved } = await invoke(analizarDocumentoSolicitud);
+    expect(error).toBeUndefined();
+    expect(saved.analisis.electricidad.campos).toMatchObject({ categoriaTarifaria: 'T2', consumoKwh: '1250' });
+    expect(saved.analisis.aviso).toBeNull();
+    expect(m.read).toHaveBeenCalledWith({ path: old.path, mimeType: old.mimeType }, 'FACTURA_ELECTRICA');
+    expect(m.update.mock.calls[0][0].data.estado).toBeUndefined();
+    expect(m.duplicate).not.toHaveBeenCalled(); expect(m.notice).not.toHaveBeenCalled();
+  });
+  it('keeps conflicting readings explicit rather than choosing the latest tariff', async () => {
+    m.read.mockResolvedValue({ ...complete, texto: 'EDEMSA\nTarifa: T1R3\nConsumo: 400 kWh' });
+    const { saved } = await invoke(analizarDocumentoSolicitud);
+    expect(saved.analisis.electricidad.conflictos).toContain('categoriaTarifaria');
+    expect(saved.analisis.electricidad.campos.categoriaTarifaria).toBeUndefined();
+    expect(saved.analisis.electricidad.campos.consumoKwh).toBe('400');
+  });
+  it.each(['NO_DISPONIBLE', 'SIN_TEXTO'])('preserves evidence and explains an unsuccessful %s retry', async lectura => {
+    m.read.mockResolvedValue({ ...complete, lectura, texto: '', aviso: 'No se pudo completar la nueva lectura.' });
+    const { saved } = await invoke(analizarDocumentoSolicitud);
+    expect(saved.analisis.texto).toBe(partial.texto);
+    expect(saved.analisis.electricidad.campos.categoriaTarifaria).toBe('T2');
+    expect(saved.analisis.aviso).toContain('No se pudo completar');
+  });
+  it('does not repeat evidence on an identical retry', async () => {
+    m.read.mockResolvedValue({ ...partial, aviso: null });
+    const { saved } = await invoke(analizarDocumentoSolicitud);
+    expect(saved.analisis.electricidad.evidencias.filter((e: { campo: string }) => e.campo === 'categoriaTarifaria')).toHaveLength(1);
+    expect(saved.analisis.aviso).toBeNull();
+  });
+  it('does not grow without bound or silently omit conflicting evidence', async () => {
+    m.old.mockResolvedValue({ ...old, tipo: 'FACTURA_ELECTRICA', analisis: { ...partial, texto: 'Tarifa: T2\n' + 'A'.repeat(48000) } });
+    m.read.mockResolvedValue({ ...complete, texto: 'Tarifa: T1R3\n' + 'B'.repeat(48000) });
+    const { saved } = await invoke(analizarDocumentoSolicitud);
+    expect(saved.analisis.texto).not.toContain('T1R3');
+    expect(saved.analisis.aviso).toContain('supera el límite');
+  });
+  it('uses the current transaction evidence when another retry completed first', async () => {
+    m.old.mockResolvedValueOnce({ ...old, tipo: 'FACTURA_ELECTRICA', analisis: partial })
+      .mockResolvedValueOnce({ ...old, tipo: 'FACTURA_ELECTRICA', analisis: { ...partial, texto: 'Tarifa: T2\nPotencia contratada: 45 kW' } });
+    m.read.mockResolvedValue({ ...complete, texto: 'Consumo: 1250 kWh' });
+    const { saved } = await invoke(analizarDocumentoSolicitud);
+    expect(saved.analisis.electricidad.campos).toMatchObject({ categoriaTarifaria: 'T2', consumoKwh: '1250', potenciaContratadaKw: '45' });
+  });
+  it('retains previous conflicts when a later pass reads only one competing value', async () => {
+    m.old.mockResolvedValue({ ...old, tipo: 'FACTURA_ELECTRICA', analisis: { ...partial, texto: 'Tarifa: T2\nTarifa: T1R3' } });
+    m.read.mockResolvedValue({ ...complete, texto: 'Tarifa: T2' });
+    const { saved } = await invoke(analizarDocumentoSolicitud);
+    expect(saved.analisis.electricidad.conflictos).toContain('categoriaTarifaria');
+  });
+});

@@ -17,7 +17,7 @@ import { generateTokens } from './auth.controller';
 import { registrationActorFields } from '../domain/registrationActorData';
 import { registrationFleet, declaredLicenseDocument, isLicenseDocument } from '../domain/registrationFleet';
 import { licenseFields } from '../domain/licenseReading';
-import { describeDocument, readReceipt, mergeReceiptRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
+import { describeDocument, readReceipt, mergeReceiptRead, mergeElectricityRead, receiptDuplicate, receiptNotice, retainReceiptDigest } from '../services/documentAnalysis.service';
 import { electricityReading } from '../domain/electricityReading';
 import { applySolicitudPayments, confirmPayment, notePaymentDecision, paymentAnalysis, requirePaymentIdentity, retainPaymentAllocation, solicitudPaymentScope } from '../services/paymentIdentity.service';
 import {
@@ -552,7 +552,7 @@ export const analizarDocumentoSolicitud = async (req: AuthRequest, res: Response
       }
       if (original.tipo === 'COMPROBANTE_PAGO') reading.duplicado = await receiptDuplicate(tx, description.sha256, docId);
       let analisis = license ? { ...reading, documentKind: 'LICENCIA' as const, campos: licenseFields(reading.texto) }
-        : electric ? { ...mergeReceiptRead(current.analisis, reading), documentKind: 'FACTURA_ELECTRICA' as const, electricidad: electricityReading(mergeReceiptRead(current.analisis, reading).texto) }
+        : electric ? mergeElectricityRead(current.analisis, reading)
         : mergeReceiptRead(current.analisis, reading);
       if (original.tipo === 'COMPROBANTE_PAGO' && analisis.pago?.revision !== 'CONFIRMADO') analisis = await paymentAnalysis(tx, analisis, solicitudPaymentScope(id));
       const saved = await tx.documentoSolicitud.update({ where: { id: docId }, data: { sha256: description.sha256, analisis } });
