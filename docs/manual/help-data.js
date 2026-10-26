@@ -17,6 +17,17 @@
 
     guides: [
       {
+        id: 'alta-responder-observaciones', profile: 'generador', audiences: ['generador', 'transportista', 'operador'],
+        title: 'Responder observaciones del alta', summary: 'Conservá tu respuesta y distinguí el mensaje guardado del reenvío a revisión.',
+        duration: '3 min', icon: 'chat', keywords: ['alta', 'observada', 'respuesta', 'reenvío', 'mensajes', 'borrador'],
+        safety: 'Los textos se guardan por siete días en este dispositivo, separados por cuenta, contexto y solicitud. Cerrar no envía nada. Los adjuntos se corrigen desde el formulario del alta.',
+        steps: [
+          { title: 'Revisar qué pidió Administración', body: ['En Mi solicitud elegí la actividad correspondiente. Si está Observada, leé el motivo y la conversación antes de responder.', 'Corregir datos y documentos abre el formulario de esa actividad. Un mensaje no sustituye el documento ni modifica los datos declarados.'], expected: 'Sabés qué falta y en qué solicitud vas a actuar.' },
+          { title: 'Preparar y recuperar tu respuesta', body: ['Escribí Tu respuesta para acompañar el reenvío. Mensaje a administración permite consultar sin reenviar el alta.', 'Podés cerrar y reabrir web o app en el mismo dispositivo. Si otra pestaña escribió una versión distinta, elegí cuál conservar. Si no pudo guardarse, mantené abierto y usá Reintentar guardado antes de enviar.'], expected: 'Tu texto se conserva sin enviarlo ni mezclarse con otro trámite.' },
+          { title: 'Confirmar mensaje y reenvío', body: ['Responder y Re-enviar primero registra la respuesta y después presenta la solicitud. Si falla la confirmación, reintentá con la misma referencia: el mensaje no se duplica.', 'Si el mensaje se guardó pero faltan documentos o falló el reenvío, corregí el problema indicado y reintentá. Si escribiste otro texto mientras esperaba, se conserva por separado de la respuesta pendiente.', 'Cuando cambian los datos u observaciones, revisalos y elegí Preparar respuesta con los datos actuales. No se reenvía automáticamente. Al recuperar una presentación ya registrada, se muestra el estado actual sin volver a enviarla. Una solicitud Rechazada sigue cerrada y no ofrece responder.'], expected: 'Distinguís texto local, mensaje registrado y solicitud enviada a revisión.' }
+        ]
+      },
+      {
         id: 'solicitar-cambios-ficha', profile: 'generador', audiences: ['generador', 'operador'],
         title: 'Solicitar cambios de tu ficha', summary: 'Enviá correcciones a Administración sin confundir la solicitud con la actualización del padrón.',
         duration: '2 min', icon: 'edit_note', keywords: ['perfil', 'corregir', 'cambios', 'renovación', 'datos'],

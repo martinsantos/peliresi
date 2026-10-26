@@ -8,7 +8,7 @@ vi.mock('../../utils/logger',()=>({default:{error:vi.fn()}}));
 vi.mock('../../services/email.service',()=>({emailService:{sendEmailVerification:vi.fn()}}));
 vi.mock('../../controllers/auth.controller',()=>({generateTokens:vi.fn()}));
 vi.mock('fs',async original=>{const fs=await original<typeof import('fs')>();return {...fs,default:{...fs,existsSync:()=>true}};});
-import { getSolicitud,getMensajes,crearMensaje,listarSolicitudes,revisarSolicitud,observarSolicitud,aprobarSolicitud,rechazarSolicitud,revisarDocumento,downloadDocumentoSolicitud } from '../../controllers/solicitud.controller';
+import { getSolicitud,getMensajes,crearMensaje,enviarSolicitud,listarSolicitudes,revisarSolicitud,observarSolicitud,aprobarSolicitud,rechazarSolicitud,revisarDocumento,downloadDocumentoSolicitud } from '../../controllers/solicitud.controller';
 const application=()=>({id:'s',tipoActor:'GENERADOR',estado:'EN_REVISION',usuarioId:'owner',usuario:{id:'owner',nombre:'QA solicitante'}});
 async function call(handler:any,role='ADMIN',body:unknown={},id='admin',query:unknown={},restricted=false) {
  const res={json:vi.fn(),status:vi.fn().mockReturnThis()}, next=vi.fn();
@@ -97,4 +97,19 @@ it.each([{autorId:'another'},{solicitudId:'foreign'},{contenido:'Different'}])('
 it('stores a valid client reference on the message, not on its notification',async()=>{
  expect((await call(crearMensaje,'ADMIN',{contenido:'Mensaje con referencia',clientMessageId})).error).toBeUndefined();
  expect(m.message.mock.calls[0][0].data.id).toBe('ui-'+clientMessageId);expect(m.notify).toHaveBeenCalledOnce();
+});
+
+it('candidate resend refuses a newer observation revision before writing or notifying',async()=>{
+ m.find.mockResolvedValue({...application(),estado:'OBSERVADA',updatedAt:new Date('2026-10-26T12:01:00Z')});
+ expect((await call(enviarSolicitud,'GENERADOR',{expectedUpdatedAt:'2026-10-26T12:00:00.000Z'},'owner')).error).toMatchObject({statusCode:409});
+ expect(m.update).not.toHaveBeenCalled();expect(m.notify).not.toHaveBeenCalled();
+});
+it('resend of an already submitted request is read-only and never repeats notices',async()=>{
+ m.find.mockResolvedValue({...application(),estado:'ENVIADA',updatedAt:new Date('2026-10-26T12:01:00Z')});
+ expect((await call(enviarSolicitud,'GENERADOR',{expectedUpdatedAt:'2026-10-26T12:00:00.000Z'},'owner')).error).toBeUndefined();
+ expect(m.update).not.toHaveBeenCalled();expect(m.notify).not.toHaveBeenCalled();
+});
+it.each([null,'invalid',17])('invalid resend revision %j cannot write',async expectedUpdatedAt=>{
+ expect((await call(enviarSolicitud,'GENERADOR',{expectedUpdatedAt},'owner')).error).toMatchObject({statusCode:400});
+ expect(m.update).not.toHaveBeenCalled();expect(m.notify).not.toHaveBeenCalled();
 });

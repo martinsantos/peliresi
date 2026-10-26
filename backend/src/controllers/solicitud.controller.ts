@@ -353,6 +353,8 @@ export const editarDatosRevision = async (req: AuthRequest, res: Response, next:
 export const enviarSolicitud = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const { expectedUpdatedAt } = req.body || {};
+    if (expectedUpdatedAt !== undefined && (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt)))) throw new AppError('La versión de la solicitud es inválida', 400);
     const updated = await prisma.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM solicitudes_inscripcion WHERE id = ${id} FOR UPDATE`;
     const solicitud = await tx.solicitudInscripcion.findUnique({
@@ -372,6 +374,8 @@ export const enviarSolicitud = async (req: AuthRequest, res: Response, next: Nex
     if (!['BORRADOR', 'OBSERVADA'].includes(solicitud.estado)) {
       throw new AppError('Solo se pueden enviar solicitudes en estado BORRADOR u OBSERVADA', 400);
     }
+
+    if (expectedUpdatedAt !== undefined && solicitud.updatedAt.toISOString() !== expectedUpdatedAt) throw new AppError('Los datos u observaciones cambiaron. Revisá la solicitud actual antes de reenviar; tu respuesta sigue guardada.', 409);
 
     // Validate required data
     if (!solicitud.datosActor) {

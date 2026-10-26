@@ -13,7 +13,7 @@ import MiSolicitudPage from '../../pages/solicitud/MiSolicitudPage';
 const originalScroll = HTMLElement.prototype.scrollIntoView;
 const documentScroll = vi.fn();
 describe('applicant conversation scroll', () => {
-  beforeEach(() => { state.messages = []; state.status = 'OBSERVADA'; state.sentAt = null; state.loading = false; state.error = false; state.hasData = true; state.refetch.mockClear();state.messageError=false;state.messageLoading=false;state.retryMessages.mockClear(); documentScroll.mockClear(); HTMLElement.prototype.scrollIntoView = documentScroll; });
+  beforeEach(() => { localStorage.clear(); state.messages = []; state.status = 'OBSERVADA'; state.sentAt = null; state.loading = false; state.error = false; state.hasData = true; state.refetch.mockClear();state.messageError=false;state.messageLoading=false;state.retryMessages.mockClear(); documentScroll.mockClear(); HTMLElement.prototype.scrollIntoView = documentScroll; });
   afterEach(() => { HTMLElement.prototype.scrollIntoView = originalScroll; });
   it('replaces initial skeletons with the received application', () => {
     state.loading = true; state.hasData = false;
@@ -74,7 +74,7 @@ describe('applicant conversation scroll', () => {
 it('never represents a message loading/error as an empty conversation; retries preserve typed text',()=>{
   state.messageLoading=true;
   const view=render(<MemoryRouter><MiSolicitudPage/></MemoryRouter>);
-  expect(screen.getByRole('status')).toHaveTextContent('Consultando mensajes');
+  expect(screen.getByText('Consultando mensajes…')).toHaveAttribute('role','status');
   expect(screen.queryByText('Todavía no hay mensajes')).toBeNull();
   const field=screen.getByRole('textbox',{name:'Mensaje a administración'});
   fireEvent.change(field,{target:{value:'Consulta sin enviar'}});

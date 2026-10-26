@@ -39,8 +39,8 @@ export const solicitudService = {
     return data.data.solicitud;
   },
 
-  async enviar(id: string): Promise<SolicitudInscripcion> {
-    const { data } = await api.post(`/solicitudes/${id}/enviar`);
+  async enviar(id: string, expectedUpdatedAt?: string): Promise<SolicitudInscripcion> {
+    const { data } = await api.post(`/solicitudes/${id}/enviar`, expectedUpdatedAt ? { expectedUpdatedAt } : undefined);
     return data.data.solicitud;
   },
 

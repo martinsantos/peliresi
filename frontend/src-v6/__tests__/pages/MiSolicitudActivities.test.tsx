@@ -2,7 +2,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const requests = vi.hoisted(() => ({ message: vi.fn(), resend: vi.fn() }));
-beforeEach(() => { requests.message.mockReset(); requests.resend.mockReset(); });
+beforeEach(() => { localStorage.clear(); requests.message.mockReset(); requests.resend.mockReset(); });
 vi.mock('../../components/ActorActivities', () => ({ default: () => <h2>Mis actividades</h2> }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ isRestricted: true, logout: vi.fn() }) }));
 vi.mock('../../hooks/useSolicitudes', () => ({
@@ -59,7 +59,7 @@ for (const kind of ['message', 'reply'] as const) it.each([false, true])(`${kind
   fireEvent.change(field(), { target: { value: 'Texto enviado del generador' } });
   fireEvent.click(screen.getByRole('button', { name: kind === 'message' ? 'Enviar mensaje' : 'Responder y Re-enviar', exact: true }));
   await act(async () => { await Promise.resolve(); });
-  expect(requests.message).toHaveBeenCalledWith({ solicitudId: 'g', contenido: 'Texto enviado del generador' });
+  expect(requests.message).toHaveBeenCalledWith(expect.objectContaining({ solicitudId: 'g', contenido: 'Texto enviado del generador', clientMessageId: expect.any(String) }));
   if (switchActivity) fireEvent.change(screen.getByLabelText('Solicitud por actividad'), { target: { value: 'o' } });
   fireEvent.change(field(), { target: { value: 'Texto nuevo todavía sin enviar' } });
   await act(async () => { finish(); await pending; });

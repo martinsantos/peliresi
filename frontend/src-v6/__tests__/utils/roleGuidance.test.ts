@@ -30,7 +30,8 @@ it.each(['', '/app', '/mobile'].flatMap(prefix => ['ADMIN', 'ADMIN_GENERADOR', '
 it.each(['', '/app', '/mobile'])('requester help stays scoped to the actual task on %s', prefix => {
  for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
   const own = contextualGuidance(prefix + '/mi-solicitud', role);
-  expect(own.manual).toBe('alta-borradores-ocr');
+  expect(own.manual).toBe('alta-responder-observaciones');
+  expect(own.steps.join(' ')).toContain('sin reenviar');
   expect(own.steps.join(' ')).not.toContain('Iniciar revisión');
  }
  const changes = contextualGuidance(prefix + '/mi-perfil/solicitar-cambios', 'GENERADOR');

@@ -67,7 +67,7 @@ export function useUpdateSolicitud() {
 export function useEnviarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => solicitudService.enviar(id),
+    mutationFn: (request: string | { id: string; expectedUpdatedAt?: string }) => typeof request === 'string' ? solicitudService.enviar(request) : solicitudService.enviar(request.id, request.expectedUpdatedAt),
     onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }

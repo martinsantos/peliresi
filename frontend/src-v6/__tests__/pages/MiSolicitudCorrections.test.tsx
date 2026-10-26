@@ -13,7 +13,7 @@ vi.mock('../../hooks/useSolicitudes', () => ({
 import MiSolicitudPage from '../../pages/solicitud/MiSolicitudPage';
 function Destination() { return <p>Destino: {useLocation().pathname}</p>; }
 function open() { render(<MemoryRouter initialEntries={['/mi-solicitud']}><Routes><Route path="/mi-solicitud" element={<MiSolicitudPage />} /><Route path="/inscripcion/:tipo" element={<Destination />} /><Route path="/login" element={<Destination />} /><Route path="/dashboard" element={<Destination />} /></Routes></MemoryRouter>); }
-beforeEach(() => { vi.clearAllMocks(); state.restricted = true; state.logout.mockResolvedValue(undefined); vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'false'); });
+beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); state.restricted = true; state.logout.mockResolvedValue(undefined); vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'false'); });
 afterEach(() => vi.unstubAllEnvs());
 it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('%s explicitly renews the limited session after approval through a fresh login', async type => {
   state.applications = [{ id: 'owned', tipoActor: type, estado: 'APROBADA' }]; open();
