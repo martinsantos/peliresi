@@ -220,3 +220,51 @@ it.each(['','/app'])('keeps a failed read beside its original with a retry and n
  expect(screen.getByRole('button',{name:'Leer documento',exact:true})).toBeEnabled();
  expect(state.document).not.toHaveBeenCalled();
 });
+
+it.each(['', '/app'])('confirms the selected document and retains its note across reopening (%s)', async prefix => {
+ state.detail.data.documentos=[{id:'invoice',tipo:'FACTURA_ELECTRICA',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:'a'.repeat(64)}];
+ let view=render(tree(prefix));
+ fireEvent.click(screen.getByRole('button',{name:'Rechazar documento Factura artificial'}));
+ expect(state.document).not.toHaveBeenCalled();
+ expect(screen.getByRole('dialog')).toHaveTextContent('Factura artificial');
+ fireEvent.change(screen.getByLabelText('Observaciones del documento (opcional)'),{target:{value:'Falta la página donde figura el suministro.'}});
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Volver sin decidir'}));
+ expect(state.document).not.toHaveBeenCalled();view.unmount();view=render(tree(prefix));
+ fireEvent.click(screen.getByRole('button',{name:'Rechazar documento Factura artificial'}));
+ expect(screen.getByLabelText('Observaciones del documento (opcional)')).toHaveValue('Falta la página donde figura el suministro.');
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Confirmar rechazo del documento'}));});
+ expect(state.document).toHaveBeenCalledWith({solicitudId:'s1',docId:'invoice',estado:'RECHAZADO',observaciones:'Falta la página donde figura el suministro.',expectedDocument:{estado:'PENDIENTE',sha256:'a'.repeat(64)}});
+ expect(state.reject).not.toHaveBeenCalled();expect(state.observe).not.toHaveBeenCalled();
+ expect(screen.queryByRole('dialog')).toBeNull();
+});
+it('does not transfer a document note to another document or another administrator', () => {
+ const docs=['one','two'].map(id=>({id,tipo:'OTRO',estado:'PENDIENTE',nombre:id,size:100,sha256:id.repeat(64).slice(0,64)}));state.detail.data.documentos=docs;
+ let view=render(tree());fireEvent.click(screen.getByRole('button',{name:'Rechazar documento one'}));
+ fireEvent.change(screen.getByLabelText('Observaciones del documento (opcional)'),{target:{value:'Sólo documento uno'}});
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Volver sin decidir'}));fireEvent.click(screen.getByRole('button',{name:'Rechazar documento two'}));
+ expect(screen.getByLabelText('Observaciones del documento (opcional)')).toHaveValue('');
+ view.unmount();state.owner='admin:other';view=render(tree());fireEvent.click(screen.getByRole('button',{name:'Rechazar documento one'}));
+ expect(screen.getByLabelText('Observaciones del documento (opcional)')).toHaveValue('');
+});
+it('blocks confirmation when the document changes while its dialog is open', () => {
+ state.detail.data.documentos=[{id:'invoice',tipo:'OTRO',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:'a'.repeat(64)}];
+ const view=render(tree());fireEvent.click(screen.getByRole('button',{name:'Aprobar documento Factura artificial'}));
+ state.detail.data={...state.detail.data,documentos:[{...state.detail.data.documentos[0],estado:'RECHAZADO'}]};view.rerender(tree());
+ expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('El documento cambió');
+ expect(screen.getByRole('button',{name:'Confirmar aprobación del documento'})).toBeDisabled();expect(state.document).not.toHaveBeenCalled();
+});
+it('keeps the document note and failure inside the confirmation dialog',async()=>{
+ state.detail.data.documentos=[{id:'invoice',tipo:'OTRO',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:null}];state.document.mockRejectedValue({response:{data:{message:'El documento cambió durante la revisión.'}}});
+ render(tree());fireEvent.click(screen.getByRole('button',{name:'Rechazar documento Factura artificial'}));
+ fireEvent.change(screen.getByLabelText('Observaciones del documento (opcional)'),{target:{value:'Revisar original'}});
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Confirmar rechazo del documento'}));});
+ expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('El documento cambió');
+ expect(screen.getByLabelText('Observaciones del documento (opcional)')).toHaveValue('Revisar original');
+});
+
+it('an observed application explains that the applicant already owes a correction',()=>{
+ state.detail.data.estado='OBSERVADA';state.detail.data.documentos=[{id:'d',tipo:'OTRO',estado:'PENDIENTE',nombre:'Original artificial',size:100}];render(tree());
+ fireEvent.click(screen.getByRole('button',{name:'Rechazar documento Original artificial'}));
+ expect(screen.getByRole('dialog')).toHaveTextContent('El solicitante ya debe corregir y reenviar');
+ expect(screen.getByRole('dialog')).not.toHaveTextContent('usá Observar');expect(state.document).not.toHaveBeenCalled();
+});

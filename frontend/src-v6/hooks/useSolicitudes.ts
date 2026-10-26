@@ -136,9 +136,9 @@ export function useRechazarSolicitud() {
 export function useRevisarDocumento() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ solicitudId, docId, estado, observaciones }: {
-      solicitudId: string; docId: string; estado: 'APROBADO' | 'RECHAZADO'; observaciones?: string;
-    }) => solicitudService.revisarDocumento(solicitudId, docId, estado, observaciones),
+    mutationFn: ({ solicitudId, docId, estado, observaciones, expectedDocument }: {
+      solicitudId: string; docId: string; estado: 'APROBADO' | 'RECHAZADO'; observaciones?: string; expectedDocument?: { estado: string; sha256: string | null };
+    }) => solicitudService.revisarDocumento(solicitudId, docId, estado, observaciones, expectedDocument),
     onSuccess: (_, { solicitudId }) => qc.invalidateQueries({ queryKey: KEYS.solicitud(solicitudId) }),
   });
 }

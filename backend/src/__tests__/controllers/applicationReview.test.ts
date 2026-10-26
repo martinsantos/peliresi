@@ -113,3 +113,29 @@ it.each([null,'invalid',17])('invalid resend revision %j cannot write',async exp
  expect((await call(enviarSolicitud,'GENERADOR',{expectedUpdatedAt},'owner')).error).toMatchObject({statusCode:400});
  expect(m.update).not.toHaveBeenCalled();expect(m.notify).not.toHaveBeenCalled();
 });
+
+it.each(['APROBADO','RECHAZADO'])('does not overwrite another document decision with an old pending view (%s)',async estado=>{
+ m.doc.mockResolvedValue({id:'d',solicitudId:'s',tipo:'OTRO',estado,sha256:'a'.repeat(64)});
+ expect((await call(revisarDocumento,'ADMIN',{estado:'RECHAZADO',expectedDocument:{estado:'PENDIENTE',sha256:'a'.repeat(64)}})).error).toMatchObject({statusCode:409});
+ expect(m.docUpdate).not.toHaveBeenCalled();
+});
+it('rejects a different original even if its document identifier is reused',async()=>{
+ m.doc.mockResolvedValue({id:'d',solicitudId:'s',tipo:'OTRO',estado:'PENDIENTE',sha256:'b'.repeat(64)});
+ expect((await call(revisarDocumento,'ADMIN',{estado:'APROBADO',expectedDocument:{estado:'PENDIENTE',sha256:'a'.repeat(64)}})).error).toMatchObject({statusCode:409});expect(m.docUpdate).not.toHaveBeenCalled();
+});
+it.each([12,null,'x'.repeat(5001)])('rejects invalid document observations before writing (%#)',async observaciones=>{
+ expect((await call(revisarDocumento,'ADMIN',{estado:'RECHAZADO',observaciones})).error).toMatchObject({statusCode:400});expect(m.docUpdate).not.toHaveBeenCalled();
+});
+it('saves an explicit empty note without erasing notes when the field is omitted',async()=>{
+ await call(revisarDocumento,'ADMIN',{estado:'RECHAZADO',observaciones:''});expect(m.docUpdate).toHaveBeenLastCalledWith(expect.objectContaining({data:expect.objectContaining({observaciones:''})}));
+ await call(revisarDocumento,'ADMIN',{estado:'RECHAZADO'});expect(m.docUpdate).toHaveBeenLastCalledWith(expect.objectContaining({data:expect.objectContaining({observaciones:undefined})}));
+});
+
+it('reviews the expected current original and trims its note without resolving the application',async()=>{
+ m.doc.mockResolvedValue({id:'d',solicitudId:'s',tipo:'OTRO',estado:'PENDIENTE',sha256:'a'.repeat(64)});
+ expect((await call(revisarDocumento,'ADMIN',{estado:'RECHAZADO',observaciones:'  Falta una página  ',expectedDocument:{estado:'PENDIENTE',sha256:'a'.repeat(64)}})).error).toBeUndefined();
+ expect(m.docUpdate).toHaveBeenCalledWith(expect.objectContaining({data:expect.objectContaining({estado:'RECHAZADO',observaciones:'Falta una página'})}));expect(m.update).not.toHaveBeenCalled();expect(m.notify).not.toHaveBeenCalled();
+});
+it.each([null,[],{estado:'OTRO',sha256:null},{estado:'PENDIENTE',sha256:'broken'}])('invalid document reference cannot write (%#)',async expectedDocument=>{
+ expect((await call(revisarDocumento,'ADMIN',{estado:'APROBADO',expectedDocument})).error).toMatchObject({statusCode:400});expect(m.docUpdate).not.toHaveBeenCalled();
+});

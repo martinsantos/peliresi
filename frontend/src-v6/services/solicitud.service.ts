@@ -121,8 +121,8 @@ export const solicitudService = {
     return data.data.solicitud;
   },
 
-  async revisarDocumento(solicitudId: string, docId: string, estado: 'APROBADO' | 'RECHAZADO', observaciones?: string): Promise<DocumentoSolicitud> {
-    const { data } = await api.patch(`/solicitudes/${solicitudId}/documentos/${docId}/revisar`, { estado, observaciones });
+  async revisarDocumento(solicitudId: string, docId: string, estado: 'APROBADO' | 'RECHAZADO', observaciones?: string, expectedDocument?: { estado: string; sha256: string | null }): Promise<DocumentoSolicitud> {
+    const { data } = await api.patch(`/solicitudes/${solicitudId}/documentos/${docId}/revisar`, { estado, observaciones, expectedDocument });
     return data.data.documento;
   },
 };

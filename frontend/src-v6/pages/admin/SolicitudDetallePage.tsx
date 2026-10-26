@@ -98,6 +98,35 @@ function ReviewDraftNotice({ draft }: { draft: Pick<ReturnType<typeof useRecover
   </div>;
 }
 
+function DocumentReviewDialog({ document, decision, scope, allowed, busy, changed, observed, feedback, onClose, onConfirm }: {
+  document: DocumentoSolicitud; decision: 'APROBADO' | 'RECHAZADO'; scope: string;
+  allowed: boolean; busy: boolean; changed: boolean; observed: boolean; feedback: React.ReactNode;
+  onClose: () => void; onConfirm: (note: string, clear: () => void) => void;
+}) {
+  const note = useRecoverableForm(`${scope}:document:${document.id}:${document.sha256 || 'original'}:${decision}`, document.observaciones || '', validText);
+  const approving = decision === 'APROBADO';
+  return <Modal isOpen onClose={onClose} isBusy={busy} title={approving ? 'Aprobar documento' : 'Rechazar documento'} size="sm">
+    <div className="space-y-4">
+      <p className="font-semibold text-neutral-900 [overflow-wrap:anywhere]">{document.nombre}</p>
+      <p className="text-sm text-neutral-700">{approving ? 'Esta decisión aprueba sólo el documento. La solicitud mantiene su estado hasta que la resuelvas.' : observed ? 'El solicitante ya debe corregir y reenviar el alta. Podés registrar tu revisión del documento; esta decisión no envía otro requerimiento.' : 'Registrá qué debe corregirse. Para pedir correcciones y avisar al solicitante, usá Observar en la solicitud.'}</p>
+      {feedback}
+      {changed ? <p role="alert" className="text-sm text-error-900">El documento cambió. Volvé a la ficha y revisá su estado antes de decidir. Tu texto se conserva.</p> : !allowed && <p role="status" className="text-sm text-neutral-700">Esperá a verificar la solicitud antes de confirmar.</p>}
+      <div>
+        <label htmlFor="document-review-note" className="mb-1 block text-sm font-medium text-neutral-800">Observaciones del documento (opcional)</label>
+        <textarea id="document-review-note" value={note.value} onChange={event => note.update(event.target.value)} maxLength={5000} disabled={busy}
+          rows={4} className="w-full rounded-xl border border-neutral-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary-700" />
+        <ReviewDraftNotice draft={note} />
+      </div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" disabled={busy} onClick={onClose}>Volver sin decidir</Button>
+        <Button variant={approving ? 'primary' : 'danger'} disabled={!allowed || changed || busy || note.conflict} isLoading={busy} onClick={() => onConfirm(note.value.trim(), note.clear)}>
+          {approving ? 'Confirmar aprobación del documento' : 'Confirmar rechazo del documento'}
+        </Button>
+      </div>
+    </div>
+  </Modal>;
+}
+
 const SolicitudReview: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -113,6 +142,7 @@ const SolicitudReview: React.FC = () => {
   const [observarModal, setObservarModal] = useState(false);
   const [rechazarModal, setRechazarModal] = useState(false);
   const [confirmarAprobar, setConfirmarAprobar] = useState(false);
+  const [documentDecision, setDocumentDecision] = useState<{ document: DocumentoSolicitud; decision: 'APROBADO' | 'RECHAZADO' } | null>(null);
   const [readingReceipt, setReadingReceipt] = useState(false);
   const [editingData, setEditingData] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -162,9 +192,17 @@ const SolicitudReview: React.FC = () => {
   const handleRechazar = () => run(canDecide && !!rechazarText.trim() && !rejection.conflict,
     () => rechazarSolicitud.mutateAsync({ id: id!, motivoRechazo: rechazarText.trim(), expectedUpdatedAt: solicitud?.updatedAt }),
     () => { rejection.clear(); observation.clear(); setRechazarModal(false); }, 'Solicitud rechazada. El motivo quedó registrado.');
-  const handleDocReview = (docId: string, estado: 'APROBADO' | 'RECHAZADO') => run(canAct,
-    () => revisarDocumento.mutateAsync({ solicitudId: id!, docId, estado }),
-    () => {}, estado === 'APROBADO' ? 'Documento aprobado.' : 'Documento rechazado.');
+  const currentDocument = documentDecision && solicitud?.documentos?.find(doc => doc.id === documentDecision.document.id);
+  const documentChanged = !!documentDecision && (!currentDocument || currentDocument.estado !== documentDecision.document.estado || (currentDocument.sha256 || null) !== (documentDecision.document.sha256 || null));
+  const handleDocReview = (note: string, clear: () => void) => {
+    if (!documentDecision) return;
+    const { document, decision } = documentDecision;
+    return run(canAct && !documentChanged,
+      () => revisarDocumento.mutateAsync({ solicitudId: id!, docId: document.id, estado: decision, observaciones: note,
+        expectedDocument: { estado: document.estado, sha256: document.sha256 || null } }),
+      () => { clear(); setDocumentDecision(null); },
+      decision === 'APROBADO' ? 'Documento aprobado. La solicitud mantiene su estado.' : solicitud?.estado === 'OBSERVADA' ? 'Documento rechazado. La solicitud sigue esperando la corrección del solicitante.' : 'Documento rechazado. Para pedir correcciones al solicitante, observá la solicitud.', document.id);
+  };
 
   const feedbackPanel = feedback && <p ref={feedbackRef} tabIndex={-1} role={feedback.error ? 'alert' : 'status'} className={'rounded-lg border p-3 text-sm ' + (feedback.error ? 'border-error-200 bg-error-50 text-error-900' : 'border-primary-200 bg-primary-50 text-primary-900')}>{feedback.text}</p>;
   // A failed fresh read must hide cached private data and decision controls.
@@ -216,7 +254,7 @@ const SolicitudReview: React.FC = () => {
         </div>
       </div>
 
-      {!observarModal && !rechazarModal && !confirmarAprobar && (!feedback?.documentId || !documentos.some(doc => doc.id === feedback.documentId)) && feedbackPanel}
+      {!observarModal && !rechazarModal && !confirmarAprobar && !documentDecision && (!feedback?.documentId || !documentos.some(doc => doc.id === feedback.documentId)) && feedbackPanel}
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary-100 bg-primary-50 p-4">
         <p className="min-w-0 flex-1 text-sm text-primary-900">{statusText}</p>
         {solicitud.estado === 'ENVIADA' && reviewer && <Button disabled={!fresh || busy} onClick={() => void run(fresh && reviewer, () => revisarSolicitud.mutateAsync({ id: id!, expectedUpdatedAt: solicitud?.updatedAt }), () => {}, 'Revisión iniciada. Podés revisar documentos y resolver la solicitud.')}>Iniciar revisión</Button>}
@@ -303,11 +341,11 @@ const SolicitudReview: React.FC = () => {
                         {doc.observaciones}
                       </p>
                     )}
-                    {feedback?.documentId === doc.id && feedbackPanel}
+                    {!documentDecision && feedback?.documentId === doc.id && feedbackPanel}
                     <DocumentAnalysis analysis={doc.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} retrying={readingReceipt || !fresh || busy} onRetry={reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) ? () => void handleRetryReading(doc.id) : undefined} />
                     {doc.tipo === 'COMPROBANTE_PAGO' && reviewer && (['EN_REVISION', 'OBSERVADA'].includes(solicitud.estado) || doc.estado === 'APROBADO') && <fieldset disabled={!fresh || busy}><PaymentIdentityReview key={doc.id + doc.sha256} analysis={doc.analisis} sha256={doc.sha256} estadoDocumento={doc.estado} cuit={datosActor.cuit || ''} referencia={solicitud.id} onConfirm={async input => { if (!fresh || busy) throw new Error('Esperá a verificar la solicitud antes de confirmar el pago.'); await solicitudService.confirmarPago(solicitud.id, doc.id, input); await refetch(); }} /></fieldset>}
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         aria-label={`Descargar ${doc.nombre}`}
@@ -320,22 +358,22 @@ const SolicitudReview: React.FC = () => {
                       {doc.estado === 'PENDIENTE' && canAct && (
                         <>
                           <button
-                            onClick={() => handleDocReview(doc.id, 'APROBADO')}
+                            onClick={() => { setFeedback(null); setDocumentDecision({ document: { ...doc }, decision: 'APROBADO' }); }}
                             aria-label={`Aprobar documento ${doc.nombre}`}
-                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-green-800 hover:bg-green-50 focus-visible:ring-2 focus-visible:ring-primary-700"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-green-800 hover:bg-green-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Aprobar documento"
                             disabled={revisarDocumento.isPending}
                           >
-                            <CheckCircle size={13} className="text-green-600" />
+                            <CheckCircle size={16} aria-hidden="true" /> Aprobar
                           </button>
                           <button
-                            onClick={() => handleDocReview(doc.id, 'RECHAZADO')}
+                            onClick={() => { setFeedback(null); setDocumentDecision({ document: { ...doc }, decision: 'RECHAZADO' }); }}
                             aria-label={`Rechazar documento ${doc.nombre}`}
-                            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-red-800 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-primary-700"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 text-sm font-medium text-red-800 hover:bg-red-50 focus-visible:ring-2 focus-visible:ring-primary-700"
                             title="Rechazar documento"
                             disabled={revisarDocumento.isPending}
                           >
-                            <XCircle size={13} className="text-red-600" />
+                            <XCircle size={16} aria-hidden="true" /> Rechazar
                           </button>
                         </>
                       )}
@@ -451,6 +489,10 @@ const SolicitudReview: React.FC = () => {
           </Button>
         </Card>
       )}
+
+      {documentDecision && <DocumentReviewDialog key={`${documentDecision.document.id}:${documentDecision.document.sha256}:${documentDecision.decision}`}
+        document={documentDecision.document} decision={documentDecision.decision} scope={scope} allowed={canAct} busy={busy} changed={documentChanged} observed={solicitud.estado === 'OBSERVADA'}
+        feedback={feedback?.documentId === documentDecision.document.id ? feedbackPanel : null} onClose={() => setDocumentDecision(null)} onConfirm={handleDocReview} />}
 
       {/* Confirm Aprobar Modal */}
       {confirmarAprobar && (

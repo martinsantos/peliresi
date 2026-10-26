@@ -1107,7 +1107,15 @@ export const rechazarSolicitud = async (req: AuthRequest, res: Response, next: N
 export const revisarDocumento = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id, docId } = req.params;
-    const { estado, observaciones } = req.body;
+    const { estado, observaciones, expectedDocument } = req.body;
+    if (observaciones !== undefined && (typeof observaciones !== 'string' || observaciones.length > 5000)) {
+      throw new AppError('Las observaciones del documento deben ser un texto de hasta 5000 caracteres.', 400);
+    }
+    if (expectedDocument !== undefined && (!expectedDocument || typeof expectedDocument !== 'object' || Array.isArray(expectedDocument)
+      || !['PENDIENTE', 'APROBADO', 'RECHAZADO'].includes(expectedDocument.estado)
+      || !(expectedDocument.sha256 === null || typeof expectedDocument.sha256 === 'string' && /^[a-f0-9]{64}$/i.test(expectedDocument.sha256)))) {
+      throw new AppError('La referencia del documento no es válida. Actualizá la solicitud.', 400);
+    }
 
     if (!estado || !['APROBADO', 'RECHAZADO'].includes(estado)) {
       throw new AppError('El estado debe ser APROBADO o RECHAZADO', 400);
@@ -1127,13 +1135,16 @@ export const revisarDocumento = async (req: AuthRequest, res: Response, next: Ne
       if (!application || !['EN_REVISION', 'OBSERVADA'].includes(application.estado)) throw new AppError('La solicitud cambió o ya está resuelta. Actualizá antes de revisar documentos.', 409);
       const current = await tx.documentoSolicitud.findUnique({ where: { id: docId } });
       if (!current || current.solicitudId !== id) throw new AppError('El documento cambió durante la revisión.', 409);
+      if (expectedDocument && (current.estado !== expectedDocument.estado || (current.sha256 || null) !== expectedDocument.sha256)) {
+        throw new AppError('El documento cambió durante la revisión. Actualizá y revisá el original antes de decidir.', 409);
+      }
       if (current.tipo === 'COMPROBANTE_PAGO') {
         const user = await tx.usuario.findUniqueOrThrow({ where: { id: solicitud.usuarioId }, select: { cuit: true } });
         const target = { origen: 'SOLICITUD' as const, documentoId: docId, ambito: solicitudPaymentScope(id), cuit: user.cuit || '', sha256: current.sha256 || '' };
         if (estado === 'APROBADO') await requirePaymentIdentity(tx, target, current.analisis);
         await notePaymentDecision(tx, target, current.analisis, estado, req.user!.id);
       }
-      return tx.documentoSolicitud.update({ where: { id: docId }, data: { estado, observaciones: observaciones || undefined, revisadoPor: req.user!.id, revisadoAt: new Date() } });
+      return tx.documentoSolicitud.update({ where: { id: docId }, data: { estado, observaciones: observaciones === undefined ? undefined : observaciones.trim(), revisadoPor: req.user!.id, revisadoAt: new Date() } });
     });
 
     res.json({ success: true, data: { documento: updated } });
