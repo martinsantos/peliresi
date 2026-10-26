@@ -167,16 +167,26 @@ export const getInvitation=companyAction(async(req,res)=>{
  return send(res,{empresa:company.razonSocial,email:i.email,rol:activity.rol,venceAt:i.venceAt});
 });
 export const acceptInvitation=companyAction(async(req,res)=>{
- const data=parse(z.object({email:z.string().trim().toLowerCase().email(),password:z.string().min(1).max(200)}).strict(),req.body),hash=tokenHash(req.params.token);
- const {i}=await availableInvitation(prisma,hash);
+ const data=parse(z.object({email:z.string().trim().toLowerCase().email(),password:z.string().min(1).max(200),soloConsultar:z.boolean().optional()}).strict(),req.body),hash=tokenHash(req.params.token);
+ // Recover a result only after authenticating its original recipient. Anonymous
+ // reads still treat used tokens as unavailable, and recovery never regrants access.
+ const i=await prisma.invitacionEmpresa.findUnique({where:{tokenHash:hash}});
+ if(!i||i.revocadaAt)throw new AppError('Invitación no disponible',404);
  const user=await prisma.usuario.findUnique({where:{email:data.email}});
  if(i.email!==data.email||!user||!await bcrypt.compare(data.password,user.password))throw new AppError('No pudimos confirmar la cuenta de esta invitación',403);
  if(!user.emailVerified)throw new AppError('Verificá tu correo antes de aceptar la invitación',403);
  if(user.motivoInactividad==='SUSPENDIDA'||!['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(user.rol))throw new AppError('Esta cuenta no puede aceptar la invitación',403);
- await transaction(async db=>{
-  const {i:current}=await availableInvitation(db,hash);
+ const result=await transaction(async db=>{
+  const current=await db.invitacionEmpresa.findUnique({where:{tokenHash:hash}});
+  if(!current||current.revocadaAt)throw new AppError('Invitación no disponible',404);
   const fresh=await db.usuario.findUniqueOrThrow({where:{id:user.id}});
-  if(!fresh.emailVerified||fresh.motivoInactividad==='SUSPENDIDA'||fresh.email!==current.email||fresh.password!==user.password)throw new AppError('Cuenta no disponible',403);
+  if(!fresh.emailVerified||fresh.motivoInactividad==='SUSPENDIDA'||fresh.email!==current.email||fresh.password!==user.password||!['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(fresh.rol))throw new AppError('Cuenta no disponible',403);
+  if(current.aceptadaAt){
+   if(current.aceptadaPor!==fresh.id)throw new AppError('Invitación no disponible',404);
+   return {aceptada:true,recuperada:true};
+  }
+  await availableInvitation(db,hash);
+  if(data.soloConsultar)return {aceptada:false};
   if(!fresh.activo) {
    const [actors,applications]=await Promise.all([Promise.all(['generador','transportista','operador'].map(k=>db[k].count({where:{usuarioId:user.id}}))),db.solicitudInscripcion.count({where:{usuarioId:user.id}})]);
    if(fresh.motivoInactividad!=='PENDIENTE_APROBACION'||fresh.cuit||actors.some((n:number)=>n>0)||applications)throw new AppError('La cuenta tiene una revisión propia pendiente. Debe resolverla DGFA.',403);
@@ -185,7 +195,8 @@ export const acceptInvitation=companyAction(async(req,res)=>{
   await authorizePerson(db,{id:current.creadaPor},current.empresaId,current,user.id);
   await db.invitacionEmpresa.update({where:{id:current.id},data:{aceptadaPor:user.id,aceptadaAt:new Date()}});
   await enterpriseEvent(db,{id:user.id},current.empresaId,'INVITACION_ACEPTADA',{invitacionId:current.id});
- });return send(res,{aceptada:true});
+  return {aceptada:true,recuperada:false};
+ });return send(res,result);
 });
 export const revokeInvitation=companyAction(async(req,res)=>{
  await transaction(async db=>{
