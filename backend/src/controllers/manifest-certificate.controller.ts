@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { assertCertificateCommandAvailable, recoverCertificateCommand } from '../services/certificateRecovery.service';
 import type { Response, NextFunction } from 'express';
 import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
@@ -41,6 +43,7 @@ export async function releaseManifestCertificate(req:AuthRequest,res:Response,ne
     if(existing.manifiestoId!==m.id||existing.autorId!==req.user.id||existing.solicitudSha256!==fingerprint)throw new AppError('La solicitud ya tiene otro contenido',409);
     return {id:existing.id,numero:existing.numero,pdfSha256:existing.pdfSha256,replayed:true};
    }
+   await assertCertificateCommandAvailable(tx, command.id);
    const prior=await tx.certificadoManifiesto.findMany({where:{manifiestoId:m.id},orderBy:{createdAt:'asc'},select:{tipo:true,numero:true,documento:true}});
    if(prior.some(p=>p.tipo==='FINAL'))throw new AppError('El certificado final ya fue emitido; el expediente firmado se conserva',409);
    if(!['EN_TRATAMIENTO','TRATADO'].includes(m.estado))throw new AppError('Registrá el tratamiento antes de certificar',409);
@@ -78,4 +81,20 @@ export async function downloadManifestCertificate(req:AuthRequest,res:Response,n
   if(!record)throw new AppError('Certificado no encontrado',404);
   sendStoredCertificate(res,record);
  } catch(e){next(e);}
+}
+
+export async function recoverManifestCertificate(req:AuthRequest,res:Response,next:NextFunction) {
+ try {
+  await scope(req);
+  if(req.user.rol!=='OPERADOR'||!req.user.operador?.id||req.user.restricted||req.user.impersonatedBy)throw new AppError('Sólo el operador vinculado puede recuperar su envío',403);
+  const parsed=z.string().uuid().safeParse(req.params.commandId);
+  if(!parsed.success)throw new AppError('Identificador de solicitud inválido',400);
+  const result=await prisma.$transaction(async tx=>{
+   await lockManifestDocuments(tx,req.params.id);
+   const manifest=await tx.manifiesto.findUniqueOrThrow({where:{id:req.params.id},include:{operador:true}});
+   if(manifest.operadorId!==req.user.operador.id||!manifest.operador.activo)throw new AppError('Sólo el operador activo vinculado puede recuperar',403);
+   return recoverCertificateCommand(tx,manifest.id,req.user.id,parsed.data);
+  },{timeout:15000});
+  res.json({success:true,data:result});
+ }catch(e){next(e);}
 }

@@ -1,3 +1,5 @@
+import { useImpersonation } from '../../../contexts/ImpersonationContext';
+import { useCertificateCommand } from '../../../hooks/useCertificateCommand';
 import { Award, FileCheck2, LockKeyhole, CheckCircle2, Download } from 'lucide-react';
 import { CardHeader } from '../../../components/ui/CardV2';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -12,12 +14,12 @@ import {SignaturePad} from '../../../components/ui/SignaturePad';
 import type {Manifiesto} from '../../../types/models';
 type DocumentRow={id:string;numero?:string;createdAt:string;documento:{tipo:string;cantidades:{residuoId:string;cantidad:number;corriente:string;unidad:string}[]}};
 export function TrainingCertificates({manifest}:{manifest:Partial<Manifiesto>}){
- const {currentUser}=useAuth();
- const scope=JSON.stringify([currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.establecimientoId,manifest.id]);
+ const {currentUser,isRestricted}=useAuth();const {impersonationData}=useImpersonation();
+ const scope=JSON.stringify([currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.actividadId,currentUser?.empresaContexto?.establecimientoId,currentUser?.training,!!isRestricted,!!impersonationData,manifest.id]);
  return currentUser?<CertificateContext key={scope} scope={scope} manifest={manifest}/>:null;
 }
 function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope:string}){
- const {currentUser}=useAuth();const qc=useQueryClient();const id=manifest.id!;const mp=useMobilePrefix();
+ const {currentUser,isRestricted}=useAuth();const {impersonationData}=useImpersonation();const readOnly=!!isRestricted||!!impersonationData&&!currentUser?.training;const qc=useQueryClient();const id=manifest.id!;const mp=useMobilePrefix();
  const training=!!currentUser?.training;
  const endpoint=`/manifiestos/${id}/${training?'documentos-cap':'certificados'}`;
  const checks=useQuery({queryKey:['certificate-readiness',scope],enabled:training&&currentUser?.rol==='OPERADOR'&&manifest.estado==='TRATADO',queryFn:async()=>(await api.get(`/manifiestos/${id}/adendas`)).data.data.documental as {pendientes:number;observadas:number;rechazadas:number},refetchInterval:5000,staleTime:0});
@@ -30,15 +32,17 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
  useEffect(()=>{const target=selectedCertificate||id;if(query.data&&window.location.hash==='#certificaciones'&&scrolled.current!==target){(document.getElementById('certificado-'+selectedCertificate)||document.getElementById('certificaciones'))?.scrollIntoView({block:'start'});scrolled.current=target;}},[query.data,id,selectedCertificate]);
  const [kind,setKind]=useState<'PARCIAL'|'FINAL'|null>(null),[amounts,setAmounts]=useState<Record<string,string>>({}),[method,setMethod]=useState(''),[note,setNote]=useState(''),[signature,setSignature]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const lock=useRef(false),request=useRef<{id:string;body:string}|null>(null);
- const operator=currentUser?.rol==='OPERADOR'&&currentUser.actorId===manifest.operadorId;
+ const operator=currentUser?.rol==='OPERADOR'&&currentUser.actorId===manifest.operadorId&&!readOnly;
+ const recovery=useCertificateCommand({userId:String(currentUser!.id),context:scope,manifestId:id},operator&&!training);
  const canRelease=operator&&!query.isError&&query.data?.enabled&&['EN_TRATAMIENTO','TRATADO'].includes(manifest.estado||'');
  const final=query.data?.documents.some(d=>d.documento.tipo==='FINAL');
  function open(tipo:'PARCIAL'|'FINAL'){
   setKind(tipo);setMethod((manifest as Partial<Manifiesto> & {tratamientoMetodo?:string}).tratamientoMetodo || '');setNote('');setAmounts(Object.fromEntries((manifest.residuos||[]).map(r=>[r.id,String(tipo==='FINAL'?(r.cantidadRecibida??''):Math.max(0,(r.cantidadRecibida??0)-(query.data?.documents.filter(d=>d.documento.tipo==='PARCIAL').flatMap(d=>d.documento.cantidades).filter(row=>row.residuoId===r.id).reduce((n,row)=>n+row.cantidad,0)??0))||'')])));setSignature('');setError('');
  }
  async function release(e:React.FormEvent){
-  e.preventDefault();if(lock.current||!kind||!signature||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError)))return;lock.current=true;setBusy(true);setError('');
+  e.preventDefault();if(recovery.command||!recovery.ready||lock.current||!kind||!signature||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError)))return;lock.current=true;setBusy(true);setError('');
   const body={tipo:kind,firma:signature,metodo:method,nota:note,cantidades:Object.entries(amounts).filter(([,v])=>v!=='').map(([residuoId,v])=>({residuoId,cantidad:Number(v)}))};
+  if(!training){await recovery.submit(body);lock.current=false;setBusy(false);return;}
   const content=JSON.stringify(body);if(request.current?.body!==content)request.current={id:crypto.randomUUID(),body:content};
   try{await api.post(endpoint,{id:request.current.id,...body});setKind(null);setSignature('');request.current=null;await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});await qc.invalidateQueries({queryKey:['training-tasks']});}
   catch(e:any){setError(e.response?.data?.message||'No se pudo liberar. Se conserva la carga para reintentar.');}
@@ -50,6 +54,7 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
  }
  return <section id="certificaciones" aria-label="Certificaciones" className="scroll-mt-28 rounded-xl border border-neutral-200 bg-white p-4 space-y-3">
   <CardHeader icon={<Award size={22}/>} title="Certificaciones" subtitle="El operador firma y emite. Las partes vinculadas reciben un aviso y pueden descargarlo."/>
+  {readOnly&&<p role="status">Esta vista permite consultar certificados. Para firmar o recuperar un envío, entrá con la cuenta habilitada del operador.</p>}
   {query.isError?<p role="alert">No se pudieron comprobar los certificados. <Button variant="outline" onClick={()=>void query.refetch()}>Reintentar certificados</Button></p>:query.isPending?<p role="status">Comprobando certificados…</p>:<>
    <div className="grid grid-cols-2 gap-2" aria-label="Estado de certificaciones">{(['PARCIAL','FINAL'] as const).map(type=>{
     const issued=query.data?.documents.filter(d=>d.documento.tipo===type).length||0;
@@ -59,18 +64,32 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
    })}</div>
    <ul className="space-y-2">{query.data?.documents.map((d,i)=><li key={d.id} id={`certificado-${d.id}`} data-certificate-id={d.id} className={`scroll-mt-32 rounded border p-3 ${selectedCertificate===d.id?'border-primary-400 bg-primary-50':'border-neutral-200'}`}><p className="font-semibold">{d.documento.tipo==='FINAL'?'Certificación final total':'Certificación parcial '+(i+1)} · Liberado</p><p className="text-xs text-neutral-600 break-words">{d.numero || manifest.numero} · {new Date(d.createdAt).toLocaleString('es-AR')}</p><p className="text-sm">{d.documento.cantidades.map(r=>`${r.corriente}: ${r.cantidad} ${r.unidad}`).join(' · ')}</p><Button variant="outline" leftIcon={<Download size={16}/>} onClick={()=>void download(d)}>Descargar {d.documento.tipo==='FINAL'?'final':'parcial '+(i+1)}{training?' CAP':''}</Button></li>)}</ul>
   </>}
-  {canRelease&&!final&&!kind&&<div className="flex flex-wrap gap-2"><Button variant={manifest.estado==='TRATADO'&&unresolved===0?'outline':'primary'} onClick={()=>open('PARCIAL')}>Emitir certificación parcial</Button><Button disabled={manifest.estado!=='TRATADO'||unresolved!==0||checks.isError} onClick={()=>open('FINAL')}>Emitir certificación final total</Button></div>}
+  {canRelease&&recovery.ready&&!recovery.command&&!final&&!kind&&<div className="flex flex-wrap gap-2"><Button variant={manifest.estado==='TRATADO'&&unresolved===0?'outline':'primary'} onClick={()=>open('PARCIAL')}>Emitir certificación parcial</Button><Button disabled={manifest.estado!=='TRATADO'||unresolved!==0||checks.isError} onClick={()=>open('FINAL')}>Emitir certificación final total</Button></div>}
   {operator&&canRelease&&!final&&<p className="text-sm text-neutral-700">{manifest.estado!=='TRATADO'?'Para emitir la final total: cerrá el tratamiento cuando corresponda.':unresolved===null?'Comprobando revisiones antes de la certificación final…':unresolved>0?<>{unresolved} adenda(s) por resolver antes del final. <Link className="font-semibold text-primary-800 underline" to={mp(`/manifiestos/${id}/adendas`)}>Ver qué falta resolver</Link></>:'Todo listo para firmar la certificación final total.'}</p>}
   {checks.isError&&<p role="alert">No pudimos comprobar las adendas. <button onClick={()=>void checks.refetch()} className="underline">Reintentar</button></p>}
   {operator&&query.data&&!query.data.enabled&&<p className="text-sm">La emisión está deshabilitada. Los documentos emitidos siguen disponibles.</p>}
   {operator&&query.data?.enabled&&!canRelease&&!final&&<p className="text-sm">Primero: recepción → pesaje → tratamiento.</p>}
-  {kind&&<form onSubmit={release} className="space-y-3 border-t pt-3"><h3 className="font-semibold">{kind==='PARCIAL'?'Cantidad efectivamente tratada en este parcial':'Total tratado: incluye los parciales previos'}</h3>
+  {kind&&!recovery.command&&<form onSubmit={release} className="space-y-3 border-t pt-3"><h3 className="font-semibold">{kind==='PARCIAL'?'Cantidad efectivamente tratada en este parcial':'Total tratado: incluye los parciales previos'}</h3>
    {(manifest.residuos||[]).map(r=><Input key={r.id} label={`Cantidad a certificar ${r.tipoResiduo?.codigo||r.id} (${r.unidad})`} type="number" min="0.001" step="any" required={kind==='FINAL'} disabled={kind==='FINAL'} value={amounts[r.id]||''} onChange={e=>setAmounts({...amounts,[r.id]:e.target.value})} helperText={`Pesaje recibido: ${r.cantidadRecibida??'pendiente'} ${r.unidad}. En un parcial, dejá vacío lo que no se certifica.`}/>)}
    <p className="text-sm">Datos del manifiesto y pesaje ya incorporados. Revisá el método registrado y firmá.</p><Input label="Método de tratamiento certificado" required maxLength={200} value={method} onChange={e=>setMethod(e.target.value)}/>
    <Input label="Observaciones del certificado (opcional)" maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/>
    <p className="font-medium">Firma del operador</p>{signature?<div><img className="max-h-28" src={signature} alt="Firma del operador"/><Button type="button" variant="outline" onClick={()=>setSignature('')}>Volver a firmar</Button></div>:<SignaturePad onConfirm={setSignature}/>}
-   <div className="flex gap-2"><Button type="submit" disabled={busy||!signature||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError))}>{busy?'Guardando...':'Firmar y publicar certificación'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>setKind(null)}>Cancelar</Button></div>
+   <div className="flex gap-2"><Button type="submit" disabled={busy||recovery.busy||!recovery.ready||!signature||!canRelease||(kind==='FINAL'&&(manifest.estado!=='TRATADO'||unresolved!==0||checks.isError))}>{busy?'Guardando...':'Firmar y publicar certificación'}</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>setKind(null)}>Cancelar</Button></div>
   </form>}
+  {operator&&!training&&!recovery.ready&&<p role="status">Comprobando solicitudes guardadas… <Button variant="outline" onClick={()=>void recovery.reload()}>Reintentar copia local</Button></p>}
+  {recovery.command&&<div className="rounded-lg border border-primary-200 bg-primary-50 p-3 space-y-3" aria-label="Recuperación de certificación">
+   <p role="status" className="font-semibold">{recovery.command.status==='confirmed'?'Certificación emitida':recovery.command.status==='withdrawn'?'Solicitud retirada sin emitir':'Emisión pendiente de confirmación'}</p>
+   <p className="text-sm">{recovery.command.input.tipo==='FINAL'?'Final total':'Parcial'} · {recovery.command.input.cantidades.map(row=>{const r=manifest.residuos?.find(r=>r.id===row.residuoId);return (r?.tipoResiduo?.codigo||row.residuoId)+': '+row.cantidad+' '+(r?.unidad||'');}).join(' · ')}</p>
+   <p className="text-sm">{recovery.command.status==='pending'?'Conservamos el contenido firmado. Reintentar usa la misma solicitud; no genera otro certificado. Comprobar resultado confirma la emisión o retira el envío para poder corregirlo.':recovery.command.status==='confirmed'?recovery.command.receipt?.numero:'Podés corregir los datos y volver a firmar. El envío anterior ya no podrá emitir.'}</p>
+   <div className="flex flex-wrap gap-2">{recovery.command.status==='pending'?<>
+    <Button disabled={recovery.busy||!canRelease} onClick={()=>void recovery.retry()}>Reintentar misma emisión</Button>
+    <Button variant="outline" disabled={recovery.busy} onClick={()=>void recovery.recover()}>Comprobar resultado</Button>
+   </>:<Button disabled={recovery.busy} onClick={()=>void recovery.release(async saved=>{
+    if(saved.status==='withdrawn'){setKind(saved.input.tipo);setMethod(saved.input.metodo);setNote(saved.input.nota);setAmounts(Object.fromEntries(saved.input.cantidades.map(r=>[r.residuoId,String(r.cantidad)])));setSignature('');}
+    else {setKind(null);setSignature('');await qc.invalidateQueries({queryKey:key});await qc.invalidateQueries({queryKey:['manifiestos']});}
+   })}>{recovery.command.status==='confirmed'?'Continuar con certificados':'Corregir y volver a firmar'}</Button>}</div>
+  </div>}
+  {recovery.error&&<p role="alert">{recovery.error}</p>}
   {error&&<p role="alert">{error}</p>}
   <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-neutral-600">{training?'Capacitación · sin validez oficial':'Cada documento emitido conserva su firma y contenido.'}</span><Button size="sm" variant="ghost" onClick={()=>void query.refetch()}>Actualizar certificados</Button></div>
  </section>;

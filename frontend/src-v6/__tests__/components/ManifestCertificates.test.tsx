@@ -3,11 +3,14 @@ import {render,screen,fireEvent,waitFor} from '@testing-library/react';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {MemoryRouter} from 'react-router-dom';
 import {TrainingCertificates} from '../../pages/manifiestos/components/TrainingCertificates';
-const mocks=vi.hoisted(()=>({get:vi.fn(),post:vi.fn(),user:{id:'o',rol:'OPERADOR',actorId:'o',training:false}}));
+const mocks=vi.hoisted(()=>({impersonated:false,restricted:false,rows:new Map<string,any>(),get:vi.fn(),post:vi.fn(),user:{id:'o',rol:'OPERADOR',actorId:'o',training:false}}));
 vi.mock('../../services/api',()=>({api:{get:mocks.get,post:mocks.post}}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:mocks.user})}));
+vi.mock('../../utils/supportSession',()=>({supportSessionMatches:()=>true,supportRequestContext:()=> 'operator-context'}));
+vi.mock('../../services/supportCommandStore',()=>({readSupportCommandRecord:async(k:string)=>mocks.rows.get(k)||null,updateSupportCommandRecord:async(k:string,change:any)=>{const next=change(mocks.rows.get(k)||null);if(next)mocks.rows.set(k,next);else mocks.rows.delete(k);return next;}}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:mocks.user,isRestricted:mocks.restricted})}));
+vi.mock('../../contexts/ImpersonationContext',()=>({useImpersonation:()=>({impersonationData:mocks.impersonated?{userId:'admin'}:null})}));
 vi.mock('../../components/ui/SignaturePad',()=>({SignaturePad:({onConfirm}:any)=><button type="button" onClick={()=>onConfirm('test-signature')}>Use QA signature</button>}));
-beforeEach(()=>{vi.clearAllMocks();mocks.user={id:'o',rol:'OPERADOR',actorId:'o',training:false};});
+beforeEach(()=>{vi.clearAllMocks();mocks.rows.clear();mocks.impersonated=false;mocks.restricted=false;mocks.user={id:'o',rol:'OPERADOR',actorId:'o',training:false};});
 const m:any={id:'m',numero:'M',estado:'TRATADO',operadorId:'o',tratamientoMetodo:'Tratamiento registrado',residuos:[{id:'r',cantidadRecibida:10,unidad:'kg',tipoResiduo:{codigo:'Y1'}}]};
 function show(){const q=new QueryClient({defaultOptions:{queries:{retry:false}}});return render(<MemoryRouter><QueryClientProvider client={q}><TrainingCertificates manifest={m}/></QueryClientProvider></MemoryRouter>);}
 it('prefills remaining partial quantities and method, retains form after a failed issue',async()=>{
@@ -17,8 +20,8 @@ it('prefills remaining partial quantities and method, retains form after a faile
  expect(screen.getByLabelText('Cantidad a certificar Y1 (kg)')).toHaveValue(6);
  expect(screen.getByLabelText('Método de tratamiento certificado')).toHaveValue('Tratamiento registrado');
  fireEvent.click(screen.getByText('Use QA signature'));fireEvent.click(screen.getByText('Firmar y publicar certificación'));
- await screen.findByText('Servicio no disponible');expect(screen.getByLabelText('Cantidad a certificar Y1 (kg)')).toHaveValue(6);
- fireEvent.click(screen.getByText('Firmar y publicar certificación'));await waitFor(()=>expect(mocks.post).toHaveBeenCalledTimes(2));
+ await screen.findByText('Servicio no disponible');expect(screen.getByText(/Y1: 6 kg/)).toBeVisible();
+ fireEvent.click(screen.getByText('Reintentar misma emisión'));await waitFor(()=>expect(mocks.post).toHaveBeenCalledTimes(2));
  expect(mocks.post.mock.calls[0][1].id).toBe(mocks.post.mock.calls[1][1].id);
 });
 it('a counterpart sees released documents, never emission controls',async()=>{
@@ -58,4 +61,11 @@ it('blocks issue after a refresh failure and preserves entered data until retry 
  fireEvent.click(screen.getByRole('button',{name:'Reintentar certificados'}));
  await waitFor(()=>expect(screen.getByRole('button',{name:'Firmar y publicar certificación'})).toBeEnabled());
  expect(screen.getByLabelText('Observaciones del certificado (opcional)')).toHaveValue('Mi nota conservada');
+});
+
+it.each(['impersonated','restricted'] as const)('does not expose signing or local operator recovery in %s mode',async mode=>{
+ mocks[mode]=true;mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0}});
+ show();await screen.findByText(/Esta vista permite consultar certificados/);
+ expect(screen.queryByRole('button',{name:'Emitir certificación parcial'})).toBeNull();
+ expect(screen.queryByRole('button',{name:'Comprobar resultado'})).toBeNull();expect(mocks.post).not.toHaveBeenCalled();
 });

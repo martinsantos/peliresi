@@ -10,6 +10,7 @@ const labels: Record<string, string> = {
   APROBACION_TRANSPORTISTA: 'Transporte aprobó', APROBACION_OPERADOR: 'Operador aprobó',
   RECHAZO_PARTE: 'Participación rechazada', INICIO_COORDINACION: 'Coordinación iniciada',
   INICIO_COORDINACION_CAP: 'Coordinación iniciada',
+  CERTIFICACION_ENVIO_RETIRADO: 'Solicitud de certificación retirada sin emitir',
   CERTIFICACION_OPERADOR_V1: 'Certificación habilitada',
   CERTIFICADO_OPERADOR_V1: 'Certificado emitido', CERTIFICADO_CAP_V1: 'Certificado de práctica emitido',
 };

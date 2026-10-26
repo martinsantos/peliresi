@@ -1,4 +1,4 @@
-import { listManifestCertificates, releaseManifestCertificate, downloadManifestCertificate } from '../controllers/manifest-certificate.controller';
+import { listManifestCertificates, releaseManifestCertificate, downloadManifestCertificate, recoverManifestCertificate } from '../controllers/manifest-certificate.controller';
 import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
 import { canCreateManifestProposal } from '../domain/manifestProposal';
 import { handoffEnabled, listTransportLegs, createTransportHandoff, rotateTransportAccess, assignedTransportHandoffs, assignedTransportAccess } from '../controllers/transport-handoff.controller';
@@ -294,6 +294,7 @@ router.get('/:id', getManifiestoById);
 router.post('/', (req: any, res, next) => canCreateManifestProposal(req.user) ? next() : hasRole('GENERADOR', 'ADMIN')(req, res, next), createManifiesto);
 router.get('/:id/certificados', listManifestCertificates);
 router.post('/:id/certificados', releaseManifestCertificate);
+router.post('/:id/certificados/:commandId/recuperar', recoverManifestCertificate);
 router.get('/:id/certificados/:documentId/archivo', downloadManifestCertificate);
 
 router.get('/:id/documentos-cap', listTrainingCertificates);
