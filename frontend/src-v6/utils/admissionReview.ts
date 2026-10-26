@@ -27,13 +27,18 @@ const labels: Record<string, string> = { razonSocial: 'Razón social', domicilio
 const valueLabel = (v: unknown) => v == null || v === '' ? 'Sin declarar' : typeof v === 'string' || typeof v === 'number' ? String(v) : JSON.stringify(v);
 const applicationLabels: Record<string, string> = {
   ...labels, cuit: 'CUIT', emailContacto: 'Correo de contacto', nombreFantasia: 'Nombre de fantasía',
+  corrientesControl: 'Corrientes de control del generador', corrientesY: 'Corrientes autorizadas del operador',
   tefPersonal: 'Personal en planta', tefPotencia: 'Potencia instalada (HP)', tefSuperficie: 'Superficie cubierta (m²)', tefZona: 'Zona del establecimiento',
-  corrientesAutorizadas: 'Corrientes Y autorizadas', vencimientoHabilitacion: 'Vencimiento de habilitación',
+  corrientesAutorizadas: 'Corrientes autorizadas del transporte', vencimientoHabilitacion: 'Vencimiento de habilitación', tefCapacidad: 'Capacidad de tratamiento (tn/mes)',
   domicilioLegalCalle: 'Domicilio legal · calle', domicilioLegalLocalidad: 'Domicilio legal · localidad', domicilioLegalDepto: 'Domicilio legal · departamento',
   domicilioRealCalle: 'Domicilio real · calle', domicilioRealLocalidad: 'Domicilio real · localidad', domicilioRealDepto: 'Domicilio real · departamento',
+  expedienteDPA: 'Expediente DPA', resolucionDPA: 'Resolución DPA', resolucionSSP: 'Resolución SSP', actaInspeccion: 'Acta de inspección', actaInspeccion2: 'Segunda acta de inspección',
+  categoriaIndividual: 'Categoría individual', libroOperatoria: 'Libro de operatoria', certificacionISO: 'Certificación ISO',
+  representanteLegalNombre: 'Representante legal · nombre', representanteLegalDNI: 'Representante legal · DNI', representanteLegalTelefono: 'Representante legal · teléfono',
+  representanteTecnicoNombre: 'Representante técnico · nombre', representanteTecnicoMatricula: 'Representante técnico · matrícula', representanteTecnicoTelefono: 'Representante técnico · teléfono',
 };
 export function applicationFieldLabel(key: string): string {
-  return applicationLabels[key] || key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').replace(/^\w/, c => c.toUpperCase()).trim();
+  return Object.prototype.hasOwnProperty.call(applicationLabels, key) ? applicationLabels[key] : key.replace(/([A-Z])/g, ' $1').replace(/[_-]/g, ' ').replace(/^\w/, c => c.toUpperCase()).trim();
 }
 /** Presentation only: retain unrecognized legacy values rather than guessing or dropping them. */
 export function applicationFieldValue(key: string, value: unknown): string {
@@ -41,6 +46,25 @@ export function applicationFieldValue(key: string, value: unknown): string {
   if (key === 'tipoOperador' && value === 'IN_SITU') return 'Operador in situ';
   if (key === 'tipoOperador' && value === 'FIJO') return 'Planta fija';
   return valueLabel(value);
+}
+const declarationGroups = [
+  { title: 'Identificación y contacto', fields: ['razonSocial', 'nombreFantasia', 'cuit', 'telefono', 'emailContacto', 'email'] },
+  { title: 'Domicilios', fields: ['domicilio', 'localidad', 'coordenadas', 'domicilioLegalCalle', 'domicilioLegalLocalidad', 'domicilioLegalDepto', 'domicilioRealCalle', 'domicilioRealLocalidad', 'domicilioRealDepto'] },
+  { title: 'Inscripción y habilitaciones', fields: ['numeroInscripcion', 'numeroHabilitacion', 'vencimientoHabilitacion', 'expedienteDPA', 'resolucionDPA', 'resolucionSSP', 'actaInspeccion', 'actaInspeccion2'] },
+  { title: 'Actividad declarada', fields: ['actividad', 'rubro', 'categoria', 'categoriaIndividual', 'tipoOperador', 'tecnologia', 'corrientesControl', 'corrientesY', 'corrientesAutorizadas', 'libroOperatoria', 'certificacionISO', 'tefPersonal', 'tefSuperficie', 'tefPotencia', 'tefZona', 'tefCapacidad'] },
+  { title: 'Representantes declarados', fields: ['representanteLegalNombre', 'representanteLegalDNI', 'representanteLegalTelefono', 'representanteTecnicoNombre', 'representanteTecnicoMatricula', 'representanteTecnicoTelefono'] },
+];
+/** Group presentation only. Keep every unknown field; fleet has its own structured summary. */
+export function applicationDeclarationGroups(data: Record<string, unknown>) {
+  const remaining = new Set(Object.keys(data).filter(key => !['choferesJson', 'vehiculosJson'].includes(key)));
+  const groups = declarationGroups.map(group => ({ title: group.title, rows: group.fields.filter(key => remaining.delete(key)).map(key => ({ key, value: data[key] })) }));
+  groups.push({ title: 'Otros datos declarados', rows: [...remaining].map(key => ({ key, value: data[key] })) });
+  return groups.filter(group => group.rows.length > 0);
+}
+export function applicationDeclarationsReadable(s?: Pick<SolicitudInscripcion, 'datosActor' | 'datosResiduos' | 'datosRegulatorio'>) {
+  if (!s) return false;
+  const actor = recordJson(s.datosActor);
+  return !!actor && Object.keys(actor).length > 0 && [s.datosResiduos, s.datosRegulatorio].every(raw => !raw || recordJson(raw) !== null);
 }
 /** Describe the stored proposal; malformed values are never interpreted as no changes. */
 export function renewalChanges(r: Renovacion) {

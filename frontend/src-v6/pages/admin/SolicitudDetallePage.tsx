@@ -1,4 +1,3 @@
-import { applicationFieldLabel as fieldLabel, applicationFieldValue } from '../../utils/admissionReview';
 /**
  * SITREP v6 - Solicitud Detalle Page (Admin)
  * Review a specific inscription solicitud
@@ -8,7 +7,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useAdmissionContext } from '../../hooks/useAdmissionContext';
-import { ACTOR_NAMES, APPLICATION_STATES, applicantName, applicationReturn } from '../../utils/admissionReview';
+import { ACTOR_NAMES, APPLICATION_STATES, applicantName, applicationReturn, applicationDeclarationsReadable } from '../../utils/admissionReview';
+import { ApplicationDeclarationSummary } from '../../components/registration/ApplicationDeclarationSummary';
 import {
   ArrowLeft, FileText, CheckCircle, XCircle, AlertTriangle, Eye,
   Send, Download, MessageSquare, User, File, Clock,
@@ -130,6 +130,7 @@ const SolicitudReview: React.FC = () => {
   const fresh = !!solicitud && !detail.isError && !detail.isPending && !detail.isFetching;
   const reviewer = !!solicitud && !!currentUser && ['ADMIN', `ADMIN_${solicitud.tipoActor}`].includes(currentUser.rol);
   const canDecide = fresh && reviewer && solicitud?.estado === 'EN_REVISION' && !busy;
+  const canApprove = canDecide && applicationDeclarationsReadable(solicitud);
   const canAct = fresh && reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud!.estado) && !busy;
   const canMessage = fresh && reviewer && !messages.isError && !messages.isPending && !messages.isFetching && !busy;
 
@@ -150,7 +151,7 @@ const SolicitudReview: React.FC = () => {
   const handleObservar = () => run(canDecide && !!observarText.trim() && !observation.conflict,
     () => observarSolicitud.mutateAsync({ id: id!, mensaje: observarText.trim(), expectedUpdatedAt: solicitud?.updatedAt }),
     () => { observation.clear(); setObservarModal(false); }, 'Observaciones enviadas. El solicitante debe corregir y reenviar.');
-  const handleAprobar = () => run(canDecide,
+  const handleAprobar = () => run(canApprove,
     () => aprobarSolicitud.mutateAsync({ id: id!, expectedUpdatedAt: solicitud?.updatedAt }),
     () => { setConfirmarAprobar(false); observation.clear(); rejection.clear(); }, 'Solicitud aprobada. El alta quedó habilitada.');
   const handleRechazar = () => run(canDecide && !!rechazarText.trim() && !rejection.conflict,
@@ -241,39 +242,20 @@ const SolicitudReview: React.FC = () => {
             {canAct && solicitud.estado === 'EN_REVISION' && <Button variant="outline" size="sm" className="ml-auto" onClick={() => setEditingData(true)}>Corregir datos</Button>}
           </div>
           <div className="p-5 space-y-3">
-            {Object.keys(datosActor).length === 0 ? (
-              <p className="text-sm text-neutral-400">Sin datos cargados</p>
-            ) : (
-              Object.entries(datosActor).filter(([key]) => !['choferesJson', 'vehiculosJson'].includes(key)).map(([key, value]) => (
-                <div key={key}>
-                  <p className="text-xs text-neutral-500 mb-0.5">{fieldLabel(key)}</p>
-                  <p className="text-sm font-medium text-neutral-800 break-words">{applicationFieldValue(key, value)}</p>
-                </div>
-              ))
-            )}
+            <ApplicationDeclarationSummary raw={solicitud.datosActor} title="Datos del actor" grouped onRetry={() => void refetch()} retrying={!fresh || busy} />
 
             <RegistrationFleetSummary form={datosActor} />
             {/* Extra JSON sections */}
             {solicitud.datosResiduos && (
               <div className="pt-3 border-t border-neutral-100">
                 <p className="text-xs font-semibold text-neutral-600 mb-2">Datos de Residuos</p>
-                {Object.entries(parseDatosActor(solicitud.datosResiduos)).map(([k, v]) => (
-                  <div key={k} className="mb-2">
-                    <p className="text-xs text-neutral-500">{fieldLabel(k)}</p>
-                    <p className="text-sm text-neutral-800 break-words">{applicationFieldValue(k, v)}</p>
-                  </div>
-                ))}
+                <ApplicationDeclarationSummary raw={solicitud.datosResiduos} title="Datos de residuos" onRetry={() => void refetch()} retrying={!fresh || busy} />
               </div>
             )}
             {solicitud.datosRegulatorio && (
               <div className="pt-3 border-t border-neutral-100">
                 <p className="text-xs font-semibold text-neutral-600 mb-2">Datos Regulatorios</p>
-                {Object.entries(parseDatosActor(solicitud.datosRegulatorio)).map(([k, v]) => (
-                  <div key={k} className="mb-2">
-                    <p className="text-xs text-neutral-500">{fieldLabel(k)}</p>
-                    <p className="text-sm text-neutral-800 break-words">{applicationFieldValue(k, v)}</p>
-                  </div>
-                ))}
+                <ApplicationDeclarationSummary raw={solicitud.datosRegulatorio} title="Datos regulatorios" onRetry={() => void refetch()} retrying={!fresh || busy} />
               </div>
             )}
           </div>
@@ -422,6 +404,7 @@ const SolicitudReview: React.FC = () => {
               size="sm"
               onClick={handleSendMessage}
               aria-label="Enviar mensaje sobre la solicitud"
+              className="min-w-11 shrink-0"
               disabled={!canMessage || !messageText.trim() || message.conflict}
               isLoading={enviarMensaje.isPending}
             >
@@ -440,7 +423,7 @@ const SolicitudReview: React.FC = () => {
             variant="primary"
             leftIcon={<CheckCircle size={16} />}
             onClick={() => { setFeedback(null); setConfirmarAprobar(true); }}
-            disabled={!canDecide}
+            disabled={!canApprove}
           >
             Aprobar
           </Button>
@@ -469,6 +452,7 @@ const SolicitudReview: React.FC = () => {
           <div className="space-y-4">
             {feedbackPanel}
             {!canDecide && <p role="status" className="text-sm">Esperá a verificar el estado. Sólo se puede resolver una solicitud en revisión.</p>}
+            {canDecide && !canApprove && <p role="alert" className="text-sm text-error-900">No se puede aprobar sin una declaración legible. Actualizá los datos de la solicitud.</p>}
             <p className="text-sm text-neutral-600">
               Vas a aprobar la solicitud de <strong>{solicitud.usuario?.nombre}</strong> como{' '}
               <strong>{solicitud.tipoActor}</strong>. Esto habilitará el alta de esa actividad.
@@ -482,7 +466,7 @@ const SolicitudReview: React.FC = () => {
                 variant="primary"
                 size="sm"
                 onClick={handleAprobar}
-                disabled={!canDecide}
+                disabled={!canApprove}
                 isLoading={aprobarSolicitud.isPending}
               >
                 Confirmar aprobación

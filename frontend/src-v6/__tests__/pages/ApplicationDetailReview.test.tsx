@@ -28,6 +28,38 @@ beforeEach(() => {
   for (const fn of [state.send,state.review,state.observe,state.approve,state.reject,state.document,state.read]) fn.mockResolvedValue({});
 });
 afterEach(cleanup);
+it.each(['', '/app'])('groups declarations without confusing current types or dropping historical fields (%s)', prefix => {
+ state.detail.data.datosActor = JSON.stringify({ razonSocial:'Empresa QA', corrientesControl:'Y8', corrientesY:'Y12', corrientesAutorizadas:'Y48', tefPotencia:'120', domicilioLegalCalle:'Calle legal', campoAnterior:'Dato conservado', constructor:'Dato histórico adicional' });
+ render(tree(prefix));
+ expect(screen.getByRole('heading',{name:'Identificación y contacto'})).toBeVisible();
+ expect(screen.getByRole('heading',{name:'Domicilios'})).toBeVisible();
+ expect(screen.getByRole('heading',{name:'Actividad declarada'})).toBeVisible();
+ expect(screen.getByRole('heading',{name:'Otros datos declarados'})).toBeVisible();
+ for(const [label,value] of [['Corrientes de control del generador','Y8'],['Corrientes autorizadas del operador','Y12'],['Corrientes autorizadas del transporte','Y48']]) {
+  expect(within(screen.getByText(label).parentElement!).getByText(value)).toBeVisible();
+ }
+ expect(screen.getByText('Dato conservado')).toBeVisible();
+ expect(screen.getByText('Constructor')).toBeVisible();
+ expect(screen.getByText('Dato histórico adicional')).toBeVisible();
+});
+it.each(['', '/app'])('does not turn unreadable declarations into an empty application or allow approval (%s)', prefix => {
+ state.detail.data.datosActor='[]'; state.detail.data.datosResiduos='{broken';
+ render(tree(prefix));
+ expect(screen.getAllByRole('alert').some(el=>el.textContent?.includes('No pudimos interpretar'))).toBe(true);
+ expect(screen.queryByText('Sin datos cargados')).toBeNull();
+ expect(screen.getByRole('button',{name:'Aprobar',exact:true})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Observar',exact:true})).toBeEnabled();
+ expect(screen.getByRole('button',{name:'Rechazar',exact:true})).toBeEnabled();
+ expect(state.approve).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'Actualizar datos del actor',exact:true}));
+ expect(state.detail.refetch).toHaveBeenCalledOnce();
+});
+it('rechecks declaration readability if it changes while approval is open',async()=>{
+ const view=render(tree()); fireEvent.click(screen.getByRole('button',{name:'Aprobar',exact:true}));
+ state.detail.data.datosRegulatorio='null'; view.rerender(tree());
+ const confirm=screen.getByRole('button',{name:'Confirmar aprobación',exact:true});
+ expect(confirm).toBeDisabled(); fireEvent.click(confirm); expect(state.approve).not.toHaveBeenCalled();
+});
 it.each(['','/app'])('keeps the reading action and progress visible while the original is being analysed (%s)', async prefix => {
  state.detail.data.documentos=[{id:'invoice',tipo:'FACTURA_ELECTRICA',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:'qa'}];
  let finish!:()=>void; state.read.mockReturnValue(new Promise<void>(resolve=>{finish=resolve;}));

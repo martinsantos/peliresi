@@ -93,7 +93,7 @@ export const SWUpdateBanner: React.FC = () => {
       <button
         onClick={() => void handleUpdate()}
         disabled={updating}
-        className="mx-auto flex min-h-10 w-full max-w-xl items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700"
+        className="mx-auto flex min-h-11 w-full max-w-xl items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary-700"
       >
         <RefreshCw size={16} />
         {updating ? 'Preparando actualización…' : 'Nueva versión disponible — Actualizar cuando termines'}
