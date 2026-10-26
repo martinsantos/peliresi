@@ -24,6 +24,13 @@
       .replace(/(^-|-$)/g, '');
   }
 
+  // A saved position is secondary to the identity of the instruction being read.
+  function stepKey(step) { return slugify(step.id || step.title); }
+  function stepIndexByKey(guide, key) {
+    var matches = guide.steps.map(function (step, index) { return stepKey(step) === key ? index : -1; }).filter(function (index) { return index >= 0; });
+    return matches.length === 1 ? matches[0] : -1;
+  }
+
   function profileById(id) {
     return data.profiles.find(function (profile) { return profile.id === id; });
   }
@@ -61,8 +68,11 @@
       data.guides.forEach(function (guide) {
         var item = stored[guide.id];
         if (!item || !Number.isInteger(item.step) || item.step < 0 || !Number.isFinite(item.updatedAt) || item.updatedAt < 0) return;
+        var identified = typeof item.stepKey === 'string' ? stepIndexByKey(guide, item.stepKey) : null;
         valid[guide.id] = {
-          step: Math.min(item.step, guide.steps.length - 1), total: guide.steps.length,
+          step: identified === null ? Math.min(item.step, guide.steps.length - 1) : Math.max(0, identified),
+          stepKey: typeof item.stepKey === 'string' ? item.stepKey : undefined,
+          unavailable: identified === -1, total: guide.steps.length,
           title: guide.title, profile: guide.profile, updatedAt: item.updatedAt
         };
       });
@@ -79,6 +89,7 @@
     var progress = readProgress();
     progress[guide.id] = {
       step: index,
+      stepKey: stepKey(guide.steps[index]),
       total: guide.steps.length,
       title: guide.title,
       profile: guide.profile,
@@ -131,7 +142,7 @@
   function tutorialURL(guide, stepIndex) {
     var url = 'tutorial.html?guide=' + encodeURIComponent(guide.id);
     if (typeof stepIndex === 'number' && guide.steps[stepIndex]) {
-      url += '#paso-' + (stepIndex + 1) + '-' + slugify(guide.steps[stepIndex].title);
+      url += '#paso-' + (stepIndex + 1) + '-' + stepKey(guide.steps[stepIndex]);
     }
     return url;
   }
@@ -188,9 +199,9 @@
       var profile = profileById(guide.profile);
       var nextStep = Math.min(recent.step || 0, guide.steps.length - 1);
       var percent = Math.round(((nextStep + 1) / guide.steps.length) * 100);
-      document.getElementById('continueDescription').textContent = (guideProfileLabel(guide) + ' · ') + guide.title + ' · Paso ' + (nextStep + 1) + ' de ' + guide.steps.length;
-      document.getElementById('continueProgress').style.width = percent + '%';
-      document.getElementById('continueLink').href = tutorialURL(guide, nextStep);
+      document.getElementById('continueDescription').textContent = (guideProfileLabel(guide) + ' · ') + guide.title + (recent.unavailable ? ' · Guía actualizada: elegí una sección' : ' · Paso ' + (nextStep + 1) + ' de ' + guide.steps.length);
+      document.getElementById('continueProgress').style.width = (recent.unavailable ? 0 : percent) + '%';
+      document.getElementById('continueLink').href = tutorialURL(guide, recent.unavailable ? undefined : nextStep);
       continuePanel.hidden = false;
     }
 
@@ -369,7 +380,7 @@
     function releaseHashRestoration() { restoringHashIndex = -1; }
 
     guide.steps.forEach(function (step, index) {
-      var id = 'paso-' + (index + 1) + '-' + slugify(step.title);
+      var id = 'paso-' + (index + 1) + '-' + stepKey(step);
       var listItem = document.createElement('li');
       var link = document.createElement('a');
       link.href = '#' + id;
@@ -446,6 +457,7 @@
     }
 
     function goToStep(index) {
+      document.getElementById('stepRecoveryStatus').hidden = true;
       releaseHashRestoration();
       var target = Math.max(0, Math.min(index, guide.steps.length - 1));
       if (index >= guide.steps.length) {
@@ -490,10 +502,31 @@
       });
     }, { passive: true });
 
-    var hashIndex = stepSections.findIndex(function (section) { return '#' + section.id === window.location.hash; });
+    function resolveHash() {
+      var exact = stepSections.findIndex(function (section) { return '#' + section.id === window.location.hash; });
+      if (exact >= 0) return exact;
+      // Existing shared URLs contain a position and title. Recover the unique
+      // title after insertions, never the unrelated step at its former position.
+      var match = /^#paso-\d+-(.+)$/.exec(window.location.hash);
+      return match ? stepIndexByKey(guide, match[1]) : -1;
+    }
+    function showMissingStep() {
+      var status = document.getElementById('stepRecoveryStatus');
+      status.textContent = 'El paso que querías retomar ya no está disponible con esa referencia. Elegí una sección del índice para continuar.';
+      status.hidden = false;
+    }
+    var hashIndex = resolveHash();
     var saved = readProgress()[guide.id];
-    var initial = hashIndex >= 0 ? hashIndex : (saved ? Math.min(saved.step || 0, guide.steps.length - 1) : 0);
-    updateActive(initial, false);
+    var explicitHash = !!window.location.hash && window.location.hash !== '#tutorialMain';
+    var initial = explicitHash ? Math.max(0, hashIndex) : (saved ? saved.step : 0);
+    if ((explicitHash && hashIndex < 0) || (!explicitHash && saved && saved.unavailable)) showMissingStep();
+    updateActive(initial, hashIndex >= 0);
+    window.addEventListener('hashchange', function () {
+      if (window.location.hash === '#tutorialMain') return;
+      var target = resolveHash();
+      if (target >= 0) goToStep(target);
+      else if (window.location.hash) { goToStep(0); showMissingStep(); }
+    });
     if (hashIndex >= 0 || initial > 0) {
       restoringHashIndex = initial;
       loadStepsThrough(initial);
