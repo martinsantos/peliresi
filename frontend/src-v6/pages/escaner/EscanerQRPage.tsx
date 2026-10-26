@@ -1,3 +1,4 @@
+import { useQueryOwner } from '../../hooks/useQueryOwner';
 /**
  * SITREP v6 - Escaner QR Page
  * ============================
@@ -67,6 +68,7 @@ const EscanerQRPage: React.FC = () => {
   };
 
   const { currentUser } = useAuth();
+  const owner = useQueryOwner();
 
   const handleViewManifiesto = async () => {
     if (!scanResult) return;
@@ -76,7 +78,9 @@ const EscanerQRPage: React.FC = () => {
     }
     // Offline check: verify we have this manifiesto cached before navigating
     if (!navigator.onLine && currentUser?.id) {
-      const cached = await getCachedManifiestos(currentUser.id);
+      let cached;
+      try { cached = await getCachedManifiestos(currentUser.id, owner); }
+      catch { toast.error('No se pudo leer la copia descargada. Reintentá o recuperá la conexión.'); return; }
       const found = cached.find(m => m.numero === scanResult.value || m.id === scanResult.value);
       if (!found) {
         toast.info('Sin conexión — Este manifiesto no está descargado. Volvé a intentarlo al recuperar conexión.');

@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 /**
  * SITREP v6 - Generador Hooks
  */
@@ -12,18 +13,21 @@ const KEYS = {
 };
 
 export function useGeneradores(filters?: ActorFilters) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.generadores(filters),
+    queryKey: [...KEYS.generadores(filters), owner],
     queryFn: () => actoresService.listGeneradores(filters),
     staleTime: 60_000,
+    enabled: Boolean(owner),
   });
 }
 
 export function useGenerador(id: string) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.generador(id),
+    queryKey: [...KEYS.generador(id), owner],
     queryFn: () => actoresService.getGenerador(id),
-    enabled: !!id,
+    enabled: Boolean(owner && id),
   });
 }
 

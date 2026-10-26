@@ -1,3 +1,5 @@
+import { useQueryOwner } from './useQueryOwner';
+import { supportRequestContext } from '../utils/supportSession';
 /**
  * SITREP v6 - Offline Sync Hook
  * ==============================
@@ -22,28 +24,36 @@ const EMPTY_RESULT: SyncQueueResult = { processed: 0, pending: 0, retryable: 0, 
 export function useOfflineSync({ downloadManifests = true }: { downloadManifests?: boolean } = {}): OfflineSyncStatus {
   const { currentUser, isRestricted } = useAuth();
   const { isOnline } = useConnectivity({ enablePing: false });
+  const owner = useQueryOwner();
+  const activeOwner = useRef(owner);
+  activeOwner.current = owner;
   const syncingRef = useRef(false);
   const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<SyncQueueResult>(EMPTY_RESULT);
 
   const doSync = useCallback(async (manual = false) => {
-    if (!currentUser?.id || !isOnline || isRestricted) return;
+    if (!currentUser?.id || !owner || !isOnline || isRestricted) return;
       if (syncingRef.current) return;
       syncingRef.current = true;
       setSyncing(true);
+      const context = supportRequestContext();
+      const matches = () => activeOwner.current === owner && context === supportRequestContext();
       try {
-        setResult(await processSyncQueue(currentUser.id, manual));
-        if (downloadManifests && document.visibilityState !== 'hidden') await syncOfflineData(currentUser.id);
+        const next = await processSyncQueue(currentUser.id, manual);
+        if (!matches()) return;
+        setResult(next);
+        if (downloadManifests && document.visibilityState !== 'hidden') await syncOfflineData(currentUser.id, owner);
       } catch (error) {
+        if (!matches()) return;
         setResult((current) => ({ ...current, lastError: error instanceof Error ? error.message : 'No se pudo leer la cola local.' }));
       } finally {
         syncingRef.current = false;
         setSyncing(false);
       }
-  }, [currentUser?.id, isOnline, isRestricted, downloadManifests]);
+  }, [currentUser?.id, owner, isOnline, isRestricted, downloadManifests]);
 
   useEffect(() => {
-    if (!currentUser?.id || !isOnline || isRestricted) return;
+    if (!currentUser?.id || !owner || !isOnline || isRestricted) return;
 
     // Sync immediately on mount (login)
     void doSync();
@@ -51,7 +61,7 @@ export function useOfflineSync({ downloadManifests = true }: { downloadManifests
     // Re-sync every 5 minutes while online
     const interval = setInterval(() => void doSync(), SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [currentUser?.id, isOnline, isRestricted, doSync]);
+  }, [currentUser?.id, owner, isOnline, isRestricted, doSync]);
 
   return { ...result, syncing, retry: async () => { await doSync(true); } };
 }

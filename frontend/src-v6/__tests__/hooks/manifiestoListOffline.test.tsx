@@ -1,3 +1,4 @@
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { act, renderHook, waitFor, cleanup } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
@@ -63,7 +64,7 @@ it('abre un detalle descargado por primera vez sin red ni una consulta pausada',
   const { result } = renderHook(() => useManifiesto('own-cached'), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data).toMatchObject({ id: 'own-cached', offline: true });
-  expect(mocks.cached).toHaveBeenCalledWith('offline-qa');
+  expect(mocks.cached).toHaveBeenCalledWith('offline-qa', inspectionWorkspaceOwner({id:'offline-qa',rol:'GENERADOR',actorId:'g-1'}));
   expect(mocks.detail).not.toHaveBeenCalled();
   client.clear();
 });
@@ -98,7 +99,7 @@ it('resuelve un filtro nuevo sin red con React Query real, sin esperar reconexiÃ
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data?.items.map(m => m.id)).toEqual(['active']);
   expect(result.current.data).toHaveProperty('offline', true);
-  expect(mocks.cached).toHaveBeenCalledWith('offline-qa');
+  expect(mocks.cached).toHaveBeenCalledWith('offline-qa', inspectionWorkspaceOwner({id:'offline-qa',rol:'GENERADOR',actorId:'g-1'}));
   expect(mocks.list).not.toHaveBeenCalled();
   client.clear();
 });

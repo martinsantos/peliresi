@@ -5,90 +5,131 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogoService } from '../services/catalogo.service';
-import { saveOffline, getOffline } from '../services/indexeddb';
+import { updateOffline, getOffline } from '../services/indexeddb';
+import { supportRequestContext } from '../utils/supportSession';
+import { useQueryOwner } from './useQueryOwner';
 import type { TipoResiduo } from '../types/models';
 
 const STALE_TIME = 10 * 60 * 1000; // 10 min cache for catalogos
 
-/**
- * Fetches catalog data from API and caches to IndexedDB.
- * Falls back to IndexedDB when offline/API fails.
- */
+type CatalogueCopy<T> = { id: string; owner: string; data: T; updatedAt: string };
+
+/** Only a disconnected session can use its own downloaded catalogue.
+ * An HTTP error must remain visible, especially permission failures. */
 async function fetchWithOfflineFallback<T>(
-  key: string,
+  resource: string,
+  owner: string,
   fetcher: () => Promise<T>,
 ): Promise<T> {
-  try {
-    const data = await fetcher();
-    // Cache to IndexedDB for offline use
-    saveOffline('catalogos', { id: key, data, updatedAt: new Date().toISOString() }).catch(() => {});
-    return data;
-  } catch (err) {
-    // Try IndexedDB fallback
-    const cached = await getOffline<{ data: T }>('catalogos', key).catch(() => null);
-    if (cached?.data) return cached.data as T;
-    throw err; // No cache available — propagate original error
+  const context = supportRequestContext();
+  const key = 'context-v2:' + JSON.stringify([owner, resource]);
+  const assertContext = () => {
+    if (!owner || !context || supportRequestContext() !== context) {
+      throw new Error('Cambió el contexto de la cuenta. Volvé a consultar.');
+    }
+  };
+  if (!navigator.onLine) {
+    assertContext();
+    const cached = await getOffline<CatalogueCopy<T>>('catalogos', key);
+    assertContext();
+    if (navigator.onLine) return fetchWithOfflineFallback(resource, owner, fetcher);
+    if (cached?.owner === owner && cached.data != null) return cached.data;
+    throw new Error('No hay una copia descargada de este catálogo para tu actividad y sede. Reconectate para consultarlo.');
   }
+  const data = await fetcher();
+  assertContext();
+  // A failed optional download must not hide a valid server response.
+  await updateOffline<CatalogueCopy<T>>('catalogos', key, () => {
+    assertContext();
+    return { id: key, owner, data, updatedAt: new Date().toISOString() };
+  }).catch(() => {});
+  assertContext();
+  return data;
 }
 
 export function useTiposResiduo() {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: ['catalogos', 'tipos-residuo'],
-    queryFn: () => fetchWithOfflineFallback('tipos-residuo', () => catalogoService.tiposResiduo()),
+    queryKey: ['catalogos', 'tipos-residuo', owner],
+    queryFn: () => fetchWithOfflineFallback('tipos-residuo', owner, () => catalogoService.tiposResiduo()),
     staleTime: STALE_TIME,
     select: (data) => data.tiposResiduos,
+    enabled: Boolean(owner),
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 
 /** Returns tiposResiduos + server-side counts (manifiestosPorResiduo, operadoresPorResiduo) */
 export function useTiposResiduoEnriched() {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: ['catalogos', 'tipos-residuo'],
-    queryFn: () => fetchWithOfflineFallback('tipos-residuo', () => catalogoService.tiposResiduo()),
+    queryKey: ['catalogos', 'tipos-residuo', owner],
+    queryFn: () => fetchWithOfflineFallback('tipos-residuo', owner, () => catalogoService.tiposResiduo()),
     staleTime: STALE_TIME,
+    enabled: Boolean(owner),
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 
 export function useCatalogoGeneradores(enabled = true) {
+  const owner = useQueryOwner();
   return useQuery({
-    enabled,
-    queryKey: ['catalogos', 'generadores'],
-    queryFn: () => fetchWithOfflineFallback('generadores', () => catalogoService.generadores()),
+    enabled: Boolean(owner) && enabled,
+    queryKey: ['catalogos', 'generadores', owner],
+    queryFn: () => fetchWithOfflineFallback('generadores', owner, () => catalogoService.generadores()),
     staleTime: STALE_TIME,
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 
 export function useCatalogoTransportistas(enabled = true) {
+  const owner = useQueryOwner();
   return useQuery({
-    enabled,
-    queryKey: ['catalogos', 'transportistas'],
-    queryFn: () => fetchWithOfflineFallback('transportistas', () => catalogoService.transportistas()),
+    enabled: Boolean(owner) && enabled,
+    queryKey: ['catalogos', 'transportistas', owner],
+    queryFn: () => fetchWithOfflineFallback('transportistas', owner, () => catalogoService.transportistas()),
     staleTime: STALE_TIME,
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 
 export function useCatalogoOperadores(enabled = true) {
+  const owner = useQueryOwner();
   return useQuery({
-    enabled,
-    queryKey: ['catalogos', 'operadores'],
-    queryFn: () => fetchWithOfflineFallback('operadores', () => catalogoService.operadores()),
+    enabled: Boolean(owner) && enabled,
+    queryKey: ['catalogos', 'operadores', owner],
+    queryFn: () => fetchWithOfflineFallback('operadores', owner, () => catalogoService.operadores()),
     staleTime: STALE_TIME,
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 
 export function useCatalogoVehiculos() {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: ['catalogos', 'vehiculos'],
-    queryFn: () => fetchWithOfflineFallback('vehiculos', () => catalogoService.vehiculos()),
+    queryKey: ['catalogos', 'vehiculos', owner],
+    queryFn: () => fetchWithOfflineFallback('vehiculos', owner, () => catalogoService.vehiculos()),
     staleTime: STALE_TIME,
+    enabled: Boolean(owner),
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 
 export function useCatalogoChoferes() {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: ['catalogos', 'choferes'],
-    queryFn: () => fetchWithOfflineFallback('choferes', () => catalogoService.choferes()),
+    queryKey: ['catalogos', 'choferes', owner],
+    queryFn: () => fetchWithOfflineFallback('choferes', owner, () => catalogoService.choferes()),
     staleTime: STALE_TIME,
+    enabled: Boolean(owner),
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 
@@ -120,9 +161,13 @@ export function useDeleteTipoResiduo() {
 
 // List all tratamientos autorizados (admin)
 export function useAllTratamientos() {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: ['catalogos', 'tratamientos'],
+    queryKey: ['catalogos', 'tratamientos', owner],
     queryFn: () => catalogoService.allTratamientos(),
+    enabled: Boolean(owner),
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 

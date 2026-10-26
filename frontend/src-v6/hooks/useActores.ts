@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 /**
  * SITREP v6 - Actores Hooks (barrel re-export)
  * ==============================================
@@ -14,9 +15,10 @@ export * from './useOperadores';
 
 // Historial de cambios (shared across actor types)
 export function useHistorialActor(tipo: string, id: string, filters?: { anio?: number; modulo?: string; page?: number; limit?: number }) {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: ['historial-actor', tipo, id, filters] as const,
+    queryKey: ['historial-actor', tipo, id, filters, owner] as const,
     queryFn: () => actoresService.getHistorialActor(tipo, id, filters),
-    enabled: !!tipo && !!id,
+    enabled: Boolean(owner && tipo && id),
   });
 }

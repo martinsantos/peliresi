@@ -1,3 +1,4 @@
+import { useQueryOwner } from './useQueryOwner';
 /**
  * SITREP v6 - Manifiestos Hooks
  * ==============================
@@ -12,12 +13,10 @@ import { useAuth } from '../contexts/AuthContext';
 import type { ManifiestoFilters } from '../types/api';
 import type { Manifiesto } from '../types/models';
 
-type UserId = string | number;
-
 const KEYS = {
   all: ['manifiestos'] as const,
   lists: () => [...KEYS.all, 'list'] as const,
-  list: (filters?: ManifiestoFilters, userScope?: { userId: UserId; rol: string; actorId: string | null } | null) => [...KEYS.lists(), userScope, filters] as const,
+  list: (filters?: ManifiestoFilters, owner?: string) => [...KEYS.lists(), owner, filters] as const,
   detail: (id: string) => [...KEYS.all, 'detail', id] as const,
   dashboard: () => [...KEYS.all, 'dashboard'] as const,
 };
@@ -50,13 +49,11 @@ function applyClientFilters(items: Manifiesto[], filters?: ManifiestoFilters): M
 
 export function useManifiestos(filters?: ManifiestoFilters, options?: { enabled?: boolean }) {
   const { currentUser } = useAuth();
-  const userScope = currentUser
-    ? { userId: currentUser.id, rol: currentUser.rol, actorId: currentUser.actorId ?? null }
-    : null;
+  const owner = useQueryOwner();
 
   return useQuery({
-    queryKey: KEYS.list(filters, userScope),
-    enabled: options?.enabled ?? true,
+    queryKey: KEYS.list(filters, owner),
+    enabled: Boolean(owner) && (options?.enabled ?? true),
     // New filters must run the offline cache reader instead of remaining paused.
     networkMode: 'always',
     refetchOnReconnect: 'always',
@@ -64,7 +61,7 @@ export function useManifiestos(filters?: ManifiestoFilters, options?: { enabled?
     staleTime: query => query.state.data && 'offline' in query.state.data && query.state.data.offline ? 0 : 60_000,
     queryFn: async () => {
       const readOffline = async () => {
-        const cached = currentUser?.id ? await getCachedManifiestos(currentUser.id) : [];
+        const cached = currentUser?.id ? await getCachedManifiestos(currentUser.id, owner) : [];
         // Reconnection may happen while IndexedDB is pending. The reconnect
         // refetch shares this in-flight query, so finish with live data instead.
         if (navigator.onLine) return manifiestoService.list(filters);
@@ -89,8 +86,9 @@ export function useManifiestos(filters?: ManifiestoFilters, options?: { enabled?
 
 export function useManifiesto(id: string) {
   const { currentUser } = useAuth();
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.detail(id),
+    queryKey: [...KEYS.detail(id), owner],
     networkMode: 'always',
     refetchOnReconnect: 'always',
     // Another actor can advance the same manifest from a different device.
@@ -104,7 +102,7 @@ export function useManifiesto(id: string) {
     retry: (count, error) => navigator.onLine && error.message !== 'No hay una copia descargada de este manifiesto.' && count < 3,
     queryFn: async (): Promise<Manifiesto & { offline?: true }> => {
       const readOffline = async () => {
-        const cached = currentUser?.id ? await getCachedManifiestos(currentUser.id) : [];
+        const cached = currentUser?.id ? await getCachedManifiestos(currentUser.id, owner) : [];
         if (navigator.onLine) return manifiestoService.getById(id);
         const found = cached.find(m => m.id === id);
         if (found) return { ...found, offline: true as const };
@@ -119,13 +117,15 @@ export function useManifiesto(id: string) {
         throw err;
       }
     },
-    enabled: !!id,
+    enabled: Boolean(owner && id),
   });
 }
 
 export function useManifiestoDashboard() {
+  const owner = useQueryOwner();
   return useQuery({
-    queryKey: KEYS.dashboard(),
+    queryKey: [...KEYS.dashboard(), owner],
+    enabled: Boolean(owner),
     queryFn: () => manifiestoService.dashboard(),
     staleTime: 60 * 1000,
   });
