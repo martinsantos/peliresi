@@ -1,20 +1,21 @@
 import React, { useState, useMemo } from 'react';
 import { ReportRow, ReportSortHeader } from './ReportTableControls';
+import { formatEstado } from '../../../utils/formatters';
+import type { EstadoManifiesto } from '../../../types/models';
 import { formatReportQuantities } from '../../../utils/report-quantities';
 import {
-  FileText, Package, Activity, TrendingUp, FileDown,
+  FileText, Package, Activity, TrendingUp,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
-import { Button } from '../../../components/ui/ButtonV2';
 import { CHART_TEXT_COLOR, ESTADO_CHART_COLORS } from '../../../utils/chart-colors';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { ReportResidueBreakdown } from './ReportResidueBreakdown';
 
-export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
+export default function ManifiestosTab({ data, periodo }: { data: any; periodo: string }) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const porEstado = data.porEstado || {};
@@ -43,7 +44,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
 
   const estadoData = useMemo(() =>
     Object.entries(porEstado).map(([name, value]) => ({
-      name: name.replace(/_/g, ' '),
+      name: formatEstado(name as EstadoManifiesto),
       value: value as number,
       fill: ESTADO_CHART_COLORS[name] || '#94A3B8',
     })),
@@ -98,11 +99,6 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
             className="flex-col sm:flex-row"
             title={`Detalle de Manifiestos (${manifiestosList.length})`}
             subtitle="Registros individuales del período"
-            action={
-              <Button variant="outline" size="sm" leftIcon={<FileDown size={16} />} onClick={onExportPDF}>
-                Exportar PDF
-              </Button>
-            }
           />
           <CardContent className="p-0">
             <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
@@ -126,7 +122,7 @@ export default function ManifiestosTab({ data, periodo, onExportPDF }: { data: a
                           backgroundColor: (ESTADO_CHART_COLORS[m.estado] || '#94A3B8') + '18',
                         }}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ESTADO_CHART_COLORS[m.estado] || '#94A3B8' }} />
-                          {m.estado?.replace(/_/g, ' ')}
+                          {m.estado ? formatEstado(m.estado) : 'Sin estado'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-neutral-900 max-w-[200px] truncate" title={m.generador}>{m.generador}</td>

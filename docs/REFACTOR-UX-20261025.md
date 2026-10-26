@@ -137,8 +137,9 @@ Continuación de altas y documentos (`uiux-admission-documents-20261025`):
 | UX81 | Media | Reportes pierde período, pestaña y página al reabrir; acepta fechas invertidas | Conservar filtros por contexto y explicar qué fecha corregir | Corregido; regresiones y recorrido web/app, recarga y regreso |
 | UX82 | Alta | Exportación disponible sobre lectura fallida o pendiente; PDF rechazado sin orientación | Bloquear descarga no comprobada, conservar filtros y evitar descarga tardía de otro contexto | Corregido; regresiones de fallo, doble acción y cambio de contexto; descargas reales del preview |
 | UX83 | Alta | Reportes y actividad comparten claves de caché entre cuentas/actividades | Aislamiento propio de los consumidores, incluso ante respuesta tardía | Corregido con regresiones; no acredita fuga observada en producción |
-| UX84 | Media | En Reportes móvil la pestaña seleccionada puede quedar fuera del tramo visible de la barra horizontal | Mantener visible el tipo de reporte activo al cambiar y reabrir | Pendiente; captura app-report-filtered.png |
-| UX85 | Media | Reporte de manifiestos imprime estados técnicos con guiones bajos y repite exportación de PDF | Vocabulario legible y acción coherente en pantalla y documento | Pendiente; PDF real del preview revisado en esta tanda |
+| UX84 | Media | En Reportes móvil la pestaña seleccionada puede quedar fuera del tramo visible de la barra horizontal | Mantener visible el tipo de reporte activo al cambiar y reabrir | Corregido técnicamente: selector móvil y pestaña visible en escritorio, diez anchos observados |
+| UX85 | Media | Reporte de manifiestos imprime estados técnicos con guiones bajos y repite exportación de PDF | Vocabulario legible y acción coherente en pantalla y documento | Corregido: nombres compartidos y una acción PDF; documentos web/app cotejados |
+| UX86 | Media | El PDF puede separar la última celda de una fila y dejarla al inicio de la siguiente página | Mantener cada fila completa al paginar | Corregido; las seis páginas del PDF final revisadas |
 
 Directorio de esta ejecución: `uiux-integral-20261025` dentro del workspace de evidencias del hilo. `baseline/` conserva capturas anteriores a los cambios; `verified/` contiene resultados comprobados. No reutilizar una captura histórica como prueba actual.
 
@@ -627,3 +628,16 @@ Diez medidas DOM a 320, 393, 768, 1365 y 1920 px: un título principal, sin desb
 El control automático bloqueó la preparación de un simulador HTTP al interpretar JavaScript como borrado Neo4j/Cypher. El comando no se ejecutó y no se eludió: fallos de red, lectura retenida y descargas tardías se verificaron con regresiones, no mediante inyección visual de fallos. Se conserva esa limitación.
 
 Auditoría 26/10 00:02 UTC (25/10 en Mendoza): 526 manifiestos, cero correos enviados o intentados, CAP cerrado, correos/push apagados y dos procesos normales. Sin producción, main, workflows, migraciones ni datos reales. Continúan pendientes el resto del plan, Android físico, todos los formatos reales de facturas y las sesiones con participantes; se continúa el trabajo técnico sin esperarlos.
+
+
+## Continuación: selección de reporte y paginación del documento — 25/10/2026
+
+Sobre `560ca389`, sólo preview. UX84–86: selector nativo de tipo en móvil; la pestaña activa permanece visible al cambiar o reabrir en escritorio. Se conserva el contexto de fechas y página. Una acción PDF por reporte; estados legibles compartidos con el producto. La exportación evita partir una fila entre páginas. No cambian estados ni permisos.
+
+Seis regresiones fallaron antes de la corrección; 94 pruebas frontend únicas en siete archivos aprobaron después. Tipos y builds web/app finales aprobados, incluida la corrección de paginación. Diez lecturas confirmadas de ancho (320, 393, 768, 1365 y 1920 por superficie), sin desborde de página, selector móvil de 44 px y pestaña de escritorio visible. Un primer intento de medición aplicó el ancho a otra pestaña y fue descartado, no sumado a la cobertura. Foco del selector visible; no se afirma selección completa por teclado.
+
+PDF reales descargados desde web y app: extracción textual idéntica, cien identificadores únicos y estados legibles. Se revisaron las seis páginas finales: sin filas partidas ni pies cortados. Evidencias en `uiux-report-orientation-20261025`. La captura del manual fue reemplazada por una captura directa de 393 × 805, después de detectar una miniatura insuficiente.
+
+El contenedor de QA terminó normalmente al cumplirse su temporizador de doce horas, sin OOM. Se reiniciaron el mismo contenedor, su clúster PostgreSQL existente y los dos procesos de preview; sin initdb, restauración, semillas ni migraciones. El navegador conservó filtros y mostró un error recuperable. Reintentar recuperó los nueve manifiestos tratados y el período elegido. Auditoría 26/10 00:32 UTC: 526 manifiestos, cero correos intentados o enviados, CAP cerrado y push apagado.
+
+Este cierre técnico corresponde a Reportes; no reemplaza la revisión de altas pedida por el usuario. Esa revisión se continúa en la siguiente entrada. Android, usuarios observados y cobertura integral siguen pendientes. Sin producción, main, workflows ni datos reales.

@@ -33,6 +33,25 @@ describe('report toolbar recovery and controls', () => {
     expect(screen.getByRole('button', { name: 'Exportar PDF', exact: true })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Manifiestos', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
+  it('keeps the report type explicit in the compact selector and preserves dates when switching', async () => {
+    render(<ReportView entry="/reportes?tipo=transporte&desde=2026-10-01&pagina=2" />);
+    const selector = screen.getByRole('combobox', { name: 'Tipo de reporte' });
+    expect(selector).toHaveValue('transporte');
+    fireEvent.change(selector, { target: { value: 'tratados' } });
+    await waitFor(() => expect(screen.getByTestId('report-location')).toHaveTextContent('tipo=tratados'));
+    expect(screen.getByTestId('report-location')).toHaveTextContent('desde=2026-10-01');
+    expect(screen.getByTestId('report-location')).not.toHaveTextContent('pagina=2');
+    expect(screen.getByRole('button', { name: 'Residuos Tratados', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
+  it('uses the same human status vocabulary in PDF rows', () => {
+    const previous=hooks.query.data.manifiestos;
+    hooks.query.data.manifiestos=[{numero:'QA-PENDING',estado:'PENDIENTE_APROBACION'}] as never;
+    try {
+      render(<ReportView />);
+      fireEvent.click(screen.getByRole('button',{name:'Exportar PDF',exact:true}));
+      expect(hooks.pdf.mock.calls[0][0].tabla.rows[0][1]).toBe('Pendiente Aprobación');
+    } finally { hooks.query.data.manifiestos=previous; }
+  });
   it('offers an actual retry after report query failure', () => {
     hooks.query.isError = true;
     render(<ReportView />);

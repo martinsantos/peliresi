@@ -2,20 +2,19 @@ import React, { useState, useMemo } from 'react';
 import { ReportRow, ReportSortHeader } from './ReportTableControls';
 import { formatReportQuantities } from '../../../utils/report-quantities';
 import {
-  Package, Activity, Factory, FileDown,
+  Package, Activity, Factory,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
-import { Button } from '../../../components/ui/ButtonV2';
 import { Badge } from '../../../components/ui/BadgeV2';
 import { ChartTooltip } from '../../../components/charts/ChartTooltip';
 import { CHART_TEXT_COLOR } from '../../../utils/chart-colors';
 import { KpiCard } from '../../../components/charts/KpiCard';
 import { ReportResidueBreakdown } from './ReportResidueBreakdown';
 
-export default function TratadosTab({ data, periodo, onExportPDF }: { data: any; periodo: string; onExportPDF: () => void }) {
+export default function TratadosTab({ data, periodo }: { data: any; periodo: string }) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const resumen = data.resumen || {};
   const porGenerador = data.porGenerador || {};
@@ -95,11 +94,6 @@ export default function TratadosTab({ data, periodo, onExportPDF }: { data: any;
             className="flex-col sm:flex-row"
             title={`Detalle de Tratamientos (${detalle.length})`}
             subtitle="Registros de residuos tratados"
-            action={
-              <Button variant="outline" size="sm" leftIcon={<FileDown size={16} />} onClick={onExportPDF}>
-                Exportar PDF
-              </Button>
-            }
           />
           <CardContent className="p-0">
             <div className="overflow-x-auto">

@@ -128,6 +128,7 @@ export async function exportReportePDF(config: ExportConfig) {
       head: [config.tabla.headers],
       body: config.tabla.rows.map(row => row.map(cell => String(cell))),
       theme: 'grid',
+      rowPageBreak: 'avoid',
       headStyles: {
         fillColor: PRIMARY_COLOR,
         textColor: [255, 255, 255],

@@ -33,6 +33,8 @@ import { useCentroControl } from '../../hooks/useCentroControl';
 import type { ActorGenerador, ActorTransportista, ActorOperador } from '../../hooks/useCentroControl';
 import { exportReportePDF } from '../../utils/exportPdf';
 import { formatReportQuantities } from '../../utils/report-quantities';
+import { formatEstado } from '../../utils/formatters';
+import type { EstadoManifiesto } from '../../types/models';
 import { DATE_PRESETS, computeDateRange } from '../../utils/date-presets';
 import { agruparPorDepartamento } from '../../utils/mendoza-departamentos';
 import type { ReporteFilters } from '../../types/api';
@@ -81,6 +83,24 @@ function ReportWorkspace() {
   const fechaHasta = inspectionDateFilter(params.get('hasta'));
   const validTab = tabs.find(tab => tab.id === params.get('tipo') && (tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)));
   const activeTab: TabType = validTab?.id || 'manifiestos';
+  const reportNav = useRef<HTMLElement>(null);
+  const selectedReport = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const nav = reportNav.current;
+    const selected = selectedReport.current;
+    if (!nav || !selected) return;
+    const revealSelection = () => {
+      if (!nav.clientWidth || nav.scrollWidth <= nav.clientWidth) return;
+      const container = nav.getBoundingClientRect();
+      const item = selected.getBoundingClientRect();
+      // Scroll only the report choices, never the page or its focused field.
+      nav.scrollLeft += item.left - container.left - Math.max(0, (nav.clientWidth - item.width) / 2);
+    };
+    revealSelection();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealSelection);
+    observer?.observe(nav);
+    return () => observer?.disconnect();
+  }, [activeTab]);
   const reportPage = inspectionPage(params.get('pagina'));
   const datePreset = params.has('periodo') ? Number(params.get('periodo')) : (fechaDesde || fechaHasta ? -1 : 0);
   const incluirTodos = params.has('todos') ? params.get('todos') === 'true' : !fechaDesde && !fechaHasta;
@@ -188,7 +208,7 @@ function ReportWorkspace() {
       headers = ['Número', 'Estado', 'Generador', 'Transportista', 'Operador', 'Fecha'];
       rows = list.map((m) => [
         (m.numero as string) || '',
-        (m.estado as string) || '',
+        m.estado ? formatEstado(m.estado as EstadoManifiesto) : 'Sin estado',
         (m.generador as string) || '',
         (m.transportista as string) || '',
         (m.operador as string) || '',
@@ -326,19 +346,27 @@ function ReportWorkspace() {
           </div>
         </div>
 
-        {/* Row 2: Tabs — horizontally scrollable with gradient fade indicators */}
+        {/* One visible report chooser per viewport, using the same options and state. */}
         <div className="relative bg-white rounded-b-xl border-x border-b border-neutral-100">
+          <label className="block px-3 pb-3 text-sm font-medium text-neutral-700 sm:hidden">
+            Tipo de reporte
+            <select value={activeTab} onChange={event => updateFilters({tipo:event.target.value,pagina:undefined})}
+              className="mt-1 w-full min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+              {tabs.filter(tab => tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)).map(tab => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
+            </select>
+          </label>
           {/* Left gradient fade */}
-          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 rounded-bl-xl" />
+          <div className="hidden sm:block pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white to-transparent z-10 rounded-bl-xl" />
           {/* Right gradient fade */}
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
-          <nav aria-label="Tipos de reporte" className="flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
+          <div className="hidden sm:block pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-10 rounded-br-xl" />
+          <nav ref={reportNav} aria-label="Tipos de reporte" className="hidden sm:flex items-center gap-0.5 px-2 overflow-x-auto scrollbar-hide">
             {tabs.filter(tab => tab.id !== 'inspecciones' || canUseInspectionOperations(currentUser)).map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  ref={isActive ? selectedReport : undefined}
                   type="button"
                   aria-pressed={isActive}
                   onClick={() => updateFilters({tipo:tab.id,pagina:undefined})}
@@ -381,9 +409,9 @@ function ReportWorkspace() {
         ) : activeQuery?.data ? (
           <>
             {activeQuery.isFetching && <div className="mb-4"><LoadingIndicator label="Actualizando reporte; la exportación estará disponible al terminar…"/></div>}
-            {activeTab === 'manifiestos' && <ManifiestosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
-            {activeTab === 'tratados' && <TratadosTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
-            {activeTab === 'transporte' && <TransporteTab data={activeQuery.data} periodo={periodoLabel} onExportPDF={handleExportPDF} />}
+            {activeTab === 'manifiestos' && <ManifiestosTab data={activeQuery.data} periodo={periodoLabel} />}
+            {activeTab === 'tratados' && <TratadosTab data={activeQuery.data} periodo={periodoLabel} />}
+            {activeTab === 'transporte' && <TransporteTab data={activeQuery.data} periodo={periodoLabel} />}
             {pagination && (
               <nav aria-label="Páginas del reporte" className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white p-3">
                 <p role="status" className="text-sm text-neutral-700">Página {pagination.page} de {Math.max(1, pagination.pages)} · {pagination.total} registros</p>
