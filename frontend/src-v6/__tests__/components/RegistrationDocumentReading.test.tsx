@@ -33,3 +33,35 @@ describe('reading the original in an application', () => {
     expect(data.onRetryReading).toHaveBeenCalledWith('FACTURA_ELECTRICA');
   });
 });
+
+
+describe('document storage and administrative review are separate', () => {
+  it.each(['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA', 'CONSTANCIA_AFIP'])('%s names pending review even when the file is saved', tipo => {
+    render(<StepDocumentos {...props(tipo)} />);
+    const row = screen.getByTestId(`registration-document-${tipo}`);
+    expect(row).toHaveTextContent('Guardado · Pendiente de revisión');
+    expect(row).not.toHaveClass('bg-emerald-50/60');
+    expect(row.querySelector('.lucide-circle-check-big')).toBeNull();
+  });
+  it('only an explicit administrative decision presents a document as approved', () => {
+    const data = props('FACTURA_ELECTRICA'); data.uploadedDocs.FACTURA_ELECTRICA.estado = 'APROBADO';
+    render(<StepDocumentos {...data} />);
+    expect(screen.getByTestId('registration-document-FACTURA_ELECTRICA')).toHaveTextContent('Guardado · Documento aprobado');
+  });
+  it('names a rejected document and keeps the correction reason visible', () => {
+    const data = props('COMPROBANTE_PAGO');
+    Object.assign(data.uploadedDocs.COMPROBANTE_PAGO, { estado: 'RECHAZADO', observaciones: 'El CUIT no corresponde a este establecimiento.' });
+    render(<StepDocumentos {...data} />);
+    expect(screen.getByTestId('registration-document-COMPROBANTE_PAGO')).toHaveTextContent('Guardado · Documento rechazado');
+    expect(screen.getByRole('alert')).toHaveTextContent('El CUIT no corresponde');
+  });
+  it('does not transfer approval from the saved original to a pending replacement', () => {
+    const data = props('FACTURA_ELECTRICA'); data.uploadedDocs.FACTURA_ELECTRICA.estado = 'APROBADO';
+    data.adjuntos.FACTURA_ELECTRICA = new File(['replacement'], 'nueva.pdf');
+    render(<StepDocumentos {...data} />);
+    const row = screen.getByTestId('registration-document-FACTURA_ELECTRICA');
+    expect(row).not.toHaveClass('bg-emerald-50/60');
+    expect(row).toHaveTextContent('Reemplazo pendiente');
+    expect(row).not.toHaveTextContent('Documento aprobado');
+  });
+});

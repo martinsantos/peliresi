@@ -7,6 +7,7 @@ import { Button } from '../../../../components/ui/ButtonV2';
 import { SectionTitle } from '../SectionTitle';
 import type { DocDef } from '../shared';
 import type { DocumentoSolicitud } from '../../../../types/api';
+import { registrationDocumentReviewLabel } from '../../../../utils/registrationDocumentReview';
 import { DocumentAnalysis } from '../../../../components/DocumentAnalysis';
 import type { ReceiptAnalysis } from '../../../../types/documentAnalysis';
 
@@ -95,19 +96,20 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
           const attached = uploaded || pendingFile;
           const isBusy = state === 'uploading' || state === 'deleting' || state === 'reading' || state === 'downloading';
           const rejected = uploaded?.estado === 'RECHAZADO';
+          const approved = uploaded?.estado === 'APROBADO' && !pendingFile;
           return (
-            <div key={doc.tipo} data-testid={`registration-document-${doc.tipo}`} className={`rounded-xl border p-3 transition-colors ${state === 'error' || rejected ? 'border-error-200 bg-error-50/60' : uploaded ? 'border-emerald-200 bg-emerald-50/60' : 'border-neutral-200 bg-neutral-50'}`}>
+            <div key={doc.tipo} data-testid={`registration-document-${doc.tipo}`} className={`rounded-xl border p-3 transition-colors ${state === 'error' || rejected ? 'border-error-200 bg-error-50/60' : approved ? 'border-emerald-200 bg-emerald-50/60' : 'border-neutral-200 bg-neutral-50'}`}>
               <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 {state === 'uploading' || state === 'deleting'
                   ? <Loader2 size={17} className="shrink-0 animate-spin text-[#0D8A4F]" />
-                  : rejected ? <AlertCircle size={17} className="shrink-0 text-error-700" /> : uploaded ? <CheckCircle2 size={17} className="shrink-0 text-emerald-600" /> : <Paperclip size={16} className="shrink-0 text-neutral-400" />}
+                  : rejected ? <AlertCircle size={17} className="shrink-0 text-error-700" /> : approved ? <CheckCircle2 size={17} className="shrink-0 text-emerald-600" /> : <Paperclip size={16} className="shrink-0 text-neutral-400" />}
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-neutral-800">{doc.nombre} {doc.required && <span className="text-error-600" aria-label="obligatorio">*</span>}</p>
                   {attached && (
-                    <div className={`text-xs ${uploaded ? 'text-emerald-700' : 'text-neutral-600'}`}>
+                    <div className={`text-xs ${approved ? 'text-emerald-700' : 'text-neutral-600'}`}>
                       <p className="truncate" title={pendingFile?.name || uploaded?.nombre}>{pendingFile?.name || uploaded?.nombre}</p>
-                      <p>{((pendingFile?.size || uploaded?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : pendingFile ? (reviewMode ? 'Seleccionado para revisión' : 'Pendiente') : 'Guardado'}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
+                      <p>{((pendingFile?.size || uploaded?.size || 0) / 1024).toFixed(0)} KB · {state === 'uploading' ? 'Subiendo…' : state === 'deleting' ? 'Eliminando…' : pendingFile ? (reviewMode ? 'Seleccionado para revisión' : 'Pendiente') : `Guardado · ${registrationDocumentReviewLabel(uploaded?.estado)}`}{state === 'reading' ? ' · Leyendo…' : state === 'downloading' ? ' · Descargando…' : ''}</p>
                       {pendingFile && uploaded && <p className="text-neutral-700">Reemplazo pendiente. El original {uploaded.nombre} sigue guardado hasta confirmar la nueva carga.</p>}
                     </div>
                   )}

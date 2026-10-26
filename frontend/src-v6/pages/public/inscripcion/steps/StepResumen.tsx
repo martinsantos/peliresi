@@ -7,6 +7,7 @@ import { SectionTitle } from '../SectionTitle';
 import type { RegistrationData, TipoActor } from '../shared';
 import type { DocumentoSolicitud } from '../../../../types/api';
 import { ZONAS } from '../../../../utils/calculoTEF';
+import { registrationDocumentReviewLabel } from '../../../../utils/registrationDocumentReview';
 import { RegistrationFleetSummary } from '../../../../components/registration/RegistrationFleetSummary';
 
 interface StepResumenProps {
@@ -170,20 +171,20 @@ export const StepResumen: React.FC<StepResumenProps> = ({
     }
   }
 
-  // Documents
-  const docEntries = [
-    ...Object.entries(uploadedDocs).map(([tipo, document]) => [tipo, { name: document.nombre, size: document.size, saved: true }] as const),
-    ...Object.entries(adjuntos)
-      .filter(([tipo]) => !uploadedDocs[tipo])
-      .map(([tipo, file]) => [tipo, { name: file.name, size: file.size, saved: false }] as const),
-  ];
-  if (docEntries.length > 0) {
+  // Show the selected replacement without transferring the original's approval to it.
+  const documentTypes = [...new Set([...Object.keys(uploadedDocs), ...Object.keys(adjuntos)])];
+  if (documentTypes.length > 0) {
     sections.push({
       label: 'Documentos adjuntos',
-      fields: docEntries.map(([tipo, file]) => ({
-        label: tipo.replace(/_/g, ' '),
-        value: `${file.name} (${(file.size / 1024).toFixed(0)} KB)${file.saved ? ' · Guardado' : ' · Pendiente'}`,
-      })),
+      fields: documentTypes.map(tipo => {
+        const original = uploadedDocs[tipo];
+        const pending = adjuntos[tipo];
+        const file = pending || { name: original.nombre, size: original.size };
+        const status = pending
+          ? original ? `Reemplazo pendiente; el original ${original.nombre} sigue guardado.` : 'Pendiente de carga'
+          : `Guardado · ${registrationDocumentReviewLabel(original.estado)}`;
+        return { label: tipo.replace(/_/g, ' '), value: `${file.name} (${(file.size / 1024).toFixed(0)} KB) · ${status}` };
+      }),
     });
   }
 
