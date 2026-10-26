@@ -14,8 +14,8 @@ export function ManifestAgenda(){
  const {currentUser}=useAuth();const mp=useMobilePrefix();const location=useLocation();const owner=manifestDraftScope(currentUser);
  const [params,setParams]=useScopedSearchParams('manifest-agenda',['programado','paginaProgramados'],owner);
  const search=params.get('programado')||'',rawPage=Number(params.get('paginaProgramados')||1),page=Number.isInteger(rawPage)&&rawPage>0?rawPage:1;
- const setPage=(value:number)=>{const next=new URLSearchParams(params);next.set('paginaProgramados',String(value));setParams(next);};
- const setSearch=(value:string)=>{const next=new URLSearchParams(params);if(value)next.set('programado',value);else next.delete('programado');next.delete('paginaProgramados');setParams(next);};
+ const setPage=(value:number)=>setParams(next=>{next.set('paginaProgramados',String(value));return next;});
+ const setSearch=(value:string)=>setParams(next=>{if(value)next.set('programado',value);else next.delete('programado');next.delete('paginaProgramados');return next;});
  const query=useQuery({queryKey:['manifest-agenda',owner,search,page],queryFn:async()=>(await api.get('/manifiestos/agenda-partes',{params:{search,page}})).data.data as {total:number;items:{id:string;numero:string;fechaEstimadaRetiro:string;generador?:{razonSocial:string};operador?:{razonSocial:string}}[]},refetchInterval:15000,staleTime:0});
  return <section aria-label="Manifiestos programados"><Card padding="none" className="overflow-hidden"><div className="space-y-4 p-4">
    <div className="flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 font-semibold"><CalendarDays size={20} aria-hidden="true" className="shrink-0 text-primary-800"/>Manifiestos programados</h2><Button size="sm" variant="outline" onClick={()=>void query.refetch()}>Actualizar programados</Button></div>

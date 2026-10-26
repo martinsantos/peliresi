@@ -20,11 +20,10 @@ export function InspectionOperationsPanel({ mode = 'agenda', desde, hasta, embed
   const filtersId = useId();
   const owner = inspectionWorkspaceOwner(currentUser);
   const [searchParams, setSearchParams] = useScopedSearchParams('inspections', INSPECTION_FILTER_KEYS, owner);
-  const updateFilters = (values: Record<string, string | number>) => {
-    const next = new URLSearchParams(searchParams);
+  const updateFilters = (values: Record<string, string | number>) => setSearchParams(next => {
     Object.entries(values).forEach(([key, value]) => value && value !== 1 ? next.set(key, String(value)) : next.delete(key));
-    setSearchParams(next);
-  };
+    return next;
+  });
   const page = inspectionPage(searchParams.get('agendaPage'));
   const rawState = searchParams.get('agendaEstado') || '';
   const state: InspectionState | '' = Object.hasOwn(INSPECTION_STATE_LABELS, rawState) && (mode === 'report' || !['CERRADA_CONFORME', 'FINALIZADA', 'CANCELADA'].includes(rawState)) ? rawState as InspectionState : '';

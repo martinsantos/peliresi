@@ -144,3 +144,26 @@ it('does not offer renewals to transport administration', () => {
   render(<MemoryRouter><AdmissionTabs active="solicitudes" /></MemoryRouter>);
   expect(screen.queryByRole('link', { name: 'Renovaciones', exact: true })).not.toBeInTheDocument();
 });
+
+it.each(['', '/app'])('preserves both renewal filters changed before the next render (%s)', prefix => {
+  list('renewals', prefix);
+  const year = screen.getByLabelText('Año'), status = screen.getByLabelText('Estado');
+  act(() => {
+    fireEvent.change(year, { target: { value: '' } });
+    fireEvent.change(status, { target: { value: 'PENDIENTE' } });
+  });
+  expect(year).toHaveValue('');
+  expect(status).toHaveValue('PENDIENTE');
+  expect(state.filters).toHaveBeenLastCalledWith(expect.objectContaining({ anio: undefined, estado: 'PENDIENTE', page: 1 }));
+});
+it.each(['', '/app'])('preserves search and state changed before the next render (%s)', prefix => {
+  list('applications', prefix);
+  const search = screen.getByLabelText('Nombre o correo del solicitante'), status = screen.getByLabelText('Estado');
+  act(() => {
+    fireEvent.change(search, { target: { value: 'QA' } });
+    fireEvent.change(status, { target: { value: 'OBSERVADA' } });
+  });
+  expect(search).toHaveValue('QA');
+  expect(status).toHaveValue('OBSERVADA');
+  expect(state.filters).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'QA', estado: 'OBSERVADA', page: 1 }));
+});

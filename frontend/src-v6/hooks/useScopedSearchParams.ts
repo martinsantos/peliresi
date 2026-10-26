@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
 const fallbackOwners = new Map<string, string>();
@@ -23,6 +23,15 @@ export function useScopedSearchParams(namespace: string, keys: readonly string[]
   const search = params.toString();
   const nextState = { ...state, filterOwners: { ...owners, [namespace]: owner } };
 
+  const entry = JSON.stringify([namespace, owner, location.key, location.pathname]);
+  const pending = useRef({ entry, search });
+  // A second control can fire before React commits the first navigation. Keep
+  // the pending search for functional updates, but reset it on history/context changes.
+  useLayoutEffect(() => {
+    pending.current = { entry, search };
+    return () => { pending.current.entry = ''; };
+  }, [entry, search]);
+
   useEffect(() => {
     if (!owner) return;
     fallbackOwners.set(storageKey, owner);
@@ -30,5 +39,12 @@ export function useScopedSearchParams(namespace: string, keys: readonly string[]
     if (stampedOwner !== owner || mismatch) setRaw(new URLSearchParams(search), { replace: true, state: nextState });
   }, [owner, location.key, location.search, namespace]); // Each entry is stamped once, including login redirects.
 
-  return [params, (next: URLSearchParams) => setRaw(next, { replace: true, state: nextState })] as const;
+  const update = (next: URLSearchParams | ((current: URLSearchParams) => URLSearchParams)) => {
+    // An event retained by an old account, role or history entry cannot navigate this one.
+    if (pending.current.entry !== entry) return;
+    const value = typeof next === 'function' ? next(new URLSearchParams(pending.current.search)) : next;
+    pending.current.search = value.toString();
+    setRaw(new URLSearchParams(pending.current.search), { replace: true, state: nextState });
+  };
+  return [params, update] as const;
 }

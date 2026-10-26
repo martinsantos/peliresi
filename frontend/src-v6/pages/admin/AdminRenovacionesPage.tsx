@@ -25,7 +25,7 @@ function RenewalList({ owner, actorType, role }: { owner: string; actorType: str
   const anio = params.get('anio') ?? String(new Date().getFullYear()), tipoActor = actorType || params.get('tipoActor') || '', estado = params.get('estado') || '';
   const page = Math.max(1, Math.floor(Number(params.get('page'))) || 1), selected = params.get('revision') || '';
   const query = useRenovaciones({ anio: anio ? Number(anio) : undefined, tipoActor: tipoActor || undefined, estado: estado || undefined, page, limit: 20 });
-  const change = (key: string, value: string) => { const next = new URLSearchParams(params); value || key === 'anio' ? next.set(key, value) : next.delete(key); if (key !== 'page' && key !== 'revision') next.delete('page'); setParams(next); };
+  const change = (key: string, value: string) => setParams(next => { value || key === 'anio' ? next.set(key, value) : next.delete(key); if (key !== 'page' && key !== 'revision') next.delete('page'); return next; });
   const years = Array.from(new Set([new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2, ...(anio ? [Number(anio)] : [])])).sort((a,b) => b-a);
   return <div className="space-y-4">
     <AdmissionTabs active="renovaciones" />

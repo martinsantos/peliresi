@@ -106,9 +106,13 @@ function ReportWorkspace() {
   const incluirTodos = params.has('todos') ? params.get('todos') === 'true' : !fechaDesde && !fechaHasta;
   const invalidDates = !!fechaDesde && !!fechaHasta && fechaDesde > fechaHasta;
   function updateFilters(values: Record<string, string | number | undefined>) {
-    const next = new URLSearchParams(params);
-    for (const [key,value] of Object.entries(values)) { if(value === undefined || value === '')next.delete(key);else next.set(key,String(value)); }
-    setParams(next);
+    setParams(next => {
+      for (const [key, value] of Object.entries(values)) {
+        if (value === undefined || value === '') next.delete(key);
+        else next.set(key, String(value));
+      }
+      return next;
+    });
   }
   const setReportPage = (page:number) => updateFilters({pagina:page>1?page:undefined});
   const setIncluirTodos = (value:boolean) => updateFilters({todos:String(value)});

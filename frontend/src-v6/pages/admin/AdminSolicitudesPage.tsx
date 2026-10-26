@@ -19,7 +19,7 @@ export default function AdminSolicitudesPage() {
   const estado = params.get('estado') || '', tipoActor = actorType || params.get('tipoActor') || '', search = params.get('search') || '';
   const page = Math.max(1, Math.floor(Number(params.get('page'))) || 1);
   const query = useSolicitudes({ estado: (estado || undefined) as EstadoSolicitud | undefined, tipoActor: tipoActor || undefined, search: search || undefined, page, limit: 20 });
-  const change = (key: string, value: string) => { const next = new URLSearchParams(params); value ? next.set(key, value) : next.delete(key); if (key !== 'page') next.delete('page'); setParams(next); };
+  const change = (key: string, value: string) => setParams(next => { value ? next.set(key, value) : next.delete(key); if (key !== 'page') next.delete('page'); return next; });
   return <div className="space-y-4">
     <AdmissionTabs active="solicitudes" />
     <div className="grid gap-3 rounded-xl border border-neutral-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_1fr_1fr]">

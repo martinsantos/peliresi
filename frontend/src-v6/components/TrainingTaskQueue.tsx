@@ -25,8 +25,8 @@ export function TrainingTaskQueue(){
  const period=['today','future'].includes(params.get('periodo')||'')?params.get('periodo')!:'all';
  const search=(params.get('buscarPendiente')||'').slice(0,80);
  const rawPage=Number(params.get('paginaPendientes')||1),page=Number.isSafeInteger(rawPage)&&rawPage>0&&rawPage<=100000?rawPage:1;
- const changeFilter=(key:string,value:string)=>{const next=new URLSearchParams(params);if(value&&value!=='all')next.set(key,value);else next.delete(key);next.delete('paginaPendientes');setParams(next);};
- const setPage=(value:number)=>{const next=new URLSearchParams(params);next.set('paginaPendientes',String(value));setParams(next);};
+ const changeFilter=(key:string,value:string)=>setParams(next=>{if(value&&value!=='all')next.set(key,value);else next.delete(key);next.delete('paginaPendientes');return next;});
+ const setPage=(value:number)=>setParams(next=>{next.set('paginaPendientes',String(value));return next;});
  const query=useQuery({queryKey:['training-tasks',currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.establecimientoId,filter,period,search,page],enabled:manifestProposalsVisible(currentUser),queryFn:async()=>(await api.get('/manifiestos/tareas-partes',{params:{filter,period,search,page,limit:6}})).data.data as {items:Task[];total:number;page:number;limit:number;counts:Record<string,number>},refetchInterval:5000,staleTime:0});
  if(!manifestProposalsVisible(currentUser) || !currentUser)return null;
  const items=query.data?.items||[], counts=query.data?.counts||{};

@@ -39,11 +39,10 @@ const InspeccionesPageV2: React.FC = () => {
   const { currentUser, isAdmin } = useAuth();
   const owner = inspectionWorkspaceOwner(currentUser);
   const [searchParams, setSearchParams] = useScopedSearchParams('inspections', INSPECTION_FILTER_KEYS, owner);
-  const updateFilters = (values: Record<string, string | number>) => {
-    const next = new URLSearchParams(searchParams);
+  const updateFilters = (values: Record<string, string | number>) => setSearchParams(next => {
     Object.entries(values).forEach(([key, value]) => value && value !== 1 ? next.set(key, String(value)) : next.delete(key));
-    setSearchParams(next);
-  };
+    return next;
+  });
   const initialType = isActorType(searchParams.get('tipoActor')) ? searchParams.get('tipoActor') as InspectionActorType : '';
   const initialActor = searchParams.get('actorId') || '';
   const search = searchParams.get('search') || '';
@@ -148,7 +147,7 @@ const InspeccionesPageV2: React.FC = () => {
   return <div className="min-w-0 space-y-4" data-operational-page>
     <PageToolbar label="Acciones de Inspecciones">
       <h2 className="sr-only">Inspecciones</h2>
-      <Button variant="outline" onClick={() => { setSearchParams(new URLSearchParams(sectionSearch(''))); setFindingRequest((value) => value + 1); }} aria-label="Denuncia / hallazgo"><span className="sm:hidden">Hallazgo</span><span className="hidden sm:inline">Denuncia / hallazgo</span></Button>
+      <Button variant="outline" onClick={() => { updateFilters({ vista: '' }); setFindingRequest((value) => value + 1); }} aria-label="Denuncia / hallazgo"><span className="sm:hidden">Hallazgo</span><span className="hidden sm:inline">Denuncia / hallazgo</span></Button>
       <Button className="ml-auto" leftIcon={<Plus size={16} />} disabled={offline || inspections.isError} onClick={() => { setSourceIntake(null); setShowCreate(true); }} aria-label="Nueva inspección">Nueva<span className="hidden sm:inline"> inspección</span></Button>
     </PageToolbar>
     <nav aria-label="Secciones de Inspecciones" className="flex border-b border-neutral-200">
