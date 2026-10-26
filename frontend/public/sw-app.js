@@ -134,7 +134,7 @@ self.addEventListener('fetch', (event) => {
             await cache.put(request, response.clone()).catch(() => {});
           }
           return response;
-        });
+        }).catch(() => new Response('', { status: 408, statusText: 'Offline' }));
       })
     );
     return;

@@ -136,6 +136,33 @@ describe.each([false, true])('service worker scope/app=%s', (app) => {
     expect(await (await worker.request(asset, 'cors'))?.text()).toBe('export {}');
   });
 
+  it.each([404, 503, 200])('keeps the exact warmed release asset when the server returns %s instead of its module', async (status) => {
+    const worker = workerHarness(app);
+    const asset = `${base}/assets/page-Ab_cd-12.js`;
+    await worker.cacheFor(worker.runtimeName).put(asset, new Response('export const version = "installed"', { headers: { 'Content-Type': 'application/javascript' } }));
+    worker.fetch.mockResolvedValue(new Response('unavailable page', { status, headers: { 'Content-Type': 'text/html' } }));
+    const response = await worker.request(asset, 'cors');
+    expect(response?.status).toBe(200);
+    expect(await response?.text()).toBe('export const version = "installed"');
+    expect(worker.fetch).not.toHaveBeenCalled();
+  });
+
+  it('returns an explicit offline response for an unseen release module without substituting another version', async () => {
+    const worker = workerHarness(app);
+    await worker.cacheFor(worker.runtimeName).put(`${base}/assets/page-OldVer12.js`, new Response('old module', {headers: {'Content-Type':'application/javascript'}}));
+    const response = await worker.request(`${base}/assets/page-NewVer12.js`, 'cors');
+    expect(response?.status).toBe(408);
+    expect(await response?.text()).not.toContain('old module');
+  });
+
+  it('replaces an invalid cached module only with a valid network module', async () => {
+    const worker = workerHarness(app), asset = `${base}/assets/page-Ab_cd-12.js`;
+    await worker.cacheFor(worker.runtimeName).put(asset, html('INVALID CACHE'));
+    worker.fetch.mockResolvedValue(new Response('valid module', {headers: {'Content-Type':'application/javascript'}}));
+    expect(await (await worker.request(asset, 'cors'))?.text()).toBe('valid module');
+    expect(await (await worker.cacheFor(worker.runtimeName).match(asset))?.text()).toBe('valid module');
+  });
+
   it.each(['icon-192.png', 'icon-512.png'])('restores its installed %s before any runtime image request', async (icon) => {
     const worker = workerHarness(app), url = `${base}/${icon}`;
     const bytes = new Uint8Array(readFileSync('public/' + icon));

@@ -17,6 +17,17 @@
 
     guides: [
       {
+        id: 'actualizar-sin-perder-contexto', profile: 'generador', audiences: ['generador', 'transportista', 'operador', 'administrador', 'inspector'],
+        title: 'Actualizar y recuperar una pantalla', summary: 'Distinguí una actualización de una falta de conexión y conservá el destino de tu trabajo.',
+        duration: '2 min', icon: 'system_update', keywords: ['actualizar', 'versión', 'conexión', 'pantalla', 'recargar'],
+        safety: 'Una pantalla disponible sin conexión no confirma un envío ni renueva permisos. Revisá siempre el estado de guardado de datos y adjuntos.',
+        steps: [
+          { title: 'Terminar el trabajo pendiente', body: ['Cuando aparezca Nueva versión disponible, guardá y comprobá los cambios antes de actualizar. La actualización espera tu acción; no necesita cerrar la sesión.', 'Si SITREP indica trabajo pendiente, resolvé ese aviso antes de continuar. Un archivo seleccionado o un texto sin confirmar no equivalen a guardado en servidor.'], expected: 'Sabés qué quedó guardado antes de cambiar de versión.' },
+          { title: 'Reconocer qué puede seguir disponible', body: ['Web y app reutilizan los archivos versionados de pantallas que ya guardaron en ese navegador. Si el servidor ya no tiene ese archivo durante una actualización, la copia válida permite continuar con esa versión.', 'Una pantalla nunca cargada puede necesitar conexión. No se sustituye por otra versión ni se recuperan datos de otra cuenta. Los accesos y los envíos siguen sujetos a la comprobación del servidor.'], expected: 'No confundís una pantalla conservada con un trámite enviado o aprobado.' },
+          { title: 'Recuperar la pantalla indicada', body: ['Si aparece No pudimos abrir esta pantalla, recuperá la conexión y elegí Recargar página. Se conserva la dirección, incluida la solicitud o expediente indicado.', 'Si la sesión venció, ingresá con la cuenta correspondiente. Comprobá el rol, el trámite y los borradores recuperados antes de continuar. No borres los datos del navegador para resolver una carga fallida: allí pueden estar tus copias pendientes.'], expected: 'Retomás el destino correcto y verificás el trabajo conservado.' }
+        ]
+      },
+      {
         id: 'alta-responder-observaciones', profile: 'generador', audiences: ['generador', 'transportista', 'operador'],
         title: 'Responder observaciones del alta', summary: 'Conservá tu respuesta y distinguí el mensaje guardado del reenvío a revisión.',
         duration: '3 min', icon: 'chat', keywords: ['alta', 'observada', 'respuesta', 'reenvío', 'mensajes', 'borrador'],

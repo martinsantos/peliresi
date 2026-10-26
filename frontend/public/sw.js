@@ -106,6 +106,28 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // An open release must retain its exact, validated content-hashed assets.
+    // A deployment may remove that URL from the server while this tab still
+    // references it. Never substitute another hash, cache scope, or an API.
+    if (/^\/assets\/.*-[a-zA-Z0-9_-]{8}\./.test(url.pathname)) {
+        event.respondWith(
+            caches.open(RUNTIME_CACHE).then(async (cache) => {
+                const cached = await cache.match(request) || await (await caches.open(CACHE_NAME)).match(request);
+                if (isCacheableAsset(request, cached)) return cached;
+                try {
+                    const response = await fetch(request);
+                    if (isCacheableAsset(request, response)) {
+                        await cache.put(request, response.clone()).catch(() => {});
+                    }
+                    return response;
+                } catch {
+                    return new Response('', { status: 408, statusText: 'Offline' });
+                }
+            })
+        );
+        return;
+    }
+
     // Static assets: network-first with cache fallback
     event.respondWith(
         caches.open(RUNTIME_CACHE).then(async (cache) => {
