@@ -750,3 +750,5 @@ p { margin: 0; }
   .tutorial-container { width: 100%; padding: 0; }
   .guide-step { break-inside: avoid; }
 }
+
+.progress-storage-status { margin: 12px 0 0; color: #5f410a; font-size: 0.875rem; line-height: 1.5; }

@@ -29,8 +29,15 @@ describe('manual documentation stays usable and truthful', () => {
       for (const step of guide.steps) {
         expect(step.title.length && step.body.length && step.expected.length).toBeGreaterThan(0);
         if (step.image) {
-          expect(step.image).toMatch(/^screenshots\/(desktop|mobile)\/[^/]+\.png$/);
+          expect(step.image).toMatch(/^screenshots\/(desktop|mobile)\/[^/]+\.(png|jpg)$/);
           expect(existsSync(manual + step.image), step.image).toBe(true);
+          const bytes = readFileSync(manual + step.image);
+          expect(bytes.length, step.image).toBeGreaterThan(24);
+          // Some historical .png captures contain original JPEG bytes. Preserve the
+          // evidence; validate the actual supported encoding rather than its label.
+          const png = bytes.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+          const jpeg = bytes.subarray(0, 3).toString('hex') === 'ffd8ff';
+          expect(png || jpeg, step.image).toBe(true);
           expect(step.alt?.length).toBeGreaterThan(0);
         }
       }
@@ -80,11 +87,11 @@ describe('manual documentation stays usable and truthful', () => {
   it('exposes the tutorial in all entry pages and escapes the explicit capture caption', () => {
     for (const file of ['index.html', 'search.html', 'tutorial.html']) {
       const html = readFileSync(manual + file, 'utf8');
-      // Guide content uses its own current cache key; the corrected renderer has its own key; CSS has its own identity revision.
-      // Keep exact versions: stale entry pages must not load an older renderer.
-      expect(html).toContain('help-data.js?v=2026.24.1');
-      expect(html).toContain('manual.js?v=2026.20.6');
-      expect(html).toContain('manual.css?v=2026.23.2');
+      // Any changed asset must have a new URL, including content-only manual edits.
+      for (const asset of ['help-data.js', 'manual.js', 'manual.css']) {
+        const digest = createHash('sha256').update(readFileSync(manual + asset)).digest('hex').slice(0, 12);
+        expect(html, `Refresh ${asset} cache key in ${file}`).toContain(`${asset}?v=${digest}`);
+      }
     }
     const script = readFileSync(manual + 'manual.js', 'utf8');
     expect(script).toContain("'administrador-alertas-proactivas'");
@@ -93,12 +100,15 @@ describe('manual documentation stays usable and truthful', () => {
   });
 });
 
-it('documents operational proposals separately from CAP and keeps the old manifest contract explicit',()=>{
+it('documents explicit operational approvals separately from CAP without inventing historical decisions',()=>{
  const guide=data.guides.find(g=>g.id==='manifiestos-tres-partes')!;
  const text=guide.steps.flatMap(s=>s.body.concat(s.expected)).join(' ');
  for(const value of ['Crear no aprueba','Generador firma','3 de 3','Iniciar coordinación','Leer un aviso no aprueba'])expect(text).toContain(value);
  expect(guide.safety).toContain('CAP cerrado y correo/push apagados');
- expect(data.guides.find(g=>g.id==='generador-crear-manifiesto')!.safety).toContain('modo de borrador anterior');
+ const creator = data.guides.find(g=>g.id==='generador-crear-manifiesto')!;
+ expect(creator.safety).toContain('no aprueba por ninguna parte');
+ expect(creator.safety).toContain('no se les inventan aprobaciones');
+ expect(JSON.stringify(creator.steps)).toContain('Pendiente aprobación');
 });
 
 it('explains eventual search, live updates and explicit conflict recovery', () => {

@@ -17,6 +17,27 @@
 
     guides: [
       {
+        id: 'solicitar-cambios-ficha', profile: 'generador', audiences: ['generador', 'operador'],
+        title: 'Solicitar cambios de tu ficha', summary: 'Enviá correcciones a Administración sin confundir la solicitud con la actualización del padrón.',
+        duration: '2 min', icon: 'edit_note', keywords: ['perfil', 'corregir', 'cambios', 'renovación', 'datos'],
+        safety: 'Solicitar un cambio no lo aprueba. Esta pantalla no conserva un borrador al cerrarla.',
+        steps: [
+          { title: 'Revisar el contexto y los datos', body: ['Desde tu perfil, abrí Solicitar cambios. Comprobá la razón social y revisá los valores actuales antes de modificar los campos disponibles.', 'Si falla la consulta, reintentá antes de enviar. Mantené la pantalla abierta mientras preparás la corrección; no hay confirmación de borrador guardado.'], expected: 'La solicitud corresponde a la ficha de tu actividad actual.' },
+          { title: 'Enviar para revisión', body: ['Revisá lo que cambiaste y enviá la solicitud una sola vez. Esperá la confirmación; una falla de envío no confirma que se haya presentado.', 'Administración revisa la solicitud de cambio. El envío no reemplaza inmediatamente los datos del padrón ni aprueba una renovación.'], expected: 'Distinguís la solicitud enviada de los cambios aprobados en la ficha.' }
+        ]
+      },
+      {
+        id: 'ayuda-retomar-tutorial', profile: 'generador', audiences: ['generador', 'transportista', 'operador', 'administrador', 'inspector', 'auditor'],
+        title: 'Retomar una guía de ayuda', summary: 'Volvé al paso que estabas leyendo y distinguí el avance de lectura de las tareas en SITREP.',
+        duration: '2 min', icon: 'menu_book', keywords: ['ayuda', 'tutorial', 'retomar', 'progreso', 'guardar', 'alta', 'ATM', 'multirol'],
+        safety: 'El progreso del manual sólo indica lectura. No guarda formularios, no aprueba trámites y no envía avisos.',
+        steps: [
+          { title: 'Continuar donde dejaste', body: ['El índice y Siguiente paso permiten recorrer la guía. Al cerrar y volver a abrirla en el mismo navegador, se recupera el último paso guardado y la pantalla se ubica allí.', 'El avance queda en este navegador, no se sincroniza entre dispositivos ni pertenece a una cuenta de SITREP. No se guardan datos de formularios en el progreso de lectura.'], expected: 'El paso visible coincide con el índice y el avance mostrado.' },
+          { title: 'Abrir un paso específico', body: ['Copiar enlace a este paso permite compartir o conservar la dirección de una sección. Un enlace a un paso específico tiene prioridad sobre el avance guardado.', 'Leer una guía o marcarla como completada no resuelve el requerimiento ni confirma una aprobación. Volvé al registro de SITREP para realizar la acción correspondiente.'], expected: 'El enlace abre la sección solicitada, sin cambiar el trámite.' },
+          { title: 'Seguir cuando no se puede guardar', body: ['Si el navegador bloquea el almacenamiento, el manual avisa que no puede guardar tu avance. Podés seguir usando el índice, Anterior y Siguiente paso.', 'Conservá la dirección del paso en la barra del navegador para retomarlo. El aviso no significa que se haya guardado tu avance después de cerrar.'], expected: 'La ayuda sigue disponible aunque falle el guardado del progreso.' }
+        ]
+      },
+      {
         id: 'revision-altas-renovaciones', profile: 'administrador',
         title: 'Revisar altas y renovaciones', summary: 'En Solicitudes, elegí Inscripciones o Renovaciones; reconocé quién debe actuar y revisá los cambios antes de decidir.',
         duration: '6 min', icon: 'fact_check', keywords: ['solicitudes', 'alta', 'renovaciones', 'aprobación', 'rechazo', 'borrador', 'filtros', 'avisos'],

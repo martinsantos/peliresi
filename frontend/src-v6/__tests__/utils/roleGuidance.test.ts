@@ -16,3 +16,26 @@ it.each(['','/app','/mobile'])('contextual guidance on %s',prefix=>{
  expect(contextualGuidance(prefix+'/mis-inspecciones/i','GENERADOR').manual).toBe('actor-mis-inspecciones');
  expect(contextualGuidance(prefix+'/inspecciones/i','GENERADOR',true).manual).toBe('psip-flujo-inspecciones');
 });
+it.each(['', '/app', '/mobile'].flatMap(prefix => ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].map(role => [prefix, role])))('administrative admission guidance %s for %s follows the review task', (prefix, role) => {
+ for (const route of ['/admin/solicitudes', '/admin/solicitudes/qa', '/admin/renovaciones']) {
+  const help = contextualGuidance(prefix + route, role);
+  expect(help.manual).toBe('revision-altas-renovaciones');
+  expect(help.steps.join(' ')).toContain('Administración');
+  expect(help.steps.join(' ')).not.toContain('Presentar');
+  expect(help.steps.join(' ')).not.toContain('Adjuntá comprobantes');
+ }
+ expect(contextualGuidance(prefix + '/admin/solicitudes/qa', role).steps.join(' ')).toContain('Iniciar revisión');
+ expect(contextualGuidance(prefix + '/admin/renovaciones', role).steps.join(' ')).toContain('propuestos');
+});
+it.each(['', '/app', '/mobile'])('requester help stays scoped to the actual task on %s', prefix => {
+ for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
+  const own = contextualGuidance(prefix + '/mi-solicitud', role);
+  expect(own.manual).toBe('alta-borradores-ocr');
+  expect(own.steps.join(' ')).not.toContain('Iniciar revisión');
+ }
+ const changes = contextualGuidance(prefix + '/mi-perfil/solicitar-cambios', 'GENERADOR');
+ expect(changes.title).toBe('Solicitar cambios de tu ficha');
+ expect(changes.steps.join(' ')).toContain('Administración');
+ expect(changes.steps.join(' ')).not.toContain('Guardar borrador');
+ expect(changes.steps.join(' ')).not.toContain('Adjuntá');
+});

@@ -38,9 +38,41 @@
     return profile ? profile.label : guide.profile;
   }
 
+  var sessionProgress = {};
+  var progressReadFailed = false;
+
+  function showProgressStorageLimit(unavailable) {
+    var status = document.getElementById('progressStorageStatus');
+    if (status) status.hidden = !unavailable;
+  }
+
   function readProgress() {
-    try { return JSON.parse(localStorage.getItem(storageKey) || '{}'); }
-    catch (_error) { return {}; }
+    var stored;
+    try {
+      stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      progressReadFailed = false;
+    } catch (_error) {
+      progressReadFailed = true;
+      showProgressStorageLimit(true);
+      return sessionProgress;
+    }
+    var valid = {};
+    if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+      data.guides.forEach(function (guide) {
+        var item = stored[guide.id];
+        if (!item || !Number.isInteger(item.step) || item.step < 0 || !Number.isFinite(item.updatedAt) || item.updatedAt < 0) return;
+        valid[guide.id] = {
+          step: Math.min(item.step, guide.steps.length - 1), total: guide.steps.length,
+          title: guide.title, profile: guide.profile, updatedAt: item.updatedAt
+        };
+      });
+    }
+    // Keep the current page usable even when a previous write could not persist.
+    Object.keys(sessionProgress).forEach(function (id) {
+      if (!valid[id] || sessionProgress[id].updatedAt > valid[id].updatedAt) valid[id] = sessionProgress[id];
+    });
+    sessionProgress = valid;
+    return sessionProgress;
   }
 
   function writeProgress(guide, index) {
@@ -52,16 +84,20 @@
       profile: guide.profile,
       updatedAt: Date.now()
     };
-    localStorage.setItem(storageKey, JSON.stringify(progress));
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(progress));
+      showProgressStorageLimit(progressReadFailed);
+    } catch (_error) {
+      showProgressStorageLimit(true);
+    }
   }
 
   function latestProgress() {
-    var entries = Object.keys(readProgress()).map(function (key) {
-      var item = readProgress()[key];
-      item.guideId = key;
-      return item;
+    var progress = readProgress();
+    var entries = Object.keys(progress).map(function (key) {
+      return Object.assign({ guideId: key }, progress[key]);
     });
-    return entries.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); })[0];
+    return entries.sort(function (a, b) { return b.updatedAt - a.updatedAt; })[0];
   }
 
   function showToast(message) {
@@ -458,9 +494,9 @@
     var saved = readProgress()[guide.id];
     var initial = hashIndex >= 0 ? hashIndex : (saved ? Math.min(saved.step || 0, guide.steps.length - 1) : 0);
     updateActive(initial, false);
-    if (hashIndex >= 0) {
-      restoringHashIndex = hashIndex;
-      loadStepsThrough(hashIndex);
+    if (hashIndex >= 0 || initial > 0) {
+      restoringHashIndex = initial;
+      loadStepsThrough(initial);
       window.setTimeout(restoreHashStep, 60);
       window.addEventListener('load', restoreHashStep, { once: true });
     }

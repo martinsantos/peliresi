@@ -135,3 +135,42 @@ it('a later layout change cannot override the reader scrolling away', () => {
   expect(scroll).toHaveBeenCalledTimes(previous);
   expect(targetTop).toBe(600);
 });
+
+
+it.each(['null', '[]', '{"qa":null}', '{"qa":{"step":"wrong","updatedAt":1}}'])('invalid saved progress %s cannot prevent reading the guide', value => {
+  localStorage.setItem('sitrep_help_progress_v1', value);
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  expect(() => mount()).not.toThrow();
+  expect(current()).toContain('Paso 1');
+  (document.getElementById('nextStep') as HTMLElement).click();
+  expect(current()).toContain('Paso 2');
+});
+
+it.each(['getItem', 'setItem'] as const)('unavailable storage (%s) keeps previous/next usable and explains the limit', method => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  vi.spyOn(Storage.prototype, method).mockImplementation(() => { throw new Error('Storage unavailable'); });
+  expect(() => mount()).not.toThrow();
+  (document.getElementById('nextStep') as HTMLElement).click();
+  expect(current()).toContain('Paso 2');
+  expect(window.location.hash).toBe('#paso-2-paso-2');
+  expect(document.getElementById('progressStorageStatus')).toHaveTextContent('no puede guardar');
+  expect(document.getElementById('progressStorageStatus')).not.toHaveAttribute('hidden');
+  (document.getElementById('previousStep') as HTMLElement).click();
+  expect(current()).toContain('Paso 1');
+});
+
+it('reopening a guide scrolls to the recovered step instead of showing another step at the top', () => {
+  window.history.replaceState(null, '', '/manual/tutorial.html?guide=qa');
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:2,updatedAt:1}}));
+  mount(); vi.advanceTimersByTime(100);
+  expect(current()).toContain('Paso 3');
+  expect(targetTop).toBe(180);
+  expect(scroll.mock.contexts.some(target => (target as HTMLElement).id === 'paso-3-paso-3')).toBe(true);
+});
+
+it('an explicit link wins over a different saved step', () => {
+  localStorage.setItem('sitrep_help_progress_v1', JSON.stringify({qa:{step:1,updatedAt:1}}));
+  mount(); vi.advanceTimersByTime(100);
+  expect(current()).toContain('Paso 3');
+  expect(targetTop).toBe(180);
+});
