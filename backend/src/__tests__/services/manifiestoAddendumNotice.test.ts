@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { notifyAddendumParties } from '../../services/manifiestoAddendumNotice.service';
 
+beforeEach(()=>vi.stubEnv('ENTERPRISE_ENABLED','false'));
+afterEach(()=>vi.unstubAllEnvs());
 const manifest = { id: 'manifest-qa', numero: 'QA-2026-1', generadorId: 'g', transportistaId: 't', operadorId: 'o' };
 const tx = () => {
   const createMany = vi.fn().mockResolvedValue({ count: 2 });
@@ -18,7 +20,7 @@ describe('adenda cross-party notices', () => {
     await notifyAddendumParties(db as never, manifest, 'adenda-qa', 0, 'CREADA', 'carrier');
     const notices = db.notificacion.createMany.mock.calls[0][0].data;
     expect(notices.map((notice: { usuarioId: string }) => notice.usuarioId)).toEqual(['generator', 'operator']);
-    expect(notices.every((notice: { manifiestoId: string; datos: string }) => notice.manifiestoId === manifest.id && JSON.parse(notice.datos).url === '/manifiestos/manifest-qa/adendas')).toBe(true);
+    expect(notices.every((notice: { manifiestoId: string; datos: string }) => notice.manifiestoId === manifest.id && JSON.parse(notice.datos).url === '/manifiestos/manifest-qa/adendas?adenda=adenda-qa')).toBe(true);
     expect(notices[0].mensaje).toContain('QA-2026-1');
     expect(db.notificacion.createMany.mock.calls[0][0].skipDuplicates).toBe(true);
   });

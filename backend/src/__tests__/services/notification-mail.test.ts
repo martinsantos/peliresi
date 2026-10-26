@@ -15,9 +15,9 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
-  it('revalidates representative certificate access before any future delivery, including revocation', async () => {
+  it.each(['certificado_manifiesto','propuesta_partes','adenda_manifiesto'])('revalidates representative %s access before any future delivery, including revocation', async tipo => {
     const n = { ...notice, id: 'company-cert', usuarioId: 'representative', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
-      datos: JSON.stringify({ tipo: 'certificado_manifiesto', version: 1, documentoId: 'doc', tipoCertificado: 'PARCIAL', accesosEmpresa: [{empresaId:'co',actividadId:'a'}] }) };
+      datos: JSON.stringify({ tipo, version: 1, documentoId: 'doc', tipoCertificado: 'PARCIAL', accesosEmpresa: [{empresaId:'co',actividadId:'a'}] }) };
     mocks.manifest.mockResolvedValue({isDemoData:false,generador:{usuarioId:'original'},operador:{usuarioId:'signer'}});
     mocks.certificate.mockResolvedValue({id:'doc'});
     mocks.companyRecipients.mockResolvedValue([{usuarioId:'representative',accesosEmpresa:[]}]);

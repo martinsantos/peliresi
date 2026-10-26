@@ -45,7 +45,7 @@ export async function releaseTrainingCertificate(req:AuthRequest,res:Response,ne
   if(!metodo)throw new AppError('Falta el método registrado. Completalo antes de firmar.',409);
   const document={generador:manifest.generador.razonSocial,transportista:manifest.transportista?.razonSocial||'In situ',formato:SCHOOL_CERTIFICATE,tipo:command.tipo,numero:manifest.numero,operador:manifest.operador.razonSocial,metodo,nota:command.nota,cantidades:rows,parcialesPrevios:prior.map(e=>e.id),adendas:adendas.map(a=>({id:a.id,version:a.version})),huellaSolicitud:fingerprint,autorId:req.user.id,sinValidezOficial:true};
   const event=await tx.eventoManifiesto.create({data:{id:command.id,manifiestoId:manifest.id,usuarioId:req.user.id,tipo:SCHOOL_CERTIFICATE,descripcion:JSON.stringify(document),firmaImagen:firma.imagen,firmaSha256:firma.sha256}});
-  await notifyManifestParties(tx,manifest,'documento-'+event.id,req.user.id);
+  await notifyManifestParties(tx,manifest,'documento-'+event.id,req.user.id,req.user.rol);
   return event;
  });
  res.status(201).json({success:true,data:{id:result.id}});

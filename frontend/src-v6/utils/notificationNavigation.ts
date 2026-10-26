@@ -31,7 +31,7 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
 
 export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos'>): Array<{empresaId:string;actividadId:string;rol:string;razonSocial:string;establecimientoId?:string;establecimiento?:string}> {
  const data = parseNotificationData(notice.datos), id = (v: unknown) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
- if (data.tipo !== 'certificado_manifiesto' || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
+ if (!['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo)) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
  return data.accesosEmpresa.filter(a => a && id(a.empresaId) && id(a.actividadId) && ['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(a.rol)
   && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string'));
 }

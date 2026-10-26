@@ -141,7 +141,7 @@ export async function createAddendum(req: AuthRequest, res: Response, next: Next
       verifyReplay(created);
       if (informeHallazgo) await recordFindingIntakes(tx, { adendaId: created.id, referencia: manifest.numero,
         generadorId: manifest.generadorId, creadoPorId: req.user.id, informe: informeHallazgo });
-      pushIds = await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id);
+      pushIds = await notifyAddendumParties(tx, manifest, command.id, created.version, 'CREADA', req.user.id,req.user.rol);
       return created;
     }).catch(async (error: unknown) => {
       // Prisma can race its client-side upsert on simultaneous first requests.
@@ -185,7 +185,7 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
           '/manifiestos/' + current.manifiestoId + '/adendas', command.id, req.user.id,
           { id: current.id, version: command.version + 1, manifiestoId: manifest.id, numero: manifest.numero });
       }
-      pushIds = await notifyAddendumParties(tx, manifest, current.id, command.version + 1, command.decision, req.user.id);
+      pushIds = await notifyAddendumParties(tx, manifest, current.id, command.version + 1, command.decision, req.user.id,req.user.rol);
       return tx.adendaManifiesto.findUniqueOrThrow({ where: { id: current.id } });
     });
     scheduleCommittedManifestPush(pushIds);

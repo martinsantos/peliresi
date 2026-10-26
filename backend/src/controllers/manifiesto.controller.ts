@@ -237,7 +237,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
         manifiestoId: created.id, tipo: MANIFEST_PROPOSAL, usuarioId: userId,
         descripcion: JSON.stringify({ version: 1, modalidad, generadorId, transportistaId: modalidad === 'IN_SITU' ? null : transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
       } });
-      if (partyProposal) pushIds=await notifyManifestParties(tx, created, 'creada', userId);
+      if (partyProposal) pushIds=await notifyManifestParties(tx, created, 'creada', userId, req.user.rol);
       if (intent) await recordManifestCreation(tx, intent, created.id);
       return created;
     });

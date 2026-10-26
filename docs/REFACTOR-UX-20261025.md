@@ -837,3 +837,19 @@ Pendientes registrados, sin cierre de la tanda:
 - Formatos eléctricos reales adicionales, conciliación normativa TEF, Android físico y comprensión con participantes siguen pendientes. Continúa el trabajo técnico sin esperar participantes.
 
 Sin producción, main, workflows, cambios de flags ni datos reales. No se publicará sin autorización sobre una versión identificada.
+
+## Continuación: propuestas y adendas para representantes — 26/10/2026
+
+Sobre `b957b404`, cierre técnico de UX101 en preview. Las propuestas y adendas incorporan a las personas autorizadas de las actividades vinculadas mediante el mismo control de empresa, cuenta, CUIT y sede usado por certificados. CAP queda excluido de la consulta empresarial. Se deduplica por evento/persona; las adendas no avisan al autor. La actividad autora proviene del contexto autenticado: un representante de Generador deja de aparecer como Revisor designado.
+
+El aviso orienta a la empresa y sede y ofrece abrir manifiesto/adenda con la actividad correspondiente. El perfil se vuelve a verificar antes de guardar el contexto; los metadatos del aviso no conceden permisos. La adenda abre por su identificador exacto. Las plantillas de correo dirigen al aviso propio y comprueban elegibilidad actual; se probaron sin envío.
+
+Pruebas de este corte: 199 backend en cinco archivos y 82 frontend en cuatro, 281 únicas aprobadas. Incluyen las fases de propuesta, eventos de adenda, autores representantes, aislamiento CAP, elegibilidad de correo, navegación por contexto y regresiones de certificados. Backend, tipos frontend y builds web/app aprobados secuencialmente en el contenedor existente de 1 CPU/2 GiB/swap0/un worker.
+
+Integración con entidad artificial existente (tres actividades/dos personas): nuevo manifiesto 2026-000151, tres aprobaciones, coordinación, retiro/entrega, recepción, pesaje y adenda por 11 kg observados frente a 10 kg declarados. La segunda persona recibió propuesta, avances de aprobación, coordinación y adenda. Una cuenta ajena obtuvo 404. En navegador web, desde Operador, el aviso abierto por Enter verificó Generador y mostró 0/3 aprobaciones; las tres aprobaciones posteriores se ejecutaron mediante HTTP de QA. En app, desde Transporte, el aviso abrió esa adenda como Generador; la persona registró Observar con motivo artificial. El expediente mostró Generador · QA segunda persona. La base verificó tres avisos únicos a titular, transporte y operador, sin autoaviso. Huella de los manifiestos previos y residuos conservada.
+
+Diez combinaciones de ancho (320/393/768/1365/1920 por web/app) del aviso sin desbordes, acción de 44 px y dentro del ancho. Consolas consultadas sin errores/advertencias. Manual servido con nuevo paso 9, conservando enlaces anteriores y captura real de app. Evidencias `company-workflow-notices.json`, `company-workflow-browser.json`, `company-workflow-widths.json`, regresiones y capturas en `uiux-onboarding-recheck-20261025`.
+
+Recomprobación de altas/ATM/electricidad/multirol: 12 solicitudes HTTP, tres logins QA, sin escrituras de negocio; cinco altas aprobadas, ATM reservado y documentos aprobados, G/O con 1250 kWh y 45 kW; entidad de tres actividades y dos personas. No se repite ni se suma la integración histórica de altas. Auditoría 26/10 04:35 UTC: 528 manifiestos (uno artificial nuevo), cero intentos/envíos de correo, CAP cerrado, correo/push apagados y dos procesos normales. Main conserva c8402190edfc36b5e5d0dee1337c24bd1689420d. Sin producción, workflows, migraciones ni datos reales.
+
+UX102 (recuperación durable de emisión de certificado) continúa pendiente. También formatos eléctricos reales adicionales, conciliación normativa TEF, Android físico y comprensión con participantes. La tanda completa permanece abierta y el trabajo técnico no espera participantes.

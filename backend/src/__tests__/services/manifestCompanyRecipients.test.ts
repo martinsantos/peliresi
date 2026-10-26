@@ -1,3 +1,6 @@
+import { notifyManifestParties } from '../../services/manifestProposal.service';
+import { notifyAddendumParties } from '../../services/manifiestoAddendumNotice.service';
+import { inTrainingSession } from '../../lib/trainingScope';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { manifestCompanyRecipients } from '../../services/manifestCompanyRecipients.service';
 import { notifyCertificateParties } from '../../services/manifestCertificate.service';
@@ -62,4 +65,33 @@ it('keeps one notice per person, same immutable id on retry, and no notice for t
 it('renders a representative email to the owned notice without sending or exposing company metadata',()=>{
  const mail=notificationMailContent({id:'notice-qa',tipo:'INFO_GENERAL',manifiestoId:'m',rol:'GENERADOR',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'cert',tipoCertificado:'FINAL',accesosEmpresa:[{empresaId:'co',razonSocial:'PRIVATE_QA'}]}),createdAt:new Date()} as any)!;
  expect(mail.html).toContain('/notificaciones/notice-qa');expect(mail.html).not.toContain('PRIVATE_QA');
+});
+
+it('does not read operational company grants in CAP even if the enterprise flag is enabled',async()=>{
+ expect(await inTrainingSession(()=>manifestCompanyRecipients(db,'m'))).toEqual([]);
+ expect(db.manifiesto.findUnique).not.toHaveBeenCalled();
+});
+it.each(['creada','aprobacion-GENERADOR','aprobacion-TRANSPORTISTA','aprobacion-OPERADOR','aprobada','iniciada','rechazada'])('proposal %s reaches the representative with an actionable title and scoped destination',async phase=>{
+ db.generador.findUnique.mockResolvedValue({activo:true,cuit:'30123456789',razonSocial:'QA Empresa',usuario:{id:'owner',activo:true}});
+ const m={id:'m',numero:'QA-M',generadorId:'g',transportistaId:null,operadorId:'o',creadoPorId:'owner',fechaEstimadaRetiro:null};
+ await notifyManifestParties(db,m,phase,'rep','GENERADOR');
+ const notices=db.notificacion.createMany.mock.calls[0][0].data;
+ const representative=notices.find((n:any)=>n.usuarioId==='rep');expect(representative).toBeDefined();
+ expect(new Set(notices.map((n:any)=>n.usuarioId)).size).toBe(notices.length);
+ expect(JSON.parse(representative.datos)).toMatchObject({tipo:'propuesta_partes',version:1,fase:phase,accesosEmpresa:[{empresaId:'co',actividadId:'activity'}]});
+ if(phase==='creada'){expect(representative.titulo).toBe('Manifiesto pendiente de tu aprobación');expect(representative.mensaje).toContain('QA Empresa (Generador) propuso');}
+});
+it.each(['CREADA','APROBADA','OBSERVADA','RECHAZADA'] as const)('addendum %s reaches the representative and links exactly the reviewed annex',async event=>{
+ const m={id:'m',numero:'QA-M',generadorId:'g',transportistaId:null,operadorId:'o'};
+ await notifyAddendumParties(db,m,'annex',3,event,'operator','OPERADOR');
+ const notices=db.notificacion.createMany.mock.calls[0][0].data;
+ const representative=notices.find((n:any)=>n.usuarioId==='rep');
+ expect(JSON.parse(representative.datos)).toMatchObject({tipo:'adenda_manifiesto',version:1,evento:event,adendaId:'annex',autorRol:'Operador',url:'/manifiestos/m/adendas?adenda=annex',accesosEmpresa:[{empresaId:'co'}]});
+ expect(notices.some((n:any)=>n.usuarioId==='operator')).toBe(false);
+});
+it('names the authenticated activity of a representative reviewing an addendum, without self notice',async()=>{
+ await notifyAddendumParties(db,{id:'m',numero:'QA-M',generadorId:'g',transportistaId:null,operadorId:'o'},'annex',4,'OBSERVADA','rep','GENERADOR');
+ const notices=db.notificacion.createMany.mock.calls[0][0].data;
+ expect(notices.some((n:any)=>n.usuarioId==='rep')).toBe(false);
+ expect(notices.every((n:any)=>JSON.parse(n.datos).autorRol==='Generador')).toBe(true);
 });

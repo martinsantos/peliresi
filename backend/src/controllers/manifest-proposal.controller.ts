@@ -76,7 +76,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     if (reject) {
       const rejected = await tx.manifiesto.update({where:{id,estado:'PENDIENTE_APROBACION'},data:{estado:'RECHAZADO'}});
       if (!isTrainingSession()) await updateRollingHash(tx,id,rejected.estado,event.createdAt,event.descripcion,event.id);
-      pushIds=await notifyManifestParties(tx,rejected,'rechazada',req.user.id);
+      pushIds=await notifyManifestParties(tx,rejected,'rechazada',req.user.id,req.user.rol);
       return rejected;
     }
     const complete = proposalRoles(value.proposal).every(role => APPROVAL_EVENTS[role] === event.tipo || value.events.some(e => e.tipo === APPROVAL_EVENTS[role]));
@@ -91,7 +91,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
         genesisHash = hashManifiesto(sealed);
       }
     }
-    pushIds=await notifyManifestParties(tx,updated,complete?'aprobada':`aprobacion-${rol}`,req.user.id);
+    pushIds=await notifyManifestParties(tx,updated,complete?'aprobada':`aprobacion-${rol}`,req.user.id,req.user.rol);
     return updated;
   });
   scheduleCommittedManifestPush(pushIds);
@@ -148,7 +148,7 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    const preparation=value.proposal.modalidad==='IN_SITU'?'Generador y operador coordinan la recepción en origen, sin retiro ni viaje.':'Generador prepara la carga, operador coordina la recepción y transporte confirma el retiro cuando ocurra.';
    const event=await tx.eventoManifiesto.create({data:{manifiestoId:req.params.id,usuarioId:req.user.id,tipo:isTrainingSession()?'INICIO_COORDINACION_CAP':'INICIO_COORDINACION',descripcion:`Coordinación iniciada por ${rol}. ${preparation}`}});
    if (!isTrainingSession()) await updateRollingHash(tx,req.params.id,value.manifest.estado,event.createdAt,event.descripcion,event.id);
-   pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id);
+   pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id,req.user.rol);
    return event;
   });
   scheduleCommittedManifestPush(pushIds);

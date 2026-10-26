@@ -1,3 +1,4 @@
+import { manifestCompanyRecipients } from './manifestCompanyRecipients.service';
 import { createHash } from 'node:crypto';
 import prisma from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
@@ -32,10 +33,13 @@ export async function validateProposalParties(tx: Tx, p: Parties) {
 }
 /** Creation and inbox commit together. Return only fresh IDs for a caller's
  * post-commit dispatch; CAP never sends external notifications. */
-export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:string;numero:string;creadoPorId:string;fechaEstimadaRetiro:Date|null;modalidad?:string|null}, phase:string, author:string) {
+export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:string;numero:string;creadoPorId:string;fechaEstimadaRetiro:Date|null;modalidad?:string|null}, phase:string, author:string, authorRole?:string) {
   const users=await parties(tx,manifest);
-  const partyUsers=users.filter(p=>p.usuario?.activo).map(p=>p.usuario!.id);
-  const origin=users.find(p=>p.usuario?.id===author);
+  const companyRecipients=await manifestCompanyRecipients(tx,manifest.id);
+  const companyAccess=new Map(companyRecipients.map(p=>[p.usuarioId,p.accesosEmpresa]));
+  const partyUsers=[...new Set([...users.filter(p=>p.usuario?.activo).map(p=>p.usuario!.id),...companyRecipients.map(p=>p.usuarioId)])];
+  const roleIndex=['GENERADOR','TRANSPORTISTA','OPERADOR'].indexOf(authorRole || '');
+  const origin=roleIndex>=0?users[roleIndex]:users.find(p=>p.usuario?.id===author);
   const sender=phase==='creada'&&origin?.nombre ? `${origin.nombre} (${origin.rol}) propuso este manifiesto. ` : '';
   const context=users.filter(p=>p.nombre).map(p=>`${p.rol}: ${p.nombre}`).join(' · ');
   const recipients=[...new Set([...partyUsers,manifest.creadoPorId])];
@@ -48,7 +52,7 @@ export async function notifyManifestParties(tx: Tx, manifest: Parties & {id:stri
     id:createHash('sha256').update(`${manifest.id}:${phase}:${usuarioId}`).digest('hex'),usuarioId,tipo:'INFO_GENERAL' as const,
     prioridad: (['creada','aprobada','rechazada'].includes(phase) ? 'ALTA' : 'NORMAL') as 'ALTA' | 'NORMAL',
     titulo:phase==='creada'&&!partyUsers.includes(usuarioId)?'Manifiesto enviado a las partes':title,mensaje:`${manifest.numero}. ${sender}${context ? context + '. ' : ''}Fecha prevista: ${date}. ${next}`,
-    manifiestoId:manifest.id,datos:JSON.stringify({tipo:'propuesta_partes',fase:phase,autorId:author,url:`/manifiestos/${manifest.id}`}),
+    manifiestoId:manifest.id,datos:JSON.stringify({tipo:'propuesta_partes',version:1,...(companyAccess.has(usuarioId)?{accesosEmpresa:companyAccess.get(usuarioId)}:{}),fase:phase,autorId:author,url:`/manifiestos/${manifest.id}`}),
   }));
   const inserted=await tx.notificacion.createMany({skipDuplicates:true,data});
   return inserted.count===data.length?data.map(notice=>notice.id):[];

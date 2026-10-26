@@ -14,6 +14,8 @@ export default function CompanyNoticeAction({ notice, target, userId, context }:
  notice: Notificacion; target: string; userId: string; context?: CompanyContext;
 }) {
  const accesses = notificationCompanyAccesses(notice), mp = useMobilePrefix();
+ const subject = target.includes('/adendas') ? 'adenda' : target.includes('certificado=') ? 'certificado' : 'manifiesto';
+ const article = subject === 'adenda' ? 'la' : 'el';
  const [busy, setBusy] = useState(false), [error, setError] = useState('');
  const locked = useRef(false), alive = useRef(true);
  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -33,12 +35,12 @@ export default function CompanyNoticeAction({ notice, target, userId, context }:
   } catch { if (alive.current) setError('No pudimos confirmar esta autorización. Tu contexto no cambió. Reintentá o consultá al responsable de la entidad.'); }
   finally { if (alive.current) { locked.current = false; setBusy(false); } }
  }
- return <div className="space-y-3" aria-label="Acceso al certificado por empresa">
-  <p className="text-sm text-neutral-700">Abrí el certificado con la actividad que representa a la empresa.</p>
+ return <div className="space-y-3" aria-label={`Acceso ${article === 'el' ? 'al' : 'a la'} ${subject} por empresa`}>
+  <p className="text-sm text-neutral-700">Abrí {article} {subject} con la actividad que representa a la empresa.</p>
   {accesses.map(a => <div key={a.actividadId} className="rounded-lg border border-primary-100 bg-primary-50 p-3 space-y-2">
    <p className="font-semibold break-words">{a.razonSocial}</p>
    <p className="text-sm">{labels[a.rol]}{a.establecimiento ? ' · ' + a.establecimiento : ''}</p>
-   <Button disabled={busy} onClick={() => void open(a)}>{context?.actividadId === a.actividadId ? 'Abrir certificado' : 'Usar ' + labels[a.rol] + ' y abrir certificado'}</Button>
+   <Button disabled={busy} onClick={() => void open(a)}>{context?.actividadId === a.actividadId ? 'Abrir ' + subject : 'Usar ' + labels[a.rol] + ' y abrir ' + subject}</Button>
   </div>)}
   {error && <div role="alert" className="space-y-2 text-sm text-error-700"><p>{error}</p><Link className="inline-flex min-h-11 items-center underline" to={mp('/empresas?origen=avisos')}>Revisar mis autorizaciones</Link></div>}
  </div>;

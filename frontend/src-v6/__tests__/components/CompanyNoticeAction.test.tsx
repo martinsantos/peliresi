@@ -41,3 +41,17 @@ it('ignores a late validation after leaving the account screen and blocks double
  finish({data:{data:{user:{id:'rep',empresaContexto:access}}}});await Promise.resolve();await Promise.resolve();
  expect(mocks.save).not.toHaveBeenCalled();
 });
+
+it.each(['propuesta_partes','adenda_manifiesto'])('uses a specific action and preserves the object for %s in web and app',tipo=>{
+ const target=tipo==='adenda_manifiesto'?'/manifiestos/m/adendas?adenda=annex':'/manifiestos/m';
+ const subject=tipo==='adenda_manifiesto'?'adenda':'manifiesto';
+ const n={...notice,datos:JSON.stringify({tipo,version:1,adendaId:'annex',url:target,accesosEmpresa:[access]})};
+ for(const prefix of ['', '/app']){
+  expect(resolveNotificationPath(n,prefix)).toBe(prefix+'/notificaciones/n');
+  expect(resolveNotificationPath(n,prefix,undefined,true)).toBe(prefix+target);
+ }
+ render(<MemoryRouter><CompanyNoticeAction notice={n} target={target} userId="rep"/></MemoryRouter>);
+ expect(screen.getByRole('button',{name:'Usar Generador y abrir '+subject})).toBeVisible();
+ expect(screen.queryByRole('button',{name:/certificado/})).toBeNull();
+ expect(mocks.get).not.toHaveBeenCalled();
+});

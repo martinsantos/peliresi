@@ -14,7 +14,7 @@ const users={GENERADOR:{id:'ug',rol:'GENERADOR',generador:{id:'g'}},TRANSPORTIST
 const req=(rol:keyof typeof users,body={})=>({params:{id:'m'},user:users[rol],body} as any);
 const signature={imagen:'signed-image',sha256:'signed-hash'};
 beforeEach(()=>{
- vi.unstubAllEnvs();
+ vi.unstubAllEnvs();vi.stubEnv('ENTERPRISE_ENABLED','false');
  mock.manifest={id:'m',numero:'CAP-TEST',estado:'PENDIENTE_APROBACION',...p,generador:{cuit:'QA-G'},transportista:{cuit:'QA-T'},operador:{cuit:'QA-O'},residuos:[],fechaEstimadaRetiro:new Date('2026-10-19T15:00:00Z')};
  mock.events=[{id:'marker',tipo:MANIFEST_PROPOSAL,descripcion:JSON.stringify(p)}];
  mock.tx={$queryRaw:vi.fn(),manifiesto:{count:vi.fn(async()=>3),findUnique:vi.fn(async()=>mock.manifest),findUniqueOrThrow:vi.fn(async()=>mock.manifest),update:vi.fn(async({data}:any)=>Object.assign(mock.manifest,data))},eventoManifiesto:{

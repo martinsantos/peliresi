@@ -1,3 +1,4 @@
+import { isTrainingSession } from '../lib/trainingScope';
 import type { Prisma } from '@prisma/client';
 import { empresaEnabled } from '../domain/empresa';
 
@@ -10,7 +11,7 @@ export type ManifestCompanyRecipient = { usuarioId: string; accesosEmpresa: Mani
 /** The same approved activity/site rules used by resolveCompanyContext, in the
  * caller's transaction. Being responsible alone never grants dossier access. */
 export async function manifestCompanyRecipients(db: Prisma.TransactionClient, manifiestoId: string): Promise<ManifestCompanyRecipient[]> {
- if (!empresaEnabled()) return [];
+ if (!empresaEnabled() || isTrainingSession()) return [];
  const manifest = await db.manifiesto.findUnique({ where: { id: manifiestoId }, select: {
   generadorId: true, transportistaId: true, operadorId: true, contextoEmpresa: true,
  } });
