@@ -74,7 +74,10 @@ export function canAccessMobilePath(user: User, pathname: string): boolean {
     return hasRole(user, ['ADMIN', 'ADMIN_GENERADOR']);
   }
 
-  if (path.startsWith('/admin/tratamientos') || path.startsWith('/admin/renovaciones')) {
+  if (path.startsWith('/admin/renovaciones')) {
+    return hasRole(user, ['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']);
+  }
+  if (path.startsWith('/admin/tratamientos')) {
     return hasRole(user, ['ADMIN', 'ADMIN_OPERADOR']);
   }
 

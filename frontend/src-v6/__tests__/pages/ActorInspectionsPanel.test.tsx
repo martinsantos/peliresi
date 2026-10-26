@@ -36,10 +36,11 @@ describe('ActorInspectionsPanel', () => {
     expect(screen.queryByRole('button', { name: /nueva inspección/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /abrir listado completo/i })).not.toBeInTheDocument();
   });
-  it('sends an ordinary actor to participation without issuing a forbidden staff query', () => {
-    state.role = 'GENERADOR';
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('keeps %s outside the inspection module and never issues a staff query', role => {
+    state.role = role;
     render(<MemoryRouter><ActorInspectionsPanel actorType="GENERADOR" actorId="g-1" actorName="Generador Alfa" /></MemoryRouter>);
-    expect(screen.getByRole('link', { name: 'Ver mis inspecciones', exact: true })).toHaveAttribute('href', '/mis-inspecciones');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByText('Inspecciones de Generador Alfa')).not.toBeInTheDocument();
     expect(state.query).not.toHaveBeenCalled();
     expect(screen.queryByText('Total')).not.toBeInTheDocument();
   });

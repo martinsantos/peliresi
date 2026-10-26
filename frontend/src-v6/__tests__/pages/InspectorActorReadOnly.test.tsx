@@ -41,7 +41,7 @@ describe('inspector actor consultation', () => {
   afterEach(() => vi.restoreAllMocks());
   it('does not grant administrative routes unless explicitly designated read-only', () => {
     open(false);
-    expect(screen.getByText('Acceso denegado')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Acceso no disponible' })).toBeInTheDocument();
   });
   it('can read the same ficha without payment, declaration, upload, review or delete controls', () => {
     open(true);

@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Inspection } from '../../types/inspection';
 import { inspeccionService } from '../../services/inspeccion.service';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { queueInspectionEvidence, syncPendingInspectionEvidence } from '../../services/inspectionOfflineEvidence';
 import { toast } from '../../components/ui/Toast';
 import InspeccionExpedientePage from '../../pages/inspecciones/InspeccionExpedientePage';
@@ -78,7 +79,7 @@ describe('Inspection audio failure recovery', () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     getUserMedia.mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] });
     vi.mocked(inspeccionService.saveDraft).mockResolvedValue({ ...inspection, version: 8 });
-    vi.mocked(queueInspectionEvidence).mockImplementation(async (_inspectionId, _userId, file) => ({ id: 'pending-audio', sha256: 'audio-hash', blob: file } as Awaited<ReturnType<typeof queueInspectionEvidence>>));
+    vi.mocked(queueInspectionEvidence).mockImplementation(async (_inspectionId, _userId, _owner, file) => ({ id: 'pending-audio', sha256: 'audio-hash', blob: file } as Awaited<ReturnType<typeof queueInspectionEvidence>>));
     vi.mocked(syncPendingInspectionEvidence).mockImplementation(async ({ upload }) => {
       await upload({ id: 'pending-audio', fields: {}, capturedAt: '2026-10-02T12:00:00Z' } as Parameters<typeof upload>[0]);
       return { synchronized: 1, failed: 0, skipped: 0 };
@@ -130,7 +131,8 @@ describe('Inspection audio failure recovery', () => {
 
     await waitFor(() => expect(inspeccionService.uploadEvidence).toHaveBeenCalledTimes(1));
     expect(queueInspectionEvidence).toHaveBeenCalledTimes(1);
-    const file = vi.mocked(queueInspectionEvidence).mock.calls[0][2];
+    expect(vi.mocked(queueInspectionEvidence).mock.calls[0][2]).toBe(inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }));
+    const file = vi.mocked(queueInspectionEvidence).mock.calls[0][3];
     expect(file).toBeInstanceOf(File);
     expect(file.size).toBe(14);
     expect(file.type).toBe('audio/webm');
@@ -155,7 +157,8 @@ describe('Inspection audio failure recovery', () => {
 
     await waitFor(() => expect(inspeccionService.uploadEvidence).toHaveBeenCalledTimes(1));
     expect(queueInspectionEvidence).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(queueInspectionEvidence).mock.calls[0][2].size).toBe(14);
+    expect(vi.mocked(queueInspectionEvidence).mock.calls[0][2]).toBe(inspectionWorkspaceOwner({ id: 'admin-1', rol: 'ADMIN' }));
+    expect(vi.mocked(queueInspectionEvidence).mock.calls[0][3].size).toBe(14);
     expect(screen.queryByText('Grabando audio de campo')).not.toBeInTheDocument();
   });
 });

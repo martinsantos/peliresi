@@ -195,6 +195,13 @@ function App() {
           </Route>
         </Route>
 
+        {/* Renewal review is shared by the two authorized actor sectors. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MobileLayout />}>
+            <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
+          </Route>
+        </Route>
+
         {/* Sub-Admin Operador Mobile */}
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
           <Route element={<MobileLayout />}>
@@ -204,7 +211,6 @@ function App() {
             <Route path="/mobile/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
 
             <Route path="/mobile/admin/tratamientos" element={<AdminTratamientosPage />} />
-            <Route path="/mobile/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
         </Route>
 
@@ -353,6 +359,13 @@ function App() {
           </Route>
         </Route>
 
+        {/* Renewal review is shared by the two authorized actor sectors. */}
+        <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR']} />}>
+          <Route element={<MainLayout />}>
+            <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
+          </Route>
+        </Route>
+
         {/* Sub-Admin Operador */}
         <Route element={<ProtectedRoute roles={['ADMIN', 'ADMIN_OPERADOR']} />}>
           <Route element={<MainLayout />}>
@@ -362,7 +375,6 @@ function App() {
             <Route path="/admin/actores/operadores/:id/renovar" element={<NuevoOperadorPage />} />
 
             <Route path="/admin/tratamientos" element={<AdminTratamientosPage />} />
-            <Route path="/admin/renovaciones" element={<AdminRenovacionesPage />} />
           </Route>
         </Route>
 

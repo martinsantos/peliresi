@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { filterCachedInspections, useInspections } from '../../hooks/useInspecciones';
+import { inspectionContextKey, inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import type { Inspection } from '../../types/inspection';
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), getAllOffline: vi.fn() }));
@@ -32,11 +33,13 @@ describe('local inspection discovery', () => {
     expect(filterCachedInspections(cases, { search: 'I-001' }).items.map((entry) => entry.id)).toEqual(['one']);
   });
 
-  it('falls back only on a transport failure and only for the same user', async () => {
+  it('falls back on transport failure only for the same full context, excluding legacy copies', async () => {
     mocks.list.mockRejectedValue(Object.assign(new Error('Network Error'), { isAxiosError: true, code: 'ERR_NETWORK' }));
     mocks.getAllOffline.mockResolvedValue([
-      { id: 'inspector-1:one', inspection: cached('one', 'I-001', 'a-1', '2026-09-20T00:00:00Z') },
-      { id: 'inspector-2:two', inspection: cached('two', 'I-002', 'a-2', '2026-09-22T00:00:00Z') },
+      { id: 'inspector-1:legacy', inspection: cached('legacy', 'I-003', 'a-1', '2026-09-21') },
+      { id: inspectionContextKey('inspector-1', 'other-activity', 'foreign'), owner: 'other-activity', inspection: cached('foreign', 'I-004', 'a-1', '2026-09-21') },
+      { id: inspectionContextKey('inspector-1', inspectionWorkspaceOwner({ id: 'inspector-1' }), 'one'), owner: inspectionWorkspaceOwner({ id: 'inspector-1' }), inspection: cached('one', 'I-001', 'a-1', '2026-09-20T00:00:00Z') },
+      { id: inspectionContextKey('inspector-2', inspectionWorkspaceOwner({ id: 'inspector-2' }), 'two'), owner: inspectionWorkspaceOwner({ id: 'inspector-2' }), inspection: cached('two', 'I-002', 'a-2', '2026-09-22T00:00:00Z') },
     ]);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;

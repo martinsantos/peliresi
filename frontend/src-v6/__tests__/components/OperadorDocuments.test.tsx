@@ -26,6 +26,6 @@ it.each(['ADMIN', 'ADMIN_OPERADOR'])('%s can attach and review using the existin
 it('a failed read exposes a retry and does not pretend the actor has no documents', async () => {
   mock.get.mockRejectedValueOnce(new Error('offline')); open();
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron consultar');
-  fireEvent.click(screen.getByRole('button', { name: 'Reintentar', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar documentos', exact: true }));
   expect(await screen.findByText('Factura-QA.pdf')).toBeVisible(); expect(mock.get).toHaveBeenCalledTimes(2);
 });

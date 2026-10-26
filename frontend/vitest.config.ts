@@ -10,6 +10,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['src-v6/__tests__/setup.ts'],
     include: ['src-v6/**/*.test.{ts,tsx}'],
+    // macOS resource forks are binary metadata, not test modules.
+    exclude: ['**/._*'],
     coverage: {
       provider: 'v8',
       include: ['src-v6/**/*.{ts,tsx}'],
