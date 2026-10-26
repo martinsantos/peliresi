@@ -185,6 +185,7 @@ export async function crearTicket(req: AuthRequest, res: Response, next: NextFun
 export async function accionarTicket(req: AuthRequest, res: Response, next: NextFunction) {
   let stored: SupportFile[] = [];
   let committed = false;
+  let absentUnderLock = false;
   try {
     const parsed = supportMutationInput.safeParse(inputBody(req));
     if (!parsed.success) throw new AppError(parsed.error.issues[0].message, 400);
@@ -203,6 +204,7 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
       const { ticket, managing } = await access(req, db);
       const previous = await db.eventoSoporte.findUnique({ where: { ticketId_usuarioId_clienteId: { ticketId: ticket.id, usuarioId: req.user.id, clienteId } } });
       if (previous) { checkHash(previous, huella); return { id: ticket.id, version: ticket.version, replay: true }; }
+      absentUnderLock = true;
       if (ticket.version !== input.version) throw new AppError('El ticket cambió. Actualizá antes de volver a actuar.', 409);
       const own = ticket.autorId === req.user.id;
       const assigned = managing && (ticket.responsableId === req.user.id || req.user.rol === 'ADMIN');
@@ -269,7 +271,12 @@ export async function accionarTicket(req: AuthRequest, res: Response, next: Next
     });
     committed = !result.replay;
     res.json({ success: true, data: result });
-  } catch (error) { next(error); }
+  } catch (error) {
+    // Only a rolled-back transaction that checked this key under the ticket lock
+    // can prove absence. Auth failures, hash conflicts and uncertain 5xx cannot.
+    if (absentUnderLock && error instanceof AppError && error.statusCode !== undefined && error.statusCode >= 400 && error.statusCode < 500) error.code = 'SUPPORT_ACTION_NOT_APPLIED';
+    next(error);
+  }
   finally { if (!committed && stored.length) await discardSupportFiles(stored); }
 }
 export async function descargarAdjuntoSoporte(req: AuthRequest, res: Response, next: NextFunction) {

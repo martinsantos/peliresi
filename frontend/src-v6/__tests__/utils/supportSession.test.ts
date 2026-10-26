@@ -1,9 +1,10 @@
-import { beforeEach, expect, it } from 'vitest';
-import { assertSupportSession, supportSessionMatches, SupportSessionChangedError } from '../../utils/supportSession';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { assertSupportSession, supportRequestContext, supportSessionMatches, SupportSessionChangedError } from '../../utils/supportSession';
 
 // Unsigned unit markers are never submitted to a server or used as auth.
 const marker = (payload: unknown) => 'unit.' + btoa(JSON.stringify(payload)) + '.not-a-credential';
-beforeEach(() => localStorage.clear());
+beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+afterEach(() => vi.unstubAllEnvs());
 it('blocks a missing credential without inventing an authenticated owner', () => {
   expect(supportSessionMatches('owner')).toBe(false);
   expect(() => assertSupportSession('owner')).toThrow(SupportSessionChangedError);
@@ -31,4 +32,26 @@ it('binds a represented report to the expected signed operator without treating 
   expect(supportSessionMatches('owner', 'admin')).toBe(true);
   expect(supportSessionMatches('owner', 'other-admin')).toBe(false);
   expect(() => assertSupportSession('owner', 'other-admin')).toThrow(SupportSessionChangedError);
+});
+
+it('keeps request context stable for renewal and changes it for another role or represented operator', () => {
+  localStorage.setItem('sitrep_access_token', marker({ id: 'owner', rol: 'GENERADOR', iat: 1 }));
+  const original = supportRequestContext();
+  localStorage.setItem('sitrep_access_token', marker({ id: 'owner', rol: 'GENERADOR', iat: 2 }));
+  expect(supportRequestContext()).toBe(original);
+  localStorage.setItem('sitrep_access_token', marker({ id: 'owner', rol: 'OPERADOR' }));
+  expect(supportRequestContext()).not.toBe(original);
+  const role = supportRequestContext();
+  localStorage.setItem('sitrep_access_token', marker({ id: 'owner', rol: 'OPERADOR', impersonatedBy: 'admin' }));
+  expect(supportRequestContext()).not.toBe(role);
+});
+it('captures actual activity and company headers for same-account context changes', () => {
+  vi.stubEnv('VITE_ACTOR_MULTIROLE_ENABLED', 'true'); vi.stubEnv('VITE_ENTERPRISE_ENABLED', 'true');
+  localStorage.setItem('sitrep_access_token', marker({ id: 'owner', rol: 'GENERADOR' }));
+  const original = supportRequestContext();
+  sessionStorage.setItem('sitrep_activity:owner', 'TRANSPORTISTA');
+  expect(supportRequestContext()).not.toBe(original);
+  const activity = supportRequestContext();
+  sessionStorage.setItem('sitrep_company:owner', JSON.stringify({ empresaId: 'company', actividadId: 'activity' }));
+  expect(supportRequestContext()).not.toBe(activity);
 });

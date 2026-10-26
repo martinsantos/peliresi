@@ -9,10 +9,12 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { SupportEntry } from '../../components/SupportReportDialog';
 import { supportService, supportError } from '../../services/support.service';
-import { supportStates, supportCategories, supportTypes, supportPriorities, supportFileAccept, type SupportAction, type SupportMutation, type SupportTicket, type SupportType, type SupportPriority, type SupportCategory } from '../../types/support';
+import { supportStates, supportCategories, supportTypes, supportPriorities, supportFileAccept, type SupportAction, type SupportTicket, type SupportType, type SupportPriority, type SupportCategory } from '../../types/support';
 import { assertSupportSession, supportSessionMatches } from '../../utils/supportSession';
 import { SupportAudioInput } from '../../components/SupportAudioInput';
 import { SupportAudioPlayer } from '../../components/SupportAudioPlayer';
+import { useSupportCommand } from '../../hooks/useSupportCommand';
+import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 
 const name = (user: { nombre: string; apellido?: string | null }) => [user.nombre, user.apellido].filter(Boolean).join(' ');
 const date = (value: string) => new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Argentina/Mendoza' }).format(new Date(value));
@@ -27,7 +29,7 @@ export default function SoportePage() {
   const { currentUser } = useAuth();
   const { id } = useParams();
   // A session change must not reuse another user's ticket query or draft.
-  return currentUser ? <SupportWorkspace key={String(currentUser.id)} owner={String(currentUser.id)} id={id} /> : null;
+  return currentUser ? <SupportWorkspace key={inspectionWorkspaceOwner(currentUser)} owner={String(currentUser.id)} id={id} /> : null;
 }
 function SupportWorkspace({ owner, id }: { owner: string; id?: string }) {
   const mp = useMobilePrefix();
@@ -160,12 +162,15 @@ function ticketActions(ticket: SupportTicket) {
 type ActionDraft = { body: string; files: File[]; audio: File | null };
 const emptyActionDraft = (): ActionDraft => ({ body: '', files: [], audio: null });
 function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owner: string; changed: () => Promise<void> }) {
+  const { currentUser } = useAuth();
+  const journal = useSupportCommand({ userId: owner, context: inspectionWorkspaceOwner(currentUser), ticketId: ticket.id });
+  const pending = journal.command;
   const [action, setAction] = useState<SupportAction>('RESPONDER');
   const actions = ticketActions(ticket);
-  const selected = actions.some(option => option.value === action) ? action : actions[0]?.value;
+  const selected = pending && pending.input.accion !== 'TOMAR' ? pending.input.accion : actions.some(option => option.value === action) ? action : actions[0]?.value;
   const [drafts, setDrafts] = useState<Partial<Record<SupportAction, ActionDraft>>>({});
   const draftAction = selected || 'TOMAR';
-  const { body, files, audio } = drafts[draftAction] || emptyActionDraft();
+  const { body, files, audio } = pending ? { body: pending.input.cuerpo, files: pending.files, audio: null } : drafts[draftAction] || emptyActionDraft();
   const updateDraft = (patch: Partial<ActionDraft>) => setDrafts(previous => ({ ...previous, [draftAction]: { ...(previous[draftAction] || emptyActionDraft()), ...patch } }));
   const setBody = (body: string) => updateDraft({ body });
   const setFiles = (files: File[]) => updateDraft({ files });
@@ -175,49 +180,49 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   const [category, setCategory] = useState(ticket.categoria);
   const [type, setType] = useState<SupportType>(ticket.tipo || 'PROBLEMA');
   const [priority, setPriority] = useState<SupportPriority>(ticket.prioridad || 'NORMAL');
-  const [busy, setBusy] = useState(false);
+  const busy = journal.busy;
   const [error, setError] = useState('');
-  const [pending, setPending] = useState<{ input: SupportMutation; key: string; files: File[] } | null>(null);
-  const inFlight = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const bodyInput = useRef<HTMLTextAreaElement>(null);
   const team = useQuery({ queryKey: ['soporte', owner, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
-  const recipient = team.data?.find(user => user.id === target);
+  const displayedTarget = pending?.input.responsableId ?? target;
+  const recipient = team.data?.find(user => user.id === displayedTarget);
   const send = async (chosen = action) => {
-    if (inFlight.current || recording) return;
-    if (!pending && !['TOMAR', 'DERIVAR', 'CLASIFICAR'].includes(chosen) && !body.trim()) { setError('Escribí un mensaje o una resolución.'); bodyInput.current?.focus(); return; }
-    if (!pending && chosen === 'DERIVAR' && !target) { setError('Elegí el nuevo responsable antes de confirmar la derivación.'); return; }
-    inFlight.current = true; setBusy(true); setError('');
-    try {
-      assertSupportSession(owner);
-      const frozen = pending || { key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
-        version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}), ...(chosen === 'CLASIFICAR' ? { categoria: category, tipo: type, prioridad: priority } : {}) },
-        files: chosen === 'RESPONDER' || chosen === 'NOTA' ? [...files, ...(audio ? [audio] : [])] : [] };
-      if (frozen.files.length > 3) throw new Error('Hasta 3 archivos, incluido el audio.');
-      setPending(frozen);
-      await supportService.act(ticket.id, frozen.input, frozen.files, frozen.key);
-      if (!supportSessionMatches(owner)) return;
-      setPending(null); setDrafts(previous => ({ ...previous, [frozen.input.accion]: emptyActionDraft() })); if (fileInput.current) fileInput.current.value = ''; setTarget(''); setAction('RESPONDER'); await changed();
-    } catch (failure) {
-      setError(failure instanceof Error && failure.message.startsWith('Hasta 3 archivos') ? failure.message : supportError(failure));
-      const status = (failure as { response?: { status?: number } }).response?.status;
-      if ([400, 403, 409, 413, 422].includes(status || 0)) { setPending(null); if (status === 409) await changed(); }
-    } finally { inFlight.current = false; setBusy(false); }
+    if (busy || recording || !journal.ready) return;
+    if (pending) { await journal.retry(); return; }
+    if (!['TOMAR', 'DERIVAR', 'CLASIFICAR'].includes(chosen) && !body.trim()) { setError('Escribí un mensaje o una resolución.'); bodyInput.current?.focus(); return; }
+    if (chosen === 'DERIVAR' && !target) { setError('Elegí el nuevo responsable antes de confirmar la derivación.'); return; }
+    const outgoingFiles = chosen === 'RESPONDER' || chosen === 'NOTA' ? [...files, ...(audio ? [audio] : [])] : [];
+    if (outgoingFiles.length > 3) { setError('Hasta 3 archivos, incluido el audio.'); return; }
+    setError('');
+    await journal.submit({ key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
+      version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}), ...(chosen === 'CLASIFICAR' ? { categoria: category, tipo: type, prioridad: priority } : {}) }, files: outgoingFiles });
   };
+  const finishConfirmed = () => journal.release(async saved => {
+    await changed();
+    setDrafts(previous => ({ ...previous, [saved.input.accion]: saved.status === 'confirmed' ? emptyActionDraft() : { body: saved.input.cuerpo, files: saved.files, audio: null } }));
+    if (fileInput.current) fileInput.current.value = '';
+    setTarget(saved.status === 'rejected' ? saved.input.responsableId || '' : '');
+    if (saved.status === 'rejected') { setCategory(saved.input.categoria || ticket.categoria); setType(saved.input.tipo || ticket.tipo || 'PROBLEMA'); setPriority(saved.input.prioridad || ticket.prioridad); }
+    setAction(saved.status === 'rejected' ? saved.input.accion : 'RESPONDER');
+  });
   const canTake = ticket.puedeGestionar && ticket.responsableId !== owner && (!ticket.responsableId || ticket.puedeAtender) && ticket.estado !== 'CERRADO';
   const optionalBody = selected === 'DERIVAR' || selected === 'CLASIFICAR';
   const recipients = (team.data || []).filter(user => user.id !== ticket.responsableId);
   const privateAction = selected === 'NOTA' || selected === 'DERIVAR' || selected === 'CLASIFICAR';
   return <section aria-label="Atender ticket" className="min-w-0 space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
     <h4 className="font-semibold text-neutral-900">Atender ticket</h4>
-    {canTake && <Button disabled={busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
-    {pending?.input.accion === 'TOMAR' && <Button isLoading={busy} onClick={() => void send('TOMAR')}>Reintentar toma del ticket</Button>}
+    {canTake && <Button disabled={!journal.ready || busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
+    {!journal.ready && <p role="status">Comprobando envíos guardados… <Button variant="outline" onClick={() => void journal.reload()}>Reintentar lectura</Button></p>}
+    {pending?.status === 'confirmed' && <div role="status" className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900"><p>Acción confirmada. No hace falta enviarla otra vez.</p><Button isLoading={busy} onClick={() => void finishConfirmed()}>Actualizar conversación y continuar</Button></div>}
+    {pending?.status === 'rejected' && <div role="alert" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>La acción no se registró: {pending.rejection}</p><Button isLoading={busy} onClick={() => void finishConfirmed()}>Actualizar ticket y recuperar contenido</Button></div>}
+    {pending?.status === 'pending' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Envío sin confirmar. Conservamos el contenido y los archivos en este dispositivo. Reintentar usa la misma clave; no prepara otra acción.</p><Button isLoading={busy} onClick={() => void journal.retry()}>Reintentar mismo envío</Button></div>}
     {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
       <div role="group" aria-label="Acciones del ticket" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {actions.map(option => {
           const Icon = actionIcons[option.value];
           return <Button key={option.value} type="button" variant={selected === option.value ? 'primary' : 'outline'}
-            aria-pressed={selected === option.value} disabled={busy || !!pending || recording} leftIcon={<Icon size={18} />}
+            aria-pressed={selected === option.value} disabled={!journal.ready || busy || !!pending || recording} leftIcon={<Icon size={18} />}
             onClick={() => { setAction(option.value); if (option.value === 'CLASIFICAR') { setCategory(ticket.categoria); setType(ticket.tipo || 'PROBLEMA'); setPriority(ticket.prioridad || 'NORMAL'); } }}>{option.value === 'RESPONDER' && ticket.estado === 'CERRADO' ? 'Responder y reabrir' : actionLabels[option.value]}</Button>;
         })}
       </div>
@@ -227,35 +232,34 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
           : selected === 'CERRAR' ? 'La resolución queda visible para el usuario y cierra el ticket.' : 'Este mensaje queda visible en la conversación del ticket.'}
       </p>
       {selected === 'CLASIFICAR' && <div className="grid gap-3 sm:grid-cols-3">
-        <Select label="Área del problema" value={category} onChange={value => setCategory(value as SupportCategory)} disabled={busy || !!pending} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
-        <Select label="Tipo de ticket" value={type} onChange={value => setType(value as SupportType)} disabled={busy || !!pending} options={Object.entries(supportTypes).map(([value, label]) => ({ value, label }))} />
-        <Select label="Prioridad" value={priority} onChange={value => setPriority(value as SupportPriority)} disabled={busy || !!pending} options={Object.entries(supportPriorities).map(([value, label]) => ({ value, label }))} />
+        <Select label="Área del problema" value={pending?.input.categoria ?? category} onChange={value => setCategory(value as SupportCategory)} disabled={!journal.ready || busy || !!pending} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
+        <Select label="Tipo de ticket" value={pending?.input.tipo ?? type} onChange={value => setType(value as SupportType)} disabled={!journal.ready || busy || !!pending} options={Object.entries(supportTypes).map(([value, label]) => ({ value, label }))} />
+        <Select label="Prioridad" value={pending?.input.prioridad ?? priority} onChange={value => setPriority(value as SupportPriority)} disabled={!journal.ready || busy || !!pending} options={Object.entries(supportPriorities).map(([value, label]) => ({ value, label }))} />
       </div>}
       {selected === 'DERIVAR' && <>{team.isError ? <p role="alert" className="text-error-700">{supportError(team.error)} <Button variant="outline" onClick={() => void team.refetch()}>Reintentar equipo</Button></p> :
-        <Select label="Nuevo responsable" value={target} onChange={setTarget} disabled={busy || !!pending || team.isPending} searchable
+        <Select label="Nuevo responsable" value={displayedTarget} onChange={setTarget} disabled={busy || !!pending || team.isPending} searchable
           helperText={recipient ? 'Responsable seleccionado: ' + recipient.email : undefined}
           renderOption={option => <span className="block [overflow-wrap:anywhere]">{option.label}</span>}
           options={recipients.map(user => ({ value: user.id, label: name(user) + ' · ' + user.email }))} />}
         {team.isSuccess && !recipients.length && <p role="status" className="text-sm text-neutral-700">No hay otro responsable activo. Un administrador puede configurar el Equipo de soporte desde la mesa.</p>}</>}
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-reply">{privateAction ? `Nota interna / motivo${optionalBody ? ' (opcional)' : ''}` : 'Mensaje o resolución'}</label>
-      <textarea ref={bodyInput} id="support-reply" aria-label={privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'} aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} required={!optionalBody} disabled={busy || !!pending} onChange={event => setBody(event.target.value)} rows={optionalBody ? 2 : 4}
+      <textarea ref={bodyInput} id="support-reply" aria-label={privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'} aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} required={!optionalBody} disabled={!journal.ready || busy || !!pending} onChange={event => setBody(event.target.value)} rows={optionalBody ? 2 : 4}
         className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
       <p id="support-reply-help" className="text-sm text-neutral-600">{optionalBody ? 'Podés confirmar sin escribir un motivo. La acción y el responsable quedan en el historial.' : 'El audio puede acompañar tu mensaje.'}</p>
       <div hidden={selected !== 'RESPONDER' && selected !== 'NOTA'} className="space-y-2"><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
         <p className="text-sm text-neutral-600">Opcional · podés enviar sólo texto.</p>
-        <SupportAudioInput key={'audio:' + draftAction} value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={busy || !!pending} />
-        <input key={'files:' + draftAction} ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={busy || !!pending}
+        <SupportAudioInput key={'audio:' + draftAction} value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={!journal.ready || busy || !!pending} />
+        <input key={'files:' + draftAction} ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={!journal.ready || busy || !!pending}
           className="block min-h-11 w-full text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900" onChange={event => {
             const chosen = Array.from(event.target.files || []); if (chosen.length > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; } else setFiles(chosen);
           }} />
         {!!files.length && <ul aria-label="Archivos de esta acción" className="space-y-2">{files.map((file, index) => <li key={index + ':' + file.name} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-neutral-200 px-3 py-1">
-          <span className="min-w-0 break-all text-sm text-neutral-800">{file.name}</span><Button type="button" variant="ghost" className="shrink-0" aria-label={'Quitar ' + file.name} disabled={busy || !!pending} onClick={() => { setFiles(files.filter((_, position) => position !== index)); if (fileInput.current) fileInput.current.value = ''; }}>Quitar</Button>
+          <span className="min-w-0 break-all text-sm text-neutral-800">{file.name}</span><Button type="button" variant="ghost" className="shrink-0" aria-label={'Quitar ' + file.name} disabled={!journal.ready || busy || !!pending} onClick={() => { setFiles(files.filter((_, position) => position !== index)); if (fileInput.current) fileInput.current.value = ''; }}>Quitar</Button>
         </li>)}</ul>}
       </div>
-      {pending && <p className="text-sm text-neutral-700">Envío sin confirmar. El reintento conservará el contenido y la misma clave.</p>}
-      <Button type="submit" isLoading={busy} disabled={recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{pending ? 'Reintentar mismo envío' : selected ? submitLabels[selected] : 'Confirmar acción'}</Button>
+      {!pending && <Button type="submit" isLoading={busy} disabled={!journal.ready || recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{selected ? submitLabels[selected] : 'Confirmar acción'}</Button>}
     </form>}
-    {error && <p role="alert" className="text-error-700">{error}</p>}
+    {(error || journal.error) && <p role="alert" className="text-error-700">{error || journal.error}</p>}
   </section>;
 }
 function TeamSettings({ owner }: { owner: string }) {

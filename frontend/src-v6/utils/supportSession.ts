@@ -1,4 +1,18 @@
 import { getAccessToken } from '../services/api';
+import { readActorActivity } from '../services/actorActivity';
+import { readCompanyContext } from '../services/companyContext';
+
+/** Snapshot the same context that the API interceptor uses; token refresh alone is safe. */
+export function supportRequestContext(): string {
+  try {
+    const token = getAccessToken();
+    const part = token?.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    if (!part) return '';
+    const claims = JSON.parse(atob(part.padEnd(Math.ceil(part.length / 4) * 4, '=')));
+    if (!claims.id) return '';
+    return JSON.stringify([claims.id, claims.rol, claims.impersonatedBy, !!claims.restricted, readActorActivity(token), readCompanyContext(token)]);
+  } catch { return ''; }
+}
 
 export class SupportSessionChangedError extends Error {
   constructor() {

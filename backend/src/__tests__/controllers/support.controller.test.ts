@@ -86,7 +86,7 @@ describe('support identity, visibility and transactional workflow', () => {
   });
   it('rejects stale versions before any mutation, event or notice', async () => {
     const next = vi.fn(); await accionarTicket(request({ accion: 'RESPONDER', version: 1, cuerpo: 'Respuesta del usuario' }) as never, response() as never, next);
-    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 }); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.createNotices).not.toHaveBeenCalled();
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409, code: 'SUPPORT_ACTION_NOT_APPLIED' }); expect(mocks.update).not.toHaveBeenCalled(); expect(mocks.createNotices).not.toHaveBeenCalled();
   });
   it('does not grant support power through a sector role or inspector flag', async () => {
     const next = vi.fn(); await accionarTicket(request({ accion: 'TOMAR', version: 2 }, { ...user, rol: 'ADMIN_GENERADOR' }) as never, response() as never, next);
@@ -143,5 +143,17 @@ describe('support identity, visibility and transactional workflow', () => {
   it('rejects a reused creation key with different contents and does not write', async () => {
     const next = vi.fn(); await crearTicket(request({ asunto: 'GPS no responde', descripcion: 'No muestra el marcador después del permiso.', categoria: 'GPS' }) as never, response() as never, next);
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 }); expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not claim non-application for a reused key with another payload', async () => {
+    mocks.event.mockResolvedValueOnce({ huella: 'different' });
+    const next = vi.fn(); await accionarTicket(request({ accion: 'RESPONDER', version: 2, cuerpo: 'Respuesta diferente' }) as never, response() as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 409 });
+    expect(next.mock.calls[0][0].code).toBeUndefined(); expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it('does not claim non-application when access fails before checking the key', async () => {
+    mocks.ticket.mockResolvedValueOnce(null);
+    const next = vi.fn(); await accionarTicket(request({ accion: 'RESPONDER', version: 2, cuerpo: 'Respuesta pendiente' }) as never, response() as never, next);
+    expect(next).toHaveBeenCalled(); expect(next.mock.calls[0][0].code).toBeUndefined(); expect(mocks.event).not.toHaveBeenCalled();
   });
 });

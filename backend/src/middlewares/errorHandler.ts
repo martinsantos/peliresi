@@ -83,7 +83,7 @@ export const errorHandler = (
     success: false,
     status: statusCode,
     message,
-    code: err instanceof AppError && ['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT'].includes(String(err.code)) ? err.code : undefined,
+    code: err instanceof AppError && ['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT', 'SUPPORT_ACTION_NOT_APPLIED'].includes(String(err.code)) ? err.code : undefined,
     details: process.env.NODE_ENV === 'development' ? details : undefined,
     fieldErrors: statusCode === 400 && err instanceof AppError ? err.fieldErrors : undefined,
   });

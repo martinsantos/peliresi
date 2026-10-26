@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, it, vi } from 'vitest';
+const records = vi.hoisted(() => new Map<string, unknown>());
+vi.mock('../../services/supportCommandStore', () => ({ readSupportCommandRecord: async (key: string) => records.get(key) || null, updateSupportCommandRecord: async (key: string, update: (value: unknown) => unknown) => { const next = update(records.get(key) || null); if (next) records.set(key, next); else records.delete(key); return next; } }));
 const calls = vi.hoisted(() => ({ access: vi.fn(), list: vi.fn(), get: vi.fn(), create: vi.fn(), team: vi.fn(), act: vi.fn() }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', nombre: 'QA', rol: 'OPERADOR' } }) }));
 vi.mock('../../contexts/ImpersonationContext', () => ({ useImpersonation: () => ({ impersonationData: null }) }));
@@ -17,7 +19,7 @@ const ticket = { id: 'new-ticket', referencia: 'SOP-000001', asunto: subject, ca
   mensajes: [{ id: 'message', cuerpo: 'Descripción original del reporte', interno: false, autor: { id: 'owner', nombre: 'QA' }, createdAt: '2026-10-06T01:00:00Z',
     adjuntos: [{ id: 'file', nombre: filename, mime: 'image/png', bytes: 1200, sha256: 'unit-fixture' }] }], eventos: [] };
 beforeEach(() => {
-  localStorage.clear(); localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner' })) + '.not-a-credential');
+  records.clear(); localStorage.clear(); localStorage.setItem('sitrep_access_token', 'unit.' + btoa(JSON.stringify({ id: 'owner' })) + '.not-a-credential');
   vi.clearAllMocks(); calls.access.mockResolvedValue({ puedeGestionar: false, puedeConfigurar: false });
   calls.list.mockResolvedValue({ items: [], total: 0, page: 1, totalPages: 0 }); calls.get.mockResolvedValue(ticket);
   calls.create.mockImplementation(async () => {
@@ -147,6 +149,7 @@ it('offers assignment and direct routing for unassigned staff without opening re
 
 it('keeps private notes and attachments separate from a public response while switching actions', async () => {
   openDetail();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
   fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Respuesta pública pendiente' } });
   const publicFile = new File(['public'], 'publico.png', { type: 'image/png' });
   fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [publicFile] } });
@@ -160,6 +163,8 @@ it('keeps private notes and attachments separate from a public response while sw
   expect(screen.queryByText('privado.png', { exact: true })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ accion: 'RESPONDER', cuerpo: 'Respuesta pública pendiente' }), [publicFile], expect.any(String)));
+  fireEvent.click(await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Nota interna', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
   expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('Diagnóstico privado pendiente');
   expect(screen.getByText('privado.png', { exact: true })).toBeVisible();
@@ -180,6 +185,7 @@ it('keeps a prepared public reply when a separate private note is confirmed', as
   fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'Nota privada confirmada' } });
   fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledOnce());
+  fireEvent.click(await screen.findByRole('button', { name: 'Actualizar conversación y continuar', exact: true }));
   await waitFor(() => expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Próxima respuesta pública'));
   fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
   expect(screen.getByLabelText('Nota interna / motivo')).toHaveValue('');
@@ -193,4 +199,25 @@ it('keeps previously chosen files after rejecting an oversized replacement and s
   expect(screen.getByText('conservado.png', { exact: true })).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Quitar conservado.png', exact: true }));
   expect(screen.queryByText('conservado.png', { exact: true })).toBeNull(); expect(calls.act).not.toHaveBeenCalled();
+});
+
+it.each(['RESPONDER', 'NOTA'])('recovers an uncertain %s in the real ticket composer after reopening', async action => {
+  const first = openDetail();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
+  if (action === 'NOTA') fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  const label = action === 'NOTA' ? 'Nota interna / motivo' : 'Mensaje o resolución';
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'Texto original pendiente de confirmar' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['file'], 'reabrir.pdf', { type: 'application/pdf' })] } });
+  calls.act.mockRejectedValueOnce(new Error('Lost response'));
+  fireEvent.click(screen.getByRole('button', { name: action === 'NOTA' ? 'Guardar nota interna' : 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledOnce());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Reintentar mismo envío', exact: true })).toBeEnabled());
+  first.unmount(); openDetail();
+  await screen.findByRole('button', { name: 'Reintentar mismo envío', exact: true });
+  expect(screen.getByLabelText(label)).toHaveValue('Texto original pendiente de confirmar');
+  expect(screen.getByLabelText(label)).toBeDisabled(); expect(screen.getByText('reabrir.pdf', { exact: true })).toBeVisible();
+  expect(calls.act).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar mismo envío', exact: true }));
+  await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
+  expect(calls.act.mock.calls[1]).toEqual(calls.act.mock.calls[0]);
 });

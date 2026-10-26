@@ -76,7 +76,7 @@ describe('errorHandler middleware', () => {
     expect(res.status).toHaveBeenCalledWith(500);
   });
 
-  it.each(['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT', 'PRIVATE_INTERNAL_CODE'])('exposes only safe PSIP recovery codes: %s', code => {
+  it.each(['INSPECTION_COMMAND_NOT_APPLIED', 'INSPECTION_COMMAND_CONFLICT', 'SUPPORT_ACTION_NOT_APPLIED', 'PRIVATE_INTERNAL_CODE'])('exposes only safe recovery codes: %s', code => {
     process.env.NODE_ENV = 'production';
     const { req, res, next } = createMocks();
     const err = new AppError('Revise la presentación', 409);
