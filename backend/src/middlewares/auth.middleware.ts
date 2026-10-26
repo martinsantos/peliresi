@@ -109,7 +109,7 @@ export const isAuthenticated = async (
         generador:null,transportista:null,operador:null,[enterprise.key]:enterprise.actor,empresaContexto:enterprise.context };
       // These legacy sections lack a per-establishment historical contract.
       // Restricted delegates cannot inherit company-wide records through them.
-      if(!enterprise.context.todasSedes&&!/^\/api\/(?:auth\/profile|manifiestos|pdf|catalogos|notificaciones|soporte)(?:[/?]|$)/.test(req.originalUrl)) {
+      if(!enterprise.context.todasSedes&&!/^\/api\/(?:auth\/profile|manifiestos|pdf|catalogos|notificaciones|soporte|search)(?:[/?]|$)/.test(req.originalUrl)) {
         throw new AppError('Esta sección requiere autorización para todos los establecimientos de la empresa',403);
       }
     }

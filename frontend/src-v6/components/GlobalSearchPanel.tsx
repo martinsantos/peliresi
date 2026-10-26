@@ -1,242 +1,77 @@
-import React, { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useId, useRef } from 'react';
 import { Search, FileText, Factory, Truck, FlaskConical, Clock, X } from 'lucide-react';
 import { useGlobalSearch } from '../hooks/useGlobalSearch';
 import type { FlatResult } from '../hooks/useGlobalSearch';
-import { ESTADO_LABELS, ESTADO_COLORS } from '../utils/constants';
+import { ESTADO_LABELS } from '../utils/constants';
 import { EstadoManifiesto } from '../types/models';
+import { useAuth } from '../contexts/AuthContext';
+import { workspaceRoleLabel } from '../utils/workspaceNavigation';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/ButtonV2';
 
-interface Props {
-  onClose: () => void;
-}
+const icons = { manifiesto: FileText, generador: Factory, transportista: Truck, operador: FlaskConical };
+const labels = { manifiesto: 'Manifiestos', generador: 'Generadores', transportista: 'Transportistas', operador: 'Operadores' };
+const control = 'min-h-11 rounded-lg border border-neutral-300 bg-white px-3 text-base text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700';
 
-const ESTADO_CHIPS: EstadoManifiesto[] = [
-  EstadoManifiesto.BORRADOR,
-  EstadoManifiesto.APROBADO,
-  EstadoManifiesto.EN_TRANSITO,
-  EstadoManifiesto.ENTREGADO,
-  EstadoManifiesto.RECIBIDO,
-  EstadoManifiesto.TRATADO,
-];
-
-const TYPE_ICONS: Record<FlatResult['type'], React.ReactNode> = {
-  manifiesto: <FileText size={16} className="text-primary-500" />,
-  generador: <Factory size={16} className="text-purple-500" />,
-  transportista: <Truck size={16} className="text-orange-500" />,
-  operador: <FlaskConical size={16} className="text-blue-500" />,
-};
-
-const TYPE_LABELS: Record<FlatResult['type'], string> = {
-  manifiesto: 'Manifiestos',
-  generador: 'Generadores',
-  transportista: 'Transportistas',
-  operador: 'Operadores',
-};
-
-export const GlobalSearchPanel: React.FC<Props> = ({ onClose }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const {
-    query, setQuery,
-    activeEstado, setActiveEstado,
-    isLoading,
-    isError,
-    data,
-    flatResults,
-    focusedIndex, setFocusedIndex,
-    recentSearches,
-    navigateTo,
-  } = useGlobalSearch({ onClose });
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const showRecent = query.length < 2 && recentSearches.length > 0;
-  const showEmpty = !isLoading && !isError && query.length >= 2 && (!data || data.totalHits === 0);
-  const showError = isError && query.length >= 2 && !isLoading;
-
-  // Group flatResults by type, preserving global index for keyboard nav
-  const grouped = (['manifiesto', 'generador', 'transportista', 'operador'] as FlatResult['type'][]).map((type) => ({
-    type,
-    items: flatResults
-      .map((item, idx) => ({ item, idx }))
-      .filter(({ item }) => item.type === type),
-  })).filter((g) => g.items.length > 0);
-
-  return createPortal(
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[900]"
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <div className="fixed top-[72px] left-1/2 -translate-x-1/2 w-full max-w-2xl z-[901] px-4">
-        <div className="bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden">
-          {/* Input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-100">
-            <Search size={20} className="text-neutral-400 shrink-0" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar manifiestos, generadores, CUIT..."
-              className="flex-1 text-base text-neutral-900 placeholder:text-neutral-400 bg-transparent outline-none"
-            />
-            {query && (
-              <button onClick={() => setQuery('')} className="text-neutral-400 hover:text-neutral-600">
-                <X size={16} />
-              </button>
-            )}
-            <kbd className="hidden sm:flex items-center text-[10px] text-neutral-400 bg-neutral-100 rounded px-1.5 py-0.5 border border-neutral-200 font-mono">
-              Esc
-            </kbd>
-          </div>
-
-          {/* Estado chips */}
-          <div className="flex gap-1.5 px-4 py-2 border-b border-neutral-100 overflow-x-auto">
-            {ESTADO_CHIPS.map((e) => {
-              const active = activeEstado === e;
-              const colors = ESTADO_COLORS[e];
-              return (
-                <button
-                  key={e}
-                  onClick={() => setActiveEstado(active ? '' : e)}
-                  className={`shrink-0 text-xs px-2.5 py-1 rounded-full border font-medium transition-all
-                    ${active
-                      ? `${colors.bg} ${colors.text} ${colors.border}`
-                      : 'bg-neutral-50 text-neutral-500 border-neutral-200 hover:border-neutral-300'
-                    }`}
-                >
-                  {ESTADO_LABELS[e]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Body */}
-          <div className="max-h-[400px] overflow-y-auto">
-            {/* Recent searches */}
-            {showRecent && (
-              <div className="px-4 py-3">
-                <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                  Búsquedas recientes
-                </p>
-                {recentSearches.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setQuery(s)}
-                    className="w-full flex items-center gap-2 py-1.5 text-sm text-neutral-600 hover:text-neutral-900 text-left"
-                  >
-                    <Clock size={14} className="text-neutral-400 shrink-0" />
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Hint when no query and no recent */}
-            {query.length < 2 && recentSearches.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-neutral-400">
-                Buscar manifiestos, generadores, transportistas, CUIT...
-              </div>
-            )}
-
-            {/* Loading skeleton */}
-            {isLoading && (
-              <div className="px-4 py-3 space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3 py-2">
-                    <div className="w-8 h-8 bg-neutral-100 rounded-lg animate-pulse" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 bg-neutral-100 rounded animate-pulse w-1/3" />
-                      <div className="h-2.5 bg-neutral-100 rounded animate-pulse w-1/2" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Error state */}
-            {showError && (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm text-neutral-500 font-medium">Error al conectar con el servidor</p>
-                <p className="text-xs text-neutral-400 mt-1">Verificá tu conexión e intentá de nuevo</p>
-              </div>
-            )}
-
-            {/* Empty state */}
-            {showEmpty && (
-              <div className="px-4 py-8 text-center">
-                <p className="text-sm text-neutral-500 font-medium">Sin resultados para "{query}"</p>
-                <button
-                  onClick={() => navigateTo('/manifiestos')}
-                  className="mt-2 text-xs text-primary-600 hover:underline"
-                >
-                  Ver todos los manifiestos
-                </button>
-              </div>
-            )}
-
-            {/* Results grouped */}
-            {!isLoading && grouped.map(({ type, items }) => (
-              <div key={type} className="px-4 py-2">
-                <div className="flex items-center gap-2 mb-1">
-                  {TYPE_ICONS[type]}
-                  <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                    {TYPE_LABELS[type]} ({items.length})
-                  </p>
-                </div>
-                {items.map(({ item, idx }) => {
-                  const isFocused = focusedIndex === idx;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => navigateTo(item.href)}
-                      onMouseEnter={() => setFocusedIndex(idx)}
-                      className={`w-full flex items-center gap-3 px-2 py-2 rounded-xl text-left transition-colors
-                        ${isFocused ? 'bg-primary-50' : 'hover:bg-neutral-50'}`}
-                    >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                        ${isFocused ? 'bg-primary-100' : 'bg-neutral-100'}`}>
-                        {TYPE_ICONS[type]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isFocused ? 'text-primary-700' : 'text-neutral-900'}`}>
-                          {item.label}
-                        </p>
-                        <p className="text-xs text-neutral-500 truncate">{item.sublabel}</p>
-                      </div>
-                      {item.estado && (
-                        <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium
-                          ${ESTADO_COLORS[item.estado as EstadoManifiesto]?.bg || 'bg-neutral-100'}
-                          ${ESTADO_COLORS[item.estado as EstadoManifiesto]?.text || 'text-neutral-600'}
-                          ${ESTADO_COLORS[item.estado as EstadoManifiesto]?.border || 'border-neutral-200'}`}
-                        >
-                          {ESTADO_LABELS[item.estado as EstadoManifiesto] || item.estado}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-
-          {/* Footer hint */}
-          {flatResults.length > 0 && (
-            <div className="px-4 py-2 border-t border-neutral-100 flex gap-4 text-xs text-neutral-400">
-              <span>↑↓ navegar</span>
-              <span>↵ abrir</span>
-              <span>Esc cerrar</span>
-            </div>
-          )}
+export const GlobalSearchPanel: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const input = useRef<HTMLInputElement>(null), id = useId();
+  const { currentUser } = useAuth();
+  const contextLabel = [workspaceRoleLabel(currentUser?.rol || ''), currentUser?.empresaContexto?.razonSocial || currentUser?.sector, currentUser?.empresaContexto?.establecimiento?.nombre].filter(Boolean).join(' · ');
+  const { query, setQuery, activeEstado, setActiveEstado, isLoading, isError, data, flatResults,
+    focusedIndex, setFocusedIndex, recentSearches, navigateTo, onQueryKeyDown, retry } = useGlobalSearch({ onClose });
+  useEffect(() => { input.current?.focus(); }, []);
+  useEffect(() => { if (focusedIndex >= 0) document.getElementById(`${id}-${focusedIndex}`)?.scrollIntoView?.({ block: 'nearest' }); }, [focusedIndex, id]);
+  const searching = query.trim().length >= 2;
+  return <Modal isOpen onClose={onClose} title="Buscar en SITREP" description={contextLabel} size="lg">
+    <div className="space-y-4">
+      <div>
+        <label htmlFor={`${id}-query`} className="mb-2 block text-sm font-medium text-neutral-700">Número, razón social o CUIT</label>
+        <div className="flex items-center gap-2">
+          <Search size={20} aria-hidden="true" className="shrink-0 text-primary-700" />
+          <input id={`${id}-query`} ref={input} type="text" inputMode="search" enterKeyHint="search" role="combobox" autoComplete="off" maxLength={200}
+            aria-autocomplete="list" aria-expanded={flatResults.length > 0 && !isLoading} aria-controls={`${id}-results`}
+            aria-activedescendant={!isLoading && flatResults[focusedIndex] ? `${id}-${focusedIndex}` : undefined}
+            value={query} onChange={e => setQuery(e.target.value)} onKeyDown={onQueryKeyDown} className={`${control} min-w-0 flex-1`} />
+          {query && <button type="button" aria-label="Limpiar búsqueda" onClick={() => { setQuery(''); input.current?.focus(); }} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-neutral-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><X size={20} aria-hidden="true" /></button>}
         </div>
       </div>
-    </>,
-    document.body
-  );
+      <div>
+        <label htmlFor={`${id}-state`} className="mb-2 block text-sm font-medium text-neutral-700">Estado del manifiesto</label>
+        <select id={`${id}-state`} value={activeEstado} onChange={e => setActiveEstado(e.target.value)} className={`${control} w-full`}>
+          <option value="">Todos los estados</option>
+          {Object.values(EstadoManifiesto).map(state => <option key={state} value={state}>{ESTADO_LABELS[state] || state}</option>)}
+        </select>
+      </div>
+      {!searching && <div>
+        {recentSearches.length > 0 ? <><p className="text-sm font-medium text-neutral-600">Búsquedas recientes</p>
+          {recentSearches.map(term => <button key={term} type="button" onClick={() => setQuery(term)} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-neutral-700 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><Clock size={16} aria-hidden="true" /><span className="break-all">{term}</span></button>)}</>
+          : <p className="text-sm text-neutral-600">Escribí al menos dos caracteres.</p>}
+      </div>}
+      <p role="status" className="text-sm text-neutral-600">{isLoading ? 'Buscando…' : searching && !isError && data ? `${flatResults.length} ${flatResults.length === 1 ? 'resultado' : 'resultados'}` : ''}</p>
+      {isError && <div role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3">
+        <p className="mb-2 text-sm text-neutral-900">No pudimos consultar los resultados. Intentá nuevamente.</p>
+        <Button variant="outline" onClick={() => void retry()}>Reintentar búsqueda</Button>
+      </div>}
+      {searching && !isLoading && !isError && data && flatResults.length === 0 && <div className="space-y-2">
+        <p className="break-words text-neutral-700">Sin coincidencias para «{query.trim()}» en tu contexto actual.</p>
+        <Button variant="outline" onClick={() => navigateTo('/manifiestos')}>Ver manifiestos</Button>
+      </div>}
+      <ul id={`${id}-results`} role="listbox" aria-label="Resultados de búsqueda" className="space-y-3">
+        {!isLoading && (Object.keys(labels) as FlatResult['type'][]).map(type => {
+          const items = flatResults.map((item, index) => ({ item, index })).filter(result => result.item.type === type);
+          if (!items.length) return null;
+          const Icon = icons[type];
+          return <li key={type} role="group" aria-label={labels[type]}><p className="mb-1 text-sm font-semibold text-neutral-600">{labels[type]}</p>
+            {items.map(({ item, index }) => <button id={`${id}-${index}`} key={item.id} type="button" role="option" aria-selected={index === focusedIndex}
+              onClick={() => navigateTo(item.href)} onFocus={() => setFocusedIndex(index)} onMouseEnter={() => setFocusedIndex(index)}
+              className={`flex min-h-11 w-full items-start gap-3 rounded-lg p-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 ${index === focusedIndex ? 'bg-primary-50' : 'hover:bg-neutral-50'}`}>
+              <Icon size={20} aria-hidden="true" className="mt-0.5 shrink-0 text-primary-700" />
+              <span className="min-w-0 flex-1 break-words"><span className="block font-semibold text-neutral-900">{item.label}</span><span className="block text-sm text-neutral-600">{item.sublabel}</span>
+                {item.estado && <span className="block text-sm text-primary-800">{ESTADO_LABELS[item.estado as EstadoManifiesto] || item.estado}</span>}</span>
+            </button>)}
+          </li>;
+        })}
+      </ul>
+    </div>
+  </Modal>;
 };

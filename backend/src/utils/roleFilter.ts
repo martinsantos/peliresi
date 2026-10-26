@@ -87,3 +87,11 @@ export async function assertCanAccessManifiesto(
     throw new AppError('Manifiesto no encontrado', 404);
   }
 }
+
+/** Directory consultation follows the same actor boundary as ficha access. */
+export function directoryActorIdScope(user: ActorScopedUser, type: 'generador' | 'transportista' | 'operador') {
+  // Site delegates cannot open company-wide actor records.
+  if (user.empresaContexto && !user.empresaContexto.todasSedes) return { in: [] as string[] };
+  if (isFullAccess(user)) return undefined;
+  return (user.rol === type.toUpperCase() ? user[type]?.id : undefined) || { in: [] as string[] };
+}

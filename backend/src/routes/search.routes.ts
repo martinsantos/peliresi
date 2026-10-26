@@ -13,7 +13,7 @@ router.use(requireFullAccess);
  *   get:
  *     tags: [Search]
  *     summary: Busqueda global
- *     description: Busca manifiestos, actores y usuarios por texto libre. Retorna resultados agrupados por tipo.
+ *     description: Busca manifiestos y fichas de actores dentro del contexto autorizado. Retorna resultados agrupados por tipo.
  *     parameters:
  *       - in: query
  *         name: q

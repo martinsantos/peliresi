@@ -1,3 +1,4 @@
+import { directoryActorIdScope } from '../utils/roleFilter';
 import { actorRegistrationIdentity, linkApprovedRegistration, notifyCompanyActorChange } from '../services/companyRegistration.service';
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
@@ -18,7 +19,6 @@ import {
     parseFiscalYear,
 } from '../utils/generadorFiscal';
 
-type DirectoryActorType = 'generador' | 'transportista' | 'operador';
 
 function validateVehicleCapacity(capacidad: unknown): asserts capacidad is number {
     if (typeof capacidad !== 'number' || !Number.isFinite(capacidad) || capacidad <= 0) {
@@ -33,12 +33,6 @@ function validateInitialPassword(password: unknown, cuit: string): asserts passw
     if (password.replace(/\D/g, '') === String(cuit).replace(/\D/g, '') && /^[\d\s-]+$/.test(password)) {
         throw new AppError('La contraseña inicial no puede ser el CUIT', 400);
     }
-}
-
-function directoryActorIdScope(req: AuthRequest, type: DirectoryActorType) {
-    if (['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'].includes(req.user?.rol) || req.user?.esInspector) return undefined;
-    const ownId = req.user?.rol === type.toUpperCase() ? req.user[type]?.id : undefined;
-    return ownId || { in: [] as string[] };
 }
 
 // ============== GENERADORES (CU-A06) ==============
@@ -94,7 +88,7 @@ export const getGeneradores = async (req: AuthRequest, res: Response, next: Next
         }
 
         const where: any = combineWhere(baseWhere, buildFiscalWhere(fiscalStatus, fiscalYear));
-        const directoryId = directoryActorIdScope(req, 'generador');
+        const directoryId = directoryActorIdScope(req.user, 'generador');
         if (directoryId !== undefined) where.id = directoryId;
         const include = {
             usuario: { select: { email: true, nombre: true, apellido: true } },
@@ -467,7 +461,7 @@ export const getTransportistas = async (req: AuthRequest, res: Response, next: N
         const orderBy = TRANS_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
         const where: any = {};
-        const directoryId = directoryActorIdScope(req, 'transportista');
+        const directoryId = directoryActorIdScope(req.user, 'transportista');
         if (directoryId !== undefined) where.id = directoryId;
         if (search) {
             where.OR = [
@@ -945,7 +939,7 @@ export const getOperadores = async (req: AuthRequest, res: Response, next: NextF
         const orderBy = OPER_SORT[sortBy as string] ?? { razonSocial: 'asc' };
 
         const where: any = {};
-        const directoryId = directoryActorIdScope(req, 'operador');
+        const directoryId = directoryActorIdScope(req.user, 'operador');
         if (directoryId !== undefined) where.id = directoryId;
         if (search) {
             where.OR = [

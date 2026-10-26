@@ -13,6 +13,8 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Menu, X, ChevronRight, User, LogOut, SwitchCamera, Eye, ArrowLeft, AlertTriangle, BookOpen, Navigation,  } from 'lucide-react';
 
+import { Search } from 'lucide-react';
+import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
 import { NotificationBell } from '../components/NotificationBell';
 import { SitrepMark, SitrepWordmark } from '../components/SitrepMark';
 import { ConnectivityIndicator } from '../components/ConnectivityIndicator';
@@ -96,6 +98,8 @@ const NavItem: React.FC<NavItemProps> = ({ to, icon, label, badge, isActive }) =
 // ========================================
 export const MobileLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isLoading, isDemo, isRestricted } = useAuth();
@@ -240,6 +244,7 @@ export const MobileLayout: React.FC = () => {
         <div className="flex items-center justify-between gap-2 h-16 px-4 safe-top">
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <button
+              ref={menuButtonRef}
               onClick={() => setIsMenuOpen(true)}
               className="p-2 -ml-2 text-primary-800 hover:bg-primary-50 rounded-xl transition-colors touch-target"
               aria-label="Abrir menu"
@@ -255,12 +260,13 @@ export const MobileLayout: React.FC = () => {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {inlineSupport && <SupportBubble mobile inline hidden={isMenuOpen} />}
+            {inlineSupport && <SupportBubble mobile inline hidden={isMenuOpen || searchOpen} />}
             <NotificationBell basePath={mp('')} />
           </div>
         </div>
       </header>
       <ToastContainer />
+      {searchOpen && <GlobalSearchPanel onClose={() => { setSearchOpen(false); menuButtonRef.current?.focus(); }} />}
       <CompanyContextBar />
 
       {/* Keep absolutely positioned field controls inside this scroll container. */}
@@ -271,7 +277,7 @@ export const MobileLayout: React.FC = () => {
         </div>
       </main>
 
-      {floatingSupport && <SupportBubble mobile hidden={isMenuOpen} />}
+      {floatingSupport && <SupportBubble mobile hidden={isMenuOpen || searchOpen} />}
 
       {/* Bottom Navigation */}
       {!isInspectionCase && <nav aria-label="Navegación principal" className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
@@ -342,6 +348,9 @@ export const MobileLayout: React.FC = () => {
               style={{ WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain' }}
             >
               <div className="space-y-1">
+                <button type="button" onClick={() => { setIsMenuOpen(false); setSearchOpen(true); }} className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+                  <Search size={20} aria-hidden="true" /> Buscar en SITREP
+                </button>
                 {mainItems.map((item) => (
                   <MenuItem 
                     key={item.to}
