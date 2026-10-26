@@ -1,3 +1,5 @@
+const renewalRecipients = vi.hoisted(() => vi.fn());
+vi.mock('../../services/renewalCompanyRecipients.service', () => ({ renewalCompanyRecipients: renewalRecipients }));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), applicationContexts: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), exchange: vi.fn(), companyRecipients: vi.fn(), certificate: vi.fn() }));
 vi.mock('../../services/manifestCompanyRecipients.service', () => ({ manifestCompanyRecipients: mocks.companyRecipients }));
@@ -7,6 +9,7 @@ import { mailText } from '../../services/email-templates';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
 beforeEach(() => {
   vi.resetAllMocks();
+  renewalRecipients.mockResolvedValue([]);
   mocks.applicationContexts.mockResolvedValue([{id:'sol-qa',tipoActor:'GENERADOR'}]);
   vi.stubEnv('DISABLE_EMAILS', 'false');
   vi.stubEnv('EMAIL_DELIVERY_NOT_BEFORE', new Date(Date.now() - 60000).toISOString());
@@ -332,4 +335,17 @@ describe('signature reminder mail freshness',()=>{
     expect(await notificationSourceEligible(n,'alertas')).toBe(expected);
     expect(notificationMailContent(n)?.html).toContain('30 días desde la firma:</strong>');
   });
+});
+
+it('rechecks renewal representative access and decision before future mail without sending', async () => {
+  const n = { ...notice, usuarioId: 'member', rol: 'TRANSPORTISTA', tipo: 'MODIFICACION_APROBADA', datos: JSON.stringify({ renovacionId: 'r' }) };
+  mocks.renewal.mockResolvedValue({ id: 'r', estado: 'APROBADA', tipoActor: 'OPERADOR', operadorId: 'o', operador: { usuarioId: 'owner' } });
+  renewalRecipients.mockResolvedValue(['member']);
+  expect(await notificationSourceEligible(n, 'padron')).toBe(true);
+  renewalRecipients.mockResolvedValue([]);
+  expect(await notificationSourceEligible(n, 'padron')).toBe(false);
+  mocks.renewal.mockResolvedValue({ id: 'r', estado: 'RECHAZADA', tipoActor: 'OPERADOR', operador: { usuarioId: 'owner' } });
+  renewalRecipients.mockResolvedValue(['member']);
+  expect(await notificationSourceEligible(n, 'padron')).toBe(false);
+  expect(mocks.insert).not.toHaveBeenCalled();
 });

@@ -1,4 +1,7 @@
-import { expect, it, vi } from 'vitest';
+const company = vi.hoisted(() => vi.fn());
+vi.mock('../../services/renewalCompanyRecipients.service', () => ({ renewalCompanyRecipients: company }));
+beforeEach(() => company.mockResolvedValue([]));
+import { beforeEach, expect, it, vi } from 'vitest';
 import type { Prisma, Renovacion } from '@prisma/client';
 import { notifyRenovacion } from '../../services/renovacion-notification.service';
 it.each(['GENERADOR', 'OPERADOR'])('notifies only the relevant %s reviewers on submission, inside the supplied transaction', async tipoActor => {
@@ -21,4 +24,14 @@ it.each(['GENERADOR', 'OPERADOR'].flatMap(tipoActor => ['MODIFICACION_APROBADA',
   expect(JSON.parse(row.datos)).toEqual({ tipo: 'renovacion_padron', version: 1, renovacionId: 'renewal', tipoActor, actorNombre: 'Empresa de práctica', anio: 2027 });
   expect(row.mensaje).toContain('Período 2027');
   if (tipo === 'MODIFICACION_RECHAZADA') expect(row.mensaje).toContain('Motivo: Falta constancia');
+});
+
+it('notifies both activity representatives once, without broadening the reviewer audience', async () => {
+  company.mockResolvedValue(['owner', 'member', 'member']);
+  const createMany = vi.fn(), findUnique = vi.fn().mockResolvedValue({ usuarioId: 'owner', razonSocial: 'QA empresa' });
+  const tx = { generador: { findUnique }, notificacion: { createMany } } as unknown as Prisma.TransactionClient;
+  const renewal = { id: 'r', tipoActor: 'GENERADOR', generadorId: 'g', anio: 2026 } as Renovacion;
+  await notifyRenovacion(tx, renewal, 'MODIFICACION_APROBADA');
+  expect(company).toHaveBeenCalledWith(tx, renewal);
+  expect(createMany.mock.calls[0][0].data.map((n: { usuarioId: string }) => n.usuarioId)).toEqual(['owner', 'member']);
 });

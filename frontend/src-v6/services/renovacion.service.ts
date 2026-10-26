@@ -1,7 +1,13 @@
 import api from './api';
 import type { Renovacion, RenovacionFilters, CreateRenovacionRequest, PaginatedData } from '../types/api';
 
+export type RenovacionReceipt = Pick<Renovacion, 'id' | 'anio' | 'tipoActor' | 'modalidad' | 'estado' | 'createdAt'> & { datosNuevos: string | null; camposModificados: string | null; fechaRevision: string | null; motivoRechazo: string | null };
+
 export const renovacionService = {
+  async getOwn(anio: number): Promise<RenovacionReceipt | null> {
+    const { data } = await api.get('/renovaciones/mi-solicitud', { params: { anio } });
+    return data.data.renovacion;
+  },
   async list(filters?: RenovacionFilters): Promise<PaginatedData<Renovacion>> {
     const { data } = await api.get('/renovaciones', { params: filters });
     const raw = data.data;

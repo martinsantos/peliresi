@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { hasRole, isAuthenticated, requireFullAccess } from '../middlewares/auth.middleware';
 import {
     getRenovaciones,
+    getOwnRenovacion,
     getRenovacionById,
     createRenovacion,
     aprobarRenovacion,
@@ -13,6 +14,7 @@ router.use(isAuthenticated);
 router.use(requireFullAccess);
 
 router.get('/', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), getRenovaciones);
+router.get('/mi-solicitud', hasRole('GENERADOR', 'OPERADOR'), getOwnRenovacion);
 router.get('/:id', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), getRenovacionById);
 router.post('/', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR', 'GENERADOR', 'OPERADOR'), createRenovacion);
 router.post('/:id/aprobar', hasRole('ADMIN', 'ADMIN_GENERADOR', 'ADMIN_OPERADOR'), aprobarRenovacion);

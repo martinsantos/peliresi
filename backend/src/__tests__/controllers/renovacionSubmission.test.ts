@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({ actor: vi.fn(), existing: vi.fn(), create: vi.fn(), notify: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: {generador:{findUnique:m.actor},operador:{findUnique:m.actor},renovacion:{findFirst:m.existing},$transaction:async (fn:any)=>fn({renovacion:{create:m.create}})} }));
 vi.mock('../../services/renovacion-notification.service', () => ({ notifyRenovacion:m.notify }));
-import { createRenovacion } from '../../controllers/renovacion.controller';
+import { createRenovacion, getOwnRenovacion } from '../../controllers/renovacion.controller';
 const body={anio:2026,tipoActor:'GENERADOR',generadorId:'gen',modalidad:'CON_CAMBIOS',datosNuevos:{domicilio:'Nuevo',telefono:'123'}};
 const saved={id:'receipt',anio:2026,tipoActor:'GENERADOR',generadorId:'gen',modalidad:'CON_CAMBIOS',datosNuevos:JSON.stringify({telefono:'123',domicilio:'Nuevo'}),estado:'PENDIENTE',tefAnterior:null,tefNuevo:null,observaciones:null};
 async function submit(payload:any=body,user:any={rol:'GENERADOR',generador:{id:'gen'}}){const json=vi.fn(),status=vi.fn().mockReturnValue({json}),next=vi.fn();await createRenovacion({body:payload,user} as any,{status} as any,next);return {json,status,next};}
@@ -13,3 +13,14 @@ it.each([{datosNuevos:'{"domicilio":"Otra"}'},{datosNuevos:'invalid'},{datosNuev
 it('does not disclose another actor receipt',async()=>{const r=await submit(body,{rol:'GENERADOR',generador:{id:'other'}});expect(r.next.mock.calls[0][0].statusCode).toBe(403);expect(m.existing).not.toHaveBeenCalled();expect(m.create).not.toHaveBeenCalled();});
 it('creates a first request and its notice once',async()=>{m.create.mockResolvedValue(saved);const r=await submit();expect(r.status).toHaveBeenCalledWith(201);expect(m.notify).toHaveBeenCalledOnce();expect(m.existing).not.toHaveBeenCalled();});
 it('does not hide a non-duplicate storage failure',async()=>{const error=new Error('QA unavailable');m.create.mockRejectedValue(error);const r=await submit();expect(r.next).toHaveBeenCalledWith(error);expect(m.existing).not.toHaveBeenCalled();});
+
+async function own(user:any={rol:'GENERADOR',generador:{id:'gen'}},query:any={anio:'2026'}){const json=vi.fn(),next=vi.fn();await getOwnRenovacion({user,query} as any,{json} as any,next);return {json,next};}
+it.each(['GENERADOR','OPERADOR'])('reads only the verified %s actor and a bounded receipt projection',async rol=>{
+ const r=await own({rol,[rol.toLowerCase()]:{id:'session-actor'}});expect(r.next).not.toHaveBeenCalled();
+ const query=m.existing.mock.calls[0][0];expect(query.where).toEqual({anio:2026,tipoActor:rol,[rol.toLowerCase()+'Id']:'session-actor'});
+ expect(Object.keys(query.select).sort()).toEqual(['anio','camposModificados','createdAt','datosNuevos','estado','fechaRevision','id','modalidad','motivoRechazo','tipoActor'].sort());expect(m.create).not.toHaveBeenCalled();expect(m.notify).not.toHaveBeenCalled();
+});
+it.each([{rol:'ADMIN'},{rol:'TRANSPORTISTA'},{rol:'GENERADOR'},{rol:'OPERADOR'}])('denies missing or unsupported receipt ownership %#',async user=>{const r=await own(user);expect(r.next.mock.calls[0][0].statusCode).toBe(403);expect(m.existing).not.toHaveBeenCalled();});
+it.each([{},{anio:'bad'},{anio:'2019'},{anio:'2101'},{anio:['2026']},{anio:'2026',generadorId:'foreign'}])('rejects malformed or foreign-target queries %#',async query=>{const r=await own(undefined,query);expect(r.next.mock.calls[0][0].statusCode).toBe(400);expect(m.existing).not.toHaveBeenCalled();});
+it('returns null only after a successful lookup with no registered request',async()=>{m.existing.mockResolvedValue(null);const r=await own();expect(r.json).toHaveBeenCalledWith({success:true,data:{renovacion:null}});});
+it('does not turn a failed receipt lookup into an empty state',async()=>{const failure=new Error('database unavailable');m.existing.mockRejectedValue(failure);const r=await own();expect(r.next).toHaveBeenCalledWith(failure);expect(r.json).not.toHaveBeenCalled();});

@@ -6,6 +6,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import { approvedOperatorModeChange } from '../domain/operatorModalities';
 import { notifyRenovacion } from '../services/renovacion-notification.service';
 import {
+    ownRenovacionQuerySchema,
     canReviewRenovacion,
     canSubmitRenovacion,
     createRenovacionSchema,
@@ -72,6 +73,24 @@ export const getRenovacionById = async (req: AuthRequest, res: Response, next: N
     } catch (error) {
         next(error);
     }
+};
+
+/** Actor receipt recovery is read-only and derives ownership from the verified session. */
+export const getOwnRenovacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const parsedRole = tipoActorRenovacionSchema.safeParse(req.user.rol);
+        if (!parsedRole.success) throw new AppError('Esta consulta es sólo para la actividad operativa actual', 403);
+        const role = parsedRole.data;
+        const actorId = role === 'GENERADOR' ? req.user.generador?.id : role === 'OPERADOR' ? req.user.operador?.id : null;
+        if (!actorId) throw new AppError('Esta consulta requiere una actividad de generador u operador vinculada a tu cuenta', 403);
+        const query = ownRenovacionQuerySchema.safeParse(req.query);
+        if (!query.success) throw new AppError('Indicá un período válido para consultar tu solicitud', 400);
+        const renovacion = await prisma.renovacion.findFirst({
+            where: { anio: query.data.anio, tipoActor: role, ...(role === 'GENERADOR' ? { generadorId: actorId } : { operadorId: actorId }) },
+            select: { id: true, anio: true, tipoActor: true, modalidad: true, estado: true, datosNuevos: true, camposModificados: true, fechaRevision: true, motivoRechazo: true, createdAt: true },
+        });
+        res.json({ success: true, data: { renovacion } });
+    } catch (error) { next(error); }
 };
 
 export const createRenovacion = async (req: AuthRequest, res: Response, next: NextFunction) => {

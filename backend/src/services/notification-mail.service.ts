@@ -1,3 +1,4 @@
+import { renewalCompanyRecipients } from './renewalCompanyRecipients.service';
 import { manifestCompanyRecipients } from './manifestCompanyRecipients.service';
 import { applicationNoticeMessage, withApplicationNoticeContext } from './applicationNotice.service';
 import { ADDENDUM_AUTHORITY_ROLES } from '../domain/addendumAuthority';
@@ -61,7 +62,8 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
     if (notice.tipo === 'MODIFICACION_SOLICITADA') return renewal.estado === 'PENDIENTE' && ['ADMIN', 'ADMIN_' + renewal.tipoActor].includes(notice.rol);
     const owner = renewal.tipoActor === 'GENERADOR' ? renewal.generador : renewal.operador;
     const expected = notice.tipo === 'MODIFICACION_APROBADA' ? 'APROBADA' : 'RECHAZADA';
-    return Boolean(notice.usuarioId && owner?.usuarioId === notice.usuarioId && renewal.estado === expected);
+    if (!notice.usuarioId || renewal.estado !== expected) return false;
+    return owner?.usuarioId === notice.usuarioId || (await renewalCompanyRecipients(prisma, renewal)).includes(notice.usuarioId);
   }
   if (notice.manifiestoId) {
     const manifest = await prisma.manifiesto.findUnique({ where: { id: notice.manifiestoId }, select: {

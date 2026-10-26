@@ -1,3 +1,4 @@
+import { renewalCompanyRecipients } from './renewalCompanyRecipients.service';
 import type { Prisma, Renovacion, TipoNotificacion } from '@prisma/client';
 import { RENEWAL_NOTICE_LABELS, renewalNoticeReference, validRenewalNotice } from '../domain/renewalNotice';
 
@@ -19,6 +20,7 @@ export async function notifyRenovacion(tx: Prisma.TransactionClient, renewal: Re
     recipients.push(...reviewers.map(user => user.id));
   } else {
     if (actor) recipients.push(actor.usuarioId);
+    recipients.push(...await renewalCompanyRecipients(tx, renewal));
   }
   const [title, action] = RENEWAL_NOTICE_LABELS[tipo] || ['Renovación de padrón', 'Consultá el resultado en tus avisos.'];
   const reference = validRenewalNotice(context) ? renewalNoticeReference(context) + '. ' : '';

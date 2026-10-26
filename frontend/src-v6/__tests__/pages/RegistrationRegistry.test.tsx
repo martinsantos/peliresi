@@ -7,7 +7,7 @@ import { ActorRegistryLookup } from '../../components/ActorRegistryLookup';
 const mock = vi.hoisted(() => ({ get: vi.fn(), token: '', role: 'GENERADOR', submit: vi.fn() }));
 vi.mock('../../services/api', () => ({ default: { get: mock.get }, getAccessToken: () => mock.token }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', actorId: 'actor', rol: mock.role }, isGenerador: mock.role === 'GENERADOR', isOperador: mock.role === 'OPERADOR' }) }));
-vi.mock('../../services/renovacion.service', () => ({ renovacionService: { create: mock.submit } }));
+vi.mock('../../services/renovacion.service', () => ({ renovacionService: { create: mock.submit, getOwn: async () => null } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn() } }));
 beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); mock.role = 'GENERADOR'; mock.token = `qa.${btoa(JSON.stringify({ id: 'owner' }))}.qa`; });
 describe('existing registry is available only through the verified owner and actual API shape', () => {

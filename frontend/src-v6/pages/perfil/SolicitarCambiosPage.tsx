@@ -17,6 +17,7 @@ import {
   Briefcase,
   Award,
   CheckCircle,
+  Clock,
   AlertTriangle,
 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
@@ -25,7 +26,7 @@ import { Badge } from '../../components/ui/BadgeV2';
 import { Input } from '../../components/ui/Input';
 import { toast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
-import { renovacionService } from '../../services/renovacion.service';
+import { renovacionService, type RenovacionReceipt } from '../../services/renovacion.service';
 import api from '../../services/api';
 import { getApiErrorMessage } from '../../utils/api-error';
 import { useAdmissionContext } from '../../hooks/useAdmissionContext';
@@ -115,10 +116,22 @@ function ChangeRequestEditor({ owner, actorId, role, actor, refresh }: { owner: 
   const inFlight = useRef(false), active = useRef(true), feedback = useRef<HTMLDivElement>(null);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   useEffect(() => { if (submitted || sendError) feedback.current?.focus(); }, [submitted, sendError]);
+  const [receipt, setReceipt] = useState<RenovacionReceipt | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(true), [receiptError, setReceiptError] = useState(false), [receiptAttempt, setReceiptAttempt] = useState(0);
+  useEffect(() => {
+    let current = true; setReceiptLoading(true); setReceiptError(false);
+    renovacionService.getOwn(year).then(result => {
+      if (!current) return;
+      if (result !== null && (!result?.id || result.anio !== year || result.tipoActor !== role || !['PENDIENTE', 'APROBADA', 'RECHAZADA'].includes(result.estado))) throw new Error('La solicitud no corresponde al contexto consultado');
+      setReceipt(result);
+    }).catch(() => { if (current) setReceiptError(true); }).finally(() => { if (current) setReceiptLoading(false); });
+    return () => { current = false; };
+  }, [year, role, receiptAttempt]);
+  useEffect(() => { if (receipt && !receiptLoading) feedback.current?.focus(); }, [receipt, receiptLoading]);
   const rebase = (keep: boolean) => draft.update({ year, base: currentValues, values: keep ? { ...currentValues, ...Object.fromEntries(changedKeys.map(key => [key, values[key]])) } : currentValues });
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (inFlight.current || !changedKeys.length || registryChanged || draft.conflict || draft.error) return;
+    if (receiptLoading || receiptError || receipt || inFlight.current || !changedKeys.length || registryChanged || draft.conflict || draft.error) return;
     const written = draft.update(draft.value);
     if (!written.saved || written.conflict) return;
     inFlight.current = true; setSubmitting(true); setSendError(null);
@@ -147,6 +160,28 @@ function ChangeRequestEditor({ owner, actorId, role, actor, refresh }: { owner: 
     {(draft.error || draft.conflict) && <div role="alert" className="space-y-2"><p>El servidor confirmó la solicitud, pero no pudimos limpiar la copia local. No hace falta enviarla de nuevo.</p><Button variant="outline" onClick={() => draft.acknowledge()}>Reintentar limpieza local</Button></div>}
     <Button onClick={() => navigate('/mi-perfil')}>Volver a mi perfil</Button>
   </div>;
+  if (receiptLoading) return <div role="status" className="flex items-center gap-3 p-4"><BrandSpinner />Consultando la solicitud de este período…</div>;
+  if (receiptError) return <div role="alert" className="mx-auto max-w-[960px] space-y-3 rounded-xl border border-warning-200 bg-warning-50 p-4"><p>No pudimos consultar si ya hay una solicitud presentada. Tu borrador se conserva; reintentá antes de enviar.</p><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setReceiptAttempt(a => a + 1)}>Reintentar consulta</Button><Button variant="outline" onClick={() => navigate('/mi-perfil')}>Volver a mi perfil</Button></div></div>;
+  if (receipt) {
+    let registered: Record<string, unknown> | null = null;
+    try { const data = JSON.parse(receipt.datosNuevos || '{}'); if (data && typeof data === 'object' && !Array.isArray(data)) registered = data; } catch { /* Display the receipt even if a historical proposal cannot be parsed. */ }
+    const proposed = Object.fromEntries(changedKeys.map(key => [key, values[key].trim()]));
+    const canonical = (data: Record<string, unknown>) => JSON.stringify(Object.keys(data).sort().map(key => [key, data[key]]));
+    const sameDraft = !!changedKeys.length && !!registered && canonical(proposed) === canonical(registered);
+    const title = receipt.estado === 'APROBADA' ? 'Solicitud aprobada' : receipt.estado === 'RECHAZADA' ? 'Solicitud rechazada' : 'Solicitud en revisión';
+    return <div ref={feedback} tabIndex={-1} aria-label={title} className="mx-auto w-full max-w-[960px] space-y-4">
+      <Card><CardHeader title={title} icon={receipt.estado === 'APROBADA' ? <CheckCircle size={20} /> : receipt.estado === 'RECHAZADA' ? <AlertTriangle size={20} /> : <Clock size={20} />} /><CardContent className="space-y-4">
+        <p>{role === 'GENERADOR' ? 'Generador' : 'Operador'} · {String(actor.razonSocial || 'Tu ficha')} · Período {receipt.anio}</p>
+        <p>{receipt.estado === 'APROBADA' ? 'Administración aprobó la solicitud. Consultá los datos actualizados en tu perfil.' : receipt.estado === 'RECHAZADA' ? 'Administración rechazó la solicitud. Revisá el motivo y consultá a Administración para presentar una corrección.' : 'Administración debe revisar la solicitud. Los cambios propuestos todavía no se aplicaron.'}</p>
+        {receipt.motivoRechazo && <p className="[overflow-wrap:anywhere]">Motivo: {receipt.motivoRechazo}</p>}
+        <p className="text-sm text-neutral-600 [overflow-wrap:anywhere]">Referencia {receipt.id}</p>
+        <details><summary className="flex min-h-11 cursor-pointer items-center font-medium text-primary-800">Ver cambios presentados</summary>{registered ? <dl className="space-y-2 py-2">{fields.filter(f => Object.hasOwn(registered!, f.key)).map(f => <div key={f.key}><dt className="text-sm font-medium">{f.label}</dt><dd className="[overflow-wrap:anywhere]">{String(registered![f.key] ?? 'Sin declarar')}</dd></div>)}{!Object.keys(registered).length && <p>Solicitud sin cambios de datos.</p>}</dl> : <p>No se pudieron mostrar los datos históricos. El estado de la solicitud sí fue confirmado.</p>}</details>
+        <p className="text-sm text-neutral-600">Ya hay una solicitud de este período. No se envía otra al volver a esta pantalla.</p>
+        <div className="flex flex-wrap gap-3"><Button onClick={() => navigate('/mi-perfil')}>Volver a mi perfil</Button><Button variant="outline" onClick={() => setReceiptAttempt(a => a + 1)}>Actualizar resultado</Button></div>
+      </CardContent></Card>
+      {(changedKeys.length > 0 || draft.conflict) && <section className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4" aria-label="Borrador local conservado"><h3 className="font-semibold">Borrador local conservado</h3><p>{sameDraft ? 'Tu borrador coincide con la solicitud registrada. No hace falta volver a enviarlo.' : 'Tu borrador local es diferente de la solicitud presentada. Lo conservamos en este dispositivo sin enviarlo ni reemplazar la solicitud.'}</p>{changedKeys.map(key => <div key={key}><p className="text-sm font-medium">{fields.find(f => f.key === key)?.label}</p><p className="[overflow-wrap:anywhere]">{values[key]}</p></div>)}{draft.conflict && <p>También hay versiones guardadas de otras pestañas; esta consulta no las modifica.</p>}</section>}
+    </div>;
+  }
   return <div className="mx-auto w-full max-w-[960px] space-y-6">
     <div className="flex items-start gap-3"><Button variant="ghost" aria-label="Volver a mi perfil" onClick={() => navigate('/mi-perfil')}><ArrowLeft size={18} /></Button><div><h2 className="text-xl font-semibold">Solicitar cambios de tu ficha</h2><p className="text-sm text-neutral-600">{role === 'GENERADOR' ? 'Generador' : 'Operador'} · Período {year}. Administración revisa antes de aplicar los cambios.</p></div></div>
     {draft.conflict && <DraftConflictNotice durable={draft.conflictSaved} count={draft.conflictCount} onReload={draft.reload} onKeep={draft.overwrite} />}
@@ -155,7 +190,7 @@ function ChangeRequestEditor({ owner, actorId, role, actor, refresh }: { owner: 
     {sendError && <div ref={feedback} tabIndex={-1} role="alert" className="rounded-lg bg-error-50 p-3 text-error-900">{sendError}</div>}
     <Card><CardHeader title={String(actor.razonSocial || 'Datos de la ficha')} icon={<Building2 size={18} />} /><CardContent>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <p role="status" className="text-sm text-neutral-600">{draft.saved && !draft.conflict && !draft.error ? 'Borrador guardado en este dispositivo. Todavía no enviado.' : 'Los cambios se envían sólo al confirmar.'}</p>
+        <p role="status" className="text-sm text-neutral-600">{draft.saved && !draft.conflict && !draft.error ? 'Borrador guardado en este dispositivo.' : 'Los cambios se envían sólo al confirmar.'}</p>
         {draft.restored && <p className="text-sm text-primary-800">Recuperamos tu propuesta. Revisá los valores antes de enviarla.</p>}
         {fields.map(field => <div key={field.key}>
           <div className="mb-1.5 flex items-center gap-2"><span aria-hidden="true" className="text-neutral-500">{field.icon}</span><label htmlFor={`profile-change-${field.key}`} className="text-sm font-medium text-neutral-700">{field.label}</label>{changedKeys.includes(field.key) && <Badge variant="soft" color="warning" size="sm">Modificado</Badge>}</div>
