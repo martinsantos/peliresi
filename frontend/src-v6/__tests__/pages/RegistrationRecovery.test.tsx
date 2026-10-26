@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import InscripcionWizardPage from '../../pages/public/InscripcionWizardPage';
 import { readRegistrationDraft, writeRegistrationDraft } from '../../services/registrationDraft';
@@ -13,8 +13,9 @@ const revision = '2026-10-09T10:00:00.000Z';
 function session(owner: string) { return `qa.${btoa(JSON.stringify({ id: owner, restricted: true, registrationDraft: 'draft' }))}.qa`; }
 function request(owner = 'owner') { return { data: { data: { solicitud: { id: 'draft', usuarioId: owner, tipoActor: 'GENERADOR', estado: 'BORRADOR', datosActor: '{}', updatedAt: revision,
   usuario: { nombre: 'QA responsable', cuit: '30-70987654-3', email: 'qa@night-qa.invalid' }, documentos: [] } } } }; }
+function ReturnReceipt() { const location = useLocation(); return <p>Solicitud recuperada {location.search}</p>; }
 async function open(type = 'generador', prefix = '') {
-  await act(async () => { render(<MemoryRouter initialEntries={[`${prefix}/inscripcion/${type}`]}><Routes><Route path={`${prefix}/inscripcion/:tipo`} element={<InscripcionWizardPage />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
+  await act(async () => { render(<MemoryRouter initialEntries={[`${prefix}/inscripcion/${type}`]}><Routes><Route path={`${prefix}/inscripcion/:tipo`} element={<InscripcionWizardPage />} /><Route path="/mi-solicitud" element={<ReturnReceipt />} /><Route path="/login" element={<p>Ingreso seguro</p>} /></Routes></MemoryRouter>); });
 }
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear(); queryClient.clear(); mock.token = session('owner'); mock.canWrite.mockReturnValue(true);
@@ -286,4 +287,49 @@ describe('a real registration UI protects the current step and account boundary'
     fireEvent.click(screen.getByRole('button', { name: 'Guardar borrador' })); await waitFor(() => expect(mock.put).toHaveBeenCalledOnce());
     expect(mock.put.mock.calls[0][1].datosActor).toMatchObject({ tefInputs: { personal: 0, potenciaHP: 100 }, legacy: { version: 1 }, razonSocial: 'QA nueva declaración' });
   });
+});
+
+
+describe('returning from corrections never submits stale saved data', () => {
+  it.each(['generador', 'transportista', 'operador'].flatMap(type => ['', '/app'].map(prefix => [type,prefix])))('%s %s saves the current edit before returning to its exact request', async (type,prefix) => {
+    const response=request(); response.data.data.solicitud.tipoActor=type.toUpperCase(); response.data.data.solicitud.estado='OBSERVADA';
+    mock.get.mockResolvedValue(response); await open(type,prefix);
+    let finish!: (value: unknown) => void; mock.put.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+    fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'Corrección recién escrita'}});
+    fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(mock.put).toHaveBeenCalledOnce(); expect(screen.queryByText(/Solicitud recuperada/)).toBeNull();
+    expect(mock.put.mock.calls[0][1].datosActor.domicilio).toBe('Corrección recién escrita');
+    await act(async()=>finish({data:{data:{solicitud:{updatedAt:'2026-10-09T10:01:00.000Z'}}}}));
+    expect(await screen.findByText('Solicitud recuperada ?solicitud=draft')).toBeVisible(); expect(mock.post).not.toHaveBeenCalled();
+  });
+  it('stays with the correction when return cannot confirm its save',async()=>{
+    await open(); mock.put.mockRejectedValue(new Error('disconnected'));
+    fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'No perder'}});
+    fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(await screen.findByText(/No se confirmó el guardado en SITREP/)).toBeVisible(); expect(screen.getByLabelText('Domicilio')).toHaveValue('No perder'); expect(screen.queryByText(/Solicitud recuperada/)).toBeNull();
+  });
+  it('does not leave behind text typed while the return save is pending',async()=>{
+    await open(); let finish!:(value:unknown)=>void; mock.put.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+    fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'Primera corrección'}});fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(mock.put).toHaveBeenCalledOnce();fireEvent.change(screen.getByLabelText('Domicilio'),{target:{value:'Cambio posterior'}});
+    await act(async()=>finish({data:{data:{solicitud:{updatedAt:'2026-10-09T10:01:00.000Z'}}}}));
+    expect(screen.getByLabelText('Domicilio')).toHaveValue('Cambio posterior');expect(screen.queryByText(/Solicitud recuperada/)).toBeNull();
+  });
+  it('returns without a write when there are no local changes',async()=>{
+    await open();fireEvent.click(screen.getByRole('button',{name:'Volver a Mi solicitud'}));
+    expect(await screen.findByText('Solicitud recuperada ?solicitud=draft')).toBeVisible();expect(mock.put).not.toHaveBeenCalled();expect(mock.post).not.toHaveBeenCalled();
+  });
+});
+
+
+it.each(['generador','transportista','operador'].flatMap(type=>['', '/app'].map(prefix=>[type,prefix])))('%s %s ignores a previous account local hint and recovers the authenticated application',async(type,prefix)=>{
+ mock.token=`qa.${btoa(JSON.stringify({id:'owner',restricted:true}))}.qa`;
+ localStorage.setItem('sitrep_pending_solicitud',JSON.stringify({id:'foreign',tipoActor:type.toUpperCase(),step:6}));
+ const response=request();response.data.data.solicitud.tipoActor=type.toUpperCase();response.data.data.solicitud.estado='OBSERVADA';response.data.data.solicitud.datosActor=JSON.stringify({razonSocial:'Mi alta exacta',domicilio:'Datos propios'});
+ mock.get.mockImplementation(async(path)=>path==='/solicitudes/mis-solicitudes'?{data:{data:{solicitudes:[response.data.data.solicitud]}}}:path==='/solicitudes/draft'?response:Promise.reject(new Error('Otra cuenta')));
+ await open(type,prefix);expect(screen.getByLabelText('Razon Social *')).toHaveValue('Mi alta exacta');expect(mock.get).not.toHaveBeenCalledWith('/solicitudes/foreign');expect(mock.put).not.toHaveBeenCalled();expect(mock.post).not.toHaveBeenCalled();
+});
+
+it.each(['null','[]','true'])('ignores malformed local hint %s without breaking recovery',async value=>{
+ localStorage.setItem('sitrep_pending_solicitud',value);await open();expect(screen.getByLabelText('Razon Social *')).toBeVisible();expect(mock.put).not.toHaveBeenCalled();
 });

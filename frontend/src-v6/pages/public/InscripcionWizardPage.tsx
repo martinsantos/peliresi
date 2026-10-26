@@ -224,10 +224,16 @@ const InscripcionWizardContent: React.FC = () => {
 
   useEffect(() => {
     if (isReviewMode) return undefined;
-    let pending: { id?: string; tipoActor?: TipoActor; step?: number } = {};
-    try { pending = JSON.parse(localStorage.getItem('sitrep_pending_solicitud') || '{}'); } catch { /* use the server-owned draft */ }
+    let pending: { id?: string; tipoActor?: TipoActor; step?: number; owner?: string } = {};
+    try {
+      const stored = JSON.parse(localStorage.getItem('sitrep_pending_solicitud') || '{}');
+      if (stored && typeof stored === 'object' && !Array.isArray(stored)) pending = stored;
+    } catch { /* use the server-owned draft */ }
     const token = getAccessToken();
     const hint = token ? registrationDraftHint(token) : null;
+    // Legacy/global hints may belong to another signed-out account. Only an
+    // account-bound hint can select a draft; otherwise discover it on the server.
+    if (!hint && pending.owner !== registrationSessionOwner(token)) pending = {};
     if (hint) pending = { id: hint, tipoActor, step: pending.id === hint ? pending.step : 1 };
     if (pending.tipoActor !== tipoActor) pending = {};
     if (!pending.id && !token) return undefined;
@@ -397,13 +403,26 @@ const InscripcionWizardContent: React.FC = () => {
       const updated = response.data?.data?.solicitud?.updatedAt;
       if (typeof updated !== 'string') throw new Error('No se recibió confirmación del guardado. Conservamos los datos en pantalla.');
       serverRevisionRef.current = updated; setServerRevision(updated);
-      try { localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solicitudId, tipoActor, step: target })); } catch { /* owned draft also exists on server */ }
+      try { localStorage.setItem('sitrep_pending_solicitud', JSON.stringify({ id: solicitudId, tipoActor, step: target, owner })); } catch { /* owned draft also exists on server */ }
       if (editRevision.current === revisionAtStart) setDirty(false);
       return true;
     } catch (error) {
       setSaveError(`No se confirmó el guardado en SITREP. ${getApiErrorMessage(error, 'Revisá la conexión y reintentá; los datos siguen en pantalla.')}`);
       return false;
     } finally { saveInFlight.current = false; setSaving(false); }
+  };
+
+  const returnToRequest = async () => {
+    if (!owner || isReviewMode) { navigate(owner ? '/mi-solicitud' : '/login'); return; }
+    if (saveInFlight.current || submitInFlight.current) return;
+    if (uploadsInFlight.current.size) { setSaveError('Esperá a que termine la operación del archivo antes de volver a Mi solicitud.'); return; }
+    if (localConflict) { setSaveError('Elegí qué versión conservar antes de volver a Mi solicitud.'); return; }
+    const revisionAtStart = editRevision.current;
+    if (dirty && !(await persistDraft(step))) return;
+    // A person may continue typing while the save is pending. Keep that new
+    // edit visible instead of navigating to a resend of the older payload.
+    if (editRevision.current !== revisionAtStart) return;
+    navigate('/mi-solicitud' + (solicitudId ? '?solicitud=' + encodeURIComponent(solicitudId) : ''));
   };
 
   // An interrupted current step must be recoverable on another authenticated device.
@@ -812,7 +831,7 @@ const InscripcionWizardContent: React.FC = () => {
               </div>
               <p className="text-sm leading-5 text-neutral-600">Paso {step} de {totalSteps} · {steps[step - 1]?.label}</p>
             </div>
-            <button type="button" onClick={() => navigate(owner ? "/mi-solicitud" : "/login")} aria-label={owner ? "Volver a Mi solicitud" : "Volver al acceso"} className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
+            <button type="button" onClick={() => void returnToRequest()} disabled={saving || submitting} aria-label={owner ? "Volver a Mi solicitud" : "Volver al acceso"} className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">
               <ArrowLeft size={16} aria-hidden="true" /> {owner ? "Mi solicitud" : "Acceso"}
             </button>
           </div>
@@ -853,14 +872,14 @@ const InscripcionWizardContent: React.FC = () => {
         <div ref={validationRef} className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-4 sm:p-6 min-h-[320px]">
           {isReviewMode && <RegistrationTrialDraftBar saved={localSaved} onSave={() => { persistTrial(step); }} />}
           {!isReviewMode && <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 pb-3">
-            <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Cambios guardados en este dispositivo · pendientes de guardar en SITREP' : 'Cambios en pantalla · no se pudo guardar en este dispositivo') : 'Borrador guardado en SITREP · todavía no enviado'}</p>
+            <p role="status" className="text-sm text-neutral-700">{saving ? 'Guardando en SITREP…' : dirty ? (localSaved ? 'Cambios guardados en este dispositivo · pendientes de guardar en SITREP' : 'Cambios en pantalla · no se pudo guardar en este dispositivo') : observations ? 'Correcciones guardadas en SITREP · pendientes de reenviar a revisión' : 'Borrador guardado en SITREP · todavía no enviado'}</p>
             <Button variant="outline" leftIcon={<Save size={16} />} isLoading={saving} disabled={submitting || Boolean(localConflict)} onClick={() => void persistDraft(step)}>Guardar borrador</Button>
           </div>}
           {!isReviewMode && ownership.status === 'blocked' && <div role="alert" className="mb-4 text-sm text-error-800">Este borrador está abierto en otra pestaña. No se sobrescribirá.<Button variant="outline" className="ml-2" onClick={ownership.retry}>Reintentar edición</Button></div>}
           {!isReviewMode && ownership.status === 'unavailable' && <p role="alert" className="mb-4 text-sm text-error-800">El navegador no pudo proteger el borrador frente a otra pestaña. Los datos siguen en pantalla; no se guardará una edición sin proteger.</p>}
           {localConflict && <div role="alert" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p>El borrador de SITREP cambió desde tu copia local. Elegí qué conservar; no mezclamos ni sobrescribimos automáticamente.</p><div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => { setForm(localConflict); setLocalConflict(null); setDirty(true); editRevision.current++; }}>Recuperar mis cambios locales</Button><Button variant="outline" onClick={() => { clearRegistrationDraft(owner!, draftScope); setLocalConflict(null); }}>Conservar versión de SITREP</Button></div></div>}
           {missingLocalFiles.length > 0 && <p role="alert" className="mb-4 text-sm text-amber-900">{isReviewMode ? 'Datos recuperados. Volvé a seleccionar los archivos de prueba para leerlos.' : `Hay archivos que no llegaron a guardarse: ${missingLocalFiles.join(', ')}. Volvé a seleccionarlos en Documentos. Los originales ya guardados se recuperan.`}</p>}
-          {observations && <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Observaciones por corregir</p><p className="mt-1 whitespace-pre-wrap break-words">{observations}</p><p className="mt-2">Corregí lo solicitado y volvé a enviar desde el resumen.</p></div>}
+          {observations && <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Observaciones por corregir</p><p className="mt-1 whitespace-pre-wrap break-words">{observations}</p><p className="mt-2">Corregí lo solicitado. Podés reenviar desde el resumen o volver a Mi solicitud para acompañar los cambios con una respuesta.</p></div>}
           {saveError && <div role="alert" className="mb-4 rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-800"><p>{saveError}</p>{!isReviewMode && <div className="mt-2 flex flex-wrap gap-2"><Button variant="outline" onClick={() => setResumeAttempt(value => value + 1)}>Conciliar borrador</Button><Button variant="outline" onClick={() => navigate('/login', { state: { from: `/inscripcion/${tipo}` } })}>Recuperar sesión</Button></div>}</div>}
           {validationError && <p role="alert" className="mb-4 text-sm text-error-800">{validationError}</p>}
           {renderStepContent()}
