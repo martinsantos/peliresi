@@ -513,7 +513,7 @@ const NuevoGeneradorPage: React.FC = () => {
             <Card>
               <CardHeader><div className="flex items-center gap-2"><ClipboardList size={20} className="text-green-600" /><h3 className="text-lg font-bold text-neutral-900">Norma ISO 14000</h3></div></CardHeader>
               <CardContent>
-                <p className="text-xs text-neutral-500 mb-3">Si la empresa posee certificacion ISO 14000, ingrese la fecha. Esto duplica el factor ISO en el calculo TEF (x2 en vez de x1).</p>
+                <p className="text-xs text-neutral-500 mb-3">Si la empresa posee certificación ISO 14000, ingresá la fecha declarada. Su efecto fiscal se verifica con la liquidación correspondiente.</p>
                 <div className="max-w-xs">
                   <Input label="Fecha Certificacion ISO 14000" type="date" value={form.certificacionISO} onChange={e => up('certificacionISO', e.target.value)} />
                 </div>

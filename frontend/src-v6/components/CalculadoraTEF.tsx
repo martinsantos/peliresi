@@ -1,5 +1,5 @@
 /**
- * Calculadora TEF - Decreto 2625/99
+ * Simulación TEF con parámetros heredados, pendiente de conciliación normativa.
  * Formula: TEF = M x R x ISO
  * R = Z x A x D x C
  *
@@ -118,8 +118,9 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
   const content = (
     <div className="space-y-6" data-testid="tef-calculator">
       {/* === RESULTADO TEF === */}
-      <div className="bg-neutral-900 rounded-2xl p-6 text-white shadow-xl">
-        <p className="text-white text-sm font-semibold uppercase tracking-wide">Tasa de Evaluacion y Fiscalizacion</p>
+      <section aria-label="Resultado de simulación TEF" className="bg-neutral-900 rounded-2xl p-4 text-white sm:p-6">
+        <p className="text-white text-sm font-semibold uppercase tracking-wide">Simulación TEF · importe orientativo</p>
+        <p className="mt-2 text-sm leading-6 text-white">No es una liquidación. Fórmula y parámetros pendientes de verificación normativa; usá la liquidación de la autoridad para controlar el pago.</p>
         <div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <p className="min-w-0 break-words text-3xl font-black font-mono tracking-tight text-white sm:text-5xl">{fmtMoney(result.TEF)}</p>
           <div className="text-left text-sm space-y-0.5 sm:text-right">
@@ -142,7 +143,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
       {/* === SECCION 1: COEFICIENTE ZONAL Z === */}
       <div className="space-y-3">
@@ -317,7 +318,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           </div>
         ) : (
           <div className="bg-neutral-50 rounded-lg p-3 text-xs text-neutral-400 text-center">
-            Seleccione corrientes Y en el Paso 3 para calcular el coeficiente C
+            Sin corrientes Y declaradas para esta simulación. Revisá las corrientes del establecimiento.
           </div>
         )}
       </div>
@@ -338,12 +339,10 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           </div>
           <div>
             <p className="text-sm font-medium text-neutral-800">
-              {tieneISO ? 'Posee certificacion ISO 14000 — Factor x2' : 'No posee certificacion ISO 14000 — Factor x1'}
+              {tieneISO ? 'Certificación ISO 14000 declarada' : 'Sin certificación ISO 14000 declarada'}
             </p>
-            <p className="text-[10px] text-neutral-500">
-              {tieneISO
-                ? 'El factor ISO duplica la TEF como incentivo a mantener la certificacion.'
-                : 'Para indicar ISO, complete la fecha de certificacion en Datos Regulatorios (Paso 5).'}
+            <p className="text-sm leading-6 text-neutral-700">
+              Factor usado en esta simulación: ×{result.ISO}. Su aplicación fiscal requiere verificación con la liquidación correspondiente.
             </p>
           </div>
         </div>
@@ -353,14 +352,14 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-blue-800">
           <Info size={16} />
-          <p className="text-sm font-bold">Desglose del Calculo</p>
+          <p className="text-sm font-bold">Desglose de la simulación</p>
         </div>
         <div className="text-xs text-blue-700 font-mono space-y-1">
           <p>R = Z x A x D x C = {result.Z} x {result.A.toFixed(3)} x {result.D.toFixed(3)} x {result.C} = <strong>{result.R.toFixed(4)}</strong></p>
           <p>TEF = M x R x ISO = {result.M} x {result.R.toFixed(4)} x {result.ISO} = <strong>{result.TEF.toFixed(2)}</strong></p>
         </div>
-        <p className="text-[10px] text-blue-600 mt-2">
-          M = {M_COEFICIENTE} (coeficiente anual fijado por la Autoridad de Aplicacion para 2026)
+        <p className="text-sm leading-6 text-blue-800 mt-2">
+          M = {M_COEFICIENTE} · valor configurado en esta simulación; verificar vigencia.
         </p>
       </div>
     </div>
@@ -376,12 +375,9 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <Calculator size={20} className="text-primary-600" />
-            <h3 className="font-bold text-neutral-900">Calculadora TEF</h3>
-            <span className="text-xs text-neutral-500">Decreto 2625/99</span>
+            <h3 className="font-bold text-neutral-900">Simulación TEF</h3>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold text-primary-700 font-mono">{fmtMoney(result.TEF)}</p>
-          </div>
+
         </div>
       </CardHeader>
       <CardContent>{content}</CardContent>

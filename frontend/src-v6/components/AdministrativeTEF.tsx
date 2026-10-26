@@ -36,7 +36,6 @@ function AdministrativeEvaluation({ declaration, corrientesY, tieneISO }: Admini
       <div className="space-y-4 border-t border-neutral-200 p-4 sm:p-5">
         <p className="text-sm leading-6 text-neutral-700">Evaluación administrativa con los datos declarados. Los cambios de esta calculadora son una simulación: no guardan un importe, no emiten una liquidación y no validan el pago de un recibo.</p>
         <p className="text-sm leading-6 text-neutral-700">Si se adjuntó factura eléctrica, revisá su lectura en Documentos. La categoría tarifaria y los kWh no determinan por sí solos la potencia instalada en HP ni cambian estos valores.</p>
-        <p className="text-sm leading-6 text-amber-900">Fórmula y parámetros de la simulación pendientes de conciliación con la normativa vigente. Para controlar el comprobante, usá la liquidación correspondiente emitida por la autoridad.</p>
         {changed && <div role="alert" className="space-y-3 rounded-lg border border-warning-300 bg-warning-50 p-3 text-sm text-neutral-900">
           <p><strong>La declaración cambió.</strong> Tu simulación sigue aquí. Elegí qué datos usar antes de continuar.</p>
           <div className="flex flex-wrap gap-2"><Button onClick={loadCurrent}>Usar declaración actualizada</Button><Button variant="outline" onClick={() => setAcknowledged(sourceKey)}>Conservar mi simulación</Button></div>
