@@ -69,7 +69,8 @@ function openDetail(overrides = {}) {
   calls.get.mockResolvedValue({ ...ticket, autorId: 'customer', puedeGestionar: true, puedeAtender: true, esAutor: false, ...overrides });
   calls.act.mockResolvedValue({ id: ticket.id, version: 2, replay: false });
   const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>);
+  query.setQueryData(['attention', 'current', 'support'], 6);
+  return { query, ...render(<QueryClientProvider client={query}><MemoryRouter initialEntries={['/soporte/new-ticket']}><Routes><Route path="/soporte/:id" element={<SoportePage />} /></Routes></MemoryRouter></QueryClientProvider>) };
 }
 it('classifies area, type and priority with an internal reason rather than closing the ticket', async () => {
   openDetail();
@@ -270,4 +271,12 @@ it('requires reviewing a changed ticket before sending a recovered draft', async
   fireEvent.click(screen.getByRole('button', { name: 'Revisé la conversación' }));
   fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ cuerpo: 'Revisar antes de responder', version: 2 }), [], expect.any(String)));
+});
+
+it('a confirmed support decision invalidates the pending count', async () => {
+ const { query } = openDetail();
+ fireEvent.click(await screen.findByRole('button', { name: 'Nota interna', exact: true }));
+ fireEvent.change(screen.getByLabelText('Nota interna / motivo'), { target: { value: 'QA decisión registrada.' } });
+ fireEvent.click(screen.getByRole('button', { name: 'Guardar nota interna', exact: true }));
+ await waitFor(() => expect(query.getQueryState(['attention', 'current', 'support'])?.isInvalidated).toBe(true));
 });

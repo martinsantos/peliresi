@@ -217,7 +217,7 @@ export const MainLayout: React.FC = () => {
                   >
                     <Icon size={20} />
                     {item.label}
-                    {item.path === '/admin/solicitudes' && <AttentionBadge count={attention.applicationPending} />}
+                    {item.path === '/admin/solicitudes' && <AttentionBadge count={attention.applicationPending} state={attention.applicationsState} />}
                   </Link>
                 );
               })}
@@ -249,7 +249,7 @@ export const MainLayout: React.FC = () => {
           <div className="mt-4 border-t border-white/15 pt-4">
             {toolsItems.map(item => <NavLink key={item.path} to={item.path} onClick={() => setSidebarOpen(false)}
               className={({isActive}) => 'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium '+(isActive?'bg-white/20 text-white hover:text-white':'text-white/70 hover:bg-white/10 hover:text-white')}>
-              <item.icon size={20} aria-hidden="true"/>{item.label}{item.path==='/soporte'&&<AttentionBadge count={attention.support}/>}
+              <item.icon size={20} aria-hidden="true"/>{item.label}{item.path==='/soporte'&&<AttentionBadge count={attention.support} state={attention.supportState}/>}
             </NavLink>)}
             <a
               href="/manual/"

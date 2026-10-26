@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, LifeBuoy, Download, UserRoundCheck, LockKeyhole, Search, MessageSquare, ArrowRightLeft, MessageCircleQuestion, CircleCheck, RotateCcw, Tags, Bell } from 'lucide-react';
@@ -167,6 +167,12 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
   const journal = useSupportCommand(scope);
   const recovery = useSupportActionDraft(scope);
   const pending = journal.command;
+  const query = useQueryClient();
+  useEffect(() => {
+    if (pending?.status === 'confirmed' && supportSessionMatches(owner)) {
+      void query.invalidateQueries({ queryKey: ['attention'] });
+    }
+  }, [pending?.status, pending?.key, owner, query]);
   const action = recovery.workspace.action;
   const actions = ticketActions(ticket);
   const selected = pending && pending.input.accion !== 'TOMAR' ? pending.input.accion : actions.some(option => option.value === action) ? action : actions[0]?.value;

@@ -68,7 +68,7 @@ export function useEnviarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => solicitudService.enviar(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
@@ -103,7 +103,7 @@ export function useRevisarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, expectedUpdatedAt }: { id: string; expectedUpdatedAt?: string }) => solicitudService.revisar(id, expectedUpdatedAt),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
@@ -112,7 +112,7 @@ export function useObservarSolicitud() {
   return useMutation({
     mutationFn: ({ id, mensaje, expectedUpdatedAt }: { id: string; mensaje: string; expectedUpdatedAt?: string }) =>
       solicitudService.observar(id, mensaje, expectedUpdatedAt),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
@@ -120,7 +120,7 @@ export function useAprobarSolicitud() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, expectedUpdatedAt }: { id: string; expectedUpdatedAt?: string }) => solicitudService.aprobar(id, expectedUpdatedAt),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 
@@ -129,7 +129,7 @@ export function useRechazarSolicitud() {
   return useMutation({
     mutationFn: ({ id, motivoRechazo, expectedUpdatedAt }: { id: string; motivoRechazo: string; expectedUpdatedAt?: string }) =>
       solicitudService.rechazar(id, motivoRechazo, expectedUpdatedAt),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitudes'] }),
+    onSuccess: async () => { await Promise.all([qc.invalidateQueries({ queryKey: ['solicitudes'] }), qc.invalidateQueries({ queryKey: ['attention'] })]); },
   });
 }
 

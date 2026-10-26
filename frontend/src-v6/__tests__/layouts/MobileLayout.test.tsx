@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MobileLayout } from '../../layouts/MobileLayout';
-vi.mock('../../hooks/useAttentionCounts', () => ({ useAttentionCounts: () => ({ support: 0, applicationPending: 0 }) }));
+const attentionState = vi.hoisted(() => ({ support: 0, applicationPending: 0, supportState: 'ready', applicationsState: 'ready' }));
+vi.mock('../../hooks/useAttentionCounts', () => ({ useAttentionCounts: () => attentionState }));
 
 const authState = vi.hoisted(() => ({
   currentUser: {
@@ -445,4 +446,20 @@ describe('MobileLayout Android shell', () => {
     fireEvent.click(screen.getByTestId('exit-impersonation'));
     expect(impersonationState.exit).toHaveBeenCalledOnce();
   });
+});
+
+
+it('shows application pending totals and failure state in the administrative app menu', async () => {
+  authState.currentUser.rol = 'ADMIN'; attentionState.applicationPending = 12;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const content = <QueryClientProvider client={client}><MemoryRouter initialEntries={['/dashboard']}><MobileLayout /></MemoryRouter></QueryClientProvider>;
+  const view = render(content);
+  fireEvent.click(screen.getByRole('button', { name: 'Abrir menu' }));
+  const link = screen.getByRole('link', { name: /Solicitudes/ });
+  expect(within(link).getByLabelText('12 pendientes de atender')).toBeVisible();
+  attentionState.applicationsState = 'error';
+  view.rerender(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/dashboard']}><MobileLayout /></MemoryRouter></QueryClientProvider>);
+  expect(within(link).getByLabelText(/Cantidad de pendientes no disponible/)).toBeVisible();
+  expect(within(link).queryByText('12')).toBeNull();
+  attentionState.applicationPending = 0; attentionState.applicationsState = 'ready'; client.clear();
 });

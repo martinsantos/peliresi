@@ -64,7 +64,9 @@ describe('report problem preserves the human workflow', () => {
     await waitFor(() => expect(mocks.navigate).toHaveBeenCalledWith('/soporte/ticket'));
     expect(mocks.create.mock.calls[0]).toEqual(mocks.create.mock.calls[1]);
     expect(localStorage.getItem('sitrep-soporte:v1:owner')).toBeNull();
-    expect(mocks.invalidate).toHaveBeenCalledExactlyOnceWith({ queryKey: ['soporte', 'owner'] });
+    expect(mocks.invalidate).toHaveBeenCalledWith({ queryKey: ['soporte', 'owner'] });
+    expect(mocks.invalidate).toHaveBeenCalledWith({ queryKey: ['attention'] });
+    expect(mocks.invalidate).toHaveBeenCalledTimes(2);
   });
   it('lets a user close without submitting or losing the locally saved text', async () => {
     const close = vi.fn(); render(<SupportReportDialog open onClose={close} />); fill();

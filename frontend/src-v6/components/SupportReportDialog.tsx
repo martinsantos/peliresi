@@ -67,6 +67,7 @@ function ReportForm({ owner, onClose, onSubmitted, screenshot, captureError, ret
     // list may still be fresh in React Query when returning from the detail.
     if (mounted.current && supportSessionMatches(owner, administratorId)) {
       void queryClient.invalidateQueries({ queryKey: ['soporte', owner] });
+      void queryClient.invalidateQueries({ queryKey: ['attention'] });
       onClose(); onSubmitted?.(); if (!returnToTask) navigate(mp('/soporte/' + ticket.id));
     }
   };

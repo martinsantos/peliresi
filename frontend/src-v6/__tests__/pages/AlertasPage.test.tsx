@@ -7,7 +7,7 @@ const service = vi.hoisted(() => ({ listAlertas: vi.fn(), listReglas: vi.fn(), r
 const auth = vi.hoisted(() => ({ isAdmin: true, isAnyAdmin: true }));
 const notices = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock('../../services/alerta.service', () => ({ alertaService: service }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ ...auth, currentUser: { id: 'qa-alert-reader', rol: auth.isAdmin ? 'ADMIN' : 'GENERADOR', actorId: 'qa-actor' }, isRestricted: false }) }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: notices }));
 const caseRow = { id: 'case', estado: 'PENDIENTE', createdAt: new Date().toISOString(), manifiestoId: 'manifest', manifiesto: { numero: 'QA-001', estado: 'RECIBIDO' }, regla: { nombre: 'Seguimiento de manifiesto', evento: 'TIEMPO_EXCESIVO' }, datos: '{"descripcion":"Recepción registrada; revisar el tratamiento"}' };
 function setup() {

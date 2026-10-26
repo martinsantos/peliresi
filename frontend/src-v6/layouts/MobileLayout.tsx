@@ -32,7 +32,7 @@ import { useOfflineSync } from '../hooks/useOfflineSync';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
-import { useAttentionCounts } from '../hooks/useAttentionCounts';
+import { useAttentionCounts, type AttentionState } from '../hooks/useAttentionCounts';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { inspectionContextLabel } from '../utils/inspectionContextLabel';
 
@@ -182,7 +182,8 @@ export const MobileLayout: React.FC = () => {
   const menuItems = useMemo(() => navigation.map(item => ({
     to:mp(item.path), icon:<item.icon size={20}/>, label:item.label, section:item.section, isActive:selectedPath===item.path,
     badge:item.path==='/notificaciones'?unreadNotificationCount:item.path==='/admin/solicitudes'?attention.applicationPending:item.path==='/soporte'?attention.support:undefined,
-  })), [navigation, mp, unreadNotificationCount, attention.applicationPending, attention.support, selectedPath]);
+    badgeState:item.path==='/admin/solicitudes'?attention.applicationsState:item.path==='/soporte'?attention.supportState:undefined,
+  })), [navigation, mp, unreadNotificationCount, attention.applicationPending, attention.support, attention.applicationsState, attention.supportState, selectedPath]);
 
   // Separar items por sección
   const mainItems = menuItems.filter(i => i.section === 'main');
@@ -359,6 +360,7 @@ export const MobileLayout: React.FC = () => {
                     label={item.label}
                         isActive={item.isActive}
                     badge={item.badge}
+                        badgeState={item.badgeState}
                     onClick={() => setIsMenuOpen(false)}
                   />
                 ))}
@@ -378,6 +380,8 @@ export const MobileLayout: React.FC = () => {
                         icon={item.icon} 
                         label={item.label}
                         isActive={item.isActive}
+                        badge={item.badge}
+                        badgeState={item.badgeState}
                         onClick={() => setIsMenuOpen(false)}
                       />
                     ))}
@@ -400,6 +404,7 @@ export const MobileLayout: React.FC = () => {
                         label={item.label}
                         isActive={item.isActive}
                         badge={item.badge}
+                        badgeState={item.badgeState}
                         onClick={() => setIsMenuOpen(false)}
                       />
                     ))}
@@ -479,10 +484,11 @@ interface MenuItemProps {
   icon: React.ReactNode;
   label: string;
   badge?: number;
+  badgeState?: AttentionState;
   onClick?: () => void;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick, isActive }) => {
+const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, badgeState, onClick, isActive }) => {
   return (
     <Link
       to={to}
@@ -497,7 +503,7 @@ const MenuItem: React.FC<MenuItemProps> = ({ to, icon, label, badge, onClick, is
     >
       {icon}
       <span className="flex-1 font-medium">{label}</span>
-      <AttentionBadge count={badge} label={label === 'Avisos' ? 'avisos sin leer' : 'pendientes de atender'} />
+      <AttentionBadge count={badge} state={badgeState} label={label === 'Avisos' ? 'avisos sin leer' : 'pendientes de atender'} />
       <ChevronRight size={16} className="text-neutral-400" />
     </Link>
   );
