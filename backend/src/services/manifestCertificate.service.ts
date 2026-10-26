@@ -1,3 +1,4 @@
+import { manifestCompanyRecipients } from './manifestCompanyRecipients.service';
 import { createHash } from 'node:crypto';
 import { institutionalPdf, PDF_STYLE } from './institutionalPdf.service';
 import type { Prisma } from '@prisma/client';
@@ -30,12 +31,14 @@ export async function notifyCertificateParties(tx: Prisma.TransactionClient, man
   manifest.transportistaId ? tx.transportista.findUnique({where:{id:manifest.transportistaId},select}) : null,
   tx.operador.findUnique({where:{id:manifest.operadorId},select}),
  ]);
- const recipients=[...new Set(parties.filter(p=>p?.activo&&p.usuario?.activo).map(p=>p!.usuario!.id))].filter(id=>id!==authorId);
+ const companyRecipients=await manifestCompanyRecipients(tx,manifest.id);
+ const companyAccess=new Map(companyRecipients.map(p=>[p.usuarioId,p.accesosEmpresa]));
+ const recipients=[...new Set([...parties.filter(p=>p?.activo&&p.usuario?.activo).map(p=>p!.usuario!.id),...companyRecipients.map(p=>p.usuarioId)])].filter(id=>id!==authorId);
  await tx.notificacion.createMany({skipDuplicates:true,data:recipients.map(usuarioId=>({
   id:sha256('certificate:'+record.id+':'+usuarioId),usuarioId,tipo:'INFO_GENERAL',prioridad:'NORMAL',manifiestoId:manifest.id,
   titulo:record.tipo==='FINAL'?'Certificación final total disponible':'Certificación parcial disponible',
   mensaje:record.numero+'. Ya podés ver y descargar el documento firmado por el operador.',
-  datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:record.id,tipoCertificado:record.tipo,url:'/manifiestos/'+manifest.id+'?certificado='+record.id+'#certificaciones'}),
+  datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:record.id,tipoCertificado:record.tipo,...(companyAccess.has(usuarioId)?{accesosEmpresa:companyAccess.get(usuarioId)}:{}),url:'/manifiestos/'+manifest.id+'?certificado='+record.id+'#certificaciones'}),
  }))});
 }
 export function renderManifestCertificate(data: CertificateSnapshot, id: string, signature: string): Promise<Buffer> {

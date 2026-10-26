@@ -1,3 +1,4 @@
+import { manifestCompanyRecipients } from './manifestCompanyRecipients.service';
 import { applicationNoticeMessage, withApplicationNoticeContext } from './applicationNotice.service';
 import { ADDENDUM_AUTHORITY_ROLES } from '../domain/addendumAuthority';
 import { designatedReviewAccount } from '../domain/manifestReviewAuthority';
@@ -78,6 +79,9 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
     if (!isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) {
       // A registered replacement can see its own leg history in the carrier
       // profile. This never grants it the private original manifest dossier.
+      if (data.tipo === 'certificado_manifiesto' && Array.isArray(data.accesosEmpresa)) {
+        if (!(await manifestCompanyRecipients(prisma, notice.manifiestoId)).some(p => p.usuarioId === notice.usuarioId)) return false;
+      } else {
       if (data.tipo !== 'relevo_transporte' || notice.rol !== 'TRANSPORTISTA' || !notice.usuarioId) return false;
       const carrier = await prisma.transportista.findFirst({ where: { usuarioId: notice.usuarioId }, select: { id: true } });
       if (!carrier) return false;
@@ -85,6 +89,7 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
         manifiestoId: notice.manifiestoId, tipo: 'REGISTRADO', transportistaId: carrier.id,
       }, select: { id: true } });
       if (!ownLeg) return false;
+      }
     }
   }
   if (data.tipo === 'ADENDA_POST_FACTO') {
@@ -279,6 +284,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     // confirmed role switch before entering the requirement, on web and app.
     if (participant && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))) path = '/notificaciones/' + encodeURIComponent(notice.id);
   } else return null;
+  if (data.tipo === 'certificado_manifiesto' && Array.isArray(data.accesosEmpresa) && data.accesosEmpresa.length) path = '/notificaciones/' + encodeURIComponent(notice.id);
   // Only controlled event labels. Never copy free text, notes, attachments or amounts.
   const labels: Record<string, [string, string]> = {
     SOLICITUD_ENVIADA: ['Inscripción presentada para revisar', 'Hay una inscripción presentada. Revisá sus datos y documentación en SITREP.'],

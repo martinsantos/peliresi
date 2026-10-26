@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), applicationContexts: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), exchange: vi.fn() }));
-vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application, findMany: mocks.applicationContexts }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier }, usuario: { findFirst: mocks.account }, intercambioInspeccion: { findUnique: mocks.exchange } } }));
+const mocks = vi.hoisted(() => ({ query: vi.fn(), insert: vi.fn(), inspection: vi.fn(), notice: vi.fn(), application: vi.fn(), applicationContexts: vi.fn(), document: vi.fn(), manifest: vi.fn(), alert: vi.fn(), renewal: vi.fn(), leg: vi.fn(), carrier: vi.fn(), account: vi.fn(), exchange: vi.fn(), companyRecipients: vi.fn(), certificate: vi.fn() }));
+vi.mock('../../services/manifestCompanyRecipients.service', () => ({ manifestCompanyRecipients: mocks.companyRecipients }));
+vi.mock('../../lib/prisma', () => ({ default: { $queryRawUnsafe: mocks.query, emailQueue: { createMany: mocks.insert }, inspeccion: { findUnique: mocks.inspection }, notificacion: { findUnique: mocks.notice }, solicitudInscripcion: { findFirst: mocks.application, findMany: mocks.applicationContexts }, documento: { findUnique: mocks.document }, manifiesto: { findUnique: mocks.manifest }, alertaGenerada: { findUnique: mocks.alert }, renovacion: { findUnique: mocks.renewal }, tramoTransporte: { findFirst: mocks.leg }, transportista: { findFirst: mocks.carrier }, usuario: { findFirst: mocks.account }, intercambioInspeccion: { findUnique: mocks.exchange }, certificadoManifiesto: { findFirst: mocks.certificate } } }));
 import { notificationMailContent, notificationSourceEligible, queueCommittedNotificationEmails, queuedNoticeStillEligible, type NoticeForMail } from '../../services/notification-mail.service';
 import { mailText } from '../../services/email-templates';
 const notice: NoticeForMail = { id: 'qa-notice', tipo: 'SOLICITUD_ENVIADA', datos: JSON.stringify({ solicitudId: 'sol-qa' }), createdAt: new Date(), email: 'qa@example.invalid', activo: true, emailVerified: true, notifEmail: true, rol: 'ADMIN' };
@@ -14,6 +15,23 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('revalidates representative certificate access before any future delivery, including revocation', async () => {
+    const n = { ...notice, id: 'company-cert', usuarioId: 'representative', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
+      datos: JSON.stringify({ tipo: 'certificado_manifiesto', version: 1, documentoId: 'doc', tipoCertificado: 'PARCIAL', accesosEmpresa: [{empresaId:'co',actividadId:'a'}] }) };
+    mocks.manifest.mockResolvedValue({isDemoData:false,generador:{usuarioId:'original'},operador:{usuarioId:'signer'}});
+    mocks.certificate.mockResolvedValue({id:'doc'});
+    mocks.companyRecipients.mockResolvedValue([{usuarioId:'representative',accesosEmpresa:[]}]);
+    expect(await notificationSourceEligible(n,'manifiestos')).toBe(true);
+    mocks.companyRecipients.mockResolvedValue([]);
+    expect(await notificationSourceEligible(n,'manifiestos')).toBe(false);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+  it('never makes synthetic certificate notifications eligible for external delivery',async()=>{
+    mocks.manifest.mockResolvedValue({isDemoData:true});
+    const n={...notice,usuarioId:'representative',rol:'GENERADOR',manifiestoId:'m',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,accesosEmpresa:[{}]})};
+    expect(await notificationSourceEligible(n,'manifiestos')).toBe(false);
+    expect(mocks.companyRecipients).not.toHaveBeenCalled();expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it('rechecks an approved secondary PSIP activity at delivery and rejects its revocation without sending', async () => {
     vi.stubEnv('ACTOR_MULTIROLE_ENABLED', 'true');
     const n = { ...notice, usuarioId: 'owner', rol: 'GENERADOR', tipo: 'INFO_GENERAL', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, correoVersion: 1, inspeccionId: 'case', intercambioId: 'exchange', secuencia: 2, evento: 'REQUERIMIENTO', parte: 'AUTORIDAD', destino: 'participacion', tipoActor: 'OPERADOR' }) };

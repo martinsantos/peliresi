@@ -29,6 +29,13 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
   }
 }
 
+export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos'>): Array<{empresaId:string;actividadId:string;rol:string;razonSocial:string;establecimientoId?:string;establecimiento?:string}> {
+ const data = parseNotificationData(notice.datos), id = (v: unknown) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+ if (data.tipo !== 'certificado_manifiesto' || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
+ return data.accesosEmpresa.filter(a => a && id(a.empresaId) && id(a.actividadId) && ['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(a.rol)
+  && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string'));
+}
+
 export function notificationActorRole(notice: Notificacion): 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | null {
   const data = parseNotificationData(notice.datos);
   return ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1
@@ -97,8 +104,9 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
   return 'Abrir detalle →';
 }
 
-export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string): string {
+export function resolveNotificationPath(notificacion: Notificacion, basePath = '', recipientRole?: string, companyTarget = false): string {
   const data = parseNotificationData(notificacion.datos);
+  if (!companyTarget && notificationCompanyAccesses(notificacion).length) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
   if (['adenda_manifiesto', 'ADENDA_POST_FACTO'].includes(String(data.tipo)) && safeId(notificacion.manifiestoId) && safeId(data.adendaId)) return withBasePath(`/manifiestos/${notificacion.manifiestoId}/adendas?adenda=${data.adendaId}`, basePath);
   if (data.tipo === 'soporte' && safeId(data.ticketId)) return withBasePath('/soporte/' + data.ticketId, basePath);

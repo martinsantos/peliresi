@@ -1,3 +1,4 @@
+import CompanyNoticeAction from '../../components/CompanyNoticeAction';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -5,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/api';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
-import { resolveNotificationPath, notificationActionLabel, notificationActorRole } from '../../utils/notificationNavigation';
+import { resolveNotificationPath, notificationActionLabel, notificationActorRole, notificationCompanyAccesses } from '../../utils/notificationNavigation';
 import { activateActorActivity } from '../../services/activateActorActivity';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import type { Notificacion } from '../../types/models';
@@ -19,7 +20,8 @@ export default function AvisoPage() {
     queryFn: async () => (await api.get('/notificaciones/' + encodeURIComponent(id || ''))).data.data as Notificacion,
     retry: false, staleTime: 0 });
   const notice = !query.isError && !query.isPending ? query.data : undefined;
-  const target = notice ? resolveNotificationPath(notice, '', currentUser?.rol) : '/notificaciones';
+  const target = notice ? resolveNotificationPath(notice, '', currentUser?.rol, true) : '/notificaciones';
+  const companyAccesses = notice ? notificationCompanyAccesses(notice) : [];
   const actorRole = notice ? notificationActorRole(notice) : null;
   const otherRole = actorRole && actorRole !== currentUser?.rol;
   const roleLabel = actorRole ? { GENERADOR: 'Generador', TRANSPORTISTA: 'Transportista', OPERADOR: 'Operador' }[actorRole] : '';
@@ -51,7 +53,8 @@ export default function AvisoPage() {
         {contextError && <p role="alert" className="text-sm text-error-700">{contextError}</p>}
       </div>}
       <p className="text-sm text-neutral-600">Aviso del {new Date(notice.createdAt).toLocaleString('es-AR')}. Consultá el estado actual antes de actuar.</p>
-      {target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}>{notificationActionLabel(target, notice)}</Link>}
+      {companyAccesses.length > 0 && currentUser && <CompanyNoticeAction key={inspectionWorkspaceOwner(currentUser)} notice={notice} target={target} userId={String(currentUser.id)} context={currentUser.empresaContexto} />}
+      {!companyAccesses.length && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}>{notificationActionLabel(target, notice)}</Link>}
     </article>}
   </section>;
 }

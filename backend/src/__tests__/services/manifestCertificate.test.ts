@@ -6,6 +6,7 @@ afterEach(()=>vi.unstubAllEnvs());
 describe('Operator-issued certificates',()=>{
  it('emission is explicit opt-in, never assumed',()=>{vi.stubEnv('MANIFEST_CERTIFICATES_ENABLED','false');expect(certificatesEnabled()).toBe(false);vi.stubEnv('MANIFEST_CERTIFICATES_ENABLED','true');expect(certificatesEnabled()).toBe(true);});
  it('notifies only active linked counterparts, no invented in situ carrier or self notice',async()=>{
+  vi.stubEnv('ENTERPRISE_ENABLED','false');
   const party=(id:string,activo=true)=>({activo,usuario:{id,activo:true}});
   const tx:any={generador:{findUnique:vi.fn().mockResolvedValue(party('g'))},transportista:{findUnique:vi.fn()},operador:{findUnique:vi.fn().mockResolvedValue(party('o'))},notificacion:{createMany:vi.fn()}};
   const m={id:'m',numero:'M',generadorId:'g',transportistaId:null,operadorId:'o'},d={id:'cert',tipo:'FINAL',numero:'M-F'};
