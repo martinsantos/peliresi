@@ -14,6 +14,8 @@ import { assertSupportSession, supportSessionMatches } from '../../utils/support
 import { SupportAudioInput } from '../../components/SupportAudioInput';
 import { SupportAudioPlayer } from '../../components/SupportAudioPlayer';
 import { useSupportCommand } from '../../hooks/useSupportCommand';
+import { useSupportActionDraft } from '../../hooks/useSupportActionDraft';
+import { emptySupportActionDraft, type SupportActionDraft } from '../../services/supportActionDraft';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 
 const name = (user: { nombre: string; apellido?: string | null }) => [user.nombre, user.apellido].filter(Boolean).join(' ');
@@ -159,71 +161,83 @@ function ticketActions(ticket: SupportTicket) {
   if (ticket.esAutor || ticket.puedeAtender) actions.push(ticket.estado === 'CERRADO' ? { value: 'REABRIR', label: 'Reabrir ticket' } : { value: 'CERRAR', label: 'Cerrar con una resolución' });
   return actions;
 }
-type ActionDraft = { body: string; files: File[]; audio: File | null };
-const emptyActionDraft = (): ActionDraft => ({ body: '', files: [], audio: null });
 function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owner: string; changed: () => Promise<void> }) {
   const { currentUser } = useAuth();
-  const journal = useSupportCommand({ userId: owner, context: inspectionWorkspaceOwner(currentUser), ticketId: ticket.id });
+  const scope = { userId: owner, context: inspectionWorkspaceOwner(currentUser), ticketId: ticket.id };
+  const journal = useSupportCommand(scope);
+  const recovery = useSupportActionDraft(scope);
   const pending = journal.command;
-  const [action, setAction] = useState<SupportAction>('RESPONDER');
+  const action = recovery.workspace.action;
   const actions = ticketActions(ticket);
   const selected = pending && pending.input.accion !== 'TOMAR' ? pending.input.accion : actions.some(option => option.value === action) ? action : actions[0]?.value;
-  const [drafts, setDrafts] = useState<Partial<Record<SupportAction, ActionDraft>>>({});
   const draftAction = selected || 'TOMAR';
-  const { body, files, audio } = pending ? { body: pending.input.cuerpo, files: pending.files, audio: null } : drafts[draftAction] || emptyActionDraft();
-  const updateDraft = (patch: Partial<ActionDraft>) => setDrafts(previous => ({ ...previous, [draftAction]: { ...(previous[draftAction] || emptyActionDraft()), ...patch } }));
+  const draft = recovery.workspace.drafts[draftAction] || emptySupportActionDraft(ticket.version);
+  const { body, files, audio } = pending ? { body: pending.input.cuerpo, files: pending.files, audio: null } : draft;
+  const updateDraft = (patch: Partial<SupportActionDraft>) => recovery.update(draftAction, ticket.version, patch);
   const setBody = (body: string) => updateDraft({ body });
   const setFiles = (files: File[]) => updateDraft({ files });
-  const setAudio = (audio: File | null) => updateDraft({ audio });
-  const [target, setTarget] = useState('');
+  const setAudio = (audio: File | null) => { if (audio && files.length >= 3) { setError('Hasta 3 archivos, incluido el audio. Quitá un adjunto antes de grabar.'); return; } updateDraft({ audio }); };
+  const target = draft.target || '', category = draft.category || ticket.categoria;
+  const type = draft.type || ticket.tipo || 'PROBLEMA', priority = draft.priority || ticket.prioridad;
   const [recording, setRecording] = useState(false);
-  const [category, setCategory] = useState(ticket.categoria);
-  const [type, setType] = useState<SupportType>(ticket.tipo || 'PROBLEMA');
-  const [priority, setPriority] = useState<SupportPriority>(ticket.prioridad || 'NORMAL');
-  const busy = journal.busy;
+  const [preparing, setPreparing] = useState(false);
+  const submitting = useRef(false);
+  const busy = journal.busy || preparing;
+  const canEdit = journal.ready && recovery.ready && recovery.ownership.status === 'owned';
+  const staleDraft = !!recovery.workspace.drafts[draftAction] && draft.version !== ticket.version;
   const [error, setError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const bodyInput = useRef<HTMLTextAreaElement>(null);
   const team = useQuery({ queryKey: ['soporte', owner, 'equipo'], queryFn: supportService.team, enabled: ticket.puedeGestionar, retry: false });
   const displayedTarget = pending?.input.responsableId ?? target;
   const recipient = team.data?.find(user => user.id === displayedTarget);
-  const send = async (chosen = action) => {
-    if (busy || recording || !journal.ready) return;
+  const send = async (chosen = selected) => {
+    if (submitting.current || busy || recording || !canEdit || !recovery.canWrite() || !chosen) return;
     if (pending) { await journal.retry(); return; }
+    if (chosen !== 'TOMAR' && staleDraft) { setError('El ticket cambió. Revisá la conversación antes de confirmar.'); return; }
     if (!['TOMAR', 'DERIVAR', 'CLASIFICAR'].includes(chosen) && !body.trim()) { setError('Escribí un mensaje o una resolución.'); bodyInput.current?.focus(); return; }
     if (chosen === 'DERIVAR' && !target) { setError('Elegí el nuevo responsable antes de confirmar la derivación.'); return; }
     const outgoingFiles = chosen === 'RESPONDER' || chosen === 'NOTA' ? [...files, ...(audio ? [audio] : [])] : [];
     if (outgoingFiles.length > 3) { setError('Hasta 3 archivos, incluido el audio.'); return; }
-    setError('');
-    await journal.submit({ key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
-      version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}), ...(chosen === 'CLASIFICAR' ? { categoria: category, tipo: type, prioridad: priority } : {}) }, files: outgoingFiles });
+    submitting.current = true; setPreparing(true); setError('');
+    try {
+      if (!await recovery.flush() || !recovery.canWrite()) return;
+      await journal.submit({ key: crypto.randomUUID(), input: { accion: chosen, cuerpo: chosen === 'TOMAR' ? '' : body,
+        version: ticket.version, ...(chosen === 'DERIVAR' ? { responsableId: target } : {}), ...(chosen === 'CLASIFICAR' ? { categoria: category, tipo: type, prioridad: priority } : {}) }, files: outgoingFiles });
+    } finally { submitting.current = false; setPreparing(false); }
   };
-  const finishConfirmed = () => journal.release(async saved => {
-    await changed();
-    setDrafts(previous => ({ ...previous, [saved.input.accion]: saved.status === 'confirmed' ? emptyActionDraft() : { body: saved.input.cuerpo, files: saved.files, audio: null } }));
-    if (fileInput.current) fileInput.current.value = '';
-    setTarget(saved.status === 'rejected' ? saved.input.responsableId || '' : '');
-    if (saved.status === 'rejected') { setCategory(saved.input.categoria || ticket.categoria); setType(saved.input.tipo || ticket.tipo || 'PROBLEMA'); setPriority(saved.input.prioridad || ticket.prioridad); }
-    setAction(saved.status === 'rejected' ? saved.input.accion : 'RESPONDER');
-  });
+  const finishConfirmed = () => {
+    if (!recovery.canWrite()) return;
+    return journal.release(async saved => {
+      await changed();
+      await recovery.finish(saved);
+      if (fileInput.current) fileInput.current.value = '';
+    });
+  };
   const canTake = ticket.puedeGestionar && ticket.responsableId !== owner && (!ticket.responsableId || ticket.puedeAtender) && ticket.estado !== 'CERRADO';
   const optionalBody = selected === 'DERIVAR' || selected === 'CLASIFICAR';
   const recipients = (team.data || []).filter(user => user.id !== ticket.responsableId);
   const privateAction = selected === 'NOTA' || selected === 'DERIVAR' || selected === 'CLASIFICAR';
   return <section aria-label="Atender ticket" className="min-w-0 space-y-4 rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 [overflow-wrap:anywhere]">
     <h4 className="font-semibold text-neutral-900">Atender ticket</h4>
-    {canTake && <Button disabled={!journal.ready || busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
+    {recovery.ownership.status === 'blocked' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Este ticket se está editando en otra pestaña. Cerrala para continuar aquí sin reemplazar su borrador.</p><Button variant="outline" onClick={recovery.ownership.retry}>Retomar edición aquí</Button></div>}
+    {recovery.ownership.status === 'unavailable' && <div role="alert" className="space-y-2"><p>Este navegador no pudo proteger la edición del borrador. Reintentá o abrí SITREP en un navegador actualizado.</p><Button variant="outline" onClick={recovery.ownership.retry}>Reintentar protección</Button></div>}
+    {recovery.ownership.status === 'owned' && !recovery.ready && <p role="status">Comprobando borradores… <Button variant="outline" onClick={() => void recovery.reload()}>Reintentar borrador</Button></p>}
+    {recovery.error && <div role="alert" className="space-y-2 text-error-700"><p>{recovery.error}</p>{recovery.ready && <Button variant="outline" disabled={!canEdit || recovery.saving} onClick={() => void recovery.flush()}>Reintentar guardado local</Button>}</div>}
+    {canEdit && !pending && Object.keys(recovery.workspace.drafts).length > 0 && !recovery.error && <p role="status" className="text-sm text-neutral-600">{recovery.saving ? 'Guardando borrador…' : recovery.restored ? 'Borrador recuperado en este dispositivo. Todavía no se envió.' : 'Borrador guardado en este dispositivo. Todavía no se envió.'}</p>}
+    {canEdit && !pending && staleDraft && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>El ticket cambió desde que preparaste este borrador. Revisá la conversación y el estado antes de confirmar.</p><Button variant="outline" onClick={() => { setError(''); updateDraft({ version: ticket.version }); }}>Revisé la conversación</Button></div>}
+    {canTake && <Button disabled={!canEdit || busy || !!pending || recording} leftIcon={<UserRoundCheck size={18} />} onClick={() => void send('TOMAR')}>Asignarme</Button>}
     {!journal.ready && <p role="status">Comprobando envíos guardados… <Button variant="outline" onClick={() => void journal.reload()}>Reintentar lectura</Button></p>}
-    {pending?.status === 'confirmed' && <div role="status" className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900"><p>Acción confirmada. No hace falta enviarla otra vez.</p><Button isLoading={busy} onClick={() => void finishConfirmed()}>Actualizar conversación y continuar</Button></div>}
-    {pending?.status === 'rejected' && <div role="alert" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>La acción no se registró: {pending.rejection}</p><Button isLoading={busy} onClick={() => void finishConfirmed()}>Actualizar ticket y recuperar contenido</Button></div>}
-    {pending?.status === 'pending' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Envío sin confirmar. Conservamos el contenido y los archivos en este dispositivo.</p><div className="flex flex-wrap gap-2"><Button isLoading={busy} onClick={() => void journal.retry()}>Reintentar mismo envío</Button><Button variant="outline" disabled={busy} onClick={() => void journal.recover()}>Comprobar y corregir envío</Button></div><p className="text-sm">Para corregir, primero comprobamos si ya se registró. Si no se registró, retiramos ese envío y recuperamos el contenido.</p></div>}
-    {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
+    {pending?.status === 'confirmed' && <div role="status" className="space-y-2 rounded-lg bg-primary-50 p-3 text-primary-900"><p>Acción confirmada. No hace falta enviarla otra vez.</p><Button isLoading={busy} disabled={!canEdit} onClick={() => void finishConfirmed()}>Actualizar conversación y continuar</Button></div>}
+    {pending?.status === 'rejected' && <div role="alert" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>La acción no se registró: {pending.rejection}</p><Button isLoading={busy} disabled={!canEdit} onClick={() => void finishConfirmed()}>Actualizar ticket y recuperar contenido</Button></div>}
+    {pending?.status === 'pending' && <div role="status" className="space-y-2 rounded-lg bg-warning-50 p-3 text-warning-900"><p>Envío sin confirmar. Conservamos el contenido y los archivos en este dispositivo.</p><div className="flex flex-wrap gap-2"><Button isLoading={busy} disabled={!canEdit} onClick={() => recovery.canWrite() && void journal.retry()}>Reintentar mismo envío</Button><Button variant="outline" disabled={!canEdit || busy} onClick={() => recovery.canWrite() && void journal.recover()}>Comprobar y corregir envío</Button></div><p className="text-sm">Para corregir, primero comprobamos si ya se registró. Si no se registró, retiramos ese envío y recuperamos el contenido.</p></div>}
+    {!actions.length ? <p className="text-neutral-600">{ticket.responsable ? 'La respuesta está a cargo del responsable asignado.' : 'Tomá el ticket para responder o derivarlo.'}</p> : !recovery.ready || recovery.ownership.status !== 'owned' ? null : <form noValidate className="space-y-4" onSubmit={event => { event.preventDefault(); void send(selected); }}>
       <div role="group" aria-label="Acciones del ticket" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {actions.map(option => {
           const Icon = actionIcons[option.value];
           return <Button key={option.value} type="button" variant={selected === option.value ? 'primary' : 'outline'}
-            aria-pressed={selected === option.value} disabled={!journal.ready || busy || !!pending || recording} leftIcon={<Icon size={18} />}
-            onClick={() => { setAction(option.value); if (option.value === 'CLASIFICAR') { setCategory(ticket.categoria); setType(ticket.tipo || 'PROBLEMA'); setPriority(ticket.prioridad || 'NORMAL'); } }}>{option.value === 'RESPONDER' && ticket.estado === 'CERRADO' ? 'Responder y reabrir' : actionLabels[option.value]}</Button>;
+            aria-pressed={selected === option.value} disabled={!canEdit || busy || !!pending || recording} leftIcon={<Icon size={18} />}
+            onClick={() => recovery.select(option.value)}>{option.value === 'RESPONDER' && ticket.estado === 'CERRADO' ? 'Responder y reabrir' : actionLabels[option.value]}</Button>;
         })}
       </div>
       <p id="support-action-audience" className={'flex items-start gap-2 text-sm ' + (privateAction ? 'text-warning-800' : 'text-neutral-700')}>
@@ -232,32 +246,32 @@ function TicketActions({ ticket, owner, changed }: { ticket: SupportTicket; owne
           : selected === 'CERRAR' ? 'La resolución queda visible para el usuario y cierra el ticket.' : 'Este mensaje queda visible en la conversación del ticket.'}
       </p>
       {selected === 'CLASIFICAR' && <div className="grid gap-3 sm:grid-cols-3">
-        <Select label="Área del problema" value={pending?.input.categoria ?? category} onChange={value => setCategory(value as SupportCategory)} disabled={!journal.ready || busy || !!pending} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
-        <Select label="Tipo de ticket" value={pending?.input.tipo ?? type} onChange={value => setType(value as SupportType)} disabled={!journal.ready || busy || !!pending} options={Object.entries(supportTypes).map(([value, label]) => ({ value, label }))} />
-        <Select label="Prioridad" value={pending?.input.prioridad ?? priority} onChange={value => setPriority(value as SupportPriority)} disabled={!journal.ready || busy || !!pending} options={Object.entries(supportPriorities).map(([value, label]) => ({ value, label }))} />
+        <Select label="Área del problema" value={pending?.input.categoria ?? category} onChange={value => updateDraft({ category: value as SupportCategory })} disabled={!canEdit || busy || !!pending} options={Object.entries(supportCategories).map(([value, label]) => ({ value, label }))} />
+        <Select label="Tipo de ticket" value={pending?.input.tipo ?? type} onChange={value => updateDraft({ type: value as SupportType })} disabled={!canEdit || busy || !!pending} options={Object.entries(supportTypes).map(([value, label]) => ({ value, label }))} />
+        <Select label="Prioridad" value={pending?.input.prioridad ?? priority} onChange={value => updateDraft({ priority: value as SupportPriority })} disabled={!canEdit || busy || !!pending} options={Object.entries(supportPriorities).map(([value, label]) => ({ value, label }))} />
       </div>}
       {selected === 'DERIVAR' && <>{team.isError ? <p role="alert" className="text-error-700">{supportError(team.error)} <Button variant="outline" onClick={() => void team.refetch()}>Reintentar equipo</Button></p> :
-        <Select label="Nuevo responsable" value={displayedTarget} onChange={setTarget} disabled={busy || !!pending || team.isPending} searchable
+        <Select label="Nuevo responsable" value={displayedTarget} onChange={target => updateDraft({ target })} disabled={!canEdit || busy || !!pending || team.isPending} searchable
           helperText={recipient ? 'Responsable seleccionado: ' + recipient.email : undefined}
           renderOption={option => <span className="block [overflow-wrap:anywhere]">{option.label}</span>}
           options={recipients.map(user => ({ value: user.id, label: name(user) + ' · ' + user.email }))} />}
         {team.isSuccess && !recipients.length && <p role="status" className="text-sm text-neutral-700">No hay otro responsable activo. Un administrador puede configurar el Equipo de soporte desde la mesa.</p>}</>}
       <label className="block text-sm font-medium text-neutral-700" htmlFor="support-reply">{privateAction ? `Nota interna / motivo${optionalBody ? ' (opcional)' : ''}` : 'Mensaje o resolución'}</label>
-      <textarea ref={bodyInput} id="support-reply" aria-label={privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'} aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} required={!optionalBody} disabled={!journal.ready || busy || !!pending} onChange={event => setBody(event.target.value)} rows={optionalBody ? 2 : 4}
+      <textarea ref={bodyInput} id="support-reply" aria-label={privateAction ? 'Nota interna / motivo' : 'Mensaje o resolución'} aria-describedby="support-action-audience support-reply-help" value={body} maxLength={8000} required={!optionalBody} disabled={!canEdit || busy || !!pending} onChange={event => setBody(event.target.value)} rows={optionalBody ? 2 : 4}
         className="w-full rounded-lg border border-neutral-400 p-3 text-base text-neutral-900 focus-visible:outline-primary-700" />
       <p id="support-reply-help" className="text-sm text-neutral-600">{optionalBody ? 'Podés confirmar sin escribir un motivo. La acción y el responsable quedan en el historial.' : 'El audio puede acompañar tu mensaje.'}</p>
       <div hidden={selected !== 'RESPONDER' && selected !== 'NOTA'} className="space-y-2"><label htmlFor="support-reply-files" className="block text-sm font-medium text-neutral-700">Adjuntar captura o documento</label>
         <p className="text-sm text-neutral-600">Opcional · podés enviar sólo texto.</p>
-        <SupportAudioInput key={'audio:' + draftAction} value={audio} onChange={setAudio} onBusyChange={setRecording} disabled={!journal.ready || busy || !!pending} />
-        <input key={'files:' + draftAction} ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={!journal.ready || busy || !!pending}
+        <SupportAudioInput key={'audio:' + draftAction} value={audio} onChange={setAudio} recoveryEnabled onBusyChange={setRecording} disabled={!canEdit || busy || !!pending} />
+        <input key={'files:' + draftAction} ref={fileInput} id="support-reply-files" type="file" multiple accept={supportFileAccept} disabled={!canEdit || busy || !!pending}
           className="block min-h-11 w-full text-sm text-neutral-700 file:mr-2 file:min-h-11 file:rounded-lg file:border file:border-neutral-400 file:bg-white file:px-3 file:text-neutral-900" onChange={event => {
-            const chosen = Array.from(event.target.files || []); if (chosen.length > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; } else setFiles(chosen);
+            const chosen = Array.from(event.target.files || []); if (chosen.length + (audio ? 1 : 0) > 3 || chosen.some(file => file.size > 5 * 1024 * 1024)) { setError('Hasta 3 archivos de 5 MB cada uno.'); event.target.value = ''; } else setFiles(chosen);
           }} />
         {!!files.length && <ul aria-label="Archivos de esta acción" className="space-y-2">{files.map((file, index) => <li key={index + ':' + file.name} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-neutral-200 px-3 py-1">
-          <span className="min-w-0 break-all text-sm text-neutral-800">{file.name}</span><Button type="button" variant="ghost" className="shrink-0" aria-label={'Quitar ' + file.name} disabled={!journal.ready || busy || !!pending} onClick={() => { setFiles(files.filter((_, position) => position !== index)); if (fileInput.current) fileInput.current.value = ''; }}>Quitar</Button>
+          <span className="min-w-0 break-all text-sm text-neutral-800">{file.name}</span><Button type="button" variant="ghost" className="shrink-0" aria-label={'Quitar ' + file.name} disabled={!canEdit || busy || !!pending} onClick={() => { setFiles(files.filter((_, position) => position !== index)); if (fileInput.current) fileInput.current.value = ''; }}>Quitar</Button>
         </li>)}</ul>}
       </div>
-      {!pending && <Button type="submit" isLoading={busy} disabled={!journal.ready || recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{selected ? submitLabels[selected] : 'Confirmar acción'}</Button>}
+      {!pending && <Button type="submit" isLoading={busy} disabled={!canEdit || staleDraft || recording || (selected === 'DERIVAR' && (team.isPending || team.isError || !recipients.length))}>{selected ? submitLabels[selected] : 'Confirmar acción'}</Button>}
     </form>}
     {(error || journal.error) && <p role="alert" className="text-error-700">{error || journal.error}</p>}
   </section>;

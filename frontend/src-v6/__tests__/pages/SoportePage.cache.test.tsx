@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, it, vi } from 'vitest';
 const records = vi.hoisted(() => new Map<string, unknown>());
+vi.mock('../../hooks/useInspectionDraftOwnership', () => ({ useInspectionDraftOwnership: () => ({ status: 'owned', canWrite: () => true, retry: vi.fn() }) }));
 vi.mock('../../services/supportCommandStore', () => ({ readSupportCommandRecord: async (key: string) => records.get(key) || null, updateSupportCommandRecord: async (key: string, update: (value: unknown) => unknown) => { const next = update(records.get(key) || null); if (next) records.set(key, next); else records.delete(key); return next; } }));
 const calls = vi.hoisted(() => ({ access: vi.fn(), list: vi.fn(), get: vi.fn(), create: vi.fn(), team: vi.fn(), act: vi.fn(), recoverAction: vi.fn() }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'owner', nombre: 'QA', rol: 'OPERADOR' } }) }));
@@ -143,6 +144,7 @@ it('offers assignment and direct routing for unassigned staff without opening re
   expect(await screen.findByRole('button', { name: 'Asignarme', exact: true })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Derivar', exact: true })).toBeVisible();
   for (const label of ['Responder', 'Nota interna', 'Pedir respuesta']) expect(screen.queryByRole('button', { name: label, exact: true })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Asignarme', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Asignarme', exact: true }));
   await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, { accion: 'TOMAR', cuerpo: '', version: 1 }, [], expect.any(String)));
 });
@@ -242,4 +244,30 @@ it.each(['RESPONDER', 'NOTA'])('restores a rejected %s and lets its attachment b
   fireEvent.click(screen.getByRole('button', { name: action === 'NOTA' ? 'Guardar nota interna' : 'Enviar respuesta', exact: true }));
   await screen.findByText('Acción confirmada. No hace falta enviarla otra vez.');
   expect(calls.act.mock.calls[1][2]).toEqual([]); expect(calls.act.mock.calls[1][3]).not.toEqual(calls.act.mock.calls[0][3]);
+});
+
+it.each(['RESPONDER', 'NOTA'])('restores an unsent %s draft with its files after closing the composer', async action => {
+  const first = openDetail(); await waitFor(() => expect(screen.getByRole('button', { name: 'Responder', exact: true })).toBeEnabled());
+  if (action === 'NOTA') fireEvent.click(screen.getByRole('button', { name: 'Nota interna', exact: true }));
+  const label = action === 'NOTA' ? 'Nota interna / motivo' : 'Mensaje o resolución';
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'Borrador sin enviar que debe recuperarse' } });
+  fireEvent.change(screen.getByLabelText('Adjuntar captura o documento'), { target: { files: [new File(['draft'], 'borrador.pdf', { type: 'application/pdf', lastModified: 321 })] } });
+  // Allow an automatic local transaction to settle, without submitting a ticket action.
+  await waitFor(() => expect(screen.getByLabelText(label)).toHaveValue('Borrador sin enviar que debe recuperarse'));
+  await screen.findByText('Borrador guardado en este dispositivo. Todavía no se envió.');
+  first.unmount(); openDetail();
+  await waitFor(() => expect(screen.getByLabelText(label)).toHaveValue('Borrador sin enviar que debe recuperarse'));
+  expect(screen.getByText('borrador.pdf', { exact: true })).toBeVisible(); expect(calls.act).not.toHaveBeenCalled();
+});
+
+it('requires reviewing a changed ticket before sending a recovered draft', async () => {
+  const first = openDetail(); fireEvent.change(await screen.findByLabelText('Mensaje o resolución'), { target: { value: 'Revisar antes de responder' } });
+  await screen.findByText('Borrador guardado en este dispositivo. Todavía no se envió.'); first.unmount();
+  openDetail({ version: 2 });
+  await screen.findByText('El ticket cambió desde que preparaste este borrador. Revisá la conversación y el estado antes de confirmar.');
+  expect(screen.getByRole('button', { name: 'Enviar respuesta', exact: true })).toBeDisabled();
+  expect(screen.getByLabelText('Mensaje o resolución')).toHaveValue('Revisar antes de responder');
+  fireEvent.click(screen.getByRole('button', { name: 'Revisé la conversación' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar respuesta', exact: true }));
+  await waitFor(() => expect(calls.act).toHaveBeenCalledWith(ticket.id, expect.objectContaining({ cuerpo: 'Revisar antes de responder', version: 2 }), [], expect.any(String)));
 });

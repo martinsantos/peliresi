@@ -9,9 +9,9 @@ function AudioPreview({ file }: { file: File }) {
 }
 
 /** Short voice attachment, not speech recognition. No provider, background
- * recording or persistent audio draft. Tracks/timers die on cancel/unmount. */
-export function SupportAudioInput({ value, onChange, onBusyChange, disabled = false }: {
-  value: File | null; onChange: (value: File | null) => void; onBusyChange: (busy: boolean) => void; disabled?: boolean;
+ * recording. The parent may persist completed audio. Tracks/timers die on cancel/unmount. */
+export function SupportAudioInput({ value, onChange, onBusyChange, disabled = false, recoveryEnabled = false }: {
+  value: File | null; onChange: (value: File | null) => void; onBusyChange: (busy: boolean) => void; disabled?: boolean; recoveryEnabled?: boolean;
 }) {
   const [phase, setPhase] = useState<'idle' | 'requesting' | 'recording' | 'stopping'>('idle');
   const [seconds, setSeconds] = useState(0);
@@ -89,7 +89,7 @@ export function SupportAudioInput({ value, onChange, onBusyChange, disabled = fa
     </div>
     {value && <div className="space-y-2"><AudioPreview key={value.name + value.lastModified} file={value} />
       <Button type="button" variant="outline" leftIcon={<X size={16} />} disabled={disabled || phase !== 'idle'} onClick={() => onChange(null)}>Quitar audio</Button></div>}
-    <p className="text-sm text-neutral-600">Opcional · hasta 2 minutos. Escuchalo antes de enviar. No se guarda al cerrar el formulario.</p>
+    <p className="text-sm text-neutral-600">Opcional · hasta 2 minutos. Escuchalo antes de enviar. {recoveryEnabled ? 'Terminá la grabación y esperá Borrador guardado antes de cerrar.' : 'No se guarda al cerrar el formulario.'}</p>
     {error && <p role="alert" className="text-sm text-error-700">{error}</p>}
   </div>;
 }
