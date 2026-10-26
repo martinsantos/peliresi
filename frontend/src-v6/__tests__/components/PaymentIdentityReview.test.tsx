@@ -7,6 +7,45 @@ const sha = 'a'.repeat(64);
 const analysis: ReceiptAnalysis = { version: 1, duplicado: false, lectura: 'LEIDO', motor: 'PDF_TEXT', texto: 'ATM ARTIFICIAL', alcance: 'QA', aviso: null,
   pago: { revision: 'PENDIENTE', coincidencia: false, propuesta: { campos: { emisor: 'ATM_TASAS', idComprobante: 'QA123', codigoTasa: '162', importe: '12500.00', fechaPago: '2026-10-20' }, conflictos: [] } } };
 describe('reviewing payment identity', () => {
+  it('requires reconciling a new OCR reading of the same original before reserving a payment', () => {
+    const save = vi.fn();
+    const { rerender } = render(<PaymentIdentityReview sha256={sha} cuit="30900000011" referencia="QA" onConfirm={save} />);
+    fireEvent.click(screen.getByText('Identificar y reservar pago ATM'));
+    fireEvent.change(screen.getByLabelText('ID Comprobante ATM'), { target: { value: 'MANUAL999' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    rerender(<PaymentIdentityReview analysis={analysis} sha256={sha} cuit="30900000011" referencia="QA" onConfirm={save} />);
+    expect(screen.getByRole('button', { name: 'Confirmar y reservar pago' })).toBeDisabled();
+    expect(screen.getByLabelText('ID Comprobante ATM')).toHaveValue('MANUAL999');
+    fireEvent.click(screen.getByRole('button', { name: 'Usar nueva lectura' }));
+    expect(screen.getByLabelText('ID Comprobante ATM')).toHaveValue('QA123');
+    expect(screen.getByLabelText('Importe pagado (ARS)')).toHaveValue('12500.00');
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    expect(save).not.toHaveBeenCalled();
+  });
+  it('keeps manual corrections only after an explicit choice and requests a fresh original review', () => {
+    const { rerender } = render(<PaymentIdentityReview analysis={analysis} sha256={sha} referencia="QA" onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByText('Identificar y reservar pago ATM'));
+    fireEvent.change(screen.getByLabelText('Importe pagado (ARS)'), { target: { value: '19000' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    const next = { ...analysis, pago: { ...analysis.pago!, propuesta: { campos: { ...analysis.pago!.propuesta!.campos, importe: '21000' }, conflictos: [] } } };
+    rerender(<PaymentIdentityReview analysis={next} sha256={sha} referencia="QA" onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Conservar mis datos' }));
+    expect(screen.getByLabelText('Importe pagado (ARS)')).toHaveValue('19000');
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    rerender(<PaymentIdentityReview analysis={JSON.parse(JSON.stringify(next))} sha256={sha} referencia="QA" onConfirm={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Usar nueva lectura' })).toBeNull();
+    expect(screen.getByLabelText('Importe pagado (ARS)')).toHaveValue('19000');
+  });
+  it('does not carry reviewed payment fields to another original or taxpayer', () => {
+    const { rerender } = render(<PaymentIdentityReview analysis={analysis} sha256={sha} cuit="30900000011" referencia="QA" onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByText('Identificar y reservar pago ATM'));
+    fireEvent.click(screen.getByRole('checkbox'));
+    rerender(<PaymentIdentityReview sha256={'b'.repeat(64)} cuit="30900000022" referencia="QA-OTHER" onConfirm={vi.fn()} />);
+    fireEvent.click(screen.getByText('Identificar y reservar pago ATM'));
+    expect(screen.getByLabelText('ID Comprobante ATM')).toHaveValue('');
+    expect(screen.getByLabelText('CUIT del obligado')).toHaveValue('30900000022');
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+  });
   it.each([
     ['PENDIENTE', 'Revisá el documento para aprobarlo o rechazarlo.'],
     ['APROBADO', 'Documento aprobado.'],
