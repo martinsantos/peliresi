@@ -1,17 +1,11 @@
-/**
- * Simulación TEF con parámetros heredados, pendiente de conciliación normativa.
- * Formula: TEF = M x R x ISO
- * R = Z x A x D x C
- *
- * Version didactica: siempre visible, explicaciones claras por seccion.
- */
+/** Declaraciones para revisión administrativa. No calcula ni determina una deuda fiscal. */
 
-import React, { useState, useMemo, useId } from 'react';
-import { Calculator, MapPin, Building2, ShieldAlert, FlaskConical, Truck, ClipboardList, Eye, Wrench, Users, Award, Info, HelpCircle } from 'lucide-react';
+import React, { useState, useId } from 'react';
+import { Calculator, MapPin, Building2, ShieldAlert, FlaskConical, Truck, ClipboardList, Eye, Wrench, Users, Award, HelpCircle } from 'lucide-react';
 import { Card, CardHeader, CardContent } from './ui/CardV2';
 import {
-  calcularTEF, DEFAULT_A, ZONAS, A_OPTIONS, A_LABELS, C_CORRIENTES, M_COEFICIENTE,
-  type CoeficientesA, type TEFResult,
+  DEFAULT_A, ZONAS, A_OPTIONS, A_LABELS,
+  type CoeficientesA,
 } from '../utils/calculoTEF';
 
 export interface TEFInputs {
@@ -24,21 +18,17 @@ export interface TEFInputs {
 
 /** Imperative handle to read current TEF state without re-render coupling */
 export interface CalculadoraTEFHandle {
-  getResult: () => TEFResult;
   getInputs: () => TEFInputs;
 }
 
 interface CalculadoraTEFProps {
   corrientesY: string[];
   tieneISO: boolean;
-  onResultChange?: (result: TEFResult) => void;
   onInputsChange?: (inputs: TEFInputs) => void;
   initialInputs?: TEFInputs | null;
   /** When true, renders expanded inline (wizard mode). When false, renders as collapsible card. */
   inline?: boolean;
 }
-
-const fmtMoney = (v: number) => `$ ${v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // Icons for each A coefficient to make them more visual
 const A_ICONS: Record<string, React.ElementType> = {
@@ -68,7 +58,7 @@ const A_HELP: Record<string, string> = {
   a10_idoneidad: 'Nivel de capacitacion y conciencia ambiental del personal.',
 };
 
-const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProps>(({ corrientesY, tieneISO, onResultChange, onInputsChange, initialInputs, inline = false }, ref) => {
+const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProps>(({ corrientesY, tieneISO, onInputsChange, initialInputs, inline = false }, ref) => {
   const [zona, setZona] = useState(initialInputs?.zona || 'zona_rural');
   const [coefA, setCoefA] = useState<CoeficientesA>(initialInputs?.coefA ? { ...initialInputs.coefA } : { ...DEFAULT_A });
   const [personal, setPersonal] = useState(initialInputs?.personal || 0);
@@ -77,35 +67,13 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
   const [showHelp, setShowHelp] = useState<string | null>(null);
   const helpId = useId();
 
-  const result = useMemo(() => {
-    return calcularTEF({
-      zona, coeficientesA: coefA, personal, potenciaHP, superficieM2,
-      corrientesY, tieneISO,
-    });
-  }, [zona, coefA, personal, potenciaHP, superficieM2, corrientesY, tieneISO]);
-
-  // Imperative handle: parent reads values on demand (no render coupling)
   React.useImperativeHandle(ref, () => ({
-    getResult: () => result,
     getInputs: () => ({ zona, coefA, personal, potenciaHP, superficieM2 }),
   }));
-
-  // Legacy callback support for admin pages that pass onInputsChange/onResultChange
-  // Guarded by stable string keys to prevent infinite loops
-  const onResultChangeRef = React.useRef(onResultChange);
   const onInputsChangeRef = React.useRef(onInputsChange);
-  onResultChangeRef.current = onResultChange;
   onInputsChangeRef.current = onInputsChange;
-  const resultKey = `${result.TEF}|${result.R}`;
   const inputsKey = `${zona}|${JSON.stringify(coefA)}|${personal}|${potenciaHP}|${superficieM2}`;
-  const didMountRef = React.useRef(false);
   React.useEffect(() => {
-    if (!didMountRef.current) { didMountRef.current = true; return; }
-    onResultChangeRef.current?.(result);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultKey]);
-  React.useEffect(() => {
-    if (!didMountRef.current) return;
     onInputsChangeRef.current?.({ zona, coefA, personal, potenciaHP, superficieM2 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputsKey]);
@@ -113,36 +81,12 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
   const updateA = (key: keyof CoeficientesA, val: number) =>
     setCoefA(prev => ({ ...prev, [key]: val }));
 
-  const maxC = corrientesY.length > 0 ? Math.max(...corrientesY.map(y => C_CORRIENTES[y.trim()] || 0)) : 0;
-
   const content = (
     <div className="space-y-6" data-testid="tef-calculator">
-      {/* === RESULTADO TEF === */}
-      <section aria-label="Resultado de simulación TEF" className="bg-neutral-900 rounded-2xl p-4 text-white sm:p-6">
-        <p className="text-white text-sm font-semibold uppercase tracking-wide">Simulación TEF · importe orientativo</p>
-        <p className="mt-2 text-sm leading-6 text-white">No es una liquidación. Fórmula y parámetros pendientes de verificación normativa; usá la liquidación de la autoridad para controlar el pago.</p>
-        <div className="mt-2 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <p className="min-w-0 break-words text-3xl font-black font-mono tracking-tight text-white sm:text-5xl">{fmtMoney(result.TEF)}</p>
-          <div className="text-left text-sm space-y-0.5 sm:text-right">
-            <p className="text-white">TEF = M x R x ISO</p>
-            <p className="font-mono text-white">{result.M} x {result.R.toFixed(4)} x {result.ISO}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 mt-5 sm:grid-cols-5">
-          {[
-            { label: 'Z', desc: 'Zona', value: result.Z.toFixed(2), bg: 'bg-blue-500/20 border-blue-500/30' },
-            { label: 'A', desc: 'Ambiental', value: result.A.toFixed(2), bg: 'bg-amber-500/20 border-amber-500/30' },
-            { label: 'D', desc: 'Magnitud', value: result.D.toFixed(3), bg: 'bg-purple-500/20 border-purple-500/30' },
-            { label: 'C', desc: 'Residuo', value: result.C.toFixed(1), bg: 'bg-red-500/20 border-red-500/30' },
-            { label: 'R', desc: 'Riesgo', value: result.R.toFixed(2), bg: 'bg-white/10 border-white/20' },
-          ].map(item => (
-            <div key={item.label} className={`min-w-0 rounded-xl p-2.5 text-center border ${item.bg} ${item.label === 'R' ? 'col-span-2 sm:col-span-1' : ''}`}>
-              <p className="text-sm text-white font-medium">{item.desc}</p>
-              <p className="text-lg font-bold font-mono text-white">{item.value}</p>
-              <p className="text-xs text-white font-mono">{item.label}</p>
-            </div>
-          ))}
-        </div>
+      <section aria-label="Estado de la evaluación TEF" className="space-y-2 rounded-xl border border-warning-300 bg-warning-50 p-4 text-neutral-900">
+        <h4 className="font-semibold">Importe pendiente de liquidación</h4>
+        <p className="text-sm leading-6">El cálculo está en revisión. Para controlar el pago, usá la liquidación oficial del concepto y período correspondientes.</p>
+        <a className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-800 underline focus-visible:outline focus-visible:outline-2" href="https://atm.mendoza.gov.ar/normativas/ley-impositiva/" target="_blank" rel="noopener noreferrer">Consultar normativa en ATM (nueva pestaña)</a>
       </section>
 
       {/* === SECCION 1: COEFICIENTE ZONAL Z === */}
@@ -220,9 +164,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
             />
           </div>
         </div>
-        <div className="bg-purple-50 rounded-lg px-3 py-2 text-xs text-purple-700 font-mono">
-          D = 0.15 x ({personal} + {potenciaHP}) + 0.005 x {superficieM2} = <strong>{result.D.toFixed(3)}</strong>
-        </div>
+
       </div>
 
       {/* === SECCION 3: PELIGROSIDAD AMBIENTAL A === */}
@@ -232,7 +174,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
           <h4 className="text-sm font-bold text-neutral-800 uppercase tracking-wide">
             Coeficiente de Peligrosidad Ambiental (A)
           </h4>
-          <span className="text-xs text-neutral-400 font-mono ml-auto">Sumatoria: {result.A.toFixed(3)}</span>
+
         </div>
         <p className="text-xs text-neutral-500">
           Tiene en cuenta las caracteristicas del emprendimiento (Art. 15 incisos c al j).
@@ -282,86 +224,12 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
         </div>
       </div>
 
-      {/* === SECCION 4: COEFICIENTE C === */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <FlaskConical size={18} className="text-red-600" />
-          <h4 className="text-sm font-bold text-neutral-800 uppercase tracking-wide">
-            Coeficiente de Peligrosidad del Residuo (C)
-          </h4>
-          <span className="text-xs text-neutral-400 font-mono ml-auto">Max: {maxC}</span>
-        </div>
-        <p className="text-xs text-neutral-500">
-          Se determina por el tipo de residuos peligrosos generado. Se toma el valor maximo
-          entre todas las corrientes Y inscriptas por el generador.
-        </p>
-        {corrientesY.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {corrientesY.map(y => {
-              const cVal = C_CORRIENTES[y.trim()] || 0;
-              const isMax = cVal === maxC && maxC > 0;
-              return (
-                <div
-                  key={y}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
-                    isMax
-                      ? 'bg-red-50 border-red-300 shadow-sm'
-                      : 'bg-neutral-50 border-neutral-200'
-                  }`}
-                >
-                  <span className={`text-xs font-bold ${isMax ? 'text-red-700' : 'text-neutral-600'}`}>{y.trim()}</span>
-                  <span className={`text-sm font-mono font-bold ${isMax ? 'text-red-800' : 'text-neutral-500'}`}>{cVal}</span>
-                  {isMax && <span className="text-[9px] bg-red-200 text-red-800 px-1.5 py-0.5 rounded font-bold">MAX</span>}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="bg-neutral-50 rounded-lg p-3 text-xs text-neutral-400 text-center">
-            Sin corrientes Y declaradas para esta simulación. Revisá las corrientes del establecimiento.
-          </div>
-        )}
-      </div>
-
-      {/* === SECCION 5: ISO === */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Award size={18} className="text-green-600" />
-          <h4 className="text-sm font-bold text-neutral-800 uppercase tracking-wide">Norma ISO 14000</h4>
-        </div>
-        <div className={`flex items-center gap-3 p-3 rounded-xl border-2 ${
-          tieneISO ? 'border-green-300 bg-green-50' : 'border-neutral-200 bg-neutral-50'
-        }`}>
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
-            tieneISO ? 'bg-green-600 text-white' : 'bg-neutral-300 text-white'
-          }`}>
-            {result.ISO}
-          </div>
-          <div>
-            <p className="text-sm font-medium text-neutral-800">
-              {tieneISO ? 'Certificación ISO 14000 declarada' : 'Sin certificación ISO 14000 declarada'}
-            </p>
-            <p className="text-sm leading-6 text-neutral-700">
-              Factor usado en esta simulación: ×{result.ISO}. Su aplicación fiscal requiere verificación con la liquidación correspondiente.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* === FORMULA DESGLOSADA === */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
-        <div className="flex items-center gap-2 text-blue-800">
-          <Info size={16} />
-          <p className="text-sm font-bold">Desglose de la simulación</p>
-        </div>
-        <div className="text-xs text-blue-700 font-mono space-y-1">
-          <p>R = Z x A x D x C = {result.Z} x {result.A.toFixed(3)} x {result.D.toFixed(3)} x {result.C} = <strong>{result.R.toFixed(4)}</strong></p>
-          <p>TEF = M x R x ISO = {result.M} x {result.R.toFixed(4)} x {result.ISO} = <strong>{result.TEF.toFixed(2)}</strong></p>
-        </div>
-        <p className="text-sm leading-6 text-blue-800 mt-2">
-          M = {M_COEFICIENTE} · valor configurado en esta simulación; verificar vigencia.
-        </p>
-      </div>
+      <section className="space-y-2" aria-label="Declaraciones vinculadas">
+        <h4 className="text-sm font-semibold text-neutral-900">Corrientes y certificación declaradas</h4>
+        <p className="text-sm text-neutral-700">{corrientesY.length ? [...new Set(corrientesY)].join(', ') : 'Sin corrientes Y declaradas. Revisá la actividad del establecimiento.'}</p>
+        <p className="flex items-center gap-2 text-sm text-neutral-700"><Award size={18} aria-hidden="true" />{tieneISO ? 'Certificación ISO 14000 declarada' : 'Sin certificación ISO 14000 declarada'}</p>
+        <p className="text-sm leading-6 text-neutral-600">Estos datos no aplican un coeficiente fiscal automáticamente.</p>
+      </section>
     </div>
   );
 
@@ -375,7 +243,7 @@ const CalculadoraTEF = React.forwardRef<CalculadoraTEFHandle, CalculadoraTEFProp
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <Calculator size={20} className="text-primary-600" />
-            <h3 className="font-bold text-neutral-900">Simulación TEF</h3>
+            <h3 className="font-bold text-neutral-900">Datos para evaluación TEF</h3>
           </div>
 
         </div>

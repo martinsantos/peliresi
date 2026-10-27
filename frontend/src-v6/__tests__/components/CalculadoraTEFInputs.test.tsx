@@ -2,7 +2,8 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import CalculadoraTEF from '../../components/CalculadoraTEF';
-import { A_LABELS, A_OPTIONS, DEFAULT_A, calcularTEF } from '../../utils/calculoTEF';
+import { StepTEF, type StepTEFHandle } from '../../pages/public/inscripcion/steps/StepTEF';
+import { A_LABELS, A_OPTIONS, DEFAULT_A } from '../../utils/calculoTEF';
 
 describe('CalculadoraTEF reports every declared input to its parent', () => {
   it('opens contextual help without changing a coefficient and exposes its expanded state', () => {
@@ -29,16 +30,30 @@ describe('CalculadoraTEF reports every declared input to its parent', () => {
 });
 
 
-describe('TEF simulation does not claim an official amount or a context-specific step', () => {
-  it.each([{ inline: true, tieneISO: true }, { inline: true, tieneISO: false }, { inline: false, tieneISO: true }, { inline: false, tieneISO: false }])('identifies the simulation beside its amount: %j', ({ inline, tieneISO }) => {
+describe('Unreconciled TEF never emits a fiscal result', () => {
+  it.each([{ inline: true, tieneISO: true }, { inline: true, tieneISO: false }, { inline: false, tieneISO: true }, { inline: false, tieneISO: false }])('keeps declarations without exposing an invalid amount: %j', ({ inline, tieneISO }) => {
     const ref = React.createRef<import('../../components/CalculadoraTEF').CalculadoraTEFHandle>();
     const initialInputs = { zona: 'zona_industrial', coefA: DEFAULT_A, personal: 10, potenciaHP: 20, superficieM2: 30 };
     render(<CalculadoraTEF ref={ref} inline={inline} tieneISO={tieneISO} corrientesY={['Y8']} initialInputs={initialInputs} />);
-    const result = screen.getByRole('region', { name: 'Resultado de simulación TEF' });
-    expect(result).toHaveTextContent('No es una liquidación');
-    expect(result).toHaveTextContent('Fórmula y parámetros pendientes de verificación normativa');
+    const result = screen.getByRole('region', { name: 'Estado de la evaluación TEF' });
+    expect(result).toHaveTextContent('Importe pendiente de liquidación');
+    expect(result).toHaveTextContent('El cálculo está en revisión');
+    expect(screen.queryByText(/TEF =|R =|Factor usado|\$ /)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Consultar normativa en ATM/ })).toHaveAttribute('href', 'https://atm.mendoza.gov.ar/normativas/ley-impositiva/');
     expect(screen.queryByText(/incentivo|fijado por la Autoridad|Paso [35]/i)).not.toBeInTheDocument();
-    expect(ref.current?.getResult()).toEqual(calcularTEF({ zona: initialInputs.zona, coeficientesA: DEFAULT_A, personal: 10, potenciaHP: 20, superficieM2: 30, corrientesY: ['Y8'], tieneISO }));
+    expect(ref.current).not.toHaveProperty('getResult');
     expect(ref.current?.getInputs()).toEqual(initialInputs);
   });
+});
+
+
+it('the legacy public step snapshots declarations without inventing R or a monetary result', () => {
+  const ref = React.createRef<StepTEFHandle>();
+  render(<StepTEF ref={ref} form={{corrientesControl:'Y8',certificacionISO:'2026-01-01'}} isGenerador isOperador={false} />);
+  fireEvent.change(screen.getByLabelText('Cantidad de Personal'), {target:{value:'32'}});
+  const snapshot = ref.current!.snapshotTEF();
+  expect(snapshot.tefPersonal).toBe('32');
+  expect(JSON.parse(snapshot.tefInputs).personal).toBe(32);
+  expect(snapshot).not.toHaveProperty('factorR');
+  expect(snapshot).not.toHaveProperty('montoMxR');
 });

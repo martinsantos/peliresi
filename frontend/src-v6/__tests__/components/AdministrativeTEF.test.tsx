@@ -31,8 +31,8 @@ describe('TEF belongs to administrative evaluation, not the public applicant', (
     fireEvent.click(screen.getByText('Evaluación TEF · Administración'));
     fireEvent.change(screen.getByLabelText('Cantidad de Personal'),{target:{value:'35'}});
     view.rerender(<AdministrativeTEF {...props} declaration={{...props.declaration,tefPersonal:'50'}} />);
-    fireEvent.click(screen.getByRole('button',{name:'Conservar mi simulación'}));
-    expect(screen.getByText(/Simulación basada en la declaración anterior/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button',{name:'Conservar mis ajustes'}));
+    expect(screen.getByText(/Revisión basada en la declaración anterior/)).toBeVisible();
     expect(screen.getByLabelText('Cantidad de Personal')).toHaveValue(35);
     expect(screen.getByLabelText('Cantidad de Personal')).toBeEnabled();
     view.rerender(<AdministrativeTEF {...props} declaration={{...props.declaration,tefPersonal:'60'}} />);
@@ -40,7 +40,7 @@ describe('TEF belongs to administrative evaluation, not the public applicant', (
     view.rerender(<AdministrativeTEF {...props} identity="qa-other" declaration={{...props.declaration,tefPersonal:'10'}} />);
     fireEvent.click(screen.getByText('Evaluación TEF · Administración'));
     expect(screen.getByLabelText('Cantidad de Personal')).toHaveValue(10);
-    expect(screen.queryByText(/Simulación basada en la declaración anterior/)).toBeNull();
+    expect(screen.queryByText(/Revisión basada en la declaración anterior/)).toBeNull();
     fireEvent.change(screen.getByLabelText('Cantidad de Personal'),{target:{value:'77'}});
     auth.rol='ADMIN_GENERADOR';view.rerender(<AdministrativeTEF {...props} identity="qa-other" declaration={{...props.declaration,tefPersonal:'10'}} />);
     fireEvent.click(screen.getByText('Evaluación TEF · Administración'));
@@ -56,8 +56,8 @@ describe('TEF belongs to administrative evaluation, not the public applicant', (
     expect(screen.getByLabelText('Cantidad de Personal')).toHaveValue(32);
     expect(screen.getByLabelText('Potencia Instalada en HP')).toHaveValue(120);
     expect(screen.getByLabelText('Superficie Cubierta en M2')).toHaveValue(1250);
-    expect(screen.getByText(/no guardan un importe, no emiten una liquidación/)).toBeVisible();
-    expect(screen.getByText(/Fórmula y parámetros pendientes de verificación normativa/)).toBeVisible();
+    expect(screen.getByText(/no guardan datos ni modifican la liquidación/)).toBeVisible();
+    expect(screen.getByText(/El cálculo está en revisión/)).toBeVisible();
     fireEvent.click(screen.getByText('Evaluación TEF · Administración'));
     expect(details).not.toHaveAttribute('open');
   });

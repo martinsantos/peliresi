@@ -50,7 +50,7 @@ const STEPS = [
   { id: 2, label: 'Domicilios', icon: MapPin },
   { id: 3, label: 'Representantes', icon: Users },
   { id: 4, label: 'Residuos', icon: Biohazard },
-  { id: 5, label: 'Calculo TEF', icon: Calculator },
+  { id: 5, label: 'Datos TEF', icon: Calculator },
   { id: 6, label: 'Regulatorio', icon: ClipboardList },
   { id: 7, label: 'Adjuntos', icon: Upload },
 ];
@@ -612,7 +612,7 @@ const NuevoOperadorPage: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Calculator size={20} className="text-primary-600" />
                 <div>
-                  <h3 className="text-lg font-bold text-neutral-900">Calculo de la T.E.F.</h3>
+                  <h3 className="text-lg font-bold text-neutral-900">Datos para evaluación TEF</h3>
                   <p className="text-xs text-neutral-500">Decreto Reglamentario 2625/99 — Ley Provincial 5917</p>
                 </div>
               </div>

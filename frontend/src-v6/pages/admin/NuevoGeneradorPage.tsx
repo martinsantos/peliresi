@@ -48,7 +48,7 @@ const STEPS = [
   { id: 1, label: 'Identificacion', icon: Factory },
   { id: 2, label: 'Domicilios', icon: MapPin },
   { id: 3, label: 'Residuos', icon: Biohazard },
-  { id: 4, label: 'Calculo TEF', icon: Calculator },
+  { id: 4, label: 'Datos TEF', icon: Calculator },
   { id: 5, label: 'Regulatorio', icon: ClipboardList },
   { id: 6, label: 'Adjuntos', icon: Upload },
 ];
@@ -509,7 +509,7 @@ const NuevoGeneradorPage: React.FC = () => {
         {/* ===== PASO 4: Calculo TEF + ISO date ===== */}
         {step === 4 && (
           <div className="space-y-6">
-            {/* ISO date input — here because it affects TEF */}
+            {/* Fecha de certificación declarada, sin multiplicador fiscal automático */}
             <Card>
               <CardHeader><div className="flex items-center gap-2"><ClipboardList size={20} className="text-green-600" /><h3 className="text-lg font-bold text-neutral-900">Norma ISO 14000</h3></div></CardHeader>
               <CardContent>
@@ -517,10 +517,7 @@ const NuevoGeneradorPage: React.FC = () => {
                 <div className="max-w-xs">
                   <Input label="Fecha Certificacion ISO 14000" type="date" value={form.certificacionISO} onChange={e => up('certificacionISO', e.target.value)} />
                 </div>
-                <div className={`mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${form.certificacionISO ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-neutral-50 text-neutral-500 border border-neutral-200'}`}>
-                  Factor ISO: <span className="font-bold font-mono">{form.certificacionISO ? '2' : '1'}</span>
-                  <span className="text-xs">({form.certificacionISO ? 'Posee ISO — factor x2' : 'Sin ISO — factor x1'})</span>
-                </div>
+
               </CardContent>
             </Card>
 
@@ -529,7 +526,7 @@ const NuevoGeneradorPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Calculator size={20} className="text-primary-600" />
                   <div>
-                    <h3 className="text-lg font-bold text-neutral-900">Datos para el Calculo de la T.E.F.</h3>
+                    <h3 className="text-lg font-bold text-neutral-900">Datos para evaluación TEF</h3>
                     <p className="text-xs text-neutral-500">Decreto Reglamentario 2625/99 — Ley Provincial 5917</p>
                   </div>
                 </div>
