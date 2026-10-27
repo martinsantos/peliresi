@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-25",
+  "synthetic": true,
+  "productionCapture": false,
+  "edited": false,
+  "physicalAndroid": false,
+  "note": "Tres casos artificiales distintos en el preview; la secuencia es ilustrativa, no un único expediente.",
+  "supersedes": [
+    {
+      "file": "mobile/actor-inspection-20261012.png",
+      "replacement": "mobile/psip-actor-pending-20261025.jpg",
+      "guide": "actor-mis-inspecciones",
+      "reason": "La vista anterior mostraba el módulo de Inspecciones; el actor ahora abre sólo el requerimiento autorizado."
+    },
+    {
+      "file": "desktop/actor-inspection-closed-20261012.png",
+      "replacement": "mobile/psip-actor-decision-20261025.jpg",
+      "guide": "actor-mis-inspecciones",
+      "reason": "La vista anterior mostraba el módulo de Inspecciones; el resultado se consulta desde el requerimiento autorizado."
+    }
+  ],
+  "files": [
+    {
+      "file": "mobile/psip-actor-notice-20261025.jpg",
+      "source": "uiux-psip-context-20261025/app-notice-393.png",
+      "case": "aviso",
+      "sha256": "a1ec843a848f88cf2c8fc0bba9d9204cb97ac223d5b63b669083548a11bbe8d5",
+      "width": 393,
+      "height": 900,
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "mobile/psip-actor-pending-20261025.jpg",
+      "source": "uiux-psip-context-20261025/generator-draft-recovered-app.png",
+      "case": "pedido",
+      "sha256": "61433e6690c320ec0867c7da1253d4eb42b4dad36bc372a843f9cbb09060bece",
+      "width": 393,
+      "height": 852,
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "mobile/psip-actor-decision-20261025.jpg",
+      "source": "uiux-psip-retry-20261025/app-operador-result.png",
+      "case": "decisión",
+      "sha256": "419c53e92f426faba02b87b6692dccab500c0d380281b1b7aec17c1bac59a89c",
+      "width": 393,
+      "height": 900,
+      "mime": "image/jpeg"
+    }
+  ]
+}

@@ -31,8 +31,13 @@ test('admission and its gallery never advertise the withdrawn fiscal estimate as
     assert.ok(!moduleBody.includes(old), old);
     assert.ok(!gallery.includes(old), old);
   }
-  assert.match(moduleBody, /tef-review-pending-20261026\.png/);
-  assert.match(gallery, /tef-review-pending-20261026\.png/);
+  assert.match(moduleBody, /tef-review-pending-20261026\.jpg/);
+  assert.match(gallery, /tef-review-pending-20261026\.jpg/);
+  for (const match of gallery.matchAll(/<img src="screenshots\/([^"]+)"/g)) {
+    assert.match(match[1], /\.jpg$/);
+    const bytes = readFileSync(new URL('../../docs/manual/screenshots/' + match[1], import.meta.url));
+    assert.equal(bytes.readUInt16BE(0), 0xffd8, match[1] + ' is JPEG');
+  }
 });
 
 test('actor use cases do not promise a calculated TEF amount', () => {

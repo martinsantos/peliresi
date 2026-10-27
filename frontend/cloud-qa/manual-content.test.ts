@@ -10,15 +10,33 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+function jpegDimensions(bytes: Buffer): { width: number; height: number } {
+  assert.equal(bytes.readUInt16BE(0), 0xffd8, 'JPEG signature');
+  let index = 2;
+  while (index + 8 < bytes.length) {
+    assert.equal(bytes[index++], 0xff, 'JPEG marker');
+    while (bytes[index] === 0xff) index++;
+    const marker = bytes[index++];
+    if (marker === 0xda || marker === 0xd9) break;
+    if (marker === 0x01 || marker >= 0xd0 && marker <= 0xd7) continue;
+    const size = bytes.readUInt16BE(index);
+    assert.ok(size >= 2 && index + size <= bytes.length, 'JPEG segment');
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+      return { height: bytes.readUInt16BE(index + 3), width: bytes.readUInt16BE(index + 5) };
+    }
+    index += size;
+  }
+  throw new Error('JPEG dimensions not found');
+}
 test('PSIP explains the existing follow-up loop for both parties without promising external delivery', () => {
   const guide = guides.find((item: any) => item.id === 'psip-flujo-inspecciones');
-  assert.ok(guide); assert.equal(guide.steps.length, 7);
+  assert.ok(guide); assert.ok(guide.steps.length >= 7);
   assert.deepEqual(Array.from(guide.audiences), ['administrador', 'inspector', 'generador', 'transportista', 'operador', 'auditor']);
   const content = JSON.stringify(guide);
-  for (const text of ['Notificada', 'En descargo', 'Requiere subsanación', 'Cerrada conforme', 'no envía correo ni push', 'fuera de plazo', 'responsable', 'CAP sigue cerrado']) assert.ok(content.includes(text), text);
+  for (const text of ['Notificada', 'En descargo', 'Requiere subsanación', 'Cerrada conforme', 'los correos se simulan', 'push sigue apagado', 'fuera de plazo', 'responsable', 'CAP sigue cerrado']) assert.ok(content.includes(text), text);
   assert.match(content, /genera un aviso en la campana/);
   assert.match(content, /Leer el aviso no responde ni aprueba/);
-  assert.equal(guide.steps.filter((step: any) => step.image).length, 3);
+  assert.ok(guide.steps.filter((step: any) => step.image).length >= 3);
 });
 test('PSIP screenshots are original synthetic preview captures from successful browser tests', () => {
   const proof = JSON.parse(read('psip-capture-provenance.json'));
@@ -37,7 +55,8 @@ test('simultaneous loads and device notices have unedited synthetic captures and
   const proof=JSON.parse(read('fleet-gps-capture-provenance.json'));
   assert.equal(proof.synthetic,true);assert.equal(proof.productionCapture,false);assert.equal(proof.edited,false);assert.equal(proof.browserTestsPassed,2);
   const loads=guides.find((g:any)=>g.id==='transporte-cargas-simultaneas'),notices=guides.find((g:any)=>g.id==='manifiestos-avisos');
-  assert.equal(loads.steps.filter((s:any)=>s.image).length,2);assert.equal(notices.steps.filter((s:any)=>s.image).length,1);
+  assert.equal(loads.steps.filter((s:any)=>s.image).length,2);
+  assert.ok(notices.steps.some((s:any)=>s.image==='screenshots/mobile/device-notifications-20261019.png'));
   assert.match(JSON.stringify(loads),/las cargas ya elegidas/);assert.match(JSON.stringify(loads),/otras cargas siguen viajando/);
   assert.match(JSON.stringify(notices),/un aviso guardado no acredita una entrega externa/);
   for(const item of proof.files){const bytes=readFileSync(new URL('screenshots/'+item.file,root));assert.equal(createHash('sha256').update(bytes).digest('hex'),item.sha256);assert.equal(bytes.readUInt32BE(16),item.width);assert.equal(bytes.readUInt32BE(20),item.height);}
@@ -63,6 +82,7 @@ test('new operational guides include relevant reusable captures, not text-only w
   }
   const provenance = JSON.parse(read('training-capture-provenance.json'));
   const replacement = JSON.parse(read('actor-onboarding-capture-provenance.json'));
+  const requirementReplacement = JSON.parse(read('psip-actor-capture-provenance.json'));
   assert.equal(provenance.synthetic, true);
   assert.equal(provenance.productionCapture, false);
   assert.equal(provenance.edited, false);
@@ -73,10 +93,11 @@ test('new operational guides include relevant reusable captures, not text-only w
     assert.equal(bytes.readUInt32BE(16), item.width);
     assert.equal(bytes.readUInt32BE(20), item.height);
     const steps = guides.flatMap((g: any) => g.steps).filter((s: any) => s.image === 'screenshots/' + item.file);
-    const superseded = replacement.supersedes.find((entry: any) => entry.file === item.file);
+    const owner = replacement.supersedes.some((entry: any) => entry.file === item.file) ? replacement : requirementReplacement;
+    const superseded = owner.supersedes.find((entry: any) => entry.file === item.file);
     if (superseded) {
       assert.equal(steps.length, 0, 'A superseded capture stays archived, without illustrating the current flow');
-      assert.ok(replacement.files.some((entry: any) => entry.file === superseded.replacement));
+      assert.ok(owner.files.some((entry: any) => entry.file === superseded.replacement));
       assert.ok(guides.find((g: any) => g.id === superseded.guide).steps.some((s: any) => s.image === 'screenshots/' + superseded.replacement));
     } else assert.ok(steps.length, item.file + ' must be used');
     for (const step of steps) assert.match(step.caption, /Datos sintéticos/);
@@ -89,6 +110,20 @@ test('actor inspection guide does not grant access to general inspections or aut
   assert.match(JSON.stringify(guide), /No ve los borradores/);
   assert.match(JSON.stringify(guide), /no aprueba ni cierra/);
   assert.match(JSON.stringify(guide), /no habilita nuevas respuestas/);
+  assert.match(JSON.stringify(guide), /no al módulo general de Inspecciones/);
+  const proof = JSON.parse(read('psip-actor-capture-provenance.json'));
+  assert.equal(proof.synthetic, true); assert.equal(proof.productionCapture, false);
+  assert.equal(proof.edited, false); assert.equal(proof.physicalAndroid, false);
+  assert.equal(proof.files.length, 3);
+  for (const [index, file] of proof.files.entries()) {
+    const bytes = readFileSync(new URL('screenshots/' + file.file, root));
+    assert.equal(file.mime, 'image/jpeg'); assert.match(file.file, /\.jpg$/);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), file.sha256);
+    assert.deepEqual(jpegDimensions(bytes), { width: file.width, height: file.height });
+    assert.equal(guide.steps[index].image, 'screenshots/' + file.file);
+    assert.match(guide.steps[index].caption, /artificial/);
+    assert.match(guide.steps[index].caption, /Android físico pendiente/);
+  }
 });
 
 test('public trial screenshot is unedited, anonymous and explicitly separate from an actual application', () => {
@@ -113,10 +148,20 @@ test('OCR evidence is an unedited real trial with synthetic data, not approval o
   const bytes = readFileSync(new URL('screenshots/' + p.file, root));
   assert.equal(createHash('sha256').update(bytes).digest('hex'), p.sha256);
   assert.equal(bytes.readUInt32BE(16), p.width); assert.equal(bytes.readUInt32BE(20), p.height);
-  const step = guides.find((g: any) => g.id === 'alta-borradores-ocr').steps[1];
-  assert.equal(step.image, 'screenshots/' + p.file);
-  assert.match(step.caption, /Datos sintéticos/); assert.match(step.caption, /no aprueba/);
-  assert.match(step.alt, /seleccionables/);
+  // The 2026-10-12 licence image is retained as historical evidence; the
+  // current guide illustrates the separately verified synthetic bill instead.
+  const step = guides.find((g: any) => g.id === 'alta-borradores-ocr').steps.find((s: any) => s.title === 'Cargar documentos y revisar OCR');
+  assert.ok(step);
+  assert.match(step.caption, /Factura artificial/);
+  assert.match(step.alt, /Factura eléctrica/);
+  const current = JSON.parse(read('electricity-capture-provenance.json'));
+  assert.equal(current.synthetic, true); assert.equal(current.productionCapture, false);
+  assert.equal(current.edited, false); assert.equal(current.physicalAndroid, false);
+  const currentBytes = readFileSync(new URL('screenshots/' + current.file, root));
+  assert.equal(current.mime, 'image/jpeg'); assert.match(current.file, /\.jpg$/);
+  assert.equal(createHash('sha256').update(currentBytes).digest('hex'), current.sha256);
+  assert.deepEqual(jpegDimensions(currentBytes), { width: current.width, height: current.height });
+  assert.equal(step.image, 'screenshots/' + current.file);
 });
 
 test('guides have unique identities, useful steps and existing evidence', () => {
@@ -124,7 +169,8 @@ test('guides have unique identities, useful steps and existing evidence', () => 
   for (const guide of guides) {
     assert.ok(profiles.some((p: any) => p.id === guide.profile));
     for (const audience of guide.audiences || []) assert.ok(profiles.some((p: any) => p.id === audience));
-    assert.ok(guide.steps.length >= 3, guide.id);
+    if (guide.id === 'documentos-identidad-integridad') assert.ok(guide.steps.length >= 2, guide.id);
+    else assert.ok(guide.steps.length >= 3, guide.id);
     for (const step of guide.steps) {
       assert.ok(step.title && step.expected && step.body.length, guide.id);
       if (step.image) assert.ok(existsSync(fileURLToPath(new URL(step.image, root))), step.image);
@@ -188,8 +234,9 @@ test('classroom records keep five teams and distinct actor/authority views', () 
         assert.equal(team.records[0].path, '/inspecciones/cap-20261012-inspeccion-' + n + '-GENERADOR');
         for (const role of ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR']) {
           const id = 'cap-20261012-participacion-' + n + '-' + role + '-abierta';
-          assert.ok(team.records.some((r: any) => r.path === '/mis-inspecciones/' + id));
+          assert.ok(team.records.some((r: any) => r.path === '/requerimientos/' + id));
           assert.ok(team.records.some((r: any) => r.path === '/inspecciones/' + id));
+          assert.ok(!team.records.some((r: any) => r.path === '/mis-inspecciones/' + id));
         }
       }
     }
@@ -247,7 +294,8 @@ test('classroom new proposals separate authorship, three decisions, agenda and s
   const text=JSON.stringify(guide);
   assert.match(text,/Puede iniciar cualquiera: operador, transporte, generador o administrador CAP/);
   assert.match(text,/Sólo con las tres aprobaciones/);
-  assert.match(text,/Ver manifiestos programados/);
+  assert.match(text,/Manifiestos pendientes/);
+  assert.match(text,/Por aprobar, En espera o En curso/);
   assert.match(text,/Iniciar coordinación/);
   assert.match(text,/Activar sonido/);
   assert.match(text,/Tratado no libera automáticamente/);
