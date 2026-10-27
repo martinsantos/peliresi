@@ -73,7 +73,7 @@ function CompanyCreate({done,draftKey}:{done:(c:Company)=>Promise<void>;draftKey
  </form>;
 }
 function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:()=>Promise<unknown>}){
- const [tab,setTab]=useState('empresa'),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
+ const [tab,setTab]=useState('empresa'),[sectionNotice,setSectionNotice]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
  const confirmedWrite=useRef<{after?:()=>void}|null>(null),[awaitingRead,setAwaitingRead]=useState(false);
  const recoveryNotice=useRef<HTMLDivElement>(null);
  const [openedTabs,setOpenedTabs]=useState<Record<string,boolean>>({empresa:true});
@@ -114,39 +114,50 @@ function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:
   catch(e){if(!failed?.(e)){setError(message(e));if((e as any)?.response?.status===409)void query.refetch();}}
   finally{setBusy(false);lock.current=false;}
  }
+ useEffect(()=>{
+  if(query.isSuccess&&query.data&&!query.data.puedeGestionar&&['personas','historial'].includes(tab)){
+   setTab('empresa');setSectionNotice('Tu acceso de gestión cambió. Podés consultar los datos disponibles de la empresa.');
+  }
+ },[query.isSuccess,query.data?.puedeGestionar,tab]);
  const unavailable=[401,403,404].includes((query.error as any)?.response?.status);
  if(unavailable)return <Card><p role="alert">Ya no está disponible el acceso a esta empresa en el contexto actual.</p><Button onClick={()=>void query.refetch()}>Reintentar empresa</Button></Card>;
  if(!query.data)return query.isError?<div role="alert"><p>No pudimos abrir la empresa.</p><Button onClick={()=>void query.refetch()}>Reintentar empresa</Button></div>:<p role="status">Cargando empresa…</p>;
  const d=query.data;
+ const sections=[['empresa','Empresa'],['sedes','Establecimientos'],['personas','Personas autorizadas'],['historial','Historial']].filter(([key])=>d.puedeGestionar||!['personas','historial'].includes(key));
+ const visibleTab=sections.some(([key])=>key===tab)?tab:'empresa';
+ const chooseSection=(key:string)=>{if(!sections.some(([value])=>value===key))return;setOpenedTabs(opened=>({...opened,[key]:true}));setTab(key);setSectionNotice('');};
  return <>
   {query.isFetching&&!busy&&<p role="status" className="text-sm text-neutral-700">Actualizando datos de la empresa…</p>}
   {query.isError&&<div ref={recoveryNotice} tabIndex={-1} role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 focus:outline-none focus:ring-2 focus:ring-primary-700"><p>{awaitingRead?'El cambio fue registrado, pero no pudimos actualizar la empresa. Reintentá la consulta; no vuelvas a enviar el cambio.':'No pudimos actualizar la empresa. Conservamos lo escrito; reintentá la consulta antes de continuar.'}</p><Button variant="outline" disabled={query.isFetching} onClick={()=>void query.refetch()}>Reintentar empresa</Button></div>}
   <fieldset disabled={busy||query.isError||awaitingRead} className="min-w-0 space-y-5">
   <WorkspaceChoices key={id} choices={d.contextos||[]}/>
-  <nav className="flex gap-2 overflow-x-auto border-b border-neutral-200" aria-label="Secciones de empresa">{[['empresa','Empresa'],['sedes','Establecimientos'],['personas','Personas autorizadas'],['historial','Historial']].filter(([key])=>d.puedeGestionar||!['personas','historial'].includes(key)).map(([key,title])=><button type="button" key={key} className={'min-h-11 shrink-0 border-b-2 px-3 font-medium '+(tab===key?'border-primary-700 text-primary-800':'border-transparent text-neutral-600')} aria-current={tab===key?'page':undefined} onClick={()=>{setOpenedTabs(opened=>({...opened,[key]:true}));setTab(key);}}>{title}</button>)}</nav>
+  <div className="sm:hidden"><NativeSelect label="Sección de empresa" value={visibleTab} onChange={chooseSection}>{sections.map(([key,title])=><option key={key} value={key}>{title}</option>)}</NativeSelect></div>
+  <nav className="hidden gap-2 overflow-x-auto border-b border-neutral-200 sm:flex" aria-label="Secciones de empresa">{sections.map(([key,title])=><button type="button" key={key} className={'min-h-11 shrink-0 border-b-2 px-3 font-medium '+(visibleTab===key?'border-primary-700 text-primary-800':'border-transparent text-neutral-600')} aria-current={visibleTab===key?'page':undefined} onClick={()=>chooseSection(key)}>{title}</button>)}</nav>
+  {sectionNotice&&<p role="status" className="text-sm text-neutral-700">{sectionNotice}</p>}
   {error&&<p role="alert" className="rounded-lg border border-error-200 bg-error-50 p-3 text-error-800">{error}</p>}{notice&&<p role="status" className="text-primary-800">{notice}</p>}
   {/* Keep visited forms mounted; hidden sections pause effects and stay out of keyboard navigation. */}
-  <Activity mode={tab==='empresa'?'visible':'hidden'}><CompanyForm key={savedForms.company||0} draftKey={companyDraftKey(scope,id,'legal')} company={d.empresa} manage={d.puedeGestionar} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id,'PUT',data),()=>resetForm('company'),confirmed)}/>{d.puedeValidar&&<AuthorityTools id={id} draftKey={companyDraftKey(scope,id,'authority')} details={d} busy={busy} run={run}/>}</Activity>
-  {openedTabs.sedes&&<Activity mode={tab==='sedes'?'visible':'hidden'}><div className="space-y-3">{d.establecimientos.map(s=><Card key={s.id}><h2 className="font-semibold">{s.nombre}</h2><p>{s.domicilio||'Domicilio productivo por completar'}{s.localidad?', '+s.localidad:''}{s.departamento?', '+s.departamento:''}</p><p className="text-sm text-neutral-600">{s.codigo} · {s.activo?'Activo':'Inactivo'}</p>{Array.isArray(s.certificados)&&s.certificados.length>0&&<p className="text-sm">Certificados: {s.certificados.join(', ')}</p>}{d.puedeGestionar&&<details className="mt-2"><summary className="min-h-11 cursor-pointer text-primary-800">Editar establecimiento</summary><SiteForm key={savedForms[s.id]||0} draftKey={companyDraftKey(scope,id,'site:'+s.id)} site={s} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id+'/establecimientos/'+s.id,'PUT',data),()=>resetForm(s.id),confirmed)}/></details>}</Card>)}</div>
+  <Activity mode={visibleTab==='empresa'?'visible':'hidden'}><CompanyForm key={savedForms.company||0} draftKey={companyDraftKey(scope,id,'legal')} company={d.empresa} manage={d.puedeGestionar} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id,'PUT',data),()=>resetForm('company'),confirmed)}/>{d.puedeValidar&&<AuthorityTools id={id} draftKey={companyDraftKey(scope,id,'authority')} details={d} busy={busy} run={run}/>}</Activity>
+  {openedTabs.sedes&&<Activity mode={visibleTab==='sedes'?'visible':'hidden'}><div className="space-y-3">{d.establecimientos.map(s=><Card key={s.id}><h2 className="font-semibold">{s.nombre}</h2><p>{s.domicilio||'Domicilio productivo por completar'}{s.localidad?', '+s.localidad:''}{s.departamento?', '+s.departamento:''}</p><p className="text-sm text-neutral-600">{s.codigo} · {s.activo?'Activo':'Inactivo'}</p>{Array.isArray(s.certificados)&&s.certificados.length>0&&<p className="text-sm">Certificados: {s.certificados.join(', ')}</p>}{d.puedeGestionar&&<details className="mt-2"><summary className="min-h-11 cursor-pointer text-primary-800">Editar establecimiento</summary><SiteForm key={savedForms[s.id]||0} draftKey={companyDraftKey(scope,id,'site:'+s.id)} site={s} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id+'/establecimientos/'+s.id,'PUT',data),()=>resetForm(s.id),confirmed)}/></details>}</Card>)}</div>
    {!d.establecimientos.length&&<p>No hay establecimientos cargados.</p>}{d.puedeGestionar&&<Card><h2 className="font-semibold">Agregar establecimiento</h2><SiteForm key={savedForms.newSite||0} draftKey={companyDraftKey(scope,id,'new-site')} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id+'/establecimientos','POST',data),()=>resetForm('newSite'),confirmed)}/></Card>}</Activity>}
-  {openedTabs.personas&&d.puedeGestionar&&<Activity mode={tab==='personas'?'visible':'hidden'}><People id={id} draftKey={companyDraftKey(scope,id,'people')} details={d} refresh={async()=>{const result=await query.refetch();return result.isSuccess?result.data:undefined;}} verified={query.isSuccess&&!query.isFetching&&!busy} busy={busy} run={run}/></Activity>}
-  {tab==='historial'&&d.puedeGestionar&&<Card><h2 className="font-semibold mb-3">Últimos 50 cambios</h2><ol className="divide-y divide-neutral-100">{d.eventos.map(e=><li className="py-3 break-words" key={e.id}><p className="font-medium">{e.tipo.replaceAll('_',' ')}</p><p className="text-sm">{new Date(e.createdAt).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza'})} · Persona: {e.usuarioId}</p>{e.datos?.motivo&&<p>{e.datos.motivo}</p>}</li>)}</ol>{!d.eventos.length&&<p>Sin cambios registrados.</p>}</Card>}
+  {openedTabs.personas&&d.puedeGestionar&&<Activity mode={visibleTab==='personas'?'visible':'hidden'}><People id={id} draftKey={companyDraftKey(scope,id,'people')} details={d} refresh={async()=>{const result=await query.refetch();return result.isSuccess?result.data:undefined;}} verified={query.isSuccess&&!query.isFetching&&!busy} busy={busy} run={run}/></Activity>}
+  {visibleTab==='historial'&&d.puedeGestionar&&<Card><h2 className="font-semibold mb-3">Últimos 50 cambios</h2><ol className="divide-y divide-neutral-100">{d.eventos.map(e=><li className="py-3 break-words" key={e.id}><p className="font-medium">{e.tipo.replaceAll('_',' ')}</p><p className="text-sm">{new Date(e.createdAt).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza'})} · Persona: {e.usuarioId}</p>{e.datos?.motivo&&<p>{e.datos.motivo}</p>}</li>)}</ol>{!d.eventos.length&&<p>Sin cambios registrados.</p>}</Card>}
  </fieldset></>;
 }
 function WorkspaceChoices({choices}:{choices:CompanyChoice[]}){
  const {currentUser}=useAuth(),mp=useMobilePrefix();
  const initialChoice=choices.find(c=>c.empresaId===currentUser?.empresaContexto?.empresaId&&c.actividadId===currentUser?.empresaContexto?.actividadId)
   ||choices.find(c=>c.rol===currentUser?.rol)||(choices.length===1?choices[0]:undefined);
- const [selection,setSelection]=useState(initialChoice?.actividadId||''),[site,setSite]=useState(currentUser?.empresaContexto?.establecimientoId||''),[error,setError]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
+ const [selection,setSelection]=useState(initialChoice?.actividadId||''),[site,setSite]=useState(initialChoice?.empresaId===currentUser?.empresaContexto?.empresaId&&initialChoice?.actividadId===currentUser?.empresaContexto?.actividadId?(currentUser?.empresaContexto?.establecimientoId||initialChoice?.establecimientos[0]?.id||''):(initialChoice?.establecimientos[0]?.id||'')),[error,setError]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
  // Keep the user's choice across reads. If it disappears, require a new choice
  // instead of silently moving the next action to a different role.
  const choice=choices.find(c=>c.actividadId===selection);
  const unavailable=!!selection&&!choice;
- const siteId=choice?.establecimientos.find(s=>s.id===site)?.id||choice?.establecimientos[0]?.id||'';
- const missingScope=!!choice&&!choice.todosEstablecimientos&&!siteId;
+ const siteId=choice?.establecimientos.find(s=>s.id===site)?.id||'';
+ const unavailableSite=!!choice&&!!site&&!siteId;
+ const missingScope=!!choice&&(unavailableSite||((choice.establecimientos.length>0||!choice.todosEstablecimientos)&&!siteId));
  async function choose(personal=false){if(!currentUser||lock.current||!personal&&(!choice||missingScope))return;lock.current=true;setBusy(true);setError('');try{
   if(personal)saveCompanyContext(String(currentUser.id),null);
-  else if(choice){const next={empresaId:choice.empresaId,actividadId:choice.actividadId,...(siteId?{establecimientoId:siteId}:{})};const result=await api.get('/auth/profile',{headers:companyHeaders(next)});if(result.data.data.user.empresaContexto?.empresaId!==next.empresaId)throw new Error('Contexto incompatible');saveCompanyContext(String(currentUser.id),next);}
+  else if(choice){const next={empresaId:choice.empresaId,actividadId:choice.actividadId,...(siteId?{establecimientoId:siteId}:{})};const result=await api.get('/auth/profile',{headers:companyHeaders(next)});const verified=result.data?.data?.user?.empresaContexto;if(verified?.empresaId!==next.empresaId||verified?.actividadId!==next.actividadId||(verified?.establecimientoId||undefined)!==next.establecimientoId){setError('No pudimos confirmar la actividad y el establecimiento elegidos. Volvé a intentarlo.');setBusy(false);lock.current=false;return;}saveCompanyContext(String(currentUser.id),next);}
   clearOfflineSession();window.location.replace((window.location.pathname.startsWith('/app/')?'/app':'')+mp('/dashboard'));
  }catch(e){setError(message(e));setBusy(false);lock.current=false;}}
  const active=currentUser?.empresaContexto;
@@ -158,14 +169,16 @@ function WorkspaceChoices({choices}:{choices:CompanyChoice[]}){
   </summary>
   <div className="border-t border-neutral-200 py-4">
    {choices.length>0?<div className="grid gap-3 sm:grid-cols-2">
-    {choices.length>1||!choice?<NativeSelect label="Actividad autorizada" value={choice?.actividadId||''} onChange={v=>{setSelection(v);setSite('');setError('');}}>
+    {choices.length>1||!choice?<NativeSelect label="Actividad autorizada" value={choice?.actividadId||''} onChange={v=>{setSelection(v);setSite(choices.find(c=>c.actividadId===v)?.establecimientos[0]?.id||'');setError('');}}>
      {!choice&&<option value="">Elegí una actividad</option>}
      {choices.map(c=><option key={c.actividadId} value={c.actividadId}>{labels[c.rol]||c.rol}</option>)}
     </NativeSelect>:<p className="flex min-h-11 items-center text-sm text-neutral-700">Actividad autorizada: <strong className="ml-1">{labels[choice.rol]||choice.rol}</strong></p>}
-    {!!choice?.establecimientos.length&&<NativeSelect label="Establecimiento para operar" value={siteId} onChange={setSite}>{choice.establecimientos.map(s=><option key={s.id} value={s.id}>{s.nombre} · {s.codigo}</option>)}</NativeSelect>}
+    {!!choice?.establecimientos.length&&<NativeSelect label="Establecimiento para operar" value={siteId} onChange={setSite}>{!siteId&&<option value="">Elegí un establecimiento</option>}{choice.establecimientos.map(s=><option key={s.id} value={s.id}>{s.nombre} · {s.codigo}</option>)}</NativeSelect>}
     {!choice&&<p role="status" className="text-sm text-neutral-700 sm:col-span-2">{unavailable?'La actividad elegida ya no está disponible. Elegí otra actividad autorizada.':'Elegí la actividad con la que querés operar.'}</p>}
-    {missingScope&&<p role="status" className="text-sm text-neutral-700 sm:col-span-2">No hay establecimientos disponibles dentro de tu autorización. Pedí al responsable de la empresa que revise tu acceso.</p>}
-    <Button className="sm:col-span-2 sm:justify-self-start" disabled={busy||!choice||missingScope} onClick={()=>void choose()}>{siteId?'Usar empresa y establecimiento':'Usar esta actividad'}</Button>
+    {unavailableSite&&<p role="status" className="text-sm text-neutral-700 sm:col-span-2">{choice.establecimientos.length?'El establecimiento elegido ya no está disponible. Elegí otro establecimiento autorizado.':choice.todosEstablecimientos?'El establecimiento elegido ya no está disponible. Podés elegir continuar con la actividad sin establecimiento.':'El establecimiento elegido ya no está disponible. Pedí al responsable de la empresa que revise tu acceso.'}</p>}
+    {unavailableSite&&choice?.todosEstablecimientos&&!choice.establecimientos.length&&<Button variant="outline" className="sm:col-span-2 sm:justify-self-start" disabled={busy} onClick={()=>{setSite('');setError('');}}>Continuar sin establecimiento</Button>}
+    {missingScope&&!unavailableSite&&<p role="status" className="text-sm text-neutral-700 sm:col-span-2">{choice?.establecimientos.length?'Elegí el establecimiento con el que querés operar.':'No hay establecimientos disponibles dentro de tu autorización. Pedí al responsable de la empresa que revise tu acceso.'}</p>}
+    <Button className="sm:col-span-2 sm:justify-self-start" disabled={busy||!choice||missingScope} onClick={()=>void choose()}>{choice?.establecimientos.length?'Usar empresa y establecimiento':'Usar esta actividad'}</Button>
    </div>:<p>La validación como responsable permite gestionar la empresa. Para operar necesitás una actividad autorizada.</p>}
    {currentUser?.empresaContexto&&<Button className="mt-3" variant="outline" disabled={busy} onClick={()=>void choose(true)}>Volver a mi cuenta personal</Button>}
    {error&&<p role="alert" className="mt-2 text-error-700">{error}</p>}

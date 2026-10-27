@@ -6,11 +6,11 @@ import { render,screen,fireEvent,waitFor,cleanup,act,within } from '@testing-lib
 import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import EmpresasPage from './EmpresasPage';
-const mocks=vi.hoisted(()=>({request:vi.fn(),user:{id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'} as {id:string;rol:string;actorId:string;empresaContexto?:any}}));
+const mocks=vi.hoisted(()=>({request:vi.fn(),get:vi.fn(),user:{id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'} as {id:string;rol:string;actorId:string;empresaContexto?:any}}));
 vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:mocks.user})}));
-vi.mock('../../services/api',()=>({api:{request:mocks.request}}));
+vi.mock('../../services/api',()=>({api:{request:mocks.request,get:mocks.get}}));
 beforeEach(()=>{localStorage.clear();sessionStorage.clear();});
-afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();mocks.request.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();mocks.request.mockReset();mocks.get.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
 const company=(id:string,razonSocial:string)=>({id,cuit:'30712345671',razonSocial,revision:0,domicilioLegal:{calle:'Legal '+id,localidad:'Mendoza',departamento:'Capital'}});
 function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;admin?:boolean;entry?:any;base?:string}={}){
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
@@ -731,4 +731,53 @@ test('a company refresh that removes the selected role does not silently choose 
  await waitFor(()=>expect(screen.getByLabelText('Actividad autorizada')).toHaveValue(''));
  expect(screen.getByText('La actividad elegida ya no está disponible. Elegí otra actividad autorizada.')).toBeInTheDocument();
  expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeDisabled();
+});
+
+const twoSites=()=>[{id:'site-a',nombre:'Sede A',codigo:'A'},{id:'site-b',nombre:'Sede B',codigo:'B'}];
+test.each(['/empresas','/app/empresas'])('%s never substitutes a removed selected establishment with the first remaining one',async entry=>{
+ const extra={contextos:[{...workspaceChoices(['GENERADOR'])[0],establecimientos:twoSites()}]};
+ const state=setup(extra,{entry,base:entry.startsWith('/app')?'/app':undefined});await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Establecimiento para operar'),{target:{value:'site-b'}});
+ extra.contextos=[{...extra.contextos[0],establecimientos:twoSites().slice(0,1)}];await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ await waitFor(()=>expect(screen.getByLabelText('Establecimiento para operar')).toHaveValue(''));
+ expect(screen.getByText('El establecimiento elegido ya no está disponible. Elegí otro establecimiento autorizado.')).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Usar empresa y establecimiento',hidden:true})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('Establecimiento para operar'),{target:{value:'site-a'}});
+ expect(screen.getByRole('button',{name:'Usar empresa y establecimiento',hidden:true})).toBeEnabled();
+ expect(mocks.get).not.toHaveBeenCalled();
+});
+test('removing the last selected establishment never silently expands to the whole company',async()=>{
+ const extra={contextos:workspaceChoices(['GENERADOR'])};const state=setup(extra);await screen.findByLabelText('Calle legal');
+ extra.contextos=[{...extra.contextos[0],establecimientos:[]}];await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeDisabled());
+ fireEvent.click(screen.getByRole('button',{name:'Continuar sin establecimiento',hidden:true}));
+ expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeEnabled();expect(mocks.get).not.toHaveBeenCalled();
+});
+test.each(['actividadId','establecimientoId'])('a mismatched %s returned by profile validation does not save the requested context',async field=>{
+ setup({contextos:workspaceChoices(['GENERADOR'])});await screen.findByLabelText('Calle legal');
+ mocks.get.mockResolvedValue({data:{data:{user:{empresaContexto:{empresaId:'first',actividadId:'GENERADOR',establecimientoId:'site-a',[field]:'wrong'}}}}});
+ fireEvent.click(screen.getByRole('button',{name:'Usar empresa y establecimiento',hidden:true}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos confirmar la actividad y el establecimiento elegidos. Volvé a intentarlo.');
+ expect(sessionStorage.getItem('sitrep_company:person-qa')).toBeNull();expect(localStorage.getItem('sitrep_company:person-qa')).toBeNull();
+});
+test.each(['/empresas','/app/empresas'])('%s section selector preserves the draft and names the current company task',async entry=>{
+ setup({actividades:[{id:'g',rol:'GENERADOR'}]},{entry,base:entry.startsWith('/app')?'/app':undefined});await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Sección de empresa'),{target:{value:'personas'}});
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'sections@qa.invalid'}});
+ fireEvent.change(screen.getByLabelText('Sección de empresa'),{target:{value:'historial'}});
+ expect(screen.getByRole('heading',{name:'Últimos 50 cambios'})).toBeVisible();
+ expect(screen.getByLabelText('Sección de empresa')).toHaveValue('historial');
+ fireEvent.change(screen.getByLabelText('Sección de empresa'),{target:{value:'personas'}});
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('sections@qa.invalid');
+ expect(screen.getByRole('button',{name:'Personas autorizadas'})).toHaveAttribute('aria-current','page');
+});
+test.each(['personas','historial'])('losing management access while in %s falls back to company details instead of a blank workspace',async section=>{
+ const extra={puedeGestionar:true};const state=setup(extra);await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:section==='personas'?'Personas autorizadas':'Historial'}));
+ extra.puedeGestionar=false;await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ expect(await screen.findByRole('heading',{name:'Domicilio legal'})).toBeVisible();
+ expect(screen.getByLabelText('Sección de empresa')).toHaveValue('empresa');
+ expect(screen.getByText('Tu acceso de gestión cambió. Podés consultar los datos disponibles de la empresa.')).toBeVisible();
+ expect(screen.queryByLabelText('Correo de la persona')).toBeNull();
+ expect(screen.queryByRole('button',{name:'Historial'})).toBeNull();
 });
