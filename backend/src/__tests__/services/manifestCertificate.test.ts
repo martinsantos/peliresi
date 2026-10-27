@@ -29,6 +29,7 @@ describe('Operator-issued certificates',()=>{
   expect(result.unresolved).toBe(0);
   expect(result.adendas).toHaveLength(2);
   expect(tx.adendaManifiesto.findMany.mock.calls[0][0].select.rectificaId).toBe(true);
+  expect(tx.adendaManifiesto.findMany.mock.calls[0][0].orderBy).toEqual([{createdAt:'asc'},{id:'asc'}]);
   expect(JSON.stringify(rows)).toBe(before);
  });
  it.each(['PARCIAL','FINAL'])('renders controlled %s email and exact document link without free-text leakage',tipo=>{

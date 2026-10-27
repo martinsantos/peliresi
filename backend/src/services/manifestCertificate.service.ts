@@ -24,7 +24,7 @@ export async function lockManifestDocuments(tx: Prisma.TransactionClient, id: st
  if (!rows.length) throw new AppError('Manifiesto no encontrado',404);
 }
 export async function certificateReadiness(tx: Prisma.TransactionClient, id: string) {
- const adendas = await tx.adendaManifiesto.findMany({where:{manifiestoId:id},select:{id:true,version:true,rectificaId:true,revisiones:true,informeHallazgo:true,declaracion:true,residuos:true}});
+ const adendas = await tx.adendaManifiesto.findMany({where:{manifiestoId:id},orderBy:[{createdAt:'asc'},{id:'asc'}],select:{id:true,version:true,rectificaId:true,revisiones:true,informeHallazgo:true,declaracion:true,residuos:true}});
  const {counts}=documentaryResolution(adendas);
  return {adendas, unresolved: counts.pendientes + counts.observadas + counts.rechazadas, ...certificateFindings(adendas)};
 }
@@ -58,16 +58,22 @@ export function renderManifestCertificate(data: CertificateSnapshot, id: string,
   layout.fields([{label:'Operador',value:data.operador},{label:'Emitido por',value:data.autor}]);
   layout.section('02  TRATAMIENTO CERTIFICADO');
   layout.fields([{label:'Método declarado',value:data.metodo}]);
-  if (data.nota) { layout.text('Observaciones',true,9); layout.text(data.nota); }
+  if (data.nota) layout.text('Observaciones: '+data.nota,false,9);
   layout.text(data.tipo==='FINAL'?'Total recibido y tratado (incluye los parciales previos)':'Cantidad tratada certificada en este parcial',true,10);
   layout.table(['Corriente','Cantidad','Unidad'],data.cantidades.map(row=>[row.corriente,String(row.cantidad),row.unidad]),[260,155,92]);
-  if(data.hallazgosNoTratados?.length) {
-   layout.text('Hallazgos declarados no tratados en esta certificación',true,9);
-   layout.text(data.hallazgosNoTratados.map(row=>row.corriente+' · observado: '+row.observado+' '+row.unidad).join(', '),false,9);
+  if(data.parcialesPrevios.length) layout.text('Parciales previos: '+data.parcialesPrevios.join(', '),false,9);
+  if(data.adendas.length) layout.text((data.tipo==='FINAL'?'Adendas resueltas: ':'Adendas vinculadas: ')+data.adendas.map((a,i)=>'Adenda '+(i+1)+' · versión '+a.version).join(' / '),false,9);
+  const fromFindings=data.cantidades.filter(row=>row.origen==='HALLAZGO');
+  if(fromFindings.length) {
+   layout.text('Origen de corrientes: '+fromFindings.map(row=>{
+    const labels=(row.adendas||[]).map(source=>data.adendas.findIndex(a=>a.id===source.id)).filter(index=>index>=0).map(index=>'adenda '+(index+1));
+    return row.corriente+' · '+(labels.length?labels.join(', '):'adenda vinculada');
+   }).join(' / '),false,9);
   }
-  if(data.parcialesPrevios.length) { layout.text('Parciales previos',true,9); layout.text(data.parcialesPrevios.join(', '),false,9); }
-  if(data.adendas.length) { layout.text(data.tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas',true,9); layout.text(data.adendas.map(a=>a.id+' v'+a.version).join(', '),false,8); }
-  layout.section('03  FIRMA E INTEGRIDAD', 155);
+  if(data.hallazgosNoTratados?.length) {
+   layout.text('No tratadas en esta certificación: '+data.hallazgosNoTratados.map(row=>row.corriente+' · observado: '+row.observado+' '+row.unidad).join(', '),false,9);
+  }
+  layout.section('03  FIRMA E INTEGRIDAD', 185);
   layout.text('Firma manuscrita del operador',true,10);
   const y=doc.y;doc.image(Buffer.from(signature.split(',')[1],'base64'),44,y,{fit:[220,60]});doc.y=y+70;
   layout.text('Registro: '+id,false,8);layout.text('Huella de la firma: '+data.firmaSha256,false,8,PDF_STYLE.muted);

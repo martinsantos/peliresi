@@ -32,8 +32,10 @@ try {
    const data={version:1,tipo,numero:'QA-PDF-'+tipo,manifiestoNumero:'QA-PDF',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Firmante',fecha:new Date().toISOString(),metodo:'QA',nota:'',cantidades:[{residuoId:'qa-r',cantidad:1,corriente:'Y1',unidad:'kg'}],parcialesPrevios:[],adendas:[{id:'qa-adenda',version:1}],firmaSha256:'qa',artificial:true};
    const bytes=await service.renderManifestCertificate(data,'qa-pdf',firma),file=out+'/adenda-label-'+tipo+'.pdf';writeFileSync(file,bytes);
    const text=execFileSync('pdftotext',['-raw',file,'-'],{encoding:'utf8'});
-   assert.ok(text.includes(tipo==='FINAL'?'Adendas resueltas:':'Adendas vinculadas:'));
-   if(tipo==='PARCIAL')assert.ok(!text.includes('Adendas resueltas:'));
+   assert.ok(text.includes(tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas'));
+   assert.match(text,/Adenda 1\s*·\s*versión 1/);
+   assert.ok(!text.includes('qa-adenda'));
+   if(tipo==='PARCIAL')assert.ok(!text.includes('Adendas resueltas'));
   }
   checks.push('partial PDF lists linked addenda without claiming resolution; final labels resolved addenda');
  } else if(phase==='fixtures') {
