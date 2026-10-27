@@ -44,7 +44,7 @@ export function actorWorkspaceNavigation(pathname: string, user: User | null | u
   const fallback = canManage ? route.listPath : route.prefix + (user?.esInspector ? '/actores' : user?.rol === route.role ? '/mi-perfil' : '/dashboard');
   const history = state && typeof state === 'object' && !Array.isArray(state) ? state as { actorReturn?: unknown; inspectionReturn?: unknown; actorDetailReturn?: unknown } : {};
   const candidate = localTarget(history.actorReturn ?? history.inspectionReturn, route.prefix);
-  const entry = candidate && /^\/(?:dashboard|mi-perfil|(?:admin\/)?actores(?:\/(?:generadores|transportistas|operadores))?|manifiestos\/[^/]+(?:\/adendas)?|inspecciones\/[^/]+)\/?$/.test(candidate.path)
+  const entry = candidate && /^\/(?:dashboard|mi-perfil|(?:admin\/)?actores(?:\/(?:generadores|transportistas|operadores))?|manifiestos\/[^/]+(?:\/adendas)?|inspecciones\/[^/]+|notificaciones(?:\/[a-zA-Z0-9_-]{1,100})?)\/?$/.test(candidate.path)
     && !/\/(?:nuevo|editar|renovar)\/?$/.test(candidate.path)
     && user && canAccessMobilePath(user, candidate.path) && canUseCompanySection(user.empresaContexto, candidate.path)
     ? candidate.target : fallback;
@@ -59,11 +59,14 @@ export function actorWorkspaceNavigation(pathname: string, user: User | null | u
   }
   const originPath = origin.slice(route.prefix.length).split(/[?#]/)[0];
   const sectionPath = /^\/manifiestos\//.test(originPath) ? '/manifiestos'
-    : /^\/inspecciones\//.test(originPath) ? '/inspecciones' : originPath;
+    : /^\/inspecciones\//.test(originPath) ? '/inspecciones'
+    : /^\/notificaciones(?:\/|$)/.test(originPath) ? '/notificaciones' : originPath;
   const originRoute = actorWorkspaceRoute(originPath);
   const backLabel = route.stage === 'edit' || route.stage === 'renew' ? 'Volver a la ficha'
     : /^\/manifiestos\//.test(originPath) ? 'Volver al manifiesto'
     : /^\/inspecciones\//.test(originPath) ? 'Volver a la inspección'
+    : /^\/notificaciones\//.test(originPath) ? 'Volver al aviso'
+    : originPath === '/notificaciones' ? 'Volver a Avisos'
     : originPath === '/mi-perfil' ? 'Volver a mi perfil'
     : originRoute?.stage === 'list' ? `Volver a ${originRoute.plural}`
     : /\/actores$/.test(originPath) ? 'Volver a Actores' : 'Volver a Inicio';

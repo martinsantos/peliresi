@@ -7,6 +7,12 @@ import { signatureReminderPhase } from '../jobs/manifestSignatureReminder.job';
 import { getNotificacion } from '../controllers/notification.controller';
 afterEach(() => vi.unstubAllEnvs());
 describe('communication links', () => {
+  it('keeps the explicitly in-app-only fiscal reminder out of email', () => {
+    const notice = { id: 'n-fiscal', tipo: 'INFO_GENERAL', rol: 'GENERADOR', datos: JSON.stringify({
+      tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil',
+    }) };
+    expect(notificationMailContent(notice as any)).toBeNull();
+  });
   it('enriches a historic own PSIP notice with its activity without rewriting the row', async () => {
     const original = { id: 'mine', usuarioId: 'self', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, destino: 'participacion', inspeccionId: 'case-own' }) };
     db.findFirst.mockResolvedValue(original); db.inspectionContexts.mockResolvedValue([{ id: 'case-own', tipoActor: 'OPERADOR' }]);

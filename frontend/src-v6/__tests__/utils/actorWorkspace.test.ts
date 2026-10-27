@@ -66,6 +66,16 @@ for (const prefix of ['', '/app', '/mobile']) describe('actor workspace on ' + (
     const siteUser = { ...user, empresaContexto: { todasSedes: false } } as User;
     expect(actorWorkspaceNavigation(path, siteUser, { actorReturn: prefix + '/admin/actores' })?.backPath).toBe(prefix + '/mi-perfil');
   });
+  it('returns to the specific notice without losing the active section', () => {
+    const user = { id: 'qa', rol: 'GENERADOR', actorId: 'qa' } as User;
+    const detail = prefix + '/admin/actores/generadores/qa';
+    const entry = prefix + '/notificaciones/n-1';
+    const nav = actorWorkspaceNavigation(detail, user, { actorReturn: entry })!;
+    expect(nav.backPath).toBe(entry);
+    expect(nav.backLabel).toBe('Volver al aviso');
+    expect(nav.sectionPath).toBe('/notificaciones');
+    expect(actorWorkspaceNavigation(detail, user, { actorReturn: prefix + '/notificaciones/../dashboard' })?.backPath).toBe(prefix + '/mi-perfil');
+  });
 });
 it('recognizes legacy fiche paths without treating creation as a record', () => {
   expect(actorWorkspaceRoute('/admin/generadores/qa')?.stage).toBe('detail');

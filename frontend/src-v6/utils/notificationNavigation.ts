@@ -47,10 +47,20 @@ export function notificationEnvironmentalCertificate(notice: Pick<Notificacion, 
     ? { role, actorId: data.actorId, documentoId: data.documentoId } : null;
 }
 
+/** A fiscal reminder names the generator and year; it does not grant access. */
+export function notificationFiscalReminder(notice: Pick<Notificacion, 'datos'>) {
+  const data = parseNotificationData(notice.datos);
+  return data.tipo === 'recordatorio_fiscal'
+    && typeof data.generadorId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.generadorId)
+    && typeof data.fiscalYear === 'number' && Number.isInteger(data.fiscalYear) && data.fiscalYear >= 2000 && data.fiscalYear <= 2100
+    ? { role: 'GENERADOR' as const, actorId: data.generadorId, fiscalYear: data.fiscalYear } : null;
+}
+
 export function notificationActorRole(notice: Notificacion): 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | null {
   const data = parseNotificationData(notice.datos);
   const certificate = notificationEnvironmentalCertificate(notice);
   if (certificate) return certificate.role;
+  if (notificationFiscalReminder(notice)) return 'GENERADOR';
   return ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1
     && data.destino === 'participacion' && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))
     ? data.tipoActor as 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' : null;
@@ -68,6 +78,12 @@ function withBasePath(path: string, basePath: string): string {
 /** Opening a workflow notice must refresh its linked expediente/application. */
 export function refreshInspectionNotification(notificacion: Notificacion, queryClient: QueryClient): void {
   const data = parseNotificationData(notificacion.datos);
+  const fiscal = notificationFiscalReminder(notificacion);
+  if (fiscal) {
+    for (const key of ['generador-pagos', 'generador-ddjj', 'generador-documentos']) {
+      void queryClient.invalidateQueries({ queryKey: [key, fiscal.actorId] });
+    }
+  }
   if (typeof data.renovacionId === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(data.renovacionId)) {
     void queryClient.invalidateQueries({ queryKey: ['renovaciones'] });
   }
@@ -108,6 +124,7 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
   if (pathname === '/empresas') return 'Ver entidad y acceso →';
   if (pathname === '/mi-perfil' && new URLSearchParams(query).has('certificadoAmbiental')) return 'Ver certificado ambiental →';
   if (pathname === '/mi-perfil') return 'Abrir mi ficha y documentos →';
+  if (/^\/admin\/actores\/generadores\/[^/]+$/.test(pathname) && new URLSearchParams(query).get('tab') === 'fiscal') return 'Ver situación fiscal →';
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
   if (pathname === '/admin/renovaciones') return 'Revisar renovación →';
   if (/^\/notificaciones\/[^/]+$/.test(pathname)) return 'Ver aviso y resultado →';
@@ -122,6 +139,13 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   const data = parseNotificationData(notificacion.datos);
   if (!companyTarget && notificationCompanyAccesses(notificacion).length) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+  if (data.tipo === 'recordatorio_fiscal') {
+    const reminder = notificationFiscalReminder(notificacion);
+    if (!reminder || !safeId(notificacion.id)) return withBasePath('/notificaciones', basePath);
+    return withBasePath(companyTarget
+      ? '/admin/actores/generadores/' + encodeURIComponent(reminder.actorId) + '?tab=fiscal&ejercicio=' + reminder.fiscalYear
+      : '/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
+  }
   if (data.tipo === 'certificado_ambiental') {
     const certificate = notificationEnvironmentalCertificate(notificacion);
     if (!certificate || !safeId(notificacion.id)) return withBasePath('/notificaciones', basePath);

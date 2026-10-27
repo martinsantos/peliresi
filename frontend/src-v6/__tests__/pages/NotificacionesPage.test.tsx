@@ -75,6 +75,16 @@ describe('notification inbox states and interaction', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: PSIP · Nuevo requerimiento', exact: true }));
     expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
   });
+  it.each(['', '/app'])('orients an operator to the generator fiscal notice on %s', async base => {
+    auth.user.rol = 'OPERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Recordatorio fiscal 2026', datos: JSON.stringify({
+      tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil',
+    }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Ver aviso para Generador →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Recordatorio fiscal 2026', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
+  });
   it('keeps secondary controls behind explicit options without changing read state', async () => {
     setup('/app/notificaciones');
     await screen.findByText(notice.titulo);

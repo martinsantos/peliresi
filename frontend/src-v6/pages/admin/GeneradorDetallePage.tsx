@@ -13,7 +13,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { actorInspectionAccess } from '../../utils/actorReadAccess';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Factory, MapPin, Phone, Mail, Calendar, Download,
   CheckCircle, AlertTriangle, Biohazard, Shield, FileText,
@@ -146,6 +146,10 @@ const GeneradorDetallePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedFiscalYear = searchParams.get('ejercicio');
+  const fiscalYear = requestedFiscalYear && /^\d{4}$/.test(requestedFiscalYear)
+    && Number(requestedFiscalYear) >= 2000 && Number(requestedFiscalYear) <= 2100 ? Number(requestedFiscalYear) : null;
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
   const canEdit = currentUser?.rol === 'ADMIN' || currentUser?.rol === 'ADMIN_GENERADOR';
@@ -187,12 +191,17 @@ const GeneradorDetallePage: React.FC = () => {
   const actorNavigation = useActorNavigation();
   const backPath = actorNavigation?.backPath || mp('/dashboard');
   const backLabel = actorNavigation?.backLabel || 'Volver a Inicio';
+  const goBack = () => {
+    const state = backLabel === 'Volver al aviso' && location.state && typeof location.state === 'object' && !Array.isArray(location.state)
+      ? { notificationInboxReturn: (location.state as { notificationInboxReturn?: unknown }).notificationInboxReturn } : undefined;
+    navigate(backPath, state ? { state } : undefined);
+  };
 
   if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in xl:max-w-7xl xl:mx-auto">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={goBack}>{backLabel}</Button>
         </div>
         <Card className="py-12">
           <LoadingIndicator label="Cargando generador…" />
@@ -201,7 +210,7 @@ const GeneradorDetallePage: React.FC = () => {
     );
   }
 
-  if (!generador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={() => navigate(backPath)} backLabel={backLabel} />;
+  if (!generador) return <ActorDetailUnavailable onRetry={() => void refetch()} onBack={goBack} backLabel={backLabel} />;
 
   const g = generador;
   const categoriaLabel = generador.categoria?.replaceAll('_', ' ') || 'Sin categoría';
@@ -312,7 +321,7 @@ const GeneradorDetallePage: React.FC = () => {
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={() => navigate(backPath)}>{backLabel}</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft size={16} />} onClick={goBack}>{backLabel}</Button>
           <Button variant="outline" size="sm" leftIcon={<Download size={16} />} onClick={() => {
             if (generador) downloadCsv([{
               RazonSocial: generador.razonSocial, CUIT: generador.cuit,
@@ -352,14 +361,14 @@ const GeneradorDetallePage: React.FC = () => {
       </section>}
 
       {canEdit && <Button variant="outline" leftIcon={<Pencil size={16} />} onClick={() => navigate(mp(`/admin/actores/generadores/${id}/editar`), { state: { actorReturn: backPath, actorDetailReturn: location.pathname + location.search } })}>Editar datos del padrón</Button>}
-      <ActorCertificates type="GENERADOR" actorId={id || ''} />
+      <div hidden={detailTabs.activeTab === 'fiscal'}><ActorCertificates type="GENERADOR" actorId={id || ''} /></div>
 
       {/* 5 Tabs */}
       <Tabs {...detailTabs} variant="default">
         <TabList>
-          <Tab id="info" icon={<Factory size={16} />}>Info General</Tab>
+          <Tab id="info" icon={<Factory size={16} />}>Información general</Tab>
           <Tab id="residuos" icon={<Biohazard size={16} />}>Residuos</Tab>
-          <Tab id="fiscal" icon={<DollarSign size={16} />}>Situacion Fiscal</Tab>
+          <Tab id="fiscal" icon={<DollarSign size={16} />}>Situación fiscal</Tab>
           <Tab id="ddjj" icon={<ClipboardList size={16} />}>DDJJ y Documentos</Tab>
           {showInspections && <Tab id="inspecciones" icon={<ClipboardCheck size={16} />}>Inspecciones</Tab>}
           <Tab id="historial" icon={<Route size={16} />}>Trazabilidad</Tab>
@@ -471,22 +480,26 @@ const GeneradorDetallePage: React.FC = () => {
         <TabPanel id="fiscal">
           <QueryContent query={pagosQuery} loading="Cargando pagos…" error="No pudimos consultar la situación fiscal." retryLabel="Reintentar pagos">
           <div className="space-y-6">
+            {fiscalYear && <div className="rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-neutral-800">
+              <p>Ejercicio consultado: <strong>{fiscalYear}</strong></p>
+              {!pagos.some(p => p.anio === fiscalYear) && <p className="mt-1">No hay pagos registrados para este ejercicio. Revisá las declaraciones y documentos o consultá a DGFA.</p>}
+            </div>}
             {/* KPI mini-cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Ultimo TEF</p>
+                <p className="text-xs text-neutral-500">Último TEF registrado</p>
                 <p className="text-lg font-bold text-neutral-900 mt-1">
-                  {pagos.length > 0 ? fmtMoney(pagos[0].montoTEF) : '-'}
+                  {pagos.length > 0 ? fmtMoney(pagos[0].montoTEF) : 'Sin registro'}
                 </p>
                 {pagos.length > 0 && <p className="text-xs text-neutral-400">{pagos[0].anio}</p>}
               </Card>
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Anos al dia</p>
-                <p className="text-2xl font-bold text-success-600 mt-1">{pagos.filter(p => p.fechaPago).length}</p>
+                <p className="text-xs text-neutral-500">Años con pago registrado</p>
+                <p className="text-2xl font-bold text-neutral-900 mt-1">{pagos.filter(p => p.fechaPago).length}</p>
               </Card>
               <Card className="p-4 text-center">
-                <p className="text-xs text-neutral-500">Pendientes</p>
-                <p className="text-2xl font-bold text-error-600 mt-1">{pagos.filter(p => !p.fechaPago).length}</p>
+                <p className="text-xs text-neutral-500">Pagos sin fecha</p>
+                <p className="text-2xl font-bold text-neutral-900 mt-1">{pagos.filter(p => !p.fechaPago).length}</p>
               </Card>
             </div>
 
@@ -497,48 +510,55 @@ const GeneradorDetallePage: React.FC = () => {
                 </Button> : undefined} />
               <CardContent>
                 {pagos.length > 0 ? (
+                  <>
+                  <p className="mb-2 text-xs text-neutral-600 md:hidden">Deslizá la tabla para ver todos los datos.</p>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full min-w-[640px] text-sm">
                       <thead className="bg-neutral-50">
                         <tr>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Ano</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Año</th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">TEF</th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">Resolucion</th>
-                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Notif.</th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600 hidden md:table-cell">F. Pago</th>
-                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Hab.</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Resolución</th>
+                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Notificación</th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-neutral-600">Fecha de pago</th>
+                          <th className="px-3 py-2.5 text-center text-xs font-semibold text-neutral-600">Habilitación</th>
                           {canEdit && <th className="px-3 py-2.5 text-right text-xs font-semibold text-neutral-600">Acciones</th>}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
                         {pagos.map(p => (
-                          <tr key={p.id} className="hover:bg-neutral-50">
-                            <td className="px-3 py-2.5 font-bold text-neutral-900">{p.anio}</td>
+                          <tr key={p.id} className={p.anio === fiscalYear ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-neutral-50'}>
+                            <td className="px-3 py-2.5 font-bold text-neutral-900">{p.anio}{p.anio === fiscalYear && <span className="block text-xs font-medium text-primary-800">Ejercicio consultado</span>}</td>
                             <td className="px-3 py-2.5 font-mono">{fmtMoney(p.montoTEF)}</td>
-                            <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{p.resolucion || '-'}</td>
+                            <td className="px-3 py-2.5 text-neutral-600">{p.resolucion || '-'}</td>
                             <td className="px-3 py-2.5 text-center">
-                              <div className={`w-2.5 h-2.5 rounded-full mx-auto ${p.notificado ? 'bg-success-500' : 'bg-neutral-200'}`} />
+                              <span className="inline-flex items-center justify-center gap-1.5">
+                                <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${p.notificado ? 'bg-success-500' : 'bg-neutral-300'}`} />
+                                <span>{p.notificado ? 'Notificada' : 'Sin notificación registrada'}</span>
+                              </span>
                             </td>
-                            <td className="px-3 py-2.5 text-neutral-600 hidden md:table-cell">{fmtDate(p.fechaPago)}</td>
+                            <td className="px-3 py-2.5 text-neutral-600">{fmtDate(p.fechaPago)}</td>
                             <td className="px-3 py-2.5 text-center">
                               {p.habilitado != null && (
                                 <Badge variant="soft" color={p.habilitado ? 'success' : 'error'} className="text-[10px] px-1.5">
-                                  {p.habilitado ? 'SI' : 'NO'}
+                                  {p.habilitado ? 'Sí' : 'No'}
                                 </Badge>
                               )}
+                              {p.habilitado == null && <span className="text-neutral-600">No informada</span>}
                             </td>
                             {canEdit && <td className="px-3 py-2.5 text-right">
-                              <button onClick={() => setPagoModal({ open: true, editing: p })} className="p-1 rounded hover:bg-neutral-100 text-neutral-400 hover:text-primary-600"><Pencil size={14} /></button>
-                              <button onClick={() => handleDeletePago(p.id)} className="p-1 rounded hover:bg-error-50 text-neutral-400 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
+                              <button aria-label={`Editar pago de ${p.anio}`} onClick={() => setPagoModal({ open: true, editing: p })} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-neutral-100 text-neutral-600 hover:text-primary-600"><Pencil size={14} /></button>
+                              <button aria-label={`Eliminar pago de ${p.anio}`} onClick={() => handleDeletePago(p.id)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded hover:bg-error-50 text-neutral-600 hover:text-error-600 ml-1"><Trash2 size={14} /></button>
                             </td>}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                ) : (
+                  </>
+                ) : !fiscalYear ? (
                   <p className="text-sm text-neutral-400 text-center py-6">Sin pagos registrados</p>
-                )}
+                ) : null}
               </CardContent>
             </Card>
 

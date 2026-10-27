@@ -18,6 +18,19 @@ const base: Notificacion = {
 };
 
 describe('resolveNotificationPath', () => {
+  it.each(['', '/app', '/mobile'])('routes fiscal reminders via the owned notice in %s and ignores the obsolete profile path', prefix => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil' }) };
+    expect(resolveNotificationPath(notice, prefix, 'OPERADOR')).toBe(prefix + '/notificaciones/n-1');
+    const target = resolveNotificationPath(notice, prefix, 'GENERADOR', true);
+    expect(target).toBe(prefix + '/admin/actores/generadores/g-1?tab=fiscal&ejercicio=2026');
+    expect(notificationActionLabel(target, notice)).toBe('Ver situación fiscal →');
+    const invalidateQueries = vi.fn(); refreshInspectionNotification(notice, { invalidateQueries } as any);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['generador-pagos', 'g-1'] });
+  });
+  it.each([{ generadorId: '../otro' }, { fiscalYear: 1999 }, { fiscalYear: '2026' }, { fiscalYear: 2101 }])('keeps malformed fiscal reminders in the inbox: %j', invalid => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil', ...invalid }) };
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app/notificaciones');
+  });
   it.each(['', '/app', '/mobile'])('describes recorded decisions without offering a response on %s', prefix => {
     for (const [evento, label] of [['CIERRE_CONFORME', 'Consultar cierre conforme →'], ['DERIVACION_LEGALES', 'Consultar derivación a Legales →']]) {
       const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino: 'participacion', tipoActor: 'OPERADOR', evento }) };
