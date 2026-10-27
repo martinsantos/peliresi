@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0,0&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="sitrep-mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="directorio.css?v=2026.23.2">
+<link rel="stylesheet" href="directorio.css?v=730edcc8a1b6">
 </head>
 <body data-page="directory">
 
@@ -1724,7 +1724,7 @@ Una misma entidad puede solicitar actividades como generador, transportista y op
 <div class="info-box"><strong>Importe pendiente de liquidación.</strong> La evaluación administrativa conserva los datos declarados, pero no calcula ni liquida un importe. Contrastá concepto, período y monto con la liquidación oficial. La fórmula histórica y sus importes no son una regla vigente validada en esta interfaz.</div>
 <p>Para revisar el comprobante, Administración contrasta su identidad con el ticket original y reserva el pago para el trámite. La reserva no aprueba el documento ni acredita fondos ante ATM. El mismo pago no puede reservarse en otra alta aunque cambie la foto, el CUIT o el período; si la identidad no es legible, se necesita revisión administrativa.</p>
 <p>La lectura de una factura eléctrica propone sólo datos identificados para revisar contra el original. Tarifa, consumo en kWh y potencia contratada en kW no equivalen a potencia instalada en HP ni modifican automáticamente la TEF. Si falta un dato o hay lecturas contradictorias, revisá el documento; la lectura no acredita su aprobación.</p>
-<div class="cu-screenshot"><a href="screenshots/mobile/tef-review-pending-20261026.png" target="_blank"><img src="screenshots/mobile/tef-review-pending-20261026.png" alt="Evaluación administrativa con importe pendiente de liquidación" loading="lazy"></a><div class="cu-screenshot-caption">Preview · declaración artificial · app · 26/10/2026 · Android físico pendiente.</div></div>
+<div class="cu-screenshot admission-figure"><a href="screenshots/mobile/tef-review-pending-20261026.png" target="_blank"><img src="screenshots/mobile/tef-review-pending-20261026.png" alt="Evaluación administrativa con importe pendiente de liquidación" loading="lazy"></a><div class="cu-screenshot-caption">Preview · declaración artificial · app · 26/10/2026 · Android físico pendiente.</div></div>
 <p>Consultá el detalle de ATM y facturas en la <a href="tutorial.html?guide=alta-borradores-ocr">guía de alta y documentos</a> y la normativa en <a href="https://atm.mendoza.gov.ar/normativas/ley-impositiva/" target="_blank" rel="noopener noreferrer">ATM (nueva pestaña)</a>.</p>
 
 <h4 id="inscr-adm-gen">3.12.6 Alta y ficha administrativa de generador</h4>
@@ -1740,7 +1740,7 @@ Una misma entidad puede solicitar actividades como generador, transportista y op
 <p>En ambas superficies, el encabezado identifica la actividad y el formulario indica la etapa actual. En móvil podés elegir <strong>Etapa de la inscripción</strong>. Guardar conserva la información confirmada; presentar la envía a revisión. Tras cerrar y reabrir, verificá el mismo contexto y los archivos pendientes.</p>
 
 <h4 id="inscr-workflow">3.12.10 Estados y responsabilidades</h4>
-<table>
+<table tabindex="0" aria-label="Estados y responsabilidades de la inscripción">
 <thead><tr><th>Estado</th><th>Próxima acción</th></tr></thead>
 <tbody>
 <tr><td>Borrador</td><td>La persona solicitante completa y presenta la solicitud.</td></tr>
@@ -3328,7 +3328,7 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 </table>
 
 <h5>Reportes (<code>/api/reportes</code>)</h5>
-<table>
+<table tabindex="0" aria-label="Endpoints API y parámetros">
 <thead><tr><th>Metodo</th><th>Endpoint</th><th>Params</th><th>Respuesta</th></tr></thead>
 <tbody>
 <tr><td><span class="method method-get">GET</span></td><td class="endpoint">/api/reportes/manifiestos</td><td><code>fechaInicio, fechaFin, page, limit</code></td><td><code>{ porEstado, porTipoResiduo: {cantidad,unidad}, manifiestos[], pagination }</code></td></tr>
@@ -6485,7 +6485,7 @@ SITREP - Sistema de Trazabilidad de Residuos Peligrosos | Todos los derechos res
 <h3>15.3 Schema de Base de Datos (Prisma)</h3>
 
 <h4>Entidades del Sistema (20 modelos)</h4>
-<table>
+<table tabindex="0" aria-label="Modelos de la base de datos">
 <thead><tr><th>Modelo</th><th>Campos principales</th><th>Relaciones</th></tr></thead>
 <tbody>
 <tr><td><strong>Usuario</strong></td><td>id, email, password, rol, cuit, nombre, apellido, empresa, telefono, activo, emailVerified, verificationToken</td><td>1:1 Generador/Transportista/Operador, 1:N Auditoria, RefreshToken, Notificacion, AnalyticsLog</td></tr>

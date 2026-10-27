@@ -1117,3 +1117,16 @@ section[id], h3[id], h4[id], #roleTabs { scroll-margin-top: var(--scroll-offset)
   .hero, .directory-header-nav, .directory-sidebar-heading { display: none !important; }
   .main-content { width: 100%; margin: 0; padding: 0; }
 }
+
+/* Keep the admissions figure legible and technical tables within the page.
+   The table retains its semantic markup and scrolls independently on screen. */
+@media screen {
+  #mod-inscripcion .admission-figure { max-width: 393px; }
+  #mod-inscripcion table, #arq-api table, #devops-schema table {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
