@@ -21,6 +21,7 @@ import { reporteService } from '../../services/reporte.service';
 import { downloadCsv } from '../reportes/tabs/shared';
 import { useUsuarios } from '../../hooks/useUsuarios';
 import { Link, useLocation } from 'react-router-dom';
+import { manifestEventDescription, manifestEventLabel } from '../../utils/manifestEventPresentation';
 
 type LogEntry = {
   id: string;
@@ -28,12 +29,26 @@ type LogEntry = {
   usuario: string;
   rol: string;
   accion: string;
+  accionEtiqueta: string;
   modulo: string;
   detalle: string;
+  detalleRegistrado: string;
+  aclaracion: string;
   ip: string;
   inspeccionId?: string;
   inspeccionNumero?: string;
 };
+
+/** The display explains the marker; the original stays available for audit. */
+const AuditDetail: React.FC<{ log: LogEntry }> = ({ log }) => (
+  <>
+    {log.detalle || '—'}
+    {log.aclaracion && log.detalleRegistrado && <details className="mt-1 text-xs text-neutral-600">
+      <summary className="cursor-pointer font-semibold">Texto original registrado</summary>
+      <p className="mt-1 break-words">{log.detalleRegistrado}</p>
+    </details>}
+  </>
+);
 
 const accionConfig: Record<string, { color: string; icon: React.FC<{ size?: number }> }> = {
   LOGIN: { color: 'success', icon: LogIn },
@@ -127,19 +142,28 @@ const AuditoriaPage: React.FC = () => {
   const logsData: LogEntry[] = useMemo(() => {
     const raw = apiData?.datos || apiData?.eventos || [];
     if (!Array.isArray(raw)) return [];
-    return raw.map((d: any, i: number) => ({
-      id: String(d.id || i + 1),
-      fecha: d.fecha || d.createdAt || '',
-      usuario: d.usuario || d.usuarioNombre || '',
-      rol: d.rol || 'SISTEMA',
-      accion: d.accion || d.tipo || 'UPDATE',
-      modulo: d.modulo || d.entidad || d.manifiestoNumero || '',
-      detalle: d.detalle || d.descripcion || '',
-      ip: d.ip || d.direccionIp || '',
-      inspeccionId: d.inspeccionId,
-      inspeccionNumero: d.inspeccionNumero,
-    }));
-  }, [apiData]);
+    return raw.map((d: any, i: number) => {
+      const accion = d.accion || d.tipo || 'UPDATE';
+      const detalleRegistrado = d.detalle || d.descripcion || '';
+      const marker = fuente === 'manifiestos' && accion === 'CERTIFICACION_OPERADOR_V1';
+      const aclaracion = marker ? manifestEventDescription(accion, detalleRegistrado) : '';
+      return {
+        id: String(d.id || i + 1),
+        fecha: d.fecha || d.createdAt || '',
+        usuario: d.usuario || d.usuarioNombre || '',
+        rol: d.rol || 'SISTEMA',
+        accion,
+        accionEtiqueta: marker ? manifestEventLabel(accion) : accion,
+        modulo: d.modulo || d.entidad || d.manifiestoNumero || '',
+        detalle: aclaracion || detalleRegistrado,
+        detalleRegistrado,
+        aclaracion,
+        ip: d.ip || d.direccionIp || '',
+        inspeccionId: d.inspeccionId,
+        inspeccionNumero: d.inspeccionNumero,
+      };
+    });
+  }, [apiData, fuente]);
 
   const pagination = (apiData as any)?.pagination;
   const totalItems = pagination?.total || logsData.length;
@@ -150,6 +174,7 @@ const AuditoriaPage: React.FC = () => {
     ? logsData.filter(log =>
         String(log.usuario).toLowerCase().includes(busqueda.toLowerCase()) ||
         String(log.detalle).toLowerCase().includes(busqueda.toLowerCase()) ||
+        String(log.detalleRegistrado).toLowerCase().includes(busqueda.toLowerCase()) ||
         String(log.modulo).toLowerCase().includes(busqueda.toLowerCase()))
     : logsData;
 
@@ -167,8 +192,8 @@ const AuditoriaPage: React.FC = () => {
       toast.warning('Sin datos', 'No hay registros para exportar');
       return;
     }
-    const headers = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Modulo', 'Legajo', 'Detalle', 'IP'];
-    const rows = logsFiltrados.map(l => [l.fecha, l.usuario, l.rol, l.accion, l.modulo, l.inspeccionNumero || '', l.detalle, l.ip]);
+    const headers = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Modulo', 'Legajo', 'Detalle', 'IP', 'Aclaración'];
+    const rows = logsFiltrados.map(l => [l.fecha, l.usuario, l.rol, l.accion, l.modulo, l.inspeccionNumero || '', l.detalleRegistrado, l.ip, l.aclaracion]);
     downloadCsv(`auditoria_${fuente}_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
     toast.success('Exportado', 'Registros descargados');
   };
@@ -291,13 +316,13 @@ const AuditoriaPage: React.FC = () => {
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5">
                   <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-${cfg.color}-100 text-${cfg.color}-700`}>
-                    <Icon size={10} /> {log.accion}
+                    <Icon size={10} /> {log.accionEtiqueta}
                   </div>
                   {log.modulo && <span className="text-[10px] text-neutral-400">{log.modulo}</span>}
                 </div>
                 <span className="text-[10px] text-neutral-400">{formatFecha(log.fecha)}</span>
               </div>
-              <p className="text-sm text-neutral-900">{log.inspeccionNumero && <span className="font-semibold">{log.inspeccionNumero} · </span>}{log.detalle || '—'}</p>
+              <div className="text-sm text-neutral-900">{log.inspeccionNumero && <span className="font-semibold">{log.inspeccionNumero} · </span>}<AuditDetail log={log} /></div>
               {log.inspeccionId && <Link className="text-xs font-semibold text-primary-700 underline" to={`${inspectionPath}${log.inspeccionId}`}>Abrir expediente</Link>}
               <div className="flex items-center gap-1.5 mt-1">
                 <User size={10} className="text-neutral-400" />
@@ -358,11 +383,11 @@ const AuditoriaPage: React.FC = () => {
                     </td>
                     <td className="px-3 py-2">
                       <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-${cfg.color}-100 text-${cfg.color}-700`}>
-                        <Icon size={11} /> {log.accion}
+                        <Icon size={11} /> {log.accionEtiqueta}
                       </div>
                     </td>
                     <td className="px-3 py-2 text-sm text-neutral-600 truncate hidden xl:table-cell">{log.modulo}</td>
-                    <td className="px-3 py-2 text-sm text-neutral-900" title={log.detalle}>{log.inspeccionNumero && <Link className="font-semibold text-primary-700 underline" to={`${inspectionPath}${log.inspeccionId}`}>{log.inspeccionNumero}</Link>}{log.inspeccionNumero ? ' · ' : ''}{log.detalle}</td>
+                    <td className="px-3 py-2 text-sm text-neutral-900" title={log.detalle}>{log.inspeccionNumero && <Link className="font-semibold text-primary-700 underline" to={`${inspectionPath}${log.inspeccionId}`}>{log.inspeccionNumero}</Link>}{log.inspeccionNumero ? ' · ' : ''}<AuditDetail log={log} /></td>
                     <td className="px-3 py-2 text-xs text-neutral-500 font-mono hidden xl:table-cell">{log.ip}</td>
                   </tr>
                 );
