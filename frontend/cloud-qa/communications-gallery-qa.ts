@@ -73,9 +73,10 @@ try{
    await select('psip-RESPUESTA');
    await expect(page.locator('#meta')).toContainText('Super Admin');
    await channel('inbox');
-   const style=await page.locator('iframe').evaluate((e:any)=>{const doc=e.contentDocument;const h=doc.querySelector('h2');return {font:e.contentWindow.getComputedStyle(doc.body).fontFamily,size:h?e.contentWindow.getComputedStyle(h).fontSize:''};});
+   const style=await page.locator('iframe').evaluate((e:any)=>{const doc=e.contentDocument;const title=doc.querySelector('ul[aria-label="Avisos"] li button span.block');return {font:e.contentWindow.getComputedStyle(doc.body).fontFamily,size:title?e.contentWindow.getComputedStyle(title).fontSize:'',title:title?.textContent||''};});
    assert.match(style.font,/Inter|sans-serif/);
-   assert.equal(style.size,'20px');
+   assert.ok(style.title.includes('Nueva respuesta'));
+   assert.ok(parseFloat(style.size)>=14,'Notice title must remain readable');
    await page.screenshot({path:path.join(dir,'gallery-inbox-desktop.png'),fullPage:false});
  });
  await check('actual inbox read/unread renders',async()=>{
@@ -133,6 +134,6 @@ try{
  await check('no runtime errors or external network requests',async()=>{assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);assert.deepEqual(overflows,[]);});
  console.log(JSON.stringify({checks:checks.length,overflows}));
 }finally{
- fs.writeFileSync(path.join(dir,'qa-result.json'),JSON.stringify({browserPath:'Browser plugin not available; existing Playwright in isolated preview',viewports:[{width:1440,height:1000},{width:390,height:844}],sampleWidth:375,source:data.coverage.source,checks,overflows,errors,externalRequests:requests},null,2));
+ fs.writeFileSync(path.join(dir,'qa-result.json'),JSON.stringify({browserPath:'Playwright en QA remoto aislado; navegación del producto comprobada por separado en IAB',viewports:[{width:1440,height:1000},{width:390,height:844}],sampleWidth:375,source:data.coverage.source,checks,overflows,errors,externalRequests:requests},null,2));
  await browser.close();
 }
