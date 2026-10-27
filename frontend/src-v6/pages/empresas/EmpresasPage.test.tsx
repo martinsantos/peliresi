@@ -513,7 +513,7 @@ test.each([undefined,503,408,409])('lost preparation (%s) requires a read before
  expect(await screen.findByRole('heading',{name:'Comprobar preparación de invitación'})).toBeVisible();
  expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();
  expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
- expect(screen.getByText(/No recibimos una confirmación completa/).closest('[role="status"]')).toHaveFocus();
+ await waitFor(()=>expect(screen.getByText(/No recibimos una confirmación completa/).closest('[role="status"]')).toHaveFocus());
  expect(screen.getByLabelText('Correo de la persona')).toHaveValue('uncertain@qa.invalid');
  const writes=()=>mocks.request.mock.calls.filter(([r])=>r.method==='POST');
  expect(writes()).toHaveLength(1);
@@ -622,4 +622,68 @@ test.each([false,true])('a late successful response cannot restore a secret afte
  expect(Object.keys(localStorage).filter(key=>key.startsWith(PREPARED_INVITATION_PREFIX))).toHaveLength(0);
  const pending=Object.keys(localStorage).filter(key=>key.startsWith('sitrep:invitation-preparation:v1:'));
  expect(pending).toHaveLength(logout?0:1);
+});
+
+for (const base of ['', '/app']) test(`expired invitations refresh the shared capacity without authorizing anyone (${base})`, async () => {
+ const expires=Date.now()+600;
+ const details={actividades:[{id:'g',rol:'GENERADOR'},{id:'o',rol:'OPERADOR'}],invitaciones:[{id:'expiring',email:'pending@qa.invalid',actividadId:'g',venceAt:new Date(expires).toISOString()}],cupoPersonas:{maximo:2,ocupados:2,personas:[{id:'owner',nombre:'Titular QA',email:'owner@qa.invalid',activo:true,responsable:true,roles:['GENERADOR','OPERADOR']}],reservas:['pending@qa.invalid']}};
+ setup(details,{base,entry:base+'/empresas'});const original=mocks.request.getMockImplementation()!;
+ mocks.request.mockImplementation(async request=>{if(request.url==='/empresas/first'&&Date.now()>=expires)details.cupoPersonas={...details.cupoPersonas,ocupados:1,reservas:[]};return original(request);});
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'third@qa.invalid'}});
+ expect(screen.getByText('2 de 2')).toBeVisible();expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();
+ await waitFor(()=>expect(screen.getByText('1 de 2')).toBeVisible(),{timeout:2000});
+ expect(screen.getByText('Generador · Vencida')).toBeVisible();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('third@qa.invalid');
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled();
+ expect(mocks.request.mock.calls.filter(([request])=>request.method!=='GET')).toHaveLength(0);
+});
+
+for (const base of ['', '/app']) test(`expiry read failure blocks actions and retries the read, not the invitation (${base})`, async () => {
+ const expires=Date.now()+600;
+ const details={actividades:[{id:'g',rol:'GENERADOR'}],invitaciones:[{id:'expiring',email:'pending@qa.invalid',actividadId:'g',venceAt:new Date(expires).toISOString()}],cupoPersonas:{maximo:2,ocupados:2,personas:[{id:'owner',nombre:'Titular QA',email:'owner@qa.invalid',activo:true,responsable:true,roles:['GENERADOR']}],reservas:['pending@qa.invalid']}};
+ const state=setup(details,{base,entry:base+'/empresas'});
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'owner@qa.invalid'}});
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeEnabled();state.failDetail();
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Reintentar empresa'})).toBeVisible(),{timeout:2000});
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
+ state.recover();details.cupoPersonas={...details.cupoPersonas,ocupados:1,reservas:[]};
+ fireEvent.click(screen.getByRole('button',{name:'Reintentar empresa'}));
+ await waitFor(()=>expect(screen.getByText('1 de 2')).toBeVisible());
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('owner@qa.invalid');
+ expect(mocks.request.mock.calls.filter(([request])=>request.method!=='GET')).toHaveLength(0);
+});
+
+for (const base of ['', '/app']) test(`expiry updates capacity while another company section is open (${base})`, async () => {
+ const expires=Date.now()+600;
+ const details={actividades:[{id:'g',rol:'GENERADOR'}],invitaciones:[{id:'expiring',email:'pending@qa.invalid',actividadId:'g',venceAt:new Date(expires).toISOString()}],cupoPersonas:{maximo:2,ocupados:2,personas:[{id:'owner',nombre:'Titular QA',email:'owner@qa.invalid',activo:true,responsable:true,roles:['GENERADOR']}],reservas:['pending@qa.invalid']}};
+ setup(details,{base,entry:base+'/empresas'});const original=mocks.request.getMockImplementation()!;
+ mocks.request.mockImplementation(async request=>{if(request.url==='/empresas/first'&&Date.now()>=expires)details.cupoPersonas={...details.cupoPersonas,ocupados:1,reservas:[]};return original(request);});
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'third@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Empresa'}));
+ await waitFor(()=>expect(details.cupoPersonas.ocupados).toBe(1),{timeout:2000});
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(screen.getByText('1 de 2')).toBeVisible();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('third@qa.invalid');
+ expect(mocks.request.mock.calls.filter(([request])=>request.method!=='GET')).toHaveLength(0);
+});
+
+test('an invitation expiring during a slow initial read is rechecked before trusting its capacity', async () => {
+ const expires=Date.now()+300;
+ const details={actividades:[{id:'g',rol:'GENERADOR'}],invitaciones:[{id:'expiring',email:'pending@qa.invalid',actividadId:'g',venceAt:new Date(expires).toISOString()}],cupoPersonas:{maximo:2,ocupados:2,personas:[],reservas:['pending@qa.invalid']}};
+ setup(details);const original=mocks.request.getMockImplementation()!;let reads=0;
+ mocks.request.mockImplementation(async request=>{
+  if(request.url==='/empresas/first'){
+   reads++;
+   if(reads===1){const response=structuredClone(await original(request));await new Promise(resolve=>setTimeout(resolve,Math.max(1,expires-Date.now()+50)));return response;}
+   details.cupoPersonas={...details.cupoPersonas,ocupados:1,reservas:[]};
+  }
+  return original(request);
+ });
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ await waitFor(()=>expect(screen.getByText('1 de 2')).toBeVisible());
+ expect(reads).toBe(2);
+ expect(mocks.request.mock.calls.filter(([request])=>request.method!=='GET')).toHaveLength(0);
 });
