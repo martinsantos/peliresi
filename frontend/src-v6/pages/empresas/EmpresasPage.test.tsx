@@ -4,7 +4,7 @@ import { notificationInboxReturnState } from '../../utils/notificationNavigation
 import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { render,screen,fireEvent,waitFor,cleanup,act,within } from '@testing-library/react';
 import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import EmpresasPage from './EmpresasPage';
 const mocks=vi.hoisted(()=>({request:vi.fn(),get:vi.fn(),generators:vi.fn(),carriers:vi.fn(),operators:vi.fn(),user:{id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'} as {id:string;rol:string;actorId:string;empresaContexto?:any}}));
 vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:mocks.user})}));
@@ -13,7 +13,8 @@ vi.mock('../../services/api',()=>({api:{request:mocks.request,get:mocks.get}}));
 beforeEach(()=>{localStorage.clear();sessionStorage.clear();mocks.generators.mockReset().mockResolvedValue([]);mocks.carriers.mockReset().mockResolvedValue([]);mocks.operators.mockReset().mockResolvedValue([]);});
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();mocks.request.mockReset();mocks.get.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
 const company=(id:string,razonSocial:string)=>({id,cuit:'30712345671',razonSocial,revision:0,domicilioLegal:{calle:'Legal '+id,localidad:'Mendoza',departamento:'Capital'}});
-function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;admin?:boolean;entry?:any;base?:string}={}){
+function NavigationProbe(){const location=useLocation(),navigate=useNavigate();return <><output data-testid="company-location">{JSON.stringify(location)}</output><button onClick={()=>navigate('/empresas?empresa=first')}>QA enlace Alfa</button></>;}
+function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;admin?:boolean;pages?:number;entry?:any;base?:string}={}){
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
  const first=company('first','Alfa'),other=company('other','Beta');let changed=false,failSearch=false,detailFailure=0;
  mocks.request.mockImplementation(async({url,method,data})=>{
@@ -22,14 +23,14 @@ function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;adm
    const params=new URLSearchParams(url.split('?')[1]);
    if(failSearch&&params.get('search'))throw new Error('QA network unavailable');
    const companies=params.get('search')||params.get('page')==='2'?[]:changed?[other,{...first,razonSocial:'Zeta',revision:1}]:listOptions.single?[first]:[first,other];
-   return {data:{data:{empresas:companies,pagination:{page:Number(params.get('page')),limit:25,total:companies.length,totalPages:1},puedeValidar:!!listOptions.admin}}};
+   return {data:{data:{empresas:companies,pagination:{page:Number(params.get('page')),limit:25,total:companies.length,totalPages:listOptions.pages||1},puedeValidar:!!listOptions.admin}}};
   }
   if(detailFailure)throw {response:{status:detailFailure}};
   const c=url.endsWith('/first')?{...first,...(changed?{razonSocial:'Zeta',revision:1}:{})}:other;
   return {data:{data:{empresa:c,contextos:[],actividades:[],establecimientos:[],autorizaciones:[],responsables:[],eventos:[],invitaciones:[],personas:[],puedeGestionar:true,puedeValidar:false,...extra}}};
  });
  const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}});
- const view=()=> <QueryClientProvider client={client}><MemoryRouter basename={listOptions.base} initialEntries={[listOptions.entry||'/empresas']}><EmpresasPage/></MemoryRouter></QueryClientProvider>;
+ const view=()=> <QueryClientProvider client={client}><MemoryRouter basename={listOptions.base} initialEntries={[listOptions.entry||'/empresas']}><EmpresasPage/><NavigationProbe/></MemoryRouter></QueryClientProvider>;
  const ui=render(view());
  return {client,externalChange:()=>{changed=true;},failSearch:()=>{failSearch=true;},failDetail:(status=503)=>{detailFailure=status;},recover:()=>{detailFailure=0;},rerender:()=>ui.rerender(view()),unmount:()=>ui.unmount()};
 }
@@ -358,7 +359,7 @@ test('a prepared link identifies its recipient and role independently of the nex
 
 test('initial query failure never renders an empty picker or pagination',async()=>{
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');mocks.request.mockRejectedValue(new Error('QA offline'));
- render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>);
+ render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><EmpresasPage/><NavigationProbe/></MemoryRouter></QueryClientProvider>);
  expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos consultar las empresas.');
  expect(screen.queryByText('Sin coincidencias')).toBeNull();
  expect(screen.queryByRole('navigation',{name:'Páginas de empresas'})).toBeNull();
@@ -367,7 +368,7 @@ test('initial query failure never renders an empty picker or pagination',async()
 test('empty account explains where its actor information is without a useless search',async()=>{
  vi.stubEnv('VITE_ENTERPRISE_ENABLED','true');
  mocks.request.mockResolvedValue({data:{data:{empresas:[],pagination:{page:1,limit:25,total:0,totalPages:1},puedeValidar:false}}});
- render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><EmpresasPage/></MemoryRouter></QueryClientProvider>);
+ render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false}}})}><MemoryRouter><EmpresasPage/><NavigationProbe/></MemoryRouter></QueryClientProvider>);
  expect(await screen.findByText('No hay empresas vinculadas a esta cuenta')).toBeVisible();
  expect(screen.getByRole('link',{name:'Volver a Mi perfil'})).toHaveAttribute('href','/mi-perfil');
  expect(screen.queryByLabelText('Buscar empresa')).toBeNull();
@@ -960,4 +961,68 @@ test('empty establishment selection explains the blocked authorization',async()=
  expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
  fireEvent.submit(screen.getByRole('button',{name:'Autorizar cuenta verificada'}).closest('form')!);
  expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+
+for(const base of ['', '/app']) test(`company choice, section and draft survive reopening the current address (${base})`,async()=>{
+ const state=setup({actividades:[{id:'g',rol:'GENERADOR'}]},{base,entry:base+'/empresas?empresa=first&origen=avisos'});
+ await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Empresa',{exact:true}),{target:{value:'other'}});
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal other'));
+ fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'beta@qa.invalid'}});
+ const location=JSON.parse(screen.getByTestId('company-location').textContent!);
+ expect(new URLSearchParams(location.search).get('empresa')).toBe('other');
+ expect(new URLSearchParams(location.search).get('empresaSeccion')).toBe('personas');
+ expect(new URLSearchParams(location.search).get('origen')).toBe('avisos');
+ state.unmount();
+ setup({actividades:[{id:'g',rol:'GENERADOR'}]},{base,entry:{...location,pathname:base+'/empresas'}});
+ await waitFor(()=>expect(screen.getByLabelText('Correo de la persona')).toHaveValue('beta@qa.invalid'));
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('other');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('reopening a filtered directory retains the company outside the search results',async()=>{
+ const state=setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Empresa',{exact:true}),{target:{value:'other'}});
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal other'));
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Beta pendiente'}});
+ fireEvent.change(screen.getByLabelText('Buscar empresa'),{target:{value:'Sin coincidencias'}});fireEvent.click(screen.getByRole('button',{name:'Buscar'}));
+ await screen.findByText('Sin coincidencias');
+ const location=JSON.parse(screen.getByTestId('company-location').textContent!);
+ expect(new URLSearchParams(location.search).get('empresaBusqueda')).toBe('Sin coincidencias');
+ state.unmount();setup({},{entry:location});
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Beta pendiente'));
+ expect(screen.getByLabelText('Buscar empresa')).toHaveValue('Sin coincidencias');
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('other');
+});
+test('a new company link overrides the previous picker choice and isolates its draft',async()=>{
+ setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Empresa',{exact:true}),{target:{value:'other'}});
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal other'));
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Beta privada'}});
+ fireEvent.click(screen.getByRole('button',{name:'QA enlace Alfa'}));
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('first');
+});
+test('changing role drops directory selection, filters and section before querying the next context',async()=>{
+ const state=setup({actividades:[{id:'g',rol:'GENERADOR'}]});await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Empresa',{exact:true}),{target:{value:'other'}});
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal other'));
+ fireEvent.change(screen.getByLabelText('Buscar empresa'),{target:{value:'Beta privada'}});fireEvent.click(screen.getByRole('button',{name:'Buscar'}));
+ await screen.findByText('Sin coincidencias');
+ mocks.request.mockClear();mocks.user={...mocks.user,rol:'OPERADOR',actorId:'operator'};state.rerender();
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
+ expect(screen.getByLabelText('Buscar empresa')).toHaveValue('');
+ expect(mocks.request.mock.calls.some(([r])=>r.url.includes('Beta+privada'))).toBe(false);
+});
+
+test('reopening page two preserves pagination and its selected company even when the page is empty',async()=>{
+ const state=setup({},{pages:2});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Siguiente'}));
+ await screen.findByText('2 / 2');
+ const location=JSON.parse(screen.getByTestId('company-location').textContent!);
+ expect(new URLSearchParams(location.search).get('empresaPagina')).toBe('2');
+ state.unmount();setup({},{pages:2,entry:location});
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveValue('Legal first'));
+ expect(screen.getByText('2 / 2')).toBeVisible();
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('first');
 });

@@ -28,3 +28,19 @@ test('loading disables pagination/search, retains the selected native option and
  expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('a');
  expect(document.activeElement).not.toBe(screen.getByLabelText('Buscar empresa'));
 });
+
+test('restored search replaces the previous history entry but not unsubmitted typing',()=>{
+ const props={...callbacks(),companies:[first],selected:first,pagination:{page:1,limit:25,total:1,totalPages:1},busy:false};
+ const view=render(<CompanyPicker {...props} appliedSearch="Alfa"/>);
+ expect(screen.getByLabelText('Buscar empresa')).toHaveValue('Alfa');
+ fireEvent.change(screen.getByLabelText('Buscar empresa'),{target:{value:'Sin enviar'}});
+ view.rerender(<CompanyPicker {...props} appliedSearch="Alfa"/>);
+ expect(screen.getByLabelText('Buscar empresa')).toHaveValue('Sin enviar');
+ view.rerender(<CompanyPicker {...props} appliedSearch="Beta"/>);
+ expect(screen.getByLabelText('Buscar empresa')).toHaveValue('Beta');
+});
+test('an unresolved selection never appears to select the first unrelated company',()=>{
+ render(<CompanyPicker {...callbacks()} companies={[first]} pagination={{page:1,limit:25,total:1,totalPages:1}} busy/>);
+ expect(screen.getByLabelText('Empresa',{exact:true})).toHaveValue('');
+ expect(screen.getByRole('option',{name:'Elegí una empresa'})).toBeDisabled();
+});

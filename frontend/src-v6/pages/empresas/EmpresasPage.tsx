@@ -1,3 +1,4 @@
+import { useScopedSearchParams } from '../../hooks/useScopedSearchParams';
 import { companyIdentityErrors, companySiteErrors, companyEmailError, companyReasonError } from '../../utils/companyFormValidation';
 import { useCompanyFormValidation } from '../../hooks/useCompanyFormValidation';
 import { CompanyActivityLink } from '../../components/CompanyActivityLink';
@@ -9,7 +10,7 @@ import { readPreparedInvitations, writePreparedInvitations, PREPARED_INVITATION_
 import { CompanyPeopleSummary, type CompanyCapacity } from '../../components/CompanyPeopleSummary';
 import ImpersonationContext from '../../contexts/ImpersonationContext';
 import { ChevronDown } from 'lucide-react';
-import { Activity,useContext,useEffect,useRef,useState } from 'react';
+import { Activity,useCallback,useContext,useEffect,useRef,useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { notificationInboxReturnPath } from '../../utils/notificationNavigation';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
@@ -38,9 +39,16 @@ export default function EmpresasPage(){
  return <CompanyWorkspace key={scope} scope={scope}/>;
 }
 function CompanyWorkspace({scope}:{scope:string}){
- const {currentUser}=useAuth(),[choice,setChoice]=useState<Company>(),[page,setPage]=useState(1),[search,setSearch]=useState(''),mp=useMobilePrefix();
+ const {currentUser}=useAuth(),[choice,setChoice]=useState<Company>(),mp=useMobilePrefix();
  const temporary=Boolean(useContext(ImpersonationContext)?.impersonationData);
- const location=useLocation(), params=new URLSearchParams(location.search);
+ const location=useLocation();
+ const [params,setParams]=useScopedSearchParams('company-directory',['empresa','empresaBusqueda','empresaPagina','empresaSeccion'],scope);
+ const page=Math.min(100000,Math.max(1,Math.floor(Number(params.get('empresaPagina')))||1));
+ const search=(params.get('empresaBusqueda')||'').slice(0,100);
+ const section=['empresa','sedes','personas','historial'].includes(params.get('empresaSeccion')||'')?params.get('empresaSeccion')!:'empresa';
+ const changeSection=(value:string)=>setParams(current=>{current.set('empresaSeccion',value);return current;});
+ const chooseCompany=(company:Company)=>{setChoice(company);setParams(current=>{current.set('empresa',company.id);current.delete('empresaSeccion');return current;});};
+ const rememberCompany=useCallback((company:Company)=>setChoice(company),[]);
  const fromInbox=params.get('origen')==='avisos';
  const backPath=fromInbox?notificationInboxReturnPath(location.state,inspectionWorkspaceOwner(currentUser)):'/mi-perfil';
  const backLabel=fromInbox?'Volver a Avisos':'Volver a Mi perfil';
@@ -48,22 +56,22 @@ function CompanyWorkspace({scope}:{scope:string}){
  const requested=requestedId&&/^[a-zA-Z0-9_-]{1,100}$/.test(requestedId)?requestedId:undefined;
  const list=useQuery<{empresas:Company[];pagination:CompanyPagination;puedeValidar:boolean}>({queryKey:['empresas',scope,temporary,page,search],queryFn:()=>request('?'+new URLSearchParams({page:String(page),limit:'25',search})),retry:false,enabled:!!currentUser&&!temporary&&import.meta.env.VITE_ENTERPRISE_ENABLED==='true'});
  // Pin the initial choice too: editing its name may change the server sort order.
- useEffect(()=>{if(!choice&&!requested&&list.data?.empresas[0])setChoice(list.data.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data.empresas[0]);},[choice,list.data,requested]);
+ useEffect(()=>{if(!requested&&!temporary&&list.data?.empresas[0])chooseCompany(list.data.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data.empresas[0]);},[list.data,requested,temporary]);
  if(import.meta.env.VITE_ENTERPRISE_ENABLED!=='true')return <p>Funcionalidad no disponible.</p>;
  if(temporary)return <div className="mx-auto max-w-3xl space-y-4"><Link to={mp(backPath)} className="inline-flex min-h-11 items-center text-primary-800 underline">{backLabel}</Link><Card><h2 className="text-lg font-semibold">Gestión desde la cuenta responsable</h2><p className="mt-2 text-sm text-neutral-600">La gestión de empresas se realiza desde la cuenta del responsable. La vista temporal permite consultar la ficha del actor.</p></Card></div>;
- const selected=choice||(requested?list.data?.empresas.find(c=>c.id===requested):list.data?.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data?.empresas[0]);
+ const selected=requested?(list.data?.empresas.find(c=>c.id===requested)||(choice?.id===requested?choice:undefined)):list.data?.empresas.find(c=>c.id===currentUser?.empresaContexto?.empresaId)||list.data?.empresas[0];
  const singleCompany=!search&&page===1&&!list.data?.puedeValidar&&list.data?.pagination.total===1&&list.data.empresas.length===1&&selected?.id===list.data.empresas[0].id;
  return <div className="mx-auto w-full max-w-5xl space-y-5 pb-6">
   <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp(backPath)}>{backLabel}</Link>
-  {(!singleCompany && ((list.data?.empresas.length||0)>0 || !!selected || !!search || page>1))&&<CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching}
-   onChoose={id=>setChoice(list.data?.empresas.find(c=>c.id===id)||selected)}
-   onPage={next=>{setChoice(selected);setPage(next);}}
-   onSearch={value=>{setChoice(selected);setPage(1);setSearch(value);}}/>}
+  {(!singleCompany && ((list.data?.empresas.length||0)>0 || !!selected || !!search || page>1))&&<CompanyPicker companies={list.data?.empresas||[]} selected={selected} pagination={list.data?.pagination||{page,limit:25,total:0,totalPages:page}} busy={list.isFetching} appliedSearch={search}
+   onChoose={id=>{const company=list.data?.empresas.find(c=>c.id===id);if(company)chooseCompany(company);}}
+   onPage={next=>{setChoice(selected);setParams(current=>{current.set('empresaPagina',String(next));return current;});}}
+   onSearch={value=>{setChoice(selected);setParams(current=>{current.set('empresaBusqueda',value);current.delete('empresaPagina');return current;});}}/>}
   {list.isPending&&<Card><p role="status">Consultando empresas…</p></Card>}
   {list.isSuccess&&!list.data.empresas.length&&!search&&!selected&&!requested&&<Card><h2 className="font-semibold">No hay empresas vinculadas a esta cuenta</h2><p className="mt-2 text-sm text-neutral-600">Los datos de tu actividad están en Mi perfil.</p></Card>}
   {list.isError&&<div role="alert"><p>No pudimos consultar las empresas.</p><Button onClick={()=>void list.refetch()}>Reintentar</Button></div>}
-  {(selected||requested)&&<CompanyDetail key={selected?.id||requested} scope={scope} id={(selected?.id||requested)!} reloadList={()=>list.refetch()}/>}
-  {list.data?.puedeValidar&&!list.isError&&<details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold">Registrar empresa</summary><CompanyCreate draftKey={companyDraftKey(scope,'new','identity')} done={async c=>{setChoice(c);await list.refetch();}}/></details>}
+  {(selected||requested)&&<CompanyDetail key={selected?.id||requested} scope={scope} id={(selected?.id||requested)!} reloadList={()=>list.refetch()} section={section} onSection={changeSection} onLoaded={rememberCompany}/>}
+  {list.data?.puedeValidar&&!list.isError&&<details className="rounded-xl border border-neutral-200 bg-white p-4"><summary className="min-h-11 cursor-pointer font-semibold">Registrar empresa</summary><CompanyCreate draftKey={companyDraftKey(scope,'new','identity')} done={async c=>{chooseCompany(c);await list.refetch();}}/></details>}
  </div>;
 }
 function CompanyCreate({done,draftKey}:{done:(c:Company)=>Promise<void>;draftKey:string}){
@@ -76,17 +84,19 @@ function CompanyCreate({done,draftKey}:{done:(c:Company)=>Promise<void>;draftKey
   {error&&<p role="alert" className="sm:col-span-2 text-error-700">{error}</p>}<Button type="submit" disabled={busy||draft.conflict}>Registrar empresa</Button>
  </form>;
 }
-function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:()=>Promise<unknown>}){
- const [tab,setTab]=useState('empresa'),[sectionNotice,setSectionNotice]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
+function CompanyDetail({id,scope,reloadList,section:tab,onSection:setTab,onLoaded}:{id:string;scope:string;reloadList:()=>Promise<unknown>;section:string;onSection:(value:string)=>void;onLoaded:(company:Company)=>void}){
+ const [sectionNotice,setSectionNotice]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),lock=useRef(false);
  const confirmedWrite=useRef<{after?:()=>void}|null>(null),[awaitingRead,setAwaitingRead]=useState(false);
  const recoveryNotice=useRef<HTMLDivElement>(null);
- const [openedTabs,setOpenedTabs]=useState<Record<string,boolean>>({empresa:true});
+ const [openedTabs,setOpenedTabs]=useState<Record<string,boolean>>({empresa:true,[tab]:true});
  const [savedForms,setSavedForms]=useState<Record<string,number>>({});
  const resetForm=(key:string)=>setSavedForms(current=>({...current,[key]:(current[key]||0)+1}));
  const query=useQuery<Details & {readStartedAt:number}>({queryKey:['empresa',scope,id],queryFn:async()=>{
   const readStartedAt=Date.now();
   return {...await request('/'+id),readStartedAt};
  },retry:false});
+ useEffect(()=>{if(query.isSuccess&&query.data)onLoaded(query.data.empresa);},[query.isSuccess,query.data,onLoaded]);
+ useEffect(()=>{setOpenedTabs(opened=>opened[tab]?opened:{...opened,[tab]:true});},[tab]);
  // Capacity belongs to the server. Expiration invalidates the snapshot; it does
  // not remove a person or grant a place locally. This effect stays active while
  // another company section is open, unlike the hidden People subtree.
