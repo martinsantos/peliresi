@@ -32,7 +32,7 @@ function canReview(req: AuthRequest, record: { creadoPorId: string; impersonadoP
   return canReviewAsAddendumAuthority(req.user, record) || (manifestFeatureEnabled('MANIFEST_PARTY_REVIEW_ENABLED')
     && canReviewAsCounterpart(manifestPracticeIdentity(req.user), record, record.declaracion as ReviewParties));
 }
-function present(record: { creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
+function present(record: { id: string; creadoPorId: string; impersonadoPorId: string | null; declaracion: Prisma.JsonValue; revisiones: Prisma.JsonValue; [key: string]: unknown }, req: AuthRequest) {
   const reviews = record.revisiones as unknown as AddendumReview[];
   return { ...record, estadoRevision: reviews[reviews.length - 1]?.decision || 'PENDIENTE', puedeResolver: canReview(req, record) };
 }
