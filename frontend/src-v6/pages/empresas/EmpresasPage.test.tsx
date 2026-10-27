@@ -882,3 +882,82 @@ test('background catalog verification blocks submit until the selected record is
  fireEvent.click(screen.getByRole('button',{name:'Vincular actividad existente'}));
  await waitFor(()=>expect(mocks.request).toHaveBeenCalledWith(expect.objectContaining({url:'/empresas/first/actividades',method:'POST',data:{rol:'GENERADOR',actorId:'a'}})));
 });
+
+test.each(['','/app'])('legal form focuses a blank reason and preserves entered data (%s)',async base=>{
+ setup({},{base,entry:base+'/empresas'});await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:'Calle a conservar'}});
+ fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'   '}});
+ fireEvent.submit(screen.getByRole('button',{name:'Guardar datos legales'}).closest('form')!);
+ await waitFor(()=>expect(screen.getByLabelText('Motivo del cambio legal')).toHaveFocus());
+ expect(screen.getByLabelText('Motivo del cambio legal')).toHaveAttribute('aria-invalid','true');
+ expect(screen.getByLabelText('Calle legal')).toHaveValue('Calle a conservar');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+ const street=screen.getByLabelText('Calle legal');street.focus();fireEvent.change(street,{target:{value:'Calle corregida'}});expect(street).toHaveFocus();
+});
+test('legal form rejects overlong data without truncating the draft',async()=>{
+ setup();await screen.findByLabelText('Calle legal');const street='x'.repeat(301);
+ fireEvent.change(screen.getByLabelText('Calle legal'),{target:{value:street}});fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'Corrección documentada'}});
+ fireEvent.submit(screen.getByRole('button',{name:'Guardar datos legales'}).closest('form')!);
+ await waitFor(()=>expect(screen.getByLabelText('Calle legal')).toHaveFocus());
+ expect(screen.getByLabelText('Calle legal')).toHaveValue(street);expect(screen.getByText('Usá hasta 300 caracteres.')).toBeInTheDocument();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test.each(['','/app'])('new company rejects an invalid check digit before sending (%s)',async base=>{
+ setup({},{admin:true,base,entry:base+'/empresas'});await screen.findByRole('button',{name:'Guardar datos legales'});
+ fireEvent.click(screen.getByText('Registrar empresa',{selector:'summary'}));
+ const form=screen.getByRole('button',{name:'Registrar empresa',hidden:true}).closest('form')!;
+ fireEvent.change(within(form).getByLabelText('CUIT de empresa'),{target:{value:'30-71234567-2'}});
+ fireEvent.change(within(form).getByLabelText('Razón social'),{target:{value:'QA entidad'}});
+ fireEvent.submit(form);await waitFor(()=>expect(within(form).getByLabelText('CUIT de empresa')).toHaveFocus());
+ expect(within(form).getByLabelText('CUIT de empresa')).toHaveAttribute('aria-invalid','true');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test.each(['nombre','certificados'])('establishment reports invalid %s at the field without losing its code',async field=>{
+ setup();await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Establecimientos'}));
+ fireEvent.change(screen.getByLabelText('Código de establecimiento'),{target:{value:'QA-CODE'}});
+ fireEvent.change(screen.getByLabelText('Nombre de establecimiento'),{target:{value:field==='nombre'?'   ':'QA Sede'}});
+ if(field==='certificados')fireEvent.change(screen.getByLabelText('Certificados del establecimiento'),{target:{value:'x'.repeat(101)}});
+ fireEvent.submit(screen.getByRole('button',{name:'Agregar establecimiento'}).closest('form')!);
+ const input=screen.getByLabelText(field==='nombre'?'Nombre de establecimiento':'Certificados del establecimiento');
+ await waitFor(()=>expect(input).toHaveFocus());expect(input).toHaveAttribute('aria-invalid','true');
+ expect(screen.getByLabelText('Código de establecimiento')).toHaveValue('QA-CODE');expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test.each(['','/app'])('invitation button validates malformed email and does not start an uncertain operation (%s)',async base=>{
+ setup({actividades:[{id:'g',rol:'GENERADOR'}]},{base,entry:base+'/empresas'});await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'sin-arroba'}});
+ fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));
+ await waitFor(()=>expect(screen.getByLabelText('Correo de la persona')).toHaveFocus());
+ expect(screen.getByLabelText('Correo de la persona')).toHaveAttribute('aria-invalid','true');
+ expect(screen.queryByRole('button',{name:'Comprobar preparación'})).not.toBeInTheDocument();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('responsible validation refuses whitespace reason without changing the selected activity draft',async()=>{
+ setup({puedeValidar:true});await screen.findByLabelText('Correo del responsable');
+ fireEvent.change(screen.getByLabelText('Correo del responsable'),{target:{value:'qa@night-qa.invalid'}});
+ fireEvent.change(screen.getByLabelText('Motivo de validación'),{target:{value:'  '}});
+ fireEvent.submit(screen.getByRole('button',{name:'Validar responsable'}).closest('form')!);
+ await waitFor(()=>expect(screen.getByLabelText('Motivo de validación')).toHaveFocus());
+ expect(screen.getByLabelText('Correo del responsable')).toHaveValue('qa@night-qa.invalid');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+
+test('correcting a legal field clears its inline error and submits the preserved values once',async()=>{
+ setup();await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Razón social'),{target:{value:'   '}});
+ fireEvent.change(screen.getByLabelText('Motivo del cambio legal'),{target:{value:'Corregir denominación'}});
+ fireEvent.submit(screen.getByRole('button',{name:'Guardar datos legales'}).closest('form')!);
+ await waitFor(()=>expect(screen.getByLabelText('Razón social')).toHaveFocus());
+ fireEvent.change(screen.getByLabelText('Razón social'),{target:{value:'Alfa corregida'}});
+ expect(screen.getByLabelText('Razón social')).not.toHaveAttribute('aria-invalid','true');
+ fireEvent.submit(screen.getByRole('button',{name:'Guardar datos legales'}).closest('form')!);
+ await waitFor(()=>expect(mocks.request.mock.calls.filter(([r])=>r.method==='PUT')).toHaveLength(1));
+ expect(mocks.request).toHaveBeenCalledWith(expect.objectContaining({method:'PUT',data:expect.objectContaining({razonSocial:'Alfa corregida',motivo:'Corregir denominación'})}));
+});
+test('empty establishment selection explains the blocked authorization',async()=>{
+ setup({actividades:[{id:'g',rol:'GENERADOR'}],establecimientos:[{id:'s',nombre:'Sede QA',activo:true}]});await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.click(screen.getByLabelText('Todos los establecimientos'));
+ expect(screen.getByText('Elegí al menos un establecimiento o activá Todos los establecimientos.')).toBeVisible();
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
+ fireEvent.submit(screen.getByRole('button',{name:'Autorizar cuenta verificada'}).closest('form')!);
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
