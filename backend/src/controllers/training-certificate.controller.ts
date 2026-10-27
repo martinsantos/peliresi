@@ -11,6 +11,7 @@ import { prepareManifiestoSignature } from '../domain/manifiestoSignature';
 import { certificateCommand,certifiedRows,CertificateRow } from '../domain/trainingCertificate';
 import { SCHOOL_CERTIFICATE,lockTrainingDocuments,assertNoFinalTrainingCertificate } from '../services/trainingCertificate.service';
 import { notifyManifestParties } from '../services/manifestProposal.service';
+import { documentaryResolution } from '../domain/manifiestoAdendaDocument';
 async function scope(req:AuthRequest){
  if(!isTrainingSession())throw new AppError('Documento disponible sólo en capacitación',404);
  await assertCanAccessManifiesto(prisma,req.user,req.params.id);
@@ -37,8 +38,9 @@ export async function releaseTrainingCertificate(req:AuthRequest,res:Response,ne
   await assertNoFinalTrainingCertificate(tx,manifest.id);
   if(!['EN_TRATAMIENTO','TRATADO'].includes(manifest.estado))throw new AppError('Registrá el tratamiento antes de liberar un certificado',409);
   if(command.tipo==='FINAL'&&manifest.estado!=='TRATADO')throw new AppError('El certificado final requiere operación Tratada',409);
-  const adendas=await tx.adendaManifiesto.findMany({where:{manifiestoId:manifest.id},select:{id:true,version:true,revisiones:true}});
-  if(command.tipo==='FINAL'&&adendas.some(a=>(a.revisiones as {decision:string}[]).at(-1)?.decision!=='APROBADA'))throw new AppError('Hay adendas pendientes, observadas o rechazadas; resolvelas antes del final',409);
+  const adendas=await tx.adendaManifiesto.findMany({where:{manifiestoId:manifest.id},select:{id:true,version:true,rectificaId:true,revisiones:true}});
+  const {counts}=documentaryResolution(adendas);
+  if(command.tipo==='FINAL'&&(counts.pendientes||counts.observadas||counts.rechazadas))throw new AppError('Hay adendas pendientes, observadas o rechazadas; resolvelas antes del final',409);
   const prior=await tx.eventoManifiesto.findMany({where:{manifiestoId:manifest.id,tipo:SCHOOL_CERTIFICATE},orderBy:{createdAt:'asc'}});
   const rows=certifiedRows(command,manifest.residuos,prior.map(e=>JSON.parse(e.descripcion).cantidades as CertificateRow[]));
   const metodo=command.metodo || manifest.tratamientoMetodo;

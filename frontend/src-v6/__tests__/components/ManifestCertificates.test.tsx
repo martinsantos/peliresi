@@ -34,6 +34,7 @@ it('turning off emission preserves downloadable documents and explains the restr
 });
 it('an unresolved addendum disables final emission without disabling partials',async()=>{
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:1}});show();expect(await screen.findByRole('button',{name:'Emitir certificación final total'})).toBeDisabled();expect(screen.getByRole('button',{name:'Emitir certificación parcial'})).toBeEnabled();
+ expect(screen.getByText(/1 adenda por resolver antes del final/)).toBeVisible();
 });
 
 it('never carries a certificate form or cached documents into another role of the same account',async()=>{

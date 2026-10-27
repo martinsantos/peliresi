@@ -5,6 +5,7 @@ import type { Prisma } from '@prisma/client';
 import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
 import type { CertificateRow } from '../domain/trainingCertificate';
+import { documentaryResolution } from '../domain/manifiestoAdendaDocument';
 
 export const CERTIFICATE_EVENT = 'CERTIFICADO_OPERADOR_V1';
 export const CERTIFICATE_MANAGED = 'CERTIFICACION_OPERADOR_V1';
@@ -21,8 +22,9 @@ export async function lockManifestDocuments(tx: Prisma.TransactionClient, id: st
  if (!rows.length) throw new AppError('Manifiesto no encontrado',404);
 }
 export async function certificateReadiness(tx: Prisma.TransactionClient, id: string) {
- const adendas = await tx.adendaManifiesto.findMany({where:{manifiestoId:id},select:{id:true,version:true,revisiones:true}});
- return {adendas, unresolved: adendas.filter(a => (a.revisiones as {decision:string}[]).at(-1)?.decision !== 'APROBADA').length};
+ const adendas = await tx.adendaManifiesto.findMany({where:{manifiestoId:id},select:{id:true,version:true,rectificaId:true,revisiones:true}});
+ const {counts}=documentaryResolution(adendas);
+ return {adendas, unresolved: counts.pendientes + counts.observadas + counts.rechazadas};
 }
 export async function notifyCertificateParties(tx: Prisma.TransactionClient, manifest: {id:string;numero:string;generadorId:string;transportistaId:string|null;operadorId:string}, record: {id:string;tipo:string;numero:string}, authorId:string) {
  const select={activo:true,usuario:{select:{id:true,activo:true}}} as const;

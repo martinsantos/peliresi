@@ -20,6 +20,17 @@ describe('Operator-issued certificates',()=>{
   const tx:any={adendaManifiesto:{findMany:vi.fn().mockResolvedValue([{id:'a',version:0,revisiones:[]},{id:'b',version:1,revisiones:[{decision:'OBSERVADA'}]},{id:'c',version:1,revisiones:[{decision:'RECHAZADA'}]},{id:'d',version:2,revisiones:[{decision:'OBSERVADA'},{decision:'APROBADA'}]}])}};
   expect((await certificateReadiness(tx,'m')).unresolved).toBe(3);
  });
+ it('an approved rectification resolves an observed original without changing either record',async()=>{
+  const rows=[{id:'a',version:1,rectificaId:null,revisiones:[{decision:'OBSERVADA'}]},
+   {id:'b',version:1,rectificaId:'a',revisiones:[{decision:'APROBADA'}]}];
+  const before=JSON.stringify(rows);
+  const tx:any={adendaManifiesto:{findMany:vi.fn().mockResolvedValue(rows)}};
+  const result=await certificateReadiness(tx,'m');
+  expect(result.unresolved).toBe(0);
+  expect(result.adendas).toHaveLength(2);
+  expect(tx.adendaManifiesto.findMany.mock.calls[0][0].select.rectificaId).toBe(true);
+  expect(JSON.stringify(rows)).toBe(before);
+ });
  it.each(['PARCIAL','FINAL'])('renders controlled %s email and exact document link without free-text leakage',tipo=>{
   const n:any={tipo:'INFO_GENERAL',manifiestoId:'m',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'d',tipoCertificado:tipo,nota:'SECRET'}),createdAt:new Date()};
   const mail=notificationMailContent(n)!;expect(mail.family).toBe('manifiestos');expect(mail.subject).toMatch(tipo==='FINAL'?/final total/:/parcial/);expect(mail.html).toContain('certificado=d');expect(mail.html).not.toContain('SECRET');

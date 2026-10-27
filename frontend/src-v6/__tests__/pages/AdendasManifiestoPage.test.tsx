@@ -58,6 +58,21 @@ it('all reviewed does not assert documentary closure', async () => {
   mock.get.mockResolvedValue({ data: { data: { ...data, documental: { pendientes: 0, observadas: 0, rechazadas: 0, estado: 'ADENDAS_REVISADAS', cierreAcreditado: false } } } });
   view(); await screen.findByText('Adendas revisadas. No acredita el cierre documental del expediente.');
 });
+it('explains that an approved rectification resolves an observation without changing its historic status', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, estadoRevision: 'OBSERVADA', observacionResueltaPorRectificacion: true, puedeResolver: false }],
+    documental: { pendientes: 0, observadas: 0, rechazadas: 0, estado: 'ADENDAS_REVISADAS', cierreAcreditado: false } } } });
+  view();
+  expect(await screen.findByText('Observada')).toBeVisible();
+  expect(screen.getByText('Una rectificación aprobada resolvió esta observación. El antecedente conserva su estado.')).toBeVisible();
+  expect(screen.getByText('Adendas revisadas. No acredita el cierre documental del expediente.')).toBeVisible();
+});
+it('explains an invalid rectification lineage instead of presenting the certificate as ready', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, estadoRevision: 'APROBADA', relacionRectificacionInvalida: true }],
+    documental: { pendientes: 1, observadas: 0, rechazadas: 0, estado: 'PENDIENTE', cierreAcreditado: false } } } });
+  view();
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo verificar la relación con la adenda anterior');
+  expect(screen.getByText('1 pendiente')).toBeVisible();
+});
 it('downloads current and explicit previous version without posting any changes', async () => {
   const current = { ...data, adendas: [{ ...record, version: 2 }] };
   mock.get.mockImplementation((_url, config) => Promise.resolve(config?.responseType === 'blob' ? { data: new Blob(['%PDF-']) } : { data: { data: current } }));

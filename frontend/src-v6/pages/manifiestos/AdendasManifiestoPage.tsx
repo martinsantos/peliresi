@@ -22,7 +22,7 @@ type Author = { nombre: string; rol: string };
 const roleLabels: Record<string, string> = { GENERADOR: 'Generador', TRANSPORTISTA: 'Transporte', OPERADOR: 'Operador', ADMIN: 'Administración',
   ADMIN_GENERADOR: 'Administración de Generadores', ADMIN_OPERADOR: 'Administración de Operadores', ADMIN_TRANSPORTISTA: 'Administración de Transporte' };
 const authorLabel = (author: Author | null | undefined, id: string) => author ? `${roleLabels[author.rol] || author.rol} · ${author.nombre}` : `Cuenta ${id}`;
-type Adenda = { id: string; motivo: string; rectificaId: string | null; version: number; estadoRevision: string; puedeResolver: boolean;
+type Adenda = { id: string; motivo: string; rectificaId: string | null; version: number; estadoRevision: string; puedeResolver: boolean; observacionResueltaPorRectificacion?: boolean; relacionRectificacionInvalida?: boolean;
   informeHallazgo?: OperatorFinding | null; autor?: Author | null;
   creadoPorId: string; createdAt: string; residuos: Waste[]; declaracion: { numero: string; residuos: Waste[] };
   revisiones: { autor?: Author | null; id: string; autorId: string; fecha: string; decision: string; nota: string }[] };
@@ -157,11 +157,12 @@ function AddendumContext({scope}:{scope:string}) {
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{selected ? 'Adenda del aviso' : `Adenda ${data.total - (page - 1) * 20 - i}`}</h2><span role="status" aria-label="Estado de revisión">{labels[item.estadoRevision]}</span></div>
         <p className="flex items-center gap-2 text-sm text-neutral-600"><UserRound size={16} className="shrink-0" aria-hidden="true" />{authorLabel(item.autor, item.creadoPorId)}</p>
         <p className="break-words">{item.motivo}</p>
+        {item.relacionRectificacionInvalida && <p role="alert" className="text-sm text-error-800">No se pudo verificar la relación con la adenda anterior. Consultá a Administración antes de emitir la certificación final.</p>}
         {item.revisiones.length > 0 && <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm" aria-label="Última revisión">
           <p className="font-semibold">{authorLabel(item.revisiones.at(-1)?.autor, item.revisiones.at(-1)!.autorId)}</p>
           <p>{item.revisiones.at(-1)!.nota}</p>
         </div>}
-        <p className="text-sm font-medium text-primary-800">{item.puedeResolver ? 'Podés revisar la evidencia y registrar tu decisión.' : item.creadoPorId === currentUser?.id && data.puedeRegistrar ? 'Informe registrado. Las otras partes pueden revisarlo; vos podés agregar una rectificación.' : 'Consultá las decisiones y el anexo conservado.'}</p>
+        <p className="text-sm font-medium text-primary-800">{item.observacionResueltaPorRectificacion ? 'Una rectificación aprobada resolvió esta observación. El antecedente conserva su estado.' : item.puedeResolver ? 'Podés revisar la evidencia y registrar tu decisión.' : item.creadoPorId === currentUser?.id && data.puedeRegistrar ? 'Informe registrado. Las otras partes pueden revisarlo; vos podés agregar una rectificación.' : 'Consultá las decisiones y el anexo conservado.'}</p>
         <div className="grid gap-4 sm:grid-cols-2"><div><h3 className="font-medium">Declaración conservada</h3><Load rows={item.declaracion.residuos} /></div><div><h3 className="font-medium">Carga observada</h3><Load rows={item.residuos} /></div></div>
         {item.informeHallazgo && <OperatorFindingSummary finding={item.informeHallazgo} />}
         {item.rectificaId && <p className="text-sm break-all">Rectifica adenda {item.rectificaId}; el antecedente se conserva.</p>}

@@ -10,7 +10,7 @@ import { canAccessManifiesto } from '../utils/roleFilter';
 import { canReviewAsAddendumAuthority } from '../domain/addendumAuthority';
 import { canReviewAsCounterpart, ReviewParties } from '../domain/partyReview';
 import { addendumCreateSchema, addendumReviewSchema, addendumStageAllowed, canRecordAddendum, AddendumReview } from '../domain/manifiestoAdenda';
-import { addendumDocument, documentaryStatus, DocumentaryCounts } from '../domain/manifiestoAdendaDocument';
+import { addendumDocument, documentaryStatus, documentaryResolution } from '../domain/manifiestoAdendaDocument';
 import { renderAddendumPdf } from '../services/manifiestoAdendaPdf.service';
 import { noticeNewCurrents } from '../services/postFactoNotice.service';
 import { notifyAddendumParties } from '../services/manifiestoAddendumNotice.service';
@@ -51,19 +51,17 @@ export async function listAddenda(req: AuthRequest, res: Response, next: NextFun
     const selected = req.query.adenda;
     if (selected !== undefined && (typeof selected !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(selected))) throw new AppError('Adenda inválida', 400);
     const where = { manifiestoId: manifest.id, ...(selected ? { id: selected as string } : {}) };
-    const [items, counts] = await Promise.all([
+    const [items, all] = await Promise.all([
       prisma.adendaManifiesto.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20, skip: selected ? 0 : (page - 1) * 20 }),
-      // Counts span all pages. Authorization was checked against the parent above.
-      prisma.$queryRaw<DocumentaryCounts[]>(Prisma.sql`
-        SELECT COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE jsonb_array_length(revisiones) = 0)::int AS pendientes,
-          COUNT(*) FILTER (WHERE revisiones->-1->>'decision' = 'OBSERVADA')::int AS observadas,
-          COUNT(*) FILTER (WHERE revisiones->-1->>'decision' = 'RECHAZADA')::int AS rechazadas
-        FROM adendas_manifiesto WHERE "manifiestoId" = ${manifest.id}`),
+      // Resolution spans all pages. Authorization was checked against the parent above.
+      prisma.adendaManifiesto.findMany({ where: { manifiestoId: manifest.id }, select: { id: true, rectificaId: true, revisiones: true } }),
     ]);
-    const summary = counts[0];
+    const { counts: summary, resolvedObservations, invalidLineages } = documentaryResolution(all);
     const finalLiberado = await hasFinalTrainingCertificate(prisma, manifest.id);
-    res.json({ success: true, data: { adendas: (await presentRecords(items, req)).map(r => ({...r, ...(finalLiberado ? {puedeResolver:false} : {})})), total: selected ? items.length : summary.total, finalLiberado,
+    res.json({ success: true, data: { adendas: (await presentRecords(items, req)).map(r => {
+      const resolved = resolvedObservations.has(String(r.id));
+      return { ...r, observacionResueltaPorRectificacion: resolved, relacionRectificacionInvalida: invalidLineages.has(String(r.id)), ...(finalLiberado || resolved ? { puedeResolver: false } : {}) };
+    }), total: selected ? items.length : summary.total, finalLiberado,
       documental: { ...summary, estado: documentaryStatus(summary), cierreAcreditado: false },
       manifiesto: { id: manifest.id, numero: manifest.numero, estado: manifest.estado,
         residuos: manifest.residuos.map(row => ({ corriente: row.tipoResiduo.codigo, cantidad: row.cantidad, unidad: row.unidad })) },
@@ -176,6 +174,12 @@ export async function reviewAddendum(req: AuthRequest, res: Response, next: Next
         return current;
       }
       if (current.version !== command.version) throw new AppError('La revisión cambió; recargá antes de resolver', 409);
+      if (reviews.at(-1)?.decision === 'OBSERVADA') {
+        const history = await tx.adendaManifiesto.findMany({ where: { manifiestoId: manifest.id }, select: { id: true, rectificaId: true, revisiones: true } });
+        if (documentaryResolution(history).resolvedObservations.has(current.id)) {
+          throw new AppError('La observación quedó como antecedente de una rectificación aprobada. Revisá la rectificación.', 409);
+        }
+      }
       const updated = await tx.adendaManifiesto.updateMany({ where: { id: current.id, version: command.version }, data: {
         version: { increment: 1 }, revisiones: [...reviews, { ...command, autorId: req.user.id, ...(req.user.impersonatedBy ? { impersonadoPorId: req.user.impersonatedBy.id } : {}), fecha: new Date().toISOString() }] as unknown as Prisma.InputJsonValue,
       } });

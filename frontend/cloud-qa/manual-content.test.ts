@@ -134,6 +134,15 @@ test('audit guidance separates certificate configuration from issuance and prese
     'CSV descarga sólo los registros visibles de la página actual']) assert.ok(text.includes(phrase), phrase);
 });
 
+test('certificate and addendum guides explain the approved rectification without erasing the observation', () => {
+  const cert = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));
+  const adenda = JSON.stringify(guides.find((g: any) => g.id === 'adendas-hallazgos-partes'));
+  assert.ok(cert.includes('Una rectificación aprobada resuelve la observación'));
+  assert.ok(cert.includes('Otras adendas pendientes o rechazadas siguen requiriendo resolución'));
+  assert.ok(adenda.includes('la observación anterior deja de bloquear la certificación final'));
+  assert.ok(adenda.includes('queda como antecedente observado'));
+});
+
 test('public trial screenshot is unedited, anonymous and explicitly separate from an actual application', () => {
   const p = JSON.parse(read('registration-capture-provenance.json'));
   assert.equal(p.authenticated, false); assert.equal(p.synthetic, true);
