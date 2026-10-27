@@ -7,7 +7,7 @@ import { workspaceRoleLabel } from '../../utils/workspaceNavigation';
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User,
   Mail,
@@ -37,6 +37,9 @@ import { CompanyAccessLink } from '../../components/CompanyAccessLink';
 
 const PerfilPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const certificateId = searchParams.get('certificadoAmbiental');
+  const highlightedCertificate = certificateId && /^[a-zA-Z0-9_-]{1,100}$/.test(certificateId) ? certificateId : undefined;
   const mp = useMobilePrefix();
   const { currentUser, isGenerador:personalGenerador, isOperador:personalOperador } = useAuth();
   const isGenerador=personalGenerador&&!currentUser?.empresaContexto;
@@ -94,7 +97,8 @@ const PerfilPage: React.FC = () => {
       <ActorActivities />
       <CompanyAccessLink />
       {currentUser?.empresaContexto&&<Card><CardContent><h3 className="font-semibold">Empresa y establecimiento en uso</h3><p>{currentUser.empresaContexto.razonSocial}</p><p>Legal: {currentUser.empresaContexto.domicilioLegal.calle||'Por completar'}</p><p>Productivo: {currentUser.empresaContexto.establecimiento?.domicilio||'Por completar'}</p></CardContent></Card>}
-      {!currentUser?.empresaContexto&&currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} />}
+      {(!currentUser?.empresaContexto || currentUser.empresaContexto.todasSedes) && currentUser?.actorId && (currentUser.rol === 'GENERADOR' || currentUser.rol === 'OPERADOR' || currentUser.rol === 'TRANSPORTISTA') && <ActorCertificates type={currentUser.rol} actorId={currentUser.actorId} highlightId={highlightedCertificate} />}
+      {currentUser?.empresaContexto && !currentUser.empresaContexto.todasSedes && <p className="text-sm text-neutral-600">Para consultar el certificado ambiental de la empresa necesitás autorización para todos sus establecimientos.</p>}
 
       {/* Datos del Establecimiento - solo GENERADOR/OPERADOR */}
       {(isGenerador || isOperador) && currentUser?.actorId && actorQuery.isLoading && <p role="status">Cargando datos de tu establecimiento…</p>}

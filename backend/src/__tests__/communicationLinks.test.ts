@@ -22,6 +22,14 @@ describe('communication links', () => {
     expect(content.html).toContain('/app/notificaciones/notice-role');
     expect(content.html).not.toContain('/requerimientos/case-1');
   });
+  it.each(['generador', 'transportista', 'operador'])('routes an environmental certificate for %s through its owned notice in web and app', actorTipo => {
+    const content = notificationMailContent({ id: 'notice-cert', tipo: 'INFO_GENERAL', rol: 'GENERADOR', datos: JSON.stringify({
+      tipo: 'certificado_ambiental', actorTipo, actorId: 'actor-cert', documentoId: 'doc-cert',
+    }) } as any)!;
+    expect(content.html).toContain('/notificaciones/notice-cert');
+    expect(content.html).toContain('/app/notificaciones/notice-cert');
+    expect(content.html).not.toContain('/mi-perfil');
+  });
   it.each(['/manifiestos/m?certificado=c#certificaciones', '/manifiestos/m/adendas?adenda=a', '/mis-inspecciones/i#intercambios', '/soporte/s', '/mi-solicitud?solicitud=s', '/app/notificaciones/n'])('account preference plus identical explicit web/app alternatives: %s', path => {
     vi.stubEnv('FRONTEND_URL', 'https://sitrep.example.invalid');
     const html = mailAction(path, 'Abrir');

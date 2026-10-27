@@ -169,7 +169,7 @@ describe('committed notice mail relay', () => {
     mocks.query.mockResolvedValue([certificate]); mocks.document.mockResolvedValue(document);
     await queueCommittedNotificationEmails();
     expect(mocks.insert.mock.calls[0][0].data[0]).toMatchObject({ estado: 'PENDIENTE', id: 'notification:qa-notice' });
-    expect(notificationMailContent(certificate)?.html).toContain('/mi-perfil');
+    expect(notificationMailContent(certificate)?.html).toContain('/notificaciones/qa-notice');
     expect(notificationMailContent(certificate)?.html).not.toContain('/api/');
   });
   it.each([null, { ...document, estado: 'RECHAZADO' }, { ...document, tipo: 'COMPROBANTE_PAGO' },

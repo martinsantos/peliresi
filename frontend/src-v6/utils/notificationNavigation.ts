@@ -36,8 +36,21 @@ export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos'>)
   && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string'));
 }
 
+/** Metadata provides orientation only; the selected actor is confirmed by the API. */
+export function notificationEnvironmentalCertificate(notice: Pick<Notificacion, 'datos'>) {
+  const data = parseNotificationData(notice.datos);
+  const validId = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value);
+  const roles = { generador: 'GENERADOR', transportista: 'TRANSPORTISTA', operador: 'OPERADOR' } as const;
+  const role = typeof data.actorTipo === 'string' && Object.prototype.hasOwnProperty.call(roles, data.actorTipo)
+    ? roles[data.actorTipo as keyof typeof roles] : null;
+  return data.tipo === 'certificado_ambiental' && role && validId(data.actorId) && validId(data.documentoId)
+    ? { role, actorId: data.actorId, documentoId: data.documentoId } : null;
+}
+
 export function notificationActorRole(notice: Notificacion): 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' | null {
   const data = parseNotificationData(notice.datos);
+  const certificate = notificationEnvironmentalCertificate(notice);
+  if (certificate) return certificate.role;
   return ['intercambio_inspeccion', 'agenda_inspeccion'].includes(String(data.tipo)) && data.version === 1
     && data.destino === 'participacion' && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))
     ? data.tipoActor as 'GENERADOR' | 'TRANSPORTISTA' | 'OPERADOR' : null;
@@ -93,6 +106,7 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
   if (/^\/(?:mis-)?inspecciones$/.test(pathname)) return 'Abrir inspecciones →';
   if (/^\/soporte(?:\/|$)/.test(pathname)) return 'Abrir consulta de soporte →';
   if (pathname === '/empresas') return 'Ver entidad y acceso →';
+  if (pathname === '/mi-perfil' && new URLSearchParams(query).has('certificadoAmbiental')) return 'Ver certificado ambiental →';
   if (pathname === '/mi-perfil') return 'Abrir mi ficha y documentos →';
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
   if (pathname === '/admin/renovaciones') return 'Revisar renovación →';
@@ -108,6 +122,13 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   const data = parseNotificationData(notificacion.datos);
   if (!companyTarget && notificationCompanyAccesses(notificacion).length) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+  if (data.tipo === 'certificado_ambiental') {
+    const certificate = notificationEnvironmentalCertificate(notificacion);
+    if (!certificate || !safeId(notificacion.id)) return withBasePath('/notificaciones', basePath);
+    return withBasePath(companyTarget
+      ? '/mi-perfil?certificadoAmbiental=' + encodeURIComponent(certificate.documentoId) + '#certificado-ambiental'
+      : '/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
+  }
   if (['adenda_manifiesto', 'ADENDA_POST_FACTO'].includes(String(data.tipo)) && safeId(notificacion.manifiestoId) && safeId(data.adendaId)) return withBasePath(`/manifiestos/${notificacion.manifiestoId}/adendas?adenda=${data.adendaId}`, basePath);
   if (data.tipo === 'soporte' && safeId(data.ticketId)) return withBasePath('/soporte/' + data.ticketId, basePath);
   if(data.tipo === 'certificado_manifiesto') {
@@ -141,9 +162,6 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   if (data.tipo === 'nuevo_registro') return withBasePath('/admin/usuarios', basePath);
   if (String(notificacion.tipo) === 'MODIFICACION_SOLICITADA' && safeId(data.renovacionId)) return withBasePath('/admin/renovaciones?anio=&revision=' + data.renovacionId, basePath);
   if (['MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(String(notificacion.tipo)) && safeId(data.renovacionId) && safeId(notificacion.id)) return withBasePath('/notificaciones/' + notificacion.id, basePath);
-  if (data.tipo === 'certificado_ambiental' && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
-    return withBasePath('/mi-perfil', basePath);
-  }
   if (typeof data.solicitudId === 'string') {
     if (!/^[a-zA-Z0-9_-]{1,100}$/.test(data.solicitudId)) return withBasePath('/notificaciones', basePath);
     const applicant = ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(recipientRole || '')

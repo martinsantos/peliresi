@@ -185,7 +185,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const company=readCompanyContext(token);
     const companyManagement=config.url?.startsWith('/empresas');
     const accountRoute=config.url?.startsWith('/auth/')&&config.url!=='/auth/profile';
-    if(company&&!companyManagement&&!accountRoute&&!config.headers.has('X-SITREP-Empresa'))for(const [key,value] of Object.entries(companyHeaders(company)))config.headers.set(key,value);
+    if(company&&!companyManagement&&!accountRoute&&!config.headers.has('X-SITREP-Empresa')&&!config.headers.has(ACTIVITY_HEADER))for(const [key,value] of Object.entries(companyHeaders(company)))config.headers.set(key,value);
     const activity = !company&&!config.headers.has('X-SITREP-Empresa')&&!companyManagement&&!accountRoute?readActorActivity(token):null;
     if (activity && !config.headers.has(ACTIVITY_HEADER)) config.headers.set(ACTIVITY_HEADER, activity);
   }

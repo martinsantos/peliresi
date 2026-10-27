@@ -249,7 +249,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     family = 'representacion'; title = 'Novedad en tu representación'; path = String(data.evento).includes('REVOCAD') ? '/notificaciones/' + encodeURIComponent(notice.id) : '/empresas?empresa=' + encodeURIComponent(String(data.empresaId)) + '&origen=avisos';
   } else if (notice.tipo === 'INFO_GENERAL' && data.tipo === 'certificado_ambiental' && typeof data.documentoId === 'string' && data.documentoId && typeof data.actorId === 'string' && data.actorId && ['generador', 'operador', 'transportista'].includes(String(data.actorTipo))) {
     family = 'certificados'; title = 'Certificado ambiental disponible';
-    path = '/mi-perfil';
+    path = '/notificaciones/' + encodeURIComponent(notice.id);
   } else if (['MODIFICACION_SOLICITADA', 'MODIFICACION_APROBADA', 'MODIFICACION_RECHAZADA'].includes(notice.tipo) && typeof data.renovacionId === 'string' && data.renovacionId) {
     family = 'padron'; title = 'Novedad en una solicitud de padrón';
     path = notice.tipo === 'MODIFICACION_SOLICITADA' ? '/admin/renovaciones?anio=&revision=' + encodeURIComponent(data.renovacionId) : '/notificaciones/' + encodeURIComponent(notice.id);

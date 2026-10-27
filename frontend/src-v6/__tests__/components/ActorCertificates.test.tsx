@@ -10,9 +10,9 @@ vi.mock('../../services/generador-fiscal.service', async importOriginal => {
 });
 import ActorCertificates from '../../components/ActorCertificates';
 const certificate = { id: 'official', tipo: 'CERTIFICADO_AMBIENTAL', estado: 'APROBADO', anio: 2026, nombre: 'CAA oficial.pdf', createdAt: '2026-10-08T12:00:00Z' };
-function open() {
+function open(highlightId?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><ActorCertificates type="GENERADOR" actorId="actor" /></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><ActorCertificates type="GENERADOR" actorId="actor" highlightId={highlightId} /></QueryClientProvider>);
 }
 beforeEach(() => { vi.clearAllMocks(); mock.role = 'GENERADOR'; mock.get.mockResolvedValue({ data: { data: { documentos: [certificate] } } }); mock.download.mockResolvedValue(undefined); });
 it('the actor downloads the authenticated original without upload or publication controls', async () => {
@@ -21,6 +21,19 @@ it('the actor downloads the authenticated original without upload or publication
   expect(mock.get).toHaveBeenCalledWith('/actores/generadores/actor/documentos');
   expect(screen.queryByText('Cargar certificado oficial')).not.toBeInTheDocument();
   expect(screen.queryByText('Publicar certificado')).not.toBeInTheDocument();
+});
+it('identifies the exact certificate from the notice, including an older version', async () => {
+  const newer = { ...certificate, id: 'newer', nombre: 'CAA nueva.pdf', createdAt: '2026-10-09T12:00:00Z' };
+  mock.get.mockResolvedValue({ data: { data: { documentos: [newer, certificate] } } });
+  open('official');
+  expect(await screen.findByText('Certificado del aviso')).toBeVisible();
+  expect(screen.getByText(/CAA oficial.pdf/).closest('details')).toHaveAttribute('open');
+  fireEvent.click(screen.getByRole('button', { name: 'Descargar versión anterior' }));
+  await waitFor(() => expect(mock.download).toHaveBeenCalledWith('official', 'CAA oficial.pdf'));
+});
+it('explains when the certificate in the notice is no longer available', async () => {
+  open('missing');
+  expect(await screen.findByText(/El certificado del aviso ya no está disponible/)).toBeVisible();
 });
 it('a rejected certificate is identified as rejected, never pending or valid', async () => {
   mock.role = 'ADMIN_GENERADOR'; mock.get.mockResolvedValue({ data: { data: { documentos: [{ ...certificate, estado: 'RECHAZADO' }] } } });

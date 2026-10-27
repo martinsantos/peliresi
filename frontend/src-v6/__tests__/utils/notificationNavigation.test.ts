@@ -134,10 +134,15 @@ describe('resolveNotificationPath', () => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'case-1', destino: 'participacion', ...invalid }) };
     expect(resolveNotificationPath(notice, '/app')).toBe('/app/notificaciones');
   });
-  it.each([['generador', 'generadores'], ['operador', 'operadores'], ['transportista', 'transportistas']])('opens the %s official certificate record on web and app', (actorTipo, plural) => {
-    const notice = { ...base, datos: JSON.stringify({ tipo: 'certificado_ambiental', actorTipo, actorId: 'owner' }) };
-    expect(resolveNotificationPath(notice)).toBe('/mi-perfil');
-    expect(resolveNotificationPath(notice, '/app')).toBe('/app/mi-perfil');
+  it.each(['generador', 'operador', 'transportista'])('opens the %s environmental certificate through its owned notice on web and app', actorTipo => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'certificado_ambiental', actorTipo, actorId: 'owner', documentoId: 'doc-1', url: '/wrong' }) };
+    expect(resolveNotificationPath(notice)).toBe('/notificaciones/n-1');
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app/notificaciones/n-1');
+    expect(resolveNotificationPath(notice, '', actorTipo.toUpperCase(), true)).toBe('/mi-perfil?certificadoAmbiental=doc-1#certificado-ambiental');
+  });
+  it.each([{ documentoId: '../bad' }, { actorId: '../bad' }, { actorTipo: 'otro' }, { actorTipo: '__proto__' }])('does not follow invalid environmental certificate metadata %j', invalid => {
+    const notice = { ...base, datos: JSON.stringify({ tipo: 'certificado_ambiental', actorTipo: 'generador', actorId: 'owner', documentoId: 'doc-1', url: '/wrong', ...invalid }) };
+    expect(resolveNotificationPath(notice, '/app')).toBe('/app/notificaciones');
   });
   it('opens native support in the current surface with exactly one base path', () => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'soporte', ticketId: 'ticket-1', ruta: '/soporte/ticket-1' }) };

@@ -66,6 +66,18 @@ it('does not request an actor for an unbound administrative identity', async () 
   expect(screen.queryByText('Mi establecimiento')).toBeNull();
   expect(m.get).not.toHaveBeenCalled();
 });
+it('shows the company certificate only with authorization for every site', async () => {
+  m.user = { ...m.user, empresaContexto: { todasSedes: true, razonSocial: 'QA empresa', domicilioLegal: { calle: 'QA' } } } as typeof m.user;
+  setup('/mi-perfil?certificadoAmbiental=doc-1');
+  expect(await screen.findByText('El certificado del aviso ya no está disponible en esta ficha. Consultá a DGFA si necesitás ayuda.')).toBeVisible();
+  expect(m.get).toHaveBeenCalledWith('/actores/operadores/op-1/documentos');
+});
+it('explains restricted company access without requesting company-wide certificates', () => {
+  m.user = { ...m.user, empresaContexto: { todasSedes: false, razonSocial: 'QA empresa', domicilioLegal: { calle: 'QA' } } } as typeof m.user;
+  setup();
+  expect(screen.getByText(/necesitás autorización para todos sus establecimientos/i)).toBeVisible();
+  expect(m.get).not.toHaveBeenCalledWith('/actores/operadores/op-1/documentos');
+});
 it('identifies loading rather than showing placeholder establishment fields', async () => {
   m.get.mockImplementation(() => new Promise(() => {})); setup();
   expect(await screen.findByText('Cargando datos de tu establecimiento…')).toBeVisible();

@@ -22,3 +22,11 @@ it('does not change the local activity when the server rejects or disconnects', 
   await expect(activateActorActivity('owner', 'OPERADOR')).rejects.toThrow('Unavailable');
   expect(mocks.save).not.toHaveBeenCalled(); expect(mocks.clear).not.toHaveBeenCalled();
 });
+it('checks the exact actor behind an environmental certificate before changing context', async () => {
+  mocks.get.mockResolvedValue({ data: { data: { user: { id: 'owner', rol: 'OPERADOR', operador: { id: 'other' } } } } });
+  await expect(activateActorActivity('owner', 'OPERADOR', 'actor-1')).rejects.toThrow('Actividad incompatible');
+  expect(mocks.save).not.toHaveBeenCalled(); expect(mocks.clear).not.toHaveBeenCalled();
+  mocks.get.mockResolvedValue({ data: { data: { user: { id: 'owner', rol: 'OPERADOR', operador: { id: 'actor-1' } } } } });
+  await activateActorActivity('owner', 'OPERADOR', 'actor-1');
+  expect(mocks.save).toHaveBeenCalledWith('owner', 'OPERADOR');
+});
