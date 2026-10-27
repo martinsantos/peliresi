@@ -242,19 +242,19 @@ export const MobileLayout: React.FC = () => {
 
       {/* Header */}
       <header className="sticky top-0 z-40 shrink-0 bg-white border-b border-neutral-200 safe-area-top">
-        <div className="flex items-center justify-between gap-2 h-16 px-4 safe-top">
+        <div className="flex items-center justify-between gap-2 min-h-16 px-4 py-2" style={{ paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <button
               ref={menuButtonRef}
               onClick={() => setIsMenuOpen(true)}
-              className="p-2 -ml-2 text-primary-800 hover:bg-primary-50 rounded-xl transition-colors touch-target"
+              className="shrink-0 p-2 -ml-2 text-primary-800 hover:bg-primary-50 rounded-xl transition-colors touch-target"
               aria-label="Abrir menu"
             >
               <Menu size={24} />
             </button>
-            <SitrepMark size={24} />
+            <SitrepMark size={24} className="hidden min-[360px]:block" />
             <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-              <h1 className="min-w-0 whitespace-normal break-words text-base font-bold leading-5 text-neutral-900">{getPageTitle()}</h1>
+              <h1 className="w-full min-w-0 whitespace-normal break-words text-base font-bold leading-5 text-neutral-900">{getPageTitle()}</h1>
               <span aria-label="Función actual" title={`Rol base: ${currentUser.rol}`} className="w-fit max-w-full whitespace-normal break-normal text-xs leading-4 font-medium px-2 py-0.5 rounded-full bg-primary-50 text-neutral-900">
                 {config.label}
               </span>

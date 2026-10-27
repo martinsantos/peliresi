@@ -376,7 +376,9 @@ describe('MobileLayout Android shell', () => {
     const header = screen.getByRole('banner');
     expect(header.querySelector('h1')).toHaveClass('whitespace-normal', 'break-words');
     expect(header.querySelector('h1')).not.toHaveClass('truncate');
-    expect(header.firstElementChild).toHaveClass('h-16');
+    expect(header.firstElementChild).toHaveClass('min-h-16', 'py-2');
+    expect(header.firstElementChild).not.toHaveClass('h-16');
+    expect(header.querySelector('h1')).toHaveClass('w-full');
     expect(header.querySelector('[aria-label="Función actual"]')).toHaveTextContent('Adm. Generadores');
     const badge = header.querySelector('[aria-label="Función actual"]');
     expect(badge).toHaveClass('w-fit', 'max-w-full', 'break-normal');

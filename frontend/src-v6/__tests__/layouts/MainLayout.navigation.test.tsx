@@ -151,8 +151,9 @@ describe('Sidebar: one visible current destination',()=>{
     show(path);
     const header=screen.getByRole('banner');
     const title=within(header).getByRole('heading',{name:label,exact:true});
-    expect(header).toHaveClass('h-16','shrink-0','min-w-0');
-    expect(title).toHaveClass('min-w-0','whitespace-normal','break-words','sm:truncate');
+    expect(header).toHaveClass('min-h-16','py-2','shrink-0','min-w-0');
+    expect(header).not.toHaveClass('h-16');
+    expect(title).toHaveClass('min-w-0','whitespace-normal','break-words');
     expect(title).toHaveAttribute('title',label);
     expect(title.parentElement).toHaveClass('min-w-0','flex-1');
     const help=within(header).getByRole('button',{name:path.startsWith('/admin/actores') || path === '/inspecciones' ? 'Ayuda y soporte técnico':'Ver tour de ayuda',exact:true});

@@ -329,12 +329,12 @@ export const MainLayout: React.FC = () => {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Header */}
-        <header className="h-16 shrink-0 min-w-0 header-polished flex items-center justify-between gap-2 lg:gap-4 px-4 lg:px-8 sticky top-0 z-30">
+        <header className="min-h-16 py-2 shrink-0 min-w-0 header-polished flex items-center justify-between gap-2 lg:gap-4 px-4 lg:px-8 sticky top-0 z-30">
           <div className="flex min-w-0 flex-1 items-center gap-2 lg:gap-4">
             <Button
               variant="ghost"
               size="base"
-              className="shrink-0 lg:hidden"
+              className="w-11 shrink-0 p-2 lg:hidden"
               ref={menuTrigger}
               aria-label="Abrir menú"
               aria-expanded={sidebarOpen}
@@ -343,7 +343,7 @@ export const MainLayout: React.FC = () => {
               <Menu size={20} />
             </Button>
             <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 sm:flex-row sm:items-center sm:justify-start sm:gap-4">
-              <h1 title={currentPage} className="min-w-0 whitespace-normal break-words text-base leading-5 sm:truncate sm:text-xl sm:leading-normal font-semibold text-neutral-900">{currentPage}</h1>
+              <h1 title={currentPage} className="min-w-0 whitespace-normal break-words text-base leading-5 sm:text-xl sm:leading-normal font-semibold text-neutral-900">{currentPage}</h1>
 
               {/* Badge de rol actual */}
               <Badge
