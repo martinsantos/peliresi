@@ -178,6 +178,37 @@ test('guides have unique identities, useful steps and existing evidence', () => 
   }
 });
 
+test('images displayed in the manual use an extension matching their file contents', () => {
+  const sources = new Set<string>();
+  for (const guide of guides) for (const step of guide.steps) if (step.image) sources.add(step.image);
+  for (const match of read('directorio.html').matchAll(/<img\s+src="(screenshots\/[^"]+)"/g)) sources.add(match[1]);
+  for (const source of sources) {
+    const bytes = readFileSync(new URL(source, root));
+    if (bytes.readUInt16BE(0) === 0xffd8) assert.match(source, /\.jpe?g$/i, source + ' contains JPEG');
+    else if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) assert.match(source, /\.png$/i, source + ' contains PNG');
+    else if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') assert.match(source, /\.webp$/i, source + ' contains WebP');
+    else assert.fail(source + ' is not a recognized manual image');
+  }
+});
+
+test('MIME aliases preserve the original evidence bytes and replace active references', () => {
+  const aliases = JSON.parse(read('image-mime-aliases-20261027.json'));
+  assert.equal(aliases.syntheticCapturesUnchanged, true);
+  assert.ok(aliases.files.length > 0);
+  assert.equal(new Set(aliases.files.map((file: any) => file.previous)).size, aliases.files.length);
+  const active = read('help-data.js') + read('directorio.html');
+  for (const file of aliases.files) {
+    const old = readFileSync(new URL(file.previous, root));
+    const current = readFileSync(new URL(file.current, root));
+    assert.match(file.previous, /\.png$/); assert.match(file.current, /\.jpg$/);
+    assert.equal(current.readUInt16BE(0), 0xffd8);
+    assert.ok(old.equals(current), file.previous);
+    assert.equal(createHash('sha256').update(current).digest('hex'), file.sha256);
+    assert.ok(active.includes(file.current.replace(/^screenshots\//, '')), file.current);
+    assert.ok(!active.includes(file.previous.replace(/^screenshots\//, '')), file.previous);
+  }
+});
+
 test('training, registration, support and migration are searchable, with safety boundaries', () => {
   for (const id of ['capacitacion-por-rol', 'alta-borradores-ocr', 'soporte-enviar-seguir', 'soporte-gestionar', 'cambio-dominio']) {
     const guide = guides.find((g: any) => g.id === id);

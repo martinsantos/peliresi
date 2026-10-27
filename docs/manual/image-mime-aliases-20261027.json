@@ -1,0 +1,146 @@
+{
+  "syntheticCapturesUnchanged": true,
+  "reason": "Las imágenes JPEG se sirven con extensión y tipo compatibles; se conservan los originales para la evidencia histórica.",
+  "files": [
+    {
+      "previous": "screenshots/mobile/actor-documents-synchronized-20261025.png",
+      "current": "screenshots/mobile/actor-documents-synchronized-20261025.jpg",
+      "sha256": "c1a6852cc862c09951731fa14d9a0311b6b85f8336753031637ab70005732bf7"
+    },
+    {
+      "previous": "screenshots/mobile/actor-fiscal-summary-20261025.png",
+      "current": "screenshots/mobile/actor-fiscal-summary-20261025.jpg",
+      "sha256": "9f268921d68e0d2d12ede84c8719445c2b2331e1c86efc5fbaba9b38d29b6808"
+    },
+    {
+      "previous": "screenshots/mobile/actor-own-help-20261025.png",
+      "current": "screenshots/mobile/actor-own-help-20261025.jpg",
+      "sha256": "8b549bc16de9bbac4eecf1913674c5426b533273820c6b1107d77bc263066abf"
+    },
+    {
+      "previous": "screenshots/mobile/admission-list-20261025.png",
+      "current": "screenshots/mobile/admission-list-20261025.jpg",
+      "sha256": "45d75064f291ef40dff2e374b13fdc11c23b22560b41bfe52ac400f237f400a7"
+    },
+    {
+      "previous": "screenshots/mobile/application-decision-draft-20261025.png",
+      "current": "screenshots/mobile/application-decision-draft-20261025.jpg",
+      "sha256": "d706f9c2222da2ca479d11105eca838b1997a2ec6b2abe989d467e9e68a2849a"
+    },
+    {
+      "previous": "screenshots/mobile/application-observed-20261025.png",
+      "current": "screenshots/mobile/application-observed-20261025.jpg",
+      "sha256": "150d7c5194d1907d999744a375311fc5f660171fc3d6750331d805161f7835c5"
+    },
+    {
+      "previous": "screenshots/mobile/certificate-draft-20261026.png",
+      "current": "screenshots/mobile/certificate-draft-20261026.jpg",
+      "sha256": "4ae22853c13dd7065123158ead2e52ac1b94b3c82a294b63b201b2fd415177c3"
+    },
+    {
+      "previous": "screenshots/mobile/certificate-recovery-20261026.png",
+      "current": "screenshots/mobile/certificate-recovery-20261026.jpg",
+      "sha256": "b129d53171b51e1a6a684fed5ec78202e24716a3077927bb8979468e22ade92e"
+    },
+    {
+      "previous": "screenshots/mobile/company-context-compact-20261025.png",
+      "current": "screenshots/mobile/company-context-compact-20261025.jpg",
+      "sha256": "21f36e31de0cfea5e651a9b38a47bac2dbc7612b2d9a6c8d1375713b829cb64f"
+    },
+    {
+      "previous": "screenshots/mobile/company-notice-context-20261025.png",
+      "current": "screenshots/mobile/company-notice-context-20261025.jpg",
+      "sha256": "3c2eef15d7e3a8855b861d1590ce6faa6048e7d79293e3beba45ad56891501de"
+    },
+    {
+      "previous": "screenshots/mobile/company-workflow-context-20261026.png",
+      "current": "screenshots/mobile/company-workflow-context-20261026.jpg",
+      "sha256": "d0c39518bf06378511a5a59af4e52f2da3ff501791cd35921a3f6441a06cf22c"
+    },
+    {
+      "previous": "screenshots/mobile/context-search-20261026.png",
+      "current": "screenshots/mobile/context-search-20261026.jpg",
+      "sha256": "937468f0e7bc9dfa94da40cae22d377d39e677b7aaa4fa6fc1d6f7057823e21d"
+    },
+    {
+      "previous": "screenshots/mobile/form-conflict-20261025.png",
+      "current": "screenshots/mobile/form-conflict-20261025.jpg",
+      "sha256": "83bf141bf4a7116922afa5fcac1cf943ff10168abec90f9e05abac191f8ae7a3"
+    },
+    {
+      "previous": "screenshots/mobile/form-residuos-20261025.png",
+      "current": "screenshots/mobile/form-residuos-20261025.jpg",
+      "sha256": "10ec82508dde10dd17cdddc48a411f4834cefc58b369cc3325926105efb20c85"
+    },
+    {
+      "previous": "screenshots/mobile/form-retry-20261025.png",
+      "current": "screenshots/mobile/form-retry-20261025.jpg",
+      "sha256": "00174f6df7ee54ab131f0173c5ad8e8e6f82a593ed5fce57589f62988205ee0b"
+    },
+    {
+      "previous": "screenshots/mobile/generator-rejected-history-20261027.png",
+      "current": "screenshots/mobile/generator-rejected-history-20261027.jpg",
+      "sha256": "7b1259e52607f1c836958ef078e378047d577faeebb363243348bb08eac7cfb9"
+    },
+    {
+      "previous": "screenshots/mobile/inspection-agenda-20261025.png",
+      "current": "screenshots/mobile/inspection-agenda-20261025.jpg",
+      "sha256": "549bfe2515c4a61dc001f26f0c7efa9a9d6058e89a500273a43fcb369f1df39a"
+    },
+    {
+      "previous": "screenshots/mobile/inspection-field-context-20261025.png",
+      "current": "screenshots/mobile/inspection-field-context-20261025.jpg",
+      "sha256": "86f28579b2c7df1265dd42fea60a0999554a71a7c450cbfc806da5b224f26455"
+    },
+    {
+      "previous": "screenshots/mobile/invitation-acceptance-recovery-20261026.png",
+      "current": "screenshots/mobile/invitation-acceptance-recovery-20261026.jpg",
+      "sha256": "321a0e0ec4132a26ad18fa7c8237a72ecd30653bc10f53b3eb32ec9f074c6af4"
+    },
+    {
+      "previous": "screenshots/mobile/notice-inbox-20261025.png",
+      "current": "screenshots/mobile/notice-inbox-20261025.jpg",
+      "sha256": "aa6e6ccefafc6cd78e15b1d64e784b082a16aa0c27debaf2379323f6fe897559"
+    },
+    {
+      "previous": "screenshots/mobile/profile-change-recovered-20261026.png",
+      "current": "screenshots/mobile/profile-change-recovered-20261026.jpg",
+      "sha256": "db9371fa2f8a665b874db79774b072b4479cfde7125fc36de23ad54a339289ec"
+    },
+    {
+      "previous": "screenshots/mobile/registration-orientation-20261025.png",
+      "current": "screenshots/mobile/registration-orientation-20261025.jpg",
+      "sha256": "a184af89b313f19fdff0259f81d813faf6a81f622a54e3d793c64bdab50ab485"
+    },
+    {
+      "previous": "screenshots/mobile/renewal-result-20261025.png",
+      "current": "screenshots/mobile/renewal-result-20261025.jpg",
+      "sha256": "ccc0a6cde7af74468f95375f65788481b2d1d743130272fd34690c42d53eec29"
+    },
+    {
+      "previous": "screenshots/mobile/renewal-review-20261025.png",
+      "current": "screenshots/mobile/renewal-review-20261025.jpg",
+      "sha256": "90da4cafdf055d4f38efe16eff33d65f4ea31d33c3edfc082c541e244332b20e"
+    },
+    {
+      "previous": "screenshots/mobile/report-type-selector-20261025.png",
+      "current": "screenshots/mobile/report-type-selector-20261025.jpg",
+      "sha256": "ca7dec7db56a54701917afa9c21e974d7d6fcdfc60bd44dea47b3fe606a36fdd"
+    },
+    {
+      "previous": "screenshots/mobile/role-padron-generadores-20261024.png",
+      "current": "screenshots/mobile/role-padron-generadores-20261024.jpg",
+      "sha256": "a86697e3c2797b3a370a695b3127b2080616dc34f051d3b67de9162d9e8bd27e"
+    },
+    {
+      "previous": "screenshots/mobile/workspace-home-20261024.png",
+      "current": "screenshots/mobile/workspace-home-20261024.jpg",
+      "sha256": "8904604d72f97ddbb29a3381c3e7338c6fe9c8dc72e4162c7eb05f7af50e9409"
+    },
+    {
+      "previous": "screenshots/mobile/workspace-list-20261024.png",
+      "current": "screenshots/mobile/workspace-list-20261024.jpg",
+      "sha256": "6d373b70bac6c6c4ed9bcdb421baae69114da502d17b2f07e0f5897ab696c61a"
+    }
+  ]
+}
