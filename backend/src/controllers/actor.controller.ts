@@ -11,6 +11,7 @@ import { actorCoordinates, actorNumber } from '../domain/actorNumbers';
 import { parsePagination } from '../utils/pagination';
 import { directoryText, operatorDirectoryQuery } from '../services/actorDirectoryFilters';
 import { deleteAccountPreservingSupport } from '../services/supportAccountDeletion.service';
+import { fiscalCompanyRecipients } from '../services/fiscalCompanyNotice.service';
 import {
     buildFiscalWhere,
     combineWhere,
@@ -215,36 +216,37 @@ export const crearRecordatoriosGeneradores = async (req: AuthRequest, res: Respo
             throw new AppError('El motivo debe tener entre 10 y 500 caracteres', 400);
         }
 
-        const recipients = await prisma.generador.findMany({
-            where: { id: { in: ids }, usuario: { activo: true } },
-            select: { id: true, usuarioId: true },
+        const generators = await prisma.generador.findMany({
+            where: { id: { in: ids } }, select: { id: true, usuarioId: true, usuario: { select: { activo: true } } },
         });
+        const representatives = await fiscalCompanyRecipients(prisma, generators.map(g => g.id));
         const campaignId = `${Date.now()}-${req.user!.id}`;
-        if (recipients.length > 0) {
-            await prisma.notificacion.createMany({
-                data: recipients.map((recipient) => ({
-                    usuarioId: recipient.usuarioId,
-                    tipo: 'INFO_GENERAL',
-                    titulo: `Recordatorio fiscal ${fiscalYear}`,
-                    mensaje: motivo,
-                    prioridad: 'ALTA',
-                    datos: JSON.stringify({
-                        tipo: 'recordatorio_fiscal',
-                        fiscalYear,
-                        generadorId: recipient.id,
-                        campaignId,
-                        url: '/perfil',
-                    }),
-                })),
-            });
+        const notices = new Map<string, { generadorId: string; usuarioId: string; tipo: 'INFO_GENERAL'; titulo: string; mensaje: string; prioridad: 'ALTA'; datos: string }>();
+        for (const generator of generators) {
+            if (!generator.usuario.activo) continue;
+            notices.set(`${generator.id}:${generator.usuarioId}`, { generadorId: generator.id, usuarioId: generator.usuarioId,
+                tipo: 'INFO_GENERAL', titulo: `Recordatorio fiscal ${fiscalYear}`, mensaje: motivo, prioridad: 'ALTA',
+                datos: JSON.stringify({ tipo: 'recordatorio_fiscal', fiscalYear, generadorId: generator.id, campaignId, url: '/perfil' }) });
         }
+        for (const recipient of representatives) {
+            const key = `${recipient.generadorId}:${recipient.usuarioId}`;
+            if (notices.has(key)) continue;
+            // The stored copy is generic; the message and company are projected only while access remains valid.
+            notices.set(key, { generadorId: recipient.generadorId, usuarioId: recipient.usuarioId,
+                tipo: 'INFO_GENERAL', titulo: 'Aviso para tu empresa', mensaje: 'Abrí el aviso para consultar la información de la actividad.', prioridad: 'ALTA',
+                datos: JSON.stringify({ tipo: 'recordatorio_fiscal', version: 1, destino: 'representante', generadorId: recipient.generadorId,
+                    fiscalYear, empresaId: recipient.acceso.empresaId, actividadId: recipient.acceso.actividadId, motivo, campaignId }) });
+        }
+        const rows = [...notices.values()];
+        if (rows.length) await prisma.notificacion.createMany({ data: rows.map(({ generadorId: _actorId, ...row }) => row) });
+        const reached = new Set(rows.map(row => row.generadorId));
 
         res.status(201).json({
             success: true,
             data: {
                 requested: ids.length,
-                delivered: recipients.length,
-                skipped: ids.length - recipients.length,
+                delivered: rows.length,
+                skipped: ids.length - reached.size,
                 campaignId,
             },
         });

@@ -85,6 +85,17 @@ describe('notification inbox states and interaction', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Recordatorio fiscal 2026', exact: true }));
     expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
   });
+  it.each(['', '/app'])('names a fiscal company notice before its authorized company context on %s', async base => {
+    auth.user.rol = 'GENERADOR';
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'Recordatorio fiscal 2026', datos: JSON.stringify({
+      tipo:'recordatorio_fiscal', version:1, destino:'representante', generadorId:'g-1', fiscalYear:2026,
+      accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',razonSocial:'Empresa QA'}],
+    }) }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText('Ver aviso fiscal →')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir aviso: Recordatorio fiscal 2026', exact: true }));
+    expect(screen.getByTestId('location')).toHaveTextContent(base + '/notificaciones/notice');
+  });
   it('keeps secondary controls behind explicit options without changing read state', async () => {
     setup('/app/notificaciones');
     await screen.findByText(notice.titulo);

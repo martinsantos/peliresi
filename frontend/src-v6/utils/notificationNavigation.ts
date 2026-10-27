@@ -31,9 +31,11 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
 
 export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos'>): Array<{empresaId:string;actividadId:string;rol:string;razonSocial:string;establecimientoId?:string;establecimiento?:string}> {
  const data = parseNotificationData(notice.datos), id = (v: unknown) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
- if (!['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo)) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
+ const fiscal = data.tipo === 'recordatorio_fiscal' && data.destino === 'representante' && !!notificationFiscalReminder(notice);
+ if ((!fiscal && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
  return data.accesosEmpresa.filter(a => a && id(a.empresaId) && id(a.actividadId) && ['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(a.rol)
-  && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string'));
+  && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string')
+  && (!fiscal || (a.rol === 'GENERADOR' && !a.establecimientoId && !a.establecimiento)));
 }
 
 /** Metadata provides orientation only; the selected actor is confirmed by the API. */
@@ -127,6 +129,7 @@ export function notificationActionLabel(path: string, notice?: Pick<Notificacion
   if (/^\/admin\/actores\/generadores\/[^/]+$/.test(pathname) && new URLSearchParams(query).get('tab') === 'fiscal') return 'Ver situación fiscal →';
   if (pathname === '/admin/usuarios') return 'Revisar cuentas de usuarios →';
   if (pathname === '/admin/renovaciones') return 'Revisar renovación →';
+  if (/^\/notificaciones\/[^/]+$/.test(pathname) && data.tipo === 'recordatorio_fiscal') return 'Ver aviso fiscal →';
   if (/^\/notificaciones\/[^/]+$/.test(pathname)) return 'Ver aviso y resultado →';
   if (pathname === '/alertas') return 'Revisar alerta →';
   if (/^\/manifiestos\/[^/]+\/adendas$/.test(pathname)) return 'Abrir adenda y revisiones →';

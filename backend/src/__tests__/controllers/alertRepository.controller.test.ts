@@ -5,7 +5,7 @@ vi.mock('../../services/domainEvent.service', () => ({ domainEvents: {} }));
 vi.mock('../../services/notification-dispatcher.service', () => ({ notificationService: {} }));
 vi.mock('../../jobs/seguimientoCierre.job', () => ({ simularSeguimientoCierre: mocks.simulate, ejecutarSeguimientoCierre: mocks.evaluate }));
 import { resolverAlerta, crearReglaAlerta, getAlertasGeneradas, getNotificaciones } from '../../controllers/notification.controller';
-const response = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis() });
+const response = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis(), setHeader: vi.fn() });
 beforeEach(() => vi.clearAllMocks());
 it('rejects the old read-only request instead of silently timestamping a pending case as resolved', async () => {
   const next = vi.fn();

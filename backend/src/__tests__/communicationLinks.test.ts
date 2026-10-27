@@ -12,6 +12,9 @@ describe('communication links', () => {
       tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil',
     }) };
     expect(notificationMailContent(notice as any)).toBeNull();
+    expect(notificationMailContent({ ...notice, datos: JSON.stringify({ tipo: 'recordatorio_fiscal', version: 1,
+      destino: 'representante', generadorId: 'g-1', fiscalYear: 2026, empresaId: 'co', actividadId: 'a',
+      motivo: 'Mensaje fiscal artificial de revisión.' }) } as any)).toBeNull();
   });
   it('enriches a historic own PSIP notice with its activity without rewriting the row', async () => {
     const original = { id: 'mine', usuarioId: 'self', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, destino: 'participacion', inspeccionId: 'case-own' }) };

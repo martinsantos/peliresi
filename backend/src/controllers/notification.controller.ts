@@ -11,6 +11,7 @@ import { ejecutarSeguimientoCierre, simularSeguimientoCierre } from '../jobs/seg
 import { catalogueCondition, validateCatalogueRule, CATALOGUE_MARKER } from '../services/alertCataloguePolicy.service';
 import { ejecutarCatalogo, simularCatalogo } from '../jobs/alertCatalogue.job';
 import { withCompanyNoticeContext } from '../services/companyNotice.service';
+import { maskFiscalCompanyNotice, withFiscalCompanyNoticeContext } from '../services/fiscalCompanyNotice.service';
 
 const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'INSPECCIONADO', 'INSPECTOR_ASIGNADO']);
 function normalizeAlertRecipients(raw: unknown): string {
@@ -95,7 +96,8 @@ export const getNotificaciones = async (req: Request, res: Response, next: NextF
         const stateByCase = new Map(cases.map(item => [item.id, item.estado]));
         const caseByNotice = new Map(linked.map(item => [item.noticeId, item.id]));
 
-        const contextualNotices = await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity(notificaciones)));
+        const contextualNotices = await withFiscalCompanyNoticeContext(prisma, await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity(notificaciones))));
+        res.setHeader('Cache-Control', 'private, no-store');
         res.json({
             success: true,
             data: {
@@ -120,7 +122,7 @@ export const getNotificacion = async (req: Request, res: Response, next: NextFun
             include: { manifiesto: { select: { numero: true, estado: true } } } });
         if (!notice) throw new AppError('Aviso no disponible para esta cuenta', 404);
         res.setHeader('Cache-Control', 'private, no-store');
-        res.json({ success: true, data: (await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity([notice]))))[0] });
+        res.json({ success: true, data: (await withFiscalCompanyNoticeContext(prisma, await withApplicationNoticeContext(prisma, await withCompanyNoticeContext(prisma, await withInspectionActivity([notice])))))[0] });
     } catch (error) { next(error); }
 };
 
@@ -135,7 +137,7 @@ export const marcarLeida = async (req: Request, res: Response, next: NextFunctio
             data: { leida: true, fechaLeida: new Date() }
         });
 
-        res.json({ success: true, data: notificacion });
+        res.json({ success: true, data: maskFiscalCompanyNotice(notificacion) });
     } catch (error) {
         next(error);
     }

@@ -55,3 +55,33 @@ it.each(['propuesta_partes','adenda_manifiesto'])('uses a specific action and pr
  expect(screen.queryByRole('button',{name:/certificado/})).toBeNull();
  expect(mocks.get).not.toHaveBeenCalled();
 });
+
+const fiscalNotice:any = { id:'fiscal-n', datos:JSON.stringify({ tipo:'recordatorio_fiscal', version:1, destino:'representante',
+ generadorId:'g-1', fiscalYear:2026, accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',razonSocial:'QA Entidad'}] }) };
+const fiscalTarget='/admin/actores/generadores/g-1?tab=fiscal&ejercicio=2026';
+it.each(['','/app'])('offers the exact company fiscal record in %s without a personal-role detour', prefix => {
+ expect(resolveNotificationPath(fiscalNotice,prefix)).toBe(prefix+'/notificaciones/fiscal-n');
+ expect(resolveNotificationPath(fiscalNotice,prefix,undefined,true)).toBe(prefix+fiscalTarget);
+ render(<MemoryRouter initialEntries={[prefix+'/notificaciones/fiscal-n']}><CompanyNoticeAction notice={fiscalNotice} target={fiscalTarget} userId="rep"/></MemoryRouter>);
+ expect(screen.getByText('QA Entidad')).toBeVisible();
+ expect(screen.getByRole('button',{name:'Usar Generador para continuar'})).toBeVisible();
+ expect(screen.queryByText(/manifiesto/)).toBeNull();
+});
+it.each(['wrong-actor','site-only','revoked'])('does not save a fiscal company context with %s', async reason => {
+ const context = { empresaId:'co',actividadId:'a',rol:'GENERADOR',actorId:'g-1',todasSedes:true };
+ if(reason==='wrong-actor')context.actorId='g-other';
+ if(reason==='site-only')context.todasSedes=false;
+ if(reason==='revoked')mocks.get.mockRejectedValue(new Error('403'));
+ else mocks.get.mockResolvedValue({data:{data:{user:{id:'rep',empresaContexto:context}}}});
+ render(<MemoryRouter><CompanyNoticeAction notice={fiscalNotice} target={fiscalTarget} userId="rep"/></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'Usar Generador para continuar'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Tu contexto no cambió');
+ expect(mocks.save).not.toHaveBeenCalled();
+});
+it('opens the fiscal page only in the matching full company context', () => {
+ const onOpen=vi.fn();
+ const context:any = { empresaId:'co',actividadId:'a',rol:'GENERADOR',actorId:'g-1',todasSedes:true };
+ render(<MemoryRouter><CompanyNoticeAction notice={fiscalNotice} target={fiscalTarget} userId="rep" context={context} onOpenFiscal={onOpen}/></MemoryRouter>);
+ const link=screen.getByRole('link',{name:'Ver situación fiscal →'});
+ expect(link).toHaveAttribute('href',fiscalTarget);fireEvent.click(link);expect(onOpen).toHaveBeenCalledOnce();
+});

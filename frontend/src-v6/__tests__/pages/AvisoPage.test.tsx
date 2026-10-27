@@ -98,3 +98,13 @@ it('keeps a restricted company context away from company-wide fiscal data', () =
  expect(screen.queryByRole('link', { name: 'Ver situación fiscal →' })).toBeNull();
  expect(screen.getByRole('button', { name: 'Usar Generador' })).toBeVisible();
 });
+it.each(['', '/app'])('shows company authorization instead of asking a representative for a personal role in %s', prefix => {
+ state.query.data = { ...state.query.data, titulo: 'Recordatorio fiscal 2026', datos: JSON.stringify({ tipo: 'recordatorio_fiscal', version: 1,
+  destino: 'representante', generadorId: 'g-1', fiscalYear: 2026,
+  accesosEmpresa: [{ empresaId:'co', actividadId:'a', rol:'GENERADOR', razonSocial:'Empresa QA' }] }) };
+ state.user = { ...state.user, rol: 'OPERADOR', actorId: 'o-1', actividades: ['OPERADOR'] };
+ show(prefix);
+ expect(screen.getByText('Empresa QA')).toBeVisible();
+ expect(screen.getByRole('button', { name:'Usar Generador para continuar' })).toBeVisible();
+ expect(screen.queryByText('Usá tu actividad Generador para consultar este recordatorio fiscal.')).toBeNull();
+});

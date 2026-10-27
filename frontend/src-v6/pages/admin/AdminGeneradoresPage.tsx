@@ -564,7 +564,7 @@ const AdminGeneradoresPage: React.FC = () => {
     setSendingReminders(true);
     try {
       const result = await actoresService.createGeneradorReminders({ ids: selectedIds, fiscalYear, motivo: reminderText.trim() });
-      toast.success('Recordatorios creados', `${result.delivered} avisos entregados${result.skipped ? `; ${result.skipped} omitidos por cuenta inactiva o inexistente` : ''}.`);
+      toast.success('Recordatorios creados', `${result.delivered} avisos creados${result.skipped ? `; ${result.skipped} generadores sin destinatarios disponibles` : ''}.`);
       setReminderOpen(false);
       setSelectedIds([]);
     } catch (reminderError: any) {
@@ -784,7 +784,7 @@ const AdminGeneradoresPage: React.FC = () => {
           <div className="rounded-xl bg-neutral-50 p-3"><p className="text-xs font-medium text-neutral-500">Destinatarios</p><p className="mt-1 text-xl font-bold text-neutral-900">{selectedIds.length}</p></div>
           <div className="rounded-xl bg-neutral-50 p-3"><p className="text-xs font-medium text-neutral-500">Ejercicio</p><p className="mt-1 text-xl font-bold text-neutral-900">{fiscalYear}</p></div>
         </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">Solo reciben el aviso las cuentas activas asociadas a la seleccion confirmada. Si una cuenta fue desactivada desde la seleccion, se omitira y quedara informada en el resultado.</div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">Reciben el aviso las cuentas principales activas y, si está habilitada la representación de empresas, las personas con cuenta activa, correo verificado y autorización para toda la actividad del generador. Las autorizaciones se verifican de nuevo al abrirlo; el resultado informa los generadores sin destinatarios disponibles.</div>
         <label className="block text-sm font-semibold text-neutral-800">Mensaje del recordatorio
           <textarea value={reminderText} maxLength={500} onChange={(event) => setReminderText(event.target.value)} rows={5} className="mt-2 w-full resize-y rounded-xl border border-neutral-300 px-3 py-2.5 font-normal leading-relaxed outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-100" />
         </label>

@@ -21,6 +21,7 @@ describe('resolveNotificationPath', () => {
   it.each(['', '/app', '/mobile'])('routes fiscal reminders via the owned notice in %s and ignores the obsolete profile path', prefix => {
     const notice = { ...base, datos: JSON.stringify({ tipo: 'recordatorio_fiscal', generadorId: 'g-1', fiscalYear: 2026, url: '/perfil' }) };
     expect(resolveNotificationPath(notice, prefix, 'OPERADOR')).toBe(prefix + '/notificaciones/n-1');
+    expect(notificationActionLabel(prefix + '/notificaciones/n-1', notice)).toBe('Ver aviso fiscal →');
     const target = resolveNotificationPath(notice, prefix, 'GENERADOR', true);
     expect(target).toBe(prefix + '/admin/actores/generadores/g-1?tab=fiscal&ejercicio=2026');
     expect(notificationActionLabel(target, notice)).toBe('Ver situación fiscal →');

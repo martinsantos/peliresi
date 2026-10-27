@@ -56,15 +56,15 @@ export default function AvisoPage() {
     </div>}
     {notice && <article className="rounded-xl border border-primary-200 bg-white p-5 space-y-4">
       <h2 className="text-lg font-semibold">{notice.titulo}</h2><p className="whitespace-pre-wrap break-words">{notice.mensaje}</p>
-      {actorRole && !otherRole && <p className="text-sm font-semibold text-primary-800">Actividad: {roleLabel}</p>}
-      {otherRole && <div className="space-y-3 rounded-lg bg-primary-50 p-3">
+      {!companyAccesses.length && actorRole && !otherRole && <p className="text-sm font-semibold text-primary-800">Actividad: {roleLabel}</p>}
+      {!companyAccesses.length && otherRole && <div className="space-y-3 rounded-lg bg-primary-50 p-3">
         <p>Usá tu actividad {roleLabel} para consultar {certificate ? 'este certificado ambiental' : fiscal ? 'este recordatorio fiscal' : 'este requerimiento'}.</p>
         {canChange ? <Button onClick={() => void changeActivity()} isLoading={changing}>Usar {roleLabel}{fiscal ? '' : certificate ? ' y ver certificado' : ' y abrir requerimiento'}</Button>
           : <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to={mp('/mi-perfil')}>Revisar los roles de mi cuenta</Link>}
         {contextError && <p role="alert" className="text-sm text-error-700">{contextError}</p>}
       </div>}
       <p className="text-sm text-neutral-600">Aviso del {new Date(notice.createdAt).toLocaleString('es-AR')}. Consultá el estado actual antes de actuar.</p>
-      {companyAccesses.length > 0 && currentUser && <CompanyNoticeAction key={inspectionWorkspaceOwner(currentUser)} notice={notice} target={target} userId={String(currentUser.id)} context={currentUser.empresaContexto} />}
+      {companyAccesses.length > 0 && currentUser && <CompanyNoticeAction key={inspectionWorkspaceOwner(currentUser)} notice={notice} target={target} userId={String(currentUser.id)} context={currentUser.empresaContexto} returnState={inboxState} onOpenFiscal={() => refreshInspectionNotification(notice, queryClient)} />}
       {!companyAccesses.length && (!actorTarget || actorContextMatches) && target !== '/notificaciones' && target !== '/notificaciones/' + id && <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)} onClick={() => { if (fiscal) refreshInspectionNotification(notice, queryClient); }} state={fiscal ? { actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(inboxState ? { notificationInboxReturn: inboxState } : {}) } : undefined}>{notificationActionLabel(target, notice)}</Link>}
     </article>}
   </section>;
