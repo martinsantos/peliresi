@@ -423,7 +423,9 @@ export const getLogAuditoria = async (req: AuthRequest, res: Response, next: Nex
                     tipo: e.tipo,
                     descripcion: e.descripcion,
                     manifiestoNumero: e.manifiesto.numero,
-                    usuario: e.usuario ? `${e.usuario.nombre} ${e.usuario.apellido}` : 'Sistema',
+                    usuario: e.usuario
+                        ? [e.usuario.nombre, e.usuario.apellido].filter(Boolean).join(' ').trim() || e.usuario.email || 'Sistema'
+                        : 'Sistema',
                     rol: e.usuario?.rol || 'SISTEMA',
                     ubicacion: e.latitud && e.longitud ? { lat: e.latitud, lng: e.longitud } : null
                 })),

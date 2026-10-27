@@ -13,7 +13,10 @@ test('finding guide distinguishes source evidence, unknown scope and a formal in
   assert.ok(guide.steps.flatMap((s: any) => s.resources || []).some((r: any) => r.path === '/inspecciones?vista=antecedentes'));
 });
 test('manual bundle references agree at the candidate version', () => {
-  for (const file of ['index.html', 'tutorial.html', 'search.html']) assert.match(readFileSync(new URL(file, manual), 'utf8'), /help-data\.js\?v=2026\.23\.4/);
+  const version = createHash('sha256').update(readFileSync(new URL('help-data.js', manual))).digest('hex').slice(0, 12);
+  for (const file of ['index.html', 'tutorial.html', 'search.html']) {
+    assert.ok(readFileSync(new URL(file, manual), 'utf8').includes(`help-data.js?v=${version}`), file);
+  }
 });
 test('finding and queue screenshots come unedited from the nine accepted preview journeys', () => {
   const proof = JSON.parse(readFileSync(new URL('inspection-intake-capture-provenance.json', manual), 'utf8'));

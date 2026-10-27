@@ -130,7 +130,8 @@ test('audit guidance separates certificate configuration from issuance and prese
   const guide = guides.find((g: any) => g.id === 'auditor-consultar-actividad');
   const text = JSON.stringify(guide);
   for (const phrase of ['Gestión de certificados configurada', 'no que se emitió un documento',
-    'Texto original registrado', 'columna Aclaración']) assert.ok(text.includes(phrase), phrase);
+    'Texto original registrado', 'columna Aclaración', 'búsqueda de texto se limita a la página visible',
+    'CSV descarga sólo los registros visibles de la página actual']) assert.ok(text.includes(phrase), phrase);
 });
 
 test('public trial screenshot is unedited, anonymous and explicitly separate from an actual application', () => {

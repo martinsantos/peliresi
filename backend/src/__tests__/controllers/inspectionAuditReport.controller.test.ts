@@ -41,6 +41,21 @@ describe('inspection events in the audit workspace', () => {
     expect(db.eventoInspeccion.findMany).not.toHaveBeenCalled();
   });
 
+  it('formats manifest users without leaking a missing surname and preserves system events', async () => {
+    db.eventoManifiesto.findMany.mockResolvedValue([
+      { id: 'one', tipo: 'CREACION', createdAt: new Date(), descripcion: '', manifiesto: { numero: 'QA-001' },
+        usuario: { nombre: 'Ana', apellido: null, email: 'ana@example.invalid', rol: 'GENERADOR' } },
+      { id: 'two', tipo: 'CREACION', createdAt: new Date(), descripcion: '', manifiesto: { numero: 'QA-002' },
+        usuario: null },
+    ]);
+    db.eventoManifiesto.count.mockResolvedValue(2);
+    db.eventoManifiesto.groupBy.mockResolvedValue([]);
+    const res = response(); const next = vi.fn();
+    await getLogAuditoria({ user, query: {} } as any, res as any, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].data.eventos.map((e: { usuario: string }) => e.usuario)).toEqual(['Ana', 'Sistema']);
+  });
+
   it('rejects unauthorized access and unsupported sources', async () => {
     const denied = vi.fn();
     await getLogAuditoria({ user: { id: 'inspector-1', rol: 'GENERADOR', esInspector: true }, query: { fuente: 'inspecciones' } } as any, response() as any, denied);

@@ -36,11 +36,33 @@ it('clarifies an activation marker in both responsive layouts and retains the hi
     expect(within(summary.parentElement as HTMLElement).getByText(legacy)).toBeInTheDocument();
   }
   expect(screen.getAllByText('Incidente documentado')).toHaveLength(2);
-  fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+  fireEvent.click(screen.getByRole('button', { name: 'CSV de esta página' }));
   const [, headers, rows] = mocks.download.mock.calls[0];
   expect(headers).toContain('Aclaración');
   expect(rows[0]).toContain(legacy);
   expect(rows[0][headers.indexOf('Aclaración')]).toContain('no es un certificado emitido');
+});
+
+it('identifies page-scoped search and download and names the date and pagination controls', async () => {
+  setup();
+  await screen.findAllByText('Incidente documentado');
+  expect(screen.getByPlaceholderText('Buscar en esta página...')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'CSV de esta página' })).toBeEnabled();
+  expect(screen.getByLabelText('Desde')).toBeInTheDocument();
+  expect(screen.getByLabelText('Hasta')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Registros por página' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Página anterior' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Página siguiente' })).toBeInTheDocument();
+  fireEvent.change(screen.getByPlaceholderText('Buscar en esta página...'), { target: { value: 'QA-001' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Limpiar' }));
+  expect(screen.getByPlaceholderText('Buscar en esta página...')).toHaveValue('');
+});
+
+it('does not present a failed request as an empty audit', async () => {
+  mocks.auditoria.mockRejectedValue(new Error('offline'));
+  setup();
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo actualizar');
+  expect(screen.queryByText('No se encontraron registros')).toBeNull();
 });
 
 it('does not reinterpret an inspection event with the same code', async () => {

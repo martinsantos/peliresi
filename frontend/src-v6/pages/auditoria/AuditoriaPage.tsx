@@ -195,7 +195,7 @@ const AuditoriaPage: React.FC = () => {
     const headers = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Modulo', 'Legajo', 'Detalle', 'IP', 'Aclaración'];
     const rows = logsFiltrados.map(l => [l.fecha, l.usuario, l.rol, l.accion, l.modulo, l.inspeccionNumero || '', l.detalleRegistrado, l.ip, l.aclaracion]);
     downloadCsv(`auditoria_${fuente}_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
-    toast.success('Exportado', 'Registros descargados');
+    toast.success('Exportado', 'Se descargaron los registros de esta página');
   };
 
   const setQuickDateRange = (days: number) => {
@@ -215,7 +215,7 @@ const AuditoriaPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = filtroAccion || filtroUsuario || fechaDesde || fechaHasta;
+  const hasActiveFilters = filtroAccion || filtroUsuario || fechaDesde || fechaHasta || busqueda;
 
   const formatFecha = (fecha: string) => {
     if (!fecha) return '—';
@@ -242,7 +242,7 @@ const AuditoriaPage: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" leftIcon={<Download size={16} />} disabled={isError || !logsFiltrados.length} onClick={handleExportar}>
-            CSV
+            CSV de esta página
           </Button>
         </div>
       </div>
@@ -273,7 +273,7 @@ const AuditoriaPage: React.FC = () => {
               <Select value={fuente} onChange={(value) => { setFuente(value as 'manifiestos' | 'inspecciones'); setFiltroAccion(''); setCurrentPage(1); }} options={[{ value: 'manifiestos', label: 'Manifiestos' }, { value: 'inspecciones', label: 'Inspecciones' }]} size="sm" placeholder="Módulo" />
             </div>
             <div className="flex-1">
-              <Input placeholder="Buscar en resultados..." value={busqueda} onChange={e => setBusqueda(e.target.value)} leftIcon={<Search size={16} />} />
+              <Input placeholder="Buscar en esta página..." value={busqueda} onChange={e => setBusqueda(e.target.value)} leftIcon={<Search size={16} />} />
             </div>
             <div className="w-full sm:w-48">
               <Select value={filtroAccion} onChange={(val) => { setFiltroAccion(val); setCurrentPage(1); }} options={fuente === 'inspecciones' ? [{ value: '', label: 'Todas las acciones' }, ...Object.keys(stats.porTipo).map((value) => ({ value, label: value.replace(/_/g, ' ') }))] : ACCION_OPTIONS} size="sm" placeholder="Acción" />
@@ -285,17 +285,17 @@ const AuditoriaPage: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0 w-full sm:w-auto">
               <Calendar size={14} className="text-neutral-400 shrink-0" />
-              <input type="date" value={fechaDesde} onChange={e => { setFechaDesde(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-32 sm:w-36 min-w-0" />
+              <input type="date" aria-label="Desde" value={fechaDesde} onChange={e => { setFechaDesde(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-32 sm:w-36 min-w-0 min-h-11" />
               <span className="text-xs text-neutral-400">a</span>
-              <input type="date" value={fechaHasta} onChange={e => { setFechaHasta(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-32 sm:w-36 min-w-0" />
+              <input type="date" aria-label="Hasta" value={fechaHasta} onChange={e => { setFechaHasta(e.target.value); setCurrentPage(1); }} className="text-sm border border-neutral-200 rounded-lg px-2 py-1.5 w-32 sm:w-36 min-w-0 min-h-11" />
             </div>
             <div className="flex gap-1.5 flex-wrap">
-              <button onClick={() => setQuickDateRange(1)} className="text-xs px-2 py-1 rounded-lg border border-neutral-200 hover:bg-neutral-50">Hoy</button>
-              <button onClick={() => setQuickDateRange(7)} className="text-xs px-2 py-1 rounded-lg border border-neutral-200 hover:bg-neutral-50">7 días</button>
-              <button onClick={() => setQuickDateRange(30)} className="text-xs px-2 py-1 rounded-lg border border-neutral-200 hover:bg-neutral-50">30 días</button>
-              <button onClick={() => setQuickDateRange(90)} className="text-xs px-2 py-1 rounded-lg border border-neutral-200 hover:bg-neutral-50">90 días</button>
+              <button onClick={() => setQuickDateRange(1)} className="text-xs px-2 py-1 min-h-11 rounded-lg border border-neutral-200 hover:bg-neutral-50">Hoy</button>
+              <button onClick={() => setQuickDateRange(7)} className="text-xs px-2 py-1 min-h-11 rounded-lg border border-neutral-200 hover:bg-neutral-50">7 días</button>
+              <button onClick={() => setQuickDateRange(30)} className="text-xs px-2 py-1 min-h-11 rounded-lg border border-neutral-200 hover:bg-neutral-50">30 días</button>
+              <button onClick={() => setQuickDateRange(90)} className="text-xs px-2 py-1 min-h-11 rounded-lg border border-neutral-200 hover:bg-neutral-50">90 días</button>
               {hasActiveFilters && (
-                <button onClick={clearFilters} className="text-xs px-2 py-1 rounded-lg bg-error-50 text-error-600 border border-error-200 hover:bg-error-100">Limpiar</button>
+                <button onClick={clearFilters} className="text-xs px-2 py-1 min-h-11 rounded-lg bg-error-50 text-error-600 border border-error-200 hover:bg-error-100">Limpiar</button>
               )}
             </div>
           </div>
@@ -306,7 +306,7 @@ const AuditoriaPage: React.FC = () => {
       <div className="md:hidden space-y-2">
         {isLoading ? (
           <div className="flex items-center justify-center py-12"><Loader2 size={24} className="animate-spin text-primary-500" /></div>
-        ) : logsFiltrados.length === 0 ? (
+        ) : isError ? null : logsFiltrados.length === 0 ? (
           <div className="text-center py-12 text-neutral-500 text-sm">No se encontraron registros</div>
         ) : logsFiltrados.map((log) => {
           const cfg = accionConfig[log.accion] || { color: 'neutral', icon: Activity };
@@ -362,7 +362,7 @@ const AuditoriaPage: React.FC = () => {
             <tbody className="divide-y divide-neutral-100">
               {isLoading ? (
                 <tr><td colSpan={6} className="text-center py-12"><Loader2 size={24} className="animate-spin text-primary-500 mx-auto" /></td></tr>
-              ) : logsFiltrados.length === 0 ? (
+              ) : isError ? null : logsFiltrados.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-12 text-neutral-500">No se encontraron registros</td></tr>
               ) : logsFiltrados.map((log) => {
                 const cfg = accionConfig[log.accion] || { color: 'neutral', icon: Activity };
@@ -401,13 +401,13 @@ const AuditoriaPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
         <div className="flex items-center gap-3 text-neutral-600">
           <span>Pág. {currentPage}/{totalPages} — {totalItems.toLocaleString()} registros</span>
-          <Select value={itemsPerPage.toString()} onChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }} options={ITEMS_PER_PAGE_OPTIONS} size="sm" isFullWidth={false} />
+          <Select value={itemsPerPage.toString()} onChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }} options={ITEMS_PER_PAGE_OPTIONS} size="sm" placeholder="Registros por página" isFullWidth={false} />
         </div>
         <div className="flex items-center gap-1 flex-wrap justify-center max-w-full">
-          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(1)}>
+          <Button aria-label="Primera página" variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(1)}>
             <ChevronLeft size={14} /><ChevronLeft size={14} className="-ml-2" />
           </Button>
-          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+          <Button aria-label="Página anterior" variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
             <ChevronLeft size={14} />
           </Button>
           {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -422,10 +422,10 @@ const AuditoriaPage: React.FC = () => {
               </Button>
             );
           })}
-          <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+          <Button aria-label="Página siguiente" variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
             <ChevronRight size={14} />
           </Button>
-          <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(totalPages)}>
+          <Button aria-label="Última página" variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(totalPages)}>
             <ChevronRight size={14} /><ChevronRight size={14} className="-ml-2" />
           </Button>
         </div>
