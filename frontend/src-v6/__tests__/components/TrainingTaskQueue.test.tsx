@@ -162,3 +162,22 @@ it('restores filters after opening a record and returning on the same surface',a
  expect(await screen.findByRole('button',{name:'En curso'})).toHaveAttribute('aria-pressed','true');
  expect(await screen.findByText('CAP-TRIP')).toBeVisible();expect(screen.queryByText('CAP-NEW')).not.toBeInTheDocument();q.clear();
 });
+
+
+it('does not show an invalidated approval status while its replacement is pending', async () => {
+  const q=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  const key=['training-tasks','u','OPERADOR','o','e','s','all','all','',1];
+  const stale={...items[0],numero:'QA-PROPOSAL',requiereMiAprobacion:true};
+  q.setQueryData(key, reply([stale]).data.data);
+  await q.invalidateQueries({queryKey:['training-tasks']});
+  let finish!: (value: unknown) => void;
+  mock.get.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+  render(<MemoryRouter><QueryClientProvider client={q}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
+  expect(await screen.findByRole('status')).toHaveTextContent('Actualizando agenda');
+  expect(screen.queryByRole('link',{name:/QA-PROPOSAL/})).not.toBeInTheDocument();
+  finish(reply([{...stale,estado:'APROBADO',requiereMiAprobacion:false,partes:partes.map(p=>({...p,aprobada:true}))}]));
+  const row=await screen.findByRole('link',{name:/QA-PROPOSAL/});
+  expect(row).toHaveTextContent('Listo para iniciar');
+  expect(row).not.toHaveTextContent('Te toca aprobar');
+  q.clear();
+});

@@ -11,7 +11,7 @@ const labels: Record<string, string> = {
   RECHAZO_PARTE: 'Participación rechazada', INICIO_COORDINACION: 'Coordinación iniciada',
   INICIO_COORDINACION_CAP: 'Coordinación iniciada',
   CERTIFICACION_ENVIO_RETIRADO: 'Solicitud de certificación retirada sin emitir',
-  CERTIFICACION_OPERADOR_V1: 'Certificación habilitada',
+  CERTIFICACION_OPERADOR_V1: 'Gestión de certificados configurada',
   CERTIFICADO_OPERADOR_V1: 'Certificado emitido', CERTIFICADO_CAP_V1: 'Certificado de práctica emitido',
 };
 export function manifestEventLabel(type?: string | null): string {
@@ -20,7 +20,7 @@ export function manifestEventLabel(type?: string | null): string {
 
 const roles: Record<string, string> = { GENERADOR: 'El generador', TRANSPORTISTA: 'El transporte', OPERADOR: 'El operador', ADMIN: 'La administración' };
 export function manifestEventDescription(type: string | undefined, description?: string | null): string {
-  if (type === 'CERTIFICACION_OPERADOR_V1') return 'El operador debe emitir y firmar los certificados. Este evento no es un certificado emitido.';
+  if (type === 'CERTIFICACION_OPERADOR_V1') return 'El operador podrá emitir y firmar certificados cuando se cumplan las condiciones. Este evento no es un certificado emitido.';
   const text = description?.trim() || '';
   if (!text) return manifestEventLabel(type);
   if (!/^[{[]/.test(text)) return text; // Historical prose is preserved.

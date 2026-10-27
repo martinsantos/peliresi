@@ -46,6 +46,11 @@ try{
     // Mark only this new synthetic row so it stays excluded from any future delivery.
     await db.manifiesto.update({where:{id:m.id},data:{isDemoData:true}});
     assert.equal(m.estado,'PENDIENTE_APROBACION');
+    const detail=(await request(creator,`/manifiestos/${m.id}`)).data.manifiesto;
+    const configured=detail.eventos.find((event:any)=>event.tipo==='CERTIFICACION_OPERADOR_V1');
+    assert.ok(configured, 'Certificate-management event exists at creation');
+    assert.equal(configured.descripcion,'Gestión de certificados configurada; emisión sujeta a las condiciones del manifiesto');
+    assert.ok(!detail.eventos.some((event:any)=>event.tipo==='CERTIFICADO_OPERADOR_V1'), 'No certificate is issued at creation');
     for(const role of ['generador','transportista','operador']){
       const approvals=(await request(role,`/manifiestos/${m.id}/aprobaciones`)).data;assert.equal(approvals.partes.length,3);assert.ok(approvals.partes.every((p:any)=>!p.aprobada));
       assert.ok(await db.notificacion.count({where:{manifiestoId:m.id,usuarioId:f.users[role]}})>0);
@@ -61,7 +66,7 @@ try{
     await request(creator,`/manifiestos/${m.id}/iniciar-coordinacion`,'POST',{});
     await request('transportista',`/manifiestos/${m.id}/confirmar-retiro`,'POST',{});
     await request('transportista',`/manifiestos/${m.id}/ubicacion`,'POST',{latitud:-32.89,longitud:-68.84});
-    checks.push(creator+': creación, aviso a las tres partes, 0→3 aprobaciones, bloqueos previos, agenda con nombres, coordinación y retiro');checkpoint();
+    checks.push(creator+': creación sin certificado emitido, aviso a las tres partes, 0→3 aprobaciones, bloqueos previos, agenda con nombres, coordinación y retiro');checkpoint();
   }
   const ids=created.map(m=>m.id);
   const transit=(await request('admin','/centro-control/actividad?capas=transito')).data.enTransito;

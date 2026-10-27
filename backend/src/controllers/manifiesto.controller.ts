@@ -226,7 +226,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       }
     });
 
-    if (certificatesEnabled()) await tx.eventoManifiesto.create({data:{manifiestoId:created.id,usuarioId:userId,tipo:CERTIFICATE_MANAGED,descripcion:'Certificaciones emitidas y firmadas por el operador'}});
+    if (certificatesEnabled()) await tx.eventoManifiesto.create({data:{manifiestoId:created.id,usuarioId:userId,tipo:CERTIFICATE_MANAGED,descripcion:'Gestión de certificados configurada; emisión sujeta a las condiciones del manifiesto'}});
 
     if (asignacionTransporte) await tx.eventoManifiesto.create({ data: {
       manifiestoId: created.id, tipo: 'ASIGNACION_TRANSPORTE', usuarioId: userId,

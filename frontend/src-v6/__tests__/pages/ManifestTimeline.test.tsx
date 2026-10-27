@@ -20,7 +20,7 @@ it('uses the same human event labels as Monitor without exposing structured meta
     { id:'issued', tipo:'CERTIFICADO_OPERADOR_V1', descripcion:JSON.stringify({tipo:'FINAL',numero:'QA-001'}), createdAt:'2026-10-24T12:01:00Z' },
   ] } as unknown as Manifiesto;
   const {container}=render(<ManifiestoTimeline eventos={manifiesto.eventos} manifiesto={manifiesto}/>);
-  expect(screen.getByText('Certificación habilitada',{exact:true})).toBeVisible();
+  expect(screen.getByText('Gestión de certificados configurada',{exact:true})).toBeVisible();
   expect(screen.getByText(/Este evento no es un certificado emitido/)).toBeVisible();
   expect(screen.getByText('Certificado emitido',{exact:true})).toBeVisible();
   expect(container.textContent).not.toContain('CERTIFICACION_OPERADOR_V1');

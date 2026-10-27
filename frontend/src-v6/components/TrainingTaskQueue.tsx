@@ -1,7 +1,7 @@
 import { manifestProposalsVisible } from '../utils/manifestFeatures';
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,7 +15,7 @@ type Task={id:string;numero:string;estado:string;modalidad?:string;fechaEstimada
 const roleNames: Record<string,string> = { GENERADOR:'Generador', TRANSPORTISTA:'Transporte', OPERADOR:'Operador' };
 function missingApprovals(m:Task){return ['PENDIENTE_APROBACION','APROBADO'].includes(m.estado) ? m.partes?.filter(p=>!p.aprobada).map(p=>roleNames[p.rol]||p.rol).join(', ') : '';}
 export function TrainingTaskQueue(){
- const {currentUser}=useAuth(),mp=useMobilePrefix();
+ const {currentUser}=useAuth(),mp=useMobilePrefix(),queryClient=useQueryClient();
  const location=useLocation();
  const [showFilters,setShowFilters]=useState(false);
  const scope=currentUser?JSON.stringify([currentUser.id,currentUser.rol,currentUser.actorId||'',currentUser.empresaContexto?.empresaId||'',currentUser.empresaContexto?.establecimientoId||'']):'';
@@ -27,8 +27,13 @@ export function TrainingTaskQueue(){
  const rawPage=Number(params.get('paginaPendientes')||1),page=Number.isSafeInteger(rawPage)&&rawPage>0&&rawPage<=100000?rawPage:1;
  const changeFilter=(key:string,value:string)=>setParams(next=>{if(value&&value!=='all')next.set(key,value);else next.delete(key);next.delete('paginaPendientes');return next;});
  const setPage=(value:number)=>setParams(next=>{next.set('paginaPendientes',String(value));return next;});
- const query=useQuery({queryKey:['training-tasks',currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.establecimientoId,filter,period,search,page],enabled:manifestProposalsVisible(currentUser),queryFn:async()=>(await api.get('/manifiestos/tareas-partes',{params:{filter,period,search,page,limit:6}})).data.data as {items:Task[];total:number;page:number;limit:number;counts:Record<string,number>},refetchInterval:5000,staleTime:0});
+ const queryKey=['training-tasks',currentUser?.id,currentUser?.rol,currentUser?.actorId,currentUser?.empresaContexto?.empresaId,currentUser?.empresaContexto?.establecimientoId,filter,period,search,page];
+ const query=useQuery({queryKey,enabled:manifestProposalsVisible(currentUser),queryFn:async()=>(await api.get('/manifiestos/tareas-partes',{params:{filter,period,search,page,limit:6}})).data.data as {items:Task[];total:number;page:number;limit:number;counts:Record<string,number>},refetchInterval:5000,staleTime:0});
  if(!manifestProposalsVisible(currentUser) || !currentUser)return null;
+ // A mutation or notification invalidates this cache. Do not present its previous
+ // actionable state as current while the replacement is being fetched. Ordinary
+ // background polling keeps the existing list stable.
+ const refreshingInvalidated=query.isFetching && Boolean(queryClient.getQueryState(queryKey)?.isInvalidated);
  const items=query.data?.items||[], counts=query.data?.counts||{};
  const admin=currentUser.rol==='ADMIN'||currentUser.rol.startsWith('ADMIN_');
  const filters=admin?[['all','Todos'],['waiting','Por aprobar'],['progress','En curso'],['certificates','Certificados'],['drafts','Borradores']]:[['all','Todos'],['mine','Por aprobar'],['waiting','En espera'],['progress','En curso'],['certificates','Certificados'],['drafts','Borradores']];
@@ -42,7 +47,7 @@ export function TrainingTaskQueue(){
  {(showFilters||period!=='all'||!!search)&&<div id="agenda-filters" className="grid grid-cols-1 gap-2 pb-3 sm:grid-cols-2"><input aria-label="Buscar manifiesto en agenda" type="search" maxLength={80} placeholder="Buscar nº de manifiesto" value={search} onChange={e=>{changeFilter('buscarPendiente',e.target.value);}} className="h-11 w-full min-w-0 rounded-lg border border-neutral-300 px-3 text-base sm:text-sm"/><select aria-label="Fecha de la agenda" value={period} onChange={e=>{changeFilter('periodo',e.target.value);}} className="h-11 min-w-0 rounded-lg border border-neutral-300 bg-white px-3 text-sm"><option value="all">Toda fecha</option><option value="today">Hoy</option><option value="future">Próximos</option></select></div>}
  <div role="group" aria-label="Filtrar agenda" className="flex gap-1.5 overflow-x-auto pb-3">{filters.map(([value,name])=><button type="button" key={value} title={(counts[value]??0)+((counts[value]??0)===1?' manifiesto · ':' manifiestos · ')+name} aria-pressed={filter===value} onClick={()=>{changeFilter('pendientes',value);}} className={'flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 '+(filter===value?'border-primary-800 bg-primary-800 text-white':'border-neutral-200 bg-white text-neutral-700 hover:bg-primary-50')}>{name}<span aria-hidden="true" className="tabular-nums">{counts[value]??''}</span></button>)}</div>
  </>}</div>
- {query.isError?<p role="alert" className="p-4">No pudimos actualizar la agenda. <button className="underline" onClick={()=>void query.refetch()}>Reintentar</button></p>:query.isPending?<p className="p-4">Cargando agenda…</p>:<>
+ {query.isError?<p role="alert" className="p-4">No pudimos actualizar la agenda. <button className="underline" onClick={()=>void query.refetch()}>Reintentar</button></p>:query.isPending||refreshingInvalidated?<p role="status" className="p-4">{query.isPending?'Cargando agenda…':'Actualizando agenda…'}</p>:<>
  <ul className="divide-y divide-neutral-200">{items.map(m=>{
   const missing=missingApprovals(m), actors=m.actores ? [m.actores.generador,m.actores.operador].filter(Boolean).join(' → ') : '';
   const context=[m.numero,manifestWork(m,currentUser.rol).label,actors,m.actores?.transportista&&`Transporte: ${m.actores.transportista}`,missing?`Falta aprobar: ${missing}`:m.detail].filter(Boolean).join('. ');
