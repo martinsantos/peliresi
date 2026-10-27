@@ -6,10 +6,11 @@ import { render,screen,fireEvent,waitFor,cleanup,act,within } from '@testing-lib
 import { QueryClient,QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import EmpresasPage from './EmpresasPage';
-const mocks=vi.hoisted(()=>({request:vi.fn(),get:vi.fn(),user:{id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'} as {id:string;rol:string;actorId:string;empresaContexto?:any}}));
+const mocks=vi.hoisted(()=>({request:vi.fn(),get:vi.fn(),generators:vi.fn(),carriers:vi.fn(),operators:vi.fn(),user:{id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'} as {id:string;rol:string;actorId:string;empresaContexto?:any}}));
 vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:mocks.user})}));
+vi.mock('../../services/catalogo.service',()=>({catalogoService:{generadores:mocks.generators,transportistas:mocks.carriers,operadores:mocks.operators}}));
 vi.mock('../../services/api',()=>({api:{request:mocks.request,get:mocks.get}}));
-beforeEach(()=>{localStorage.clear();sessionStorage.clear();});
+beforeEach(()=>{localStorage.clear();sessionStorage.clear();mocks.generators.mockReset().mockResolvedValue([]);mocks.carriers.mockReset().mockResolvedValue([]);mocks.operators.mockReset().mockResolvedValue([]);});
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllEnvs();mocks.request.mockReset();mocks.get.mockReset();mocks.user={id:'person-qa',rol:'GENERADOR',actorId:'generator-qa'};});
 const company=(id:string,razonSocial:string)=>({id,cuit:'30712345671',razonSocial,revision:0,domicilioLegal:{calle:'Legal '+id,localidad:'Mendoza',departamento:'Capital'}});
 function setup(extra:Record<string,unknown>={}, listOptions:{single?:boolean;admin?:boolean;entry?:any;base?:string}={}){
@@ -812,4 +813,72 @@ test('an actor without company management cannot open history even when an unexp
 test('empty history does not claim that fifty changes exist',async()=>{
  setup();await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Historial'}));
  expect(await screen.findByText('Sin cambios registrados.')).toBeInTheDocument();expect(screen.queryByText(/Últimos 50/)).not.toBeInTheDocument();
+});
+
+const eligibleFicha=(id:string)=>({id,razonSocial:'Ficha '+id,cuit:'30-71234567-1',activo:true,numeroInscripcion:'G-'+id});
+test.each(['','/app'])('authority requires an explicit active same-CUIT record and never auto-submits the first (%s)',async base=>{
+ mocks.generators.mockResolvedValue([eligibleFicha('active'),{...eligibleFicha('inactive'),activo:false},{...eligibleFicha('foreign'),cuit:'20123456786'}]);
+ setup({puedeValidar:true},{base,entry:base+'/empresas'});await screen.findByLabelText('Ficha del mismo CUIT');
+ await waitFor(()=>expect(screen.getByRole('option',{name:'Ficha active · G-active'})).toBeInTheDocument());
+ expect(screen.getByLabelText('Ficha del mismo CUIT')).toHaveValue('');
+ expect(screen.queryByRole('option',{name:/Ficha inactive|Ficha foreign/})).not.toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('Ficha del mismo CUIT'),{target:{value:'active'}});
+ expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeEnabled();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('catalog loading and failure are never described as no matching active record',async()=>{
+ let reject:(e:Error)=>void=()=>{};mocks.generators.mockReturnValue(new Promise((_,r)=>{reject=r;}));
+ setup({puedeValidar:true});await screen.findByText('Consultando fichas de Generador…');
+ expect(screen.queryByText('No hay ficha activa coincidente')).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeDisabled();
+ await act(async()=>reject(new Error('QA unavailable')));
+ expect(await screen.findByText(/No pudimos consultar las fichas de Generador/)).toBeInTheDocument();
+ expect(screen.queryByText('No hay fichas activas del mismo CUIT para Generador.')).not.toBeInTheDocument();
+});
+test.each(['','/app'])('failed catalog refresh preserves the selection but blocks linking until successful recovery (%s)',async base=>{
+ mocks.generators.mockResolvedValue([eligibleFicha('a')]);const state=setup({puedeValidar:true},{base,entry:base+'/empresas'});
+ await screen.findByRole('option',{name:'Ficha a · G-a'});fireEvent.change(screen.getByLabelText('Ficha del mismo CUIT'),{target:{value:'a'}});
+ mocks.generators.mockRejectedValue(new Error('QA offline'));
+ await act(async()=>{await state.client.invalidateQueries({queryKey:['company-role-catalogs']});});
+ expect(await screen.findByText(/No pudimos consultar las fichas de Generador/)).toBeInTheDocument();expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeDisabled();
+ expect(screen.getByLabelText('Ficha del mismo CUIT')).toHaveValue('a');
+ fireEvent.submit(screen.getByRole('button',{name:'Vincular actividad existente'}).closest('form')!);
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+ mocks.generators.mockResolvedValue([eligibleFicha('a')]);fireEvent.click(screen.getByRole('button',{name:'Reintentar fichas'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeEnabled());
+});
+test.each(['missing','inactive'])('refresh that makes the chosen record %s never replaces it with another',async kind=>{
+ mocks.generators.mockResolvedValue([eligibleFicha('a'),eligibleFicha('b')]);const state=setup({puedeValidar:true});
+ await screen.findByRole('option',{name:'Ficha b · G-b'});fireEvent.change(screen.getByLabelText('Ficha del mismo CUIT'),{target:{value:'b'}});
+ mocks.generators.mockResolvedValue([eligibleFicha('a'),...(kind==='inactive'?[{...eligibleFicha('b'),activo:false}]:[])]);
+ await act(async()=>{await state.client.invalidateQueries({queryKey:['company-role-catalogs']});});
+ await screen.findByText('La ficha elegida ya no está disponible para vincular. Elegí otra ficha activa del mismo CUIT.');
+ expect(screen.getByLabelText('Ficha del mismo CUIT')).toHaveValue('');expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeDisabled();
+ fireEvent.submit(screen.getByRole('button',{name:'Vincular actividad existente'}).closest('form')!);
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+});
+test('each activity reads its own catalog and a failing unrelated role cannot hide available generator records',async()=>{
+ mocks.generators.mockResolvedValue([eligibleFicha('g')]);mocks.carriers.mockRejectedValue(new Error('QA transport unavailable'));
+ setup({puedeValidar:true});await screen.findByRole('option',{name:'Ficha g · G-g'});
+ expect(mocks.carriers).not.toHaveBeenCalled();expect(mocks.operators).not.toHaveBeenCalled();
+ fireEvent.change(screen.getByLabelText('Ficha del mismo CUIT'),{target:{value:'g'}});
+ fireEvent.change(screen.getByLabelText('Actividad a vincular'),{target:{value:'TRANSPORTISTA'}});
+ await screen.findByText(/No pudimos consultar las fichas de Transportista/);expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('Actividad a vincular'),{target:{value:'GENERADOR'}});
+ await screen.findByRole('option',{name:'Ficha g · G-g'});expect(screen.getByLabelText('Ficha del mismo CUIT')).toHaveValue('');
+});
+
+test('background catalog verification blocks submit until the selected record is verified again',async()=>{
+ mocks.generators.mockResolvedValue([eligibleFicha('a')]);const state=setup({puedeValidar:true});
+ await screen.findByRole('option',{name:'Ficha a · G-a'});fireEvent.change(screen.getByLabelText('Ficha del mismo CUIT'),{target:{value:'a'}});
+ let resolve:(value:unknown)=>void=()=>{};mocks.generators.mockReturnValue(new Promise(r=>{resolve=r;}));
+ act(()=>{void state.client.invalidateQueries({queryKey:['company-role-catalogs']});});
+ await screen.findByText('Consultando fichas de Generador…');
+ expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeDisabled();
+ fireEvent.submit(screen.getByRole('button',{name:'Vincular actividad existente'}).closest('form')!);
+ expect(mocks.request.mock.calls.filter(([r])=>r.method!=='GET')).toHaveLength(0);
+ await act(async()=>resolve([eligibleFicha('a')]));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Vincular actividad existente'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'Vincular actividad existente'}));
+ await waitFor(()=>expect(mocks.request).toHaveBeenCalledWith(expect.objectContaining({url:'/empresas/first/actividades',method:'POST',data:{rol:'GENERADOR',actorId:'a'}})));
 });

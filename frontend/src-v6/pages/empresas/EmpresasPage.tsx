@@ -1,3 +1,4 @@
+import { CompanyActivityLink } from '../../components/CompanyActivityLink';
 import { CompanyHistory, type CompanyHistoryEvent } from '../../components/CompanyHistory';
 import { InvitationPreparationNotice } from '../../components/InvitationPreparationNotice';
 import { useInvitationPreparation } from '../../hooks/useInvitationPreparation';
@@ -16,7 +17,6 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { api } from '../../services/api';
 import { companyCacheScope,companyHeaders,saveCompanyContext,type CompanyChoice } from '../../services/companyContext';
 import { clearOfflineSession } from '../../services/offlineSession';
-import { catalogoService } from '../../services/catalogo.service';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/ButtonV2';
 import { Card } from '../../components/ui/CardV2';
@@ -210,12 +210,9 @@ function SiteForm({site,busy,save,draftKey}:{site?:any;busy:boolean;save:Company
 function AuthorityTools({id,details:d,busy,run,draftKey}:{id:string;details:Details;busy:boolean;run:CompanyAction;draftKey:string}){
  const draft=useCompanyRevisionDraft({email:'',reason:'',role:'GENERADOR',actor:''},0,draftKey),{email,reason,role,actor}=draft.value;
  const setEmail=(email:string)=>draft.change({email}),setReason=(reason:string)=>draft.change({reason}),setRole=(role:string)=>draft.change({role}),setActor=(actor:string)=>draft.change({actor});
- const catalogs=useQuery({queryKey:['company-role-catalogs',id],queryFn:async()=>{const [g,t,o]=await Promise.all([catalogoService.generadores(),catalogoService.transportistas(),catalogoService.operadores()]);return {GENERADOR:g,TRANSPORTISTA:t,OPERADOR:o};},retry:false});
- const options=(catalogs.data?.[role as 'GENERADOR']||[]).filter(a=>String(a.cuit).replace(/\D/g,'')===d.empresa.cuit);
  return <Card><h2 className="font-semibold mb-3">Validación DGFA</h2><CompanyDraftNotice draft={draft} label="validación administrativa"/><fieldset disabled={draft.conflict}><form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void run(()=>request('/'+id+'/responsables','POST',{email,motivo:reason}),undefined,draft.recovery.acknowledge);}}><Input label="Correo del responsable" type="email" required value={email} onChange={e=>setEmail(e.target.value)}/><Input label="Motivo de validación" required value={reason} onChange={e=>setReason(e.target.value)}/><Button type="submit" disabled={busy}>Validar responsable</Button></form>
   <ul className="my-4 space-y-2">{d.responsables.map(r=><li key={r.id} className="flex flex-wrap items-center gap-2"><span>{d.personas.find(p=>p.id===r.usuarioId)?.email||r.usuarioId} · {r.revocadoAt?'Revocado':'Validado'}</span>{!r.revocadoAt&&<Button variant="outline" disabled={busy||!reason} onClick={()=>void run(()=>request('/'+id+'/responsables','POST',{email:d.personas.find(p=>p.id===r.usuarioId)?.email,motivo:reason,revocar:true}),undefined,draft.recovery.acknowledge)}>Revocar responsable</Button>}</li>)}</ul>
-  <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();void run(()=>request('/'+id+'/actividades','POST',{rol:role,actorId:actor||options[0]?.id}),undefined,draft.recovery.acknowledge);}}><NativeSelect label="Actividad a vincular" value={role} onChange={v=>{setRole(v);setActor('');}}>{Object.keys(labels).map(r=><option key={r} value={r}>{labels[r]}</option>)}</NativeSelect><NativeSelect label="Ficha del mismo CUIT" value={actor||options[0]?.id||''} onChange={setActor}>{!options.length&&<option value="">No hay ficha activa coincidente</option>}{options.map(a=><option key={a.id} value={a.id}>{a.razonSocial} · {String(a.numeroInscripcion||a.numeroHabilitacion||'')}</option>)}</NativeSelect><Button type="submit" disabled={busy||!options.length}>Vincular actividad existente</Button></form>
-  {catalogs.isError&&<p role="alert">No pudimos consultar las fichas. <button className="min-h-11 underline" onClick={()=>void catalogs.refetch()}>Reintentar fichas</button></p>}
+  <CompanyActivityLink cuit={d.empresa.cuit} scope={draftKey} role={role} actor={actor} labels={labels} busy={busy} onRole={value=>{setRole(value);setActor('');}} onActor={setActor} onLink={actorId=>void run(()=>request('/'+id+'/actividades','POST',{rol:role,actorId}),undefined,draft.recovery.acknowledge)}/>
   <ul className="mt-3 text-sm">{d.actividades.map(a=><li key={a.id}>{labels[a.rol]} · Ficha vinculada</li>)}</ul></fieldset>
  </Card>;
 }
