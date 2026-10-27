@@ -687,3 +687,48 @@ test('an invitation expiring during a slow initial read is rechecked before trus
  expect(reads).toBe(2);
  expect(mocks.request.mock.calls.filter(([request])=>request.method!=='GET')).toHaveLength(0);
 });
+
+const workspaceChoices = (roles:string[], sites=true) => roles.map(rol=>({empresaId:'first',razonSocial:'Alfa',actividadId:rol,rol,autorizacionId:'qa-'+rol,revision:1,todosEstablecimientos:true,establecimientos:sites?[{id:'site-a',nombre:'Sede A',codigo:'A'}]:[]}));
+test.each(['/empresas','/app/empresas'])('%s personal transport context selects its own available company role, not the first generator',async entry=>{
+ mocks.user={...mocks.user,rol:'TRANSPORTISTA',actorId:'transport-qa'};
+ setup({contextos:workspaceChoices(['GENERADOR','TRANSPORTISTA','OPERADOR'])},{entry,base:entry.startsWith('/app')?'/app':undefined});
+ await screen.findByLabelText('Calle legal');
+ expect(screen.getByLabelText('Actividad autorizada')).toHaveValue('TRANSPORTISTA');
+ expect(screen.getByLabelText('Cambiar contexto de trabajo')).not.toHaveAttribute('open');
+ expect(mocks.request.mock.calls.every(([r])=>r.method==='GET')).toBe(true);
+});
+test('another company active context does not force the first role for this company',async()=>{
+ mocks.user={...mocks.user,rol:'OPERADOR',empresaContexto:{empresaId:'other',actividadId:'other-role',rol:'OPERADOR'}};
+ setup({contextos:workspaceChoices(['GENERADOR','OPERADOR'])});await screen.findByLabelText('Calle legal');
+ expect(screen.getByLabelText('Actividad autorizada')).toHaveValue('OPERADOR');
+});
+test('multiple activities without the current role require an explicit selection',async()=>{
+ mocks.user={...mocks.user,rol:'OPERADOR'};
+ setup({contextos:workspaceChoices(['GENERADOR','TRANSPORTISTA'],false)});await screen.findByLabelText('Calle legal');
+ expect(screen.getByLabelText('Actividad autorizada')).toHaveValue('');
+ expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeDisabled();
+ expect(screen.getByText('Elegí la actividad con la que querés operar.')).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Actividad autorizada'),{target:{value:'TRANSPORTISTA'}});
+ expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeEnabled();
+});
+test.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('%s with no establishments has no empty selector or misleading establishment action',async rol=>{
+ mocks.user={...mocks.user,rol};setup({contextos:workspaceChoices([rol],false)});await screen.findByLabelText('Calle legal');
+ expect(screen.queryByLabelText('Establecimiento para operar')).toBeNull();
+ expect(screen.queryByLabelText('Actividad autorizada')).toBeNull();
+ expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeEnabled();
+ expect(screen.queryByText('Sin establecimiento cargado')).toBeNull();
+});
+test('a restricted activity without an available establishment explains the block',async()=>{
+ setup({contextos:[{...workspaceChoices(['GENERADOR'],false)[0],todosEstablecimientos:false}]});await screen.findByLabelText('Calle legal');
+ expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeDisabled();
+ expect(screen.getByText('No hay establecimientos disponibles dentro de tu autorización. Pedí al responsable de la empresa que revise tu acceso.')).toBeInTheDocument();
+});
+test('a company refresh that removes the selected role does not silently choose a different activity',async()=>{
+ const extra={contextos:workspaceChoices(['GENERADOR','OPERADOR'])};
+ const state=setup(extra);await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Actividad autorizada'),{target:{value:'OPERADOR'}});
+ extra.contextos=extra.contextos.filter(c=>c.rol!=='OPERADOR');await act(async()=>{await state.client.invalidateQueries({queryKey:['empresa']});});
+ await waitFor(()=>expect(screen.getByLabelText('Actividad autorizada')).toHaveValue(''));
+ expect(screen.getByText('La actividad elegida ya no está disponible. Elegí otra actividad autorizada.')).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'Usar esta actividad',hidden:true})).toBeDisabled();
+});
