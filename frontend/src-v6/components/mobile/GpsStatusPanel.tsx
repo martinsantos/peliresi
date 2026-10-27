@@ -16,7 +16,7 @@ interface GpsStatusPanelProps {
 
 const STATUS_COPY: Record<GpsStatus, { label: string; tone: string; icon: React.ReactNode }> = {
   checking: { label: 'Verificando GPS', tone: 'bg-neutral-100 text-neutral-700', icon: <Loader2 size={14} className="animate-spin" /> },
-  acquiring: { label: 'Buscando senal GPS', tone: 'bg-warning-50 text-warning-700', icon: <LocateFixed size={14} className="animate-pulse" /> },
+  acquiring: { label: 'Buscando señal GPS', tone: 'bg-warning-50 text-warning-700', icon: <LocateFixed size={14} className="animate-pulse" /> },
   active: { label: 'GPS activo', tone: 'bg-success-50 text-success-700', icon: <span className="h-2.5 w-2.5 rounded-full bg-success-500 animate-pulse" /> },
   denied: { label: 'Permiso GPS denegado', tone: 'bg-error-50 text-error-700', icon: <WifiOff size={14} /> },
   unavailable: { label: 'GPS no disponible', tone: 'bg-error-50 text-error-700', icon: <WifiOff size={14} /> },
@@ -25,7 +25,7 @@ const STATUS_COPY: Record<GpsStatus, { label: string; tone: string; icon: React.
 
 function formatLastSync(lastSyncAt: Date | null) {
   if (!lastSyncAt) return 'Sin sincronizar';
-  return `Sync ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+  return `Actualizado ${lastSyncAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
@@ -50,7 +50,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
             <div className="flex shrink-0 items-center gap-2">
               {pendingCount > 0 && <Badge color="warning" variant="solid" size="sm">{pendingCount} pendientes</Badge>}
               {sendStatus === 'ok' && <Badge color="success" variant="soft" size="sm">{formatLastSync(lastSyncAt)}</Badge>}
-              {sendStatus === 'error' && <Badge color="error" variant="soft" size="sm">Guardando local</Badge>}
+              {sendStatus === 'error' && <Badge color="error" variant="soft" size="sm">Sin enviar</Badge>}
             </div>
           </div>
 
@@ -62,7 +62,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
               </div>
               <div className="flex items-center gap-1.5">
                 <MapPin size={13} className="text-neutral-400" />
-                <span>{details.accuracy != null ? `+-${Math.round(details.accuracy)}m` : 'Precision -'}</span>
+                <span>{details.accuracy != null ? `±${Math.round(details.accuracy)} m` : 'Precisión no disponible'}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Gauge size={13} className="text-neutral-400" />
@@ -76,7 +76,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
           )}
 
           {status === 'acquiring' && (
-            <p className="mt-2 text-xs text-warning-700">Ubicacion activa. Esperando primer punto GPS del dispositivo.</p>
+            <p className="mt-2 text-xs text-warning-700">Esperando el primer punto GPS del dispositivo.</p>
           )}
         </CardContent>
       </Card>

@@ -18,6 +18,7 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByText('GPS activo')).toBeInTheDocument();
     expect(screen.getByText(/-32.92871, -68.85352/)).toBeInTheDocument();
     expect(screen.getByText('3 pendientes')).toBeInTheDocument();
+    expect(screen.getByText('Sin enviar')).toBeInTheDocument();
   });
 
   it('shows Android recovery guidance when GPS is denied', () => {
@@ -48,8 +49,8 @@ describe('GpsStatusPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Buscando senal GPS')).toBeInTheDocument();
-    expect(screen.getByText('Ubicacion activa. Esperando primer punto GPS del dispositivo.')).toBeInTheDocument();
+    expect(screen.getByText('Buscando señal GPS')).toBeInTheDocument();
+    expect(screen.getByText('Esperando el primer punto GPS del dispositivo.')).toBeInTheDocument();
     expect(screen.queryByText('GPS no disponible')).not.toBeInTheDocument();
   });
 });

@@ -14,6 +14,7 @@ import { Card, CardHeader, CardContent } from '../../../components/ui/CardV2';
 import type { Manifiesto } from '../../../types/models';
 import { ActionButtons } from './ActionButtons';
 import { ActionModals } from './ActionModals';
+import { ConfirmManifestClosure } from './ConfirmManifestClosure';
 
 interface MutationState {
   isPending: boolean;
@@ -47,7 +48,7 @@ interface ManifiestoActionsProps {
   onConfirmarRecepcionInSitu: () => void;
   onPesaje: (residuos: { id: string; cantidadRecibida: number }[], observaciones?: string) => Promise<boolean>;
   onTratamiento: (metodo: string, observaciones?: string) => Promise<boolean>;
-  onCerrar: () => void;
+  onCerrar: () => Promise<boolean>;
   onRechazar: (motivo: string, descripcion?: string) => Promise<boolean>;
   onIncidente: (tipo: string, descripcion: string) => Promise<boolean>;
   onCancelar: () => Promise<boolean>;
@@ -90,6 +91,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showReversionModal, setShowReversionModal] = useState(false);
   const [showFirmaModal, setShowFirmaModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
 
   return (
     <>
@@ -128,7 +130,7 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
             onConfirmarRecepcionInSitu={onConfirmarRecepcionInSitu}
             onOpenPesajeModal={() => setShowPesajeModal(true)}
             onOpenTratamientoModal={() => setShowTratamientoModal(true)}
-            onCerrar={onCerrar}
+            onCerrar={() => setShowCloseModal(true)}
             onOpenRechazarModal={() => setShowRechazarModal(true)}
             onOpenIncidenteModal={() => setShowIncidenteModal(true)}
             onOpenCancelModal={() => setShowCancelModal(true)}
@@ -141,6 +143,8 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
           />
         </CardContent>
       </Card>
+
+      <ConfirmManifestClosure open={showCloseModal} received={m.estado === 'RECIBIDO'} onClose={() => setShowCloseModal(false)} onConfirm={onCerrar} />
 
       <ActionModals
         manifiesto={m}

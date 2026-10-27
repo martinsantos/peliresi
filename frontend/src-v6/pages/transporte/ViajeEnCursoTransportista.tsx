@@ -297,12 +297,12 @@ const ViajeEnCursoTransportista: React.FC = () => {
           <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
             <div className="flex items-center justify-between h-14 px-4">
               <div className="flex items-center gap-3">
-                <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
+                <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
                   <ArrowLeft size={20} />
                 </button>
                 <div>
                   <p className="text-xs text-neutral-500 font-medium">{cachedSnapshot.numero || id}</p>
-                  <h1 className="text-lg font-bold text-neutral-900">Viaje en Curso</h1>
+                  <h2 className="text-lg font-bold text-neutral-900">Último estado guardado</h2>
                 </div>
               </div>
             </div>
@@ -338,12 +338,12 @@ const ViajeEnCursoTransportista: React.FC = () => {
         <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
           <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center gap-3">
-              <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
+              <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
                 <ArrowLeft size={20} />
               </button>
               <div>
                 <p className="text-xs text-neutral-500 font-medium">{cachedSnapshot.numero || id}</p>
-                <h1 className="text-lg font-bold text-neutral-900">Viaje en Curso</h1>
+                <h2 className="text-lg font-bold text-neutral-900">Último estado guardado</h2>
               </div>
             </div>
           </div>
@@ -371,10 +371,10 @@ const ViajeEnCursoTransportista: React.FC = () => {
     return (
       <div className="min-h-screen bg-neutral-50 p-4">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)} className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
+          <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-lg font-bold">Manifiesto no encontrado</h1>
+          <h2 className="text-lg font-bold">Manifiesto no encontrado</h2>
         </div>
         <Card><CardContent className="py-8 text-center text-neutral-500">No se pudo cargar el manifiesto</CardContent></Card>
       </div>
@@ -390,16 +390,16 @@ const ViajeEnCursoTransportista: React.FC = () => {
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
         <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
+            <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
               <ArrowLeft size={20} />
             </button>
             <div>
               <p className="text-xs text-neutral-500 font-medium">{m.numero || id}</p>
-              <h1 className="text-lg font-bold text-neutral-900">
-                {m.estado === EstadoManifiesto.APROBADO ? 'Confirmar Retiro' :
-                 m.estado === EstadoManifiesto.EN_TRANSITO ? 'Viaje en Curso' :
-                 m.estado === EstadoManifiesto.ENTREGADO ? 'Entrega Completada' : 'Viaje'}
-              </h1>
+              <h2 className="text-lg font-bold text-neutral-900">
+                {m.estado === EstadoManifiesto.APROBADO ? 'Confirmar retiro' :
+                 m.estado === EstadoManifiesto.EN_TRANSITO ? 'En tránsito' :
+                 m.estado === EstadoManifiesto.ENTREGADO ? 'Entrega confirmada' : 'Estado del viaje'}
+              </h2>
             </div>
           </div>
           {m.estado === EstadoManifiesto.EN_TRANSITO && (

@@ -304,6 +304,7 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                     <Input
                       type="number"
                       placeholder="Peso real"
+                      aria-label={`Peso recibido de ${r.tipoResiduo?.codigo || r.tipoResiduo?.nombre || r.descripcion || 'residuo'} (${r.unidad})`}
                       value={pesajeData[r.id] ?? ''}
                       onChange={(e) => setPesajeData({ ...pesajeData, [r.id]: Number(e.target.value) })}
                     />
@@ -312,8 +313,9 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
               ))}
             </div>
             <div className="mt-3">
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
+              <label htmlFor="pesaje-observaciones" className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
               <textarea
+                id="pesaje-observaciones"
                 value={pesajeObs}
                 onChange={(e) => setPesajeObs(e.target.value)}
                 placeholder="Observaciones del pesaje..."
@@ -406,8 +408,9 @@ export const ActionModals: React.FC<ActionModalsProps> = ({
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
+                <label htmlFor="tratamiento-observaciones" className="block text-sm font-medium text-neutral-700 mb-1">Observaciones</label>
                 <textarea
+                  id="tratamiento-observaciones"
                   value={tratamientoObs}
                   onChange={(e) => setTratamientoObs(e.target.value)}
                   placeholder="Observaciones del tratamiento..."
