@@ -28,7 +28,7 @@ describe('reading the original in an application', () => {
   it('keeps trial selection explicit instead of claiming the file is stored', () => {
     const data=props('FACTURA_ELECTRICA');data.uploadedDocs={};data.reviewMode=true;data.adjuntos.FACTURA_ELECTRICA=new File(['qa'],'prueba.pdf');
     render(<StepDocumentos {...data} />);
-    expect(screen.getByRole('status')).toHaveTextContent('todavía no está guardado en el servidor');
+    expect(screen.getByText(/todavía no está guardado en el servidor/)).toBeVisible();
     fireEvent.click(screen.getByRole('button',{name:'Leer documento',exact:true}));
     expect(data.onRetryReading).toHaveBeenCalledWith('FACTURA_ELECTRICA');
   });

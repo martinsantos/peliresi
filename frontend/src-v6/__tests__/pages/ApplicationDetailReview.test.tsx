@@ -81,13 +81,13 @@ it.each(['','/app'])('keeps the reading action and progress visible while the or
  expect(state.read).toHaveBeenCalledOnce(); expect(state.read).toHaveBeenCalledWith('s1','invoice');
  expect(screen.getByRole('button',{name:'Aprobar',exact:true})).toBeDisabled();
  await act(async()=>{finish();});
- expect(screen.getByText('Lectura actualizada. Revisá el resultado del documento.')).toBeVisible();
- const feedback = within(screen.getByRole('group',{name:'Documento: Factura artificial'})).getByText('Lectura actualizada. Revisá el resultado del documento.');
+ expect(screen.getByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.')).toBeVisible();
+ const feedback = within(screen.getByRole('group',{name:'Documento: Factura artificial'})).getByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.');
  expect(feedback).toHaveAttribute('role', 'status');
  expect(state.scroll).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
- expect(feedback).toHaveTextContent('Lectura actualizada');
+ expect(feedback).toHaveTextContent('No se pudo completar la lectura automática');
  expect(feedback).toHaveFocus();
- expect(screen.getAllByText('Lectura actualizada. Revisá el resultado del documento.')).toHaveLength(1);
+ expect(screen.getAllByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.')).toHaveLength(1);
 
 });
 it.each(['', '/app'])('keeps a confirmed correction visible and focused when its subsequent read fails (%s)', async prefix => {
@@ -216,7 +216,7 @@ it.each(['','/app'])('keeps a failed read beside its original with a retry and n
  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Leer documento',exact:true}));});
  const feedback=within(screen.getByRole('group',{name:'Documento: Factura artificial'})).getByRole('alert');
  expect(feedback).toHaveFocus();
- expect(screen.queryByText('Lectura actualizada. Revisá el resultado del documento.')).toBeNull();
+ expect(screen.queryByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.')).toBeNull();
  expect(screen.getByRole('button',{name:'Leer documento',exact:true})).toBeEnabled();
  expect(state.document).not.toHaveBeenCalled();
 });
@@ -275,4 +275,13 @@ it('hides only known wizard metadata and retains unfamiliar historical declarati
 });
 it('wizard recovery metadata alone is not a readable actor declaration',()=>{
  state.detail.data.datosActor=JSON.stringify({_sitrepDraftStep:6});render(tree());expect(screen.getByRole('button',{name:'Aprobar',exact:true})).toBeDisabled();expect(screen.getByText(/Sin datos declarados en datos del actor/)).toBeVisible();
+});
+
+it.each(['', '/app'])('describes an incomplete electricity read without approving the document (%s)', async prefix => {
+ state.detail.data.documentos=[{id:'invoice',tipo:'FACTURA_ELECTRICA',estado:'PENDIENTE',nombre:'Factura artificial',size:100}];
+ state.read.mockResolvedValue({analisis:{version:1,lectura:'LEIDO',texto:'EDESTE QA',documentKind:'FACTURA_ELECTRICA',electricidad:{distribuidora:'EDESTE',campos:{categoriaTarifaria:'T2',consumoKwh:'420'},conflictos:[]}}});
+ render(tree(prefix));
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Leer documento',exact:true}));});
+ expect(screen.getByText('Lectura terminada con datos por revisar. Consultá los campos pendientes o en conflicto debajo.')).toHaveFocus();
+ expect(state.document).not.toHaveBeenCalled(); expect(state.approve).not.toHaveBeenCalled();
 });

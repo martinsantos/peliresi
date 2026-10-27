@@ -1,3 +1,4 @@
+import { documentReadingOutcome } from '../../utils/documentReadingOutcome';
 /**
  * SITREP v6 - Solicitud Detalle Page (Admin)
  * Review a specific inscription solicitud
@@ -169,17 +170,17 @@ const SolicitudReview: React.FC = () => {
   const canAct = fresh && reviewer && ['EN_REVISION', 'OBSERVADA'].includes(solicitud!.estado) && !busy;
   const canMessage = fresh && reviewer && !messages.isError && !messages.isPending && !messages.isFetching && !busy;
 
-  const run = async (allowed: boolean, action: () => Promise<unknown>, confirmed: () => void, success: string, documentId?: string) => {
+  const run = async <T,>(allowed: boolean, action: () => Promise<T>, confirmed: () => void, success: string | ((result: T) => string), documentId?: string) => {
     if (!allowed || running.current) return;
     running.current = true; setBusy(true); setFeedback(null);
-    try { await action(); confirmed(); setFeedback({ error: false, text: success, documentId }); }
+    try { const result = await action(); confirmed(); setFeedback({ error: false, text: typeof success === 'function' ? success(result) : success, documentId }); }
     catch (error) { setFeedback({ error: true, documentId, text: getApiErrorMessage(error, 'No pudimos confirmar la acción. Tus textos se conservan; revisá el estado actualizado antes de reintentar.') }); }
     finally { await refetch(); running.current = false; setBusy(false); }
   };
   const handleRetryReading = (docId: string) => run(canAct, async () => {
     setReadingReceipt(true);
-    try { await solicitudService.analizarDocumento(id!, docId); } finally { setReadingReceipt(false); }
-  }, () => {}, 'Lectura actualizada. Revisá el resultado del documento.', docId);
+    try { return await solicitudService.analizarDocumento(id!, docId); } finally { setReadingReceipt(false); }
+  }, () => {}, document => documentReadingOutcome(document?.analisis), docId);
   const handleSendMessage = () => run(canMessage && !!messageText.trim() && !message.conflict,
     () => enviarMensaje.mutateAsync({ solicitudId: id!, contenido: messageText.trim(), clientMessageId: message.value.requestId }),
     () => { message.clear(); }, 'Mensaje enviado. Quedó registrado en la conversación.');

@@ -1,3 +1,4 @@
+import { documentReadingOutcome } from '../../utils/documentReadingOutcome';
 /**
  * SITREP v6 - Inscripcion Wizard (Public)
  * ========================================
@@ -120,6 +121,7 @@ const InscripcionWizardContent: React.FC = () => {
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, DocumentoSolicitud>>({});
   const [uploadStates, setUploadStates] = useState<Record<string, 'uploading' | 'deleting' | 'reading' | 'downloading' | 'error' | undefined>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
+  const [readingFeedback, setReadingFeedback] = useState<Record<string, string | undefined>>({});
   const uploadsInFlight = useRef(new Set<string>());
   const [requirements, setRequirements] = useState<DocDef[]>([]);
   const [requirementsStatus, setRequirementsStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -163,7 +165,7 @@ const InscripcionWizardContent: React.FC = () => {
       ? Object.fromEntries(Object.entries(local.data.form).filter(([, value]) => typeof value === 'string')) as Record<string, string> : reviewFixture?.form || {});
     setStep(Math.min(totalSteps, Math.max(1, Number(local?.data.step) || 1)));
     setMissingLocalFiles(Array.isArray(local?.data.files) ? local.data.files.filter(item => typeof item === 'string') as string[] : []);
-    setAdjuntos({}); setUploadedDocs({}); setPreviewAnalyses({}); setUploadStates({}); setUploadErrors({});
+    setAdjuntos({}); setUploadedDocs({}); setPreviewAnalyses({}); setUploadStates({}); setUploadErrors({}); setReadingFeedback({});
     setOwner(null); setSolicitudId(null); setSubmitSuccess(false); setSaveError(null); setDirty(false); setObservations(null);
     serverExtraFields.current = {}; setPhase(isReviewMode ? 2 : 1);
     setReg(reviewFixture?.reg || { nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
@@ -328,7 +330,7 @@ const InscripcionWizardContent: React.FC = () => {
   }, [isReviewMode, submitSuccess, owner, solicitudId, localConflict, ownership.canWrite, ownership.status, draftScope, form, step, serverRevision, adjuntos, missingLocalFiles, uploadedDocs]);
 
   const clearVisibleAccount = useCallback(() => {
-      setForm({}); setAdjuntos({}); setUploadedDocs({}); setOwner(null);
+      setForm({}); setAdjuntos({}); setUploadedDocs({}); setReadingFeedback({}); setOwner(null);
       serverExtraFields.current = {};
       setLocalConflict(null); setMissingLocalFiles([]); setDirty(false); setLocalSaved(false);
       setReg({ nombre: '', email: '', cuit: '', password: '', confirmPassword: '' });
@@ -473,17 +475,21 @@ const InscripcionWizardContent: React.FC = () => {
   // File handling
   const handleAddFile = useCallback(async (tipo: string, file: File) => {
     if (uploadsInFlight.current.has(tipo)) return;
+    setReadingFeedback(previous => ({ ...previous, [tipo]: undefined }));
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     if (file.size === 0 || file.size > requirementsMaxBytes || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: `Elegí un PDF, JPG o PNG con contenido de hasta ${(requirementsMaxBytes / 1024 / 1024).toFixed(0)} MB.` }));
       return;
     }
+    if (isReviewMode && adjuntos[tipo] !== file) {
+      setPreviewAnalyses(previous => Object.fromEntries(Object.entries(previous).filter(([key]) => key !== tipo)));
+    }
     setAdjuntos(previous => ({ ...previous, [tipo]: file }));
     setMissingLocalFiles(previous => previous.filter(type => type !== tipo));
     if (isReviewMode) {
       uploadsInFlight.current.add(tipo); setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
-      try { const result = await previewDocument(file, tipo === 'FACTURA_ELECTRICA' ? 'FACTURA_ELECTRICA' : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: result.analisis })); }
+      try { const result = await previewDocument(file, tipo === 'FACTURA_ELECTRICA' ? 'FACTURA_ELECTRICA' : 'DOCUMENTO'); setPreviewAnalyses(previous => ({ ...previous, [tipo]: result.analisis })); setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(result.analisis) })); }
       catch (error) { setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo leer el archivo de prueba. Los datos siguen en el navegador.') })); }
       finally { uploadsInFlight.current.delete(tipo); setUploadStates(previous => ({ ...previous, [tipo]: undefined })); }
       return;
@@ -501,6 +507,7 @@ const InscripcionWizardContent: React.FC = () => {
       const document = await solicitudService.uploadDocumento(solicitudId, file, tipo);
       assertDraftSession();
       setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
+      setReadingFeedback(previous => ({ ...previous, [tipo]: document.analisis ? documentReadingOutcome(document.analisis) : undefined }));
       setAdjuntos(previous => { const next = { ...previous }; delete next[tipo]; return next; });
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
       return document;
@@ -508,7 +515,7 @@ const InscripcionWizardContent: React.FC = () => {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
       setUploadErrors(previous => ({ ...previous, [tipo]: getApiErrorMessage(error, 'No se pudo guardar el archivo. Volve a seleccionarlo o reintenta al enviar.') }));
     } finally { uploadsInFlight.current.delete(tipo); }
-  }, [isReviewMode, requirementsMaxBytes, solicitudId, assertDraftSession]);
+  }, [isReviewMode, requirementsMaxBytes, solicitudId, assertDraftSession, adjuntos]);
 
   const handleLicense = async (key: string, file: File): Promise<LicensePreview> => {
     const type = licenseDocumentType(key);
@@ -528,6 +535,7 @@ const InscripcionWizardContent: React.FC = () => {
 
   const handleRemoveFile = useCallback(async (tipo: string) => {
     if (uploadsInFlight.current.has(tipo)) return;
+    setReadingFeedback(previous => ({ ...previous, [tipo]: undefined }));
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     const uploaded = uploadedDocs[tipo];
     if ((adjuntos[tipo] || missingLocalFiles.includes(tipo)) && uploaded) {
@@ -577,6 +585,7 @@ const InscripcionWizardContent: React.FC = () => {
     const uploaded = uploadedDocs[tipo];
     if (!solicitudId || !uploaded || uploadsInFlight.current.has(tipo) || isReviewMode) return;
     uploadsInFlight.current.add(tipo);
+    setReadingFeedback(previous => ({ ...previous, [tipo]: undefined }));
     setUploadErrors(previous => ({ ...previous, [tipo]: undefined }));
     setUploadStates(previous => ({ ...previous, [tipo]: 'reading' }));
     try {
@@ -584,6 +593,7 @@ const InscripcionWizardContent: React.FC = () => {
       const document = await solicitudService.analizarDocumento(solicitudId, uploaded.id);
       assertDraftSession();
       setUploadedDocs(previous => ({ ...previous, [tipo]: document }));
+      setReadingFeedback(previous => ({ ...previous, [tipo]: documentReadingOutcome(document.analisis) }));
       setUploadStates(previous => ({ ...previous, [tipo]: undefined }));
     } catch (error) {
       setUploadStates(previous => ({ ...previous, [tipo]: 'error' }));
@@ -706,6 +716,7 @@ const InscripcionWizardContent: React.FC = () => {
     uploadedDocs={uploadedDocs}
     uploadStates={uploadStates}
     uploadErrors={uploadErrors}
+    readingFeedback={readingFeedback}
     requirementsStatus={requirementsStatus}
     maxBytes={requirementsMaxBytes}
     onRetryRequirements={() => setRequirementsAttempt(value => value + 1)}

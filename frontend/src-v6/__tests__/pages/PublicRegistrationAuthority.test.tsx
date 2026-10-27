@@ -16,9 +16,9 @@ const requirements = [
   { tipo: 'COMPROBANTE_PAGO', nombre: 'Comprobante de sellado / pago', required: false },
 ];
 const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
-async function openReview(actor: string) {
+async function openReview(actor: string, prefix = '') {
   await act(async () => {
-    render(<MemoryRouter initialEntries={[`/inscripcion/${actor}?modo=revision`]}><Routes>
+    render(<MemoryRouter basename={prefix || '/'} initialEntries={[`${prefix}/inscripcion/${actor}?modo=revision`]}><Routes>
       <Route path="/inscripcion/:tipo" element={<InscripcionWizardPage />} />
     </Routes></MemoryRouter>);
   });
@@ -87,4 +87,37 @@ describe('Public registration collects declarations, never calculates a tax for 
     expect(requests.put).not.toHaveBeenCalled();
     expect(requests.post).not.toHaveBeenCalled();
   });
+  it.each(['', '/app'])('announces repeated reads, preserves prior evidence on retry failure, and clears it for replacement (%s)', async prefix => {
+    requests.getRequirements.mockResolvedValue({documentos:[{tipo:'FACTURA_ELECTRICA',nombre:'Factura eléctrica',required:false}],maxBytes:10485760});
+    const partial = {version:1,lectura:'LEIDO',texto:'LECTURA ORIGINAL QA',documentKind:'FACTURA_ELECTRICA',electricidad:{version:1,distribuidora:'EDESTE',nombreDistribuidora:'EDESTE',campos:{categoriaTarifaria:'T2',consumoKwh:'420'},conflictos:[],evidencias:[],aviso:''}};
+    requests.preview.mockResolvedValue({persistido:false,analisis:partial});
+    await openReview('generador', prefix);
+    fireEvent.click(screen.getByRole('button',{name:'Paso 6 de 7: Documentos'}));
+    const row=screen.getByTestId('registration-document-FACTURA_ELECTRICA');
+    fireEvent.click(within(row).getByRole('button',{name:'Adjuntar'}));
+    await act(async()=>{fireEvent.change(screen.getByLabelText('Adjuntar Factura eléctrica'),{target:{files:[new File(['QA'],'uno.pdf',{type:'application/pdf'})]}});});
+    const outcome='Lectura terminada con datos por revisar. Consultá los campos pendientes o en conflicto debajo.';
+    expect(within(row).getByText(outcome)).toHaveAttribute('role','status');
+    expect(row).not.toHaveTextContent('Adjuntá la factura completa');
+    let finish!: (value: unknown)=>void;
+    requests.preview.mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));
+    fireEvent.click(within(row).getByRole('button',{name:'Reintentar lectura'}));
+    expect(within(row).queryByText(outcome)).toBeNull();
+    expect(within(row).getByRole('button',{name:'Leyendo documento…'})).toBeDisabled();
+    await act(async()=>{finish({persistido:false,analisis:partial});});
+    expect(within(row).getByText(outcome)).toBeVisible();
+    requests.preview.mockRejectedValueOnce(new Error('Lectura QA interrumpida'));
+    await act(async()=>{fireEvent.click(within(row).getByRole('button',{name:'Reintentar lectura'}));});
+    expect(within(row).queryByText(outcome)).toBeNull();
+    expect(within(row).getByText('LECTURA ORIGINAL QA')).toBeInTheDocument();
+    expect(within(row).getByRole('alert')).toHaveTextContent('Lectura QA interrumpida');
+    // A different file must never inherit the first file's OCR result.
+    requests.preview.mockRejectedValueOnce(new Error('Nuevo archivo ilegible'));
+    await act(async()=>{fireEvent.change(screen.getByLabelText('Adjuntar Factura eléctrica'),{target:{files:[new File(['QA2'],'dos.pdf',{type:'application/pdf'})]}});});
+    expect(within(row).queryByText('LECTURA ORIGINAL QA')).toBeNull();
+    expect(within(row).getByText('dos.pdf')).toBeVisible();
+    expect(within(row).getByRole('alert')).toHaveTextContent('Nuevo archivo ilegible');
+    expect(requests.uploadDocumento).not.toHaveBeenCalled(); expect(requests.put).not.toHaveBeenCalled(); expect(requests.post).not.toHaveBeenCalled();
+  });
+
 });
