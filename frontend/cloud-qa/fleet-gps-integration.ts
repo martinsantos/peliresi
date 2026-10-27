@@ -5,6 +5,10 @@ import path from 'node:path';
 import { assertCloudDatabase, backendRequire } from './safety.ts';
 await assertCloudDatabase();
 assert.equal(process.env.TRANSPORT_MULTI_GPS_ENABLED, 'true');
+assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'proposal_operations_20261021');
+assert.equal(process.env.TRAINING_DATABASE_URL, '');
+assert.equal(process.env.TRAINING_DIRECT_LOGIN_UNTIL, '2000-01-01T00:00:00Z');
+assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
 const { PrismaClient } = backendRequire('@prisma/client');
 const db = new PrismaClient(), directory = process.env.QA_ARTIFACTS!;
 const fixture = JSON.parse(await readFile(path.join(directory, 'handoff-private.json'), 'utf8'));
@@ -13,6 +17,26 @@ const request = async (method: string, route: string, token?: string, body?: unk
   return { status: response.status, body: await response.json() };
 };
 try {
+  // The fixture may only name the pre-existing artificial participants of this
+  // isolated preview. Never create or modify any real account or actor.
+  const allowed: Record<string, string> = { origin: 'transportista', foreign: 'transportista2',
+    generator: 'generador', operator: 'operador', admin: 'admin' };
+  const participants: Record<string, any> = {};
+  for (const [role, login] of Object.entries(allowed)) {
+    const entry = fixture.users[role];
+    assert.equal(entry.email, login + '@night-qa.invalid');
+    const user = await db.usuario.findUniqueOrThrow({ where: { id: entry.id },
+      include: { generador: true, transportista: true, operador: true } });
+    assert.equal(user.email, entry.email); assert.equal(user.activo, true); participants[role] = user;
+  }
+  for (const role of ['origin', 'foreign']) {
+    assert.equal(participants[role].transportista.id, fixture.carriers[role].id);
+    assert.match(participants[role].transportista.razonSocial, /^QA /);
+  }
+  assert.equal(participants.generator.generador.id, fixture.browsers.web.generadorId);
+  assert.equal(participants.operator.operador.id, fixture.browsers.web.operadorId);
+  assert.match(participants.generator.generador.razonSocial, /^QA /);
+  assert.match(participants.operator.operador.razonSocial, /^QA /);
   const tokens: Record<string, string> = {};
   for (const role of ['origin', 'foreign', 'generator', 'operator', 'admin']) {
     const login = await request('POST', '/auth/login', undefined, { email: fixture.users[role].email, password: fixture.password });

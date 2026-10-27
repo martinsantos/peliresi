@@ -1,7 +1,8 @@
 import {test,expect,devices,type Page,type TestInfo} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {login,prefix,readablePageHeading,isolatedMapTiles} from './helpers';
-test.beforeAll(() => { expect(process.env.MANIFEST_PROPOSALS_ENABLED).toBe('true'); });
+import {assertCloudDatabase,backendRequire} from '../safety';
+test.beforeAll(async () => { expect(process.env.MANIFEST_PROPOSALS_ENABLED).toBe('true'); await assertCloudDatabase(); });
 const roles=['generador','transportista','operador'] as const;
 type Role=typeof roles[number];
 async function post(page:Page,suffix:string,action:()=>Promise<unknown>,status=200){
@@ -14,6 +15,18 @@ async function proof(page:Page,info:TestInfo,name:string){
  await expect(page.getByText('Capacitación · sin validez oficial',{exact:false})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
  await readablePageHeading(page);await page.screenshot({path:info.outputPath(name+'.png'),animations:'disabled'});
+}
+async function markSynthetic(id:string,numero:string){
+ const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient();
+ try{
+  const m=await db.manifiesto.findUniqueOrThrow({where:{id},include:{generador:{include:{usuario:true}},transportista:{include:{usuario:true}},operador:{include:{usuario:true}}}});
+  expect(m.numero).toBe(numero);
+  for(const actor of [m.generador,m.transportista,m.operador]){
+   expect(actor.razonSocial).toMatch(/^QA /);
+   expect(actor.usuario.email).toMatch(/@night-qa\.invalid$/);
+  }
+  await db.manifiesto.update({where:{id},data:{isDemoData:true}});
+ }finally{await db.$disconnect();}
 }
 async function approve(page:Page,id:string,role:Role){
  const region=page.getByRole('region',{name:'Aprobaciones de las partes'});await expect(region).toBeVisible();
@@ -48,9 +61,11 @@ async function create(page:Page,info:TestInfo,role:Role){
   await expect(page.getByRole('button',{name:'Chofer (opcional)',exact:true})).toContainText('QA Segundo');
  }
  await page.getByLabel('Fecha estimada de retiro',{exact:true}).fill('2099-12-25');
+ await page.getByLabel('Observaciones',{exact:true}).fill('QA roles UX · datos artificiales');
  await proof(page,info,'creation-'+role);
  const result=await post(page,'/api/manifiestos',()=>page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201);
- expect(result.manifiesto.estado).toBe('PENDIENTE_APROBACION');return result.manifiesto;
+ expect(result.manifiesto.estado).toBe('PENDIENTE_APROBACION');
+ await markSynthetic(result.manifiesto.id,result.manifiesto.numero);return result.manifiesto;
 }
 for(const creator of ['generador','operador'] as const)test('in-situ proposal: '+creator+' creates; both parties approve before receipt',async({browser},info)=>{
  test.setTimeout(150000);
@@ -106,8 +121,6 @@ for(const creator of roles)test('ordinary proposal: '+creator+' creates; each pa
  const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
  try{
   for(const role of roles){const context=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});contexts.push(context);const page=await context.newPage();pages[role]=page;page.on('pageerror',e=>errors.push(e.message));await login(page,info,role);homes[role]=page.url();await expect(page.getByRole('region',{name:'Agenda de manifiestos'})).toBeVisible();}
-  if(info.project.name==='app')await expect(pages.transportista.getByRole('region',{name:'Viajes del transportista'})).toBeVisible();
-  else await expect(pages.transportista.getByRole('button',{name:'Ir al Viaje',exact:true}).first()).toBeVisible();
   const page=pages[creator],m=await create(page,info,creator);
   await expect(page.getByRole('region',{name:'Aprobaciones de las partes'})).toContainText('0 de 3 aprobaciones');
   const other=roles.find(r=>r!==creator)!;

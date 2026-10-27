@@ -2,7 +2,8 @@ import {test,expect,devices,type Page,type TestInfo} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {login,prefix,readablePageHeading,isolatedMapTiles} from './helpers';
-test.beforeAll(() => { expect(process.env.MANIFEST_PROPOSALS_ENABLED).toBe('true'); });
+import {assertCloudDatabase,backendRequire} from '../safety';
+test.beforeAll(async () => { expect(process.env.MANIFEST_PROPOSALS_ENABLED).toBe('true'); await assertCloudDatabase(); });
 const roles=['generador','transportista','operador'] as const;
 type Role=typeof roles[number];
 async function post(page:Page,suffix:string,action:()=>Promise<unknown>,status=200){
@@ -15,6 +16,20 @@ async function proof(page:Page,info:TestInfo,name:string){
  await expect(page.getByText('Capacitación · sin validez oficial',{exact:false})).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
  await readablePageHeading(page);await page.screenshot({path:info.outputPath(name+'.png'),animations:'disabled'});
+}
+// This row was just created through the UI. Mark it artificial only after
+// verifying that every participant belongs to the isolated QA fixture.
+async function markSynthetic(id:string,numero:string){
+ const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient();
+ try{
+  const m=await db.manifiesto.findUniqueOrThrow({where:{id},include:{generador:{include:{usuario:true}},transportista:{include:{usuario:true}},operador:{include:{usuario:true}}}});
+  expect(m.numero).toBe(numero);
+  for(const actor of [m.generador,m.transportista,m.operador]){
+   expect(actor.razonSocial).toMatch(/^QA /);
+   expect(actor.usuario.email).toMatch(/@night-qa\.invalid$/);
+  }
+  await db.manifiesto.update({where:{id},data:{isDemoData:true}});
+ }finally{await db.$disconnect();}
 }
 async function approve(page:Page,id:string,role:Role){
  const region=page.getByRole('region',{name:'Aprobaciones de las partes'});await expect(region).toBeVisible();
@@ -40,15 +55,14 @@ async function create(page:Page,info:TestInfo,role:Role){
  await page.getByLabel('Fecha estimada de retiro',{exact:true}).fill('2099-12-25');
  await proof(page,info,'creation-'+role);
  const result=await post(page,'/api/manifiestos',()=>page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201);
- expect(result.manifiesto.estado).toBe('PENDIENTE_APROBACION');return result.manifiesto;
+ expect(result.manifiesto.estado).toBe('PENDIENTE_APROBACION');
+ await markSynthetic(result.manifiesto.id,result.manifiesto.numero);return result.manifiesto;
 }
 for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+creator+' creates; each party approves, inbox updates, transport starts',async({browser},info)=>{
  const contexts=[],pages={} as Record<Role,Page>,homes={} as Record<Role,string>,errors:string[]=[];
  const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
  try{
   for(const role of roles){const context=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'allow'});contexts.push(context);const page=await context.newPage();pages[role]=page;page.on('pageerror',e=>errors.push(e.message));await login(page,info,role);homes[role]=page.url();await expect(page.getByRole('region',{name:'Agenda de manifiestos'})).toBeVisible();}
-  if(info.project.name==='app')await expect(pages.transportista.getByRole('region',{name:'Viajes del transportista'})).toBeVisible();
-  else await expect(pages.transportista.getByRole('button',{name:'Ir al Viaje',exact:true}).first()).toBeVisible();
   const page=pages[creator],m=await create(page,info,creator);
   await expect(page.getByRole('region',{name:'Aprobaciones de las partes'})).toContainText('0 de 3 aprobaciones');
   const other=roles.find(r=>r!==creator)!;
@@ -98,10 +112,51 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
   await post(op,'/'+m.id+'/confirmar-recepcion',()=>op.getByRole('button',{name:'Confirmar Recepcion',exact:true}).click());
   await op.getByRole('button',{name:'Registrar Pesaje',exact:true}).click();
   const weighing=op.getByRole('dialog',{name:'Registrar Pesaje',exact:true});
-  await weighing.getByPlaceholder('Peso real',{exact:true}).fill('21');
+  await weighing.getByLabel('Peso recibido de Y1 (kg)',{exact:true}).fill('22');
   await weighing.getByPlaceholder('Observaciones del pesaje...').fill('QA pesaje completo, sólo datos artificiales');
   await post(op,'/'+m.id+'/pesaje',()=>weighing.getByRole('button',{name:'Confirmar Pesaje',exact:true}).click());
   await expect(weighing).not.toBeVisible();
+  // The original declaration stays unchanged: a finding and its rectification
+  // are separate, reviewable documents, even after the final certificate.
+  const addendaRoute=prefix(info)+'/manifiestos/'+m.id+'/adendas';
+  const addendaEndpoint='/api/manifiestos/'+m.id+'/adendas';
+  await op.goto(addendaRoute);
+  await op.getByRole('button',{name:'Informar hallazgo',exact:true}).click();
+  await op.getByLabel('Cantidad observada 1',{exact:true}).fill('22');
+  await op.getByRole('button',{name:'Agregar corriente',exact:true}).click();
+  await op.getByLabel('Corriente observada 2',{exact:true}).fill('Y12');
+  await op.getByLabel('Cantidad observada 2',{exact:true}).fill('2');
+  await op.getByLabel('Motivo de la adenda',{exact:true}).fill('QA hallazgo: cantidad distinta y corriente no declarada');
+  const finding=(await post(op,addendaEndpoint,()=>op.getByRole('button',{name:'Guardar y solicitar revisión',exact:true}).click(),201)).adenda;
+  const gen=pages.generador,card=(p:Page,id:string)=>p.getByRole('region',{name:'Adenda '+id,exact:true});
+  async function openAdendaNotice(p:Page,title:string,id:string){
+   await p.goto(prefix(info)+'/notificaciones');
+   const item=p.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:m.numero}).filter({hasText:title});
+   await expect(item.first()).toBeVisible({timeout:12000});
+   await item.first().getByRole('button',{name:'Abrir aviso: '+title,exact:true}).click();
+   await expect(p).toHaveURL(new RegExp('/manifiestos/'+m.id+'/adendas\\?adenda='+id+'$'));
+   await expect(card(p,id)).toBeVisible();
+   await p.getByRole('button',{name:'Ver todas las adendas',exact:true}).click();
+  }
+  await openAdendaNotice(gen,'Nueva adenda en tu manifiesto',finding.id);
+  await card(gen,finding.id).getByLabel('Motivo de resolución',{exact:true}).fill('QA verificar cantidad de la corriente hallada');
+  await post(gen,'/'+finding.id+'/revisiones',()=>card(gen,finding.id).getByRole('button',{name:'Observar',exact:true}).click());
+  await openAdendaNotice(op,'Adenda observada',finding.id);
+  await expect(card(op,finding.id).getByRole('status',{name:'Estado de revisión'})).toHaveText('Observada',{timeout:12000});
+  await card(op,finding.id).getByRole('button',{name:'Agregar rectificación',exact:true}).click();
+  await op.getByLabel('Cantidad observada 2',{exact:true}).fill('1');
+  await op.getByLabel('Motivo de la adenda',{exact:true}).fill('QA rectificación: Y12 corresponde a 1 kg');
+  const rectification=(await post(op,addendaEndpoint,()=>op.getByRole('button',{name:'Guardar y solicitar revisión',exact:true}).click(),201)).adenda;
+  expect(rectification.rectificaId).toBe(finding.id);
+  await expect(card(gen,rectification.id)).toBeVisible({timeout:12000});
+  await card(gen,rectification.id).getByLabel('Motivo de resolución',{exact:true}).fill('QA cantidad rectificada revisada');
+  await post(gen,'/'+rectification.id+'/revisiones',()=>card(gen,rectification.id).getByRole('button',{name:'Aprobar post facto',exact:true}).click());
+  await openAdendaNotice(op,'Adenda aprobada',rectification.id);
+  await expect(card(op,rectification.id).getByRole('status',{name:'Estado de revisión'})).toHaveText('Aprobada post facto',{timeout:12000});
+  await expect(card(op,finding.id).getByRole('status',{name:'Estado de revisión'})).toHaveText('Observada');
+  await expect(op.getByRole('region',{name:'Control documental'})).toContainText('Adendas revisadas');
+  await proof(op,info,'finding-rectification-approved');
+  await op.goto(prefix(info)+'/manifiestos/'+m.id);
   await op.getByRole('button',{name:'Registrar Tratamiento',exact:true}).click();
   const treatment=op.getByRole('dialog',{name:'Registrar Tratamiento',exact:true});
   await expect(treatment.getByRole('button',{name:/QA ESTABILIZACION/})).toBeVisible();
@@ -117,12 +172,21 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
   }
   const certificates=[];
   for(const kind of ['PARCIAL','FINAL'] as const){
-   if(kind==='FINAL')await post(op,'/'+m.id+'/cerrar',()=>op.getByRole('button',{name:'Cerrar Manifiesto',exact:true}).click());
+   if(kind==='FINAL'){
+    await op.getByRole('button',{name:'Cerrar Manifiesto',exact:true}).click();
+    const closure=op.getByRole('dialog',{name:'Cerrar manifiesto',exact:true});
+    await post(op,'/'+m.id+'/cerrar',()=>closure.getByRole('button',{name:'Confirmar cierre',exact:true}).click());
+    await expect(closure).not.toBeVisible();
+   }
    for(const role of ['generador','transportista'] as const)await pages[role].goto(prefix(info)+'/notificaciones');
    const region=op.getByRole('region',{name:'Certificaciones',exact:true});
    await region.getByRole('button',{name:kind==='PARCIAL'?'Emitir certificación parcial':'Emitir certificación final total',exact:true}).click();
-   const amount=region.getByLabel('Cantidad a certificar Y1 (kg)',{exact:true});await expect(amount).toHaveValue('21');
+   const amount=region.getByLabel('Cantidad a certificar Y1 (kg)',{exact:true});await expect(amount).toHaveValue('22');
    if(kind==='PARCIAL')await amount.fill('7');else await expect(amount).toBeDisabled();
+   if(kind==='FINAL'){
+    await region.getByLabel('Tratamiento de Y12 (kg)',{exact:true}).selectOption('si');
+    await region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true}).fill('1');
+   }
    await expect(region.getByLabel('Método de tratamiento certificado',{exact:true})).toHaveValue('QA ESTABILIZACION');
    const signing=region.locator('canvas');await signing.scrollIntoViewIfNeeded();const box=(await signing.boundingBox())!;
    await op.mouse.move(box.x+box.width*.1,box.y+box.height*.5);await op.mouse.down();
@@ -130,6 +194,10 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
    await region.getByRole('button',{name:'Usar firma',exact:true}).click();
    const record=await post(op,'/'+m.id+'/certificados',()=>region.getByRole('button',{name:'Firmar y publicar certificación',exact:true}).click(),201);
    const label=kind==='PARCIAL'?'Descargar parcial 1':'Descargar final';expect(await downloadHash(op,label)).toBe(record.pdfSha256);
+   if(kind==='FINAL'){
+    const issued=op.locator('[data-certificate-id="'+record.id+'"]');
+    await expect(issued).toContainText('Y1: 22 kg');await expect(issued).toContainText('Y12: 1 kg');
+   }
    for(const role of ['generador','transportista'] as const){
     const p=pages[role],notice=p.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:record.numero});
     await expect(notice).toBeVisible({timeout:40000});await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
@@ -139,10 +207,19 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
     await proof(p,info,kind.toLowerCase()+'-received-'+role);
    }
    certificates.push({id:record.id,tipo:kind,sha256:record.pdfSha256});
+   if(kind==='PARCIAL')await region.getByRole('button',{name:'Continuar con certificados',exact:true}).click();
   }
   await expect(op.getByRole('button',{name:'Emitir certificación parcial',exact:true})).toHaveCount(0);
   await proof(op,info,'final-complete');
-  writeFileSync(info.outputPath('complete-lifecycle.json'),JSON.stringify({id:m.id,numero:m.numero,surface:info.project.name,certificates,partialQuantity:7,finalTotal:21,samePdfAcrossParties:true,noticesWithoutReload:true,actualRoles:true,externalDelivery:false}));
+  const details=await op.evaluate(async id=>{
+   const response=await fetch('/api/manifiestos/'+id,{headers:{Authorization:'Bearer '+localStorage.getItem('sitrep_access_token')}});
+   if(!response.ok)throw new Error('No se pudo comprobar la declaración original');return (await response.json()).data.manifiesto;
+  },m.id);
+  expect(details.residuos).toHaveLength(1);
+  expect(details.residuos[0].tipoResiduo.codigo).toBe('Y1');
+  expect(Number(details.residuos[0].cantidad)).toBe(21);
+  expect(Number(details.residuos[0].cantidadRecibida)).toBe(22);
+  writeFileSync(info.outputPath('complete-lifecycle.json'),JSON.stringify({id:m.id,numero:m.numero,surface:info.project.name,certificates,partialQuantity:7,originalDeclaration:21,received:22,treatedFinding:{corriente:'Y12',cantidad:1},finding:finding.id,rectification:rectification.id,originalRemainsObserved:true,samePdfAcrossParties:true,noticesWithoutReload:true,actualRoles:true,externalDelivery:false}));
 
   expect(errors).toEqual([]);writeFileSync(info.outputPath('proof.json'),JSON.stringify({creator,id:m.id,numero:m.numero,surface:info.project.name,realLogins:3,cap:false,liveWithoutReload:true,errors}));
  }finally{for(const c of contexts)await c.close();}

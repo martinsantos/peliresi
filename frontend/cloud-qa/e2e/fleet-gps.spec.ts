@@ -26,7 +26,13 @@ test('one phone tracks three selected loads, delivers one and isolates a subsequ
     await page.goto(mp + '/login'); await page.getByLabel('Correo electrónico o CUIT').fill(fixture.users.origin.email); await page.getByLabel('Contraseña', { exact: true }).fill(fixture.password);
     await page.getByRole('button', { name: 'Ingresar', exact: true }).click(); await expect(page).not.toHaveURL(/\/login$/);
     const skip = page.getByRole('button', { name: 'Saltar introducción', exact: true }); if (await skip.isVisible()) await skip.click();
-    await page.goto(mp + '/transporte/perfil'); await page.getByRole('button', { name: 'Cargas en este móvil', exact: true }).click();
+    await page.goto(mp + '/transporte/perfil');
+    const tripCount = await page.getByRole('heading', { name: /^En tránsito: \d+ manifiestos?$/ }).getAttribute('aria-label');
+    const total = tripCount?.match(/^En tránsito: (\d+) manifiestos?$/)?.[1];
+    expect(total).toBeTruthy();
+    await expect(page.getByText(`${total} en tránsito`, { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'GPS de mis viajes', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp('/transporte/cargas$'));
     const find = async (number: string) => { await page.getByRole('searchbox', { name: 'Número de manifiesto', exact: true }).fill(number); await page.getByRole('button', { name: 'Buscar', exact: true }).click(); };
     await find(loads.prefix);
     for (const load of [loads.a, loads.b, loads.incoming]) await page.getByRole('checkbox', { name: `Llevo ${load.numero} en este móvil`, exact: true }).check();
@@ -67,6 +73,7 @@ test('one phone tracks three selected loads, delivers one and isolates a subsequ
     await selected.evaluate(element => element.scrollIntoView({ block: 'center' })); await selected.screenshot({ path: info.outputPath('fleet-active-loads.png') });
     await page.getByRole('button', { name: 'Detener GPS', exact: true }).click();
     await page.goto(mp + '/notificaciones');
+    await page.getByRole('button', { name: 'Opciones de avisos', exact: true }).click();
     const device = page.getByRole('region', { name: 'Avisos del dispositivo', exact: true });
     await expect(device).toContainText('Este canal todavía no está habilitado');
     await expect(page.getByRole('list', { name: 'Avisos', exact: true })).toContainText('Cambio de transporte en tránsito');

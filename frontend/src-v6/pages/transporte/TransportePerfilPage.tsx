@@ -80,7 +80,7 @@ const TransportePerfilPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-success-100 text-success-700 border border-success-200">
             <Radio size={14} className="animate-pulse" />
-            <span className="text-xs font-semibold">{viajesEnCurso.length} en tránsito</span>
+            <span className="text-xs font-semibold">{enTransitoData?.total ?? viajesEnCurso.length} en tránsito</span>
           </div>
         </div>
       )}
