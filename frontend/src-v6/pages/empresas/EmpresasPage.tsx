@@ -1,3 +1,5 @@
+import { InvitationPreparationNotice } from '../../components/InvitationPreparationNotice';
+import { useInvitationPreparation } from '../../hooks/useInvitationPreparation';
 import { CompanyDraftNotice, CompanyRevisionNotice, companyDraftKey, useCompanyRevisionDraft } from '../../components/CompanyRevisionDraft';
 import { readPreparedInvitations, writePreparedInvitations, PREPARED_INVITATION_PREFIX, type PreparedCompanyInvitation } from '../../services/preparedCompanyInvitations';
 import { CompanyPeopleSummary, type CompanyCapacity } from '../../components/CompanyPeopleSummary';
@@ -20,7 +22,7 @@ import { Card } from '../../components/ui/CardV2';
 import { NativeSelect } from '../../components/ui/NativeSelect';
 import { CompanyPicker,type CompanyPagination } from '../../components/CompanyPicker';
 
-type CompanyAction=(fn:()=>Promise<unknown>,after?:()=>void,confirmed?:()=>boolean)=>Promise<void>;
+type CompanyAction=(fn:()=>Promise<unknown>,after?:()=>void,confirmed?:()=>boolean,failed?:(error:unknown)=>boolean)=>Promise<void>;
 type CompanySave=(data:unknown,confirmed:()=>boolean)=>Promise<void>;
 type Company={id:string;cuit:string;razonSocial:string;nombreFantasia?:string;revision:number;domicilioLegal:{calle:string;localidad:string;departamento:string}};
 type Details={empresa:Company;contextos:CompanyChoice[];actividades:Array<{id:string;rol:string;actorId:string}>;establecimientos:any[];autorizaciones:any[];responsables:any[];eventos:any[];invitaciones:any[];personas:any[];cupoPersonas?:CompanyCapacity;puedeGestionar:boolean;puedeValidar:boolean};
@@ -86,11 +88,11 @@ function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:
    const saved=confirmedWrite.current;confirmedWrite.current=null;setAwaitingRead(false);saved.after?.();setNotice('Cambios guardados');
   }
  },[busy,query.isSuccess,query.isFetching,query.dataUpdatedAt]);
- async function run(action:()=>Promise<unknown>,after?:()=>void,confirmed?:()=>boolean){
+ async function run(action:()=>Promise<unknown>,after?:()=>void,confirmed?:()=>boolean,failed?:(error:unknown)=>boolean){
   if(lock.current||query.isError||confirmedWrite.current)return;
   lock.current=true;setBusy(true);setError('');setNotice('');
   try{await action();if(confirmed&& !confirmed())setError('El cambio se registró, pero no pudimos limpiar su copia en este dispositivo. Al reabrir, revisá lo guardado en SITREP antes de continuar.');confirmedWrite.current={after};setAwaitingRead(true);await Promise.all([query.refetch(),reloadList()]);}
-  catch(e){setError(message(e));if((e as any)?.response?.status===409)void query.refetch();}
+  catch(e){if(!failed?.(e)){setError(message(e));if((e as any)?.response?.status===409)void query.refetch();}}
   finally{setBusy(false);lock.current=false;}
  }
  const unavailable=[401,403,404].includes((query.error as any)?.response?.status);
@@ -107,7 +109,7 @@ function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:
   <Activity mode={tab==='empresa'?'visible':'hidden'}><CompanyForm key={savedForms.company||0} draftKey={companyDraftKey(scope,id,'legal')} company={d.empresa} manage={d.puedeGestionar} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id,'PUT',data),()=>resetForm('company'),confirmed)}/>{d.puedeValidar&&<AuthorityTools id={id} draftKey={companyDraftKey(scope,id,'authority')} details={d} busy={busy} run={run}/>}</Activity>
   {openedTabs.sedes&&<Activity mode={tab==='sedes'?'visible':'hidden'}><div className="space-y-3">{d.establecimientos.map(s=><Card key={s.id}><h2 className="font-semibold">{s.nombre}</h2><p>{s.domicilio||'Domicilio productivo por completar'}{s.localidad?', '+s.localidad:''}{s.departamento?', '+s.departamento:''}</p><p className="text-sm text-neutral-600">{s.codigo} · {s.activo?'Activo':'Inactivo'}</p>{Array.isArray(s.certificados)&&s.certificados.length>0&&<p className="text-sm">Certificados: {s.certificados.join(', ')}</p>}{d.puedeGestionar&&<details className="mt-2"><summary className="min-h-11 cursor-pointer text-primary-800">Editar establecimiento</summary><SiteForm key={savedForms[s.id]||0} draftKey={companyDraftKey(scope,id,'site:'+s.id)} site={s} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id+'/establecimientos/'+s.id,'PUT',data),()=>resetForm(s.id),confirmed)}/></details>}</Card>)}</div>
    {!d.establecimientos.length&&<p>No hay establecimientos cargados.</p>}{d.puedeGestionar&&<Card><h2 className="font-semibold">Agregar establecimiento</h2><SiteForm key={savedForms.newSite||0} draftKey={companyDraftKey(scope,id,'new-site')} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id+'/establecimientos','POST',data),()=>resetForm('newSite'),confirmed)}/></Card>}</Activity>}
-  {openedTabs.personas&&d.puedeGestionar&&<Activity mode={tab==='personas'?'visible':'hidden'}><People id={id} draftKey={companyDraftKey(scope,id,'people')} details={d} verified={query.isSuccess&&!query.isFetching&&!busy} busy={busy} run={run}/></Activity>}
+  {openedTabs.personas&&d.puedeGestionar&&<Activity mode={tab==='personas'?'visible':'hidden'}><People id={id} draftKey={companyDraftKey(scope,id,'people')} details={d} refresh={async()=>{const result=await query.refetch();return result.isSuccess?result.data:undefined;}} verified={query.isSuccess&&!query.isFetching&&!busy} busy={busy} run={run}/></Activity>}
   {tab==='historial'&&d.puedeGestionar&&<Card><h2 className="font-semibold mb-3">Últimos 50 cambios</h2><ol className="divide-y divide-neutral-100">{d.eventos.map(e=><li className="py-3 break-words" key={e.id}><p className="font-medium">{e.tipo.replaceAll('_',' ')}</p><p className="text-sm">{new Date(e.createdAt).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza'})} · Persona: {e.usuarioId}</p>{e.datos?.motivo&&<p>{e.datos.motivo}</p>}</li>)}</ol>{!d.eventos.length&&<p>Sin cambios registrados.</p>}</Card>}
  </fieldset></>;
 }
@@ -158,7 +160,9 @@ function AuthorityTools({id,details:d,busy,run,draftKey}:{id:string;details:Deta
   <ul className="mt-3 text-sm">{d.actividades.map(a=><li key={a.id}>{labels[a.rol]} · Ficha vinculada</li>)}</ul></fieldset>
  </Card>;
 }
-function People({id,details:d,verified,busy,run,draftKey}:{id:string;details:Details;verified:boolean;busy:boolean;run:CompanyAction;draftKey:string}){
+function People({id,details:d,verified,busy,run,draftKey,refresh}:{id:string;details:Details;verified:boolean;busy:boolean;run:CompanyAction;draftKey:string;refresh:()=>Promise<Details|undefined>}){
+ const preparation=useInvitationPreparation(draftKey);
+
  const draft=useCompanyRevisionDraft({email:'',activity:d.actividades[0]?.id||'',all:true,sites:[] as string[]},0,draftKey),{email,activity,all,sites}=draft.value;
  const reasonDraft=useCompanyRevisionDraft({reason:''},0,draftKey+':revocation'),{reason}=reasonDraft.value;
  const setEmail=(email:string)=>draft.change({email}),setActivity=(activity:string)=>draft.change({activity}),setAll=(all:boolean)=>draft.change({all}),setSites=(sites:string[])=>draft.change({sites}),setReason=(reason:string)=>reasonDraft.change({reason});
@@ -191,11 +195,26 @@ function People({id,details:d,verified,busy,run,draftKey}:{id:string;details:Det
  const previous=d.autorizaciones.find(g=>g.usuarioId===person?.id&&g.actividadId===a?.id);
  const pending=d.invitaciones.some(i=>i.email.toLowerCase()===scope.email&&i.actividadId===a?.id&&!i.aceptadaAt&&!i.revocadaAt&&new Date(i.venceAt)>new Date());
 
- return <><CompanyPeopleSummary capacity={d.cupoPersonas} canDelegate={!d.puedeValidar} busy={busy} designate={(email,revocar)=>{if(window.confirm(revocar?'Se retirará la gestión de representantes. Los permisos operativos se conservan hasta revocarlos por separado. ¿Continuar?':'Esta persona podrá gestionar la entidad y sus representantes. No obtiene permisos de administración pública. ¿Designarla responsable?'))void run(()=>request('/'+id+'/responsables','POST',{email,revocar,motivo:revocar?'Revocación por responsable de la entidad':'Designación por responsable de la entidad'}));}}/><Card><h2 className="font-semibold mb-3">Autorizar persona</h2><CompanyDraftNotice draft={draft} label="persona autorizada"/><form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();if(draft.conflict||!a||staleSites)return;void run(()=>request('/'+id+'/personas','POST',{...scope,...(previous?{revision:previous.revision}:{})}),undefined,draft.recovery.acknowledge);}}>
+ function prepareInvitation() {
+  if (!a) return;
+  const receipt = preparation.begin(scope.email, a.id);
+  if (!receipt) return;
+  void run(async () => {
+   const result = await request('/' + id + '/invitaciones', 'POST', scope);
+   if (!preparation.canReceive(receipt)) throw new Error('Invitation context changed before confirmation');
+   const saved = { id: result?.invitacion?.id, path: result?.ruta, expiresAt: new Date(result?.invitacion?.venceAt).getTime() };
+   if (typeof saved.id !== 'string' || !/^\/empresa-invitacion\/[a-f0-9]{64}$/.test(saved.path || '') || !Number.isFinite(saved.expiresAt) || saved.expiresAt <= Date.now()) throw new Error('Incomplete invitation response');
+   const next = [...readPreparedInvitations(draftKey).filter(i => i.id !== saved.id), saved];
+   setInvitations(next); setShownInvitation(saved.id);
+   setStorageFailed(!writePreparedInvitations(draftKey, next));
+   preparation.confirmed(receipt);
+  }, undefined, draft.recovery.acknowledge, error => preparation.failed(error, receipt));
+ }
+ return <><InvitationPreparationNotice preparation={preparation} busy={busy} activityLabel={labels[d.actividades.find(a=>a.id===(preparation.pending||preparation.checked)?.activityId)?.rol||'']||'Actividad solicitada'} onCheck={()=>void preparation.check(refresh)}/><CompanyPeopleSummary capacity={d.cupoPersonas} canDelegate={!d.puedeValidar} busy={busy} designate={(email,revocar)=>{if(window.confirm(revocar?'Se retirará la gestión de representantes. Los permisos operativos se conservan hasta revocarlos por separado. ¿Continuar?':'Esta persona podrá gestionar la entidad y sus representantes. No obtiene permisos de administración pública. ¿Designarla responsable?'))void run(()=>request('/'+id+'/responsables','POST',{email,revocar,motivo:revocar?'Revocación por responsable de la entidad':'Designación por responsable de la entidad'}));}}/><Card><h2 className="font-semibold mb-3">Autorizar persona</h2><CompanyDraftNotice draft={draft} label="persona autorizada"/><form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();if(draft.conflict||!a||staleSites||preparation.pending||preparation.checking)return;void run(()=>request('/'+id+'/personas','POST',{...scope,...(previous?{revision:previous.revision}:{})}),undefined,draft.recovery.acknowledge);}}>
   <Input label="Correo de la persona" type="email" required value={email} onChange={e=>setEmail(e.target.value)}/><NativeSelect label="Rol en esta empresa" value={a?.id||''} onChange={v=>{setActivity(v);setAll(true);setSites([]);}}>{!a&&<option value="">Sin actividad validada</option>}{d.actividades.map(a=><option key={a.id} value={a.id}>{labels[a.rol]}</option>)}</NativeSelect>
   <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={all} disabled={a?.rol!=='GENERADOR'} onChange={e=>setAll(e.target.checked)}/>Todos los establecimientos</label>
   {!all&&<fieldset className="sm:col-span-2"><legend className="font-medium">Establecimientos autorizados</legend>{d.establecimientos.filter(s=>s.activo).map(s=><label key={s.id} className="flex min-h-11 items-center gap-2"><input type="checkbox" value={s.id} checked={sites.includes(s.id)} onChange={e=>setSites(e.target.checked?[...sites,s.id]:sites.filter(id=>id!==s.id))}/>{s.nombre}</label>)}</fieldset>}
-  <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="submit" disabled={busy||draft.conflict||staleSites||full||!a||!all&&!sites.length}>Autorizar cuenta verificada</Button><Button type="button" variant="outline" disabled={busy||draft.conflict||staleSites||full||!!previous||pending||!a||!email||!all&&!sites.length} onClick={()=>void run(async()=>{const result=await request('/'+id+'/invitaciones','POST',scope);const saved={id:result.invitacion.id,path:result.ruta,expiresAt:new Date(result.invitacion.venceAt).getTime()};const next=[...readPreparedInvitations(draftKey).filter(i=>i.id!==saved.id),saved];setInvitations(next);setShownInvitation(saved.id);setStorageFailed(!writePreparedInvitations(draftKey,next));},undefined,draft.recovery.acknowledge)}>Preparar invitación</Button></div>
+  <div className="flex flex-wrap gap-2 sm:col-span-2"><Button type="submit" disabled={busy||!!preparation.pending||preparation.checking||draft.conflict||staleSites||full||!a||!all&&!sites.length}>Autorizar cuenta verificada</Button><Button type="button" variant="outline" disabled={busy||!!preparation.pending||preparation.checking||draft.conflict||staleSites||full||!!previous||pending||!a||!email||!all&&!sites.length} onClick={prepareInvitation}>Preparar invitación</Button></div>
  {!a&&<p role="alert" className="text-sm text-error-800 sm:col-span-2">El rol guardado en el borrador ya no está disponible. Elegí una actividad validada para continuar.</p>}
  {staleSites&&<p role="alert" className="text-sm text-error-800 sm:col-span-2">Un establecimiento del borrador ya no está activo. Revisá el alcance antes de autorizar.<Button type="button" variant="outline" onClick={()=>setSites(sites.filter(id=>d.establecimientos.some(s=>s.id===id&&s.activo)))}>Quitar establecimientos no disponibles</Button></p>}
  {previous&&<p role="status" className="text-sm text-neutral-700 sm:col-span-2">{previous.activa?'Esta persona ya está autorizada en este rol.':'Este acceso fue revocado.'} Revisá los permisos y usá «Autorizar cuenta verificada» para {previous.activa?'actualizarlos':'reactivarlo'}.</p>}

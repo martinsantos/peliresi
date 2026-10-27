@@ -491,3 +491,135 @@ test('a recovered invitation disappears when its server expiry passes while the 
  await waitFor(()=>expect(screen.queryByLabelText('Enlace de invitación')).not.toBeInTheDocument(),{timeout:2000});
  expect(screen.getByText('Generador · Vencida')).toBeVisible();
 });
+
+async function uncertainPreparation(options:{committed?:boolean;status?:number;incomplete?:boolean}={}){
+ const details={actividades:[{id:'g',rol:'GENERADOR'}],invitaciones:[] as any[]};
+ const state=setup(details),original=mocks.request.getMockImplementation()!;
+ mocks.request.mockImplementation(async request=>{
+  if(request.method==='POST'&&request.url.endsWith('/invitaciones')){
+   if(options.committed)details.invitaciones=[{id:'uncertain-created',email:request.data.email,actividadId:'g',venceAt:new Date(Date.now()+86400000).toISOString()}];
+   if(options.incomplete)return {data:{data:{invitacion:{id:'missing-link'}}}};
+   throw options.status?{response:{status:options.status,data:{message:'QA error'}}}:new Error('Response lost');
+  }
+  return original(request);
+ });
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'uncertain@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));
+ return {state,details};
+}
+test.each([undefined,503,408,409])('lost preparation (%s) requires a read before another write, without consuming another place',async status=>{
+ await uncertainPreparation({committed:true,status});
+ expect(await screen.findByRole('heading',{name:'Comprobar preparación de invitación'})).toBeVisible();
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Autorizar cuenta verificada'})).toBeDisabled();
+ expect(screen.getByText(/No recibimos una confirmación completa/).closest('[role="status"]')).toHaveFocus();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('uncertain@qa.invalid');
+ const writes=()=>mocks.request.mock.calls.filter(([r])=>r.method==='POST');
+ expect(writes()).toHaveLength(1);
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar preparación'}));
+ expect(await screen.findByRole('heading',{name:'Preparación comprobada'})).toBeVisible();
+ expect(screen.getByText(/Hay una invitación vigente para esta persona y rol/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Revocar invitación'})).toBeVisible();
+ expect(screen.queryByLabelText('Enlace de invitación')).toBeNull();
+ expect(writes()).toHaveLength(1);
+});
+test('an incomplete success is uncertain and never clears the invitation form',async()=>{
+ await uncertainPreparation({committed:true,incomplete:true});
+ expect(await screen.findByRole('heading',{name:'Comprobar preparación de invitación'})).toBeVisible();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('uncertain@qa.invalid');
+ expect(screen.queryByLabelText('Enlace de invitación')).toBeNull();
+});
+test('when no invitation exists, checking is read-only and permits a separate explicit action',async()=>{
+ await uncertainPreparation();await screen.findByRole('button',{name:'Comprobar preparación'});
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar preparación'}));
+ expect(await screen.findByText(/No figura una invitación vigente/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method==='POST')).toHaveLength(1);
+});
+test('a failed check keeps the uncertain receipt, values and write block until a fresh read succeeds',async()=>{
+ const {state}=await uncertainPreparation({committed:true});await screen.findByRole('button',{name:'Comprobar preparación'});
+ state.failDetail();fireEvent.click(screen.getByRole('button',{name:'Comprobar preparación'}));
+ expect(await screen.findByRole('button',{name:'Reintentar empresa'})).toBeVisible();
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeDisabled();
+ state.recover();fireEvent.click(screen.getByRole('button',{name:'Reintentar empresa'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Comprobar preparación'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar preparación'}));
+ expect(await screen.findByText(/Hay una invitación vigente/)).toBeVisible();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method==='POST')).toHaveLength(1);
+});
+test.each(['','/app'])('reopening %s recovers an unconfirmed preparation without automatically posting',async base=>{
+ const {state,details}=await uncertainPreparation({committed:true});await screen.findByRole('button',{name:'Comprobar preparación'});state.unmount();sessionStorage.clear();mocks.request.mockClear();
+ setup(details,{base,entry:base+'/empresas'});await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(await screen.findByRole('button',{name:'Comprobar preparación'})).toBeVisible();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('uncertain@qa.invalid');
+ expect(mocks.request.mock.calls.every(([r])=>r.method==='GET')).toBe(true);
+});
+test.each(['account','role'])('an uncertain preparation is not shown after changing %s',async kind=>{
+ const {state,details}=await uncertainPreparation();await screen.findByRole('button',{name:'Comprobar preparación'});state.unmount();
+ mocks.user={...mocks.user,...(kind==='account'?{id:'different-person'}:{rol:'OPERADOR',actorId:'different-actor'})};
+ setup(details);await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(screen.queryByRole('button',{name:'Comprobar preparación'})).toBeNull();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('');
+});
+test('definitive validation errors do not trap the form in an uncertain result',async()=>{
+ await uncertainPreparation({status:422});expect(await screen.findByRole('alert')).toHaveTextContent('QA error');
+ expect(screen.queryByRole('button',{name:'Comprobar preparación'})).toBeNull();
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('uncertain@qa.invalid');
+});
+test('a preparation interrupted before any response remains recoverable after closing',async()=>{
+ const details={actividades:[{id:'g',rol:'GENERADOR'}]};
+ const state=setup(details),original=mocks.request.getMockImplementation()!;
+ mocks.request.mockImplementation(request=>request.method==='POST'?new Promise(()=>{}):original(request));
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'in-flight@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));state.unmount();mocks.request.mockClear();
+ setup(details);await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ expect(await screen.findByRole('button',{name:'Comprobar preparación'})).toBeVisible();
+ expect(screen.getByText(/in-flight@qa.invalid/)).toBeVisible();
+ expect(mocks.request.mock.calls.every(([r])=>r.method==='GET')).toBe(true);
+});
+test('signing out clears an uncertain preparation without clearing another project',async()=>{
+ await uncertainPreparation();await screen.findByRole('button',{name:'Comprobar preparación'});
+ localStorage.setItem('another-project','keep');
+ clearPreparedInvitations();fireEvent(window,new StorageEvent('storage',{key:null}));
+ expect(screen.queryByRole('button',{name:'Comprobar preparación'})).toBeNull();
+ expect(localStorage.getItem('another-project')).toBe('keep');
+});
+test('checking an earlier attempt identifies its recipient even if the next form has changed',async()=>{
+ await uncertainPreparation({committed:true});await screen.findByRole('button',{name:'Comprobar preparación'});
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'next-person@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar preparación'}));
+ const title=await screen.findByRole('heading',{name:'Preparación comprobada'});
+ expect(within(title.closest('[role="status"]')!).getByText('uncertain@qa.invalid · Generador')).toBeVisible();
+ expect(screen.getByLabelText('Correo de la persona')).toHaveValue('next-person@qa.invalid');
+ expect(mocks.request.mock.calls.filter(([r])=>r.method==='POST')).toHaveLength(1);
+});
+test('failure to clear the local copy does not trap a result already checked with the server',async()=>{
+ await uncertainPreparation();await screen.findByRole('button',{name:'Comprobar preparación'});
+ vi.spyOn(Storage.prototype,'removeItem').mockImplementation(()=>{throw new Error('QA storage unavailable');});
+ fireEvent.click(screen.getByRole('button',{name:'Comprobar preparación'}));
+ expect(await screen.findByText(/No figura una invitación vigente/)).toBeVisible();
+ expect(screen.getByRole('button',{name:'Preparar invitación'})).toBeEnabled();
+ expect(screen.getByText(/No pudimos actualizar la copia/)).toBeVisible();
+ expect(mocks.request.mock.calls.filter(([r])=>r.method==='POST')).toHaveLength(1);
+ fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));
+ await screen.findByRole('button',{name:'Comprobar preparación'});
+ expect(mocks.request.mock.calls.filter(([r])=>r.method==='POST')).toHaveLength(2);
+});
+test.each([false,true])('a late successful response cannot restore a secret after leaving the view (logout=%s)',async logout=>{
+ const details={actividades:[{id:'g',rol:'GENERADOR'}]};
+ const state=setup(details),original=mocks.request.getMockImplementation()!;
+ let complete!:(value:unknown)=>void;
+ mocks.request.mockImplementation(request=>request.method==='POST'?new Promise(resolve=>{complete=resolve;}):original(request));
+ await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Personas autorizadas'}));
+ fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'late@qa.invalid'}});
+ fireEvent.click(screen.getByRole('button',{name:'Preparar invitación'}));state.unmount();
+ if(logout)clearPreparedInvitations();
+ await act(async()=>{complete({data:{data:{invitacion:{id:'late',venceAt:new Date(Date.now()+86400000).toISOString()},ruta:savedInvitationPath}}});});
+ expect(Object.keys(localStorage).filter(key=>key.startsWith(PREPARED_INVITATION_PREFIX))).toHaveLength(0);
+ const pending=Object.keys(localStorage).filter(key=>key.startsWith('sitrep:invitation-preparation:v1:'));
+ expect(pending).toHaveLength(logout?0:1);
+});

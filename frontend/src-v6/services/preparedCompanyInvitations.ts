@@ -1,3 +1,4 @@
+import { INVITATION_PREPARATION_PREFIX } from './invitationPreparation';
 /** Local recovery only; the server remains the authority for every invitation. */
 export const PREPARED_INVITATION_PREFIX = 'sitrep:prepared-invitation:v1:';
 export type PreparedCompanyInvitation = { id: string; path: string; expiresAt: number };
@@ -24,7 +25,7 @@ export function writePreparedInvitations(scope: string, items: PreparedCompanyIn
 }
 export function clearPreparedInvitations(): void {
   try {
-    const keys = Object.keys(localStorage).filter(key => key.startsWith(PREPARED_INVITATION_PREFIX));
+    const keys = Object.keys(localStorage).filter(key => (key.startsWith(PREPARED_INVITATION_PREFIX) || key.startsWith(INVITATION_PREPARATION_PREFIX)));
     keys.forEach(key => localStorage.removeItem(key));
   } catch { /* A disabled store must never prevent signing out. */ }
 }
