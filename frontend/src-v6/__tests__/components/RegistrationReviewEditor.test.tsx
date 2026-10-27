@@ -83,4 +83,40 @@ describe('administrative declaration correction acknowledgement', () => {
     expect(screen.getByRole('button', { name: 'Guardar corrección' })).toBeDisabled();
   });
 
+  it('blocks invalid contact locally, focuses the field and keeps its value without a server call', async () => {
+    render(<RegistrationReviewEditor application={application as never} onClose={vi.fn()} onSaved={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Email de contacto'), { target: { value: 'correo-incompleto' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
+    await waitFor(() => expect(screen.getByLabelText('Email de contacto')).toHaveAttribute('aria-invalid', 'true'));
+    expect(screen.getByLabelText('Email de contacto')).toHaveFocus();
+    expect(screen.getByLabelText('Email de contacto')).toHaveValue('correo-incompleto');
+    expect(mock.save).not.toHaveBeenCalled();
+  });
+  it('returns to the invalid activity from another section, retains the draft and saves once after correction', async () => {
+    mock.save.mockResolvedValue({});
+    render(<RegistrationReviewEditor application={{ ...application, tipoActor: 'OPERADOR', datosActor: JSON.stringify({ razonSocial: 'QA', domicilio: 'QA', tefPotencia: '-10' }) } as never} onClose={vi.fn()} onSaved={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA domicilio corregido' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
+    await waitFor(() => expect(screen.getByLabelText('Potencia instalada (HP)')).toHaveFocus());
+    expect(screen.getByLabelText('Potencia instalada (HP)')).toHaveAttribute('aria-invalid', 'true');
+    expect(mock.save).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Potencia instalada (HP)'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
+    await waitFor(() => expect(mock.save).toHaveBeenCalledWith(application.id, expect.objectContaining({ domicilio: 'QA domicilio corregido', tefPotencia: '10' }), application.updatedAt));
+    expect(mock.save).toHaveBeenCalledOnce();
+  });
+
+  it.each(['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'])('finds invalid coordinates in %s and preserves optional empty contact', async tipoActor => {
+    mock.save.mockResolvedValue({});
+    render(<RegistrationReviewEditor application={{ ...application, tipoActor, datosActor: JSON.stringify({ razonSocial: 'QA', domicilio: 'QA', coordenadas: '91, -68', emailContacto: '' }) } as never} onClose={vi.fn()} onSaved={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Domicilio'), { target: { value: 'QA corrección conservada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
+    const field = await screen.findByLabelText(/Coordenadas/);
+    await waitFor(() => expect(field).toHaveAttribute('aria-invalid', 'true'));
+    expect(field).toHaveFocus(); expect(mock.save).not.toHaveBeenCalled();
+    fireEvent.change(field, { target: { value: '0, 0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }));
+    await waitFor(() => expect(mock.save).toHaveBeenCalledWith(application.id, expect.objectContaining({ domicilio: 'QA corrección conservada', coordenadas: '0, 0', emailContacto: '' }), application.updatedAt));
+  });
+
 });

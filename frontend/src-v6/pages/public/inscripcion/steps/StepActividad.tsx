@@ -8,6 +8,7 @@ interface StepActividadProps {
   form: Record<string, string>;
   up: (field: string, value: string) => void;
   isOperador: boolean;
+  attempted?: boolean;
 }
 
 const fields = [
@@ -16,8 +17,13 @@ const fields = [
   { key: 'tefSuperficie', label: 'Superficie cubierta (m²)', step: 'any', inputMode: 'decimal' as const },
 ];
 
+export function activityMagnitudeError(value: string): string | undefined {
+  if (value === '') return undefined;
+  return !value.trim() || !Number.isFinite(Number(value)) || Number(value) < 0 ? 'Indicá un número mayor o igual a cero.' : undefined;
+}
+
 /** Applicants declare operational facts; fiscal evaluation belongs to DGFA. */
-export function StepActividad({ form, up, isOperador }: StepActividadProps) {
+export function StepActividad({ form, up, isOperador, attempted = false }: StepActividadProps) {
   return (
     <div className="space-y-5">
       <SectionTitle icon={isOperador ? FlaskConical : Factory} title="Datos de la actividad" />
@@ -25,7 +31,8 @@ export function StepActividad({ form, up, isOperador }: StepActividadProps) {
         {fields.map(field => (
           <div key={field.key} className="min-w-0">
             <label className={labelCls} htmlFor={`registration-${field.key}`}>{field.label}</label>
-            <input id={`registration-${field.key}`} type="number" min="0" step={field.step} inputMode={field.inputMode} className={inputCls()} value={form[field.key] || ''} onChange={event => up(field.key, event.target.value)} />
+            <input id={`registration-${field.key}`} type="number" min="0" step={field.step} inputMode={field.inputMode} aria-invalid={attempted && !!activityMagnitudeError(form[field.key] || '') || undefined} aria-describedby={attempted && activityMagnitudeError(form[field.key] || '') ? `error-${field.key}` : undefined} className={inputCls(attempted && !!activityMagnitudeError(form[field.key] || ''))} value={form[field.key] || ''} onChange={event => up(field.key, event.target.value)} />
+            {attempted && activityMagnitudeError(form[field.key] || '') && <p id={`error-${field.key}`} className="mt-1 text-sm text-error-800">{activityMagnitudeError(form[field.key])}</p>}
           </div>
         ))}
         <div className="min-w-0">
@@ -38,7 +45,8 @@ export function StepActividad({ form, up, isOperador }: StepActividadProps) {
         </div>
         {isOperador && <div className="min-w-0">
           <label className={labelCls} htmlFor="registration-tefCapacidad">Capacidad de tratamiento (t/mes) · opcional</label>
-          <input id="registration-tefCapacidad" type="number" min="0" step="any" inputMode="decimal" className={inputCls()} value={form.tefCapacidad || ''} onChange={event => up('tefCapacidad', event.target.value)} />
+          <input id="registration-tefCapacidad" type="number" min="0" step="any" inputMode="decimal" aria-invalid={attempted && !!activityMagnitudeError(form.tefCapacidad || '') || undefined} aria-describedby={attempted && activityMagnitudeError(form.tefCapacidad || '') ? 'error-tefCapacidad' : undefined} className={inputCls(attempted && !!activityMagnitudeError(form.tefCapacidad || ''))} value={form.tefCapacidad || ''} onChange={event => up('tefCapacidad', event.target.value)} />
+          {attempted && activityMagnitudeError(form.tefCapacidad || '') && <p id="error-tefCapacidad" className="mt-1 text-sm text-error-800">{activityMagnitudeError(form.tefCapacidad)}</p>}
         </div>}
       </div>
       <p className="text-sm leading-6 text-neutral-700">Podés adjuntar la factura eléctrica en Documentos para revisar la categoría tarifaria y el suministro. Los kWh de consumo y la potencia contratada en kW no reemplazan la potencia instalada en HP.</p>

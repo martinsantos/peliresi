@@ -9,6 +9,9 @@ import { getApiErrorMessage } from '../../utils/api-error';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/ButtonV2';
 import { Select } from '../ui/Select';
+import { useRegistrationValidationFocus } from '../../hooks/useRegistrationValidationFocus';
+import { actorEmailError, parseActorCoordinates, COORDINATE_ERROR } from '../../utils/actorCreationValidation';
+import { activityMagnitudeError } from '../../pages/public/inscripcion/steps/StepActividad';
 import { useAdmissionContext } from '../../hooks/useAdmissionContext';
 import { useRecoverableForm } from '../../hooks/useRecoverableForm';
 import { CompanyDraftNotice, CompanyRevisionNotice } from '../CompanyRevisionDraft';
@@ -50,6 +53,8 @@ export function RegistrationReviewEditor({ application, onClose, onSaved, onConf
   const serverConflict = dirty && draft.revision !== initial.version;
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(initial.error);
   const pending = useRef(false);
+  const [attempted, setAttempted] = useState<Set<number>>(new Set());
+  const validationRef = useRegistrationValidationFocus(attempted);
   const isGenerador = application.tipoActor === 'GENERADOR', isOperador = application.tipoActor === 'OPERADOR';
   const steps = (isGenerador ? STEPS_GENERADOR : isOperador ? STEPS_OPERADOR : STEPS_TRANSPORTISTA).slice(0, -2);
   const up = (field: string, value: string) => recovery.update({ ...draft, form: { ...form, [field]: value }, changed: [...new Set([...draft.changed, field])] });
@@ -57,6 +62,23 @@ export function RegistrationReviewEditor({ application, onClose, onSaved, onConf
   const keep = () => recovery.update({ ...draft, revision: initial.version, form: { ...initial.form, ...Object.fromEntries(draft.changed.map(field => [field, form[field]])) } });
   const save = async () => {
     if (pending.current || initial.error || readOnly || recovery.conflict || serverConflict || !dirty) return;
+    // Validate the complete editable declaration, including sections not mounted.
+    // Server validation and the exact-revision check remain authoritative.
+    const activityStep = isGenerador ? 5 : 6;
+    const issues: { step: number; message: string }[] = [];
+    const contactError = actorEmailError(form.emailContacto || '');
+    if (contactError) issues.push({ step: 1, message: contactError });
+    if (parseActorCoordinates(form.coordenadas || '') === null) issues.push({ step: isGenerador || isOperador ? 3 : 1, message: COORDINATE_ERROR });
+    if (isGenerador || isOperador) for (const key of ['tefPersonal', 'tefPotencia', 'tefSuperficie', ...(isOperador ? ['tefCapacidad'] : [])]) {
+      const message = activityMagnitudeError(form[key] || '');
+      if (message) issues.push({ step: activityStep, message });
+    }
+    if (issues.length) {
+      setStep(issues[0].step);
+      setAttempted(new Set(issues.map(issue => issue.step)));
+      setError('Revisá los datos señalados antes de guardar. Tus cambios se conservan.');
+      return;
+    }
     pending.current = true; setBusy(true); setError(null);
     try {
       await solicitudService.corregirDatos(application.id, form, draft.revision);
@@ -73,13 +95,13 @@ export function RegistrationReviewEditor({ application, onClose, onSaved, onConf
   };
   return <Modal isOpen onClose={onClose} size="xl" title="Corregir datos de la solicitud" description="La corrección guarda historial antes/después. No cambia la cuenta ni aprueba el trámite." isBusy={busy}
     footer={<><Button variant="outline" disabled={busy} onClick={onClose}>Cancelar</Button><Button disabled={Boolean(initial.error) || readOnly || recovery.conflict || serverConflict || !dirty} isLoading={busy} onClick={() => void save()}>Guardar corrección</Button></>}>
-    <div className="space-y-5"><Select label="Sección de la solicitud" value={String(step)} onChange={value => setStep(Number(value))} options={steps.map(item => ({ value: String(item.id), label: `${item.id}. ${item.label}` }))} />
+    <div ref={validationRef} className="space-y-5"><Select label="Sección de la solicitud" value={String(step)} onChange={value => setStep(Number(value))} options={steps.map(item => ({ value: String(item.id), label: `${item.id}. ${item.label}` }))} />
       <CompanyDraftNotice draft={{ dirty, recovery }} label="corrección administrativa" />
       {serverConflict && <CompanyRevisionNotice fields={draft.changed.map(key => [key.replace(/([A-Z])/g, ' $1'), initial.form[key] || 'Sin declarar'])} keep={keep} useServer={recovery.clear} />}
       {readOnly && <p role="status">Esperá a que se actualice la solicitud antes de guardar.</p>}
       {(initial.error || error) && <p role="alert" className="text-sm text-error-800">{initial.error || error}</p>}
       <fieldset disabled={busy || readOnly} className="min-w-0">
-        {(isGenerador && step === 5 || isOperador && step === 6) ? <StepActividad form={form} up={up} isOperador={isOperador} /> : <StepEmpresa step={step} form={form} up={up} attempted={new Set()} isGenerador={isGenerador} isOperador={isOperador} isTransportista={!isGenerador && !isOperador}
+        {(isGenerador && step === 5 || isOperador && step === 6) ? <StepActividad form={form} up={up} isOperador={isOperador} attempted={attempted.has(step)} /> : <StepEmpresa step={step} form={form} up={up} attempted={attempted} isGenerador={isGenerador} isOperador={isOperador} isTransportista={!isGenerador && !isOperador}
           fleet={<RegistrationFleetFields allowLicenseUpload={false} drivers={fleetRows(form.choferesJson, EMPTY_DRIVER)} vehicles={fleetRows(form.vehiculosJson, EMPTY_VEHICLE)} onDrivers={rows => up('choferesJson', JSON.stringify(rows))} onVehicles={rows => up('vehiculosJson', JSON.stringify(rows))} />} />}
       </fieldset>
     </div>
