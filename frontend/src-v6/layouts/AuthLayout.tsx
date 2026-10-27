@@ -20,7 +20,7 @@ export const AuthLayout: React.FC = () => {
           <div>
             <MendozaBrand appearance="dark" />
             <div className="institutional-stripe" aria-hidden="true" />
-            <h1>Sistema de Trazabilidad de Residuos Peligrosos</h1>
+            <p className="auth-brand-description">Sistema de Trazabilidad de Residuos Peligrosos</p>
             <p className="text-white/85 leading-relaxed max-w-md">
               Gestión integral de manifiestos digitales para el control ambiental de la provincia de Mendoza.
             </p>

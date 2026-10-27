@@ -63,9 +63,7 @@ const LoginPage: React.FC = () => {
             <SitrepWordmark className="font-display" />
           </div>
         </div>
-        <p className="text-xs md:text-sm text-neutral-600">
-          Sistema de Trazabilidad de Residuos Peligrosos
-        </p>
+        <h1 className="text-2xl font-bold text-neutral-900">Iniciar sesión</h1>
       </div>
 
       {/* Error message */}
@@ -146,9 +144,9 @@ const LoginPage: React.FC = () => {
 
       {/* Inscripcion de Actores — destacado */}
       <div className="institutional-registration mt-6 md:mt-8 p-3 md:p-4 rounded-2xl">
-        <h3 className="text-center text-xs md:text-sm font-bold text-emerald-800 mb-0.5 md:mb-1">
+        <h2 className="text-center text-xs md:text-sm font-bold text-emerald-800 mb-0.5 md:mb-1">
           Inscripción Provincial de Actores
-        </h3>
+        </h2>
         <p className="text-center text-[10px] md:text-xs text-emerald-600 mb-3 md:mb-4">
           Registrá tu empresa en el sistema de trazabilidad
         </p>
@@ -184,7 +182,7 @@ const LoginPage: React.FC = () => {
 
       <p className="mt-4 text-center text-sm text-neutral-600">
         ¿Ya tenés cuenta?{' '}
-        <Link to="/reclamar" className="brand-link font-semibold hover:underline">
+        <Link to="/reclamar" className="brand-link inline-flex min-h-11 items-center font-semibold hover:underline">
           Recuperá el acceso por correo
         </Link>
       </p>

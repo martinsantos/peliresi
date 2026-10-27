@@ -20,7 +20,7 @@ describe('App public recovery retains the same institutional form frame as web',
     const frame = title.closest('main');
     expect(frame).toHaveClass('auth-form-panel');
     expect(frame?.parentElement).toHaveClass('institutional', 'auth-shell');
-    if (heading === 'Recuperar contraseña') expect(screen.getByRole('link', { name: /Volver al login/ })).toBeVisible();
+    if (heading === 'Recuperar contraseña') expect(screen.getByRole('link', { name: /Volver a iniciar sesión/ })).toBeVisible();
     expect(screen.queryByText('Página no encontrada')).not.toBeInTheDocument();
   });
 });
