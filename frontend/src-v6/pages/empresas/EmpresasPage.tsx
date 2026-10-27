@@ -1,3 +1,4 @@
+import { CompanyHistory, type CompanyHistoryEvent } from '../../components/CompanyHistory';
 import { InvitationPreparationNotice } from '../../components/InvitationPreparationNotice';
 import { useInvitationPreparation } from '../../hooks/useInvitationPreparation';
 import { CompanyDraftNotice, CompanyRevisionNotice, companyDraftKey, useCompanyRevisionDraft } from '../../components/CompanyRevisionDraft';
@@ -25,7 +26,7 @@ import { CompanyPicker,type CompanyPagination } from '../../components/CompanyPi
 type CompanyAction=(fn:()=>Promise<unknown>,after?:()=>void,confirmed?:()=>boolean,failed?:(error:unknown)=>boolean)=>Promise<void>;
 type CompanySave=(data:unknown,confirmed:()=>boolean)=>Promise<void>;
 type Company={id:string;cuit:string;razonSocial:string;nombreFantasia?:string;revision:number;domicilioLegal:{calle:string;localidad:string;departamento:string}};
-type Details={empresa:Company;contextos:CompanyChoice[];actividades:Array<{id:string;rol:string;actorId:string}>;establecimientos:any[];autorizaciones:any[];responsables:any[];eventos:any[];invitaciones:any[];personas:any[];cupoPersonas?:CompanyCapacity;puedeGestionar:boolean;puedeValidar:boolean};
+type Details={empresa:Company;contextos:CompanyChoice[];actividades:Array<{id:string;rol:string;actorId:string}>;establecimientos:any[];autorizaciones:any[];responsables:any[];eventos:CompanyHistoryEvent[];invitaciones:any[];personas:any[];cupoPersonas?:CompanyCapacity;puedeGestionar:boolean;puedeValidar:boolean};
 const labels:Record<string,string>={GENERADOR:'Generador',TRANSPORTISTA:'Transportista',OPERADOR:'Operador'};
 const request=async(route:string,method='GET',body?:unknown)=>(await api.request({url:'/empresas'+route,method,data:body})).data.data;
 const message=(e:unknown)=>(e as any)?.response?.data?.message||'No se pudo guardar. Tus datos siguen en el formulario.';
@@ -140,7 +141,7 @@ function CompanyDetail({id,scope,reloadList}:{id:string;scope:string;reloadList:
   {openedTabs.sedes&&<Activity mode={visibleTab==='sedes'?'visible':'hidden'}><div className="space-y-3">{d.establecimientos.map(s=><Card key={s.id}><h2 className="font-semibold">{s.nombre}</h2><p>{s.domicilio||'Domicilio productivo por completar'}{s.localidad?', '+s.localidad:''}{s.departamento?', '+s.departamento:''}</p><p className="text-sm text-neutral-600">{s.codigo} · {s.activo?'Activo':'Inactivo'}</p>{Array.isArray(s.certificados)&&s.certificados.length>0&&<p className="text-sm">Certificados: {s.certificados.join(', ')}</p>}{d.puedeGestionar&&<details className="mt-2"><summary className="min-h-11 cursor-pointer text-primary-800">Editar establecimiento</summary><SiteForm key={savedForms[s.id]||0} draftKey={companyDraftKey(scope,id,'site:'+s.id)} site={s} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id+'/establecimientos/'+s.id,'PUT',data),()=>resetForm(s.id),confirmed)}/></details>}</Card>)}</div>
    {!d.establecimientos.length&&<p>No hay establecimientos cargados.</p>}{d.puedeGestionar&&<Card><h2 className="font-semibold">Agregar establecimiento</h2><SiteForm key={savedForms.newSite||0} draftKey={companyDraftKey(scope,id,'new-site')} busy={busy} save={(data,confirmed)=>run(()=>request('/'+id+'/establecimientos','POST',data),()=>resetForm('newSite'),confirmed)}/></Card>}</Activity>}
   {openedTabs.personas&&d.puedeGestionar&&<Activity mode={visibleTab==='personas'?'visible':'hidden'}><People id={id} draftKey={companyDraftKey(scope,id,'people')} details={d} refresh={async()=>{const result=await query.refetch();return result.isSuccess?result.data:undefined;}} verified={query.isSuccess&&!query.isFetching&&!busy} busy={busy} run={run}/></Activity>}
-  {visibleTab==='historial'&&d.puedeGestionar&&<Card><h2 className="font-semibold mb-3">Últimos 50 cambios</h2><ol className="divide-y divide-neutral-100">{d.eventos.map(e=><li className="py-3 break-words" key={e.id}><p className="font-medium">{e.tipo.replaceAll('_',' ')}</p><p className="text-sm">{new Date(e.createdAt).toLocaleString('es-AR',{timeZone:'America/Argentina/Mendoza'})} · Persona: {e.usuarioId}</p>{e.datos?.motivo&&<p>{e.datos.motivo}</p>}</li>)}</ol>{!d.eventos.length&&<p>Sin cambios registrados.</p>}</Card>}
+  {visibleTab==='historial'&&d.puedeGestionar&&<CompanyHistory events={d.eventos}/>}
  </fieldset></>;
 }
 function WorkspaceChoices({choices}:{choices:CompanyChoice[]}){

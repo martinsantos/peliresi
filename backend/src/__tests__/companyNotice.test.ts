@@ -69,3 +69,39 @@ describe('company notices',()=>{
   expect(mail?.family).toBe('representacion');expect(mail?.html).toContain(COMPANY_NOTICE_LABELS[kind][0]);expect(mail?.html).not.toMatch(/PRIVATE|SECRET/);expect(mail?.html).toContain(kind.includes('REVOCAD')?'/notificaciones':'/empresas?empresa=company');
  });
 });
+
+import { withCompanyHistoryContext } from '../services/companyNotice.service';
+describe('manager company history',()=>{
+ it('distinguishes the author from the affected person and reuses company-scoped context without audit writes',async()=>{
+  const db=contextDb(),events=[{...event,usuarioId:'owner'}, {...event,id:'second',usuarioId:'owner'}],before=JSON.stringify(events);
+  const rows=await withCompanyHistoryContext(db,events);
+  expect(rows[0].presentacion).toEqual({titulo:'Acceso autorizado',autor:'Titular QA',persona:'Segunda persona QA',actividad:'Generador',establecimiento:null});
+  expect(JSON.stringify(events)).toBe(before);expect(rows[0].datos).toEqual(event.datos);
+  expect(db.usuario.findMany).toHaveBeenCalledTimes(2);
+  for(const [query] of db.usuario.findMany.mock.calls)expect(query.select).toEqual({id:true,nombre:true});
+  expect(db.empresaActividad.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{id:{in:['activity']},empresaId:{in:['company']}}}));
+  expect(JSON.stringify(rows[0].presentacion)).not.toMatch(/SECRET|PRIVATE|token|email/);
+ });
+ it('keeps missing accounts explicit without inventing an automated author, and does not expose unknown codes',async()=>{
+  const db=contextDb();db.usuario.findMany.mockResolvedValue([]);
+  const rows=await withCompanyHistoryContext(db,[{...event,usuarioId:'gone',tipo:'UNKNOWN_INTERNAL_CODE',datos:{}}]);
+  expect(rows[0].presentacion).toMatchObject({titulo:'Cambio registrado',autor:null,persona:null,actividad:null});
+ });
+ it('uses a neutral label for an approved application and the recorded site name for site events',async()=>{
+  const rows=await withCompanyHistoryContext(contextDb(),[
+   {...event,usuarioId:'owner',tipo:'ALTA_VINCULADA'},
+   {...event,id:'site',usuarioId:'owner',tipo:'ESTABLECIMIENTO_CREADO',datos:{despues:{nombre:'  Sede\nNorte  '}}},
+   {...event,id:'created',usuarioId:null,tipo:'EMPRESA_CREADA',datos:{}},
+  ]);
+  expect(rows.map(r=>r.presentacion.titulo)).toEqual(['Inscripción aprobada y vinculada','Establecimiento registrado','Empresa registrada']);
+  expect(rows[1].presentacion.establecimiento).toBe('Sede Norte');expect(rows[2].presentacion.autor).toBeNull();
+ });
+ it('does not query names or context for empty history',async()=>{
+  const db=contextDb();expect(await withCompanyHistoryContext(db,[])).toEqual([]);
+  expect(db.usuario.findMany).not.toHaveBeenCalled();expect(db.empresa.findMany).not.toHaveBeenCalled();
+ });
+ it('never resolves a role from a different company',async()=>{
+  const db=contextDb();db.empresaActividad.findMany.mockResolvedValue([{id:'activity',empresaId:'foreign',rol:'OPERADOR'}]);
+  const [row]=await withCompanyHistoryContext(db,[{...event,usuarioId:'owner'}]);expect(row.presentacion.actividad).toBeNull();
+ });
+});

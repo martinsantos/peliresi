@@ -142,3 +142,28 @@ export async function companyNoticeEligible(db: any, usuarioId: string | undefin
     return !!await db.autorizacionEmpresa.findFirst({ where: { empresaId: event.empresaId, actividadId: event.datos.actividadId, usuarioId, activa: true } });
   return affected === usuarioId && !!await db.autorizacionEmpresa.findFirst({ where: { empresaId: event.empresaId, usuarioId, activa: true } });
 }
+
+/** Manager-only history projection. Names are current display names, never an
+ * assertion about a person's name at the time of the event. No audit writes. */
+export async function withCompanyHistoryContext<T extends { id: string; empresaId: string; tipo: string; usuarioId: string | null; datos: unknown }>(db: any, events: T[]) {
+  if (!events.length) return [];
+  const authorIds = [...new Set(events.map(e => e.usuarioId).filter((id): id is string => typeof id === 'string' && !!id))];
+  const [contexts, authors] = await Promise.all([
+    companyContexts(db, events),
+    authorIds.length ? db.usuario.findMany({ where: { id: { in: authorIds } }, select: { id: true, nombre: true } }) : [],
+  ]);
+  return events.map(event => {
+    const context = contexts.get(event.id);
+    const data = event.datos as Record<string, any> | null;
+    const title = event.tipo === 'EMPRESA_CREADA' ? 'Empresa registrada'
+      : event.tipo === 'ALTA_VINCULADA' ? 'Inscripción aprobada y vinculada'
+      : Object.prototype.hasOwnProperty.call(COMPANY_NOTICE_LABELS, event.tipo) ? COMPANY_NOTICE_LABELS[event.tipo][0] : 'Cambio registrado';
+    return { ...event, presentacion: {
+      titulo: title,
+      autor: shortName(authors.find((person: any) => person.id === event.usuarioId)?.nombre) || null,
+      persona: context?.persona || null,
+      actividad: ACTIVITY_NAMES[String(context?.actividad)] || null,
+      establecimiento: ['ESTABLECIMIENTO_CREADO', 'ESTABLECIMIENTO_ACTUALIZADO'].includes(event.tipo) ? shortName(data?.despues?.nombre || data?.antes?.nombre) || null : null,
+    } };
+  });
+}

@@ -765,7 +765,7 @@ test.each(['/empresas','/app/empresas'])('%s section selector preserves the draf
  fireEvent.change(screen.getByLabelText('Sección de empresa'),{target:{value:'personas'}});
  fireEvent.change(screen.getByLabelText('Correo de la persona'),{target:{value:'sections@qa.invalid'}});
  fireEvent.change(screen.getByLabelText('Sección de empresa'),{target:{value:'historial'}});
- expect(screen.getByRole('heading',{name:'Últimos 50 cambios'})).toBeVisible();
+ expect(screen.getByRole('heading',{name:'Historial de la empresa'})).toBeVisible();
  expect(screen.getByLabelText('Sección de empresa')).toHaveValue('historial');
  fireEvent.change(screen.getByLabelText('Sección de empresa'),{target:{value:'personas'}});
  expect(screen.getByLabelText('Correo de la persona')).toHaveValue('sections@qa.invalid');
@@ -780,4 +780,36 @@ test.each(['personas','historial'])('losing management access while in %s falls 
  expect(screen.getByText('Tu acceso de gestión cambió. Podés consultar los datos disponibles de la empresa.')).toBeVisible();
  expect(screen.queryByLabelText('Correo de la persona')).toBeNull();
  expect(screen.queryByRole('button',{name:'Historial'})).toBeNull();
+});
+
+test.each(['','/app'])('history explains author, affected person, role and reason without rendering internal identifiers (%s)',async base=>{
+ const events=[{id:'evt-private',usuarioId:'opaque-author',tipo:'PERSONA_AUTORIZADA',createdAt:'2026-10-27T12:00:00Z',datos:{motivo:'Revisión documentada',token:'never-render'},presentacion:{titulo:'Acceso autorizado',autor:'Lucía Administración',persona:'María Representante',actividad:'Operador',establecimiento:null}}];
+ setup({eventos:events},{base,entry:base+'/empresas'});await screen.findByLabelText('Calle legal');
+ fireEvent.change(screen.getByLabelText('Sección de empresa'),{target:{value:'historial'}});
+ expect(await screen.findByRole('heading',{name:'Historial de la empresa'})).toBeInTheDocument();
+ expect(screen.getByRole('heading',{name:'Acceso autorizado'})).toBeInTheDocument();
+ expect(screen.getByText('Último cambio')).toBeInTheDocument();
+ expect(screen.getByText('María Representante · Operador')).toBeInTheDocument();
+ expect(screen.getByText('Registrado por: Lucía Administración')).toBeInTheDocument();
+ expect(screen.getByText('Motivo: Revisión documentada')).toBeInTheDocument();
+ expect(document.querySelector('time')).toHaveAttribute('datetime','2026-10-27T12:00:00.000Z');
+ expect(screen.queryByText(/opaque-author|PERSONA_AUTORIZADA|never-render/)).not.toBeInTheDocument();
+});
+test('history supports older API responses, missing people and invalid dates without crashing or inventing identities',async()=>{
+ setup({eventos:[{id:'old',usuarioId:'secret-id',tipo:'INTERNAL_NEW_TYPE',createdAt:'invalid',datos:{motivo:{nested:'private'}}}]});await screen.findByLabelText('Calle legal');
+ fireEvent.click(screen.getByRole('button',{name:'Historial'}));
+ expect(await screen.findByRole('heading',{name:'Cambio registrado'})).toBeInTheDocument();
+ expect(screen.getByText('Registrado por: Nombre no disponible')).toBeInTheDocument();
+ expect(screen.getByText('Fecha no disponible')).toBeInTheDocument();
+ expect(screen.queryByText(/secret-id|INTERNAL_NEW_TYPE|private/)).not.toBeInTheDocument();
+});
+test('an actor without company management cannot open history even when an unexpected payload contains events',async()=>{
+ setup({puedeGestionar:false,eventos:[{id:'private',presentacion:{titulo:'Private history'}}]});await screen.findByText(/^Legal first ·/);
+ expect(screen.queryByRole('button',{name:'Historial'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('option',{name:'Historial'})).not.toBeInTheDocument();
+ expect(screen.queryByText('Private history')).not.toBeInTheDocument();
+});
+test('empty history does not claim that fifty changes exist',async()=>{
+ setup();await screen.findByLabelText('Calle legal');fireEvent.click(screen.getByRole('button',{name:'Historial'}));
+ expect(await screen.findByText('Sin cambios registrados.')).toBeInTheDocument();expect(screen.queryByText(/Últimos 50/)).not.toBeInTheDocument();
 });

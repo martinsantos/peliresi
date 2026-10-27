@@ -1,3 +1,4 @@
+import { withCompanyHistoryContext } from '../services/companyNotice.service';
 import { Response,NextFunction } from 'express';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -42,7 +43,7 @@ export const getCompany=companyAction(async(req,res)=>{
   manage?prisma.invitacionEmpresa.findMany({where:{empresaId:id},select:{id:true,email:true,venceAt:true,aceptadaAt:true,revocadaAt:true,actividadId:true},orderBy:{createdAt:'desc'},take:50}):[],
  ]);
  const users=manage?await prisma.usuario.findMany({where:{id:{in:[...new Set([...authorizations.map(a=>a.usuarioId),...responsibles.map(r=>r.usuarioId)])]}},select:{id:true,nombre:true,email:true,activo:true,emailVerified:true}}):[];
- return send(res,{empresa:company,contextos:contexts,actividades:manage?activities:activities.filter(a=>contexts.some(c=>c.actividadId===a.id)),establecimientos:sites,autorizaciones:authorizations,responsables:responsibles,eventos:events,invitaciones:invitations,personas:users,cupoPersonas:manage?await companyPeople(prisma,id):undefined,puedeGestionar:manage,puedeValidar:canAdministerCompanies(user)});
+ return send(res,{empresa:company,contextos:contexts,actividades:manage?activities:activities.filter(a=>contexts.some(c=>c.actividadId===a.id)),establecimientos:sites,autorizaciones:authorizations,responsables:responsibles,eventos:manage?await withCompanyHistoryContext(prisma,events):[],invitaciones:invitations,personas:users,cupoPersonas:manage?await companyPeople(prisma,id):undefined,puedeGestionar:manage,puedeValidar:canAdministerCompanies(user)});
 });
 export const addCompany=companyAction(async(req,res)=>{
  dgfa(req.user);const data=parse(createEmpresa,req.body);
