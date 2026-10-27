@@ -92,4 +92,14 @@ describe('incomplete electricity evidence remains actionable', () => {
     expect(screen.queryByRole('button', { name: 'Reintentar lectura' })).toBeNull();
     expect(screen.getByText('1250 kWh')).toBeInTheDocument();
   });
+  it.each([undefined, 'Ruta 0012 · Folio 000345'])('identifies the EDESTE supply pair and explains missing evidence: %s', suministro => {
+    render(<DocumentAnalysis analysis={{...electric, electricidad: {...electric.electricidad, distribuidora: 'EDESTE', nombreDistribuidora: 'EDESTE / EDESTESA', campos: {...electric.electricidad.campos, suministro}}}} onRetry={vi.fn()} />);
+    expect(screen.getByText('Suministro · Ruta y Folio')).toBeInTheDocument();
+    if (!suministro) expect(screen.getByRole('button', {name: 'Reintentar lectura'})).toBeEnabled();
+    else expect(screen.queryByRole('button', {name: 'Reintentar lectura'})).toBeNull();
+    if (suministro) {
+      expect(screen.getByText(suministro)).toBeInTheDocument();
+      expect(screen.queryByText(/Revisá Ruta y Folio/)).toBeNull();
+    } else expect(screen.getByText(/Revisá Ruta y Folio/)).toHaveTextContent('el número de factura no los reemplaza');
+  });
 });

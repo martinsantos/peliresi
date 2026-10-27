@@ -2,6 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { electricityReading, MENDOZA_DISTRIBUTORS } from '../../domain/electricityReading';
 const issuers = ['EDEMSA', 'EDESTESA', 'Cooperativa Empresa Eléctrica de Godoy Cruz', 'Cooperativa Alto Verde y Algarrobo Grande', 'Cooperativa Popular de Rivadavia', 'CECSAGAL', 'Cooperativa Eléctrica de Medrano', 'Cooperativa Eléctrica de Monte Comán', 'COSPAC Bowen', 'Cooperativa Eléctrica de Santa Rosa', 'Cooperativa Sud Río Tunuyán'];
 describe('Mendoza electricity evidence, without inference or a fiscal update', () => {
+  it.each(['Ruta: 0012 Folio: 000345', 'RUTA 0012 - FOLIO 000345', 'Ruta / Folio: 0012 / 000345', 'Ruta-Folio: 0012-000345'])('reads the explicit paired EDESTE supply without discarding leading zeros: %s', line => {
+    const result = electricityReading(`EDESTE\n${line}\nFactura: 0001-00099999`);
+    expect(result.campos.suministro).toBe('Ruta 0012 · Folio 000345');
+    expect(result.evidencias.filter(item => item.campo === 'suministro')).toHaveLength(1);
+    expect(result.evidencias.find(item => item.campo === 'suministro')?.texto).toBe(line.toUpperCase());
+  });
+  it.each(['Ruta: 0012', 'Folio: 000345', 'Ruta: 0012\nFactura: 9999\nFolio: 000345', 'Ruta/Folio: 0012/000345A', 'Ruta/Folio: 0012/000345/999', 'Ruta: 0012 Folio: 000345.67'])('does not invent an EDESTE supply from incomplete or ambiguous labels: %s', line => {
+    expect(electricityReading(`EDESTE\n${line}`).campos.suministro).toBeUndefined();
+  });
+  it('limits route/folio interpretation to one identified EDESTE issuer', () => {
+    for (const issuer of ['EDEMSA', '', 'EDESTE\nCEGC']) expect(electricityReading(`${issuer}\nRuta: 12 Folio: 345`).campos.suministro).toBeUndefined();
+  });
+  it('keeps duplicate pairs as evidence but rejects conflicting supplies', () => {
+    const same = electricityReading('EDESTE\nRuta: 0012 Folio: 000345\nRuta/Folio: 0012/000345');
+    expect(same.campos.suministro).toBe('Ruta 0012 · Folio 000345'); expect(same.conflictos).toEqual([]);
+    const different = electricityReading('EDESTE\nRuta: 0012 Folio: 000345\nRuta: 0012 Folio: 000346');
+    expect(different.campos.suministro).toBeUndefined(); expect(different.conflictos).toContain('suministro');
+  });
   it.each(issuers.map((name, index) => [name, MENDOZA_DISTRIBUTORS[index].id]))('recognizes the explicit distributor header %s', (name, id) => {
     const result = electricityReading(`${name}\nTarifa: T1-R3\nConsumo facturado: 1.234,5 kWh\nPotencia contratada: 25,5 kW\nPotencia registrada: 23 kW\nNIC: 123456789\nPeríodo: 2026/10`);
     expect(result.distribuidora).toBe(id); expect(result.campos).toMatchObject({ categoriaTarifaria: 'T1R3', consumoKwh: '1234.5', potenciaContratadaKw: '25.5', potenciaRegistradaKw: '23', suministro: '123456789', periodo: '2026/10' });

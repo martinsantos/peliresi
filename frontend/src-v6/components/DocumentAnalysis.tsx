@@ -12,7 +12,7 @@ export function DocumentAnalysis({ analysis, onRetry, retrying = false, kind: re
     </div>;
   }
   const kind = analysis.documentKind === 'FACTURA_ELECTRICA' ? 'electricity' : requestedKind;
-  const retryAvailable = analysis.lectura !== 'LEIDO' || kind === 'electricity' && (!analysis.electricidad?.campos.categoriaTarifaria || !analysis.electricidad.campos.consumoKwh || !analysis.electricidad.distribuidora || analysis.electricidad.conflictos.length > 0 || Boolean(analysis.aviso));
+  const retryAvailable = analysis.lectura !== 'LEIDO' || kind === 'electricity' && (!analysis.electricidad?.campos.categoriaTarifaria || !analysis.electricidad.campos.consumoKwh || !analysis.electricidad.distribuidora || analysis.electricidad.distribuidora === 'EDESTE' && !analysis.electricidad.campos.suministro || analysis.electricidad.conflictos.length > 0 || Boolean(analysis.aviso));
   return <div className="mt-3 space-y-2 text-sm leading-6">
     {analysis.electricidad && <ElectricityEvidence reading={analysis.electricidad} />}
     {kind === 'electricity' && analysis.aviso && analysis.lectura === 'LEIDO' && <p role="status" className="text-neutral-700">{analysis.aviso}</p>}

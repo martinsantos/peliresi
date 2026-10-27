@@ -70,6 +70,19 @@ export function electricityReading(text: string): ElectricityReading {
     ['nivelSubsidio', /\b((?:CON|SIN)\s+SEF)\b/g, value => value.replace(/\s+/g, ' ')],
   ];
   const candidates = new Map<string, Set<string>>();
+  // EDESTE identifies the supply by a pair, not by an invoice number. Only join
+  // explicitly adjacent labels on one line; never pair unrelated OCR columns/pages.
+  if (result.distribuidora === 'EDESTE') {
+    const pairs = [
+      /\bRUTA[ \t]*[:=-]?[ \t]*(\d{1,12})[ \t]+(?:[-/][ \t]*)?FOLIO[ \t]*[:=-]?[ \t]*(\d{1,12})(?=[ \t]*\r?$)/gm,
+      /\bRUTA[ \t]*[-/][ \t]*FOLIO[ \t]*[:=]?[ \t]*(\d{1,12})[ \t]*[-/][ \t]*(\d{1,12})(?=[ \t]*\r?$)/gm,
+    ];
+    for (const pattern of pairs) for (const match of source.matchAll(pattern)) {
+      const values = candidates.get('suministro') || new Set<string>();
+      values.add(`Ruta ${match[1]} · Folio ${match[2]}`); candidates.set('suministro', values);
+      result.evidencias.push({ campo: 'suministro', texto: match[0].trim().slice(0, 180) });
+    }
+  }
   for (const [field, expression, convert] of rules) for (const match of source.matchAll(expression)) {
     const value = convert(match[1]); if (!value) continue;
     const values = candidates.get(field) || new Set<string>(); values.add(value); candidates.set(field, values);
