@@ -12,6 +12,9 @@ test('the registration guide explains identity reservation, legacy review and di
   for (const phrase of ['Identificar y reservar pago ATM', 'Confirmar y reservar pago', 'misma operación', 'aunque cambien la foto', 'conciliación administrativa', 'sin alterar su decisión histórica', 'potencia instalada en HP', 'ni cambia automáticamente la TEF', 'EDEMSA', 'COSPAC Bowen', 'Sud Río Tunuyán', 'Ingresar con mi cuenta', 'Continuar borrador', 'Corregir datos y documentos', 'no reemplaza un adjunto rechazado', 'Abrir solicitud y ver su estado', 'Factura eléctrica opcional', 'pestaña Documentos']) assert.ok(prose.includes(phrase), phrase);
   assert.ok(!prose.includes('El registro por identidad de pago queda pendiente'));
   assert.ok(prose.includes('no garantiza leer todas las facturas históricas'));
+  assert.ok(prose.includes('En Generador y Operador la factura eléctrica es opcional por ahora'));
+  const admin = context.window.SITREP_HELP.guides.find((item: any) => item.id === 'revision-altas-renovaciones');
+  assert.ok(JSON.stringify(admin).includes('puede quedar pendiente aunque el alta esté aprobada'));
   // Cache-busting versions are content hashes, not a date fixed to an older guide.
   const helpHash = createHash('sha256').update(readFileSync(path.join(manual, 'help-data.js'))).digest('hex').slice(0, 12);
   const cssHash = createHash('sha256').update(readFileSync(path.join(manual, 'manual.css'))).digest('hex').slice(0, 12);

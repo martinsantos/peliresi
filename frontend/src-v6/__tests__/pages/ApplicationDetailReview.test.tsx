@@ -90,6 +90,17 @@ it.each(['','/app'])('keeps the reading action and progress visible while the or
  expect(screen.getAllByText('No se pudo completar la lectura automática. Podés reintentar o revisar el original.')).toHaveLength(1);
 
 });
+it.each([['', 'GENERADOR'], ['', 'OPERADOR'], ['/app', 'GENERADOR'], ['/app', 'OPERADOR']])('distinguishes a pending electricity bill from an approved %s %s application', (prefix, tipo) => {
+ state.detail.data.tipoActor=tipo; state.detail.data.estado='APROBADA';
+ state.detail.data.documentos=[
+  {id:'invoice',tipo:'FACTURA_ELECTRICA',estado:'PENDIENTE',nombre:'Factura artificial',size:100,sha256:'qa'},
+  {id:'payment',tipo:'COMPROBANTE_PAGO',estado:'APROBADO',nombre:'Pago artificial',size:100,sha256:'qa2'},
+ ];
+ render(tree(prefix));
+ expect(within(screen.getByRole('group',{name:'Documento: Factura artificial'})).getByText('El alta está aprobada; la revisión de esta factura sigue pendiente.')).toBeVisible();
+ expect(within(screen.getByRole('group',{name:'Documento: Pago artificial'})).queryByText(/la revisión de esta factura/)).toBeNull();
+ expect(state.approve).not.toHaveBeenCalled();
+});
 it.each(['', '/app'])('keeps a confirmed correction visible and focused when its subsequent read fails (%s)', async prefix => {
  const view = render(tree(prefix));
  fireEvent.click(screen.getByRole('button', { name: 'Corregir datos' }));

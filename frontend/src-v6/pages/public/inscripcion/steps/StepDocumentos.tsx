@@ -110,7 +110,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
                   ? <Loader2 size={17} className="shrink-0 animate-spin text-[#0D8A4F]" />
                   : rejected ? <AlertCircle size={17} className="shrink-0 text-error-700" /> : approved ? <CheckCircle2 size={17} className="shrink-0 text-emerald-600" /> : <Paperclip size={16} className="shrink-0 text-neutral-400" />}
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-neutral-800">{doc.nombre} {doc.required && <span className="text-error-600" aria-label="obligatorio">*</span>}</p>
+                  <p className="text-sm font-medium text-neutral-800">{doc.nombre} {doc.required && <span className="text-error-600" aria-label="obligatorio">*</span>}{doc.tipo === 'FACTURA_ELECTRICA' && !doc.required && <span className="font-normal text-neutral-600"> · Opcional</span>}</p>
                   {attached && (
                     <div className={`text-xs ${approved ? 'text-emerald-700' : 'text-neutral-600'}`}>
                       <p className="truncate" title={pendingFile?.name || uploaded?.nombre}>{pendingFile?.name || uploaded?.nombre}</p>
@@ -139,7 +139,7 @@ export const StepDocumentos: React.FC<StepDocumentosProps> = ({
               {uploadErrors[doc.tipo] && <p className="mt-2 flex items-start gap-1.5 text-xs text-error-700" role="alert"><AlertCircle size={14} className="mt-0.5 shrink-0" />{uploadErrors[doc.tipo]}</p>}
               {state === 'error' && pendingFile && <Button variant="outline" size="sm" className="mt-2" onClick={() => void onAddFile(doc.tipo, pendingFile)}>Reintentar {doc.nombre}</Button>}
               {doc.tipo === 'COMPROBANTE_PAGO' && !attached && <p className="mt-2 text-sm leading-6 text-neutral-700">Caja de banco o transferencia. El OCR no acredita el pago.</p>}
-              {doc.tipo === 'FACTURA_ELECTRICA' && !attached && <p className="mt-2 text-sm leading-6 text-neutral-700">Adjuntá la factura completa y legible del establecimiento. Se leerán distribuidora, tarifa, período, kWh y potencia si figuran. No modifica la potencia instalada que declaraste.</p>}
+              {doc.tipo === 'FACTURA_ELECTRICA' && !attached && <p className="mt-2 text-sm leading-6 text-neutral-700">{doc.required ? 'Adjuntá la factura completa y legible del establecimiento.' : 'Si elegís adjuntarla, usá una factura completa y legible del establecimiento.'} Se leerán distribuidora, tarifa, período, kWh y potencia si figuran. No modifica la potencia instalada que declaraste.</p>}
               <DocumentAnalysis analysis={reviewMode ? previewAnalyses[doc.tipo] : pendingFile ? undefined : uploaded?.analisis} kind={doc.tipo.startsWith('LICENCIA_CHOFER_') ? 'license' : doc.tipo === 'COMPROBANTE_PAGO' ? 'receipt' : doc.tipo === 'FACTURA_ELECTRICA' ? 'electricity' : 'document'} persisted={!reviewMode && !pendingFile} retrying={isBusy} onRetry={(uploaded && !pendingFile || reviewMode && pendingFile) && (['COMPROBANTE_PAGO', 'FACTURA_ELECTRICA'].includes(doc.tipo) || doc.tipo.startsWith('LICENCIA_CHOFER_')) && onRetryReading ? () => void onRetryReading(doc.tipo) : undefined} />
             </div>
           );

@@ -8,6 +8,28 @@ function props(tipo: string): ComponentProps<typeof StepDocumentos> {
 }
 
 describe('reading the original in an application', () => {
+  it('identifies an optional electricity bill and explains what happens if it is attached', () => {
+    const data = props('FACTURA_ELECTRICA'); data.uploadedDocs = {};
+    render(<StepDocumentos {...data} />);
+    const row = screen.getByTestId('registration-document-FACTURA_ELECTRICA');
+    expect(row).toHaveTextContent('Opcional');
+    expect(row).toHaveTextContent('Si elegís adjuntarla');
+    expect(row).not.toHaveTextContent('obligatorio');
+  });
+  it('keeps the optional label alongside the saved document review state', () => {
+    render(<StepDocumentos {...props('FACTURA_ELECTRICA')} />);
+    const row = screen.getByTestId('registration-document-FACTURA_ELECTRICA');
+    expect(row).toHaveTextContent('Opcional');
+    expect(row).toHaveTextContent('Guardado · Pendiente de revisión');
+  });
+  it('respects the requirement returned by the server if it changes in the future', () => {
+    const data = props('FACTURA_ELECTRICA'); data.uploadedDocs = {}; data.docs[0].required = true;
+    render(<StepDocumentos {...data} />);
+    const row = screen.getByTestId('registration-document-FACTURA_ELECTRICA');
+    expect(row).not.toHaveTextContent('Opcional');
+    expect(row.querySelector('[aria-label="obligatorio"]')).toBeInTheDocument();
+    expect(row).toHaveTextContent('Adjuntá la factura');
+  });
   it.each(['COMPROBANTE_PAGO','FACTURA_ELECTRICA','LICENCIA_CHOFER_QA'])('reads supported saved %s without replacing it', tipo => {
     const data=props(tipo); render(<StepDocumentos {...data} />);
     fireEvent.click(screen.getByRole('button',{name:'Leer documento',exact:true}));

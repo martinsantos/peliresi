@@ -337,6 +337,9 @@ const SolicitudReview: React.FC = () => {
                       <Badge variant="soft" color={dCfg.color} size="sm">{dCfg.label}</Badge>
                     </div>
 
+                    {doc.tipo === 'FACTURA_ELECTRICA' && doc.estado === 'PENDIENTE' && solicitud.estado === 'APROBADA' && ['GENERADOR', 'OPERADOR'].includes(solicitud.tipoActor) && (
+                      <p className="text-sm text-neutral-700">El alta está aprobada; la revisión de esta factura sigue pendiente.</p>
+                    )}
                     {doc.observaciones && (
                       <p className="text-xs text-neutral-500 bg-neutral-50 px-2 py-1 rounded">
                         {doc.observaciones}
