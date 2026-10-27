@@ -142,6 +142,13 @@ test('certificate and addendum guides explain the approved rectification without
   assert.ok(adenda.includes('la observación anterior deja de bloquear la certificación final'));
   assert.ok(adenda.includes('queda como antecedente observado'));
 });
+test('certificate guide distinguishes an approved finding from an explicitly treated quantity', () => {
+  const cert = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));
+  assert.ok(cert.includes('sólo si efectivamente la trataste'));
+  assert.ok(cert.includes('indicá si se trató'));
+  assert.ok(cert.includes('no se incluye como tratamiento'));
+  assert.ok(cert.includes('La firma registra tu decisión'));
+});
 
 test('public trial screenshot is unedited, anonymous and explicitly separate from an actual application', () => {
   const p = JSON.parse(read('registration-capture-provenance.json'));
@@ -347,6 +354,6 @@ test('classroom new proposals separate authorship, three decisions, agenda and s
   assert.match(text,/Iniciar coordinación/);
   assert.match(text,/Activar sonido/);
   assert.match(text,/Tratado no libera automáticamente/);
-  assert.match(text,/todas las adendas aprobadas/);
+  assert.match(text,/las adendas resueltas/);
   assert.match(text,/CAPACITACIÓN — SIN VALIDEZ OFICIAL/);
 });

@@ -6,6 +6,7 @@ import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
 import type { CertificateRow } from '../domain/trainingCertificate';
 import { documentaryResolution } from '../domain/manifiestoAdendaDocument';
+import { certificateFindings, type CertificateFinding } from '../domain/certificateFindings';
 
 export const CERTIFICATE_EVENT = 'CERTIFICADO_OPERADOR_V1';
 export const CERTIFICATE_MANAGED = 'CERTIFICACION_OPERADOR_V1';
@@ -16,15 +17,16 @@ export type CertificateSnapshot = {
  generador: string; transportista: string; operador: string; autor: string;
  fecha: string; metodo: string; nota: string; cantidades: CertificateRow[];
  parcialesPrevios: string[]; adendas: {id:string;version:number}[]; firmaSha256: string; artificial: boolean;
+ hallazgosNoTratados?: CertificateFinding[];
 };
 export async function lockManifestDocuments(tx: Prisma.TransactionClient, id: string) {
  const rows = await tx.$queryRaw<{id:string}[]>`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
  if (!rows.length) throw new AppError('Manifiesto no encontrado',404);
 }
 export async function certificateReadiness(tx: Prisma.TransactionClient, id: string) {
- const adendas = await tx.adendaManifiesto.findMany({where:{manifiestoId:id},select:{id:true,version:true,rectificaId:true,revisiones:true}});
+ const adendas = await tx.adendaManifiesto.findMany({where:{manifiestoId:id},select:{id:true,version:true,rectificaId:true,revisiones:true,informeHallazgo:true,declaracion:true,residuos:true}});
  const {counts}=documentaryResolution(adendas);
- return {adendas, unresolved: counts.pendientes + counts.observadas + counts.rechazadas};
+ return {adendas, unresolved: counts.pendientes + counts.observadas + counts.rechazadas, ...certificateFindings(adendas)};
 }
 export async function notifyCertificateParties(tx: Prisma.TransactionClient, manifest: {id:string;numero:string;generadorId:string;transportistaId:string|null;operadorId:string}, record: {id:string;tipo:string;numero:string}, authorId:string) {
  const select={activo:true,usuario:{select:{id:true,activo:true}}} as const;
@@ -59,6 +61,10 @@ export function renderManifestCertificate(data: CertificateSnapshot, id: string,
   if (data.nota) { layout.text('Observaciones',true,9); layout.text(data.nota); }
   layout.text(data.tipo==='FINAL'?'Total recibido y tratado (incluye los parciales previos)':'Cantidad tratada certificada en este parcial',true,10);
   layout.table(['Corriente','Cantidad','Unidad'],data.cantidades.map(row=>[row.corriente,String(row.cantidad),row.unidad]),[260,155,92]);
+  if(data.hallazgosNoTratados?.length) {
+   layout.text('Hallazgos declarados no tratados en esta certificación',true,9);
+   layout.text(data.hallazgosNoTratados.map(row=>row.corriente+' · observado: '+row.observado+' '+row.unidad).join(', '),false,9);
+  }
   if(data.parcialesPrevios.length) { layout.text('Parciales previos',true,9); layout.text(data.parcialesPrevios.join(', '),false,9); }
   if(data.adendas.length) { layout.text(data.tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas',true,9); layout.text(data.adendas.map(a=>a.id+' v'+a.version).join(', '),false,8); }
   layout.section('03  FIRMA E INTEGRIDAD', 155);

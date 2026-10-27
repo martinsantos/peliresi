@@ -35,6 +35,6 @@ export function draftAfterCertificate(command: CertificateCommand): CertificateD
   if (command.status === 'pending') throw Error('Comprobá el resultado antes de modificar el borrador.');
   return command.status === 'confirmed' ? null : {
     kind: command.input.tipo, method: command.input.metodo, note: command.input.nota,
-    amounts: Object.fromEntries(command.input.cantidades.map(row => [row.residuoId, String(row.cantidad)])),
+    amounts: Object.fromEntries([...command.input.cantidades.map(row => [row.residuoId, String(row.cantidad)]), ...(command.input.exclusionesHallazgos||[]).map(id=>[id,'NO_TRATADO'])]),
   };
 }

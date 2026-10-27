@@ -37,6 +37,48 @@ it('an unresolved addendum disables final emission without disabling partials',a
  expect(screen.getByText(/1 adenda por resolver antes del final/)).toBeVisible();
 });
 
+it('requires an explicit treatment decision and quantity for an approved finding in the final',async()=>{
+ const finding={id:'hallazgo:Y12:kg',corriente:'Y12',unidad:'kg',observado:2,adendas:[{id:'adenda',version:2}]};
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[finding],problemasHallazgos:[]}});
+ mocks.post.mockRejectedValue({response:{data:{message:'QA sin envío'}}});show();
+ fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación final total'}));
+ expect(screen.getByText(/Un hallazgo aprobado registra lo observado/)).toBeVisible();
+ fireEvent.click(screen.getByText('Use QA signature'));
+ expect(screen.getByRole('button',{name:'Firmar y publicar certificación'})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('Tratamiento de Y12 (kg)'),{target:{value:'si'}});
+ fireEvent.change(screen.getByLabelText('Cantidad tratada Y12 (kg)'),{target:{value:'1'}});
+ fireEvent.click(screen.getByText('Use QA signature'));
+ fireEvent.click(screen.getByRole('button',{name:'Firmar y publicar certificación'}));
+ await screen.findByText('QA sin envío');
+ expect(mocks.post.mock.calls[0][1].cantidades).toContainEqual({residuoId:finding.id,cantidad:1});
+ expect(mocks.post.mock.calls[0][1].exclusionesHallazgos).toBeUndefined();
+});
+it('records an explicit no-treatment decision without claiming the finding was treated',async()=>{
+ const finding={id:'hallazgo:Y12:kg',corriente:'Y12',unidad:'kg',observado:2,adendas:[{id:'adenda',version:2}]};
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[finding]}});
+ mocks.post.mockRejectedValue({response:{data:{message:'QA sin envío'}}});show();
+ fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación final total'}));
+ fireEvent.change(screen.getByLabelText('Tratamiento de Y12 (kg)'),{target:{value:'no'}});
+ fireEvent.click(screen.getByText('Use QA signature'));
+ fireEvent.click(screen.getByRole('button',{name:'Firmar y publicar certificación'}));
+ await screen.findByText('QA sin envío');
+ expect(mocks.post.mock.calls[0][1].exclusionesHallazgos).toEqual([finding.id]);
+ expect(mocks.post.mock.calls[0][1].cantidades).not.toContainEqual(expect.objectContaining({residuoId:finding.id}));
+ expect(screen.getByText('No tratadas: Y12')).toBeVisible();
+});
+it('blocks final certification when approved finding reports conflict',async()=>{
+ mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[],problemasHallazgos:['Los informes discrepan.']}});
+ show();
+ expect(await screen.findByRole('button',{name:'Emitir certificación final total'})).toBeDisabled();
+ expect(screen.getByRole('alert')).toHaveTextContent('Los informes discrepan');
+});
+it('does not silently omit a finding already included in an earlier signed partial',async()=>{
+ mocks.get.mockResolvedValue({data:{data:[{id:'partial',createdAt:'2026-10-21T10:00:00Z',documento:{tipo:'PARCIAL',cantidades:[{residuoId:'hallazgo:Y12:kg',corriente:'Y12',unidad:'kg',cantidad:1}]}}],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[]}});
+ show();
+ expect(await screen.findByRole('button',{name:'Emitir certificación final total'})).toBeDisabled();
+ expect(screen.getByRole('alert')).toHaveTextContent('Un hallazgo ya certificado no coincide');
+});
+
 it('never carries a certificate form or cached documents into another role of the same account',async()=>{
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0}});
  const q=new QueryClient({defaultOptions:{queries:{retry:false}}});

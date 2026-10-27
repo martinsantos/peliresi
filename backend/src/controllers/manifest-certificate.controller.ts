@@ -19,8 +19,8 @@ export async function listManifestCertificates(req:AuthRequest,res:Response,next
  try {
   await scope(req);
   const rows=await prisma.certificadoManifiesto.findMany({where:{manifiestoId:req.params.id},orderBy:{createdAt:'asc'},select:{id:true,numero:true,tipo:true,createdAt:true,documento:true,pdfSha256:true}});
-  const {unresolved}=await certificateReadiness(prisma,req.params.id);
-  res.json({success:true,data:rows,emisionHabilitada:certificatesEnabled(),adendasSinResolver:unresolved});
+  const {unresolved,hallazgos,problemas}=await certificateReadiness(prisma,req.params.id);
+  res.json({success:true,data:rows,emisionHabilitada:certificatesEnabled(),adendasSinResolver:unresolved,hallazgos,problemasHallazgos:problemas});
  } catch(e){next(e);}
 }
 export async function releaseManifestCertificate(req:AuthRequest,res:Response,next:NextFunction) {
@@ -33,6 +33,7 @@ export async function releaseManifestCertificate(req:AuthRequest,res:Response,ne
   const command=parsed.data, firma=await prepareManifiestoSignature(command.firma);
   if(!firma)throw new AppError('La firma del operador es obligatoria',400);
   command.cantidades.sort((a,b)=>a.residuoId.localeCompare(b.residuoId));
+  command.exclusionesHallazgos?.sort();
   const fingerprint=sha256(JSON.stringify({...command,firma:firma.sha256}));
   const result=await prisma.$transaction(async tx=>{
    await lockManifestDocuments(tx,req.params.id);
@@ -48,16 +49,17 @@ export async function releaseManifestCertificate(req:AuthRequest,res:Response,ne
    if(prior.some(p=>p.tipo==='FINAL'))throw new AppError('El certificado final ya fue emitido; el expediente firmado se conserva',409);
    if(!['EN_TRATAMIENTO','TRATADO'].includes(m.estado))throw new AppError('Registrá el tratamiento antes de certificar',409);
    if(command.tipo==='FINAL'&&m.estado!=='TRATADO')throw new AppError('Cerrá el tratamiento antes de emitir el final',409);
-   const {adendas,unresolved}=await certificateReadiness(tx,m.id);
+   const {adendas,unresolved,hallazgos,problemas}=await certificateReadiness(tx,m.id);
    if(command.tipo==='FINAL'&&unresolved)throw new AppError('Resolvé las adendas pendientes, observadas o rechazadas antes del final',409);
-   const cantidades=certifiedRows(command,m.residuos,prior.map(p=>(p.documento as {cantidades:CertificateRow[]}).cantidades));
+   if(problemas.length&&(command.tipo==='FINAL'||command.cantidades.some(row=>row.residuoId.startsWith('hallazgo:'))))throw new AppError(problemas[0],409);
+   const cantidades=certifiedRows(command,m.residuos,prior.map(p=>(p.documento as {cantidades:CertificateRow[]}).cantidades),hallazgos);
    const metodo=command.metodo||m.tratamientoMetodo;
    if(!metodo)throw new AppError('Falta el método de tratamiento registrado',409);
    const numero=m.numero+'-'+(command.tipo==='FINAL'?'F':'P'+String(prior.length+1).padStart(2,'0'));
    const now=new Date();
    const autor=await tx.usuario.findUniqueOrThrow({where:{id:req.user.id},select:{nombre:true,apellido:true,activo:true}});
    if(!autor.activo)throw new AppError('La cuenta no está activa',403);
-   const documento:CertificateSnapshot={version:1,tipo:command.tipo,numero,manifiestoNumero:m.numero,generador:m.generador.razonSocial,transportista:m.transportista?.razonSocial||'In situ',operador:m.operador.razonSocial,autor:[autor.nombre,autor.apellido].filter(Boolean).join(' '),fecha:now.toISOString(),metodo,nota:command.nota,cantidades,parcialesPrevios:prior.map(p=>p.numero),adendas:adendas.map(a=>({id:a.id,version:a.version})),firmaSha256:firma.sha256,artificial:m.isDemoData};
+   const documento:CertificateSnapshot={version:1,tipo:command.tipo,numero,manifiestoNumero:m.numero,generador:m.generador.razonSocial,transportista:m.transportista?.razonSocial||'In situ',operador:m.operador.razonSocial,autor:[autor.nombre,autor.apellido].filter(Boolean).join(' '),fecha:now.toISOString(),metodo,nota:command.nota,cantidades,parcialesPrevios:prior.map(p=>p.numero),adendas:adendas.map(a=>({id:a.id,version:a.version})),firmaSha256:firma.sha256,artificial:m.isDemoData,...(command.exclusionesHallazgos?.length?{hallazgosNoTratados:hallazgos.filter(f=>command.exclusionesHallazgos!.includes(f.id))}:{})};
    const pdf=await renderManifestCertificate(documento,command.id,firma.imagen),pdfSha256=sha256(pdf);
    await tx.certificadoManifiesto.create({data:{id:command.id,manifiestoId:m.id,autorId:req.user.id,tipo:command.tipo,numero,finalKey:command.tipo==='FINAL'?'FINAL':null,documento:documento as unknown as Prisma.InputJsonValue,pdf,pdfSha256,firmaImagen:firma.imagen,firmaSha256:firma.sha256,solicitudSha256:fingerprint,createdAt:now}});
    await tx.eventoManifiesto.create({data:{manifiestoId:m.id,usuarioId:req.user.id,tipo:CERTIFICATE_EVENT,descripcion:JSON.stringify({id:command.id,tipo:command.tipo,numero,pdfSha256})}});

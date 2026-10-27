@@ -65,6 +65,11 @@ it('withdrawn command restores fields without signature',async()=>{
  const h=await ready();await act(()=>h.result.current.finish({status:'withdrawn',input:{tipo:'FINAL',metodo:'New',nota:'Correct',firma:'old',cantidades:[{residuoId:'r',cantidad:3}]}} as CertificateCommand));
  expect(h.result.current.draft).toEqual({kind:'FINAL',method:'New',note:'Correct',amounts:{r:'3'}});
 });
+it('restores the explicit no-treatment decision when a signed request is withdrawn',()=>{
+ const restored=draftAfterCertificate({status:'withdrawn',input:{tipo:'FINAL',metodo:'M',nota:'',firma:'old',
+  cantidades:[{residuoId:'r',cantidad:3}],exclusionesHallazgos:['hallazgo:Y12:kg']}} as CertificateCommand);
+ expect(restored?.amounts).toEqual({r:'3','hallazgo:Y12:kg':'NO_TRATADO'});
+});
 it('failed cleanup does not acknowledge receipt',async()=>{
  const h=await ready();m.fail=true;await act(async()=>{await expect(h.result.current.finish({status:'confirmed'} as CertificateCommand)).rejects.toThrow('borrador');});
 });

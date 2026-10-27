@@ -12,6 +12,7 @@ import { certificateCommand,certifiedRows,CertificateRow } from '../domain/train
 import { SCHOOL_CERTIFICATE,lockTrainingDocuments,assertNoFinalTrainingCertificate } from '../services/trainingCertificate.service';
 import { notifyManifestParties } from '../services/manifestProposal.service';
 import { documentaryResolution } from '../domain/manifiestoAdendaDocument';
+import { certificateFindings } from '../domain/certificateFindings';
 async function scope(req:AuthRequest){
  if(!isTrainingSession())throw new AppError('Documento disponible sólo en capacitación',404);
  await assertCanAccessManifiesto(prisma,req.user,req.params.id);
@@ -19,7 +20,9 @@ async function scope(req:AuthRequest){
 export async function listTrainingCertificates(req:AuthRequest,res:Response,next:NextFunction){
  try{await scope(req);
  const rows=await prisma.eventoManifiesto.findMany({where:{manifiestoId:req.params.id,tipo:SCHOOL_CERTIFICATE},orderBy:{createdAt:'asc'},select:{id:true,descripcion:true,createdAt:true,usuarioId:true,firmaSha256:true}});
- res.json({success:true,data:rows.map(r=>({...r,documento:JSON.parse(r.descripcion),descripcion:undefined}))});
+ const adendas=await prisma.adendaManifiesto.findMany({where:{manifiestoId:req.params.id},select:{id:true,version:true,rectificaId:true,revisiones:true,informeHallazgo:true,declaracion:true,residuos:true}});
+ const {hallazgos,problemas}=certificateFindings(adendas);
+ res.json({success:true,data:rows.map(r=>({...r,documento:JSON.parse(r.descripcion),descripcion:undefined})),hallazgos,problemasHallazgos:problemas});
  }catch(e){next(e);}
 }
 export async function releaseTrainingCertificate(req:AuthRequest,res:Response,next:NextFunction){
@@ -38,14 +41,16 @@ export async function releaseTrainingCertificate(req:AuthRequest,res:Response,ne
   await assertNoFinalTrainingCertificate(tx,manifest.id);
   if(!['EN_TRATAMIENTO','TRATADO'].includes(manifest.estado))throw new AppError('Registrá el tratamiento antes de liberar un certificado',409);
   if(command.tipo==='FINAL'&&manifest.estado!=='TRATADO')throw new AppError('El certificado final requiere operación Tratada',409);
-  const adendas=await tx.adendaManifiesto.findMany({where:{manifiestoId:manifest.id},select:{id:true,version:true,rectificaId:true,revisiones:true}});
+  const adendas=await tx.adendaManifiesto.findMany({where:{manifiestoId:manifest.id},select:{id:true,version:true,rectificaId:true,revisiones:true,informeHallazgo:true,declaracion:true,residuos:true}});
   const {counts}=documentaryResolution(adendas);
   if(command.tipo==='FINAL'&&(counts.pendientes||counts.observadas||counts.rechazadas))throw new AppError('Hay adendas pendientes, observadas o rechazadas; resolvelas antes del final',409);
+  const {hallazgos,problemas}=certificateFindings(adendas);
+  if(problemas.length&&(command.tipo==='FINAL'||command.cantidades.some(row=>row.residuoId.startsWith('hallazgo:'))))throw new AppError(problemas[0],409);
   const prior=await tx.eventoManifiesto.findMany({where:{manifiestoId:manifest.id,tipo:SCHOOL_CERTIFICATE},orderBy:{createdAt:'asc'}});
-  const rows=certifiedRows(command,manifest.residuos,prior.map(e=>JSON.parse(e.descripcion).cantidades as CertificateRow[]));
+  const rows=certifiedRows(command,manifest.residuos,prior.map(e=>JSON.parse(e.descripcion).cantidades as CertificateRow[]),hallazgos);
   const metodo=command.metodo || manifest.tratamientoMetodo;
   if(!metodo)throw new AppError('Falta el método registrado. Completalo antes de firmar.',409);
-  const document={generador:manifest.generador.razonSocial,transportista:manifest.transportista?.razonSocial||'In situ',formato:SCHOOL_CERTIFICATE,tipo:command.tipo,numero:manifest.numero,operador:manifest.operador.razonSocial,metodo,nota:command.nota,cantidades:rows,parcialesPrevios:prior.map(e=>e.id),adendas:adendas.map(a=>({id:a.id,version:a.version})),huellaSolicitud:fingerprint,autorId:req.user.id,sinValidezOficial:true};
+  const document={generador:manifest.generador.razonSocial,transportista:manifest.transportista?.razonSocial||'In situ',formato:SCHOOL_CERTIFICATE,tipo:command.tipo,numero:manifest.numero,operador:manifest.operador.razonSocial,metodo,nota:command.nota,cantidades:rows,parcialesPrevios:prior.map(e=>e.id),adendas:adendas.map(a=>({id:a.id,version:a.version})),hallazgosNoTratados:hallazgos.filter(f=>command.exclusionesHallazgos?.includes(f.id)),huellaSolicitud:fingerprint,autorId:req.user.id,sinValidezOficial:true};
   const event=await tx.eventoManifiesto.create({data:{id:command.id,manifiestoId:manifest.id,usuarioId:req.user.id,tipo:SCHOOL_CERTIFICATE,descripcion:JSON.stringify(document),firmaImagen:firma.imagen,firmaSha256:firma.sha256}});
   await notifyManifestParties(tx,manifest,'documento-'+event.id,req.user.id,req.user.rol);
   return event;
@@ -76,6 +81,7 @@ export async function downloadTrainingCertificate(req:AuthRequest,res:Response,n
   doc.moveDown().text(`Método declarado: ${data.metodo}`);if(data.nota)doc.text(`Observaciones: ${data.nota}`);
   doc.moveDown().font('Helvetica-Bold').text(data.tipo==='FINAL'?'Total recibido y tratado (incluye parciales previos)':'Cantidad tratada certificada en este parcial');doc.font('Helvetica');
   for(const row of data.cantidades)doc.text(`${row.corriente}: ${row.cantidad} ${row.unidad}`);
+  if(data.hallazgosNoTratados?.length)doc.moveDown().text('Hallazgos declarados no tratados en esta certificación: '+data.hallazgosNoTratados.map((row:{corriente:string})=>row.corriente).join(', '));
   if(data.parcialesPrevios.length)doc.moveDown().text(`Parciales previos: ${data.parcialesPrevios.join(', ')}`);
   doc.moveDown().text('Firma del operador que libera este documento:');
   if(doc.y>630)doc.addPage();
