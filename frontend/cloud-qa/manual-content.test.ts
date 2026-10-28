@@ -12,6 +12,8 @@ test('travel-duration monitoring documents explicit thresholds and the GPS-arriv
   assert.match(manual, /Un viaje no tiene un plazo fijo automático/);
   assert.match(manual, /regla de Duración del viaje con un umbral explícito en horas/);
   assert.match(manual, /sin ubicaciones nuevas no se genera ese aviso/);
+  assert.match(manual, /seguimiento GPS actual no activa las reglas históricas de Desvío de ruta/i);
+  assert.match(manual, /no con una ruta vial autorizada/i);
 });
 const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
@@ -50,6 +52,7 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(monitor, /hora de captura no está disponible/i);
   assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
   assert.match(monitor, /alertas de velocidad, parada o pérdida de GPS usan el intervalo entre recepciones/i);
+  assert.match(monitor, /mensajes anteriores conservan su texto y muestran una aclaración/i);
 });
 function jpegDimensions(bytes: Buffer): { width: number; height: number } {
   assert.equal(bytes.readUInt16BE(0), 0xffd8, 'JPEG signature');

@@ -351,7 +351,10 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   };
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
   const renewalMessage = family === 'padron' && validRenewalNotice(data) ? RENEWAL_NOTICE_LABELS[notice.tipo] : undefined;
-  const message = applicationNoticeMessage(notice.tipo, data) || renewalMessage || (validCompanyNotice(data) ? companyNoticeMessage(data) || fallback
+  const gpsObservation = notice.tipo === 'ANOMALIA_DETECTADA' || (notice.tipo === 'ALERTA_SISTEMA' && data.evento === 'ANOMALIA_GPS');
+  const message = applicationNoticeMessage(notice.tipo, data) || renewalMessage || (gpsObservation
+    ? ['Observación GPS para verificar', 'La hora de captura puede ser anterior a la recepción. Verificá el caso con transporte antes de tomar una decisión.']
+    : validCompanyNotice(data) ? companyNoticeMessage(data) || fallback
     : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
     : data.tipo === 'recordatorio_firma' && data.version === 1 ? [data.fase === 'SEMANA' ? 'Se acercan los 30 días desde la firma' : '30 días desde la firma del manifiesto', 'Revisá el estado actual y coordiná las acciones pendientes con las partes. El aviso conserva la fecha de firma; no determina una infracción.']
     : notice.tipo === 'ALERTA_SISTEMA' && data.tipo === 'comprobante_repetido' ? ['Comprobante repetido: revisá el documento', 'La huella del archivo coincide con un comprobante ya cargado. Revisá el aviso y el documento en tu inscripción o perfil. Este archivo no acredita un pago nuevo.']

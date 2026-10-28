@@ -26,6 +26,13 @@ describe('assignment notification delivery', () => {
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/app/requerimientos/case-psip'));
   });
   beforeEach(() => { service.restricted = false; service.list.mockReset().mockResolvedValue({ items: [], noLeidas: 0 }); service.marcarLeida.mockReset().mockResolvedValue({}); });
+  it('shows the reception-time warning in the bell for a historical GPS notice', async () => {
+    service.list.mockResolvedValue({ items: [{ ...notice, tipo: 'ANOMALIA_DETECTADA', titulo: 'Anomalía GPS',
+      mensaje: 'Parada prolongada de 120 minutos', datos: null, manifiesto: { numero: 'QA-001', estado: 'EN_TRANSITO' } }], noLeidas: 1 });
+    setup(); fireEvent.click(screen.getByRole('button', { name: /^Notificaciones/ }));
+    expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
+    expect(screen.getByText('Manifiesto QA-001')).toBeVisible();
+  });
   it('does not mount an unusable inbox or query full-access notices for a restricted applicant', () => {
     service.restricted = true;
     setup();

@@ -13,6 +13,13 @@ afterEach(cleanup);
 function show(prefix = '', entryState?: unknown) {
  return render(<MemoryRouter basename={prefix || '/'} initialEntries={[{ pathname: prefix + '/notificaciones/n1', state: entryState }]}><Routes><Route path="/notificaciones/:id" element={<AvisoPage />} /></Routes></MemoryRouter>);
 }
+it.each(['', '/app'])('keeps the original GPS notice and explains its temporal uncertainty on %s', prefix => {
+ state.query.data = { ...state.query.data, tipo: 'ANOMALIA_DETECTADA', titulo: 'Anomalía GPS', mensaje: 'Parada prolongada de 120 minutos', datos: null, manifiesto: { numero: 'QA-001', estado: 'EN_TRANSITO' } };
+ show(prefix);
+ expect(screen.getByText('Parada prolongada de 120 minutos')).toBeVisible();
+ expect(screen.getByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
+ expect(screen.getByText('Manifiesto QA-001')).toBeVisible();
+});
 it.each(['', '/app'])('shows the complete result without a link to itself in %s', prefix => {
  show(prefix); expect(screen.getByText(/QA empresa · Período 2027/)).toBeVisible();
  expect(screen.queryByRole('link', { name: 'Ver aviso y resultado →' })).toBeNull();

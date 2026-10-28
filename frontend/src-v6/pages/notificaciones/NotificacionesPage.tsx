@@ -14,6 +14,8 @@ import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { resolveNotificationPath, refreshInspectionNotification, notificationActionLabel, notificationActorRole, notificationInboxReturnState } from '../../utils/notificationNavigation';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import { notificationFollowup } from '../../utils/notificationFollowup';
+import { gpsNoticeContext } from '../../utils/gpsNoticeContext';
+import { notificationManifestReference } from '../../utils/notificationManifestReference';
 import type { Notificacion } from '../../types/models';
 import { useAuth } from '../../contexts/AuthContext';
 import { DeviceNotificationControl } from '../../components/DeviceNotificationControl';
@@ -135,6 +137,8 @@ const NotificacionesPage: React.FC = () => {
         <ul aria-label="Avisos" className="divide-y divide-neutral-200 overflow-hidden rounded-xl border border-neutral-200 bg-white">
           {items.map((notice,index) => {
             const followup = notificationFollowup(notice);
+            const gpsContext = gpsNoticeContext(notice);
+            const manifestReference = notificationManifestReference(notice);
             // A configurable rule has an identity. Do not replace its saved
             // name with a generic title; retain the fallback for legacy data.
             const title = followup ? notice.titulo?.trim() || 'Seguimiento de manifiesto' : notice.titulo;
@@ -158,6 +162,7 @@ const NotificacionesPage: React.FC = () => {
                   <Icon size={20} aria-hidden="true" className={'mt-0.5 shrink-0 ' + (warning ? 'text-warning-800' : success ? 'text-emerald-800' : 'text-primary-700')} />
                   <span className="min-w-0 flex-1">
                     <span className={'block break-words text-base leading-snug ' + (notice.leida ? 'font-medium' : 'font-semibold')}>{title}</span>
+                    {manifestReference && <span className="mt-1 block text-xs font-semibold text-neutral-700">{manifestReference}</span>}
                     <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                       {!notice.leida && <span className="text-xs font-semibold text-primary-800">Sin leer</span>}
                       {(notice.prioridad === 'ALTA' || notice.prioridad === 'URGENTE') && (
@@ -165,6 +170,7 @@ const NotificacionesPage: React.FC = () => {
                       )}
                       <time dateTime={notice.createdAt} className="text-xs text-neutral-600">{formatRelativeTime(notice.createdAt)}</time>
                     </span>
+                    {gpsContext && <span className="mt-2 block text-sm font-medium text-neutral-700">{gpsContext}</span>}
                     <span className="mt-2 block break-words text-sm leading-relaxed text-neutral-700">{followup ? 'Situación registrada al evaluar: ' : ''}{notice.mensaje}</span>
                     {followup && <span className="mt-2 block text-sm font-semibold text-primary-800">{followup}</span>}
                     {linked && <span className="mt-2 block text-sm font-semibold text-primary-800">{otherActivity ? `Ver aviso para ${otherActivity} →` : notificationActionLabel(path, notice)}</span>}

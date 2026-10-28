@@ -58,6 +58,14 @@ describe('notification inbox states and interaction', () => {
     service.list.mockReset().mockResolvedValue(response);
     for (const mutation of [service.marcarLeida, service.marcarTodasLeidas, service.eliminar]) mutation.mockReset().mockResolvedValue({});
   });
+  it.each(['', '/app'])('clarifies an older GPS notice without changing its saved text on %s', async base => {
+    service.list.mockResolvedValue({ ...response, items: [{ ...notice, tipo: 'ANOMALIA_DETECTADA', titulo: 'Anomalía GPS',
+      mensaje: 'Velocidad anormalmente alta detectada: 250 km/h', datos: null, manifiesto: { numero: 'QA-001', estado: 'EN_TRANSITO' } }] });
+    setup(base + '/notificaciones');
+    expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
+    expect(screen.getByText('Velocidad anormalmente alta detectada: 250 km/h')).toBeVisible();
+    expect(screen.getByText('Manifiesto QA-001')).toBeVisible();
+  });
   it.each(['', '/app'])('offers the recorded decision rather than a new response on %s', async base => {
     auth.user.rol = 'OPERADOR';
     service.list.mockResolvedValue({ ...response, items: [{ ...notice, titulo: 'PSIP · Cierre conforme', datos: JSON.stringify({ tipo: 'intercambio_inspeccion', version: 1, inspeccionId: 'closed-1', destino: 'participacion', tipoActor: 'OPERADOR', evento: 'CIERRE_CONFORME' }) }] });

@@ -38,6 +38,7 @@ export type DomainEvent =
   | {
       type: 'ANOMALIA_GPS';
       manifiestoId: string;
+      numero?: string;
       tipoAnomalia: string;
       descripcion: string;
       severidad: string;

@@ -40,6 +40,7 @@ import { alertaService, type FollowupPreview, type CataloguePreview } from '../.
 import { cataloguePath } from '../../utils/alertCatalogue';
 import { formatActorCalendarDate } from '../../utils/actorCalendarDate';
 import { notificationFollowup } from '../../utils/notificationFollowup';
+import { gpsNoticeContext } from '../../utils/gpsNoticeContext';
 import { EstadoAlerta } from '../../types/models';
 import { formatRelativeTime } from '../../utils/formatters';
 
@@ -61,6 +62,7 @@ interface AlertaLocal {
   fechaResolucion?: string;
   destino?: string;
   seguimiento?: string;
+  gpsContext?: string;
 }
 
 // ─── Visual config ────────────────────────────────────────────────────────────
@@ -202,6 +204,7 @@ function groupByDay(alertas: AlertaLocal[]): { label: string; items: AlertaLocal
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 10;
+const routeRuleWarning = 'El seguimiento GPS actual no activa esta regla y no compara una ruta autorizada. Revisá las observaciones de corredor geográfico en Anomalía GPS.';
 
 const EVENTO_OPTIONS = [
   { value: 'CAMBIO_ESTADO', label: 'Cambio de Estado' },
@@ -246,7 +249,7 @@ const CONDITION_PRESETS: Record<string, Array<{ label: string; value: string }>>
   RECHAZO_CARGA: [{ label: 'Cualquier rechazo', value: '{}' }],
   DIFERENCIA_PESO: [{ label: 'Cualquier diferencia', value: '{}' }, { label: 'Diferencia igual o mayor a 10%', value: '{"deltaPorcentaje":{"gte":10}}' }],
   TIEMPO_EXCESIVO: [{ label: 'Más de 24 horas', value: '{"horasTransito":{"gte":24}}' }, { label: 'Más de 48 horas', value: '{"horasTransito":{"gte":48}}' }],
-  DESVIO_RUTA: [{ label: 'Más de 50 km fuera del corredor autorizado', value: '{"distanciaKm":{"gt":50}}' }],
+  DESVIO_RUTA: [{ label: 'Distancia mayor a 50 km · evento histórico', value: '{"distanciaKm":{"gt":50}}' }],
   VENCIMIENTO: [{ label: 'Dentro de 30 días', value: '{"diasRestantes":{"lte":30}}' }, { label: 'Dentro de 7 días', value: '{"diasRestantes":{"lte":7}}' }],
   ANOMALIA_GPS: [{ label: 'Cualquier anomalía GPS', value: '{}' }, { label: 'Sólo severidad alta', value: '{"severidad":{"in":["ALTA","CRITICA"]}}' }],
 };
@@ -380,6 +383,7 @@ export const AlertasPage: React.FC = () => {
           estado: n.leida ? 'RESUELTA' : 'PENDIENTE',
           destino: cataloguePath(n.datos, true) || undefined,
           seguimiento: notificationFollowup(n) || undefined,
+          gpsContext: gpsNoticeContext(n) || undefined,
         }));
     }
     // Admin: alertas generadas by rules
@@ -393,6 +397,7 @@ export const AlertasPage: React.FC = () => {
           tipo: getTipoFromEvento(evento, estado),
           titulo: a.regla?.nombre || 'Alerta',
           mensaje: parseMensaje(a.datos, a.regla?.evento),
+          gpsContext: gpsNoticeContext({ tipo: evento, datos: a.datos, mensaje: parseMensaje(a.datos, evento) }) || undefined,
           fecha: a.createdAt,
           leida: estado === 'RESUELTA' || estado === 'DESCARTADA',
           manifiestoId: a.manifiestoId || a.manifiesto?.id,
@@ -550,7 +555,7 @@ export const AlertasPage: React.FC = () => {
   // ─── Reglas table ──────────────────────────────────────────────────────────
 
   const reglasColumns: Column<any>[] = [
-    { key: 'nombre', header: 'Nombre', sortable: true, render: (r) => <div><span>{r.nombre}</span>{r.requiereUmbralTransito && <p className="text-xs text-warning-800">Falta configurar un umbral de tránsito.</p>}</div> },
+    { key: 'nombre', header: 'Nombre', sortable: true, render: (r) => <div><span>{r.nombre}</span>{r.requiereUmbralTransito && <p className="text-xs text-warning-800">Falta configurar un umbral de tránsito.</p>}{r.evento === 'DESVIO_RUTA' && <p className="text-xs text-warning-800">{routeRuleWarning}</p>}</div> },
     {
       key: 'evento',
       header: 'Evento',
@@ -713,6 +718,7 @@ export const AlertasPage: React.FC = () => {
                                 </button>
                               )}
                             </div>
+                            {alerta.gpsContext && <p className="text-sm font-medium text-neutral-700">{alerta.gpsContext}</p>}
                             <p className="text-sm text-neutral-600 leading-snug">{alerta.mensaje}</p>
                             {alerta.seguimiento && <p className="mt-1 text-sm font-medium text-primary-800">{alerta.seguimiento}</p>}
                             {isAnyAdmin && alerta.estadoActual && <p className="mt-1 text-xs text-neutral-600">Estado actual del manifiesto: {alerta.estadoActual.replaceAll('_', ' ').toLowerCase()}. El caso conserva la situación registrada al detectarlo.</p>}
@@ -836,6 +842,7 @@ export const AlertasPage: React.FC = () => {
             </div>
             <p className="text-xs text-neutral-500 mt-1">{reglaEventLabel(r)}</p>
             {r.requiereUmbralTransito && <p className="mt-1 text-xs text-warning-800">Falta configurar un umbral de tránsito.</p>}
+            {r.evento === 'DESVIO_RUTA' && <p className="mt-1 text-xs text-warning-800">{routeRuleWarning}</p>}
             {isAdmin && <Button variant="outline" aria-label={`Editar regla: ${r.nombre}`} className="mt-2" onClick={() => openEditRegla(r)}>Editar regla</Button>}
           </div>
         ))}
@@ -970,6 +977,7 @@ export const AlertasPage: React.FC = () => {
             value={reglaForm.evento}
             onChange={(val) => setReglaForm(prev => ({ ...prev, evento: val, condicion: val === 'TIEMPO_EXCESIVO' ? '{}' : CONDITION_PRESETS[val]?.[0]?.value || '{}' }))}
           />
+          {reglaForm.evento === 'DESVIO_RUTA' && <p className="text-sm text-warning-800">{routeRuleWarning}</p>}
           {reglaForm.evento === 'TIEMPO_EXCESIVO' && basicTransitCondition ? <div className="space-y-2">
             <Input label="Avisar a partir de (horas)" type="number" min={0} step="any" inputMode="decimal" value={basicTransitHours ?? ''}
               onChange={event => { const value = event.target.value; setReglaForm(prev => ({ ...prev, condicion: value === '' ? '{}' : JSON.stringify({ horasTransito: { gte: Number(value) } }) })); }} />

@@ -112,6 +112,18 @@ try{
    await select('propuesta-insitu-historica-aprobada');await channel('email');
    await expect(page.locator('iframe').contentFrame().locator('body')).not.toContainText('aprobado por las tres partes');
  });
+ await check('GPS observations and configured duration show their actual limits',async()=>{
+   for(const id of ['gps-ALTA','gps-NORMAL','gps-sin-recepcion']){
+     await select(id);await channel('inbox');
+     await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Hora de captura no disponible');
+     await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Verificá el caso con transporte');
+     await channel('email');
+     await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('hora de captura puede ser anterior a la recepción');
+   }
+   await select('transito-tiempo');await channel('inbox');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('umbral configurado por Ambiente');
+   await expect(page.locator('iframe').contentFrame().locator('body')).not.toContainText('Tiempo de Tránsito Excesivo');
+ });
  await page.locator('[data-width="mobile"]').click();
  await check('all scenarios, email and inbox, at phone preview width',async()=>{
    for(const [index,c] of data.cases.entries()){

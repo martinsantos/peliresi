@@ -18,6 +18,16 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each([
+    { tipo: 'ANOMALIA_DETECTADA', datos: '{}' },
+    { tipo: 'ALERTA_SISTEMA', datos: JSON.stringify({ evento: 'ANOMALIA_GPS', tipoAnomalia: 'VELOCIDAD_ANORMAL', descripcion: 'PRIVATE' }) },
+  ])('renders a GPS observation as unconfirmed without sending or exposing free text', fields => {
+    const rendered = notificationMailContent({ ...notice, ...fields, manifiestoId: 'manifest' })!;
+    expect(mailText(rendered.html)).toMatch(/hora de captura.*recepci[oó]n/i);
+    expect(mailText(rendered.html)).toMatch(/verific[aá].*transporte/i);
+    expect(rendered.html).not.toContain('PRIVATE');
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('renders origin coordination accurately for %s without sending mail', rol => {
     const n = { ...notice, rol, tipo: 'INFO_GENERAL', manifiestoId: 'manifest', datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: 'iniciada', modalidad: 'IN_SITU', partesRequeridas: 3 }) };
     const content = notificationMailContent(n)!;

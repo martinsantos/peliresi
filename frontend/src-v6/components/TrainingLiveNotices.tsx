@@ -6,6 +6,8 @@ import {notificacionService} from '../services/notificacion.service';
 import {resolveNotificationPath} from '../utils/notificationNavigation';
 import {useMobilePrefix} from '../hooks/useMobilePrefix';
 import type {Notificacion} from '../types/models';
+import {gpsNoticeContext} from '../utils/gpsNoticeContext';
+import {notificationManifestReference} from '../utils/notificationManifestReference';
 
 /** Foreground CAP notices. No push registration, permission prompt or external delivery. */
 export function TrainingLiveNotices({userId}:{userId:string|number}){
@@ -32,11 +34,11 @@ export function TrainingLiveNotices({userId}:{userId:string|number}){
   if(audio.current?.state==='running')ping();
   void qc.invalidateQueries({queryKey:['training-tasks']});void qc.invalidateQueries({queryKey:['manifiestos']});void qc.invalidateQueries({queryKey:['manifest-proposal']});void qc.invalidateQueries({queryKey:['training-certificates']});
  },[data,key,qc]);
- const notice=queue[0];
+ const notice=queue[0],gpsContext=notice?gpsNoticeContext(notice):null,manifestReference=notice?notificationManifestReference(notice):null;
  function dismiss(){setQueue(q=>q.slice(1));}
  function open(){if(!notice)return;void notificacionService.marcarLeida(notice.id).then(()=>qc.invalidateQueries({queryKey:['notificaciones']})).catch(()=>{});dismiss();navigate(resolveNotificationPath(notice,mp('')));}
  return <div className="shrink-0 bg-white"><aside aria-label="Avisos en vivo" className="max-h-[28dvh] overflow-y-auto overscroll-contain">
-  {notice&&<div role="status" aria-live="polite" className="border-b-2 border-primary-600 bg-primary-50 px-3 py-2 text-neutral-900"><div className="flex items-start gap-3"><BellRing size={24} className="shrink-0 text-primary-700"/><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wide text-primary-800">Nuevo aviso{queue.length>1?` · ${queue.length} novedades`:''}</p><h2 className="mt-1 text-base font-bold">{notice.titulo}</h2></div><button aria-label="Cerrar aviso en vivo" onClick={dismiss} className="min-h-11 min-w-11"><X size={20}/></button></div><p className="mt-1 text-sm leading-snug">{notice.mensaje}</p><button onClick={open} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-700 px-3 font-semibold text-white">Abrir manifiesto <ArrowRight size={18}/></button></div>}
+  {notice&&<div role="status" aria-live="polite" className="border-b-2 border-primary-600 bg-primary-50 px-3 py-2 text-neutral-900"><div className="flex items-start gap-3"><BellRing size={24} className="shrink-0 text-primary-700"/><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wide text-primary-800">Nuevo aviso{queue.length>1?` · ${queue.length} novedades`:''}</p><h2 className="mt-1 text-base font-bold">{notice.titulo}</h2></div><button aria-label="Cerrar aviso en vivo" onClick={dismiss} className="min-h-11 min-w-11"><X size={20}/></button></div>{manifestReference&&<p className="mt-1 text-xs font-semibold">{manifestReference}</p>}{gpsContext&&<p className="mt-1 text-sm font-medium">{gpsContext}</p>}<p className="mt-1 text-sm leading-snug">{notice.mensaje}</p><button onClick={open} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-700 px-3 font-semibold text-white">Abrir manifiesto <ArrowRight size={18}/></button></div>}
  </aside>
  <div className="flex flex-wrap items-center justify-center gap-2 bg-primary-50/50 px-3 py-1 text-xs text-neutral-700 border-b border-neutral-200">
   <BellRing size={14}/><span title="Avisos en vivo con la app abierta">Avisos en vivo</span><button type="button" onClick={()=>sound?(setSound(false),void audio.current?.suspend()):void enable()} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 font-semibold text-primary-800">{sound?<Volume2 size={16}/>:<VolumeX size={16}/>} {sound?'Sonido activo':'Activar sonido'}</button>{soundError&&<p role="alert">{soundError}</p>}

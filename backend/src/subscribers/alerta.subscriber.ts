@@ -144,6 +144,8 @@ async function dispararReglasAlerta(
     for (const usuarioId of recipientIds) {
       const mensaje = transitDuration && typeof datos.horasTransito === 'number' && Number.isFinite(datos.horasTransito)
         ? `El manifiesto ${datos.numero} lleva aproximadamente ${datos.horasTransito.toLocaleString('es-AR', { maximumFractionDigits: 1 })} horas en tránsito. Se alcanzó el umbral configurado por Ambiente.`
+        : eventoAlerta === 'ANOMALIA_GPS' && typeof datos.descripcion === 'string' && datos.descripcion.trim()
+          ? `${typeof datos.numero === 'string' && datos.numero.trim() ? `${datos.numero} · ` : ''}${datos.descripcion}`
         : `Regla activada: ${regla.nombre}`;
       await notificationService.crearNotificacion({
         usuarioId,
@@ -253,16 +255,25 @@ export async function alertaSubscriber(event: DomainEvent): Promise<void> {
       break;
     }
 
-    case 'ANOMALIA_GPS':
+    case 'ANOMALIA_GPS': {
+      // These observations compare receipt times, not necessarily sensor
+      // times. Distinct titles also prevent one class hiding another in the
+      // existing per-title notification deduplication window.
+      const receiptTitles: Record<string, string> = {
+        VELOCIDAD_ANORMAL: 'GPS: posible velocidad elevada',
+        PARADA_PROLONGADA: 'GPS: posible parada',
+        GPS_PERDIDO: 'GPS: sin posiciones recibidas',
+      };
       await notificarAdmins(
         'ANOMALIA_DETECTADA',
-        '⚠️ Anomalía GPS Detectada',
-        event.descripcion,
+        receiptTitles[event.tipoAnomalia] || '⚠️ Anomalía GPS Detectada',
+        `${event.numero ? `${event.numero} · ` : ''}${event.descripcion}`,
         event.manifiestoId,
         event.severidad === 'ALTA' ? 'URGENTE' : 'ALTA',
         event.userId,
       );
       break;
+    }
 
     case 'DESVIO_RUTA':
       await notificarAdmins(

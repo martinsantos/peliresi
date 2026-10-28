@@ -17,6 +17,8 @@ import { useAuth } from '../contexts/AuthContext';
 import type { Notificacion } from '../types/models';
 import { TipoNotificacion } from '../types/models';
 import { resolveNotificationPath, refreshInspectionNotification } from '../utils/notificationNavigation';
+import { gpsNoticeContext } from '../utils/gpsNoticeContext';
+import { notificationManifestReference } from '../utils/notificationManifestReference';
 
 // ========================================
 // HELPERS
@@ -244,6 +246,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                 {items.map((notif) => {
                   const type = getNotificationType(notif);
                   const isUnread = !notif.leida;
+                  const gpsContext = gpsNoticeContext(notif);
+                  const manifestReference = notificationManifestReference(notif);
 
                   return (
                     <button
@@ -267,6 +271,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = React.memo(func
                               <span className="w-2 h-2 bg-primary-500 rounded-full shrink-0 mt-1.5" />
                             )}
                           </div>
+                          {manifestReference && <p className="mt-1 text-xs font-semibold text-neutral-700">{manifestReference}</p>}
+                          {gpsContext && <p className="mt-1 text-sm font-medium text-neutral-700">{gpsContext}</p>}
                           <p className="text-sm text-neutral-700 mt-1 line-clamp-2">
                             {notif.mensaje}
                           </p>

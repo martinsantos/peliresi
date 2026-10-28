@@ -472,7 +472,7 @@ class AnomaliaDetector {
             if (velocidadCalculada > 120) {
                 addAnomaly({
                     tipo: 'VELOCIDAD_ANORMAL' as TipoAnomalia,
-                    descripcion: `Velocidad anormalmente alta detectada: ${velocidadCalculada.toFixed(1)} km/h`,
+                    descripcion: 'Hora de captura no disponible. Verificá el caso con transporte. La distancia y el intervalo entre dos recepciones superan el umbral de velocidad; esto no confirma la velocidad real.',
                     latitud: puntoActual.latitud,
                     longitud: puntoActual.longitud,
                     valorDetectado: velocidadCalculada,
@@ -485,7 +485,7 @@ class AnomaliaDetector {
             if (distancia < 0.1 && tiempoHoras > 2) {
                 addAnomaly({
                     tipo: 'PARADA_PROLONGADA' as TipoAnomalia,
-                    descripcion: `Parada prolongada de ${(tiempoHoras * 60).toFixed(0)} minutos`,
+                    descripcion: `Hora de captura no disponible. Verificá el caso con transporte. Se recibieron dos posiciones próximas con ${(tiempoHoras * 60).toFixed(0)} minutos de diferencia; esto no confirma una parada.`,
                     latitud: puntoActual.latitud,
                     longitud: puntoActual.longitud,
                     valorDetectado: tiempoHoras * 60,
@@ -498,7 +498,7 @@ class AnomaliaDetector {
             if (tiempoHoras > 0.5 && distancia > 10) {
                 addAnomaly({
                     tipo: 'GPS_PERDIDO' as TipoAnomalia,
-                    descripcion: `Perdida de senal GPS por ${(tiempoHoras * 60).toFixed(0)} minutos`,
+                    descripcion: `Hora de captura no disponible. Verificá el caso con transporte. Pasaron ${(tiempoHoras * 60).toFixed(0)} minutos entre dos recepciones; esto no confirma pérdida de señal.`,
                     latitud: puntoActual.latitud,
                     longitud: puntoActual.longitud,
                     valorDetectado: tiempoHoras * 60,
@@ -520,6 +520,7 @@ class AnomaliaDetector {
             domainEvents.emit({
                 type: 'ANOMALIA_GPS',
                 manifiestoId,
+                numero: manifiesto.numero,
                 tipoAnomalia: anomalia.tipo,
                 descripcion: anomalia.descripcion,
                 severidad: anomalia.severidad,

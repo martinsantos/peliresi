@@ -58,6 +58,18 @@ it('identifies a historical duration rule that needs a threshold', async () => {
   setup(); fireEvent.click(screen.getByRole('tab', { name: /Reglas/ }));
   expect((await screen.findAllByText('Falta configurar un umbral de tránsito.')).length).toBeGreaterThan(0);
 });
+it('does not present the legacy route-deviation rule as a working authorised route check', async () => {
+  service.listReglas.mockResolvedValue([{ id: 'legacy-route', nombre: 'QA ruta', evento: 'DESVIO_RUTA', activa: true,
+    condicion: '{"distanciaKm":{"gt":50}}', destinatarios: '["ADMIN"]' }]);
+  setup(); fireEvent.click(screen.getByRole('tab', { name: /Reglas/ }));
+  expect((await screen.findAllByText(/seguimiento GPS actual no activa esta regla/i)).length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole('button', { name: 'Nueva Regla', exact: true }));
+  const dialog = screen.getByRole('dialog', { name: 'Nueva Regla', exact: true });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Evento', exact: true }));
+  fireEvent.click(screen.getByRole('option', { name: 'Desvío de Ruta', exact: true }));
+  expect(within(dialog).getByText(/seguimiento GPS actual no activa esta regla/i)).toBeVisible();
+  expect(within(dialog).queryByText(/corredor autorizado/i)).toBeNull();
+});
 it('names rule families consistently without confusing inspection or treatment follow-up with travel duration', async () => {
   service.listReglas.mockResolvedValue([
     { id: 'duration', nombre: 'QA viaje', evento: 'TIEMPO_EXCESIVO', condicion: '{"horasTransito":{"gte":36}}', destinatarios: '[]' },
@@ -75,6 +87,14 @@ beforeEach(() => {
   notices.list.mockResolvedValue({ items: [], total: 0 });
   service.listAlertas.mockResolvedValue({ items: [caseRow], total: 110, page: 1, limit: 10, totalPages: 11 });
   service.listReglas.mockResolvedValue([]); service.resolverAlerta.mockResolvedValue({ ...caseRow, estado: 'RESUELTA' });
+});
+it('keeps a historical GPS case and shows the uncertainty of its original description', async () => {
+  service.listAlertas.mockResolvedValue({ items: [{ ...caseRow, regla: { nombre: 'QA GPS', evento: 'ANOMALIA_GPS' },
+    datos: JSON.stringify({ tipoAnomalia: 'PARADA_PROLONGADA', descripcion: 'Parada prolongada de 120 minutos' }) }],
+    total: 1, page: 1, limit: 10, totalPages: 1 });
+  setup();
+  expect(await screen.findByText(/hora de captura.*recepci[oó]n/i)).toBeVisible();
+  expect(screen.getByText('Parada prolongada de 120 minutos')).toBeVisible();
 });
 it('keeps the actor alert unread badge readable without inventing a global count', async () => {
   auth.isAdmin = false; auth.isAnyAdmin = false;

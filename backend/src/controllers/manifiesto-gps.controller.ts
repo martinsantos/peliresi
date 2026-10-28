@@ -184,6 +184,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
         domainEvents.emit({
           type: 'ANOMALIA_GPS',
           manifiestoId: id,
+          numero: cacheEntry.numero,
           tipoAnomalia: 'FUERA_CORREDOR_GEOGRAFICO',
           descripcion: `Tres posiciones consecutivas se mantuvieron a más de 50 km del corredor geográfico estimado entre origen y destino (mínimo ${corridorAssessment.minimumDistanceKm.toFixed(1)} km). No se compara una ruta vial autorizada; requiere revisión operativa.`,
           severidad: 'ALTA',

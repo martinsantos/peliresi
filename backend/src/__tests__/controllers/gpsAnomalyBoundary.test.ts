@@ -10,7 +10,7 @@ vi.mock('../../services/notification-dispatcher.service', () => ({ notificationS
 vi.mock('../../jobs/seguimientoCierre.job', () => ({ simularSeguimientoCierre: vi.fn(), ejecutarSeguimientoCierre: vi.fn() }));
 import { anomaliaDetector, detectarAnomalias, getAnomalias } from '../../controllers/notification.controller';
 
-const manifest = { id: 'synthetic-trip', generadorId: 'generator-a', transportistaId: 'carrier-a', operadorId: 'operator-a',
+const manifest = { id: 'synthetic-trip', numero: 'QA-001', generadorId: 'generator-a', transportistaId: 'carrier-a', operadorId: 'operator-a',
   contextoEmpresa: { empresaId: 'company-a', establecimientoId: 'site-a' } };
 const response = () => ({ json: vi.fn() });
 
@@ -104,5 +104,23 @@ describe('GPS anomaly repeated analysis', () => {
     expect(detector).toHaveBeenCalledWith(manifest.id, 'synthetic-admin');
     expect(res.json).toHaveBeenCalledWith({ success: true, data: [] });
     detector.mockRestore();
+  });
+
+  it.each([
+    ['VELOCIDAD_ANORMAL', -33.1, 1],
+    ['PARADA_PROLONGADA', -33, 3 * 3600],
+    ['GPS_PERDIDO', -33.1, 31 * 60],
+  ])('explains that %s is inferred from reception, not a confirmed event', async (kind, latitude, seconds) => {
+    db.points.mockResolvedValue([
+      { id: 'point-a', latitud: -33, longitud: -69, timestamp: new Date('2026-01-01T00:00:00Z') },
+      { id: 'point-b', latitud: latitude, longitud: -69, timestamp: new Date(Date.parse('2026-01-01T00:00:00Z') + Number(seconds) * 1000) },
+    ]);
+    const results = await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-user');
+    const observation = results.find(item => item.tipo === kind);
+    expect(observation).toBeDefined();
+    expect(observation.descripcion).toMatch(/hora de captura no disponible/i);
+    expect(observation.descripcion).toMatch(/verific[aá].*transporte/i);
+    expect(observation.descripcion).not.toMatch(/velocidad anormalmente alta detectada|p[eé]rdida de se[nñ]al GPS por|^parada prolongada de/i);
+    expect(db.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ANOMALIA_GPS', numero: 'QA-001', tipoAnomalia: kind, descripcion: observation.descripcion }));
   });
 });

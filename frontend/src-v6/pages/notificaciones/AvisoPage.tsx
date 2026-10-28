@@ -11,6 +11,8 @@ import { activateActorActivity } from '../../services/activateActorActivity';
 import { inspectionWorkspaceOwner } from '../../utils/inspectionWorkspace';
 import type { Notificacion } from '../../types/models';
 import { Button } from '../../components/ui/ButtonV2';
+import { gpsNoticeContext } from '../../utils/gpsNoticeContext';
+import { notificationManifestReference } from '../../utils/notificationManifestReference';
 
 /** No acknowledgement or business mutation on opening a mail (including link scanners). */
 export default function AvisoPage() {
@@ -22,6 +24,8 @@ export default function AvisoPage() {
     queryFn: async () => (await api.get('/notificaciones/' + encodeURIComponent(id || ''))).data.data as Notificacion,
     retry: false, staleTime: 0 });
   const notice = !query.isError && !query.isPending ? query.data : undefined;
+  const gpsContext = notice ? gpsNoticeContext(notice) : null;
+  const manifestReference = notice ? notificationManifestReference(notice) : null;
   const inboxReturn = notificationInboxReturnPath(location.state, inspectionWorkspaceOwner(currentUser));
   const inboxState = location.state && typeof location.state === 'object' && !Array.isArray(location.state)
     ? (location.state as { notificationInboxReturn?: unknown }).notificationInboxReturn : undefined;
@@ -55,7 +59,7 @@ export default function AvisoPage() {
       <Button variant="outline" onClick={() => void query.refetch()}>Reintentar</Button>
     </div>}
     {notice && <article className="rounded-xl border border-primary-200 bg-white p-5 space-y-4">
-      <h2 className="text-lg font-semibold">{notice.titulo}</h2><p className="whitespace-pre-wrap break-words">{notice.mensaje}</p>
+      <h2 className="text-lg font-semibold">{notice.titulo}</h2>{manifestReference && <p className="text-sm font-semibold text-neutral-700">{manifestReference}</p>}{gpsContext && <p className="text-sm font-medium text-neutral-700">{gpsContext}</p>}<p className="whitespace-pre-wrap break-words">{notice.mensaje}</p>
       {!companyAccesses.length && actorRole && !otherRole && <p className="text-sm font-semibold text-primary-800">Actividad: {roleLabel}</p>}
       {!companyAccesses.length && otherRole && <div className="space-y-3 rounded-lg bg-primary-50 p-3">
         <p>Usá tu actividad {roleLabel} para consultar {certificate ? 'este certificado ambiental' : fiscal ? 'este recordatorio fiscal' : 'este requerimiento'}.</p>
