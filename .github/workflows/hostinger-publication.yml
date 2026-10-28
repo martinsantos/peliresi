@@ -55,6 +55,11 @@ jobs:
           fs.writeFileSync(process.env.RUNNER_TEMP+'/publisher.mjs',stripTypeScriptTypes(fs.readFileSync('scripts/cicd/hostinger/publisher.ts','utf8'),{mode:'strip'}));
           JS
           node --check "$RUNNER_TEMP/publisher.mjs"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20.19.6'
+      - name: Parse the compiled JavaScript with the production Node version
+        run: node --check "$RUNNER_TEMP/publisher.mjs"
   manual-release:
     needs: verify-publisher
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'

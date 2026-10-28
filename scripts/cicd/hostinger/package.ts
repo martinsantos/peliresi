@@ -24,6 +24,8 @@ const files=inventory(tree);
 for(const name of Object.keys(files)) {
   if(/(^|\/)(?:\.env[^/]*|\.git|node_modules|uploads|data)(\/|$)/.test(name) || /[\r\n\0]/.test(name))throw new Error('Private/runtime path cannot be packaged');
 }
-fs.writeFileSync(path.join(output,'release.json'),JSON.stringify({commit,databaseMigrations:false,files},null,2)+'\n');
+fs.writeFileSync(path.join(output,'release.json'),JSON.stringify({format:2,commit,databaseMigrations:false,files},null,2)+'\n');
+// The reviewed tar digest now authenticates the manifest as well as the payload.
+fs.copyFileSync(path.join(output,'release.json'),path.join(tree,'.sitrep-release.json'));
 execFileSync('tar',['-czf',path.join(output,'release.tar.gz'),'-C',tree,'.'],{stdio:'pipe'});
 console.log(JSON.stringify({packagedCommit:commit,fileCount:Object.keys(files).length,databaseMigrations:false}));

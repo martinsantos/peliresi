@@ -46,12 +46,15 @@ function directory(folder: string, mode=0o700): void {
   } else { fs.mkdirSync(folder,{recursive:true,mode}); fs.chmodSync(folder,mode); }
 }
 
-export function inventory(root: string): Json {
-  const files: Json = {};
+export function inventory(root: string, preservedLinks: string[] = []): Json {
+  const files: Json = Object.create(null);
   function visit(folder: string): void {
     for (const name of fs.readdirSync(folder).sort()) {
       const file=path.join(folder,name); const info=fs.lstatSync(file);
-      if (info.isSymbolicLink()) throw new Error('Release archives cannot contain links');
+      if (info.isSymbolicLink()) {
+        if(preservedLinks.includes(path.relative(root,file)))continue;
+        throw new Error('Release archives cannot contain links');
+      }
       if (info.isDirectory()) visit(file);
       else if (info.isFile()) files[path.relative(root,file)]={sha256:hash(file),bytes:info.size};
       else throw new Error('Unexpected release object');
@@ -59,7 +62,7 @@ export function inventory(root: string): Json {
   }
   visit(root); return files;
 }
-function codeDigest(backend: string): string {
+export function codeDigest(backend: string): string {
   return digest(JSON.stringify({dist:inventory(path.join(backend,'dist')),
     package:hash(path.join(backend,'package.json')),lock:hash(path.join(backend,'package-lock.json')),
     schema:hash(path.join(backend,'prisma/schema.prisma'))}));
@@ -160,6 +163,82 @@ function chmodTree(root: string): void {
 function nativeLinks(backend: string,currentBackend: string): void {
   for (const name of ['node_modules','data','uploads']) fs.symlinkSync(fs.realpathSync(path.join(currentBackend,name)),path.join(backend,name),'dir');
 }
+const RUNTIME_LINKS=['node_modules','data','uploads'];
+function fileMapHash(files: Json): string {
+  return digest(JSON.stringify(Object.keys(files).sort().map(name=>[name,files[name]])));
+}
+function linkEvidence(backend: string): Json {
+  const links: Json={};
+  for(const name of RUNTIME_LINKS) {
+    const file=path.join(backend,name);const link=fs.lstatSync(file);
+    if(!link.isSymbolicLink())throw new Error('Preserved runtime link was replaced');
+    const target=fs.statSync(file);
+    if(!target.isDirectory())throw new Error('Preserved runtime link target is not a directory');
+    links[name]={target:fs.readlinkSync(file),resolved:fs.realpathSync(file),
+      linkDevice:link.dev,linkInode:link.ino,linkMode:link.mode,linkOwner:link.uid,
+      targetDevice:target.dev,targetInode:target.ino};
+  }
+  return links;
+}
+function preparedPaths(ready: Json,root: string,bundle: string): Json {
+  if(!SHA.test(ready.commit) || ready.bundle!==bundle || !DIGEST.test(bundle)
+      || !/^[0-9]+-[0-9]+$/.test(ready.preparedRun)
+      || path.basename(root)!==`${ready.commit}-${bundle}` || path.basename(path.dirname(root))!=='staged')throw new Error('Prepared release identity changed');
+  const publisherRoot=path.dirname(path.dirname(root));
+  const destination=path.join(publisherRoot,'releases',`${ready.commit}-${ready.preparedRun}`);
+  if(ready.destination!==destination || ready.backend!==path.join(destination,'backend')
+      || ready.frontend!==path.join(destination,'frontend') || ready.rollback!==path.join(destination,'rollback-frontend'))throw new Error('Prepared release location changed');
+  return {archive:path.join(publisherRoot,'incoming',ready.preparedRun,'release.tar.gz'),
+    manifest:path.join(publisherRoot,'incoming',ready.preparedRun,'release.json'),extracted:path.join(root,'package')};
+}
+function sealedManifest(archive: string,manifestFile: string,extracted: string,commit: string,bundle: string): Json {
+  if(!fs.lstatSync(archive).isFile() || fs.lstatSync(archive).isSymbolicLink() || hash(archive)!==bundle)throw new Error('Reviewed bundle changed after preparation');
+  const sealed=run('tar',['-xOzf',archive,'./.sitrep-release.json']);
+  if(fs.readFileSync(manifestFile,'utf8').trim()!==sealed
+      || fs.readFileSync(path.join(extracted,'.sitrep-release.json'),'utf8').trim()!==sealed)throw new Error('Sealed release manifest changed');
+  const manifest=JSON.parse(sealed);
+  if(manifest.format!==2 || manifest.commit!==commit || manifest.databaseMigrations!==false)throw new Error('Unsupported sealed release manifest');
+  const files=inventory(extracted);delete files['.sitrep-release.json'];
+  if(fileMapHash(files)!==fileMapHash(manifest.files))throw new Error('Reviewed source payload changed after preparation');
+  return manifest;
+}
+export function capturePrepared(ready: Json,root: string): Json {
+  return {version:1,backendCodeDigest:codeDigest(ready.backend),
+    backendInventory:fileMapHash(inventory(ready.backend,RUNTIME_LINKS)),
+    frontendInventory:fileMapHash(inventory(ready.frontend)),rollbackInventory:fileMapHash(inventory(ready.rollback)),
+    candidateConfig:hash(path.join(root,'candidate.conf')),rollbackConfig:hash(path.join(root,'rollback.conf')),
+    runtimeLinks:linkEvidence(ready.backend)};
+}
+export function assertPrepared(ready: Json,root: string,bundle: string,beforeProxy: string): void {
+  const locations=preparedPaths(ready,root,bundle);
+  const manifest=sealedManifest(locations.archive,locations.manifest,locations.extracted,ready.commit,bundle);
+  if(!ready.artifacts || ready.artifacts.version!==1
+      || digest(JSON.stringify(capturePrepared(ready,root)))!==digest(JSON.stringify(ready.artifacts)))throw new Error('Prepared artifact integrity check failed');
+  if(codeDigest(ready.before.backend)!==ready.before.codeDigest
+      || digest(JSON.stringify(inventory(ready.before.frontend)))!==ready.before.frontendDigest
+      || digest(beforeProxy)!==ready.before.proxyHash)throw new Error('Reviewed rollback baseline changed');
+  const expectedBackend: Json=Object.create(null);
+  const expectedFrontend: Json=Object.assign(Object.create(null),inventory(ready.before.frontend));
+  for(const [name,entry] of Object.entries(manifest.files)) {
+    if(name.startsWith('backend/'))expectedBackend[name.slice(8)]=entry;
+    else if(name.startsWith('frontend/'))expectedFrontend[name.slice(9)]=entry;
+    else throw new Error('Unexpected release payload scope');
+  }
+  const normalized=loopbackIndex(fs.readFileSync(path.join(locations.extracted,'backend/dist/index.js'),'utf8'));
+  expectedBackend['dist/index.js']={sha256:digest(normalized),bytes:Buffer.byteLength(normalized)};
+  const expectedRollback: Json=Object.assign(Object.create(null),expectedFrontend,inventory(ready.before.frontend));
+  const oldRelease=JSON.stringify({commit:ready.before.revision})+'\n';
+  expectedRollback['release.json']={sha256:digest(oldRelease),bytes:Buffer.byteLength(oldRelease)};
+  if(fileMapHash(inventory(ready.backend,RUNTIME_LINKS))!==fileMapHash(expectedBackend)
+      || fileMapHash(inventory(ready.frontend))!==fileMapHash(expectedFrontend)
+      || fileMapHash(inventory(ready.rollback))!==fileMapHash(expectedRollback))throw new Error('Prepared payload differs from the reviewed bundle and baseline');
+  for(const name of RUNTIME_LINKS)if(fs.readlinkSync(path.join(ready.backend,name))!==fs.realpathSync(path.join(ready.before.backend,name)))throw new Error('Prepared runtime link target changed');
+  if(fs.readFileSync(path.join(root,'candidate.conf'),'utf8')!==proxyFor(beforeProxy,ready.before.frontend,ready.frontend)
+      || fs.readFileSync(path.join(root,'rollback.conf'),'utf8')!==proxyFor(beforeProxy,ready.before.frontend,ready.rollback))throw new Error('Prepared proxy differs from the reviewed root-only change');
+}
+export function withPrepared<T>(ready: Json,root: string,bundle: string,beforeProxy: string,operation:()=>T): T {
+  assertPrepared(ready,root,bundle,beforeProxy);return operation();
+}
 function request(urlPath: string): Promise<{status:number,body:Buffer,type:string}> {
   return new Promise((resolve,reject)=>{
     const req=https.get({hostname:'179.198.115.115',servername:'sitrep.ultimamilla.com.ar',port:443,
@@ -195,14 +274,14 @@ function stage(commit: string,expected: string,bundle: string,id: string): Json 
   const incoming=path.join(ROOT,'incoming',id); const archive=path.join(incoming,'release.tar.gz');
   if (hash(archive)!==bundle) throw new Error('Transport digest mismatch');
   const manifest=read(path.join(incoming,'release.json'));
-  if (manifest.commit!==commit || manifest.databaseMigrations!==false) throw new Error('Unexpected release manifest');
+  if (manifest.format!==2 || manifest.commit!==commit || manifest.databaseMigrations!==false) throw new Error('Unexpected release manifest');
   safeArchiveEntries(run('tar',['-tzf',archive]).split('\n'),run('tar',['-tvzf',archive]).split('\n'));
   directory(ROOT,0o755); directory(path.join(ROOT,'staged')); directory(path.join(ROOT,'releases'),0o755);
   const root=path.join(ROOT,'staged',`${commit}-${bundle}`);
   if (fs.existsSync(root)) throw new Error('Preserve existing staged release');
   directory(root); const extracted=path.join(root,'package');directory(extracted);
   run('tar',['-xzf',archive,'-C',extracted,'--no-same-owner','--no-same-permissions']);
-  if (digest(JSON.stringify(inventory(extracted)))!==digest(JSON.stringify(manifest.files))) throw new Error('Release file inventory mismatch');
+  sealedManifest(archive,path.join(incoming,'release.json'),extracted,commit,bundle);
   compatible(path.join(extracted,'backend'),before.backend);
   const stat=fs.statfsSync(ROOT); const sourceBytes=Object.values(inventory(before.frontend)).reduce((n:any,item:any)=>n+item.bytes,0);
   if (Number(stat.bavail)*Number(stat.bsize)<3*1024**3+3*Number(sourceBytes)+2*fs.statSync(archive).size) throw new Error('Insufficient release/backup capacity');
@@ -218,7 +297,9 @@ function stage(commit: string,expected: string,bundle: string,id: string): Json 
   const candidate=proxyFor(original,before.frontend,frontend); const rollbackProxy=proxyFor(original,before.frontend,rollback);
   fs.writeFileSync(path.join(root,'candidate.conf'),candidate);fs.writeFileSync(path.join(root,'rollback.conf'),rollbackProxy);
   run('/usr/sbin/nginx',['-t','-c',path.join(root,'candidate.conf')]);run('/usr/sbin/nginx',['-t','-c',path.join(root,'rollback.conf')]);
-  const ready={commit,bundle,controller:hash(fileURLToPath(import.meta.url)),before,backend,frontend,rollback,destination};
+  const ready: Json={commit,bundle,preparedRun:id,controller:hash(fileURLToPath(import.meta.url)),before,backend,frontend,rollback,destination};
+  ready.artifacts=capturePrepared(ready,root);
+  assertPrepared(ready,root,bundle,original);
   save(path.join(root,'ready.json'),ready);
   return {preparedCommit:commit,bundleSha256:bundle,expectedActiveRevision:expected,activation:false,schemaAndDependenciesUnchanged:true};
 }
@@ -254,20 +335,26 @@ async function publish(commit: string,expected: string,bundle: string,id: string
   const root=path.join(ROOT,'staged',`${commit}-${bundle}`);const ready=read(path.join(root,'ready.json'));
   if (ready.commit!==commit || ready.bundle!==bundle || ready.controller!==hash(fileURLToPath(import.meta.url)) || ready.before.revision!==expected) throw new Error('Reviewed preparation/controller changed');
   sameCurrent(ready.before,current());
-  const backupRoot=path.join(ROOT,'backups',id);backup(backupRoot,ready.before);
+  const originalProxy=fs.readFileSync(PROXY);const beforeProxy=originalProxy.toString();
+  const backupRoot=path.join(ROOT,'backups',id);
+  withPrepared(ready,root,bundle,beforeProxy,()=>backup(backupRoot,ready.before));
   sameCurrent(ready.before,current());
-  const originalProxy=fs.readFileSync(PROXY);const oldDropin=fs.existsSync(DROPIN)?fs.readFileSync(DROPIN):null;
+  const oldDropin=fs.existsSync(DROPIN)?fs.readFileSync(DROPIN):null;
   const candidate=fs.readFileSync(path.join(root,'candidate.conf'));const rollbackProxy=fs.readFileSync(path.join(root,'rollback.conf'));
   const override=`[Service]\nWorkingDirectory=${ready.backend}\nExecStart=\nExecStart=/usr/bin/node ${ready.backend}/dist/index.js\n`;
   let backendChanged=false;let proxyChanged=false;
   await activateWithRollback(async()=>{
-    atomic(DROPIN,override,ready.before.dropin);backendChanged=true;
-    run('systemctl',['daemon-reload']);run('systemctl',['restart',SERVICE]);
+    withPrepared(ready,root,bundle,beforeProxy,()=>{
+      atomic(DROPIN,override,ready.before.dropin);backendChanged=true;
+      run('systemctl',['daemon-reload']);run('systemctl',['restart',SERVICE]);
+    });
     await waitBackend();
+    assertPrepared(ready,root,bundle,beforeProxy);
     if (!run('systemctl',['show',SERVICE,'-p','ExecStart','--value']).includes(`${ready.backend}/dist/index.js`)) throw new Error('Unexpected backend executable');
     atomic(PROXY,candidate,ready.before.proxyHash);proxyChanged=true;
     run('/usr/sbin/nginx',['-t','-c',PROXY]);run('systemctl',['reload',INGRESS]);
   },async()=>{
+    assertPrepared(ready,root,bundle,beforeProxy);
     if (environment().secretFingerprint!==ready.before.secretFingerprint || ENVIRONMENT.some((file,index)=>hash(file)!==ready.before.environment[index][1])) throw new Error('Runtime secrets or environment changed');
     await checkPublic(ready.frontend,commit);
     const state={revision:commit,backend:ready.backend,frontend:ready.frontend,codeDigest:codeDigest(ready.backend),
