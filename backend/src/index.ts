@@ -6,6 +6,7 @@ import compression from 'compression';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 import { config } from './config/config';
+import { resolveListenHost } from './config/listenHost';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { isAuthenticated } from './middlewares/auth.middleware';
 import authRoutes from './routes/auth.routes';
@@ -259,11 +260,14 @@ iniciarAlertCatalogueJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;
-app.listen(PORT, () => {
+const HOST = resolveListenHost(process.env.HOST, config.NODE_ENV);
+const onListening = () => {
   logger.info({ port: PORT }, `Server running on port ${PORT}`);
   logger.info({ url: `http://localhost:${PORT}` }, 'Server URL');
   startEmailFlushTimer();
-});
+};
+if (HOST) app.listen(PORT, HOST, onListening);
+else app.listen(PORT, onListening);
 
 // Graceful shutdown handlers
 const gracefulShutdown = async (signal: string) => {
