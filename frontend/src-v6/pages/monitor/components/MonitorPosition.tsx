@@ -4,13 +4,13 @@ import type { EnTransitoItem } from '../api/monitor-api';
 export function positionAge(timestamp: string | undefined, now: number): string {
   if (!timestamp) return 'Sin posición recibida';
   const time = new Date(timestamp).getTime();
-  if (!Number.isFinite(time)) return 'Fecha de posición no válida';
+  if (!Number.isFinite(time)) return 'Fecha de recepción no válida';
   const seconds = Math.floor((now - time) / 1000);
-  if (seconds < 0) return 'Fecha de posición adelantada; revisar reloj';
-  if (seconds < 60) return 'Última posición hace menos de un minuto';
-  if (seconds < 3600) return `Última posición hace ${Math.floor(seconds / 60)} min`;
-  if (seconds < 86400) return `Última posición hace ${Math.floor(seconds / 3600)} h`;
-  return `Última posición hace ${Math.floor(seconds / 86400)} días`;
+  if (seconds < 0) return 'Fecha de recepción adelantada; revisar reloj';
+  if (seconds < 60) return 'Última recepción hace menos de un minuto';
+  if (seconds < 3600) return `Última recepción hace ${Math.floor(seconds / 60)} min`;
+  if (seconds < 86400) return `Última recepción hace ${Math.floor(seconds / 3600)} h`;
+  return `Última recepción hace ${Math.floor(seconds / 86400)} días`;
 }
 
 export function MonitorPosition({ position, now = Date.now(), compact = false }: {
@@ -22,6 +22,7 @@ export function MonitorPosition({ position, now = Date.now(), compact = false }:
     {!compact && valid && <time dateTime={position.timestamp} className="block">
       {new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Mendoza', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(position.timestamp))} · Mendoza
     </time>}
-    {!compact && position?.velocidad != null && Number.isFinite(position.velocidad) && <p>Velocidad registrada: {position.velocidad.toFixed(0)} km/h</p>}
+    {!compact && valid && <p>El punto puede ser anterior si el dispositivo estuvo sin conexión.</p>}
+    {!compact && position?.velocidad != null && Number.isFinite(position.velocidad) && <p>Velocidad no disponible</p>}
   </div>;
 }

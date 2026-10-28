@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { toast } from '../../components/ui/Toast';
+import { GPS_DELIVERY_CONFIRMED_EVENT, gpsQueueKey } from '../../services/gpsQueue';
 
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { actualizarUbicacion: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { error: vi.fn(), warning: vi.fn(), remove: vi.fn() } }));
@@ -12,7 +13,7 @@ const position = (latitude = -33, longitude = -69): GeolocationPosition => ({
   timestamp: Date.now(),
 } as GeolocationPosition);
 const error = (code: number) => ({ code, message: 'GPS test failure' } as GeolocationPositionError);
-const trip = { manifiestoId: 'gps-safety-trip', estado: 'EN_TRANSITO', viajeStatus: 'ACTIVO' as const };
+const trip = { ownerId: 'carrier-a', manifiestoId: 'gps-safety-trip', estado: 'EN_TRANSITO', viajeStatus: 'ACTIVO' as const };
 let watchSuccess: PositionCallback[];
 let watchError: PositionErrorCallback[];
 let coarseSuccess: PositionCallback[];
@@ -179,7 +180,7 @@ describe('GPS position provenance and cleanup', () => {
     act(() => { stop = result.current.stopAndDrain(); });
     await act(async () => { reject(new Error('offline')); await stop; });
     expect(result.current.pendingCount).toBe(1);
-    expect(JSON.parse(localStorage.getItem(`gps_pending_${trip.manifiestoId}`)!)).toEqual([{ lat:-34, lng:-70, speed:null, heading:null }]);
+    expect(JSON.parse(localStorage.getItem(gpsQueueKey(trip.ownerId, trip.manifiestoId))!)).toEqual([{ lat:-34, lng:-70, speed:null, heading:null }]);
     unmount();
   });
 
@@ -246,12 +247,31 @@ describe('GPS position provenance and cleanup', () => {
     rerender({ id: 'gps-trip-b' });
     await act(async () => { acknowledge(); await Promise.resolve(); await Promise.resolve(); });
     expect(result.current.pendingCount).toBe(0);
-    expect(JSON.parse(localStorage.getItem('gps_pending_gps-trip-a')!)).toEqual([{ lat:-33, lng:-69, speed:null, heading:null }]);
-    expect(localStorage.getItem('gps_pending_gps-trip-b')).toBeNull();
+    expect(JSON.parse(localStorage.getItem(gpsQueueKey(trip.ownerId, 'gps-trip-a'))!)).toEqual([{ lat:-33, lng:-69, speed:null, heading:null }]);
+    expect(localStorage.getItem(gpsQueueKey(trip.ownerId, 'gps-trip-b'))).toBeNull();
     act(() => watchSuccess[1](position(-34, -70)));
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(4);
     expect(manifiestoService.actualizarUbicacion).toHaveBeenLastCalledWith('gps-trip-b', -34, -70, null, null);
+    unmount();
+  });
+
+  it('does not move a queue or location to another account using the same manifest', async () => {
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValueOnce(new Error('offline'));
+    const { result, rerender, unmount } = renderHook(
+      ({ owner }: { owner: string }) => useGPSTracking({ ...trip, ownerId: owner }),
+      { initialProps: { owner:'carrier-a' } },
+    );
+    act(() => watchSuccess[0](position(-32, -68)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    rerender({ owner:'carrier-b' });
+    expect(result.current.position).toBeNull();
+    expect(result.current.pendingCount).toBe(0);
+    expect(localStorage.getItem(gpsQueueKey('carrier-a', trip.manifiestoId))).not.toBeNull();
+    expect(localStorage.getItem(gpsQueueKey('carrier-b', trip.manifiestoId))).toBeNull();
+    act(() => watchSuccess[1](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenLastCalledWith(trip.manifiestoId, -34, -70, null, null);
     unmount();
   });
 
@@ -276,23 +296,117 @@ describe('GPS position provenance and cleanup', () => {
     expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(4);
     expect(manifiestoService.actualizarUbicacion).toHaveBeenLastCalledWith(trip.manifiestoId, -33, -69, null, null);
     expect(reopened.result.current.pendingCount).toBe(0);
-    expect(localStorage.getItem(`gps_pending_${trip.manifiestoId}`)).toBeNull();
+    expect(localStorage.getItem(gpsQueueKey(trip.ownerId, trip.manifiestoId))).toBeNull();
     reopened.unmount();
   });
 
   it('does not replay saved points when a trip is already delivered', async () => {
     const point = { lat: -32, lng: -68, speed: null, heading: null };
-    localStorage.setItem(`gps_pending_${trip.manifiestoId}`, JSON.stringify([point]));
+    localStorage.setItem(gpsQueueKey(trip.ownerId, trip.manifiestoId), JSON.stringify([point]));
     const { unmount } = renderHook(() => useGPSTracking({ ...trip, estado: 'ENTREGADO' }));
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
-    expect(JSON.parse(localStorage.getItem(`gps_pending_${trip.manifiestoId}`)!)).toEqual([point]);
+    expect(JSON.parse(localStorage.getItem(gpsQueueKey(trip.ownerId, trip.manifiestoId))!)).toEqual([point]);
+    unmount();
+  });
+
+  it('preserves earlier unsent points when more than 500 positions accumulate offline', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    const pending = Array.from({ length: 500 }, (_, index) => ({ lat: -33 + index / 10_000, lng: -69, speed: null, heading: null }));
+    localStorage.setItem(key, JSON.stringify(pending));
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValue(new Error('offline'));
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    await act(async () => {});
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(result.current.pendingCount).toBe(501);
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual([...pending, { lat: -34, lng: -70, speed: null, heading: null }]);
+    unmount();
+  });
+
+  it('sends queued points before a transition and keeps the unacknowledged tail on failure', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    const first = { lat:-32, lng:-68, speed:null, heading:null }, second = { lat:-33, lng:-69, speed:null, heading:null };
+    localStorage.setItem(key, JSON.stringify([first, second]));
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValueOnce(new Error('offline'));
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    await act(async () => {});
+    await act(async () => { await result.current.stopAndDrain(); });
+    vi.mocked(manifiestoService.actualizarUbicacion).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('offline'));
+    let completed = true;
+    await act(async () => { completed = await result.current.flushPending(); });
+    expect(completed).toBe(false);
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual([second]);
+    await act(async () => { completed = await result.current.flushPending(); });
+    expect(completed).toBe(true);
+    expect(localStorage.getItem(key)).toBeNull();
+    unmount();
+  });
+
+  it('stops tracking without restoring a queue after an offline delivery sync succeeds', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    localStorage.setItem(key, JSON.stringify([{ lat:-32, lng:-68, speed:null, heading:null }]));
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValue(new Error('offline'));
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    await act(async () => {});
+    localStorage.removeItem(key);
+    act(() => window.dispatchEvent(new CustomEvent(GPS_DELIVERY_CONFIRMED_EVENT, { detail: { id:trip.manifiestoId, owner:trip.ownerId } })));
+    expect(result.current.pendingCount).toBe(0);
+    expect(result.current.deliveryWasConfirmed()).toBe(true);
+    expect(localStorage.getItem(key)).toBeNull();
+    act(() => result.current.resumeGps());
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('warns when GPS cannot be stored and retains it in memory across reopening in the same page', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    const original = Storage.prototype.setItem;
+    const unavailable = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (name, value) {
+      if (name === key) throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, name, value);
+    });
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValue(new Error('offline'));
+    const first = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(first.result.current.storageError).toBe(true);
+    expect(first.result.current.pendingCount).toBe(1);
+    expect(localStorage.getItem(key)).toBeNull();
+    first.unmount();
+    const reopened = renderHook(() => useGPSTracking(trip));
+    await act(async () => {});
+    expect(reopened.result.current.storageError).toBe(true);
+    expect(reopened.result.current.pendingCount).toBe(1);
+    unavailable.mockRestore();
+    vi.mocked(manifiestoService.actualizarUbicacion).mockResolvedValue(undefined);
+    await act(async () => { await reopened.result.current.retryGps(); await Promise.resolve(); });
+    expect(reopened.result.current.storageError).toBe(false);
+    expect(reopened.result.current.pendingCount).toBe(0);
+    expect(localStorage.getItem(key)).toBeNull();
+    reopened.unmount();
+  });
+
+  it('preserves unreadable GPS data and blocks transitions until it can be reviewed', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    localStorage.setItem(key, '{bad json');
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    await act(async () => {});
+    expect(result.current.storageError).toBe(true);
+    act(() => watchSuccess[0](position()));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); await result.current.stopAndDrain(); });
+    let ready = true;
+    await act(async () => { ready = await result.current.flushPending(); });
+    expect(ready).toBe(false);
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    expect(localStorage.getItem(key)).toBe('{bad json');
     unmount();
   });
 
   it('keeps the newest 500 visual points while preserving existing unsent GPS data', async () => {
     const pending = { lat: -32, lng: -68, speed: null, heading: null };
-    const key = `gps_pending_${trip.manifiestoId}`;
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
     localStorage.setItem(key, JSON.stringify([pending]));
     vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValue(new Error('offline'));
     const { result, unmount } = renderHook(() => useGPSTracking(trip));

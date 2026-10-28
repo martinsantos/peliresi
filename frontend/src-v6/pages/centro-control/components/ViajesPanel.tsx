@@ -154,11 +154,6 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
                       )}
                       {isSelected && m.canViewDetail !== true && <p className="mt-2 text-xs text-neutral-600">Vista operativa · expediente restringido</p>}
                     </div>
-                    {m.ultimaPosicion?.velocidad != null && (
-                      <span className="text-xs font-medium text-neutral-500 flex-shrink-0">
-                        {Math.round(m.ultimaPosicion.velocidad)} km/h
-                      </span>
-                    )}
                   </div>
                 );
               })}

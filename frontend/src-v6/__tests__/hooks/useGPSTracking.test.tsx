@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { headingToCompass, useGPSTracking } from '../../hooks/useGPSTracking';
 import { EstadoManifiesto } from '../../types/models';
 import { manifiestoService } from '../../services/manifiesto.service';
+import { gpsQueueKey } from '../../services/gpsQueue';
 
 vi.mock('../../services/manifiesto.service', () => ({
   manifiestoService: {
@@ -41,6 +42,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-2',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -86,6 +88,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-3',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -123,6 +126,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-5',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -150,6 +154,7 @@ describe('useGPSTracking', () => {
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-4',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',
@@ -182,12 +187,13 @@ describe('useGPSTracking', () => {
   it('exposes restored pending GPS metadata before sync completes', async () => {
     vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValueOnce(new Error('offline'));
     localStorage.setItem(
-      'gps_pending_trip-1',
+      gpsQueueKey('carrier-a', 'trip-1'),
       JSON.stringify([{ lat: -32.92871, lng: -68.85352, speed: null, heading: 90 }]),
     );
 
     const { result, unmount } = renderHook(() =>
       useGPSTracking({
+        ownerId: 'carrier-a',
         manifiestoId: 'trip-1',
         estado: EstadoManifiesto.EN_TRANSITO,
         viajeStatus: 'ACTIVO',

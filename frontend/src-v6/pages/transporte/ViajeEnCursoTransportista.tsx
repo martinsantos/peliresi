@@ -17,6 +17,7 @@ import { manifestFeatureVisible } from '../../utils/manifestFeatures';
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import {
@@ -43,6 +44,9 @@ import { formatDateTime } from '../../utils/formatters';
 import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
+import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError } from '../../services/gpsQueue';
+import { addToSyncQueue, getSyncQueue } from '../../services/indexeddb';
+import { hasQueuedDelivery } from '../../services/syncQueuePolicy';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Recenter map when position changes (respects user pan/zoom)
@@ -63,11 +67,25 @@ function RecenterMap({ position, onUserInteract, followUser }: {
   return null;
 }
 
+type DeliveryQueueState = 'checking' | 'pending' | 'sent' | 'none' | 'error';
+function DeliveryQueueNotice({ status, onRetry }: { status: DeliveryQueueState; onRetry: () => void }) {
+  if (status === 'none') return null;
+  return <div role="status" className="rounded-xl border border-primary-200 bg-primary-50 p-4 text-sm text-primary-900">
+    {status === 'checking' ? 'Comprobando entregas pendientes…' : status === 'pending' ? 'Entrega guardada. Se enviará al reconectar, después de las ubicaciones pendientes.' : status === 'sent' ? 'Entrega enviada. Actualizando el manifiesto…' : 'No se pudo comprobar si hay una entrega guardada en este dispositivo.'}
+    {status === 'error' && <button type="button" className="ml-2 min-h-11 font-semibold underline" onClick={onRetry}>Reintentar</button>}
+  </div>;
+}
+
 const ViajeEnCursoTransportistaContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
+  const queryClient = useQueryClient();
+  const [snapshotError, setSnapshotError] = useState(false);
+  const [deliveryQueue, setDeliveryQueue] = useState<DeliveryQueueState>('checking');
+  const [queueCheck, setQueueCheck] = useState(0);
+  const queueCheckVersion = useRef(0);
   // Map recenter control
   const [followUser, setFollowUser] = useState(true);
   const handleMapInteract = useCallback(() => setFollowUser(false), []);
@@ -106,8 +124,13 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         fechaRetiro: m.fechaRetiro,
         savedAt: new Date().toISOString(),
       };
-      localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
-      localStorage.setItem('sitrep_active_trip_id', id);
+      try {
+        localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
+        localStorage.setItem('sitrep_active_trip_id', id);
+        setSnapshotError(false);
+      } catch {
+        setSnapshotError(true);
+      }
     }
   }, [id, m.id, m.numero, m.estado, m.modalidad, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
 
@@ -117,10 +140,13 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const registrarIncidente = useRegistrarIncidente();
 
   // UI state
-  const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>(() => (
-    id && localStorage.getItem(`viaje_status_${id}`) === 'PAUSADO' ? 'PAUSADO' : 'ACTIVO'
-  ));
+  const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>(() => {
+    try { return id && localStorage.getItem(`viaje_status_${id}`) === 'PAUSADO' ? 'PAUSADO' : 'ACTIVO'; }
+    catch { return 'ACTIVO'; }
+  });
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
+  const [deliveryError, setDeliveryError] = useState('');
+  const deliveryErrorRef = useRef<HTMLParagraphElement>(null);
   const [isFinishingTrip, setIsFinishingTrip] = useState(false);
   const deliveryInFlightRef = useRef(false);
   const gpsRetryInFlightRef = useRef(false);
@@ -129,13 +155,39 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const [incidenteTipo, setIncidenteTipo] = useState('');
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
   const [vistaMapa, setVistaMapa] = useState(true);
+  useEffect(() => { if (deliveryError) deliveryErrorRef.current?.focus(); }, [deliveryError]);
   const legs=useTransportLegs(m.modalidad==='IN_SITU'?'':id||'');
   const hasHandoff=legs.data?.tramos.some(leg=>!leg.fin&&leg.tipo!=='ORIGINAL')||false;
+
+  useEffect(() => {
+    if (!id || currentUser?.id == null) return;
+    const owner = currentUser.id;
+    const version = ++queueCheckVersion.current;
+    let active = true;
+    setDeliveryQueue('checking');
+    void getSyncQueue().then(actions => {
+      if (active && queueCheckVersion.current === version) setDeliveryQueue(hasQueuedDelivery(actions, owner, id) ? 'pending' : 'none');
+    }).catch(() => { if (active && queueCheckVersion.current === version) setDeliveryQueue('error'); });
+    return () => { active = false; };
+  }, [currentUser?.id, id, queueCheck]);
+
+  useEffect(() => {
+    const onDelivery = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; owner: string }>).detail;
+      if (detail?.id !== id || detail.owner !== String(currentUser?.id)) return;
+      ++queueCheckVersion.current;
+      setDeliveryQueue('sent');
+      void queryClient.invalidateQueries({ queryKey:['manifiestos', 'detail', id] });
+    };
+    window.addEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
+    return () => window.removeEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
+  }, [currentUser?.id, id, queryClient]);
 
   // GPS tracking via custom hook
   const gps = useGPSTracking({
     manifiestoId: id,
-    estado: hasHandoff||m.modalidad==='IN_SITU'?undefined:m.estado,
+    ownerId: currentUser?.id,
+    estado: hasHandoff||m.modalidad==='IN_SITU'||deliveryQueue!=='none'?undefined:m.estado,
     viajeStatus,
   });
 
@@ -208,24 +260,36 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   // Confirmar Entrega with GPS coordinates + offline queue
   const handleConfirmarEntrega = async () => {
-    if (!currentUser) return toast.error('Sesión no disponible', 'Vuelva a iniciar sesión.');
+    if (!currentUser) { setDeliveryError('Sesión no disponible. Volvé a iniciar sesión.'); return; }
     if (deliveryInFlightRef.current) return;
     deliveryInFlightRef.current = true;
+    setDeliveryError('');
     setIsFinishingTrip(true);
     try {
       await gps.stopAndDrain();
-      const result = await offlineSafeMutation(
-        () => confirmarEntrega.mutateAsync({
-          id: id!,
-          latitud: currentPosition?.[0],
-          longitud: currentPosition?.[1],
-          observaciones: 'Entrega confirmada desde app móvil',
-        }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' }, userId: currentUser.id }
-      );
+      const offline = !navigator.onLine;
+      if (offline && gps.hasStorageError()) {
+        gps.resumeGps();
+        setDeliveryError('Ubicaciones sin guardar. Mantené esta pantalla abierta y recuperá la conexión o el almacenamiento antes de confirmar.');
+        return;
+      }
+      if (!offline && !(await gps.flushPending())) {
+        if (gps.deliveryWasConfirmed()) setDeliveryError('La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.');
+        else {
+          gps.resumeGps();
+          setDeliveryError('Ubicaciones pendientes. No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.');
+        }
+        return;
+      }
+      const delivery = { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' };
+      const queuedDelivery = { type: 'POST' as const, endpoint: `/manifiestos/${id}/confirmar-entrega`, data: delivery, userId: currentUser.id };
+      const result = offline
+        ? (await addToSyncQueue(queuedDelivery), 'QUEUED' as const)
+        : await offlineSafeMutation(() => confirmarEntrega.mutateAsync({ id: id!, ...delivery }), queuedDelivery);
       if (result === 'QUEUED') {
+        ++queueCheckVersion.current;
+        setDeliveryQueue('pending');
         toast.info('Sin conexión — La entrega se confirmará al reconectar');
-        if (id) localStorage.setItem(`viaje_status_${id}`, 'ENTREGA_PENDIENTE');
         cleanupGps();
         setShowFinalizarModal(false);
         return;
@@ -235,17 +299,21 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       if (id) {
         localStorage.removeItem(`viaje_snapshot_${id}`);
         localStorage.removeItem(`viaje_status_${id}`);
-        localStorage.removeItem(`gps_pending_${id}`);
         localStorage.removeItem('sitrep_active_trip_id');
       }
       setShowFinalizarModal(false);
     } catch (err: any) {
       gps.resumeGps();
-      toast.error('Error', err?.response?.data?.message || 'No se pudo confirmar la entrega');
+      setDeliveryError(err?.response?.data?.message || 'No se pudo confirmar la entrega. Revisá la conexión y volvé a intentar.');
     } finally {
       deliveryInFlightRef.current = false;
       setIsFinishingTrip(false);
     }
+  };
+
+  const prepareHandoff = async () => {
+    await gps.stopAndDrain();
+    if (!(await gps.flushPending())) throw new GpsPendingError(gps.deliveryWasConfirmed() ? 'La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.' : undefined);
   };
 
   // Incident saving with description fallback + GPS coords
@@ -365,6 +433,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
             <WifiOff size={16} className="text-warning-600 flex-shrink-0" />
             <p className="text-xs text-warning-700">Datos de la última sesión — reconectando...</p>
           </div>
+          <DeliveryQueueNotice status={deliveryQueue} onRetry={() => setQueueCheck(value => value + 1)} />
           <Card variant="elevated">
             <CardContent className="p-4">
               <div className="space-y-2">
@@ -432,8 +501,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       </header>
 
       <div className="p-4 space-y-4">
+        {snapshotError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">No se pudo guardar una copia del viaje en el dispositivo. Si perdés conexión, sus datos podrían no estar disponibles; revisá el almacenamiento.</p>}
         <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800 underline"><Truck size={17} aria-hidden="true" />Ver todos mis viajes</Link>
-        <TransportLegs id={id!} beforeHandoff={gps.stopAndDrain} onHandoffError={gps.resumeGps}/>
+        {deliveryQueue === 'none' && <TransportLegs id={id!} beforeHandoff={prepareHandoff} onHandoffError={gps.resumeGps}/>}
         {hasHandoff&&<p role="status" className="rounded-xl bg-primary-50 p-3 text-sm text-primary-900">El GPS continúa desde el enlace del reemplazo. Como transportista de origen, seguís registrando la entrega del manifiesto.</p>}
         {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
         {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
@@ -466,7 +536,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               onConfirmPickup={handleConfirmarRetiro}
               onTogglePause={handlePausar}
               onReportIncident={() => setShowIncidenteModal(true)}
-              onConfirmDelivery={() => setShowFinalizarModal(true)}
+              onConfirmDelivery={() => { setDeliveryError(''); setShowFinalizarModal(true); }}
             />
           </>
         )}
@@ -475,7 +545,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         {m.estado === EstadoManifiesto.EN_TRANSITO && (
           <>
             {/* GPS Status Panel */}
-            {!hasHandoff&&<GpsStatusPanel
+            {!hasHandoff&&deliveryQueue==='none'&&<GpsStatusPanel
               status={gpsStatus}
               sendStatus={gpsSendStatus}
               position={currentPosition}
@@ -486,6 +556,8 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               retrying={retryingGps}
               retryDisabled={isActionPending}
               paused={viajeStatus === 'PAUSADO'}
+              storageError={gps.storageError}
+              storageIssue={gps.storageIssue}
             />}
 
             {/* Timer */}
@@ -516,7 +588,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               </div>
             </div>
 
-            <TripActionBar
+            {deliveryQueue === 'none' ? <TripActionBar
               estado={m.estado}
               viajeStatus={viajeStatus}
               delegated={hasHandoff}
@@ -525,8 +597,8 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               onConfirmPickup={handleConfirmarRetiro}
               onTogglePause={handlePausar}
               onReportIncident={() => setShowIncidenteModal(true)}
-              onConfirmDelivery={() => setShowFinalizarModal(true)}
-            />
+              onConfirmDelivery={() => { setDeliveryError(''); setShowFinalizarModal(true); }}
+            /> : <DeliveryQueueNotice status={deliveryQueue} onRetry={() => setQueueCheck(value => value + 1)} />}
 
             {/* Toggle map/events */}
             {!hasHandoff&&<div className="flex bg-neutral-100 rounded-xl p-1">
@@ -624,7 +696,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       {/* Modal Finalizar / Confirmar Entrega */}
       {showFinalizarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <Card role="dialog" aria-modal="true" aria-labelledby="confirmar-entrega-titulo" className="w-full max-w-sm">
+          <Card role="dialog" aria-modal="true" aria-labelledby="confirmar-entrega-titulo" className="w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <CardContent className="p-6 text-center">
               <div className="w-16 h-16 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="text-success-600" size={32} />
@@ -636,11 +708,12 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
                   Ubicación: {currentPosition[0].toFixed(4)}, {currentPosition[1].toFixed(4)}
                 </p>
               )}
+              {deliveryError && <p ref={deliveryErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{deliveryError}</p>}
               <div className="space-y-3">
                 <Button fullWidth onClick={handleConfirmarEntrega} disabled={isActionPending}>
                   {isActionPending ? 'Confirmando...' : 'Sí, Confirmar Entrega'}
                 </Button>
-                <Button variant="outline" fullWidth onClick={() => setShowFinalizarModal(false)} disabled={isActionPending}>
+                <Button variant="outline" fullWidth onClick={() => { setDeliveryError(''); setShowFinalizarModal(false); }} disabled={isActionPending}>
                   Cancelar
                 </Button>
               </div>
@@ -724,7 +797,8 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 // Keep the pause state, dialogs and GPS view bound to the selected manifest.
 const ViajeEnCursoTransportista: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  return <ViajeEnCursoTransportistaContent key={id ?? 'sin-viaje'} />;
+  const { currentUser } = useAuth();
+  return <ViajeEnCursoTransportistaContent key={JSON.stringify([currentUser?.id ?? null, id ?? null])} />;
 };
 
 export default ViajeEnCursoTransportista;

@@ -250,9 +250,6 @@ export const ControlMap: React.FC<ControlMapProps> = ({
                       <Popup>
                         <div className="text-sm">
                           <strong className="text-red-700">{m.numero}</strong>
-                          {m.ultimaPosicion.velocidad != null && (
-                            <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>{Math.round(m.ultimaPosicion.velocidad)} km/h</span>
-                          )}
                           <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#15803d' }}>ORIGEN:</strong> {m.origen}</span>
                             <span style={{ fontSize: '11px' }}><strong style={{ color: '#b45309' }}>TRANSPORTE:</strong> {m.transportista}</span>

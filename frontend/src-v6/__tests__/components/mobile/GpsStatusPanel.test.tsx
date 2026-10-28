@@ -72,6 +72,14 @@ describe('GpsStatusPanel', () => {
     expect(screen.queryByRole('button',{name:'Reintentar GPS'})).not.toBeInTheDocument();
   });
 
+  it('keeps a storage failure visible even when the trip is paused', () => {
+    render(<GpsStatusPanel status="active" sendStatus="error" position={null}
+      details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={1} lastSyncAt={null} paused storageError />);
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo guardar el recorrido');
+    expect(screen.getByRole('alert')).toHaveTextContent('Mantené esta pantalla abierta');
+  });
+
   it('reports Android GPS as searching instead of off while waiting for a fix', () => {
     render(
       <GpsStatusPanel

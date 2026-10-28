@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRightLeft, Copy, MapPin, Truck, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -9,6 +9,7 @@ import { useTransportLegs,transportHandoffService,transportLegKey,handoffLink,ty
 import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateTime } from '../../../utils/formatters';
 import { manifestFeatureVisible } from '../../../utils/manifestFeatures';
+import { GpsPendingError } from '../../../services/gpsQueue';
 
 const fieldClass='mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100';
 interface Props {id:string;beforeHandoff?:()=>Promise<void>;onHandoffError?:()=>void}
@@ -21,6 +22,8 @@ function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
   const {currentUser}=useAuth();
   const query=useTransportLegs(id);const qc=useQueryClient();
   const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[link,setLink]=useState('');
+  const errorRef=useRef<HTMLParagraphElement>(null);
+  useEffect(()=>{if(error)errorRef.current?.focus();},[error]);
   const [kind,setKind]=useState<'REGISTRADO'|'EXTERNO'>('REGISTRADO');
   const [carrierId,setCarrierId]=useState(''),[vehicle,setVehicle]=useState(''),[driver,setDriver]=useState(''),[reason,setReason]=useState('');
   const [declared,setDeclared]=useState<TransportDeclaration>({});
@@ -38,7 +41,7 @@ function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
       const result=await transportHandoffService.create(id,{id:commandId,anteriorId:expectedLeg,tipo:kind,motivo:reason,
         ...(kind==='REGISTRADO'?{transportistaId:carrierId,...(vehicle?{vehiculoId:vehicle}:{}),...(driver?{choferId:driver}:{})}:{}),datos:declared});
       setLink(result.acceso?handoffLink(result.tramo.id,result.acceso):'');setOpen(false);setReason('');setDeclared({});setCommandId(crypto.randomUUID());await refresh();
-    }catch(err:any){onHandoffError?.();setError(err?.response?.data?.message||'No se pudo registrar el traspaso. Los datos del formulario se conservaron.');}
+    }catch(err:any){onHandoffError?.();setError(err instanceof GpsPendingError ? err.message : err?.response?.data?.message||'No se pudo registrar el traspaso. Los datos del formulario se conservaron.');}
     finally{setBusy(false);}
   };
   const access=async(revoke:boolean)=>{
@@ -57,7 +60,7 @@ function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
         <p className="mt-1 text-xs text-neutral-500">{formatDateTime(leg.inicio)}{leg.fin?` → ${formatDateTime(leg.fin)}`:''}</p>
         {leg.tipo!=='ORIGINAL'&&<p className="mt-1 break-words text-sm text-neutral-600">{leg.motivo}</p>}
       </div></li>)}</ol>}
-    {error&&<p role="alert" className="rounded-lg bg-error-50 p-3 text-sm text-error-800">{error}</p>}
+    {error&&!open&&<p ref={errorRef} role="alert" tabIndex={-1} className="rounded-lg bg-error-50 p-3 text-sm text-error-800 focus:outline focus:outline-2 focus:outline-error-600">{error}</p>}
     {query.data.puedeRegistrar&&!open&&<div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>{setExpectedLeg(active?.id??null);setCommandId(crypto.randomUUID());setOpen(true);setError('');setLink('');}}>Registrar traspaso</Button>
       {active&&active.tipo!=='ORIGINAL'&&<><Button variant="outline" isLoading={busy} onClick={()=>access(false)}>Nuevo enlace GPS</Button>{active.accesoActivo&&<Button variant="outline" disabled={busy} onClick={()=>access(true)}>Revocar enlace GPS</Button>}</>}
     </div>}
@@ -71,6 +74,7 @@ function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
       </>}
       {kind==='EXTERNO'&&<><p className="text-sm text-neutral-600">Completá lo que tengas. Los datos faltantes quedarán sin declarar.</p><div className="grid gap-3 sm:grid-cols-2">{([['empresa','Empresa',180],['cuit','CUIT',30],['patente','Patente',30],['chofer','Chofer',180],['documento','Documento',40],['telefono','Contacto',80]] as const).map(([key,label,max])=><label key={key} className="block text-sm font-semibold text-neutral-800">{label}<input type="text" autoComplete="off" maxLength={max} className={fieldClass} value={declared[key]||''} onChange={e=>updateDeclared(key,e.target.value)}/></label>)}</div></>}
       <label className="block text-sm font-semibold text-neutral-800">Motivo del traspaso<textarea required minLength={3} maxLength={1000} className={fieldClass} rows={2} value={reason} onChange={e=>{setReason(e.target.value);setCommandId(crypto.randomUUID());}} placeholder="Ej.: rotura del móvil"/></label>
+      {error&&<p ref={errorRef} role="alert" tabIndex={-1} className="rounded-lg bg-error-50 p-3 text-sm text-error-800 focus:outline focus:outline-2 focus:outline-error-600">{error}</p>}
       <div className="flex flex-wrap gap-2"><Button type="submit" isLoading={busy}>Confirmar traspaso</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>setOpen(false)}>Cerrar formulario</Button></div>
     </form>}
     {link&&<section aria-label="Acceso GPS del reemplazo" className="space-y-3 rounded-xl bg-primary-50 p-4 text-primary-900">

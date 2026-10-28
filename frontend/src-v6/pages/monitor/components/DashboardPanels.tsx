@@ -399,11 +399,6 @@ export const DashboardPanels: React.FC<Props> = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
                         <p className="text-[11px] font-black font-mono text-neutral-800 truncate">{v.numero}</p>
-                        {v.ultimaPosicion?.velocidad != null && v.ultimaPosicion.velocidad > 0 && (
-                          <span className="text-[9px] font-mono text-orange-500 shrink-0">
-                            {v.ultimaPosicion.velocidad.toFixed(0)}km/h
-                          </span>
-                        )}
                       </div>
                       {mode === 'LIVE' && <MonitorPosition position={v.ultimaPosicion} now={now} compact />}
                       {v.transportista && (

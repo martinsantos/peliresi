@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from '../components/ui/Toast';
 import { manifiestoService } from '../services/manifiesto.service';
+import { GPS_DELIVERY_CONFIRMED_EVENT, gpsTasksForTrip, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
 import { EstadoManifiesto } from '../types/models';
 
 // Bound the rendered route independently from the persisted upload queue.
@@ -27,34 +28,9 @@ export interface GpsDetails {
   lastUpdate: Date | null;
 }
 
-interface PendingGpsPoint {
-  lat: number;
-  lng: number;
-  speed: number | null;
-  heading: number | null;
-}
-
-// A trip view can unmount while an upload is still in flight. Keep its tasks
-// separate from other trips and wait for them before replaying the same queue.
-const gpsTasksByTrip = new Map<string, Set<Promise<void>>>();
-
-function trackGpsTask(tripId: string, task: Promise<void>): void {
-  let tasks = gpsTasksByTrip.get(tripId);
-  if (!tasks) {
-    tasks = new Set();
-    gpsTasksByTrip.set(tripId, tasks);
-  }
-  const bucket = tasks;
-  bucket.add(task);
-  const remove = () => {
-    bucket.delete(task);
-    if (bucket.size === 0 && gpsTasksByTrip.get(tripId) === bucket) gpsTasksByTrip.delete(tripId);
-  };
-  void task.then(remove, remove);
-}
-
 interface UseGPSTrackingOptions {
   manifiestoId: string | undefined;
+  ownerId: string | number | undefined;
   estado: string | undefined;
   viajeStatus: 'ACTIVO' | 'PAUSADO';
 }
@@ -67,14 +43,19 @@ interface UseGPSTrackingReturn {
   sendStatus: 'ok' | 'error' | 'idle';
   pendingCount: number;
   hasPending: boolean;
+  storageError: boolean;
+  storageIssue: GpsStorageIssue | null;
   lastSyncAt: Date | null;
   cleanupGps: () => void;
   stopAndDrain: () => Promise<void>;
+  flushPending: () => Promise<boolean>;
+  deliveryWasConfirmed: () => boolean;
+  hasStorageError: () => boolean;
   resumeGps: () => void;
   retryGps: () => Promise<void>;
 }
 
-export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrackingOptions): UseGPSTrackingReturn {
+export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: UseGPSTrackingOptions): UseGPSTrackingReturn {
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('checking');
   const [currentPosition, setCurrentPosition] = useState<[number, number] | null>(null);
   const [trackPoints, setTrackPoints] = useState<[number, number][]>([]);
@@ -83,6 +64,9 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   });
   const [gpsSendStatus, setGpsSendStatus] = useState<'ok' | 'error' | 'idle'>('idle');
   const [pendingCount, setPendingCount] = useState(0);
+  const [storageError, setStorageError] = useState(false);
+  const [storageIssue, setStorageIssue] = useState<GpsStorageIssue | null>(null);
+  const storageErrorRef = useRef(false);
   const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
 
   const watchIdRef = useRef<number | null>(null);
@@ -102,28 +86,32 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
   useEffect(() => { gpsDetailsRef.current = gpsDetails; }, [gpsDetails]);
 
   const id = manifiestoId;
-  const activeTripRef = useRef(id);
-  activeTripRef.current = id;
-  const previousTripRef = useRef(id);
+  const owner = ownerId == null ? undefined : String(ownerId);
+  const context = id && owner ? JSON.stringify([owner, id]) : null;
+  const activeContextRef = useRef(context);
+  activeContextRef.current = context;
+  const previousContextRef = useRef(context);
   const uploadsStoppedRef = useRef(false);
+  const deliveryConfirmedRef = useRef(false);
   const [restart, setRestart] = useState(0);
   const sendPoint = useCallback((tripId: string, p: PendingGpsPoint) => {
     return manifiestoService.actualizarUbicacion(tripId, p.lat, p.lng, p.speed, p.heading);
   }, []);
 
   const setPendingUpdates = useCallback((points: PendingGpsPoint[]) => {
-    if (activeTripRef.current === id) {
+    if (activeContextRef.current === context) {
       pendingUpdatesRef.current = points;
       setPendingCount(points.length);
     }
-    if (!id) return;
-
-    if (points.length > 0) {
-      localStorage.setItem(`gps_pending_${id}`, JSON.stringify(points));
-    } else {
-      localStorage.removeItem(`gps_pending_${id}`);
+    if (!id || !owner) return false;
+    const saved = savePendingGpsQueue(owner, id, points);
+    if (activeContextRef.current === context) {
+      storageErrorRef.current = !saved;
+      setStorageError(!saved);
+      setStorageIssue(saved ? null : 'storage');
     }
-  }, [id]);
+    return saved;
+  }, [context, id, owner]);
 
   const clearGpsErrorNotice = useCallback(() => {
     if (gpsErrorToastRef.current) toast.remove(gpsErrorToastRef.current);
@@ -149,48 +137,74 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       acquisitionRetryIntervalRef.current = null;
     }
     // Flush pending to localStorage on cleanup so they survive PWA close
-    if (id && pendingUpdatesRef.current.length > 0) {
-      localStorage.setItem(`gps_pending_${id}`, JSON.stringify(pendingUpdatesRef.current));
+    if (id && owner && pendingUpdatesRef.current.length > 0) {
+      const saved = savePendingGpsQueue(owner, id, pendingUpdatesRef.current);
+      if (activeContextRef.current === context) { storageErrorRef.current = !saved; setStorageError(!saved); setStorageIssue(saved ? null : 'storage'); }
     }
-  }, [clearGpsErrorNotice, id]);
+  }, [clearGpsErrorNotice, context, id, owner]);
 
   // Finish in-flight HTTP writes before changing the server trip state.
   const stopAndDrain = useCallback(async () => {
     cleanupGps();
-    if (id) await Promise.allSettled([...(gpsTasksByTrip.get(id) ?? [])]);
+    if (id) await Promise.allSettled(gpsTasksForTrip(id));
   }, [cleanupGps, id]);
-  const resumeGps = useCallback(() => setRestart(value => value + 1), []);
+  // Called after stopAndDrain, before a state change that would reject older GPS points.
+  const flushPending = useCallback(async (): Promise<boolean> => {
+    if (!id || !owner || !uploadsStoppedRef.current || deliveryConfirmedRef.current) return false;
+    const generation = trackingGenerationRef.current;
+    let completed = false;
+    await runExclusiveGpsTask(id, async () => {
+      if (activeContextRef.current !== context || trackingGenerationRef.current !== generation || deliveryConfirmedRef.current) return;
+      const saved = readPendingGpsQueue(owner, id);
+      if (!saved.ok) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(saved.reason); return; }
+      let pending = saved.points;
+      if (!setPendingUpdates(pending) && pending.length === 0) return;
+      for (const point of [...pending]) {
+        try { await sendPoint(id, point); } catch { return; }
+        pending = pending.slice(1);
+        if (!setPendingUpdates(pending)) return;
+        if (activeContextRef.current !== context || trackingGenerationRef.current !== generation || deliveryConfirmedRef.current) return;
+      }
+      completed = true;
+    });
+    return completed;
+  }, [context, id, owner, sendPoint, setPendingUpdates]);
+  const resumeGps = useCallback(() => { if (!deliveryConfirmedRef.current) setRestart(value => value + 1); }, []);
   // A retry must not re-enable tracking if a delivery, handoff or unmount
   // stopped it while an outstanding GPS upload was being drained.
   const retryGps = useCallback(async () => {
-    if (!id || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus !== 'ACTIVO') return;
+    if (!id || !owner || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus !== 'ACTIVO') return;
     const expectedGeneration = trackingGenerationRef.current + 1;
     await stopAndDrain();
-    if (trackingGenerationRef.current !== expectedGeneration || activeTripRef.current !== id) return;
+    if (trackingGenerationRef.current !== expectedGeneration || activeContextRef.current !== context) return;
     const emptyDetails: GpsDetails = { accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null };
     currentPositionRef.current = null;
     gpsDetailsRef.current = emptyDetails;
     setCurrentPosition(null);
     setGpsDetails(emptyDetails);
     setRestart(value => value + 1);
-  }, [estado, id, stopAndDrain, viajeStatus]);
+  }, [context, estado, id, owner, stopAndDrain, viajeStatus]);
 
   // A position and its pending queue belong to one manifest only.
   useEffect(() => {
-    if (previousTripRef.current === id) return;
-    previousTripRef.current = id;
+    if (previousContextRef.current === context) return;
+    previousContextRef.current = context;
+    deliveryConfirmedRef.current = false;
     const emptyDetails: GpsDetails = { accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null };
     pendingUpdatesRef.current = [];
+    storageErrorRef.current = false;
     currentPositionRef.current = null;
     gpsDetailsRef.current = emptyDetails;
     setPendingCount(0);
+    setStorageError(false);
+    setStorageIssue(null);
     setCurrentPosition(null);
     setTrackPoints([]);
     setGpsDetails(emptyDetails);
     setGpsSendStatus('idle');
     setLastSyncAt(null);
     setGpsStatus('checking');
-  }, [id]);
+  }, [context]);
 
   // Check GPS permission on mount
   useEffect(() => {
@@ -215,40 +229,51 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
 
   // Restore pending GPS updates from localStorage on mount and flush in order
   useEffect(() => {
-    if (!id || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
+    if (!id || !owner || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
     uploadsStoppedRef.current = false;
     let isMounted = true;
-    const earlierTasks = [...(gpsTasksByTrip.get(id) ?? [])];
-    const savedPending = localStorage.getItem(`gps_pending_${id}`);
-    if (savedPending || earlierTasks.length > 0) {
+    const earlierTasks = gpsTasksForTrip(id);
+    const savedPending = readPendingGpsQueue(owner, id);
+    if (!savedPending.ok) {
+      storageErrorRef.current = true;
+      setStorageError(true);
+      setStorageIssue(savedPending.reason);
+    } else if (!savedPending.durable) {
+      setPendingUpdates(savedPending.points);
+    }
+    if ((!savedPending.ok || savedPending.points.length > 0) || earlierTasks.length > 0) {
       const replay = (async () => {
         if (earlierTasks.length > 0) await Promise.allSettled(earlierTasks);
-        if (!isMounted || uploadsStoppedRef.current || activeTripRef.current !== id) return;
-        const saved = localStorage.getItem(`gps_pending_${id}`);
-        if (!saved) return;
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+        if (!isMounted || uploadsStoppedRef.current || activeContextRef.current !== context) return;
+        const saved = readPendingGpsQueue(owner, id);
+        if (!saved.ok) {
+          storageErrorRef.current = true;
+          setStorageError(true);
+          setStorageIssue(saved.reason);
+          return;
+        }
+        const parsed = saved.points;
+        if (parsed.length > 0) {
             setPendingUpdates(parsed);
             let flushed = 0;
             for (const p of parsed) {
-              if (!isMounted || uploadsStoppedRef.current || activeTripRef.current !== id) break;
+              if (!isMounted || uploadsStoppedRef.current || activeContextRef.current !== context) break;
               try {
                 await sendPoint(id, p);
                 flushed++;
-                if (isMounted && activeTripRef.current === id) setLastSyncAt(new Date());
+                if (isMounted && activeContextRef.current === context) setLastSyncAt(new Date());
+                const remaining = parsed.slice(flushed);
+                const persisted = isMounted && activeContextRef.current === context
+                  ? setPendingUpdates(remaining) : savePendingGpsQueue(owner, id, remaining);
+                if (!persisted) break;
               } catch {
                 break;
               }
             }
             // Persist to the original trip even if the view was unmounted.
             const remaining = parsed.slice(flushed);
-            if (isMounted && activeTripRef.current === id) setPendingUpdates(remaining);
-            else if (remaining.length > 0) localStorage.setItem(`gps_pending_${id}`, JSON.stringify(remaining));
-            else localStorage.removeItem(`gps_pending_${id}`);
-          }
-        } catch {
-          localStorage.removeItem(`gps_pending_${id}`);
+            if (isMounted && activeContextRef.current === context) setPendingUpdates(remaining);
+            else savePendingGpsQueue(owner, id, remaining);
         }
       })();
       trackGpsTask(id, replay);
@@ -256,11 +281,11 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     return () => {
       isMounted = false;
     };
-  }, [id, estado, viajeStatus, restart, setPendingUpdates, sendPoint]);
+  }, [context, id, owner, estado, viajeStatus, restart, setPendingUpdates, sendPoint]);
 
   // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
-    if (estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
+    if (!id || !owner || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
     if (!('geolocation' in navigator)) {
       setGpsStatus('unavailable');
       return;
@@ -268,7 +293,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
 
     uploadsStoppedRef.current = false;
     const generation = ++trackingGenerationRef.current;
-    const isActive = () => trackingGenerationRef.current === generation && activeTripRef.current === id;
+    const isActive = () => trackingGenerationRef.current === generation && activeContextRef.current === context;
     let fallbackPositionInFlight = false;
     let permissionDenied = false;
     setGpsStatus('acquiring');
@@ -347,9 +372,10 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     // GPS send interval: every 30s
     sendIntervalRef.current = setInterval(() => {
       // Do not overlap queue replay or an earlier send when the network is slow.
-      if (!id || (gpsTasksByTrip.get(id)?.size ?? 0) > 0) return;
+      if (!id || gpsTasksForTrip(id).length > 0) return;
       trackGpsTask(id, (async () => {
         if (!isActive() || permissionDenied) return;
+        if (storageErrorRef.current && pendingUpdatesRef.current.length === 0) return;
         const pos = currentPositionRef.current;
         const details = gpsDetailsRef.current;
         if (!pos || !id) return;
@@ -367,6 +393,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
           if (pendingForAttempt.length > 0) {
             const pendingSnapshot = pendingForAttempt;
             let flushed = 0;
+            let persistenceFailed = false;
             for (const p of pendingSnapshot) {
               if (!isActive()) {
                 setPendingUpdates(pendingSnapshot.slice(flushed));
@@ -376,6 +403,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
                 await sendPoint(id, p);
                 flushed++;
                 if (isActive()) setLastSyncAt(new Date());
+                if (!setPendingUpdates(pendingSnapshot.slice(flushed))) { persistenceFailed = true; break; }
               } catch {
                 break;
               }
@@ -384,7 +412,7 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
             pendingForAttempt = remaining;
             setPendingUpdates(remaining);
             if (!isActive()) return;
-            if (remaining.length > 0) throw new Error('Unable to flush pending GPS points');
+            if (persistenceFailed || remaining.length > 0) throw new Error('Unable to flush pending GPS points');
           }
 
           // Now send current position
@@ -395,10 +423,10 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
           setLastSyncAt(new Date());
           setGpsSendStatus('ok');
         } catch {
-          const nextPending = [...pendingForAttempt, point].slice(-500);
+          const nextPending = [...pendingForAttempt, point];
           setPendingUpdates(nextPending);
           if (isActive()) setGpsSendStatus('error');
-          if (isActive() && nextPending.length === 1) {
+          if (isActive() && nextPending.length === 1 && !storageErrorRef.current) {
             toast.warning('Sin conexión GPS. Los puntos se guardan localmente.');
           }
         }
@@ -413,7 +441,23 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [estado, viajeStatus, id, restart, cleanupGps, clearGpsErrorNotice, setPendingUpdates, sendPoint]);
+  }, [context, estado, viajeStatus, id, owner, restart, cleanupGps, clearGpsErrorNotice, setPendingUpdates, sendPoint]);
+
+  useEffect(() => {
+    const onDelivery = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; owner: string }>).detail;
+      if (detail?.id !== id || detail.owner !== owner) return;
+      deliveryConfirmedRef.current = true;
+      pendingUpdatesRef.current = [];
+      storageErrorRef.current = false;
+      setPendingCount(0);
+      setStorageError(false);
+      setStorageIssue(null);
+      cleanupGps();
+    };
+    window.addEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
+    return () => window.removeEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
+  }, [cleanupGps, id, owner]);
 
   return {
     position: currentPosition,
@@ -422,10 +466,15 @@ export function useGPSTracking({ manifiestoId, estado, viajeStatus }: UseGPSTrac
     details: gpsDetails,
     sendStatus: gpsSendStatus,
     pendingCount,
-    hasPending: pendingCount > 0,
+    hasPending: pendingCount > 0 || storageError,
+    storageError,
+    storageIssue,
     lastSyncAt,
     cleanupGps,
     stopAndDrain,
+    flushPending,
+    deliveryWasConfirmed: () => deliveryConfirmedRef.current,
+    hasStorageError: () => storageErrorRef.current,
     resumeGps,
     retryGps,
   };

@@ -4,6 +4,7 @@ import { Card, CardContent } from '../ui/CardV2';
 import { Badge } from '../ui/BadgeV2';
 import { AndroidPermissionGuide } from './AndroidPermissionGuide';
 import { headingToCompass, type GpsDetails, type GpsStatus } from '../../hooks/useGPSTracking';
+import type { GpsStorageIssue } from '../../services/gpsQueue';
 
 interface GpsStatusPanelProps {
   status: GpsStatus;
@@ -16,6 +17,8 @@ interface GpsStatusPanelProps {
   retrying?: boolean;
   retryDisabled?: boolean;
   paused?: boolean;
+  storageError?: boolean;
+  storageIssue?: GpsStorageIssue | null;
 }
 
 const STATUS_COPY: Record<GpsStatus, { label: string; tone: string; icon: React.ReactNode }> = {
@@ -43,8 +46,11 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   retrying = false,
   retryDisabled = false,
   paused = false,
+  storageError = false,
+  storageIssue = null,
 }) => {
-  if (paused) return <p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>;
+  const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{storageIssue === 'legacy' ? 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'invalid' ? 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.' : 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.'}</p>;
+  if (paused) return <div className="space-y-2"><p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>{storageNotice}</div>;
   const copy = STATUS_COPY[status];
 
   return (
@@ -92,6 +98,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
 
       {status === 'denied' && <AndroidPermissionGuide permission="gps" state="denied" />}
       {status === 'unavailable' && <AndroidPermissionGuide permission="gps" state="unavailable" />}
+      {storageNotice}
       {onRetry && ['denied', 'unavailable', 'error'].includes(status) && (
         <button type="button" onClick={onRetry} disabled={retrying || retryDisabled}
           className="min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">

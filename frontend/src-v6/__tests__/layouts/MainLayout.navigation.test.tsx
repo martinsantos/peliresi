@@ -5,8 +5,10 @@ import {MainLayout} from '../../layouts/MainLayout';
 const authState=vi.hoisted(()=>({rol:'ADMIN',esInspector:false,training:false}));
 const attention=vi.hoisted(()=>({support:0,applicationPending:0}));
 const logout=vi.hoisted(()=>vi.fn());
+const sync=vi.hoisted(()=>vi.fn(()=>({processed:0,pending:0,retryable:0,terminal:0,auth:0,skipped:0,syncing:false,retry:vi.fn()})));
 vi.mock('../../hooks/useAttentionCounts',()=>({useAttentionCounts:()=>attention}));
-vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa',training:authState.training,rol:authState.rol,esInspector:authState.esInspector,nombre:'QA',email:'qa@example.invalid',avatar:'QA',permisos:[]},isAdmin:authState.rol==='ADMIN',isAdminGenerador:authState.rol==='ADMIN_GENERADOR',isAdminOperador:authState.rol==='ADMIN_OPERADOR',isAdminTransportista:authState.rol==='ADMIN_TRANSPORTISTA',isLoading:false,canAccess:()=>true,logout})}));
+vi.mock('../../hooks/useOfflineSync',()=>({useOfflineSync:sync}));
+vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'qa',training:authState.training,rol:authState.rol,esInspector:authState.esInspector,nombre:'QA',email:'qa@example.invalid',avatar:'QA',permisos:[]},isAdmin:authState.rol==='ADMIN',isTransportista:authState.rol==='TRANSPORTISTA',isAdminGenerador:authState.rol==='ADMIN_GENERADOR',isAdminOperador:authState.rol==='ADMIN_OPERADOR',isAdminTransportista:authState.rol==='ADMIN_TRANSPORTISTA',isLoading:false,canAccess:()=>true,logout})}));
 vi.mock('../../contexts/ImpersonationContext',()=>({useImpersonation:()=>({impersonationData:null,exitImpersonation:vi.fn()})}));
 vi.mock('../../components/GlobalSearchPanel',()=>({GlobalSearchPanel:()=>null}));
 vi.mock('../../components/NotificationBell',()=>({NotificationBell:()=>null}));
@@ -42,6 +44,10 @@ describe('Sidebar: one visible current destination',()=>{
     expect(help.parentElement).not.toHaveClass('fixed');
   });
   beforeEach(()=>{authState.rol='ADMIN';authState.esInspector=false;authState.training=false;attention.support=0;attention.applicationPending=0;});
+  it.each(['ADMIN','GENERADOR','OPERADOR','TRANSPORTISTA'])('enables web offline synchronization only for %s when appropriate',rol=>{
+    authState.rol=rol; sync.mockClear(); show('/dashboard');
+    expect(sync).toHaveBeenCalledWith({downloadManifests:false,enabled:rol==='TRANSPORTISTA'});
+  });
   it.each(['button','Escape'])('closes the compact menu with %s and restores keyboard focus without leaving the page',method=>{
     show('/dashboard');
     const trigger=screen.getByRole('button',{name:'Abrir menú',exact:true});

@@ -12,6 +12,7 @@ import {
   type SyncMethod,
 } from './syncQueuePolicy';
 import api from './api';
+import { GPS_DELIVERY_CONFIRMED_EVENT, flushStoredGpsQueue, gpsPointPayload, runExclusiveGpsTask } from './gpsQueue';
 
 const DB_NAME = 'sitrep_offline_db';
 const DB_VERSION = 5;
@@ -275,13 +276,16 @@ export async function clearSyncQueue(): Promise<void> {
  * If currentUserId is provided, skips actions from other users.
  * Retorna la cantidad de acciones procesadas con éxito.
  */
-export async function processSyncQueue(currentUserId: string | number, manual = false): Promise<SyncQueueResult> {
+class SyncContextChangedError extends Error {}
+
+export async function processSyncQueue(currentUserId: string | number, manual = false, isCurrent: () => boolean = () => true): Promise<SyncQueueResult> {
   const queue = await getSyncQueue();
   const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId));
   const result: SyncQueueResult = { processed: 0, pending: owned.length, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
   if (owned.length === 0) return result;
 
   for (const action of owned) {
+    if (!isCurrent()) break;
     // Skip actions from other users (prevents cross-user data leakage)
     if (!isSyncActionOwnedBy(action.userId, currentUserId)) {
       continue;
@@ -316,16 +320,32 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
     try {
       switch (action.type) {
         case 'POST':
-          await flushGpsBeforeQueuedDelivery(api, action.endpoint);
-          await api.post(action.endpoint, action.data);
+          {
+            const deliveryId = queuedDeliveryManifestId(action.endpoint);
+            if (deliveryId) {
+              await runExclusiveGpsTask(deliveryId, async () => {
+                if (!isCurrent()) throw new SyncContextChangedError();
+                await flushGpsBeforeQueuedDelivery(api, action.endpoint, currentUserId, isCurrent);
+                if (!isCurrent()) throw new SyncContextChangedError();
+                await api.post(action.endpoint, action.data);
+                if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(GPS_DELIVERY_CONFIRMED_EVENT, { detail: { id: deliveryId, owner: String(currentUserId) } }));
+              });
+            } else {
+              if (!isCurrent()) throw new SyncContextChangedError();
+              await api.post(action.endpoint, action.data);
+            }
+          }
           break;
         case 'PUT':
+          if (!isCurrent()) throw new SyncContextChangedError();
           await api.put(action.endpoint, action.data);
           break;
         case 'PATCH':
+          if (!isCurrent()) throw new SyncContextChangedError();
           await api.patch(action.endpoint, action.data);
           break;
         case 'DELETE':
+          if (!isCurrent()) throw new SyncContextChangedError();
           await api.delete(action.endpoint);
           break;
         default: {
@@ -343,6 +363,7 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
       result.processed += 1;
       result.pending -= 1;
     } catch (error) {
+      if (error instanceof SyncContextChangedError) break;
       const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
       const { failureKind, lastError } = classifySyncFailure(error);
       const attempts = (action.attempts || 0) + 1;
@@ -369,36 +390,13 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
 
 type ApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown> };
 
-async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string): Promise<void> {
+async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string, owner: string | number, isCurrent: () => boolean): Promise<void> {
   const manifiestoId = queuedDeliveryManifestId(endpoint);
   if (!manifiestoId || typeof localStorage === 'undefined') return;
-
-  const key = `gps_pending_${manifiestoId}`;
-  const stored = localStorage.getItem(key);
-  if (!stored) return;
-
-  let points: Array<{ lat: number; lng: number; speed?: number; heading?: number }>;
-  try {
-    const parsed: unknown = JSON.parse(stored);
-    points = Array.isArray(parsed)
-      ? parsed.filter((point): point is { lat: number; lng: number; speed?: number; heading?: number } => {
-          if (!point || typeof point !== 'object') return false;
-          const candidate = point as { lat?: unknown; lng?: unknown };
-          return Number.isFinite(candidate.lat) && Number.isFinite(candidate.lng);
-        })
-      : [];
-  } catch {
-    points = [];
-  }
-  for (const point of points) {
-    await api.post(`/manifiestos/${manifiestoId}/ubicacion`, {
-      latitud: point.lat,
-      longitud: point.lng,
-      velocidad: point.speed,
-      direccion: point.heading,
-    });
-  }
-  localStorage.removeItem(key);
+  await flushStoredGpsQueue(owner, manifiestoId, point => {
+    if (!isCurrent()) throw new SyncContextChangedError();
+    return api.post(`/manifiestos/${manifiestoId}/ubicacion`, gpsPointPayload(point));
+  });
 }
 
 function cleanupAfterSuccessfulSync(endpoint: string): void {
@@ -406,7 +404,6 @@ function cleanupAfterSuccessfulSync(endpoint: string): void {
   if (!manifiestoId || typeof localStorage === 'undefined') return;
   localStorage.removeItem(`viaje_snapshot_${manifiestoId}`);
   localStorage.removeItem(`viaje_status_${manifiestoId}`);
-  localStorage.removeItem(`gps_pending_${manifiestoId}`);
   if (localStorage.getItem('sitrep_active_trip_id') === manifiestoId) {
     localStorage.removeItem('sitrep_active_trip_id');
   }

@@ -11,7 +11,7 @@ import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 're
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Menu, X, ChevronRight, User, LogOut, SwitchCamera, Eye, ArrowLeft, AlertTriangle, BookOpen, Navigation,  } from 'lucide-react';
+import { Menu, X, ChevronRight, User, LogOut, SwitchCamera, Eye, ArrowLeft, BookOpen, Navigation,  } from 'lucide-react';
 
 import { Search } from 'lucide-react';
 import { GlobalSearchPanel } from '../components/GlobalSearchPanel';
@@ -29,6 +29,7 @@ import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 import { useOfflineSync } from '../hooks/useOfflineSync';
+import { OfflineSyncNotice } from '../components/OfflineSyncNotice';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
@@ -216,12 +217,7 @@ export const MobileLayout: React.FC = () => {
       {/* Connectivity indicator - always visible at top */}
       {!isInspectionCase && <ConnectivityIndicator />}
 
-      {(offlineSync.terminal > 0 || offlineSync.auth > 0 || offlineSync.retryable > 0) && (
-        <div role="status" className={`flex items-center justify-between gap-3 border-b px-4 py-2 text-xs ${offlineSync.terminal > 0 || offlineSync.auth > 0 ? 'border-error-200 bg-error-50 text-error-900' : 'border-amber-200 bg-amber-50 text-amber-950'}`}>
-          <span className="flex min-w-0 items-center gap-2"><AlertTriangle size={16} className="shrink-0" /><span className="min-w-0"><strong>{offlineSync.auth > 0 ? 'La sesión debe renovarse' : offlineSync.terminal > 0 ? 'Hay cambios que requieren revisión' : 'Hay cambios esperando reintento'}</strong><span className="ml-1">· {offlineSync.pending} pendientes</span>{offlineSync.lastError && <span className="block truncate opacity-80">{offlineSync.lastError}</span>}</span></span>
-          <button type="button" disabled={offlineSync.syncing} onClick={() => void offlineSync.retry()} className="min-h-9 shrink-0 rounded-md border border-current bg-white px-2 font-bold disabled:opacity-50">{offlineSync.syncing ? 'Reintentando…' : 'Reintentar'}</button>
-        </div>
-      )}
+      <OfflineSyncNotice status={offlineSync} />
 
       {/* SW update banner - shown when new version available */}
       <SWUpdateBanner />

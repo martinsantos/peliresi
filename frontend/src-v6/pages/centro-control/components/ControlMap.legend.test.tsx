@@ -28,6 +28,14 @@ function renderMap(inspection?: boolean, cc: React.ComponentProps<typeof Control
 }
 
 describe('Control map visual identity across desktop and mobile', () => {
+  it('does not label an unverified stored speed as km/h in the trip popup', () => {
+    renderMap(false, null, {
+      selectedTripId: 'qa-trip',
+      enTransitoForMap: [{ manifiestoId: 'qa-trip', numero: 'QA-TRIP', origen: 'QA origen', destino: 'QA destino', transportista: 'QA transporte', origenLatLng: [-32.8, -68.8], destinoLatLng: [-32.9, -68.9], ultimaPosicion: { latitud: -32.85, longitud: -68.85, velocidad: 12, direccion: null, timestamp: '2026-10-07T12:00:00Z' }, ruta: [] }],
+    });
+    expect(screen.getByText('QA-TRIP')).toBeVisible();
+    expect(screen.queryByText(/12\s*km\/h/i)).not.toBeInTheDocument();
+  });
   it('retains the selected trip data but hides all its map symbols when the transit layer is off', () => {
     renderMap(false, null, {
       layers: { generadores: true, transportistas: true, operadores: true, transito: false },

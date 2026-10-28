@@ -68,7 +68,6 @@ const ActiveTripGuard: React.FC = () => {
       localStorage.removeItem('sitrep_active_trip_id');
       localStorage.removeItem(`viaje_snapshot_${activeTripId}`);
       localStorage.removeItem(`viaje_status_${activeTripId}`);
-      localStorage.removeItem(`gps_pending_${activeTripId}`);
       return <Navigate to="/dashboard" replace />;
     }
     return <Navigate to="/dashboard" replace />;

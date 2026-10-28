@@ -51,6 +51,15 @@ describe('restricted applicants do not start full-access background services', (
     for (const fn of [mocks.unread, mocks.list, mocks.sync, mocks.process]) expect(fn).not.toHaveBeenCalled();
     unmount();
   });
+  it('does not process or manually retry the queue while synchronization is disabled', async () => {
+    mocks.restricted = false;
+    const hook = renderHook(({ enabled }: { enabled: boolean }) => useOfflineSync({ enabled, downloadManifests: false }), { wrapper, initialProps: { enabled: false } });
+    await act(async () => { await hook.result.current.retry(); });
+    expect(mocks.process).not.toHaveBeenCalled();
+    hook.rerender({ enabled: true });
+    await waitFor(() => expect(mocks.process).toHaveBeenCalledWith('pending-carrier', false, expect.any(Function)));
+    hook.unmount();
+  });
   it('does not subscribe push or mount the notice poller for a restricted applicant', () => {
     const { unmount } = render(<NotificacionesPoller />, { wrapper });
     expect(mocks.get).not.toHaveBeenCalled(); expect(mocks.notices).not.toHaveBeenCalled(); expect(mocks.push).not.toHaveBeenCalled();

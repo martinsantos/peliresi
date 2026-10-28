@@ -33,6 +33,8 @@ import { SupportBubble } from '../components/SupportBubble';
 import { ApplicantLayout } from './ApplicantLayout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { useAttentionCounts } from '../hooks/useAttentionCounts';
+import { useOfflineSync } from '../hooks/useOfflineSync';
+import { OfflineSyncNotice } from '../components/OfflineSyncNotice';
 
 // ========================================
 // COMPONENT
@@ -73,6 +75,7 @@ export const MainLayout: React.FC = () => {
   const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
   const attention = useAttentionCounts();
+  const offlineSync = useOfflineSync({ downloadManifests: false, enabled: isTransportista });
 
   const navigation = useMemo(() => workspaceNavigation(currentUser), [currentUser]);
   const adminItems = navigation.filter(item => item.section === 'admin');
@@ -132,6 +135,7 @@ export const MainLayout: React.FC = () => {
 
       {/* Connectivity indicator - always visible at top */}
       <ConnectivityIndicator />
+      <OfflineSyncNotice status={offlineSync} />
 
       <div className="flex flex-1 min-h-0">
       {/* Mobile sidebar overlay */}

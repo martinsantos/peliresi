@@ -27,7 +27,8 @@ test('the monitor displays the location received for a simultaneous handoff', as
   await marker.focus(); await marker.press('Enter');
   const popup = page.getByTestId('monitor-live-popup');
   await expect(popup).toContainText(load.numero);
-  await expect(popup.getByLabel('Última posición recibida')).toContainText('Última posición');
+  await expect(popup.getByLabel('Última posición recibida')).toContainText('Última recepción');
+  await expect(popup.getByLabel('Última posición recibida')).toContainText('puede ser anterior');
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   const frame = page.locator('.leaflet-popup');
   await expect.poll(() => frame.evaluate(element => {

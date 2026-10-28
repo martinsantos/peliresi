@@ -88,6 +88,7 @@ import { authService } from '../../services/auth.service';
 import { api, clearTokens, getAccessToken, restoreSessionCheckpoint } from '../../services/api';
 import { clearSyncQueue } from '../../services/indexeddb';
 import { OFFLINE_SESSION_KEY, MAX_OFFLINE_SESSION_MS } from '../../services/offlineSession';
+import { gpsQueueKey, readPendingGpsQueue } from '../../services/gpsQueue';
 import type { Usuario } from '../../types/models';
 
 // ========================================
@@ -398,6 +399,24 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('isAdmin').textContent).toBe('false');
     expect(clearSyncQueue).not.toHaveBeenCalled();
     expect(screen.queryByTestId('operational-onboarding')).not.toBeInTheDocument();
+  });
+
+  it('preserves GPS pending for its owner and does not assign it to the next account on logout', async () => {
+    const user = userEvent.setup();
+    renderWithProviders();
+    await waitFor(() => expect(screen.getByTestId('isLoading')).toHaveTextContent('false'));
+    await user.click(screen.getByTestId('login-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('Admin User'));
+    const points = [{ lat:-33, lng:-69, speed:null, heading:null }];
+    const ownKey = gpsQueueKey('42', 'trip-a');
+    localStorage.setItem(ownKey, JSON.stringify(points));
+    localStorage.setItem('gps_pending_legacy-trip', JSON.stringify(points));
+    await user.click(screen.getByTestId('logout-btn'));
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('null'));
+    expect(localStorage.getItem(ownKey)).toBe(JSON.stringify(points));
+    expect(localStorage.getItem('gps_pending_legacy-trip')).toBe(JSON.stringify(points));
+    expect(readPendingGpsQueue('next-account', 'trip-a')).toEqual({ ok:true, durable:true, points:[] });
+    expect(readPendingGpsQueue('42', 'trip-a')).toEqual({ ok:true, durable:true, points });
   });
 
   it('useAuth throws when used outside AuthProvider', () => {

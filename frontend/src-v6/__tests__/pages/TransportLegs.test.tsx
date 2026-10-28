@@ -8,6 +8,7 @@ vi.mock('../../services/transport-handoff.service',()=>({useTransportLegs:()=>({
   transportHandoffService:{create:mocks.create,access:mocks.access},handoffLink:(id:string,token:string)=>`https://qa.invalid/relevo/${id}#${token}`}));
 vi.mock('qrcode.react',()=>({QRCodeSVG:()=>null}));
 import {TransportLegs} from '../../pages/manifiestos/components/TransportLegs';
+import {GpsPendingError} from '../../services/gpsQueue';
 beforeEach(()=>{vi.clearAllMocks();mocks.state={tramos:[],puedeRegistrar:true};mocks.create.mockResolvedValue({tramo:{id:'new-leg'},acceso:'limited-capability'});mocks.invalidate.mockResolvedValue(undefined);});
 describe('transport handoff form',()=>{
   it('allows an incomplete external with text fields and an explicit custody reason',async()=>{
@@ -28,6 +29,18 @@ describe('transport handoff form',()=>{
     fireEvent.change(screen.getByLabelText('Empresa'),{target:{value:'Auxilio sintético'}});fireEvent.change(screen.getByLabelText('Motivo del traspaso'),{target:{value:'Rotura de prueba'}});
     fireEvent.submit(screen.getByRole('form',{name:'Registrar traspaso de carga'}));
     expect(await screen.findByRole('alert')).toHaveTextContent('El transporte cambió');expect(resume).toHaveBeenCalledOnce();expect(screen.getByLabelText('Empresa')).toHaveValue('Auxilio sintético');
+  });
+  it('does not create a handoff when old-trip GPS could not be sent',async()=>{
+    const before=vi.fn().mockRejectedValue(new GpsPendingError()),resume=vi.fn();
+    render(<TransportLegs id="manifest" beforeHandoff={before} onHandoffError={resume}/>);
+    fireEvent.click(screen.getByRole('button',{name:'Registrar traspaso'}));
+    fireEvent.change(screen.getByLabelText('Reemplazo'),{target:{value:'EXTERNO'}});
+    fireEvent.change(screen.getByLabelText('Motivo del traspaso'),{target:{value:'Rotura de prueba'}});
+    fireEvent.submit(screen.getByRole('form',{name:'Registrar traspaso de carga'}));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron enviar las ubicaciones pendientes');
+    expect(screen.getByRole('alert')).toHaveFocus();
+    expect(mocks.create).not.toHaveBeenCalled();expect(resume).toHaveBeenCalledOnce();
+    expect(screen.getByLabelText('Motivo del traspaso')).toHaveValue('Rotura de prueba');
   });
   it('presents history without custody controls to another party',()=>{
     mocks.state={tramos:[{id:'one',orden:1,tipo:'EXTERNO',datos:{},inicio:'2026-10-19T15:00:00Z',fin:null,motivo:'Rotura'}],puedeRegistrar:false};render(<TransportLegs id="manifest"/>);

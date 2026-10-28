@@ -23,7 +23,7 @@ test('an individual trip resumes GPS in one step after permission is granted', a
     (window as any).__qaGps = simulated;
     const answer = (success: PositionCallback, failure?: PositionErrorCallback | null) => {
       if (!simulated.allowed) failure?.({ code: 1, message: 'Permiso simulado denegado' } as GeolocationPositionError);
-      else success({ coords: { latitude: -33.334, longitude: -68.744, accuracy: 10, speed: null, heading: null,
+      else success({ coords: { latitude: -33.334, longitude: -68.744, accuracy: 10, speed: 12, heading: null,
         altitude: null, altitudeAccuracy: null }, timestamp: Date.now() } as GeolocationPosition);
     };
     Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
@@ -96,13 +96,17 @@ test('the office monitor shows the recovered position for that same trip', async
   expect(trip, 'The same artificial trip must appear in the monitor response').toBeTruthy();
   expect(trip.ultimaPosicion.latitud).toBeCloseTo(-33.334, 3);
   expect(trip.ultimaPosicion.longitud).toBeCloseTo(-68.744, 3);
+  expect(trip.ultimaPosicion.velocidad).toBe(12);
   expect(Number.isFinite(Date.parse(trip.ultimaPosicion.timestamp))).toBe(true);
   const marker = page.getByTitle('Viaje en tránsito: ' + manifest.numero, { exact: true });
   await expect(marker).toHaveCount(1);
   await marker.focus(); await marker.press('Enter');
   const popup = page.getByTestId('monitor-live-popup');
   await expect(popup).toContainText(manifest.numero);
-  await expect(popup.getByLabel('Última posición recibida')).toContainText('Última posición');
+  await expect(popup.getByLabel('Última posición recibida')).toContainText('Última recepción');
+  await expect(popup.getByLabel('Última posición recibida')).toContainText('puede ser anterior');
+  await expect(popup.getByLabel('Última posición recibida')).toContainText('Velocidad no disponible');
+  await expect(popup).not.toContainText(/12\s*km\/h/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('monitor-posicion-recuperada.png'), animations: 'disabled', scale: 'css' });
   expect(errors).toEqual([]); expect(writes).toEqual([]);

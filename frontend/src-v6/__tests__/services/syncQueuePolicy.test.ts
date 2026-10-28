@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSupportedSyncMethod, isSyncActionOwnedBy, queuedDeliveryManifestId } from '../../services/syncQueuePolicy';
+import { hasQueuedDelivery, isSupportedSyncMethod, isSyncActionOwnedBy, queuedDeliveryManifestId } from '../../services/syncQueuePolicy';
 
 describe('offline sync queue policy', () => {
   it('matches equivalent string and numeric user identifiers', () => {
@@ -23,5 +23,13 @@ describe('offline sync queue policy', () => {
     expect(queuedDeliveryManifestId('/manifiestos/m-1/confirmar-entrega')).toBe('m-1');
     expect(queuedDeliveryManifestId('/manifiestos/m-1/confirmar-retiro')).toBeNull();
     expect(queuedDeliveryManifestId('/otro/m-1/confirmar-entrega')).toBeNull();
+  });
+
+  it('recognizes a queued delivery only for its account and manifest', () => {
+    const queue = [{ type:'POST', endpoint:'/manifiestos/m-1/confirmar-entrega', userId:'42' }];
+    expect(hasQueuedDelivery(queue, 42, 'm-1')).toBe(true);
+    expect(hasQueuedDelivery(queue, 'other', 'm-1')).toBe(false);
+    expect(hasQueuedDelivery(queue, '42', 'm-2')).toBe(false);
+    expect(hasQueuedDelivery([{ ...queue[0], type:'GET' }], '42', 'm-1')).toBe(false);
   });
 });
