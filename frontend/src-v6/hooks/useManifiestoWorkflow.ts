@@ -7,6 +7,8 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { manifiestoService } from '../services/manifiesto.service';
+import { useAuth } from '../contexts/AuthContext';
+import { withStoredGpsBeforeTransition } from '../services/gpsTransition';
 import type {
   CreateManifiestoRequest, FirmarManifiestoRequest,
   ConfirmarRetiroRequest, ConfirmarEntregaRequest, PesajeRequest,
@@ -88,10 +90,11 @@ export function useConfirmarRetiro() {
 
 export function useConfirmarEntrega() {
   const qc = useQueryClient();
+  const { currentUser } = useAuth();
   return useMutation({
     ...WORKFLOW_OPTIONS,
     mutationFn: ({ id, ...req }: { id: string } & ConfirmarEntregaRequest) =>
-      manifiestoService.confirmarEntrega(id, req),
+      withStoredGpsBeforeTransition(currentUser?.id, id, () => manifiestoService.confirmarEntrega(id, req)),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });

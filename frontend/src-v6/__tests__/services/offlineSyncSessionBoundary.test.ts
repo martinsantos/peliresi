@@ -39,3 +39,27 @@ it('stops a queued delivery before sending another point under a different sessi
   expect(JSON.parse(localStorage.getItem(key)!)).toEqual([{ ...second, puntoId: expect.any(String) }]);
   expect(writes).not.toHaveBeenCalled();
 });
+
+it('retains a queued delivery when another account has pending GPS on this device', async () => {
+  const actions = [{ id:1, type:'POST', endpoint:'/manifiestos/trip/confirmar-entrega', data:{}, userId:'account-a', createdAt:'2026-10-28T00:00:00Z' }];
+  const writes: unknown[] = [];
+  vi.stubGlobal('indexedDB', { open:vi.fn(() => {
+    const request: { result:unknown; onsuccess?:()=>void } = { result:{ transaction:() => {
+      const transaction: { oncomplete?:()=>void; objectStore:()=>unknown } = { objectStore:() => ({
+        getAll:() => { const read: { result:unknown; onsuccess?:()=>void } = { result:[...actions] }; queueMicrotask(() => read.onsuccess?.()); return read; },
+        delete:() => { throw new Error('A pending delivery must not be removed'); },
+        put:(value:unknown) => { writes.push(value); queueMicrotask(() => transaction.oncomplete?.()); },
+      }) };
+      return transaction;
+    } } };
+    queueMicrotask(() => request.onsuccess?.()); return request;
+  }) });
+  const foreignKey = gpsQueueKey('account-b', 'trip');
+  const points = [{ lat:-33.2, lng:-68.2, speed:null, heading:null }];
+  localStorage.setItem(foreignKey, JSON.stringify(points));
+  const { processSyncQueue } = await import('../../services/indexeddb');
+  const result = await processSyncQueue('account-a', false, () => true);
+  expect(result.pending).toBe(1); expect(result.retryable).toBe(1); expect(result.lastError).toMatch(/otra cuenta/i);
+  expect(mock.post).not.toHaveBeenCalled(); expect(writes).toHaveLength(1);
+  expect(JSON.parse(localStorage.getItem(foreignKey)!)).toEqual(points);
+});

@@ -6,6 +6,7 @@ vi.mock('../../contexts/AuthContext',()=>({useAuth:()=>({currentUser:{id:'origin
 vi.mock('../../hooks/useCatalogos',()=>({useCatalogoTransportistas:()=>({data:[],refetch:vi.fn()})}));
 vi.mock('../../services/transport-handoff.service',()=>({useTransportLegs:()=>({data:mocks.state}),transportLegKey:()=>['legs'],
   transportHandoffService:{create:mocks.create,access:mocks.access},handoffLink:(id:string,token:string)=>`https://qa.invalid/relevo/${id}#${token}`}));
+vi.mock('../../services/gpsTransition',()=>({withStoredGpsBeforeTransition:(_owner:unknown,_id:string,action:()=>Promise<unknown>)=>action()}));
 vi.mock('qrcode.react',()=>({QRCodeSVG:()=>null}));
 import {TransportLegs} from '../../pages/manifiestos/components/TransportLegs';
 import {GpsPendingError} from '../../services/gpsQueue';

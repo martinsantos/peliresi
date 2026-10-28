@@ -10,6 +10,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { formatDateTime } from '../../../utils/formatters';
 import { manifestFeatureVisible } from '../../../utils/manifestFeatures';
 import { GpsPendingError } from '../../../services/gpsQueue';
+import { withStoredGpsBeforeTransition } from '../../../services/gpsTransition';
 
 const fieldClass='mt-1 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-base text-neutral-900 focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-100';
 interface Props {id:string;beforeHandoff?:()=>Promise<void>;onHandoffError?:()=>void}
@@ -38,8 +39,8 @@ function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
     event.preventDefault();if(busy)return;setBusy(true);setError('');
     try{
       await beforeHandoff?.();
-      const result=await transportHandoffService.create(id,{id:commandId,anteriorId:expectedLeg,tipo:kind,motivo:reason,
-        ...(kind==='REGISTRADO'?{transportistaId:carrierId,...(vehicle?{vehiculoId:vehicle}:{}),...(driver?{choferId:driver}:{})}:{}),datos:declared});
+      const result=await withStoredGpsBeforeTransition(currentUser?.id,id,()=>transportHandoffService.create(id,{id:commandId,anteriorId:expectedLeg,tipo:kind,motivo:reason,
+        ...(kind==='REGISTRADO'?{transportistaId:carrierId,...(vehicle?{vehiculoId:vehicle}:{}),...(driver?{choferId:driver}:{})}:{}),datos:declared}));
       setLink(result.acceso?handoffLink(result.tramo.id,result.acceso):'');setOpen(false);setReason('');setDeclared({});setCommandId(crypto.randomUUID());await refresh();
     }catch(err:any){onHandoffError?.();setError(err instanceof GpsPendingError ? err.message : err?.response?.data?.message||'No se pudo registrar el traspaso. Los datos del formulario se conservaron.');}
     finally{setBusy(false);}

@@ -22,6 +22,9 @@ vi.mock('../../hooks/useManifiestos', () => {
 });
 vi.mock('../../components/BlockchainPanel', () => ({default: () => <aside aria-label="Sellos blockchain"/>}));
 vi.mock('../../pages/manifiestos/components/ManifiestoTimeline', () => ({default: () => null}));
+// These cases exercise actor links and redirects; certificates have their own
+// provider-backed tests and browser coverage when their feature is enabled.
+vi.mock('../../pages/manifiestos/components/TrainingCertificates', () => ({TrainingCertificates: () => null}));
 vi.mock('../../pages/manifiestos/components/ManifiestoActions', () => ({default: ({isInSitu}:{isInSitu:boolean}) => <div data-testid="in-situ-action-context">{String(isInSitu)}</div>}));
 vi.mock('../../services/manifiesto.service', () => ({manifiestoService: {}}));
 

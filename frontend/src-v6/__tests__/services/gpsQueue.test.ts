@@ -48,6 +48,23 @@ describe('GPS queue before an offline delivery', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('does not send or remove another account’s pending points before a transition', async () => {
+    const foreign = gpsQueueKey('carrier-b', 'trip');
+    localStorage.setItem(foreign, JSON.stringify([second]));
+    const send = vi.fn();
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', send)).rejects.toThrow('otra cuenta');
+    expect(send).not.toHaveBeenCalled(); expect(localStorage.getItem(foreign)).toBe(JSON.stringify([second]));
+    localStorage.setItem(foreign, '[]');
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', send)).resolves.toBeUndefined();
+  });
+
+  it('keeps malformed foreign queues for review rather than treating them as empty', async () => {
+    const foreign = gpsQueueKey('carrier-b', 'trip');
+    localStorage.setItem(foreign, '{incomplete');
+    await expect(flushStoredGpsQueue('carrier-a', 'trip', vi.fn())).rejects.toThrow('otra cuenta');
+    expect(localStorage.getItem(foreign)).toBe('{incomplete');
+  });
+
   it('waits for an active upload and prevents another same-page task from overlapping', async () => {
     let finish!: () => void;
     const firstTask = new Promise<void>(resolve => { finish = resolve; });

@@ -79,6 +79,30 @@ export function gpsQueueKey(owner: string | number, id: string): string {
   return `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(owner), id]))}`;
 }
 
+/** A different account's pending work must not be uploaded under this session
+ * or silently stranded by finishing the same trip on this device. */
+export function assertNoOtherGpsQueue(owner: string | number, id: string): void {
+  const prefix = 'sitrep_gps_v2_';
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(prefix) || key === gpsQueueKey(owner, id)) continue;
+      let identity: unknown;
+      try { identity = JSON.parse(decodeURIComponent(key.slice(prefix.length))); } catch { continue; }
+      if (!Array.isArray(identity) || identity.length !== 2 || identity[1] !== id || String(identity[0]) === String(owner)) continue;
+      const raw = localStorage.getItem(key);
+      if (raw === null) continue;
+      // A deliberately empty array does not represent unsent work. Malformed
+      // data remains untouched and blocks the transition for manual review.
+      try { const value: unknown = JSON.parse(raw); if (Array.isArray(value) && value.length === 0) continue; } catch { /* preserve it */ }
+      throw new GpsPendingError('Hay ubicaciones pendientes de otra cuenta en este navegador o app. Ingresá con esa cuenta y sincronizalas antes de continuar.');
+    }
+  } catch (error) {
+    if (error instanceof GpsPendingError) throw error;
+    throw new GpsPendingError('No se pudo revisar el almacenamiento de ubicaciones. Reintentá antes de continuar.', 'storage');
+  }
+}
+
 /** Keep unsaved points in memory and report storage failures to the user. */
 export function savePendingGpsQueue(owner: string | number, id: string, points: PendingGpsPoint[]): boolean {
   const key = gpsQueueKey(owner, id);
@@ -180,4 +204,7 @@ export async function flushStoredGpsQueue(owner: string | number, id: string, se
     if (pending.length) localStorage.setItem(key, JSON.stringify(pending));
     else localStorage.removeItem(key);
   }
+  // Let this owner synchronize their own work first. Another account's work
+  // still blocks the transition and is never uploaded under this session.
+  assertNoOtherGpsQueue(owner, id);
 }

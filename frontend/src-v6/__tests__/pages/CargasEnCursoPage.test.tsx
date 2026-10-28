@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn()
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mocks.user }) }));
 vi.mock('../../services/fleet-gps.service', () => ({ fleetGpsService: { list: mocks.list, send: mocks.send } }));
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { confirmarEntrega: mocks.deliver } }));
+vi.mock('../../services/gpsTransition', () => ({ withStoredGpsBeforeTransition: (_owner: unknown, _id: string, action: () => Promise<unknown>) => action() }));
 import CargasEnCursoPage from '../../pages/transporte/CargasEnCursoPage';
 const loads = ['A', 'B'].map(id => ({ key: 'MANIFIESTO:' + id, kind: 'MANIFIESTO', id, numero: 'QA-' + id,
   origen: 'Origen artificial', destino: 'Planta QA', fechaInicio: new Date().toISOString(), referenciaTiempo: 'Desde el retiro', patente: null, puedeEntregar: true, gpsDisponible: true }));
@@ -47,6 +48,20 @@ it('delivers one explicit load and clears an old GPS session on account change',
   await waitFor(() => expect(within(selected).queryByText('QA-A')).toBeNull()); expect(selected).toHaveTextContent('QA-B');
   mocks.user.id = 'another-account'; view.rerenderSession();
   await waitFor(() => expect(screen.queryByRole('region', { name: 'Cargas marcadas' })).toBeNull()); expect(clearWatch).toHaveBeenCalledWith(12);
+  view.unmount();
+});
+it('keeps the delivery dialog and selected loads when a delivery cannot be completed', async () => {
+  mocks.deliver.mockRejectedValueOnce(new Error('Ubicaciones pendientes. Revisá la conexión.'));
+  const view = setup(); await chooseAndStart();
+  fireEvent.click(screen.getByRole('button', { name: 'Entregar QA-A', exact: true }));
+  const dialog = screen.getByRole('dialog', { name: 'Confirmar entrega' });
+  expect(within(dialog).getByText(/Las otras cargas conservan su seguimiento actual/)).toBeVisible();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar entrega de esta carga' }));
+  const error = await within(dialog).findByRole('alert');
+  expect(error).toHaveTextContent('Ubicaciones pendientes');
+  await waitFor(() => expect(error).toHaveFocus());
+  const selected = screen.getByRole('region', { name: 'Cargas marcadas' });
+  expect(selected).toHaveTextContent('QA-A'); expect(selected).toHaveTextContent('QA-B');
   view.unmount();
 });
 it('does not query loads or acquire location when the operational feature is disabled', () => {

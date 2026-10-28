@@ -7,6 +7,7 @@ import {useMobilePrefix} from '../../hooks/useMobilePrefix';
 import {useFleetGps} from '../../hooks/useFleetGps';
 import {fleetGpsService,type FleetGpsLoad} from '../../services/fleet-gps.service';
 import {manifiestoService} from '../../services/manifiesto.service';
+import {withStoredGpsBeforeTransition} from '../../services/gpsTransition';
 import {companyCacheScope} from '../../services/companyContext';
 import {getApiErrorMessage} from '../../utils/api-error';
 import {manifestFeatureVisible} from '../../utils/manifestFeatures';
@@ -31,6 +32,8 @@ export default function CargasEnCursoPage() {
   const [choosing,setChoosing]=useState(true);
   const [delivery,setDelivery]=useState<FleetGpsLoad|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const deliveryGuard=useRef(false),credentials=useRef(new Map<string,string>());
+  const errorRef=useRef<HTMLParagraphElement>(null);
+  useEffect(()=>{if(error)errorRef.current?.focus();},[error]);
   const query=useQuery({queryKey:['fleet-gps-targets',scope,term],queryFn:()=>fleetGpsService.list(term),enabled:allowed,refetchInterval:15000,retry:false});
   const ownsSession=owner===scope;
   useEffect(()=>{setOwner(scope);setKnown({});setSelected([]);setStarted(false);credentials.current.clear();setDelivery(null);setError('');},[scope]);
@@ -46,13 +49,14 @@ export default function CargasEnCursoPage() {
   };
   const finish=async()=>{
     if(!delivery||deliveryGuard.current)return;deliveryGuard.current=true;setBusy(true);setError('');
+    const selectedDelivery=delivery;
     try{
-      await gps.holdAndDrain(delivery.key);
+      await gps.holdAndDrain(selectedDelivery.key);
       const point=gps.status==='active'&&gps.position&&Date.now()-gps.position.observedAt<60000?gps.position:null;
-      await manifiestoService.confirmarEntrega(delivery.id,{observaciones:'Entrega confirmada desde las cargas de este móvil',...(point?{latitud:point.latitud,longitud:point.longitud}:{})});
-      setSelected(previous=>previous.filter(key=>key!==delivery.key));setDelivery(null);await refresh();
-      toast.success(started&&chosen.length>1?'Entrega registrada. Las demás cargas siguen con GPS.':'Entrega registrada.');
-    }catch(cause){gps.resume(delivery.key);setError(getApiErrorMessage(cause,'No se pudo confirmar la entrega. Revisá la conexión y el estado del manifiesto.'));await query.refetch();}
+      await withStoredGpsBeforeTransition(currentUser?.id,selectedDelivery.id,()=>manifiestoService.confirmarEntrega(selectedDelivery.id,{observaciones:'Entrega confirmada desde las cargas de este móvil',...(point?{latitud:point.latitud,longitud:point.longitud}:{})}));
+      setSelected(previous=>previous.filter(key=>key!==selectedDelivery.key));setDelivery(null);await refresh();
+      toast.success(started&&chosen.length>1?'Entrega registrada. Las demás cargas conservan su seguimiento actual.':'Entrega registrada.');
+    }catch(cause){gps.resume(selectedDelivery.key);setError(getApiErrorMessage(cause,'No se pudo confirmar la entrega. Revisá la conexión y el estado del manifiesto.'));await query.refetch();}
     finally{deliveryGuard.current=false;setBusy(false);}
   };
   if(!allowed)return <Card><CardContent><p className="text-sm text-neutral-700">El GPS de varias cargas no está habilitado para esta sesión.</p><Link to={mp('/transporte/perfil')} className="text-primary-800 underline">Volver a mis viajes</Link></CardContent></Card>;
@@ -90,7 +94,7 @@ export default function CargasEnCursoPage() {
     </CardContent></Card>}
     <Modal isOpen={!!delivery} onClose={()=>{if(!busy){setDelivery(null);setError('');}}} title="Confirmar entrega" description={delivery?.numero} size="sm" isBusy={busy}
       footer={<><Button variant="outline" disabled={busy} onClick={()=>setDelivery(null)}>Volver</Button><Button isLoading={busy} onClick={finish}>Confirmar entrega de esta carga</Button></>}>
-      <p className="text-sm text-neutral-700">Confirmás la entrega de {delivery?.numero} en {delivery?.destino}. Las otras cargas marcadas continúan con su GPS.</p>{error&&<p role="alert" className="mt-3 text-sm text-error-800">{error}</p>}
+      <p className="text-sm text-neutral-700">Confirmás la entrega en {delivery?.destino}.{chosen.length>1&&(started?' Las otras cargas conservan su seguimiento actual.':' Las otras cargas permanecen seleccionadas.')}</p>{error&&<p ref={errorRef} role="alert" tabIndex={-1} className="mt-3 text-sm text-error-800 focus:outline focus:outline-2 focus:outline-error-600">{error}</p>}
     </Modal>
   </div>;
 }
