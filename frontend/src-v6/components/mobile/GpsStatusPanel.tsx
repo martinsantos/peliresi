@@ -9,6 +9,7 @@ import type { GpsStorageIssue } from '../../services/gpsQueue';
 interface GpsStatusPanelProps {
   status: GpsStatus;
   sendStatus: 'ok' | 'error' | 'idle';
+  sendError?: string | null;
   position: [number, number] | null;
   details: GpsDetails;
   pendingCount: number;
@@ -38,6 +39,7 @@ function formatLastSync(lastSyncAt: Date | null) {
 export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   status,
   sendStatus,
+  sendError = null,
   position,
   details,
   pendingCount,
@@ -49,12 +51,14 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   storageError = false,
   storageIssue = null,
 }) => {
-  const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{storageIssue === 'legacy' ? 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'invalid' ? 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.' : 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.'}</p>;
-  if (paused) return <div className="space-y-2"><p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>{storageNotice}</div>;
+  const storageNotice = storageError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{storageIssue === 'legacy' ? 'Hay ubicaciones anteriores sin titular identificado. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'invalid' ? 'No se pudieron leer las ubicaciones guardadas. Se conservaron; contactá a soporte antes de confirmar.' : storageIssue === 'reference' ? 'No se pudo preparar la ubicación para enviarla de forma segura. Contactá a soporte.' : 'No se pudo guardar el recorrido en el dispositivo. Mantené esta pantalla abierta, revisá el almacenamiento o la conexión y reintentá.'}</p>;
+  const sendNotice = sendStatus === 'error' && sendError && !storageError && <p role="alert" data-gps-send-error className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">{sendError}</p>;
+  if (paused) return <div className="space-y-2"><p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>{storageNotice}{sendNotice}</div>;
   const copy = STATUS_COPY[status];
 
   return (
     <div className="space-y-2">
+      {sendNotice}
       <Card className={`${copy.tone} border-none`}>
         <CardContent className="p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

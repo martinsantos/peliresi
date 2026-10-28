@@ -4,7 +4,7 @@ const volatileQueues = new Map<string, PendingGpsPoint[]>();
 export const GPS_DELIVERY_CONFIRMED_EVENT = 'sitrep:gps-delivery-confirmed';
 
 export class GpsPendingError extends Error {
-  constructor(message = 'No se pudieron enviar las ubicaciones pendientes. Revisá la conexión y volvé a intentar.') {
+  constructor(message = 'No se pudieron enviar las ubicaciones pendientes. Revisá la conexión y volvé a intentar.', readonly issue?: GpsStorageIssue) {
     super(message);
     this.name = 'GpsPendingError';
   }
@@ -15,15 +15,64 @@ export interface PendingGpsPoint {
   lng: number;
   speed: number | null;
   heading: number | null;
+  puntoId?: string;
 }
 
 export function gpsPointPayload(point: PendingGpsPoint) {
   return { latitud: point.lat, longitud: point.lng,
+    ...(point.puntoId && { puntoId: point.puntoId }),
     ...(point.speed != null && { velocidad: point.speed }),
     ...(point.heading != null && { direccion: point.heading }) };
 }
 
-export type GpsStorageIssue = 'legacy' | 'invalid' | 'storage';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** The identifier stays with one observation across failures and reloads. */
+export function newGpsPointId(): string {
+  const crypto = globalThis.crypto;
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  if (!crypto?.getRandomValues) throw new GpsPendingError('No se pudo preparar una referencia segura para la ubicación. Contactá a soporte.', 'reference');
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** Assign and persist IDs to owned queues produced by an older app version. */
+export function prepareGpsPoints(owner: string | number, id: string, points: PendingGpsPoint[]): PendingGpsPoint[] {
+  if (points.some(point => point.puntoId !== undefined && !UUID.test(point.puntoId))) {
+    throw new GpsPendingError('Una ubicación guardada tiene una referencia inválida. Contactá a soporte.', 'invalid');
+  }
+  if (points.every(point => point.puntoId)) return points;
+  const prepared = points.map(point => point.puntoId ? point : { ...point, puntoId: newGpsPointId() });
+  if (!savePendingGpsQueue(owner, id, prepared)) {
+    throw new GpsPendingError('No se pudieron guardar las ubicaciones en el dispositivo.', 'storage');
+  }
+  return prepared;
+}
+
+type GpsApiClient = { post: (endpoint: string, data?: unknown) => Promise<unknown> };
+
+/** A new path fails closed on an older backend, which would ignore a retry key. */
+export async function sendIdempotentGps(api: GpsApiClient, id: string, point: PendingGpsPoint): Promise<void> {
+  if (!point.puntoId || !UUID.test(point.puntoId)) throw new GpsPendingError('No se pudo preparar la ubicación para sincronizar.');
+  let response: unknown;
+  try { response = await api.post(`/manifiestos/${id}/ubicacion-idempotente`, gpsPointPayload(point)); }
+  catch (error) {
+    const status = (error as { response?: { status?: number } } | null)?.response?.status;
+    if (status === 404 || status === 405 || status === 501) {
+      throw new GpsPendingError('No se pudo verificar el viaje o el servidor. Actualizá la pantalla y, si persiste, contactá a soporte.');
+    }
+    throw error;
+  }
+  const body = (response as { data?: { success?: unknown; data?: { idempotencia?: { version?: unknown; puntoId?: unknown } } } } | undefined)?.data;
+  if (body?.success !== true || body.data?.idempotencia?.version !== 1 || body.data.idempotencia.puntoId !== point.puntoId) {
+    throw new GpsPendingError('SITREP no confirmó la ubicación. Revisá la conexión o contactá a soporte.');
+  }
+}
+
+export type GpsStorageIssue = 'legacy' | 'invalid' | 'storage' | 'reference';
 type QueueRead = { ok: true; durable: boolean; points: PendingGpsPoint[] } | { ok: false; reason: GpsStorageIssue };
 
 export function gpsQueueKey(owner: string | number, id: string): string {
@@ -61,11 +110,22 @@ export function readPendingGpsQueue(owner: string | number, id: string): QueueRe
   try {
     const parsed: unknown = JSON.parse(saved);
     if (!Array.isArray(parsed) || parsed.some(point => !point || typeof point !== 'object'
-      || !Number.isFinite(point.lat) || !Number.isFinite(point.lng))) return { ok: false, reason: 'invalid' };
+      || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)
+      || (point.puntoId !== undefined && (typeof point.puntoId !== 'string' || !UUID.test(point.puntoId))))) return { ok: false, reason: 'invalid' };
     return { ok: true, durable: true, points: parsed as PendingGpsPoint[] };
   } catch {
     return { ok: false, reason: 'invalid' };
   }
+}
+
+/** Remove only the acknowledged point from the latest queue, retaining later additions. */
+export function acknowledgeGpsPoint(owner: string | number, id: string, puntoId: string): QueueRead {
+  const saved = readPendingGpsQueue(owner, id);
+  if (!saved.ok) return saved;
+  const index = saved.points.findIndex(point => point.puntoId === puntoId);
+  if (index < 0) return saved;
+  const remaining = [...saved.points.slice(0, index), ...saved.points.slice(index + 1)];
+  return { ok: true, durable: savePendingGpsQueue(owner, id, remaining), points: remaining };
 }
 
 export function gpsTasksForTrip(id: string): Promise<void>[] {
@@ -108,7 +168,7 @@ export async function flushStoredGpsQueue(owner: string | number, id: string, se
     if (!saved.durable) throw new Error('No se pudieron guardar las ubicaciones en el dispositivo.');
     return saved.points;
   };
-  let pending = read();
+  let pending = prepareGpsPoints(owner, id, read());
   while (pending.length) {
     const first = pending[0];
     await send(first);

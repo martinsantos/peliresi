@@ -34,6 +34,7 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /la hora indica cuándo llegó a SITREP y el punto puede ser anterior/i);
   assert.match(recovery, /una entrega puede quedar guardada para enviarse al reconectar con la misma cuenta/i);
   assert.match(recovery, /ubicaciones anteriores sin titular identificado se conservan para revisión/i);
+  assert.match(recovery, /no se puede verificar el viaje o el servidor/i);
   const monitor = JSON.stringify(guides.find((g: any) => g.id === 'monitor-viaje-vigente'));
   assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
 });

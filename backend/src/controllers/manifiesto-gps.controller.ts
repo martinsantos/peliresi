@@ -8,6 +8,7 @@ import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
 import { canAccessManifiesto } from '../utils/roleFilter';
 import { assessGeographicCorridor } from '../services/gpsCorridor.service';
+import { createHash } from 'node:crypto';
 
 // Zod schema for GPS update validation
 const actualizarUbicacionSchema = z.object({
@@ -15,6 +16,9 @@ const actualizarUbicacionSchema = z.object({
   longitud: z.number({ error: 'longitud es requerida y debe ser un numero' }).min(-180, 'longitud debe ser >= -180').max(180, 'longitud debe ser <= 180'),
   velocidad: z.number().min(0, 'velocidad no puede ser negativa').optional(),
   direccion: z.number().optional(),
+});
+const ubicacionIdempotenteSchema = actualizarUbicacionSchema.extend({
+  puntoId: z.string().uuid('La referencia de la ubicación no es válida'),
 });
 
 // GPS in-memory cache — optimized for high-frequency calls (30 clients x every 30s)
@@ -44,16 +48,20 @@ export function invalidateGpsCache(manifiestoId: string): void {
 // Actualizar ubicacion GPS — optimized for high-frequency calls (30 clients x every 30s)
 // Uses a lightweight SELECT instead of full row, and skips it if the
 // manifiesto was validated recently (in-memory cache per PM2 instance, 30s TTL).
-export const actualizarUbicacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunction, idempotente: boolean) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const parsed = actualizarUbicacionSchema.safeParse(req.body);
+    const parsed = (idempotente ? ubicacionIdempotenteSchema : actualizarUbicacionSchema).safeParse(req.body);
     if (!parsed.success) {
       throw new AppError(parsed.error.issues[0].message, 400);
     }
     const { latitud, longitud, velocidad, direccion } = parsed.data;
+    const puntoId = 'puntoId' in parsed.data ? parsed.data.puntoId as string : undefined;
+    // The point key is scoped to both the account and the manifest. The GPS
+    // primary key already exists, so this adds no schema or data migration.
+    const trackingId = puntoId ? 'gpsv1_' + createHash('sha256').update(JSON.stringify([id, String(userId), puntoId.toLowerCase()])).digest('hex') : undefined;
 
     // Check cache — skip DB lookup if we verified EN_TRANSITO recently
     let cacheEntry = _enTransitoCache.get(cacheKey(id));
@@ -105,7 +113,7 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
     // A PM2 worker cannot invalidate another worker's memory. Check live
     // ownership/state under a shared row lock before persisting every point;
     // delivery updates serialize with this short transaction across workers.
-    const tracking = await prisma.$transaction(async tx => {
+    const result = await prisma.$transaction(async tx => {
       const rows = await tx.$queryRaw<Array<{ estado: string; generadorId: string | null; transportistaId: string | null; operadorId: string | null }>>`
         SELECT estado, "generadorId", "transportistaId", "operadorId"
         FROM manifiestos WHERE id = ${id} FOR SHARE
@@ -117,10 +125,29 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
       }
       const activeLeg = await tx.tramoTransporte.findFirst({ where:{manifiestoId:id,fin:null} });
       if (activeLeg && activeLeg.tipo !== 'ORIGINAL') throw new AppError('El GPS de este manifiesto continúa desde el enlace del transporte de reemplazo',409);
-      return tx.trackingGPS.create({ data: { manifiestoId: id, latitud, longitud, velocidad, direccion, emisor:`usuario:${req.user.id}` } });
+      if (trackingId) {
+        // A transaction-level lock serializes retries across API workers.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${trackingId}, 0))::text`;
+        const previous = await tx.trackingGPS.findUnique({ where: { id: trackingId } });
+        if (previous) {
+          if (previous.manifiestoId !== id || previous.emisor !== `usuario:${userId}` || previous.tramoId !== null
+            || previous.latitud !== latitud || previous.longitud !== longitud
+            || (previous.velocidad ?? null) !== (velocidad ?? null) || (previous.direccion ?? null) !== (direccion ?? null)) {
+            throw new AppError('La referencia de ubicación ya corresponde a otros datos. Revisá la sincronización.', 409);
+          }
+          return { tracking: previous, repetido: true };
+        }
+      }
+      const tracking = await tx.trackingGPS.create({ data: {
+        ...(trackingId ? { id: trackingId } : {}), manifiestoId: id, latitud, longitud, velocidad, direccion, emisor:`usuario:${userId}`,
+      } });
+      return { tracking, repetido: false };
     });
 
-    res.json({ success: true, data: { tracking } });
+    res.json({ success: true, data: { tracking: result.tracking,
+      ...(puntoId ? { idempotencia: { version: 1, puntoId, repetido: result.repetido } } : {}) } });
+    // Replaying an acknowledged point must not generate another alert/event.
+    if (result.repetido) return;
 
     // Deteccion TIEMPO_EXCESIVO: >24h desde retiro
     if (cacheEntry.fechaRetiro) {
@@ -174,6 +201,9 @@ export const actualizarUbicacion = async (req: AuthRequest, res: Response, next:
     next(error);
   }
 };
+
+export const actualizarUbicacion = (req: AuthRequest, res: Response, next: NextFunction) => guardarUbicacion(req, res, next, false);
+export const actualizarUbicacionIdempotente = (req: AuthRequest, res: Response, next: NextFunction) => guardarUbicacion(req, res, next, true);
 
 // Obtener tracking GPS del viaje actual de un manifiesto
 export const getViajeActual = async (req: AuthRequest, res: Response, next: NextFunction) => {

@@ -18,9 +18,12 @@ describe('GPS queue before an offline delivery', () => {
     localStorage.setItem(key, JSON.stringify([first, second]));
     const send = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('offline'));
     await expect(flushStoredGpsQueue('carrier-a', 'trip', send)).rejects.toThrow('offline');
-    expect(JSON.parse(localStorage.getItem(key)!)).toEqual([second]);
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual([{ ...second, puntoId: expect.any(String) }]);
     await flushStoredGpsQueue('carrier-a', 'trip', send);
-    expect(send.mock.calls.map(([point]) => point)).toEqual([first, second, second]);
+    expect(send.mock.calls.map(([point]) => point)).toEqual([
+      { ...first, puntoId: expect.any(String) }, { ...second, puntoId: expect.any(String) }, { ...second, puntoId: expect.any(String) },
+    ]);
+    expect(send.mock.calls[1][0].puntoId).toBe(send.mock.calls[2][0].puntoId);
     expect(localStorage.getItem(key)).toBeNull();
   });
 

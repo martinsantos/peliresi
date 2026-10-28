@@ -12,7 +12,7 @@ import {
   type SyncMethod,
 } from './syncQueuePolicy';
 import api from './api';
-import { GPS_DELIVERY_CONFIRMED_EVENT, flushStoredGpsQueue, gpsPointPayload, runExclusiveGpsTask } from './gpsQueue';
+import { GPS_DELIVERY_CONFIRMED_EVENT, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
 
 const DB_NAME = 'sitrep_offline_db';
 const DB_VERSION = 5;
@@ -395,7 +395,7 @@ async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string, ow
   if (!manifiestoId || typeof localStorage === 'undefined') return;
   await flushStoredGpsQueue(owner, manifiestoId, point => {
     if (!isCurrent()) throw new SyncContextChangedError();
-    return api.post(`/manifiestos/${manifiestoId}/ubicacion`, gpsPointPayload(point));
+    return sendIdempotentGps(api, manifiestoId, point);
   });
 }
 

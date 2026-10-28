@@ -80,6 +80,13 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Mantené esta pantalla abierta');
   });
 
+  it('keeps an actionable upload error visible while the trip is paused', () => {
+    render(<GpsStatusPanel status="active" sendStatus="error" sendError="No se pudo verificar el viaje o el servidor. Contactá a soporte."
+      position={null} details={{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={1} lastSyncAt={null} paused />);
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudo verificar el viaje o el servidor');
+  });
+
   it('reports Android GPS as searching instead of off while waiting for a fix', () => {
     render(
       <GpsStatusPanel

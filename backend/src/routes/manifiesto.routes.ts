@@ -17,6 +17,7 @@ import {
     firmarManifiesto,
     confirmarRetiro,
     actualizarUbicacion,
+    actualizarUbicacionIdempotente,
     confirmarEntrega,
     confirmarRecepcion,
     confirmarRecepcionInSitu,
@@ -478,6 +479,10 @@ router.post('/:id/confirmar-retiro', hasRole('TRANSPORTISTA', 'ADMIN'), confirma
  *         description: Rol no autorizado
  */
 router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbicacion);
+
+// A distinct endpoint makes old backends fail closed rather than silently
+// ignoring a retry key during a rolling deployment or rollback.
+router.post('/:id/ubicacion-idempotente', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbicacionIdempotente);
 
 /**
  * @openapi

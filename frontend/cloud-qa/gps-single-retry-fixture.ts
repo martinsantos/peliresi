@@ -22,7 +22,9 @@ try {
   assert.match(generator.generador.razonSocial, /^QA /);
   assert.match(carrier.transportista.razonSocial, /^QA /);
   assert.match(operator.operador.razonSocial, /^QA /);
-  const run = randomUUID().slice(0, 8), cases: Record<string, { id: string; numero: string }> = {}, queueCases: Record<string, { id: string; numero: string }> = {};
+  const run = randomUUID().slice(0, 8), cases: Record<string, { id: string; numero: string }> = {}, queueCases: Record<string, { id: string; numero: string }> = {},
+    lostCases: Record<string, { id: string; numero: string }> = {}, raceCases: Record<string, { id: string; numero: string }> = {},
+    crossTabCases: Record<string, { id: string; numero: string }> = {};
   for (const surface of ['web-desktop', 'app']) {
     const numero = `QA-GPS-RETRY-${run}-${surface.toUpperCase()}`;
     const create = (number: string) => db.manifiesto.create({ data: {
@@ -33,7 +35,10 @@ try {
     }, select: { id: true, numero: true } });
     cases[surface] = await create(numero);
     queueCases[surface] = await create(`QA-GPS-QUEUE-${run}-${surface.toUpperCase()}`);
+    lostCases[surface] = await create(`QA-GPS-LOST-${run}-${surface.toUpperCase()}`);
+    raceCases[surface] = await create(`QA-GPS-RACE-${run}-${surface.toUpperCase()}`);
+    crossTabCases[surface] = await create(`QA-GPS-TABS-${run}-${surface.toUpperCase()}`);
   }
-  await writeFile(path.join(process.env.QA_ARTIFACTS!, 'single-gps-private.json'), JSON.stringify({ cases, queueCases }), { mode: 0o600 });
+  await writeFile(path.join(process.env.QA_ARTIFACTS!, 'single-gps-private.json'), JSON.stringify({ cases, queueCases, lostCases, raceCases, crossTabCases, owner: carrier.id }), { mode: 0o600 });
   console.log('Viajes artificiales aislados preparados para probar GPS y cola.');
 } finally { await db.$disconnect(); }

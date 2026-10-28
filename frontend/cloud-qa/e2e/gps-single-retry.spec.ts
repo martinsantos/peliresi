@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertCloudDatabase } from '../safety';
-import { login, prefix } from './helpers';
+import { isolatedMapTiles, login, prefix } from './helpers';
 
 test.beforeAll(async () => { await assertCloudDatabase(); });
 
@@ -16,7 +16,7 @@ test('an individual trip resumes GPS in one step after permission is granted', a
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); else if (message.type() === 'warning') consoleWarnings.push(message.text()); });
   page.on('response', response => {
-    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion`) && response.status() === 200) sent++;
+    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion-idempotente`) && response.status() === 200) sent++;
   });
   await page.addInitScript(() => {
     const simulated = { allowed: false, watches: 0, clears: 0, active: new Set<number>() };
@@ -143,9 +143,9 @@ test('retry preserves queued points without resending one already accepted', asy
   let attempts = 0, acknowledged = 0, acceptedStatus = 0, release!: () => void;
   const heldResponse = new Promise<void>(resolve => { release = resolve; });
   page.on('response', response => {
-    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion`) && response.status() === 200) acknowledged++;
+    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion-idempotente`) && response.status() === 200) acknowledged++;
   });
-  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion`, async route => {
+  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`, async route => {
     attempts++;
     if (attempts <= 2) { await route.abort('internetdisconnected'); return; }
     if (attempts === 3) {
@@ -190,4 +190,176 @@ test('retry preserves queued points without resending one already accepted', asy
     await page.screenshot({ path: info.outputPath('gps-cola-recuperada.png'), animations: 'disabled' });
     writeFileSync(info.outputPath('queue-proof.json'), JSON.stringify({ surface: info.project.name, attempts, acknowledged, simulatedClock: true }));
   } finally { release(); await context.close(); }
+});
+
+test('a lost GPS response retries the same observation without duplicating it', async ({ browser }, info) => {
+  const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'single-gps-private.json'), 'utf8'));
+  const manifest = fixture.lostCases[info.project.name];
+  const key = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
+    isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
+  const page = await context.newPage(), errors: string[] = [], references: string[] = [], acknowledgements: any[] = [];
+  let mode: 'unsupported' | 'lost' | 'allow' = 'unsupported', legacyRequests = 0, acceptedStatus = 0, lostAborted = false;
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith(`/manifiestos/${manifest.id}/ubicacion`)) legacyRequests++; });
+  await page.clock.install();
+  await page.addInitScript(() => {
+    const fix = () => ({ coords: { latitude: -33.777, longitude: -68.777, accuracy: 10, speed: null, heading: null,
+      altitude: null, altitudeAccuracy: null }, timestamp: Date.now() } as GeolocationPosition);
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+      watchPosition(success: PositionCallback) { setTimeout(() => success(fix()), 0); return 1; },
+      getCurrentPosition(success: PositionCallback) { setTimeout(() => success(fix()), 0); }, clearWatch() {},
+    } });
+  });
+  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`, async route => {
+    references.push(route.request().postDataJSON().puntoId);
+    if (mode === 'unsupported') { await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' }); return; }
+    if (mode === 'lost') {
+      const accepted = await route.fetch(); acceptedStatus = accepted.status();
+      await route.abort('connectionreset'); lostAborted = true; return;
+    }
+    const response = await route.fetch();
+    acknowledgements.push((await response.json()).data.idempotencia);
+    await route.fulfill({ response });
+  });
+  try {
+    await login(page, info, 'transportista');
+    if (info.project.name === 'app') await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
+    await expect(page.getByText('GPS activo', { exact: true })).toBeVisible();
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+    await page.clock.runFor(30000);
+    await expect(page.getByText('1 pendiente', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-gps-send-error]')).toContainText('No se pudo verificar el viaje o el servidor');
+    expect(await page.evaluate(k => JSON.parse(localStorage.getItem(k)!)[0].puntoId, key)).toBe(references[0]);
+    expect(legacyRequests).toBe(0);
+    mode = 'lost';
+    await page.clock.runFor(30000);
+    await expect.poll(() => acceptedStatus, { timeout: 15000 }).toBe(200);
+    await expect.poll(() => lostAborted, { timeout: 15000 }).toBe(true);
+    await expect(page.getByText('1 pendiente', { exact: true })).toBeVisible();
+    expect(references[1]).toBe(references[0]);
+    mode = 'allow';
+    await page.clock.runFor(30000);
+    await expect.poll(() => acknowledgements.length, { timeout: 20000 }).toBe(1);
+    expect(references[2]).toBe(references[0]);
+    expect(references).toHaveLength(3);
+    expect(acknowledgements[0]).toMatchObject({ version: 1, puntoId: references[0], repetido: true });
+    await expect.poll(() => page.evaluate(k => localStorage.getItem(k), key)).toBeNull();
+    expect(errors).toEqual([]); expect(legacyRequests).toBe(0);
+    await page.screenshot({ path: info.outputPath('gps-respuesta-perdida-recuperada.png'), animations: 'disabled' });
+    writeFileSync(info.outputPath('gps-lost-proof.json'), JSON.stringify({ id: manifest.id, surface: info.project.name,
+      references, acknowledged: acknowledgements, legacyRequests, acceptedStatus }));
+  } finally { await context.close(); }
+});
+
+test('a second tab keeps its queued point while the first waits for confirmation', async ({ browser }, info) => {
+  const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'single-gps-private.json'), 'utf8'));
+  const manifest = fixture.crossTabCases[info.project.name];
+  const key = `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner), manifest.id]))}`;
+  const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4177', viewport: info.project.use.viewport,
+    isMobile: info.project.name === 'app', hasTouch: info.project.name === 'app', serviceWorkers: 'allow' });
+  const first = await context.newPage(), second = await context.newPage();
+  let release!: () => void, accepted = 0, blocked = 0;
+  const heldResponse = new Promise<void>(resolve => { release = resolve; });
+  const installGps = async (page: typeof first) => {
+    await page.clock.install();
+    await page.addInitScript(() => {
+      const callbacks = new Map<number, PositionCallback>();
+      let next = 0;
+      (window as any).__qaCrossTabGps = { active: () => callbacks.size, emit(lat: number, lng: number) {
+        const fix = { coords: { latitude: lat, longitude: lng, accuracy: 10, speed: null, heading: null,
+          altitude: null, altitudeAccuracy: null }, timestamp: Date.now() } as GeolocationPosition;
+        for (const callback of callbacks.values()) callback(fix);
+      } };
+      Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
+        watchPosition(success: PositionCallback) { callbacks.set(++next, success); return next; },
+        getCurrentPosition() {}, clearWatch(id: number) { callbacks.delete(id); },
+      } });
+    });
+  };
+  await installGps(first); await installGps(second);
+  await isolatedMapTiles(second, info);
+  await first.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`, async route => {
+    const response = await route.fetch();
+    accepted++;
+    if (accepted === 1) await heldResponse;
+    await route.fulfill({ response });
+  });
+  await second.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`, async route => {
+    blocked++;
+    await route.abort('internetdisconnected');
+  });
+  try {
+    await login(first, info, 'transportista');
+    await first.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
+    await second.goto(`${prefix(info)}/transporte/viaje/${manifest.id}`);
+    await expect(first.getByText(manifest.numero, { exact: true }).first()).toBeVisible();
+    await expect(second.getByText(manifest.numero, { exact: true }).first()).toBeVisible();
+    await expect.poll(() => first.evaluate(() => (window as any).__qaCrossTabGps.active())).toBeGreaterThan(0);
+    await expect.poll(() => second.evaluate(() => (window as any).__qaCrossTabGps.active())).toBeGreaterThan(0);
+    await first.clock.pauseAt(await first.evaluate(() => Date.now() + 100));
+    await second.clock.pauseAt(await second.evaluate(() => Date.now() + 100));
+    await first.evaluate(() => (window as any).__qaCrossTabGps.emit(-33.601, -68.601));
+    await first.clock.runFor(30000);
+    await expect.poll(() => accepted, { timeout: 15000 }).toBe(1);
+    await second.evaluate(() => (window as any).__qaCrossTabGps.emit(-33.702, -68.702));
+    await second.clock.runFor(30000);
+    await expect.poll(() => blocked, { timeout: 15000 }).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => first.evaluate(k => JSON.parse(localStorage.getItem(k) || '[]').length, key)).toBe(2);
+    release();
+    await expect.poll(() => first.evaluate(k => JSON.parse(localStorage.getItem(k) || '[]').map((p: any) => p.lat), key)).toEqual([-33.702]);
+    await first.clock.runFor(30000);
+    await expect.poll(() => accepted, { timeout: 15000 }).toBe(2);
+    await expect.poll(() => first.evaluate(k => localStorage.getItem(k), key)).toBeNull();
+    await second.close();
+    expect(await first.evaluate(k => localStorage.getItem(k), key)).toBeNull();
+    writeFileSync(info.outputPath('gps-shared-queue-proof.json'), JSON.stringify({ surface: info.project.name, accepted, blocked, synthetic: true }));
+  } finally { release(); await context.close(); }
+});
+
+test('two tabs retry one GPS reference concurrently while legacy clients remain compatible', async ({ page }, info) => {
+  const fixture = JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'single-gps-private.json'), 'utf8'));
+  const manifest = fixture.raceCases[info.project.name];
+  await login(page, info, 'transportista');
+  const second = await page.context().newPage();
+  await isolatedMapTiles(second, info);
+  await second.goto(`${prefix(info)}/dashboard`);
+  const reference = await page.evaluate(() => crypto.randomUUID());
+  const send = (target: typeof page) => target.evaluate(async ({ id, reference }) => {
+    const token = localStorage.getItem('sitrep_access_token');
+    return Promise.all(Array.from({ length: 10 }, async () => {
+      const response = await fetch(`/api/manifiestos/${id}/ubicacion-idempotente`, { method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puntoId: reference, latitud: -33.555, longitud: -68.555 }) });
+      return { status: response.status, body: await response.json() };
+    }));
+  }, { id: manifest.id, reference });
+  const results = (await Promise.all([send(page), send(second)])).flat();
+  expect(results.every(result => result.status === 200)).toBe(true);
+  expect(new Set(results.map(result => result.body.data.tracking.id)).size).toBe(1);
+  expect(results.filter(result => !result.body.data.idempotencia.repetido)).toHaveLength(1);
+  const other = await page.evaluate(async ({ id, reference }) => {
+    const token = localStorage.getItem('sitrep_access_token');
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const uppercase = await fetch(`/api/manifiestos/${id}/ubicacion-idempotente`, { method: 'POST', headers,
+      body: JSON.stringify({ puntoId: reference.toUpperCase(), latitud: -33.555, longitud: -68.555 }) });
+    const uppercaseBody = await uppercase.json();
+    const conflict = await fetch(`/api/manifiestos/${id}/ubicacion-idempotente`, { method: 'POST', headers,
+      body: JSON.stringify({ puntoId: reference, latitud: -33.556, longitud: -68.555 }) });
+    const legacy = [];
+    for (const latitude of [-33.8, -33.9]) {
+      const response = await fetch(`/api/manifiestos/${id}/ubicacion`, { method: 'POST', headers,
+        body: JSON.stringify({ latitud: latitude, longitud: -68.8 }) });
+      legacy.push({ status: response.status, body: await response.json() });
+    }
+    return { uppercase: uppercase.status, uppercaseReplay: uppercaseBody.data?.idempotencia?.repetido, conflict: conflict.status, legacy };
+  }, { id: manifest.id, reference });
+  expect(other.conflict).toBe(409);
+  expect(other.uppercase).toBe(200); expect(other.uppercaseReplay).toBe(true);
+  expect(other.legacy.map(result => result.status)).toEqual([200, 200]);
+  expect(new Set(other.legacy.map(result => result.body.data.tracking.id)).size).toBe(2);
+  writeFileSync(info.outputPath('gps-race-proof.json'), JSON.stringify({ id: manifest.id, surface: info.project.name,
+    concurrent: results.length, created: 1, repeated: 19, uppercaseReplay: true, conflict: other.conflict, legacy: 2 }));
+  await second.close();
 });

@@ -277,7 +277,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         if (gps.deliveryWasConfirmed()) setDeliveryError('La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.');
         else {
           gps.resumeGps();
-          setDeliveryError('Ubicaciones pendientes. No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.');
+          setDeliveryError('Ubicaciones pendientes. ' + (gps.lastSendError() || 'No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.'));
         }
         return;
       }
@@ -313,7 +313,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   const prepareHandoff = async () => {
     await gps.stopAndDrain();
-    if (!(await gps.flushPending())) throw new GpsPendingError(gps.deliveryWasConfirmed() ? 'La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.' : undefined);
+    if (!(await gps.flushPending())) throw new GpsPendingError(gps.deliveryWasConfirmed() ? 'La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.' : gps.lastSendError() || undefined);
   };
 
   // Incident saving with description fallback + GPS coords
@@ -548,6 +548,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
             {!hasHandoff&&deliveryQueue==='none'&&<GpsStatusPanel
               status={gpsStatus}
               sendStatus={gpsSendStatus}
+              sendError={gps.sendError}
               position={currentPosition}
               details={gpsDetails}
               pendingCount={gps.pendingCount}

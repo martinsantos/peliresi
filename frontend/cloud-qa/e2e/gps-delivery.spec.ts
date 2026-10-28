@@ -21,7 +21,7 @@ test('preserves unsent GPS before confirming delivery', async ({ browser }, info
     }
   });
   page.on('response', response => {
-    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion`) && response.status() === 200) events.push('gps-accepted');
+    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion-idempotente`) && response.status() === 200) events.push('gps-accepted');
   });
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'geolocation', { configurable: true, value: {
@@ -36,7 +36,7 @@ test('preserves unsent GPS before confirming delivery', async ({ browser }, info
       clearWatch() {},
     } });
   });
-  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion`, async route => {
+  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`, async route => {
     if (gpsBlocked) await route.abort('failed'); else await route.continue();
   });
   const pending = [{ lat: -33.123, lng: -68.123, speed: null, heading: null }, { lat: -33.456, lng: -68.456, speed: null, heading: null }];
@@ -53,7 +53,7 @@ test('preserves unsent GPS before confirming delivery', async ({ browser }, info
     await expect(deliveryDialog.getByRole('alert')).toBeVisible();
     await expect(deliveryDialog.getByRole('alert')).toBeFocused();
     expect(deliveryRequests).toBe(0);
-    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual(pending);
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual(pending.map(point => ({ ...point, puntoId: expect.any(String) })));
     await page.screenshot({ path: info.outputPath('entrega-ubicaciones-pendientes.png'), animations: 'disabled' });
 
     gpsBlocked = false;
@@ -81,7 +81,7 @@ test('retries an offline delivery without resending an acknowledged location', a
     if (request.method() === 'POST' && request.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega`)) { deliveries++; events.push('delivery-request'); }
   });
   page.on('response', response => {
-    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion`) && response.status() === 200) { accepted++; events.push('gps-accepted'); }
+    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion-idempotente`) && response.status() === 200) { accepted++; events.push('gps-accepted'); }
   });
   await page.addInitScript(() => {
     const position = () => ({ coords: { latitude: -33.7, longitude: -68.7, accuracy: 10, speed: null, heading: null,
@@ -91,7 +91,7 @@ test('retries an offline delivery without resending an acknowledged location', a
       getCurrentPosition(success: PositionCallback) { setTimeout(() => success(position()), 0); }, clearWatch() {},
     } });
   });
-  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion`, async route => {
+  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`, async route => {
     if (mode === 'blocked' || (mode === 'partial' && accepted > 0)) await route.abort('failed'); else await route.continue();
   });
   const pending = [{ lat: -33.123, lng: -68.123, speed: null, heading: null }, { lat: -33.456, lng: -68.456, speed: null, heading: null }];
@@ -110,7 +110,7 @@ test('retries an offline delivery without resending an acknowledged location', a
     await expect(page.getByRole('status').filter({ hasText:'Entrega guardada. Se enviará al reconectar' })).toBeVisible();
     await expect(page.getByRole('button', { name:'Confirmar entrega', exact:true })).toHaveCount(0);
     expect(deliveries).toBe(0);
-    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual(pending);
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual(pending.map(point => ({ ...point, puntoId: expect.any(String) })));
     await page.getByRole('link', { name:'Ver todos mis viajes', exact:true }).click();
     await page.goBack();
     await expect(page.getByRole('status').filter({ hasText:'Entrega guardada. Se enviará al reconectar' })).toBeVisible();
@@ -123,7 +123,7 @@ test('retries an offline delivery without resending an acknowledged location', a
     await expect(notice).toBeVisible({ timeout: 20000 });
     expect(accepted).toBe(1);
     expect(deliveries).toBe(0);
-    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual([pending[1]]);
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual([{ ...pending[1], puntoId: expect.any(String) }]);
     mode = 'allow';
     const delivered = page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega`));
     await notice.getByRole('button', { name: 'Reintentar', exact: true }).click();
@@ -149,7 +149,7 @@ test('sends pending GPS before handing the trip to a replacement', async ({ brow
     if (request.method() === 'POST' && request.url().endsWith(`/manifiestos/${manifest.id}/tramos`)) { handoffs++; events.push('handoff-request'); }
   });
   page.on('response', response => {
-    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion`) && response.status() === 200) events.push('gps-accepted');
+    if (response.request().method() === 'POST' && response.url().endsWith(`/manifiestos/${manifest.id}/ubicacion-idempotente`) && response.status() === 200) events.push('gps-accepted');
   });
   await page.addInitScript(() => {
     const position = () => ({ coords: { latitude: -33.7, longitude: -68.7, accuracy: 10, speed: null, heading: null,
@@ -159,7 +159,7 @@ test('sends pending GPS before handing the trip to a replacement', async ({ brow
       getCurrentPosition(success: PositionCallback) { setTimeout(() => success(position()), 0); }, clearWatch() {},
     } });
   });
-  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion`, async route => {
+  await page.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`, async route => {
     if (gpsBlocked) await route.abort('failed'); else await route.continue();
   });
   const pending = [{ lat: -33.123, lng: -68.123, speed: null, heading: null }, { lat: -33.456, lng: -68.456, speed: null, heading: null }];
@@ -175,11 +175,11 @@ test('sends pending GPS before handing the trip to a replacement', async ({ brow
     await page.getByLabel('Motivo del traspaso').fill('Rotura simulada de prueba');
     await page.getByRole('button', { name: 'Confirmar traspaso', exact: true }).click();
     const handoffAlert = page.getByRole('form', { name:'Registrar traspaso de carga' }).getByRole('alert');
-    await expect(handoffAlert).toContainText('No se pudieron enviar las ubicaciones pendientes');
+    await expect(handoffAlert).toHaveText('No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.');
     await expect(handoffAlert).toBeVisible();
     await expect(handoffAlert).toBeFocused();
     expect(handoffs).toBe(0);
-    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual(pending);
+    expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), queueKey)).toEqual(pending.map(point => ({ ...point, puntoId: expect.any(String) })));
     await expect(page.getByLabel('Empresa', { exact: true })).toHaveValue('QA Reemplazo eventual');
     await page.screenshot({ path: info.outputPath('relevo-ubicaciones-pendientes.png'), animations: 'disabled' });
     gpsBlocked = false;
