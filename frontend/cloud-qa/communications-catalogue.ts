@@ -10,7 +10,7 @@ const sources=new Map<string,string>(), cache=new Map<string,any>();
 const env={FRONTEND_URL:'https://sitrep.example.invalid',DISABLE_EMAILS:'true',MANIFEST_EXCEPTIONAL_REVIEWERS:'admin',MANIFEST_PARTY_REVIEW_ENABLED:'true'};
 let capture:any[]=[], currentNotice:any, currentRole='GENERADOR';
 const actor=(role:string)=>({id:role.toLowerCase(),usuarioId:role,activo:true,razonSocial:role==='GENERADOR'?'Taller del Oeste · ejemplo':role==='OPERADOR'?'Planta Andina · ejemplo':'Transporte Cuyo · ejemplo',domicilio:'Calle de ejemplo 123',usuario:{id:role,activo:true}});
-let manifest:any={id:'MUESTRA-001',numero:'M-2026-000123',generadorId:'generador',transportistaId:'transportista',operadorId:'operador',creadoPorId:'OPERADOR',fechaEstimadaRetiro:new Date('2026-10-23T15:00:00Z'),generador:actor('GENERADOR'),transportista:actor('TRANSPORTISTA'),operador:actor('OPERADOR')};
+let manifest:any={id:'MUESTRA-001',numero:'M-2026-000123',modalidad:'FIJO',generadorId:'generador',transportistaId:'transportista',operadorId:'operador',creadoPorId:'OPERADOR',fechaEstimadaRetiro:new Date('2026-10-23T15:00:00Z'),generador:actor('GENERADOR'),transportista:actor('TRANSPORTISTA'),operador:actor('OPERADOR')};
 const db:any={notificacion:{create:async({data}:any)=>{capture.push(data);return data;},createMany:async({data}:any)=>{capture.push(...data);return {count:data.length};}},usuario:{findMany:async()=>[{id:'ADMIN'}]},manifiesto:{findUnique:async()=>manifest}};
 for(const role of ['GENERADOR','TRANSPORTISTA','OPERADOR'])db[role.toLowerCase()]={findUnique:async()=>actor(role)};
 const dummyMutation=()=>({isPending:false,isError:false,reset(){},mutate(){}});
@@ -80,8 +80,18 @@ for(const id of mailIds){
 }
 for(const event of ['created','enabled','disabled','deleted','roleChanged','emailChanged','passwordChanged'])add('seguridad-'+event,'Seguridad',allRoles,'backend/src/services/account-mail.service.ts',undefined,account.renderAccountMail(event));
 const proposal=moduleLoad('backend/src/services/manifestProposal.service.ts');
-for(const phase of ['creada','aprobacion-GENERADOR','aprobacion-TRANSPORTISTA','aprobacion-OPERADOR','aprobada','iniciada','rechazada']){
+const proposalPhases=['creada','aprobacion-GENERADOR','aprobacion-TRANSPORTISTA','aprobacion-OPERADOR','aprobada','iniciada','rechazada'];
+for(const phase of proposalPhases){
  capture=[];await proposal.notifyManifestParties(db,manifest,phase,'OPERADOR');add('propuesta-'+phase,'Manifiestos · aprobaciones',parties,'backend/src/services/manifestProposal.service.ts',capture[0],undefined,'Cuentas activas vinculadas y creador. Las decisiones no se completan leyendo el aviso.','Sujeto a la configuración del entorno');
+}
+for(const phase of proposalPhases){
+ capture=[];await proposal.notifyManifestParties(db,{...manifest,modalidad:'IN_SITU'},phase,'OPERADOR');add('propuesta-insitu-'+phase,'Manifiestos · aprobaciones',parties,'backend/src/services/manifestProposal.service.ts',capture[0],undefined,'Tratamiento en origen: transporte aprobador, sin traslado ni GPS.','Sujeto a la configuración del entorno');
+}
+for(const phase of ['aprobada','iniciada']){
+ capture=[];await proposal.notifyManifestParties(db,{...manifest,modalidad:'IN_SITU',transportistaId:null},phase,'OPERADOR');
+ const current=capture[0],{modalidad:_,partesRequeridas:__,...previous}=JSON.parse(current.datos);
+ const historical={...current,titulo:phase==='aprobada'?'Generador y operador aprobaron: listos para iniciar':'Coordinación iniciada: tratamiento en origen',mensaje:phase==='aprobada'?current.mensaje.replace('Una de las tres partes debe pulsar Iniciar coordinación.','Generador u operador debe pulsar Iniciar coordinación.'):current.mensaje,datos:JSON.stringify(previous)};
+ add('propuesta-insitu-historica-'+phase,'Manifiestos · aprobaciones',['GENERADOR','OPERADOR'],'backend/src/services/manifestProposal.service.ts',historical,undefined,'Ejemplo histórico sin modalidad en los metadatos: el correo orienta de forma general y conserva el aviso.','Sujeto a la configuración del entorno');
 }
 capture=[];await proposal.notifyManifestParties(db,{...manifest,creadoPorId:'ADMIN'},'creada','ADMIN');add('propuesta-creador-administrador','Manifiestos · aprobaciones',['ADMIN'],'backend/src/services/manifestProposal.service.ts',capture.find(n=>n.usuarioId==='ADMIN'),undefined,'Variante del creador que no es una de las tres partes.','Sujeto a la configuración del entorno');
 const dispatcher=moduleLoad('backend/src/services/notification-dispatcher.service.ts').notificationService;
@@ -90,7 +100,10 @@ for(const state of ['APROBADO','EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIE
  const groups=new Map<string,any>();for(const n of capture){const k=n.titulo+'|'+n.mensaje;if(!groups.has(k))groups.set(k,{n,roles:[]});groups.get(k).roles.push(n.usuarioId);}
  let index=0;for(const {n,roles} of groups.values())add('estado-'+state+'-'+index++,'Manifiestos · operación',roles,'backend/src/services/notification-dispatcher.service.ts',n,undefined,'El autor normalmente no recibe su propio aviso.');
 }
-manifest={...manifest,modalidad:'IN_SITU',transportista:null};capture=[];await dispatcher.notificarCambioEstado(manifest.id,'APROBADO');add('estado-insitu','Manifiestos · operación',['OPERADOR'],'backend/src/services/notification-dispatcher.service.ts',capture.find(n=>n.usuarioId==='OPERADOR'),undefined,'Variante sin transporte.');manifest={...manifest,modalidad:'CON_TRANSPORTE',transportista:actor('TRANSPORTISTA')};
+manifest={...manifest,modalidad:'IN_SITU'};capture=[];await dispatcher.notificarCambioEstado(manifest.id,'APROBADO');
+for(const role of parties)add('estado-insitu-'+role,'Manifiestos · operación',[role],'backend/src/services/notification-dispatcher.service.ts',capture.find(n=>n.usuarioId===role),undefined,'Tratamiento en origen con transporte aprobador, sin traslado.');
+manifest={...manifest,transportistaId:null,transportista:null};capture=[];await dispatcher.notificarCambioEstado(manifest.id,'APROBADO');add('estado-insitu','Manifiestos · operación',['OPERADOR'],'backend/src/services/notification-dispatcher.service.ts',capture.find(n=>n.usuarioId==='OPERADOR'),undefined,'Variante histórica sin transporte vinculado.');
+manifest={...manifest,modalidad:'FIJO',transportistaId:'transportista',transportista:actor('TRANSPORTISTA')};
 const addenda=moduleLoad('backend/src/services/manifiestoAddendumNotice.service.ts');
 for(const event of ['CREADA','APROBADA','OBSERVADA','RECHAZADA'])for(const author of [...parties,'Revisor designado']){capture=[];await addenda.notifyAddendumParties(db,manifest,'ADENDA-001',1,event,author);add('adenda-'+event+'-'+author.replaceAll(' ','-'),'Adendas',parties.filter(r=>r!==author),'backend/src/services/manifiestoAddendumNotice.service.ts',capture[0],undefined,'Autor variable: '+author+'. Aprobación individual, no unanimidad.','Sujeto a la configuración del entorno');}
 for(const [event,pair]of Object.entries(labels.eventual) as any)add('eventual-'+event,'Eventuales',event==='SOLICITAR_REVISION'?[...parties,'ADMIN']:parties,'backend/src/services/eventualNotice.service.ts',{titulo:pair[0],mensaje:'BI-MUESTRA-001 · '+pair[1],prioridad:['CREADO','SOLICITAR_REVISION','OBSERVADA_POST_FACTO'].includes(event)?'ALTA':'NORMAL',datos:{tipo:'manifiesto_eventual',version:1,correoVersion:1,registroId:'MUESTRA-001',eventoId:'evento-muestra',evento:event}},undefined,'Sólo participantes registrados con acceso. El externo sin cuenta no recibe este aviso; la autoridad debe estar designada.','Sujeto a la configuración del entorno');

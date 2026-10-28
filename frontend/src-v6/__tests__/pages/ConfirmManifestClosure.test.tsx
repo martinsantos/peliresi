@@ -5,6 +5,18 @@ import ManifiestoActions from '../../pages/manifiestos/components/ManifiestoActi
 import { EstadoManifiesto } from '../../types/models';
 
 describe('manifest closure confirmation', () => {
+  it('explains why an earlier draft cannot be signed when three-party proposals are enabled', () => {
+    vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED', 'true');
+    const noop = vi.fn(), pending = { isPending: false };
+    render(<ManifiestoActions manifiesto={{estado:EstadoManifiesto.BORRADOR,eventos:[]}} manifiestoId="qa"
+      userRol="GENERADOR" isAdmin={false} isActionPending={false} isCancelling={false}
+      mutations={{firmar:pending,confirmarRetiro:pending,confirmarEntrega:pending,confirmarRecepcion:pending,confirmarRecepcionInSitu:pending,pesaje:pending,registrarTratamiento:pending,cerrar:pending,rechazar:pending,registrarIncidente:pending,revertir:pending}}
+      onCerrar={noop} onFirmar={noop} onConfirmarRetiro={noop} onConfirmarEntrega={noop} onConfirmarRecepcion={noop} onConfirmarRecepcionInSitu={noop}
+      onPesaje={noop} onTratamiento={noop} onRechazar={noop} onIncidente={noop} onCancelar={noop} onRevertir={noop} onDescargarPDF={noop} onDescargarCertificado={noop} />);
+    expect(screen.getByRole('region',{name:'Estado del borrador'})).toHaveTextContent('Las tres partes deben aprobar');
+    expect(screen.queryByRole('button',{name:'Firmar Manifiesto'})).not.toBeInTheDocument();
+    vi.unstubAllEnvs();
+  });
   it('opens the confirmation from the real action instead of closing on the first click', async () => {
     const onCerrar = vi.fn().mockResolvedValue(true), noop = vi.fn();
     const pending = { isPending: false };

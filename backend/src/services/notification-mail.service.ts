@@ -333,8 +333,14 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   const event = typeof data.evento === 'string' ? data.evento : '';
   const proposalEvents: Record<string, [string, string]> = {
     creada: ['Manifiesto pendiente de aprobación', 'Te vincularon a un manifiesto. Abrilo para revisar si te corresponde aprobarlo.'],
-    aprobada: ['Manifiesto aprobado por las tres partes', 'La coordinación puede comenzar. Revisá el manifiesto para ver el siguiente paso.'],
-    iniciada: ['Coordinación del manifiesto iniciada', 'Las partes ya pueden preparar el retiro. El viaje comienza al confirmar el retiro físico.'],
+    aprobada: data.partesRequeridas === 3
+      ? ['Manifiesto aprobado por las tres partes', 'La coordinación puede comenzar. Revisá el manifiesto para ver el siguiente paso.']
+      : ['Manifiesto aprobado', 'Revisá las decisiones registradas y el siguiente paso en el manifiesto.'],
+    iniciada: data.modalidad === 'IN_SITU'
+      ? ['Coordinación en origen iniciada', 'El operador confirma la recepción en el domicilio del generador. No hay retiro, viaje ni GPS.']
+      : data.modalidad === 'FIJO'
+        ? ['Coordinación del manifiesto iniciada', 'Las partes ya pueden preparar el retiro. El viaje comienza al confirmar el retiro físico.']
+        : ['Coordinación del manifiesto iniciada', 'Revisá el manifiesto para conocer la siguiente acción de tu perfil.'],
     rechazada: ['Propuesta de manifiesto rechazada', 'Una parte rechazó la propuesta. Consultá el motivo y el historial.'],
   };
   const addendumEvents: Record<string, [string, string]> = {

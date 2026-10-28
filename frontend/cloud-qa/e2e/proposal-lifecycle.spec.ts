@@ -183,15 +183,35 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
    await region.getByRole('button',{name:kind==='PARCIAL'?'Emitir certificación parcial':'Emitir certificación final total',exact:true}).click();
    const amount=region.getByLabel('Cantidad a certificar Y1 (kg)',{exact:true});await expect(amount).toHaveValue('22');
    if(kind==='PARCIAL')await amount.fill('7');else await expect(amount).toBeDisabled();
-   if(kind==='FINAL'){
-    await region.getByLabel('Tratamiento de Y12 (kg)',{exact:true}).selectOption('si');
-    await region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true}).fill('1');
-   }
    await expect(region.getByLabel('Método de tratamiento certificado',{exact:true})).toHaveValue('QA ESTABILIZACION');
-   const signing=region.locator('canvas');await signing.scrollIntoViewIfNeeded();const box=(await signing.boundingBox())!;
-   await op.mouse.move(box.x+box.width*.1,box.y+box.height*.5);await op.mouse.down();
-   for(const [x,y]of[[.2,.2],[.4,.6],[.6,.2],[.8,.7]])await op.mouse.move(box.x+box.width*x,box.y+box.height*y,{steps:5});await op.mouse.up();
-   await region.getByRole('button',{name:'Usar firma',exact:true}).click();
+   async function signCertificate(){
+    // The success notice occupies space and expires after five seconds. Dismiss it
+    // before drawing so it cannot move the canvas in the middle of a stroke.
+    const success=op.getByRole('status').filter({hasText:'Manifiesto cerrado exitosamente'});
+    if(await success.isVisible())await success.getByRole('button',{name:'Cerrar notificación'}).click();
+    const signing=region.locator('canvas');await signing.scrollIntoViewIfNeeded();const box=(await signing.boundingBox())!;
+    await op.mouse.move(box.x+box.width*.1,box.y+box.height*.5);await op.mouse.down();
+    for(const [x,y]of[[.2,.2],[.4,.6],[.6,.2],[.8,.7]])await op.mouse.move(box.x+box.width*x,box.y+box.height*y,{steps:5});await op.mouse.up();
+    const useSignature=region.getByRole('button',{name:'Usar firma',exact:true});
+    await expect(useSignature).toBeEnabled({timeout:10_000});await useSignature.click();
+   }
+   if(kind==='FINAL'){
+    const decision=region.getByLabel('Tratamiento de Y12 (kg)',{exact:true});
+    const publish=region.getByRole('button',{name:'Firmar y publicar certificación',exact:true});
+    await decision.selectOption('no');await signCertificate();await expect(publish).toBeDisabled();
+    await expect(region).toContainText('completá el tratamiento de cada corriente hallada');
+    await decision.selectOption('si');
+    const findingAmount=region.getByLabel('Cantidad tratada Y12 (kg)',{exact:true});
+    await findingAmount.fill('0.5');await signCertificate();await expect(publish).toBeDisabled();
+    const firma=await region.getByAltText('Firma del operador').getAttribute('src');
+    const rejected=await op.evaluate(async ({id,residuoId,firma})=>{
+     const response=await fetch('/api/manifiestos/'+id+'/certificados',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('sitrep_access_token')},body:JSON.stringify({id:crypto.randomUUID(),tipo:'FINAL',firma,metodo:'QA ESTABILIZACION',nota:'QA sin emitir',cantidades:[{residuoId,cantidad:22},{residuoId:'hallazgo:Y12:kg',cantidad:0.5}]})});
+     return {status:response.status,body:await response.json()};
+    },{id:m.id,residuoId:m.residuos[0].id,firma});
+    expect(rejected.status).toBe(409);expect(rejected.body.message).toContain('completá el tratamiento');
+    await proof(op,info,'final-finding-incomplete');
+    await findingAmount.fill('1');await signCertificate();await expect(publish).toBeEnabled();
+   }else await signCertificate();
    const record=await post(op,'/'+m.id+'/certificados',()=>region.getByRole('button',{name:'Firmar y publicar certificación',exact:true}).click(),201);
    const label=kind==='PARCIAL'?'Descargar parcial 1':'Descargar final';expect(await downloadHash(op,label)).toBe(record.pdfSha256);
    if(kind==='FINAL'){

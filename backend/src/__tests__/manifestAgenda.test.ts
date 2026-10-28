@@ -42,8 +42,8 @@ it.each(['GENERADOR', 'OPERADOR'])('keeps an in-situ draft visible and explains 
   expect(JSON.stringify(args.where)).toContain('BORRADOR');
   expect(json.mock.calls[0][0].data.items[0]).toMatchObject({
     estado: 'BORRADOR', partes: null, requiereMiAprobacion: false,
-    action: 'Firma del generador pendiente',
-    detail: expect.stringContaining('sin transporte'),
+    action: 'Necesita nueva propuesta', requiereNuevaPropuesta: true,
+    detail: expect.stringContaining('tres aprobaciones'),
     actores: { generador: 'Generador artificial', transportista: null, operador: 'Operador artificial' },
   });
 });

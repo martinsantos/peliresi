@@ -115,14 +115,14 @@ it('does not advertise a start in the agenda when an approval is missing despite
 });
 
 it('includes a draft with its next responsible party without inventing three approvals',async()=>{
- mock.get.mockImplementation(async(_url,options)=>reply([{id:'draft',numero:'QA-DRAFT',estado:'BORRADOR',modalidad:'IN_SITU',partes:null,actores:{generador:'Origen artificial',transportista:null,operador:'Destino artificial'}}],options));
+ mock.get.mockImplementation(async(_url,options)=>reply([{id:'draft',numero:'QA-DRAFT',estado:'BORRADOR',modalidad:'IN_SITU',partes:null,requiereNuevaPropuesta:true,actores:{generador:'Origen artificial',transportista:null,operador:'Destino artificial'}}],options));
  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
  render(<MemoryRouter><QueryClientProvider client={client}><TrainingTaskQueue/></QueryClientProvider></MemoryRouter>);
  await screen.findByText('QA-DRAFT');
  fireEvent.click(screen.getByRole('button',{name:'Borradores'}));
  const row=await screen.findByRole('link',{name:/QA-DRAFT/});
- expect(row).toHaveTextContent('firma del generador pendiente');
- expect(row).toHaveTextContent('Tratamiento en origen · sin transporte');
+ expect(row).toHaveTextContent('Necesita nueva propuesta');
+ expect(row).toHaveTextContent('Tratamiento en origen · sin traslado');
  expect(within(row).queryByLabelText('Transporte: Aprobado')).not.toBeInTheDocument();
  client.clear();
 });

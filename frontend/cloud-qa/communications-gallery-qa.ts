@@ -100,6 +100,18 @@ try{
      await expect(page.locator('#review')).toContainText('Corregido:');
    }
  });
+ await check('origin notices and email do not describe a pickup',async()=>{
+   await select('propuesta-insitu-iniciada');await channel('email');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('No hay retiro, viaje ni GPS');
+   await channel('inbox');await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('No hay retiro, viaje ni GPS');
+   await select('estado-insitu-TRANSPORTISTA');await channel('inbox');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('No hay retiro, traslado ni GPS');
+   await select('propuesta-insitu-historica-iniciada');await channel('email');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('siguiente acción');
+   await expect(page.locator('iframe').contentFrame().locator('body')).not.toContainText('preparar el retiro');
+   await select('propuesta-insitu-historica-aprobada');await channel('email');
+   await expect(page.locator('iframe').contentFrame().locator('body')).not.toContainText('aprobado por las tres partes');
+ });
  await page.locator('[data-width="mobile"]').click();
  await check('all scenarios, email and inbox, at phone preview width',async()=>{
    for(const [index,c] of data.cases.entries()){

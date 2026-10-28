@@ -37,7 +37,7 @@ it('an unresolved addendum disables final emission without disabling partials',a
  expect(screen.getByText(/1 adenda por resolver antes del final/)).toBeVisible();
 });
 
-it('requires an explicit treatment decision and quantity for an approved finding in the final',async()=>{
+it('blocks a final until the complete approved finding is treated',async()=>{
  const finding={id:'hallazgo:Y12:kg',corriente:'Y12',unidad:'kg',observado:2,adendas:[{id:'adenda',version:2}]};
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[finding],problemasHallazgos:[]}});
  mocks.post.mockRejectedValue({response:{data:{message:'QA sin envío'}}});show();
@@ -48,23 +48,26 @@ it('requires an explicit treatment decision and quantity for an approved finding
  fireEvent.change(screen.getByLabelText('Tratamiento de Y12 (kg)'),{target:{value:'si'}});
  fireEvent.change(screen.getByLabelText('Cantidad tratada Y12 (kg)'),{target:{value:'1'}});
  fireEvent.click(screen.getByText('Use QA signature'));
+ expect(screen.getByRole('button',{name:'Firmar y publicar certificación'})).toBeDisabled();
+ expect(screen.getByText(/completá el tratamiento de cada corriente hallada/)).toBeVisible();
+ expect(mocks.post).not.toHaveBeenCalled();
+ fireEvent.change(screen.getByLabelText('Cantidad tratada Y12 (kg)'),{target:{value:'2'}});
+ fireEvent.click(screen.getByText('Use QA signature'));
  fireEvent.click(screen.getByRole('button',{name:'Firmar y publicar certificación'}));
  await screen.findByText('QA sin envío');
- expect(mocks.post.mock.calls[0][1].cantidades).toContainEqual({residuoId:finding.id,cantidad:1});
+ expect(mocks.post.mock.calls[0][1].cantidades).toContainEqual({residuoId:finding.id,cantidad:2});
  expect(mocks.post.mock.calls[0][1].exclusionesHallazgos).toBeUndefined();
 });
-it('records an explicit no-treatment decision without claiming the finding was treated',async()=>{
+it('explains and blocks the final when a finding has not been treated',async()=>{
  const finding={id:'hallazgo:Y12:kg',corriente:'Y12',unidad:'kg',observado:2,adendas:[{id:'adenda',version:2}]};
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[finding]}});
  mocks.post.mockRejectedValue({response:{data:{message:'QA sin envío'}}});show();
  fireEvent.click(await screen.findByRole('button',{name:'Emitir certificación final total'}));
  fireEvent.change(screen.getByLabelText('Tratamiento de Y12 (kg)'),{target:{value:'no'}});
  fireEvent.click(screen.getByText('Use QA signature'));
- fireEvent.click(screen.getByRole('button',{name:'Firmar y publicar certificación'}));
- await screen.findByText('QA sin envío');
- expect(mocks.post.mock.calls[0][1].exclusionesHallazgos).toEqual([finding.id]);
- expect(mocks.post.mock.calls[0][1].cantidades).not.toContainEqual(expect.objectContaining({residuoId:finding.id}));
- expect(screen.getByText('No tratadas: Y12')).toBeVisible();
+ expect(screen.getByRole('button',{name:'Firmar y publicar certificación'})).toBeDisabled();
+ expect(screen.getByText(/completá el tratamiento de cada corriente hallada/)).toBeVisible();
+ expect(mocks.post).not.toHaveBeenCalled();
 });
 it('blocks final certification when approved finding reports conflict',async()=>{
  mocks.get.mockResolvedValue({data:{data:[],emisionHabilitada:true,adendasSinResolver:0,hallazgos:[],problemasHallazgos:['Los informes discrepan.']}});

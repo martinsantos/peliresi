@@ -85,17 +85,17 @@ function InvitationEntry({ token }: { token: string }) {
   }
 
   return <div className="mx-auto w-full max-w-lg p-4"><Card>
-    <h1 ref={titleRef} tabIndex={-1} className="text-2xl font-bold text-neutral-900 focus:outline-none">Acceso a empresa</h1>
+    <h1 ref={titleRef} tabIndex={-1} className="text-2xl font-bold text-neutral-900 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-primary-700">Acceso a empresa</h1>
     {error && <p role="alert" className="my-3 text-error-800">{error}</p>}
     {readState === 'failed' && <Button variant="outline" onClick={() => setAttempt(value => value + 1)}>Reintentar consulta</Button>}
     {readState === 'loading' && <p role="status" className="mt-4">Consultando invitación…</p>}
     {done ? <>
-      <p ref={resultRef} tabIndex={-1} role="status" className="my-4 focus:outline-none">{done === 'recovered' ? 'Esta invitación ya fue aceptada. Consultá tus accesos actuales en Empresas; esta comprobación no reactiva permisos revocados.' : 'Acceso autorizado. Tu sesión anterior no se modificó.'}</p>
+      <p ref={resultRef} tabIndex={-1} role="status" className="my-4 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-primary-700">{done === 'recovered' ? 'Esta invitación ya fue aceptada. Consultá tus accesos actuales en Empresas; esta comprobación no reactiva permisos revocados.' : 'Acceso autorizado. Tu sesión anterior no se modificó.'}</p>
       <div className="flex flex-wrap gap-4"><Link className="inline-flex min-h-11 items-center text-primary-800 underline" to="/empresas">Elegir empresa</Link><Link className="inline-flex min-h-11 items-center text-primary-800 underline" to="/login">Iniciar sesión</Link></div>
     </> : (recoveryMode || readState === 'ready' && invitation) && <form className="mt-4 space-y-4" onSubmit={event => { event.preventDefault(); void submit(); }}>
       {!recoveryMode && invitation && <><p className="break-words font-semibold">{invitation.empresa}</p><p className="break-words">{roles[invitation.rol]} · {invitation.email}</p></>}
       {recoveryMode && <><p>Comprobá si tu cuenta ya aceptó este enlace. No se otorgarán permisos.</p><Input label="Correo de la cuenta invitada" type="email" required disabled={busy} value={recoveryEmail} autoComplete="email" onChange={event => { setRecoveryEmail(event.target.value); setCheckedPending(false); }} /></>}
-      {checkedPending && <p ref={resultRef} tabIndex={-1} role="status" className="text-neutral-700 focus:outline-none">No hay una aceptación registrada. {recoveryMode ? 'Volvé a consultar la invitación para revisar sus datos antes de aceptar.' : 'Revisá la empresa y la actividad antes de aceptar el acceso.'}</p>}
+      {checkedPending && <p ref={resultRef} tabIndex={-1} role="status" className="text-neutral-700 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-primary-700">No hay una aceptación registrada. {recoveryMode ? 'Volvé a consultar la invitación para revisar sus datos antes de aceptar.' : 'Revisá la empresa y la actividad antes de aceptar el acceso.'}</p>}
       {registrationUncertain && <Link className="inline-flex min-h-11 items-center text-primary-800 underline" to="/recuperar">Recuperar acceso a mi cuenta</Link>}
       {created && <p role="status">Cuenta creada. Verificá tu correo y volvé a este enlace para aceptar.</p>}
       {register && !recoveryMode && <Input label="Tu nombre" required disabled={busy} value={name} autoComplete="name" onChange={event => setName(event.target.value)} />}

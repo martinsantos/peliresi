@@ -14,7 +14,7 @@ export const certificatesEnabled = () => !isTrainingSession() && process.env.MAN
 export const sha256 = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 export type CertificateSnapshot = {
  version: 1; tipo: 'PARCIAL' | 'FINAL'; numero: string; manifiestoNumero: string;
- generador: string; transportista: string; operador: string; autor: string;
+ generador: string; transportista: string; operador: string; autor: string; modalidad?: string | null;
  fecha: string; metodo: string; nota: string; cantidades: CertificateRow[];
  parcialesPrevios: string[]; adendas: {id:string;version:number}[]; firmaSha256: string; artificial: boolean;
  hallazgosNoTratados?: CertificateFinding[];
@@ -54,7 +54,8 @@ export function renderManifestCertificate(data: CertificateSnapshot, id: string,
   layout.fields([{label: 'Manifiesto', value: data.manifiestoNumero}, {label: 'Emisión (Mendoza)', value: new Date(data.fecha).toLocaleString('es-AR', {timeZone:'America/Argentina/Mendoza',hour12:false})}]);
   layout.section('01  PARTES Y EMISOR');
   layout.fields([{label:'Generador',value:data.generador}]);
-  layout.fields([{label:'Transporte',value:data.transportista}]);
+  layout.fields([{label:data.modalidad==='IN_SITU'?'Transporte aprobador':'Transporte',value:data.transportista}]);
+  if(data.modalidad==='IN_SITU')layout.text('Tratamiento en origen, sin traslado ni viaje.');
   layout.fields([{label:'Operador',value:data.operador},{label:'Emitido por',value:data.autor}]);
   layout.section('02  TRATAMIENTO CERTIFICADO');
   layout.fields([{label:'Método declarado',value:data.metodo}]);

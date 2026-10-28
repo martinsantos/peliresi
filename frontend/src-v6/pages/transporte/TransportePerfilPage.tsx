@@ -48,12 +48,12 @@ const TransportePerfilPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'viaje' | 'info' | 'historial'>('viaje');
 
   // Active trip - manifiestos EN_TRANSITO for this transportista
-  const { data: enTransitoData, isLoading: loadingViaje } = useManifiestos({ estado: EstadoManifiesto.EN_TRANSITO, limit: 50 });
+  const { data: enTransitoData, isLoading: loadingViaje } = useManifiestos({ estado: EstadoManifiesto.EN_TRANSITO, modalidad: 'FIJO', limit: 50 });
   const viajesEnCurso = enTransitoData?.items || [];
   const viajeEnCurso = viajesEnCurso[0] || null;
 
   // Assigned trips - manifiestos APROBADO (pending pickup)
-  const { data: aprobadosData, isLoading: loadingAprobados } = useManifiestos({ estado: EstadoManifiesto.APROBADO, limit: 50 });
+  const { data: aprobadosData, isLoading: loadingAprobados } = useManifiestos({ estado: EstadoManifiesto.APROBADO, modalidad: 'FIJO', limit: 50 });
   const viajesAsignados = aprobadosData?.items || [];
 
   // The carrier's physical journey is over at delivery; the manifest may still

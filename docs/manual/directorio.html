@@ -693,7 +693,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 </tbody>
 </table>
 <div class="callout callout-info" style="margin-top:1rem;">
-  <strong>Operadores In Situ:</strong> Algunos operadores pueden trabajar directamente en el domicilio del generador (modalidad IN SITU), sin necesidad de transporte. Un mismo operador puede tener ambas modalidades: FIJO (planta propia) e IN SITU.
+  <strong>Operadores In Situ:</strong> Algunos operadores trabajan en el domicilio del generador (modalidad IN SITU), sin traslado físico. Las propuestas nuevas incluyen un transporte aprobador y requieren las decisiones de las tres partes. Un mismo operador puede tener ambas modalidades: FIJO (planta propia) e IN SITU.
 </div>
 </section>
 
@@ -891,16 +891,16 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 <ol>
 <li><strong>Paso 1 · Generador:</strong> Confirmar el establecimiento que declara los residuos.</li>
 <li><strong>Paso 2 · Residuos:</strong> Elegir corriente, cantidad y unidad; agregar las filas necesarias.</li>
-<li><strong>Paso 3 · Destino:</strong> Elegir transportista, vehículo y chofer de su nómina, y operador habilitado. Al cambiar de transportista se limpian vehículo y chofer; no se asignan reemplazos automáticamente.</li>
+<li><strong>Paso 3 · Destino:</strong> Elegir transporte y operador habilitados. Con traslado se pueden elegir vehículo y chofer; en origen el transporte participa como aprobador sin viaje ni GPS. Al cambiar de transporte se limpian vehículo y chofer; no se asignan reemplazos automáticamente.</li>
 </ol>
-<p>El manifiesto se guarda como <strong>BORRADOR</strong> hasta que se firma electronicamente.</p>
+<p>La propuesta nueva queda <strong>PENDIENTE DE APROBACIÓN</strong>. Generador, transporte y operador reciben avisos y deciden desde sus cuentas; sólo después de las tres aprobaciones se puede iniciar la coordinación.</p>
 <div class="callout callout-warning" style="margin-top:1rem;">
-  <strong>Filtrado inteligente:</strong> Al seleccionar residuos, el sistema muestra solo los operadores habilitados para tratar esos tipos de residuos. Si se elige modalidad IN SITU, el transportista no es requerido.
+  <strong>Filtrado inteligente:</strong> Al seleccionar residuos, el sistema muestra operadores habilitados para esas corrientes. En modalidad IN SITU también se elige un transporte aprobador, aunque no haya traslado.
 </div>
 
 <h4>Eventuales y adendas</h4>
 <div class="callout callout-info">
-<strong>Práctica de capacitación:</strong> Eventuales y adendas están disponibles con la banda «Capacitación · sin validez oficial». Permanecen apagados en la operación real de esta instalación.
+<strong>Práctica de capacitación:</strong> La disponibilidad de eventuales y adendas depende de la configuración de la instalación. En capacitación las prácticas llevan la banda «sin validez oficial».
 <a href="tutorial.html?guide=capacitacion-novedades">Abrir la guía simple para web y app</a>.
 <p>Para el relevo sin cambiar de rol: <a href="tutorial.html?guide=capacitacion-cuatro-telefonos">Un manifiesto, cuatro teléfonos</a>.</p>
 </div>
@@ -923,7 +923,7 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 
 <h4>Workflow de Estados</h4>
 <div class="workflow-diagram">
-<span class="workflow-state ws-borrador">BORRADOR</span>
+<span class="workflow-state ws-borrador">PENDIENTE DE APROBACIÓN</span>
 <span class="workflow-arrow">&rarr;</span>
 <span class="workflow-state ws-aprobado">APROBADO</span>
 <span class="workflow-arrow">&rarr;</span>
@@ -949,10 +949,10 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
 </div>
 <p><strong>Nota:</strong> INCIDENTE es un evento registrado durante EN_TRANSITO, no un estado terminal. El manifiesto permanece en estado EN_TRANSITO mientras se resuelve el incidente.</p>
 
-<h4 style="margin-top:1.5rem;">Modalidad In Situ (sin transporte)</h4>
-<p>Cuando el operador trabaja <strong>in situ</strong> en el domicilio del generador, no se requiere transporte. El flujo es:</p>
+<h4 style="margin-top:1.5rem;">Modalidad In Situ (sin traslado)</h4>
+<p>Cuando el operador trabaja <strong>in situ</strong> en el domicilio del generador, se elige un transporte aprobador, pero no hay viaje, retiro ni GPS. Las tres partes aprueban y una inicia la coordinación antes de la recepción:</p>
 <div class="workflow-diagram">
-  <span class="workflow-state ws-borrador">BORRADOR</span>
+  <span class="workflow-state ws-borrador">PENDIENTE DE APROBACIÓN</span>
   <span class="workflow-arrow">&rarr;</span>
   <span class="workflow-state ws-aprobado">APROBADO</span>
   <span class="workflow-arrow">&rarr;</span>
@@ -962,19 +962,20 @@ SITREP (Sistema de Trazabilidad de Residuos Peligrosos) es la plataforma digital
   <span class="workflow-arrow">&rarr;</span>
   <span class="workflow-state ws-tratado">TRATADO</span>
 </div>
-<p>El operador confirma la recepci&oacute;n directamente sin pasar por EN_TRANSITO ni ENTREGADO.</p>
+<p>Tras las tres aprobaciones y el inicio de la coordinación, el operador confirma la recepci&oacute;n en origen sin pasar por EN_TRANSITO ni ENTREGADO.</p>
 
 <h4>Estados del Manifiesto</h4>
 <table>
 <thead><tr><th>Estado</th><th>Descripcion</th><th>Acciones Disponibles</th></tr></thead>
 <tbody>
-<tr><td><span class="workflow-state ws-borrador">BORRADOR</span></td><td>Manifiesto creado pero aun no firmado. Puede ser editado.</td><td>Firmar/Aprobar, Cancelar</td></tr>
-<tr><td><span class="workflow-state ws-aprobado">APROBADO</span></td><td>Firmado electronicamente. Codigo QR generado. Esperando retiro.</td><td>Confirmar Retiro, Cancelar</td></tr>
+<tr><td><span class="workflow-state ws-borrador">BORRADOR</span></td><td>Registro anterior sin propuesta de tres partes. Se conserva para consulta.</td><td>Crear una nueva propuesta cuando esté habilitado el circuito de tres partes</td></tr>
+<tr><td><span class="workflow-state ws-borrador">PENDIENTE DE APROBACIÓN</span></td><td>La propuesta espera las decisiones de generador, transporte y operador.</td><td>Revisar y decidir desde la cuenta propia</td></tr>
+<tr><td><span class="workflow-state ws-aprobado">APROBADO</span></td><td>Las tres partes aprobaron. Falta iniciar la coordinación antes de la recepción o el retiro.</td><td>Iniciar coordinación</td></tr>
 <tr><td><span class="workflow-state ws-transito">EN_TRANSITO</span></td><td>Residuo retirado. GPS activo. Transportista en ruta.</td><td>Confirmar Entrega, Registrar Incidente, Cancelar</td></tr>
 <tr><td><span class="workflow-state ws-entregado">ENTREGADO</span></td><td>Residuo entregado en planta del operador. GPS desactivado.</td><td>Confirmar Recepcion, Rechazar Carga, Cancelar</td></tr>
 <tr><td><span class="workflow-state ws-recibido">RECIBIDO</span></td><td>Operador confirmo recepcion. Pesaje registrado.</td><td>Registrar Tratamiento, Cerrar Manifiesto, Cancelar</td></tr>
 <tr><td><span class="workflow-state ws-tratamiento">EN_TRATAMIENTO</span></td><td>Metodo de tratamiento aplicado. En proceso de disposicion.</td><td>Cerrar Manifiesto, Cancelar</td></tr>
-<tr><td><span class="workflow-state ws-tratado">TRATADO</span></td><td>Ciclo completo. Certificado de disposicion disponible.</td><td>Descargar PDF, Descargar Certificado</td></tr>
+<tr><td><span class="workflow-state ws-tratado">TRATADO</span></td><td>Tratamiento cerrado. El operador debe firmar y emitir la certificación final cuando se cumplen sus condiciones.</td><td>Consultar el manifiesto y las certificaciones emitidas</td></tr>
 <tr><td><span class="workflow-state ws-rechazado">RECHAZADO</span></td><td>Carga rechazada por el operador con motivo documentado.</td><td>Consultar, Descargar PDF</td></tr>
 <tr><td><span class="workflow-state ws-cancelado">CANCELADO</span></td><td>Manifiesto cancelado por generador o administrador.</td><td>Consultar, Descargar PDF</td></tr>
 </tbody>
@@ -2423,22 +2424,22 @@ SITREP esta disponible como aplicacion web progresiva (PWA), lo que permite inst
 <h4>Nuevo Manifiesto (Formulario Multi-Paso)</h4>
 <p>Formulario optimizado para mobile dividido en pasos secuenciales:</p>
 <ol>
-<li><strong>Paso 1 - Actores:</strong> Seleccionar generador, transportista y operador. Al seleccionar un actor, se auto-completan automaticamente los campos de CUIT, telefono, domicilio y numero de habilitacion.</li>
-<li><strong>Paso 2 - Residuos:</strong> Agregar uno o mas residuos con tipo, cantidad y unidad.</li>
-<li><strong>Paso 3 - Confirmacion:</strong> Revisar todos los datos y crear el manifiesto en estado BORRADOR.</li>
+<li><strong>Paso 1 - Generador:</strong> Seleccionar o confirmar el generador.</li>
+<li><strong>Paso 2 - Residuos:</strong> Agregar corrientes, cantidades y unidades.</li>
+<li><strong>Paso 3 - Destino:</strong> Elegir modalidad, transporte aprobador y operador. Con traslado se pueden asignar vehículo y chofer. La propuesta queda pendiente de las tres aprobaciones.</li>
 </ol>
 <div class="callout callout-warning" style="margin-top:1rem;">
-  <strong>Filtrado inteligente:</strong> Al seleccionar residuos, el sistema muestra solo los operadores habilitados para tratar esos tipos de residuos. Si se elige modalidad IN SITU, el transportista no es requerido.
+  <strong>Filtrado inteligente:</strong> Al seleccionar residuos, el sistema muestra operadores habilitados para esas corrientes. En modalidad IN SITU también se elige un transporte aprobador, aunque no haya traslado.
 </div>
 
 <h4>Detalle y Firma</h4>
 <p>Desde la pantalla de detalle, el generador puede:</p>
 <ul>
 <li><strong>Ver</strong> toda la informacion del manifiesto, residuos incluidos y timeline de eventos.</li>
-<li><strong>Firmar/Aprobar</strong> un manifiesto en estado BORRADOR para pasarlo a APROBADO.</li>
+<li><strong>Firmar su participación</strong> en una propuesta pendiente; transporte y operador aprueban desde sus cuentas. Sólo las tres decisiones permiten iniciar la coordinación.</li>
 <li><strong>Cancelar</strong> un manifiesto que aun no fue retirado.</li>
 <li><strong>Descargar PDF</strong> del manifiesto en cualquier estado.</li>
-<li><strong>Descargar Certificado</strong> de disposicion final cuando el manifiesto llega a estado TRATADO.</li>
+<li><strong>Descargar certificaciones</strong> cuando el operador las firme y publique. El cierre del tratamiento no las emite automáticamente.</li>
 </ul>
 </section>
 
@@ -5564,7 +5565,7 @@ El workflow de manifiestos es el corazon del sistema SITREP. Cada manifiesto sig
 <tbody>
 <tr><td><strong>2026.10</strong></td><td>Marzo 2026</td><td>
 <ul>
-  <li><strong>Operador In Situ:</strong> Operadores pueden trabajar en el domicilio del generador sin transporte. Workflow alternativo: APROBADO &rarr; RECIBIDO directo.</li>
+  <li><strong>Operador In Situ:</strong> Se incorporó el tratamiento en el domicilio del generador sin traslado. Para el circuito vigente de aprobación, consultá la guía de propuestas de tres partes.</li>
   <li><strong>Cross-filtering de residuos:</strong> Al crear manifiestos, solo se muestran operadores habilitados para los residuos seleccionados.</li>
   <li><strong>Inspector:</strong> Nueva propiedad de usuario para ver reportes completos sin restricci&oacute;n de rol.</li>
   <li><strong>Reportes filtrados:</strong> Cada rol ve solo datos de sus propios manifiestos/actores.</li>

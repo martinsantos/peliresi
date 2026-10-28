@@ -1,5 +1,6 @@
 import {test,expect,devices,type Page,type TestInfo} from '@playwright/test';
 import {writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {login,prefix,readablePageHeading,isolatedMapTiles} from './helpers';
 import {assertCloudDatabase,backendRequire} from '../safety';
 test.beforeAll(async () => { expect(process.env.MANIFEST_PROPOSALS_ENABLED).toBe('true'); await assertCloudDatabase(); });
@@ -52,10 +53,10 @@ async function create(page:Page,info:TestInfo,role:Role){
  // A mode switch must never silently remove the third assigned party.
  if(role!=='transportista'){
   await page.getByRole('button',{name:/^En origen/}).click();
-  const warning=page.getByRole('alert').filter({hasText:'Ya asignaste un transporte.'});
+  const warning=page.getByRole('alert').filter({hasText:'Ya asignaste vehículo o chofer.'});
   await expect(warning).toBeVisible();
   await expect(page.getByRole('button',{name:/^Con traslado/})).toHaveAttribute('aria-pressed','true');
-  await warning.getByRole('button',{name:'Mantener transporte',exact:true}).click();
+  await warning.getByRole('button',{name:'Mantener traslado',exact:true}).click();
   await expect(page.getByRole('button',{name:'Transportista *',exact:true})).toContainText('QA Transporte 1');
   await expect(page.getByRole('button',{name:'Vehículo (opcional)',exact:true})).toContainText('QA002ZZ');
   await expect(page.getByRole('button',{name:'Chofer (opcional)',exact:true})).toContainText('QA Segundo');
@@ -67,14 +68,16 @@ async function create(page:Page,info:TestInfo,role:Role){
  expect(result.manifiesto.estado).toBe('PENDIENTE_APROBACION');
  await markSynthetic(result.manifiesto.id,result.manifiesto.numero);return result.manifiesto;
 }
-for(const creator of ['generador','operador'] as const)test('in-situ proposal: '+creator+' creates; both parties approve before receipt',async({browser},info)=>{
- test.setTimeout(150000);
- const contexts=[],pages={} as Record<'generador'|'operador',Page>,errors:string[]=[];
+for(const creator of roles)test('in-situ proposal: '+creator+' creates; three parties approve without a trip',async({browser},info)=>{
+ test.setTimeout(180000);
+ const contexts=[],pages={} as Record<Role,Page>,errors:string[]=[];
  const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:info.project.name==='app'?390:360,height:844}};
  try{
-  for(const role of ['generador','operador'] as const){
+  for(const role of roles){
    const context=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});contexts.push(context);
-   pages[role]=await context.newPage();pages[role].on('pageerror',e=>errors.push(e.message));await login(pages[role],info,role);
+   pages[role]=await context.newPage();pages[role].on('pageerror',e=>errors.push(e.message));
+   pages[role].on('console',msg=>{if(msg.type()==='error')errors.push(msg.text());});
+   await login(pages[role],info,role);
   }
   const page=pages[creator];await page.goto(prefix(info)+'/manifiestos/nuevo');
   if(creator!=='generador')await choose(page,'Generador *',/^QA Generador 1 /);
@@ -82,38 +85,73 @@ for(const creator of ['generador','operador'] as const)test('in-situ proposal: '
   await choose(page,'Tipo de Residuo *',/^Y1 - /);await page.getByLabel('Cantidad *',{exact:true}).fill('11');
   await page.getByRole('button',{name:'Siguiente',exact:true}).click();
   await page.getByRole('button',{name:/^En origen/}).click();
-  await expect(page.getByRole('button',{name:'Transportista *',exact:true})).toHaveCount(0);
-  await expect(page.getByText(/Ambos reciben un aviso y deben aprobar/)).toBeVisible();
+  if(creator!=='transportista')await choose(page,'Transportista aprobador *',/^QA Transporte 1 /);
+  await expect(page.getByText(/Las tres partes reciben un aviso y deben aprobar/)).toBeVisible();
+  await expect(page.getByRole('button',{name:'Vehículo (opcional)',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Chofer (opcional)',exact:true})).toHaveCount(0);
   if(creator!=='operador')await choose(page,'Operador / Destino *',/^QA Operador 1 /);
   await page.getByLabel('Fecha prevista de inicio',{exact:true}).fill('2099-12-25');
+  await page.getByLabel('Observaciones',{exact:true}).fill('QA roles UX · datos artificiales');
   const result=await post(page,'/api/manifiestos',()=>page.getByRole('button',{name:'Crear Manifiesto',exact:true}).click(),201),m=result.manifiesto;
-  expect(m).toMatchObject({modalidad:'IN_SITU',transportistaId:null,estado:'PENDIENTE_APROBACION'});
-  const panel=page.getByRole('region',{name:'Aprobaciones de las partes'});
-  await expect(panel).toContainText('0 de 2 aprobaciones');
-  await expect(panel.getByLabel(/^Transporte:/)).toHaveCount(0);
+  expect(m).toMatchObject({modalidad:'IN_SITU',estado:'PENDIENTE_APROBACION'});
+  expect(m.transportistaId).toBeTruthy();await markSynthetic(m.id,m.numero);
+  for(const role of roles){
+   const reader=pages[role];await reader.goto(prefix(info)+'/notificaciones');
+   const notice=reader.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:m.numero}).filter({hasText:'Manifiesto pendiente de tu aprobación'});
+   await expect(notice).toBeVisible();
+   await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
+   await expect(reader).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
+   const panel=reader.getByRole('region',{name:'Aprobaciones de las partes'});
+   await expect(panel).toContainText('0 de 3 aprobaciones');
+   for(const name of ['Generador','Transporte','Operador'])await expect(panel.getByLabel(name+': Pendiente',{exact:true})).toBeVisible();
+  }
   await proof(page,info,'in-situ-created-'+creator);
-  await approve(page,m.id,creator);
-  await expect(panel).toContainText('1 de 2 aprobaciones');
-  await expect(page.getByRole('button',{name:'Confirmar Recepcion In Situ',exact:true})).toHaveCount(0);
-  const other=creator==='generador'?'operador':'generador',counterpart=pages[other];
-  await counterpart.goto(prefix(info)+'/notificaciones');
-  const notice=counterpart.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:m.numero}).filter({hasText:'Manifiesto pendiente de tu aprobación'});
-  await expect(notice).toBeVisible();
-  await notice.getByRole('button',{name:/^Abrir aviso:/}).click();
-  await expect(counterpart).toHaveURL(new RegExp('/manifiestos/'+m.id+'$'));
-  await approve(counterpart,m.id,other);
+  const order=[creator,...roles.filter(role=>role!==creator)];
+  for(let i=0;i<order.length;i++){
+   await approve(pages[order[i]],m.id,order[i]);
+   if(i<2){
+    await expect(pages[order[i]].getByRole('region',{name:'Aprobaciones de las partes'})).toContainText((i+1)+' de 3 aprobaciones');
+    await expect(pages[order[i]].getByRole('button',{name:'Iniciar coordinación',exact:true})).toHaveCount(0);
+   }
+  }
   const operator=pages.operador,operatorPanel=operator.getByRole('region',{name:'Aprobaciones de las partes'});
-  await expect(operatorPanel).toContainText('2 de 2 · Aprobado',{timeout:12000});
+  await expect(operatorPanel).toContainText('3 de 3 · Aprobado',{timeout:12000});
+  for(const name of ['Generador','Transporte','Operador'])await expect(operatorPanel.getByLabel(name+': Aprobado',{exact:true})).toBeVisible();
   const receipt=operator.getByRole('button',{name:'Confirmar Recepcion In Situ',exact:true});
   await expect(receipt).toBeDisabled();
   await post(operator,'/'+m.id+'/iniciar-coordinacion',()=>operatorPanel.getByRole('button',{name:'Iniciar coordinación',exact:true}).click());
-  await expect(receipt).toBeEnabled({timeout:12000});
-  await proof(operator,info,'in-situ-approved-'+creator);
+  await expect(receipt).toBeEnabled({timeout:12000});await proof(operator,info,'in-situ-approved-'+creator);
   const received=await post(operator,'/'+m.id+'/recepcion-insitu',()=>receipt.click());
-  expect(received.manifiesto.estado).toBe('RECIBIDO');
-  expect(received.manifiesto.fechaRetiro).toBeNull();
+  expect(received.manifiesto.estado).toBe('RECIBIDO');expect(received.manifiesto.fechaRetiro).toBeNull();
   await expect(operator.getByRole('button',{name:'Registrar Tratamiento',exact:true})).toBeVisible();
+  const transport=pages.transportista;
+  await transport.goto(prefix(info)+'/transporte/viaje/'+m.id);
+  await expect(transport.getByText('Tratamiento en origen · sin viaje')).toBeVisible();
+  await expect(transport.getByText(/no hay retiro ni GPS/)).toBeVisible();
+  await proof(transport,info,'in-situ-no-trip-'+creator);
+  const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient();
+  try{
+   expect(await db.trackingGPS.count({where:{manifiestoId:m.id}})).toBe(0);
+   expect(await db.tramoTransporte.count({where:{manifiestoId:m.id}})).toBe(0);
+   const notices=await db.notificacion.findMany({where:{manifiestoId:m.id,titulo:'Coordinación iniciada: tratamiento en origen'},include:{usuario:true}});
+   expect(notices).toHaveLength(3);
+   const {notificationMailContent}=backendRequire('./dist/services/notification-mail.service.js');
+   for(const notice of notices){
+    expect(JSON.parse(notice.datos)).toMatchObject({fase:'iniciada',modalidad:'IN_SITU',partesRequeridas:3});
+    const mail=notificationMailContent({...notice.usuario,...notice});
+    expect(mail.subject).toContain('Coordinación en origen iniciada');expect(mail.html).toContain('No hay retiro, viaje ni GPS');
+    expect(mail.html).toContain('/manifiestos/'+m.id);
+   }
+  }finally{await db.$disconnect();}
+  for(const role of roles){
+   const reader=pages[role];await reader.goto(prefix(info)+'/notificaciones');
+   const notices=reader.getByRole('list',{name:'Avisos',exact:true}).getByRole('listitem').filter({hasText:m.numero});
+   await expect(notices.filter({hasText:'¡Tres aprobaciones! Listos para iniciar'})).toHaveCount(1);
+   await expect(notices.filter({hasText:'Coordinación iniciada: tratamiento en origen'})).toHaveCount(1);
+   await expect(notices.filter({hasText:'Coordinación iniciada: tratamiento en origen'})).toContainText('No hay retiro, viaje ni GPS');
+  }
   expect(errors).toEqual([]);
+  writeFileSync(info.outputPath('proof.json'),JSON.stringify({creator,id:m.id,numero:m.numero,surface:info.project.name,approvals:3,cap:false,noTripOrGps:true,errors}));
  }finally{for(const context of contexts)await context.close();}
 });
 for(const creator of roles)test('ordinary proposal: '+creator+' creates; each party approves, inbox updates, transport starts',async({browser},info)=>{
@@ -208,8 +246,15 @@ test('operational proposal manual is available to all three roles, with stable n
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/manual/tutorial.html?guide=manifiestos-tres-partes');
  await expect(page.locator('#tutorialTitle')).toHaveText('Proponer un manifiesto y aprobar entre las tres partes');
- await expect(page.locator('.guide-step')).toHaveCount(4);
- for(const text of ['Crear no aprueba','Generador firma','3 de 3','Iniciar coordinación','CAP cerrado y correo/push apagados'])await expect(page.locator('body')).toContainText(text);
+ const script=page.locator('script[src^="help-data.js?v="]');
+ const url=await script.getAttribute('src');expect(url).not.toBeNull();
+ const source=await page.request.get(new URL(url!,page.url()).toString());expect(source.ok()).toBe(true);
+ const digest=createHash('sha256').update(await source.body()).digest('hex').slice(0,12);
+ expect(url).toBe('help-data.js?v='+digest);
+ const steps=page.locator('.guide-step');
+ for(const title of ['Crear desde cualquiera de las tres cuentas','Comprobar un envío sin confirmación','Resolver una parte que no puede aprobar','Revisar y decidir desde cada rol','Programar y coordinar el retiro','Confirmar el hecho físico y continuar'])await expect(steps.getByRole('heading',{name:title,exact:true})).toHaveCount(1);
+ expect(await page.locator('#tutorialIndex a').count()).toBe(await steps.count());
+ for(const text of ['Crear no aprueba','Comprobar un envío sin confirmación','transporte aprobador','Generador firma','3 de 3','Iniciar coordinación','CAP cerrado y correo/push apagados'])await expect(page.locator('body')).toContainText(text);
  if(info.project.name!=='web-desktop')await page.getByRole('button',{name:/Índice del tutorial/}).click();
  await page.locator('#tutorialIndex a').last().click();await expect(page.locator('.guide-step').last().getByRole('heading')).toBeInViewport({ratio:1});
  await page.reload();await expect(page.locator('#tutorialIndex a').last()).toHaveAttribute('aria-current','step');

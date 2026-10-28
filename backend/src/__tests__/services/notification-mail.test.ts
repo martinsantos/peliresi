@@ -18,6 +18,26 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('renders origin coordination accurately for %s without sending mail', rol => {
+    const n = { ...notice, rol, tipo: 'INFO_GENERAL', manifiestoId: 'manifest', datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: 'iniciada', modalidad: 'IN_SITU', partesRequeridas: 3 }) };
+    const content = notificationMailContent(n)!;
+    expect(content.subject).toContain('Coordinación en origen iniciada');
+    expect(mailText(content.html)).toContain('No hay retiro, viaje ni GPS');
+    expect(mailText(content.html)).not.toContain('preparar el retiro');
+    expect(content.html).toContain('/manifiestos/manifest');
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+  it('keeps ordinary and historical coordination notices truthful', () => {
+    const common = { ...notice, tipo: 'INFO_GENERAL', manifiestoId: 'manifest' };
+    const start = (modalidad?: string) => notificationMailContent({ ...common, datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: 'iniciada', modalidad }) })!;
+    expect(mailText(start('FIJO').html)).toContain('preparar el retiro');
+    expect(mailText(start().html)).toContain('siguiente acción');
+    expect(mailText(start().html)).not.toContain('preparar el retiro');
+    const approved = (partesRequeridas?: number) => notificationMailContent({ ...common, datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, fase: 'aprobada', partesRequeridas }) })!;
+    expect(approved(3).subject).toContain('tres partes');
+    expect(approved().subject).not.toContain('tres partes');
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['certificado_manifiesto','propuesta_partes','adenda_manifiesto'])('revalidates representative %s access before any future delivery, including revocation', async tipo => {
     const n = { ...notice, id: 'company-cert', usuarioId: 'representative', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
       datos: JSON.stringify({ tipo, version: 1, documentoId: 'doc', tipoCertificado: 'PARCIAL', accesosEmpresa: [{empresaId:'co',actividadId:'a'}] }) };

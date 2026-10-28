@@ -10,6 +10,20 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('current manual explains three in-situ approvals and complete treatment before a final certificate', () => {
+  const proposals = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-tres-partes'));
+  const certificates = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));
+  const notices = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-avisos'));
+  const directory = read('directorio.html');
+  assert.match(proposals, /transporte aprobador/);
+  assert.match(proposals, /3 de 3 aprobaciones/);
+  assert.doesNotMatch(proposals, /en origen sin transporte, 2 de 2/);
+  assert.match(certificates, /la certificación final queda bloqueada hasta completar su tratamiento/);
+  assert.match(notices, /En tratamiento en origen, el transporte también aprueba, pero no hay retiro, viaje ni GPS/);
+  assert.match(directory, /En modalidad IN SITU también se elige un transporte aprobador/);
+  assert.doesNotMatch(directory, /Si se elige modalidad IN SITU, el transportista no es requerido/);
+  assert.match(directory, /el cierre del tratamiento no las emite automáticamente/i);
+});
 function jpegDimensions(bytes: Buffer): { width: number; height: number } {
   assert.equal(bytes.readUInt16BE(0), 0xffd8, 'JPEG signature');
   let index = 2;
@@ -145,8 +159,8 @@ test('certificate and addendum guides explain the approved rectification without
 test('certificate guide distinguishes an approved finding from an explicitly treated quantity', () => {
   const cert = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));
   assert.ok(cert.includes('sólo si efectivamente la trataste'));
-  assert.ok(cert.includes('indicá si se trató'));
-  assert.ok(cert.includes('no se incluye como tratamiento'));
+  assert.ok(cert.includes('completá el tratamiento e indicá el total efectivamente tratado'));
+  assert.ok(cert.includes('la certificación final queda bloqueada hasta completar su tratamiento'));
   assert.ok(cert.includes('La firma registra tu decisión'));
 });
 

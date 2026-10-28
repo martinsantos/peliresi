@@ -10,13 +10,20 @@ import { parseDateParam } from '../utils/dateRange';
 // Obtener todos los manifiestos
 export const getManifiestos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { estado, fase, generadorId, transportistaId, operadorId, tipoResiduoId, search, fechaDesde, fechaHasta, page, limit, sortBy, sortOrder } = req.query;
+    const { estado, fase, modalidad, generadorId, transportistaId, operadorId, tipoResiduoId, search, fechaDesde, fechaHasta, page, limit, sortBy, sortOrder } = req.query;
     const { skip, take, page: pageNum, limit: limitNum } = parsePagination(
         { page: page as string, limit: limit as string },
         { limit: 10, maxLimit: 500 }
     );
 
     const where: any = {};
+
+    if (modalidad !== undefined) {
+      if (modalidad !== 'FIJO' && modalidad !== 'IN_SITU') throw new AppError('Filtro de modalidad inválido', 400);
+      // Older fixed-plant records may predate the explicit modalidad field.
+      if (modalidad === 'FIJO') where.AND = [{ OR: [{ modalidad: 'FIJO' }, { modalidad: null }] }];
+      else where.modalidad = 'IN_SITU';
+    }
 
     const phaseStates: Record<string, string[]> = {
       pendientes: ['BORRADOR', 'PENDIENTE_APROBACION', 'APROBADO'],

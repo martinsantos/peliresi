@@ -39,11 +39,11 @@ export const MobileDashboardPage: React.FC = () => {
 
   // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
   const { data: tripsEnTransito, isLoading: activeTripsLoading, isError: activeTripsError } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, limit: 50 } : undefined,
+    isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, modalidad: 'FIJO', limit: 50 } : undefined,
     { enabled: isTransportista && !proposals },
   );
   const { data: tripsAprobados } = useManifiestos(
-    isTransportista ? { estado: EstadoManifiesto.APROBADO, limit: 50 } : undefined,
+    isTransportista ? { estado: EstadoManifiesto.APROBADO, modalidad: 'FIJO', limit: 50 } : undefined,
     { enabled: isTransportista && !proposals },
   );
   const { data: entregadosOperador } = useManifiestos(

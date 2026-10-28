@@ -1,7 +1,7 @@
 import { CERTIFICATE_EVENT } from '../services/manifestCertificate.service';
 import { approveManifestProposal, assertManifestProposalApproved } from './manifest-proposal.controller';
 import { updateRollingHash } from '../services/manifestIntegrity.service';
-import { MANIFEST_PROPOSAL } from '../domain/manifestProposal';
+import { MANIFEST_PROPOSAL, manifestProposalsEnabled } from '../domain/manifestProposal';
 import { Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
@@ -44,6 +44,12 @@ export const firmarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       const manifiesto = await approveManifestProposal(req, firma);
       res.json({ success: true, data: { manifiesto } });
       return;
+    }
+
+    // A pre-proposal draft has no recorded decisions by the other parties.
+    // Do not turn it into a new active operation with a single signature.
+    if (manifestProposalsEnabled()) {
+      throw new AppError('Este borrador anterior no tiene las tres aprobaciones. Creá una nueva propuesta con las tres partes; el borrador se conserva.', 409);
     }
 
     // Generate QR before transaction (async, no DB write)
@@ -395,7 +401,7 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
     const manifiestoActualizado = await prisma.$transaction(async (tx) => {
       // Validate manifiesto exists, is APROBADO, and is IN_SITU
       await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
-      // New in-situ proposals need both decisions and an explicit start.
+      // New in-situ proposals need all three decisions and an explicit start.
       // Historical records without a proposal marker retain their contract.
       await assertManifestProposalApproved(tx, id);
       const current = await tx.manifiesto.findUnique({

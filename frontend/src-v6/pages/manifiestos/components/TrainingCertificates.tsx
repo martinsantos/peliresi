@@ -60,9 +60,9 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
  const validFindings=findings.every(f=>{
   const value=amounts[f.id]||'',previous=alreadyCertified(f.id);
   if(kind==='PARCIAL'&&!value)return true;
-  if(kind==='FINAL'&&value==='NO_TRATADO')return previous===0;
+  if(kind==='FINAL'&&value==='NO_TRATADO')return false;
   const amount=Number(value);
-  return !!value&&value!=='SI'&&Number.isFinite(amount)&&amount>0&&(kind==='PARCIAL'?amount+previous<=f.observado+1e-9:amount+1e-9>=previous&&amount<=f.observado+1e-9);
+  return !!value&&value!=='SI'&&Number.isFinite(amount)&&amount>0&&(kind==='PARCIAL'?amount+previous<=f.observado+1e-9:amount+1e-9>=previous&&Math.abs(amount-f.observado)<=1e-9);
  });
  function refreshQuantities(){setAmounts(Object.fromEntries([...currentResidues.map(row=>[row.id,kind==='FINAL'?String(row.cantidadRecibida??''):amounts[row.id]||'']),...findings.map(row=>[row.id,amounts[row.id]||''])]));}
  const final=query.data?.documents.some(d=>d.documento.tipo==='FINAL');
@@ -134,7 +134,7 @@ function CertificateContext({manifest,scope}:{manifest:Partial<Manifiesto>;scope
       {(kind==='PARCIAL'||choice==='si')&&<Input label={`Cantidad tratada ${f.corriente} (${f.unidad})`} type="number" min="0.001" max={f.observado} step="any" required={kind==='FINAL'} value={value==='SI'||value==='NO_TRATADO'?'':value} onChange={e=>setAmounts({...amounts,[f.id]:e.target.value||(kind==='FINAL'?'SI':'')})} helperText={kind==='FINAL'?'Incluí los parciales previos.':'Dejá vacío si no se trata en este parcial.'}/>}
      </div>;
     })}
-    {!validFindings&&kind==='FINAL'&&<p className="text-sm text-neutral-700">Indicá si se trató cada corriente y, cuando corresponda, la cantidad tratada.</p>}
+    {!validFindings&&kind==='FINAL'&&<p className="text-sm text-neutral-700">Para emitir el final, completá el tratamiento de cada corriente hallada e indicá el total observado, incluidos los parciales previos.</p>}
    </fieldset>}
    <p className="text-sm">Datos del manifiesto y pesaje ya incorporados. Revisá el método registrado y firmá.</p><Input label="Método de tratamiento certificado" required maxLength={200} value={method} onChange={e=>setMethod(e.target.value)}/>
    <Input label="Observaciones del certificado (opcional)" maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/>

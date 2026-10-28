@@ -72,10 +72,11 @@ const ACTOR_SUMMARY = {
   OPERADOR: { label: 'Operador', Icon: FlaskConical, icon: 'bg-blue-50 text-blue-600', interactive: 'hover:bg-blue-50/50' },
 };
 
-function ActorSummary({ type, actorId, user, name, detail, to, returnTo }: {
-  type: ActorReadType; actorId?: string; user: User | null; name: string; detail: string; to: string; returnTo: string;
+function ActorSummary({ type, actorId, user, name, detail, to, returnTo, roleLabel }: {
+  type: ActorReadType; actorId?: string; user: User | null; name: string; detail: string; to: string; returnTo: string; roleLabel?: string;
 }) {
-  const { label, Icon, icon, interactive } = ACTOR_SUMMARY[type];
+  const { label: defaultLabel, Icon, icon, interactive } = ACTOR_SUMMARY[type];
+  const label = roleLabel || defaultLabel;
   const readable = canReadActorDetail(user, type, actorId);
   const content = <>
     <span className={`shrink-0 rounded-lg p-2 ${icon}`}><Icon size={20} aria-hidden="true" /></span>
@@ -147,6 +148,7 @@ const ManifiestoDetailPage: React.FC = () => {
   // Use API data only
   const manifiesto = apiData;
   const m = (manifiesto || {}) as Partial<Manifiesto>;
+  const isInSitu = m.modalidad === 'IN_SITU' || (!m.modalidad && !m.transportistaId);
   const quantityTotals = declaredQuantities(Array.isArray(m.residuos) ? m.residuos : []);
 
   // --- Tracking route for GPS map ---
@@ -191,7 +193,7 @@ const ManifiestoDetailPage: React.FC = () => {
     return L.latLngBounds(allPoints);
   }, [trackingRoute, generadorPos, operadorPos]);
 
-  const showMap = !!mapBounds;
+  const showMap = !!mapBounds && !isInSitu;
 
   // --- Action Handlers ---
   // M4: actionInFlight ref prevents double-tap before React re-renders isPending
@@ -328,7 +330,7 @@ const ManifiestoDetailPage: React.FC = () => {
   // Redirect TRANSPORTISTA to the trip view for actionable states
   const isTransportista = userRol === 'TRANSPORTISTA';
   const transportistaStates = [EstadoManifiesto.APROBADO, EstadoManifiesto.EN_TRANSITO, EstadoManifiesto.ENTREGADO];
-  if (!isLoading && manifiesto && isTransportista && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
+  if (!isLoading && manifiesto && isTransportista && !isInSitu && m.estado && transportistaStates.includes(m.estado as EstadoManifiesto)) {
     const prefix = isApp ? '/app' : '';
     return <Navigate to={`${prefix}/transporte/viaje/${id}`} replace />;
   }
@@ -383,7 +385,7 @@ const ManifiestoDetailPage: React.FC = () => {
           <Badge variant="soft" color={getEstadoBadgeColor(m.estado || EstadoManifiesto.BORRADOR)} className="shrink-0">
             {formatEstado(m.estado || EstadoManifiesto.BORRADOR)}
           </Badge>
-          {m.modalidad === 'IN_SITU' && <Badge variant="soft" color="info">En origen · sin transporte</Badge>}
+          {m.modalidad === 'IN_SITU' && <Badge variant="soft" color="info">En origen · sin traslado</Badge>}
           {isError && (
             <Badge variant="soft" color="warning" className="shrink-0">
               <AlertCircle size={12} className="mr-1" />
@@ -410,7 +412,7 @@ const ManifiestoDetailPage: React.FC = () => {
         isAdmin={isAdmin}
         userRol={userRol}
         isActionPending={isActionPending}
-        isInSitu={!m.transportistaId}
+        isInSitu={isInSitu}
         mutations={{
           firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,
           confirmarRecepcionInSitu,
@@ -437,7 +439,7 @@ const ManifiestoDetailPage: React.FC = () => {
       {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
 
       {(currentUser?.training || import.meta.env.VITE_MANIFEST_CERTIFICATES_ENABLED === 'true' || m.eventos?.some(e=>['CERTIFICACION_OPERADOR_V1','CERTIFICADO_OPERADOR_V1'].includes(e.tipo))) && <TrainingCertificates key={m.id} manifest={m} />}
-      {m.transportistaId&&m.estado!==EstadoManifiesto.BORRADOR&&<TransportLegs id={id!}/>}
+      {m.transportistaId&&m.modalidad!=='IN_SITU'&&m.estado!==EstadoManifiesto.BORRADOR&&<TransportLegs id={id!}/>}
 
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -456,6 +458,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 {m.transportistaId ? (
                   <ActorSummary type="TRANSPORTISTA" actorId={m.transportistaId} user={currentUser}
                     name={m.transportista?.razonSocial || '-'} detail={`Hab: ${m.transportista?.numeroHabilitacion || '-'}`}
+                    roleLabel={isInSitu ? 'Transporte aprobador' : undefined}
                     to={mp(`/admin/actores/transportistas/${encodeURIComponent(m.transportistaId)}`)}
                     returnTo={location.pathname + location.search + location.hash} />
                 ) : (
@@ -479,7 +482,7 @@ const ManifiestoDetailPage: React.FC = () => {
           </Card>
 
           {/* Residuos */}
-          {m.transportistaId && <Card>
+          {m.transportistaId && !isInSitu && <Card>
             <CardHeader title="Transporte asignado" icon={<Truck size={20} />} />
             <CardContent>
               <dl className="grid gap-4 sm:grid-cols-2">
@@ -495,7 +498,7 @@ const ManifiestoDetailPage: React.FC = () => {
             </CardContent>
           </Card>}
           <Card>
-            <CardHeader title="Residuos transportados" icon={<Package size={20} />} />
+            <CardHeader title={isInSitu ? 'Residuos declarados' : 'Residuos transportados'} icon={<Package size={20} />} />
             <CardContent>
                 <div className="overflow-x-auto">
                 <table className="w-full">

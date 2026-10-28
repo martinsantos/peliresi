@@ -29,6 +29,15 @@ it('in situ and unsigned is honest',async()=>{
  const m={...fixture(),transportista:null,fechaFirma:null,estado:'BORRADOR'};
  const pdf=inspect(await renderManifestPdf(m),'manifiesto-in-situ');expect(pdf.text).toContain('sin transporte');expect(pdf.text).not.toContain('Firma manuscrita adjunta');
 });
+it('identifies an in-situ approving carrier without inventing a vehicle or trip',async()=>{
+ const m={...fixture(),modalidad:'IN_SITU'};
+ const pdf=inspect(await renderManifestPdf(m),'manifiesto-in-situ-aprobador');
+ expect(pdf.text).toContain('MANIFIESTO · TRATAMIENTO EN ORIGEN');
+ expect(pdf.text).toContain('TRANSPORTE APROBADOR');
+ expect(pdf.text).toContain('sin traslado ni viaje');
+ expect(pdf.text).not.toContain('Vehículo asignado');
+ expect(pdf.text).not.toContain('Chofer asignado');
+});
 it.each(['PARCIAL','FINAL'] as const)('certificate retains snapshot and integrity %s',async tipo=>{
  const data={version:1 as const,tipo,numero:'QA-CERT-'+tipo,manifiestoNumero:'QA-DISEÑO-0001',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método declarado artificial',nota:'Prueba de diseño',cantidades:[{corriente:'Y1',cantidad:21,unidad:'kg'}],parcialesPrevios:tipo==='FINAL'?['QA-CERT-PARCIAL']:[],adendas:[{id:'qa-adenda',version:1}],firmaSha256:'b'.repeat(64),artificial:true};
  const before=JSON.stringify(data),pdf=inspect(await renderManifestCertificate(data,'qa-certificate',sig),'certificado-'+tipo.toLowerCase());
@@ -36,6 +45,14 @@ it.each(['PARCIAL','FINAL'] as const)('certificate retains snapshot and integrit
  expect(pdf.text).toContain(tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas');
  expect(pdf.text).toMatch(/Adenda 1\s*·\s*versión 1/);expect(pdf.text).not.toContain('qa-adenda');
 });
+it('renders 200 certified quantities across pages without clipping',async()=>{
+ const data={version:1 as const,tipo:'FINAL' as const,numero:'QA-CERT-200',manifiestoNumero:'QA-1',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método QA',nota:'',cantidades:Array.from({length:200},(_,i)=>({residuoId:`r${i}`,corriente:`Y${i+1}`,cantidad:1,unidad:'kg'})),parcialesPrevios:[],adendas:[],firmaSha256:'b'.repeat(64),artificial:true};
+ const pdf=inspect(await renderManifestCertificate(data,'qa-200',sig),'certificado-200');
+ expect(pdf.pages.length).toBeGreaterThan(3);
+ expect(pdf.text).toMatch(/Y1\s+1\s+kg/);
+ expect(pdf.text).toMatch(/Y200\s+1\s+kg/);
+ expect(pdf.text).toContain('Firma manuscrita del operador');
+},15000);
 it('distinguishes treated findings from findings declared not treated in the final PDF',async()=>{
  const data={version:1 as const,tipo:'FINAL' as const,numero:'QA-CERT-F',manifiestoNumero:'QA-1',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método QA',nota:'',cantidades:[{residuoId:'hallazgo:Y12:kg',corriente:'Y12',cantidad:1,unidad:'kg',origen:'HALLAZGO' as const,adendas:[{id:'a',version:1}]}],parcialesPrevios:[],adendas:[{id:'a',version:1}],hallazgosNoTratados:[{id:'hallazgo:Y13:kg',corriente:'Y13',unidad:'kg',observado:2,adendas:[{id:'a',version:1}]}],firmaSha256:'b'.repeat(64),artificial:true};
  const pdf=inspect(await renderManifestCertificate(data,'qa-findings',sig),'certificado-hallazgos');

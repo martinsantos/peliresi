@@ -5,9 +5,9 @@ const date = (value: unknown) => value ? new Date(value as string).toLocaleStrin
 const states: Record<string, string> = { BORRADOR: 'Borrador', PENDIENTE_APROBACION: 'Pendiente de aprobación', APROBADO: 'Aprobado', EN_TRANSITO: 'En tránsito', ENTREGADO: 'Entregado', RECIBIDO: 'Recibido', EN_TRATAMIENTO: 'En tratamiento', TRATADO: 'Tratado', RECHAZADO: 'Rechazado', CANCELADO: 'Cancelado' };
 /** Read-only representation. Never changes the declaration or replaces stored certificates. */
 export function renderManifestPdf(m: any): Promise<Buffer> {
-  return institutionalPdf('Manifiesto de transporte de residuos peligrosos', m.numero, layout => {
+  return institutionalPdf(m.modalidad === 'IN_SITU' ? 'Manifiesto de tratamiento en origen' : 'Manifiesto de transporte de residuos peligrosos', m.numero, layout => {
     const doc = layout.doc;
-    layout.text('MANIFIESTO', true, 9, PDF_STYLE.green);
+    layout.text(m.modalidad === 'IN_SITU' ? 'MANIFIESTO · TRATAMIENTO EN ORIGEN' : 'MANIFIESTO', true, 9, PDF_STYLE.green);
     layout.text(m.numero, true, 22);
     layout.fields([{ label: 'Estado actual', value: states[m.estado] || m.estado }, { label: 'Creado', value: date(m.createdAt) }]);
     layout.text('Ley Nacional 24.051 · Decreto 831/93 · Provincia de Mendoza', false, 8, PDF_STYLE.muted);
@@ -21,10 +21,13 @@ export function renderManifestPdf(m: any): Promise<Buffer> {
     layout.fields([{ label: productive ? 'Domicilio productivo' : 'Domicilio', value: productive?.domicilio ?? m.generador?.domicilio }]);
     if (productive) layout.fields([{ label: 'Establecimiento', value: productive.nombre }, { label: 'Domicilio legal al declarar', value: company.domicilioLegal?.calle }]);
     if (m.transportista) {
-      actor('02', 'TRANSPORTISTA', m.transportista, 'numeroHabilitacion');
-      const assignment = readTransportAssignment(m.asignacionTransporte, m.transportistaId);
-      const v = assignment?.vehiculo, c = assignment?.chofer;
-      layout.fields([{ label: 'Vehículo asignado', value: v ? v.marca + ' ' + v.modelo + ' - ' + v.patente : 'Sin asignación registrada' }, { label: 'Chofer asignado', value: c ? c.nombre + ' ' + c.apellido + ' - DNI ' + c.dni : 'Sin asignación registrada' }]);
+      actor('02', m.modalidad === 'IN_SITU' ? 'TRANSPORTE APROBADOR' : 'TRANSPORTISTA', m.transportista, 'numeroHabilitacion');
+      if (m.modalidad === 'IN_SITU') layout.text('Tratamiento en origen: el transporte aprueba, sin traslado ni viaje.');
+      else {
+        const assignment = readTransportAssignment(m.asignacionTransporte, m.transportistaId);
+        const v = assignment?.vehiculo, c = assignment?.chofer;
+        layout.fields([{ label: 'Vehículo asignado', value: v ? v.marca + ' ' + v.modelo + ' - ' + v.patente : 'Sin asignación registrada' }, { label: 'Chofer asignado', value: c ? c.nombre + ' ' + c.apellido + ' - DNI ' + c.dni : 'Sin asignación registrada' }]);
+      }
     } else { layout.section('02  MODALIDAD IN SITU'); layout.text('Tratamiento in situ - sin transporte'); }
     actor('03', 'OPERADOR DE TRATAMIENTO', m.operador, 'numeroHabilitacion');
     layout.fields([{ label: 'Domicilio', value: m.operador?.domicilio }]);

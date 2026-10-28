@@ -23,6 +23,16 @@ beforeEach(()=>{
  generador:{findUnique:vi.fn(async()=>({usuario:{id:'ug',activo:true}}))},transportista:{findUnique:vi.fn(async()=>({usuario:{id:'ut',activo:true}}))},operador:{findUnique:vi.fn(async()=>({usuario:{id:'uo',activo:true}}))},notificacion:{createMany:vi.fn(async({data}:any)=>({count:data.length}))}};
 });
 describe('three independently authenticated parties',()=>{
+ it('records the mode and required parties in origin coordination notices',async()=>{
+  mock.manifest.modalidad='IN_SITU';
+  await notifyManifestParties(mock.tx,mock.manifest,'iniciada','uo');
+  const notices=mock.tx.notificacion.createMany.mock.calls[0][0].data;
+  expect(notices.map((n:any)=>n.usuarioId).sort()).toEqual(['ug','uo','ut']);
+  for(const notice of notices){
+   expect(JSON.parse(notice.datos)).toMatchObject({tipo:'propuesta_partes',fase:'iniciada',modalidad:'IN_SITU',partesRequeridas:3});
+   expect(notice.mensaje).toContain('No hay retiro, viaje ni GPS');
+  }
+ });
  it('gives all linked parties an actionable notice with the proposing company and the same manifest link',async()=>{
   for(const [actor,id,name] of [['generador','ug','Origen artificial'],['transportista','ut','Transporte artificial'],['operador','uo','Destino artificial']]){
    mock.tx[actor].findUnique.mockResolvedValue({razonSocial:name,usuario:{id,activo:true}});
@@ -95,6 +105,16 @@ describe('three independently authenticated parties',()=>{
  });
  it('does not attach new approval requirements to old records',async()=>{
   mock.events=[];await expect(inTrainingSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+ });
+ it.each(['FIJO','IN_SITU'] as const)('does not activate a historical %s draft with only one signature when proposals are enabled',async modalidad=>{
+  vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
+  mock.events=[];Object.assign(mock.manifest,{estado:'BORRADOR',modalidad});
+  const {firmarManifiesto}=await import('../controllers/manifiesto-workflow.controller');
+  const next=vi.fn(),json=vi.fn();
+  await inOperationalSession(()=>firmarManifiesto(req('GENERADOR'),{json} as any,next));
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409,message:expect.stringContaining('tres aprobaciones')}));
+  expect(mock.tx.manifiesto.update).not.toHaveBeenCalled();
+  expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();
  });
 });
 
@@ -252,84 +272,102 @@ describe('operational decisions and integrity',()=>{
  });
 });
 
-describe('in-situ agreement between generator and operator',()=>{
- const inSitu={...p,modalidad:'IN_SITU' as const,transportistaId:null};
+describe('in-situ agreement with three approvals and no trip',()=>{
+ const inSitu={...p,version:2 as const,modalidad:'IN_SITU' as const};
  beforeEach(()=>{
   vi.stubEnv('MANIFEST_PROPOSALS_ENABLED','true');
-  Object.assign(mock.manifest,inSitu,{transportista:null});
+  Object.assign(mock.manifest,inSitu);
   mock.events[0].descripcion=JSON.stringify(inSitu);
  });
- it.each(['GENERADOR','OPERADOR'] as const)('requires both approvals regardless of who approves first: %s',async first=>{
-  const second=first==='GENERADOR'?'OPERADOR':'GENERADOR';
-  await inOperationalSession(()=>approveManifestProposal(req(first),first==='GENERADOR'?signature:undefined));
-  expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');
-  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+ it.each([
+  ['GENERADOR','TRANSPORTISTA','OPERADOR'],['GENERADOR','OPERADOR','TRANSPORTISTA'],
+  ['TRANSPORTISTA','GENERADOR','OPERADOR'],['TRANSPORTISTA','OPERADOR','GENERADOR'],
+  ['OPERADOR','GENERADOR','TRANSPORTISTA'],['OPERADOR','TRANSPORTISTA','GENERADOR'],
+ ] as const)('waits for all three approvals in order %s, %s, %s',async(first,second,third)=>{
+  for(const role of [first,second]){
+   await inOperationalSession(()=>approveManifestProposal(req(role),role==='GENERADOR'?signature:undefined));
+   expect(mock.manifest.estado).toBe('PENDIENTE_APROBACION');
+   await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
+  }
   const next=vi.fn(),res={json:vi.fn()} as any;
   await inOperationalSession(()=>startManifestCoordination(req('OPERADOR'),res,next));
   expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409}));
-  await inOperationalSession(()=>approveManifestProposal(req(second),second==='GENERADOR'?signature:undefined));
-  expect(mock.manifest.estado).toBe('APROBADO');
-  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
-  next.mockClear();
+  await inOperationalSession(()=>approveManifestProposal(req(third),third==='GENERADOR'?signature:undefined));
+  expect(mock.manifest.estado).toBe('APROBADO');next.mockClear();
   await inOperationalSession(()=>startManifestCoordination(req(first),res,next));
   expect(next).not.toHaveBeenCalled();
   await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
-  const count=mock.events.length;
-  await inOperationalSession(()=>approveManifestProposal(req(second),second==='GENERADOR'?signature:undefined));
-  await inOperationalSession(()=>startManifestCoordination(req(second),res,next));
-  expect(mock.events).toHaveLength(count);
-  expect(mock.events.some(e=>e.tipo==='APROBACION_TRANSPORTISTA')).toBe(false);
   expect(mock.manifest.fechaRetiro).toBeUndefined();
-  expect(mock.tx.transportista.findUnique).not.toHaveBeenCalled();
   const notices=mock.tx.notificacion.createMany.mock.calls.flatMap(([arg]:any)=>arg.data);
-  expect([...new Set(notices.map((n:any)=>n.usuarioId))].sort()).toEqual(['ug','uo']);
-  expect(notices.some((n:any)=>n.titulo==='Generador y operador aprobaron: listos para iniciar')).toBe(true);
+  expect([...new Set(notices.map((n:any)=>n.usuarioId))].sort()).toEqual(['ug','uo','ut']);
+  expect(notices.some((n:any)=>n.titulo==='¡Tres aprobaciones! Listos para iniciar')).toBe(true);
   expect(notices.some((n:any)=>n.mensaje.includes('No hay retiro, viaje ni GPS'))).toBe(true);
  });
- it('does not let transport, administration or impersonation provide a missing decision',async()=>{
-  await expect(inOperationalSession(()=>approveManifestProposal(req('ADMIN')))).rejects.toMatchObject({statusCode:403});
-  await expect(inOperationalSession(()=>approveManifestProposal(req('TRANSPORTISTA')))).rejects.toMatchObject({statusCode:404});
-  expect(proposalRole({...users.OPERADOR,impersonatedBy:'ua'},inSitu)).toBeNull();
-  expect(mock.events).toHaveLength(1);
- });
- it.each(['GENERADOR','OPERADOR'] as const)('stops the operation when %s rejects',async role=>{
+ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'] as const)('stops when %s rejects',async role=>{
   await inOperationalSession(()=>approveManifestProposal(req(role,{decision:'RECHAZADA',motivo:'No acordamos el tratamiento'})));
   expect(mock.manifest.estado).toBe('RECHAZADO');
   await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).rejects.toMatchObject({statusCode:409});
  });
- it('returns only the two real parties in detail and agenda',async()=>{
+ it('returns three parties in detail and agenda',async()=>{
   const {getManifestProposal,getTrainingTasks}=await import('../controllers/manifest-proposal.controller');
   const json=vi.fn(),next=vi.fn();
   await inOperationalSession(()=>getManifestProposal(req('OPERADOR'),{json} as any,next));
   expect(next).not.toHaveBeenCalled();
-  expect(json.mock.calls[0][0].data).toMatchObject({modalidad:'IN_SITU',partes:[{rol:'GENERADOR',aprobada:false},{rol:'OPERADOR',aprobada:false}]});
+  expect(json.mock.calls[0][0].data).toMatchObject({modalidad:'IN_SITU',partes:[{rol:'GENERADOR',aprobada:false},{rol:'TRANSPORTISTA',aprobada:false},{rol:'OPERADOR',aprobada:false}]});
   mock.tx.manifiesto.findMany=vi.fn(async()=>[{...mock.manifest,eventos:mock.events,residuos:[]}]);
   json.mockClear();await inOperationalSession(()=>getTrainingTasks(req('OPERADOR'),{json} as any,next));
-  expect(json.mock.calls[0][0].data.items[0].partes).toHaveLength(2);
+  expect(json.mock.calls[0][0].data.items[0].partes).toHaveLength(3);
  });
- it('requires two active accounts without querying a fictitious transport',async()=>{
+ it('requires an active carrier account for the new agreement',async()=>{
   const {validateProposalParties}=await import('../services/manifestProposal.service');
   await expect(validateProposalParties(mock.tx,inSitu)).resolves.toBeUndefined();
-  mock.tx.operador.findUnique.mockResolvedValue({usuario:{id:'uo',activo:false}});
+  mock.tx.transportista.findUnique.mockResolvedValue({usuario:{id:'ut',activo:false}});
   await expect(validateProposalParties(mock.tx,inSitu)).rejects.toMatchObject({statusCode:400});
-  expect(mock.tx.transportista.findUnique).not.toHaveBeenCalled();
  });
- it('protects the actual in-situ reception endpoint even if status alone says approved',async()=>{
-  const {confirmarRecepcionInSitu}=await import('../controllers/manifiesto-workflow.controller');
+ it('recovers a previously committed in-situ send without a carrier, but refuses a new one',async()=>{
+  const {createManifiesto}=await import('../controllers/manifiesto.controller');
+  const {manifestCreationIntent}=await import('../domain/manifestCreationIntent');
+  const key='c84b3820-024e-4e4b-a54a-06c62f40f11a';
+  const body={generadorId:'g',operadorId:'o',modalidad:'IN_SITU',fechaEstimadaRetiro:'2099-12-25',residuos:[{tipoResiduoId:'y1',cantidad:1,unidad:'kg'}]};
+  const intent=manifestCreationIntent(key,'ug','GENERADOR',undefined,body);
+  mock.tx.auditoria={findUnique:vi.fn().mockResolvedValue({usuarioId:'ug',modulo:'MANIFIESTOS',accion:'CREAR_MANIFIESTO',manifiestoId:'m',datosDespues:JSON.stringify({version:1,requestHash:intent.hash})})};
+  Object.assign(mock.manifest,{generadorId:'g',operadorId:'o',transportistaId:null,modalidad:'IN_SITU'});
+  const json=vi.fn(),status=vi.fn().mockReturnValue({json}),next=vi.fn();
+  const request={...req('GENERADOR'),body:{...body,idempotencyKey:key}};
+  await inOperationalSession(()=>createManifiesto(request,{status} as any,next));
+  expect(next).not.toHaveBeenCalled();expect(status).toHaveBeenCalledWith(200);
+  expect(json.mock.calls[0][0].data).toMatchObject({replayed:true,manifiesto:{id:'m',transportistaId:null}});
+  expect(mock.tx.eventoManifiesto.create).not.toHaveBeenCalled();
+  mock.tx.auditoria.findUnique.mockResolvedValue(null);next.mockClear();
+  await inOperationalSession(()=>createManifiesto(request,{status} as any,next));
+  expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:400,message:expect.stringContaining('transportista')}));
+  expect(mock.tx.manifiesto.update).not.toHaveBeenCalled();
+ });
+ it('rejects missing or mismatched parties and protects in-situ reception',async()=>{
+  expect(()=>parseProposal(JSON.stringify({...inSitu,transportistaId:null}))).toThrow();
+  expect(proposalRoles(parseProposal(JSON.stringify(inSitu)))).toHaveLength(3);
+  expect(proposalRole({...users.OPERADOR,impersonatedBy:'ua'},inSitu)).toBeNull();
   mock.manifest.estado='APROBADO';
-  const next=vi.fn(),res={json:vi.fn()} as any;
-  await inOperationalSession(()=>confirmarRecepcionInSitu(req('OPERADOR'),res,next));
+  const {confirmarRecepcionInSitu}=await import('../controllers/manifiesto-workflow.controller');
+  const next=vi.fn();await inOperationalSession(()=>confirmarRecepcionInSitu(req('OPERADOR'),{json:vi.fn()} as any,next));
   expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:409}));
   expect(mock.tx.manifiesto.update).not.toHaveBeenCalled();
+ });
+ it('does not advance an earlier unsigned two-party agreement and explains how to replace it',async()=>{
+  const legacy={...p,modalidad:'IN_SITU' as const,transportistaId:null};
+  Object.assign(mock.manifest,legacy);mock.events[0].descripcion=JSON.stringify(legacy);
+  await expect(inOperationalSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:409,message:expect.stringContaining('nueva propuesta')});
+  const {getManifestProposal}=await import('../controllers/manifest-proposal.controller');
+  const json=vi.fn(),next=vi.fn();await inOperationalSession(()=>getManifestProposal(req('OPERADOR'),{json} as any,next));
+  expect(json.mock.calls[0][0].data).toMatchObject({requiereNuevaPropuesta:true,puedeAprobar:null,puedeRechazar:true});
   expect(mock.events).toHaveLength(1);
  });
- it('cannot convert a fixed agreement into two approvals by omitting transport or changing the stored mode',async()=>{
-  expect(()=>parseProposal(JSON.stringify({...p,transportistaId:null}))).toThrow();
-  expect(()=>parseProposal(JSON.stringify({...inSitu,transportistaId:'t'}))).toThrow();
-  expect(()=>parseProposal(JSON.stringify({...inSitu,autorRol:'TRANSPORTISTA'}))).toThrow();
-  expect(proposalRoles(parseProposal(JSON.stringify(p)))).toHaveLength(3);
-  mock.manifest.modalidad='FIJO';
-  await expect(inOperationalSession(()=>approveManifestProposal(req('OPERADOR')))).rejects.toMatchObject({statusCode:409});
+ it('preserves an already initiated historical operation without rewriting its signatures',async()=>{
+  const legacy={...p,modalidad:'IN_SITU' as const,transportistaId:null};
+  Object.assign(mock.manifest,legacy,{estado:'APROBADO'});mock.events[0].descripcion=JSON.stringify(legacy);
+  mock.events.push({tipo:'FIRMA'},{tipo:'APROBACION_OPERADOR'},{tipo:'INICIO_COORDINACION'});
+  await expect(inOperationalSession(()=>assertManifestProposalApproved(mock.tx,'m'))).resolves.toBeUndefined();
+  expect(mock.events).toHaveLength(4);
  });
 });
 

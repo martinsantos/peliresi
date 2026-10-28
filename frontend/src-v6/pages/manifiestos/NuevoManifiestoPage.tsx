@@ -164,7 +164,7 @@ const NuevoManifiestoForm: React.FC = () => {
 
   const partyProposal = proposalsAvailable;
   const selectInSitu = () => {
-    setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: '', vehiculoId: '', choferId: '', operador: ownOperatorId }));
+    setFormData(prev => ({ ...prev, modalidad: 'IN_SITU', transportista: partyProposal ? prev.transportista : '', vehiculoId: '', choferId: '', operador: ownOperatorId }));
     setConfirmWithoutTransport(false);
     setValidationErrors(prev => { const next = { ...prev }; delete next.transportista; return next; });
   };
@@ -175,11 +175,10 @@ const NuevoManifiestoForm: React.FC = () => {
   const selectedOperador = operadoresList.find((o) => o.id === formData.operador);
   const partyIssues: Partial<Record<ManifestPartyField, string>> = partyProposal ? {
     generador: partyApprovalMessage(selectedGenerador),
-    transportista: formData.modalidad === 'FIJO' ? partyApprovalMessage(selectedTransportista) : undefined,
+    transportista: partyApprovalMessage(selectedTransportista),
     operador: partyApprovalMessage(selectedOperador),
     ...serverPartyIssues,
   } : {};
-  if (formData.modalidad === 'IN_SITU') partyIssues.transportista = undefined;
   const hasPartyIssue = Object.values(partyIssues).some(Boolean) || !!submitError;
   const clearPartyError = (field: ManifestPartyField) => {
     setValidationErrors(prev => Object.fromEntries(Object.entries(prev).filter(([key]) => key !== field)));
@@ -271,13 +270,14 @@ const NuevoManifiestoForm: React.FC = () => {
   }, [selectedResiduoIds, tiposResiduo]);
 
   const transportistasFiltrados = useMemo(() => {
+    if (formData.modalidad === 'IN_SITU') return transportistasList;
     if (selectedCodigos.length === 0) return transportistasList;
     return transportistasList.filter((t: any) => {
       const transCorrientes = parseCorrientes(t.corrientesAutorizadas);
       if (transCorrientes.length === 0) return true; // No data = don't filter out
       return selectedCodigos.every(c => transCorrientes.includes(c));
     });
-  }, [transportistasList, selectedCodigos]);
+  }, [transportistasList, selectedCodigos, formData.modalidad]);
 
   const handleAddResiduo = () => {
     setFormData({
@@ -303,8 +303,8 @@ const NuevoManifiestoForm: React.FC = () => {
     if ((!targetStep || targetStep === 1) && !formData.generadorId && !formData.generador) {
       errors.generador = 'Seleccioná un generador para continuar.';
     }
-    if ((!targetStep || targetStep === 3) && formData.modalidad !== 'IN_SITU' && !formData.transportista) {
-      errors.transportista = 'Seleccioná el transportista.';
+    if ((!targetStep || targetStep === 3) && (partyProposal || formData.modalidad !== 'IN_SITU') && !formData.transportista) {
+      errors.transportista = 'Seleccioná el transportista que aprobará la propuesta.';
     }
     if ((!targetStep || targetStep === 3) && !formData.operador) {
       errors.operador = 'Seleccioná el operador de destino.';
@@ -350,7 +350,7 @@ const NuevoManifiestoForm: React.FC = () => {
       const result = await createManifiesto.mutateAsync({
         idempotencyKey: pending.id,
         generadorId: submittedForm.generadorId || submittedForm.generador,
-        ...(submittedForm.modalidad !== 'IN_SITU' && { transportistaId: submittedForm.transportista }),
+        ...(submittedForm.transportista && (partyProposal || submittedForm.modalidad !== 'IN_SITU') ? { transportistaId: submittedForm.transportista } : {}),
         ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.vehiculoId ? { vehiculoId: submittedForm.vehiculoId } : {}),
         ...(submittedForm.modalidad !== 'IN_SITU' && submittedForm.choferId ? { choferId: submittedForm.choferId } : {}),
         operadorId: submittedForm.operador,
@@ -365,7 +365,7 @@ const NuevoManifiestoForm: React.FC = () => {
       });
 
       if (result.creationRecovered) toast.success('Manifiesto recuperado', `${result.numero || result.id}. El envío ya se había guardado; no se creó otro ni se repitieron avisos.`);
-      else toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? (submittedForm.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas.':'Generador, transporte y operador deben aprobar desde sus cuentas.') : 'Todavía falta la firma del generador para continuar.'}`);
+      else toast.success(result.estado === 'PENDIENTE_APROBACION' ? 'Propuesta enviada a las partes' : 'Borrador creado', `${result.numero || result.id}. ${result.estado === 'PENDIENTE_APROBACION' ? 'Generador, transporte y operador deben aprobar desde sus cuentas.' : 'Todavía falta la firma del generador para continuar.'}`);
       if (!draft.clear()) toast.error('Manifiesto creado', 'No se pudo borrar la copia de este dispositivo. No vuelvas a enviar el formulario anterior.');
       navigate(mp(`/manifiestos/${result.id}`), { state: { manifestListReturn: returnTo } });
     } catch (err: any) {
@@ -469,7 +469,7 @@ const NuevoManifiestoForm: React.FC = () => {
       <ol aria-label="Etapas del formulario" className="mb-3 grid grid-cols-3 gap-2 text-sm text-neutral-600">
         {['Generador', 'Residuos', 'Destino'].map((label, index) => <li key={label} aria-current={step === index + 1 ? 'step' : undefined} className={`border-b-2 py-3 text-center ${step === index + 1 ? 'border-primary-700 font-semibold text-primary-800' : 'border-neutral-200'}`}>{index + 1}. {label}</li>)}
       </ol>
-      {partyProposal && <details className="group mb-3 text-sm text-neutral-700"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">Cómo se aprueba<ChevronDown size={16} aria-hidden="true" className="group-open:rotate-180"/></summary><p className="px-2 pb-3">{formData.modalidad==='IN_SITU'?'Generador y operador deben aprobar desde sus cuentas antes de comenzar el tratamiento en origen.':'Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro.'}{!isAdmin && ' Tu empresa queda vinculada a tu rol.'}</p></details>}
+      {partyProposal && <details className="group mb-3 text-sm text-neutral-700"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-2 font-medium text-primary-800 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-700">Cómo se aprueba<ChevronDown size={16} aria-hidden="true" className="group-open:rotate-180"/></summary><p className="px-2 pb-3">{formData.modalidad==='IN_SITU'?'Generador, transporte y operador deben aprobar antes de comenzar el tratamiento en origen. El transporte aprueba aunque no haya viaje.':'Generador, transporte y operador deben aprobar desde sus cuentas antes del retiro.'}{!isAdmin && ' Tu empresa queda vinculada a tu rol.'}</p></details>}
       {hasPartyIssue && <div data-party-error tabIndex={-1} role="alert" className="mb-4 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-neutral-900">
         <p className="font-semibold">Revisá las partes antes de crear</p>
         <p className="mt-1">{submitError || 'Hay un actor o una cuenta que no puede aprobar. El motivo aparece junto a su selección.'}</p>
@@ -722,11 +722,9 @@ const NuevoManifiestoForm: React.FC = () => {
                   <button
                     type="button"
                     aria-pressed={formData.modalidad === 'IN_SITU'}
-                    disabled={carrierProposal}
-                    title={carrierProposal ? 'El transporte participa sólo cuando hay traslado' : undefined}
                     onClick={() => {
                       if (formData.modalidad === 'IN_SITU') return;
-                      if (formData.transportista) setConfirmWithoutTransport(true);
+                      if (formData.vehiculoId || formData.choferId || (!partyProposal && formData.transportista)) setConfirmWithoutTransport(true);
                       else selectInSitu();
                     }}
                     className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-colors text-left ${
@@ -745,10 +743,10 @@ const NuevoManifiestoForm: React.FC = () => {
               </div>
 
               {confirmWithoutTransport && <div role="alert" className="space-y-3 rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
-                <p><strong>Ya asignaste un transporte.</strong> Pasar a tratamiento en origen lo quita de esta propuesta, junto con su vehículo y chofer. Si participa, mantené el traslado para solicitar las tres aprobaciones.</p>
+                {partyProposal?<p><strong>Ya asignaste vehículo o chofer.</strong> En origen no hay viaje: se quitan esas asignaciones y se conserva el transporte como aprobador.</p>:<p><strong>Ya asignaste un transporte.</strong> Pasar a tratamiento en origen lo quita del borrador, junto con su vehículo y chofer.</p>}
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => setConfirmWithoutTransport(false)}>Mantener transporte</Button>
-                  <Button onClick={selectInSitu}>Continuar sin transporte</Button>
+                  <Button variant="outline" onClick={() => setConfirmWithoutTransport(false)}>{partyProposal?'Mantener traslado':'Mantener transporte'}</Button>
+                  <Button onClick={selectInSitu}>{partyProposal?'Continuar en origen':'Continuar sin transporte'}</Button>
                 </div>
               </div>}
 
@@ -756,12 +754,12 @@ const NuevoManifiestoForm: React.FC = () => {
               {formData.modalidad === 'IN_SITU' && (
                 <div className="flex items-start gap-2.5 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 animate-fade-in">
                   <MapPin size={16} className="shrink-0 mt-0.5" />
-                  <span><strong>Sin transporte.</strong> El operador trabajará en el domicilio del generador. {partyProposal?'Ambos reciben un aviso y deben aprobar antes de iniciar la coordinación.':'Se guardará un borrador pendiente de la firma del generador.'}</span>
+                  <span><strong>Sin traslado.</strong> El operador trabajará en el domicilio del generador. {partyProposal?'Las tres partes reciben un aviso y deben aprobar; el transporte no realiza un viaje.':'Se guardará un borrador pendiente de la firma del generador.'}</span>
                 </div>
               )}
 
-              {/* Transportista - only shown for FIJO */}
-              {formData.modalidad === 'FIJO' && (
+              {/* In situ, the carrier approves without a vehicle or trip. */}
+              {(partyProposal || formData.modalidad === 'FIJO') && (
                 <>
                   {selectedCodigos.length > 0 && transportistasFiltrados.length < transportistasList.length && (
                     <div className="flex items-center gap-2 p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700">
@@ -771,7 +769,7 @@ const NuevoManifiestoForm: React.FC = () => {
                   )}
                   <div>
                     <Select
-                      label="Transportista *"
+                      label={formData.modalidad === 'IN_SITU' ? 'Transportista aprobador *' : 'Transportista *'}
                       value={formData.transportista}
                       disabled={carrierProposal}
                       onChange={(val) => { clearPartyError('transportista'); setFormData(prev => val === prev.transportista ? prev : ({ ...prev, transportista: val, vehiculoId: '', choferId: '' })); }}
@@ -789,7 +787,7 @@ const NuevoManifiestoForm: React.FC = () => {
                   </div>
 
                   <ActorSummary actor={selectedTransportista} label="Datos del transportista" />
-                  {selectedTransportista && <div className="grid gap-4 sm:grid-cols-2">
+                  {selectedTransportista && formData.modalidad === 'FIJO' && <div className="grid gap-4 sm:grid-cols-2">
                     <Select label="Vehículo (opcional)" value={formData.vehiculoId}
                       onChange={value => setFormData(prev => ({ ...prev, vehiculoId: value }))}
                       options={vehiculos.map((v: { id: string; patente: string; marca: string; modelo: string }) => ({ value: v.id, label: `${v.patente} · ${v.marca} ${v.modelo}`.trim() }))}

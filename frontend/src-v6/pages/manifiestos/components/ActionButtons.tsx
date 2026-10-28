@@ -35,6 +35,7 @@ export interface ActionButtonsProps {
   operatorCertificates?: boolean;
   immutableProposal?: boolean;
   pickupBlocked?: boolean;
+  legacyDraftBlocked?: boolean;
   pesajePendiente?: boolean;
   isCancelling: boolean;
   mutations: {
@@ -72,6 +73,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   operatorCertificates,
   immutableProposal,
   pickupBlocked,
+  legacyDraftBlocked,
   pesajePendiente = true,
   isCancelling,
   mutations,
@@ -93,7 +95,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {/* State-based action buttons with role guards */}
-      {estado === EstadoManifiesto.BORRADOR && (isAdmin || userRol === 'GENERADOR') && (
+      {estado === EstadoManifiesto.BORRADOR && !legacyDraftBlocked && (isAdmin || userRol === 'GENERADOR') && (
         <Button
           fullWidth
           leftIcon={mutations.firmar.isPending ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
@@ -116,7 +118,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
         </Button>
       )}
 
-      {/* Confirmar Recepcion In Situ — APROBADO + no transportista */}
+      {/* Confirmar recepción en origen, sin viaje físico. */}
       {isInSitu && estado === EstadoManifiesto.APROBADO && (isAdmin || userRol === 'OPERADOR') && (
         <Button
           fullWidth

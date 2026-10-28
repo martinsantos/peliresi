@@ -39,4 +39,24 @@ describe('manifest phase filters', () => {
     expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400 });
     expect(mocks.list).not.toHaveBeenCalled();
   });
+
+  it('filters fixed-plant trips before pagination, including legacy records with no mode', async () => {
+    const next = vi.fn();
+    await getManifiestos({ query: { modalidad: 'FIJO', estado: 'APROBADO', search: 'QA', page: '2', limit: '5' }, user: { id: 'actor' } } as never, { json: vi.fn() } as never, next);
+    expect(next).not.toHaveBeenCalled();
+    const list = mocks.list.mock.calls[0][0];
+    expect(list.where.AND).toEqual([{ OR: [{ modalidad: 'FIJO' }, { modalidad: null }] }]);
+    expect(list.where.OR).toEqual(expect.arrayContaining([{ numero: { contains: 'QA', mode: 'insensitive' } }]));
+    expect(list.where.estado).toBe('APROBADO');
+    expect(list).toMatchObject({ skip: 5, take: 5 });
+    expect(mocks.count.mock.calls[0][0].where).toEqual(list.where);
+    expect(mocks.scope).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an unknown mode before querying', async () => {
+    const next = vi.fn();
+    await getManifiestos({ query: { modalidad: 'otra' }, user: { id: 'actor' } } as never, { json: vi.fn() } as never, next);
+    expect(next.mock.calls[0][0]).toMatchObject({ statusCode: 400 });
+    expect(mocks.list).not.toHaveBeenCalled();
+  });
 });

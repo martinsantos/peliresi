@@ -63,7 +63,7 @@ for(const app of [false,true]){
   mock.request.mockResolvedValueOnce(invitation()).mockRejectedValueOnce(new Error('response lost')).mockResolvedValueOnce({data:{data:{aceptada:true,recuperada:true}}});open(app);
   fireEvent.change(await screen.findByLabelText('Contraseña de tu cuenta'),{target:{value:'OnlyTest'}});fireEvent.click(screen.getByRole('button',{name:'Aceptar acceso a empresa'}));
   const check=await screen.findByRole('button',{name:'Comprobar aceptación'});expect(mock.request.mock.calls.filter(([r])=>r.method==='POST')).toHaveLength(1);
-  fireEvent.click(check);const result=await screen.findByRole('status');expect(result).toHaveTextContent('ya fue aceptada');expect(result).toHaveFocus();
+  fireEvent.click(check);const result=await screen.findByRole('status');expect(result).toHaveTextContent('ya fue aceptada');await waitFor(()=>expect(result).toHaveFocus());
   const posts=mock.request.mock.calls.filter(([r])=>r.method==='POST');expect(posts[0][0].data.soloConsultar).toBeUndefined();expect(posts[1][0].data.soloConsultar).toBe(true);
   expect(JSON.stringify({...localStorage,...sessionStorage})).not.toContain('OnlyTest');
  });

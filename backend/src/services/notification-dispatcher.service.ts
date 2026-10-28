@@ -152,17 +152,23 @@ class NotificationService {
             const promises: Promise<any>[] = [];
             const isInSitu = manifiesto.modalidad === 'IN_SITU';
 
-            // Transportista: full pickup details with map link (skip for IN_SITU — no transportista)
+            // In origin the carrier is an approver, not a scheduled pickup.
             if (trans && trans.usuario.id !== actorId) {
                 const retiroInfo = fechaRetiro ? ` Retiro: ${fechaRetiro}.` : '';
                 promises.push(this.crearNotificacion({
                     usuarioId: trans.usuario.id,
                     tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
-                    titulo: 'Nuevo retiro asignado',
-                    mensaje: `${num} —${retiroInfo} ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
+                    titulo: isInSitu ? 'Tratamiento en origen aprobado' : 'Nuevo retiro asignado',
+                    mensaje: isInSitu
+                        ? `${num} se tratará en el domicilio de ${gen.razonSocial}. No hay retiro, traslado ni GPS. Revisá el manifiesto para conocer el próximo paso.`
+                        : `${num} —${retiroInfo} ${gen.razonSocial}, ${gen.domicilio || ''}`.trim(),
                     manifiestoId,
                     prioridad: 'ALTA' as PrioridadNotificacion,
-                    datos: {
+                    datos: isInSitu ? {
+                        tipo: 'tratamiento_insitu',
+                        generador: gen.razonSocial,
+                        operadorDestino: oper.razonSocial,
+                    } : {
                         tipo: 'retiro_asignado',
                         fechaRetiro: fechaRetiro || null,
                         direccion: gen.domicilio || null,
@@ -180,7 +186,7 @@ class NotificationService {
                     ? 'Tratamiento in situ requerido'
                     : 'Manifiesto firmado — recibiras residuos';
                 const mensaje = isInSitu
-                    ? `${num} de ${gen.razonSocial}. Debe proceder con tratamiento in situ en ${gen.domicilio || 'domicilio del generador'}.`
+                    ? `${num} de ${gen.razonSocial}. Revisá el manifiesto para coordinar la recepción en ${gen.domicilio || 'el domicilio del generador'}; no hay traslado.`
                     : `${num} de ${gen.razonSocial}.${fechaRetiro ? ` Retiro estimado: ${fechaRetiro}` : ''}`;
                 promises.push(this.crearNotificacion({
                     usuarioId: oper.usuario.id,
@@ -204,7 +210,9 @@ class NotificationService {
                     usuarioId: gen.usuario.id,
                     tipo: 'MANIFIESTO_FIRMADO' as TipoNotificacion,
                     titulo: 'Tu manifiesto fue firmado',
-                    mensaje: `${num} firmado y listo para retiro`,
+                    mensaje: isInSitu
+                        ? `${num} firmado para tratamiento en origen. Revisá el manifiesto para conocer el próximo paso.`
+                        : `${num} firmado y listo para retiro`,
                     manifiestoId,
                     prioridad: 'NORMAL' as PrioridadNotificacion,
                 }));

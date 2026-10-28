@@ -121,7 +121,6 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     // Verificar que el usuario es un generador o admin
     const partyProposal = canCreateManifestProposal(req.user);
     if (manifestProposalsEnabled() && !partyProposal) throw new AppError('Se requiere una cuenta propia de una parte vinculada para proponer', 403);
-    if (modalidad === 'IN_SITU' && req.user.rol === 'TRANSPORTISTA') throw new AppError('El tratamiento en origen sólo involucra a generador y operador', 400);
     if (partyProposal && req.user.rol === 'GENERADOR' && bodyGeneradorId && bodyGeneradorId !== req.user.generador?.id) throw new AppError('El generador debe ser tu propia empresa', 403);
     if (req.user.rol !== 'GENERADOR' && req.user.rol !== 'ADMIN' && !partyProposal) {
       throw new AppError('Solo los generadores pueden crear manifiestos', 403);
@@ -144,7 +143,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
     if (modalidad === 'FIJO' && !transportistaId) {
       throw new AppError('Se requiere transportista para modalidad FIJO', 400);
     }
-    if (modalidad === 'IN_SITU' && transportistaId) throw new AppError('No se debe asignar transportista para modalidad IN_SITU', 400);
+    if (!partyProposal && modalidad === 'IN_SITU' && transportistaId) throw new AppError('El borrador anterior en origen no admite transportista.', 400);
     const intent = idempotencyKey ? manifestCreationIntent(idempotencyKey, userId, req.user.rol, req.user.empresaContexto, {
       generadorId, transportistaId, vehiculoId, choferId, operadorId, modalidad, residuos, observaciones, fechaEstimadaRetiro,
     }) : null;
@@ -166,6 +165,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       }
       // Replays return the committed result even if a catalogue changed afterwards.
       // New requests still validate every current permission and compatibility rule.
+      if (partyProposal && !transportistaId) throw new AppError('Seleccioná el transportista que aprobará la propuesta.', 400);
       const operador = await tx.operador.findUnique({ where: { id: operadorId }, include: { tratamientos: { where: { activo: true } } } });
       if (modalidad === 'IN_SITU' && !operador?.modalidades?.includes('IN_SITU')) throw new AppError('El operador no está habilitado para trabajar in situ', 400);
       if (operador) {
@@ -176,7 +176,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
           throw new AppError(`El operador no está habilitado para tratar: ${tipos.map(t => `${t.codigo} - ${t.nombre}`).join(', ')}`, 400);
         }
       }
-      if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: modalidad === 'IN_SITU' ? null : transportistaId!, operadorId });
+      if (partyProposal) await validateProposalParties(tx, { generadorId, transportistaId: transportistaId!, operadorId });
       const asignacionTransporte = await prepareTransportAssignment(tx, { modalidad, transportistaId, vehiculoId, choferId });
       const numero = await generarNumeroManifiesto(tx);
 
@@ -185,7 +185,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
       data: {
         numero,
         generadorId,
-        transportistaId: modalidad === 'IN_SITU' ? null : transportistaId,
+        transportistaId: modalidad === 'IN_SITU' && !partyProposal ? null : transportistaId,
         ...(asignacionTransporte ? { asignacionTransporte } : {}),
         ...(req.user.empresaContexto?{contextoEmpresa:JSON.parse(JSON.stringify(req.user.empresaContexto))}:{}),
         operadorId,
@@ -235,7 +235,7 @@ export const createManifiesto = async (req: AuthRequest, res: Response, next: Ne
 
       if (partyProposal) await tx.eventoManifiesto.create({ data: {
         manifiestoId: created.id, tipo: MANIFEST_PROPOSAL, usuarioId: userId,
-        descripcion: JSON.stringify({ version: 1, modalidad, generadorId, transportistaId: modalidad === 'IN_SITU' ? null : transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
+        descripcion: JSON.stringify({ version: modalidad === 'IN_SITU' ? 2 : 1, modalidad, generadorId, transportistaId, operadorId, creadoPorId: userId, autorRol: req.user.rol }),
       } });
       if (partyProposal) pushIds=await notifyManifestParties(tx, created, 'creada', userId, req.user.rol);
       if (intent) await recordManifestCreation(tx, intent, created.id);

@@ -95,6 +95,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
         id: m.id,
         numero: m.numero,
         estado: m.estado,
+        modalidad: m.modalidad,
         generador: m.generador ? { razonSocial: m.generador.razonSocial, domicilio: m.generador.domicilio } : undefined,
         operador: m.operador ? { razonSocial: m.operador.razonSocial, domicilio: m.operador.domicilio } : undefined,
         transportista: m.transportista ? { razonSocial: m.transportista.razonSocial } : undefined,
@@ -108,7 +109,7 @@ const ViajeEnCursoTransportista: React.FC = () => {
       localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
       localStorage.setItem('sitrep_active_trip_id', id);
     }
-  }, [id, m.id, m.numero, m.estado, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
+  }, [id, m.id, m.numero, m.estado, m.modalidad, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -126,13 +127,13 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const [incidenteTipo, setIncidenteTipo] = useState('');
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
   const [vistaMapa, setVistaMapa] = useState(true);
-  const legs=useTransportLegs(id||'');
+  const legs=useTransportLegs(m.modalidad==='IN_SITU'?'':id||'');
   const hasHandoff=legs.data?.tramos.some(leg=>!leg.fin&&leg.tipo!=='ORIGINAL')||false;
 
   // GPS tracking via custom hook
   const gps = useGPSTracking({
     manifiestoId: id,
-    estado: hasHandoff?undefined:m.estado,
+    estado: hasHandoff||m.modalidad==='IN_SITU'?undefined:m.estado,
     viajeStatus,
   });
 
@@ -379,6 +380,14 @@ const ViajeEnCursoTransportista: React.FC = () => {
         <Card><CardContent className="py-8 text-center text-neutral-500">No se pudo cargar el manifiesto</CardContent></Card>
       </div>
     );
+  }
+
+  if (m.modalidad === 'IN_SITU') {
+    return <div className="min-h-screen bg-neutral-50 p-4"><Card><CardContent className="space-y-4 p-5">
+      <h2 className="text-lg font-bold">Tratamiento en origen · sin viaje</h2>
+      <p>El transporte participa en la aprobación, pero no hay retiro ni GPS para este manifiesto.</p>
+      <Button onClick={() => navigate(mp(`/manifiestos/${id}`))}>Abrir manifiesto</Button>
+    </CardContent></Card></div>;
   }
 
   const cantidadesDeclaradas = declaredQuantities(m.residuos || [])
