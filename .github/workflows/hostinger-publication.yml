@@ -1,0 +1,182 @@
+name: SITREP reviewed Hostinger publication
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/hostinger-publication.yml'
+      - '.github/workflows/deploy-production.yml'
+      - 'scripts/cicd/hostinger/**'
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [preflight, prepare, publish]
+        default: preflight
+        description: Preflight only reads the current runtime; prepare stages; publish activates an exact reviewed bundle
+      release_commit:
+        type: string
+        required: false
+        description: Full reviewed application commit already integrated into main; no default candidate
+      expected_active_revision:
+        type: string
+        required: true
+        default: 8fb6277ecabaace83671a9dfb251147a43c9ccbf
+        description: Exact currently deployed runtime revision, independent of GitHub branch names
+      bundle_sha256:
+        type: string
+        default: ''
+        description: Exact successful preparation bundle SHA-256, required to publish
+      acknowledgement:
+        type: string
+        default: ''
+        description: Enter SITREP-HOSTINGER only after reviewing the preparation receipt
+permissions:
+  contents: read
+concurrency:
+  group: sitrep-hostinger-publication
+  cancel-in-progress: false
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+jobs:
+  verify-publisher:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+      - name: Verify legacy retirement, package boundaries, compatibility and rollback
+        run: node --experimental-strip-types --test scripts/cicd/hostinger/publisher.test.ts
+      - name: Compile the reviewed TypeScript controller without installing a server toolchain
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {stripTypeScriptTypes} from 'node:module';
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/publisher.mjs',stripTypeScriptTypes(fs.readFileSync('scripts/cicd/hostinger/publisher.ts','utf8'),{mode:'strip'}));
+          JS
+          node --check "$RUNNER_TEMP/publisher.mjs"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20.19.6'
+      - name: Parse the compiled JavaScript with the production Node version
+        run: node --check "$RUNNER_TEMP/publisher.mjs"
+  manual-release:
+    needs: verify-publisher
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: production
+    env:
+      OPERATION: ${{ inputs.operation }}
+      RELEASE_COMMIT: ${{ inputs.release_commit }}
+      EXPECTED_ACTIVE: ${{ inputs.expected_active_revision }}
+      REVIEWED_BUNDLE: ${{ inputs.bundle_sha256 }}
+      ACKNOWLEDGEMENT: ${{ inputs.acknowledgement }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: publisher
+          persist-credentials: false
+      - name: Require explicit immutable release identities
+        run: |
+          set -euo pipefail
+          [[ "$OPERATION" == preflight || "$OPERATION" == prepare || "$OPERATION" == publish ]]
+          [[ "$EXPECTED_ACTIVE" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "$OPERATION" == preflight ]]; then
+            [[ -z "$RELEASE_COMMIT" && -z "$REVIEWED_BUNDLE" && -z "$ACKNOWLEDGEMENT" ]]
+          else
+            [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          fi
+          if [[ "$OPERATION" == publish ]]; then
+            [[ "$ACKNOWLEDGEMENT" == SITREP-HOSTINGER && "$REVIEWED_BUNDLE" =~ ^[0-9a-f]{64}$ ]]
+          fi
+      - uses: actions/checkout@v6
+        if: inputs.operation == 'prepare'
+        with:
+          ref: ${{ inputs.release_commit }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require the reviewed candidate in main, never the local refactor checkout
+        if: inputs.operation == 'prepare'
+        run: |
+          set -euo pipefail
+          [[ "$(git -C candidate rev-parse HEAD)" = "$RELEASE_COMMIT" ]]
+          git -C candidate merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
+          git -C candidate merge-base --is-ancestor c8402190edfc36b5e5d0dee1337c24bd1689420d "$RELEASE_COMMIT"
+      - uses: actions/setup-node@v6
+        if: inputs.operation == 'prepare'
+        with:
+          node-version: '20.19.6'
+      - name: Build and test only the explicitly reviewed application in isolated CI
+        if: inputs.operation == 'prepare'
+        env:
+          DATABASE_URL: postgresql://ci:isolated-fixture@127.0.0.1:1/sitrep_ci
+          NODE_ENV: test
+          DISABLE_EMAILS: 'true'
+          BLOCKCHAIN_ENABLED: 'false'
+          PUSH_MANIFEST_NOTICES_ENABLED: 'false'
+          VITE_API_URL: https://sitrep.ultimamilla.com.ar/api
+          VITE_PUBLIC_DEMO_MODE: 'false'
+          VITE_DEMO_LOGIN_ENABLED: 'false'
+        run: |
+          set -euo pipefail
+          cd candidate/backend
+          npm ci
+          npm audit --omit=dev --audit-level=high
+          npm test -- --maxWorkers=1
+          npm run build
+          cd ../frontend
+          npm ci
+          npm audit --omit=dev --audit-level=high
+          npm run lint
+          npm run lint:critical
+          npm test -- --maxWorkers=1
+          npm run build
+          npx vite build --config vite.config.app.ts
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+      - name: Compile trusted controller and freeze the tested package
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {stripTypeScriptTypes} from 'node:module';
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/publisher.mjs',stripTypeScriptTypes(fs.readFileSync('publisher/scripts/cicd/hostinger/publisher.ts','utf8'),{mode:'strip'}));
+          JS
+          node --check "$RUNNER_TEMP/publisher.mjs"
+          if [[ "$OPERATION" == prepare ]]; then
+            node --experimental-strip-types publisher/scripts/cicd/hostinger/package.ts "$GITHUB_WORKSPACE/candidate" "$RUNNER_TEMP/bundle" "$RELEASE_COMMIT"
+            echo "BUNDLE_SHA=$(sha256sum "$RUNNER_TEMP/bundle/release.tar.gz" | cut -d ' ' -f1)" >> "$GITHUB_ENV"
+          elif [[ "$OPERATION" == publish ]]; then
+            echo "BUNDLE_SHA=$REVIEWED_BUNDLE" >> "$GITHUB_ENV"
+          fi
+      - uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HOSTINGER_MIGRATION_KEY }}
+      - name: Execute only the reviewed operation on the pinned Hostinger host
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          id="$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf '%s\n' '179.198.115.115 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILxeE+c4eB1EKzsGySW+ARG8T8F9pyvp8iEjj9cBRuaX' > "$RUNNER_TEMP/hostinger-known-hosts"
+          opts=(-o BatchMode=yes -o ForwardAgent=no -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/hostinger-known-hosts" -o ConnectTimeout=15 -o ServerAliveInterval=30)
+          target=root@179.198.115.115
+          if [[ "$OPERATION" == preflight ]]; then
+            ssh "${opts[@]}" "$target" "/usr/bin/node --input-type=module - preflight $EXPECTED_ACTIVE" < "$RUNNER_TEMP/publisher.mjs"
+            exit 0
+          fi
+          [[ "$BUNDLE_SHA" =~ ^[0-9a-f]{64}$ ]]
+          root=/srv/umsa-sitrep-publisher
+          incoming="$root/incoming/$id"
+          ssh "${opts[@]}" "$target" "test \"\$(hostname)\" = srv2101069.hstgr.cloud && test \"\$(cat /srv/umsa-migration/.target)\" = 179.198.115.115 && test -f /srv/umsa-migration/production.active && test ! -L $root && test ! -e $incoming && install -d -m 0755 $root $root/releases && install -d -m 0700 $root/incoming $root/staged $root/backups $incoming"
+          scp "${opts[@]}" "$RUNNER_TEMP/publisher.mjs" "$target:$incoming/publisher.mjs"
+          local_hash=$(sha256sum "$RUNNER_TEMP/publisher.mjs" | cut -d ' ' -f1)
+          remote_hash=$(ssh "${opts[@]}" "$target" "sha256sum $incoming/publisher.mjs" | cut -d ' ' -f1)
+          [[ "$local_hash" = "$remote_hash" ]]
+          if [[ "$OPERATION" == prepare ]]; then
+            scp "${opts[@]}" "$RUNNER_TEMP/bundle/release.tar.gz" "$RUNNER_TEMP/bundle/release.json" "$target:$incoming/"
+          fi
+          ssh "${opts[@]}" "$target" "flock --nonblock /run/lock/umsa-sitrep-publisher.lock /usr/bin/node $incoming/publisher.mjs $OPERATION $RELEASE_COMMIT $EXPECTED_ACTIVE $BUNDLE_SHA $id"
