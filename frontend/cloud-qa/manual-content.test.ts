@@ -30,6 +30,7 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(start, /la señal del dispositivo por sí sola no confirma/i);
   assert.match(start, /no se garantiza el seguimiento al cerrar la app/i);
   assert.match(recovery, /En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece/);
+  assert.match(recovery, /desplegá «Cómo habilitar la ubicación»/);
   assert.match(recovery, /Administración puede consultar el punto recibido desde Monitor/);
   assert.match(recovery, /la hora indica cuándo llegó a SITREP y el punto puede ser anterior/i);
   assert.match(recovery, /una entrega puede quedar guardada para enviarse al reconectar con la misma cuenta/i);

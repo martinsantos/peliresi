@@ -33,9 +33,16 @@ describe('GPS position provenance and cleanup', () => {
       coarseSuccess.push(success); coarseError.push(failure!);
     });
     vi.mocked(manifiestoService.actualizarUbicacion).mockResolvedValue(undefined);
-    vi.mocked(toast.error).mockReturnValue('gps-permission-notice');
   });
   afterEach(() => { vi.useRealTimers(); });
+
+  it('reports a denied GPS permission as state without repeating it in a toast', () => {
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    act(() => watchError[0](error(1)));
+    expect(result.current.status).toBe('denied');
+    expect(toast.error).not.toHaveBeenCalled();
+    unmount();
+  });
 
   it.each([1, 3, 4])('never sends a map default when geolocation fails before the first fix (code %s)', async (code) => {
     const { result, unmount } = renderHook(() => useGPSTracking(trip));
@@ -74,7 +81,6 @@ describe('GPS position provenance and cleanup', () => {
     act(() => watchSuccess[0](position(-34, -70)));
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(result.current.status).toBe('active');
-    expect(toast.remove).toHaveBeenCalledWith('gps-permission-notice');
     expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledExactlyOnceWith(trip.manifiestoId, -34, -70, null, null, expect.any(String));
     unmount();
   });
@@ -123,7 +129,6 @@ describe('GPS position provenance and cleanup', () => {
     act(() => watchError[0](error(1)));
     expect(result.current.status).toBe('denied');
     await act(async () => { await result.current.retryGps(); });
-    expect(toast.remove).toHaveBeenCalledWith('gps-permission-notice');
     expect(navigator.geolocation.clearWatch).toHaveBeenCalledWith(1);
     expect(navigator.geolocation.watchPosition).toHaveBeenCalledTimes(2);
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });

@@ -95,7 +95,6 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
   const trackingGenerationRef = useRef(0);
   const pendingUpdatesRef = useRef<PendingGpsPoint[]>([]);
   const lastGpsSearchToastAtRef = useRef(0);
-  const gpsErrorToastRef = useRef<string | null>(null);
   // Use refs for current position/details inside the interval callback
   // to avoid stale closures
   const currentPositionRef = useRef<[number, number] | null>(null);
@@ -155,18 +154,12 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
     return result;
   }, [context, id, owner]);
 
-  const clearGpsErrorNotice = useCallback(() => {
-    if (gpsErrorToastRef.current) toast.remove(gpsErrorToastRef.current);
-    gpsErrorToastRef.current = null;
-  }, []);
-
   // Stop the watcher. Points were persisted before sending, so do not replace
   // a newer queue written by another tab with this page's stale snapshot.
   const cleanupGps = useCallback(() => {
     // getCurrentPosition cannot be cancelled; invalidate its pending callbacks.
     trackingGenerationRef.current++;
     uploadsStoppedRef.current = true;
-    clearGpsErrorNotice();
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
@@ -179,7 +172,7 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
       clearInterval(acquisitionRetryIntervalRef.current);
       acquisitionRetryIntervalRef.current = null;
     }
-  }, [clearGpsErrorNotice]);
+  }, []);
 
   // Finish in-flight HTTP writes before changing the server trip state.
   const stopAndDrain = useCallback(async () => {
@@ -352,7 +345,6 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
 
     const applyPosition = (pos: GeolocationPosition) => {
       if (!isActive() || permissionDenied) return;
-      clearGpsErrorNotice();
       const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
       const point: [number, number] = [latitude, longitude];
       const measuredAt = Number.isFinite(pos.timestamp) && pos.timestamp > 0 ? pos.timestamp : null;
@@ -406,7 +398,6 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
         if (err.code === 1) {
           permissionDenied = true;
           setGpsStatus('denied');
-          gpsErrorToastRef.current = toast.error('Permiso de ubicación denegado', 'Permití el acceso para compartir el recorrido.');
         } else if (err.code === 2) {
           setGpsStatus('acquiring');
           notifyGpsSearching('GPS activo. Esperando señal de ubicación del dispositivo.');
@@ -491,7 +482,7 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [context, estado, viajeStatus, id, owner, restart, cleanupGps, clearGpsErrorNotice, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
+  }, [context, estado, viajeStatus, id, owner, restart, cleanupGps, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
 
   useEffect(() => {
     const onDelivery = (event: Event) => {

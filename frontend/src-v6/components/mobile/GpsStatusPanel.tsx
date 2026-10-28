@@ -62,7 +62,7 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
       <Card className={`${copy.tone} border-none`}>
         <CardContent className="p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
+            <div role="status" aria-live="polite" className="flex min-w-0 items-center gap-2">
               {copy.icon}
               <span className="text-sm font-bold">{copy.label}</span>
             </div>
@@ -72,6 +72,13 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
               {sendStatus === 'error' && <Badge color="error" variant="soft" size="sm">Sin enviar</Badge>}
             </div>
           </div>
+
+          {onRetry && ['denied', 'unavailable', 'error'].includes(status) && (
+            <button type="button" onClick={onRetry} disabled={retrying || retryDisabled}
+              className="mt-3 min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">
+              {retrying ? 'Reintentando GPS' : 'Reintentar GPS'}
+            </button>
+          )}
 
           {status === 'active' && position && (
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-neutral-700">
@@ -100,15 +107,15 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
         </CardContent>
       </Card>
 
-      {status === 'denied' && <AndroidPermissionGuide permission="gps" state="denied" />}
-      {status === 'unavailable' && <AndroidPermissionGuide permission="gps" state="unavailable" />}
-      {storageNotice}
-      {onRetry && ['denied', 'unavailable', 'error'].includes(status) && (
-        <button type="button" onClick={onRetry} disabled={retrying || retryDisabled}
-          className="min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">
-          {retrying ? 'Reintentando GPS' : 'Reintentar GPS'}
-        </button>
+      {(status === 'denied' || status === 'unavailable') && (
+        <details className="rounded-xl border border-neutral-200 bg-white p-3 text-sm">
+          <summary className="min-h-11 cursor-pointer py-3 font-semibold text-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700">
+            {status === 'denied' ? 'Cómo habilitar la ubicación' : 'Cómo recuperar el GPS'}
+          </summary>
+          <AndroidPermissionGuide permission="gps" state={status} />
+        </details>
       )}
+      {storageNotice}
     </div>
   );
 };

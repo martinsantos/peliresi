@@ -502,6 +502,21 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
       <div className="p-4 space-y-4">
         {snapshotError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">No se pudo guardar una copia del viaje en el dispositivo. Si perdés conexión, sus datos podrían no estar disponibles; revisá el almacenamiento.</p>}
+        {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && deliveryQueue === 'none' && <GpsStatusPanel
+          status={gpsStatus}
+          sendStatus={gpsSendStatus}
+          sendError={gps.sendError}
+          position={currentPosition}
+          details={gpsDetails}
+          pendingCount={gps.pendingCount}
+          lastSyncAt={gps.lastSyncAt}
+          onRetry={viajeStatus === 'ACTIVO' ? handleRetryGps : undefined}
+          retrying={retryingGps}
+          retryDisabled={isActionPending}
+          paused={viajeStatus === 'PAUSADO'}
+          storageError={gps.storageError}
+          storageIssue={gps.storageIssue}
+        />}
         <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800 underline"><Truck size={17} aria-hidden="true" />Ver todos mis viajes</Link>
         {deliveryQueue === 'none' && <TransportLegs id={id!} beforeHandoff={prepareHandoff} onHandoffError={gps.resumeGps}/>}
         {hasHandoff&&<p role="status" className="rounded-xl bg-primary-50 p-3 text-sm text-primary-900">El GPS continúa desde el enlace del reemplazo. Como transportista de origen, seguís registrando la entrega del manifiesto.</p>}
@@ -544,23 +559,6 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         {/* EN_TRANSITO state: Active trip */}
         {m.estado === EstadoManifiesto.EN_TRANSITO && (
           <>
-            {/* GPS Status Panel */}
-            {!hasHandoff&&deliveryQueue==='none'&&<GpsStatusPanel
-              status={gpsStatus}
-              sendStatus={gpsSendStatus}
-              sendError={gps.sendError}
-              position={currentPosition}
-              details={gpsDetails}
-              pendingCount={gps.pendingCount}
-              lastSyncAt={gps.lastSyncAt}
-              onRetry={viajeStatus === 'ACTIVO' ? handleRetryGps : undefined}
-              retrying={retryingGps}
-              retryDisabled={isActionPending}
-              paused={viajeStatus === 'PAUSADO'}
-              storageError={gps.storageError}
-              storageIssue={gps.storageIssue}
-            />}
-
             {/* Timer */}
             <Card variant="elevated" className="bg-gradient-to-br from-primary-600 to-primary-700 text-white border-none shadow-lg">
               <CardContent className="p-5">

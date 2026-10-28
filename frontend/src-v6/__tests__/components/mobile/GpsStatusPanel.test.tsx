@@ -21,7 +21,7 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByText('Sin enviar')).toBeInTheDocument();
   });
 
-  it('shows Android recovery guidance when GPS is denied', () => {
+  it('shows one GPS permission status, a direct retry and optional recovery guidance', () => {
     render(
       <GpsStatusPanel
         status="denied"
@@ -30,11 +30,16 @@ describe('GpsStatusPanel', () => {
         details={{ accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null }}
         pendingCount={0}
         lastSyncAt={null}
+        onRetry={vi.fn()}
       />,
     );
 
-    expect(screen.getByText('Permiso GPS denegado')).toBeInTheDocument();
-    expect(screen.getByText('Permiso de ubicación bloqueado')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Permiso GPS denegado');
+    expect(screen.getByRole('button', { name: 'Reintentar GPS', exact: true })).toBeVisible();
+    expect(screen.queryByText('Permiso de ubicación bloqueado')).not.toBeVisible();
+    fireEvent.click(screen.getByText('Cómo habilitar la ubicación'));
+    expect(screen.getByText('Permiso de ubicación bloqueado')).toBeVisible();
+    expect(screen.getByText(/permisos de ubicación de SITREP en el navegador o teléfono/)).toBeVisible();
   });
 
   it('uses the singular for one point waiting to be sent', () => {
