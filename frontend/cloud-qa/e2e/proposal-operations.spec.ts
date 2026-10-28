@@ -259,5 +259,38 @@ test('operational proposal manual is available to all three roles, with stable n
  await page.locator('#tutorialIndex a').last().click();await expect(page.locator('.guide-step').last().getByRole('heading')).toBeInViewport({ratio:1});
  await page.reload();await expect(page.locator('#tutorialIndex a').last()).toHaveAttribute('aria-current','step');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
- await page.screenshot({path:info.outputPath('manual-proposals.png'),animations:'disabled'});expect(errors).toEqual([]);
+ await page.screenshot({path:info.outputPath('manual-proposals.png'),animations:'disabled'});
+ await page.goto('/manual/tutorial.html?guide=resolver-espera-reintento');
+ await expect(page.locator('#tutorialTitle')).toHaveText('Continuar cuando aparece Esperá un momento');
+ for(const text of ['El sistema está ocupado','no se reenvían automáticamente','revisá el estado o el historial'])await expect(page.locator('body')).toContainText(text);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+ await page.screenshot({path:info.outputPath('manual-espera.png'),animations:'disabled'});expect(errors).toEqual([]);
+});
+
+test('a busy approval is explained and only retried after an explicit action',async({browser},info)=>{
+ const options=info.project.name==='web-desktop'?{...devices['Desktop Chrome'],viewport:{width:1440,height:900}}:{...devices['Pixel 7'],viewport:{width:390,height:844}};
+ const operatorContext=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});
+ const carrierContext=await browser.newContext({...options,baseURL:'http://127.0.0.1:4177',serviceWorkers:'block'});
+ try{
+  const operator=await operatorContext.newPage(),carrier=await carrierContext.newPage();
+  await login(operator,info,'operador');await login(carrier,info,'transportista');
+  const m=await create(operator,info,'operador');
+  await carrier.goto(prefix(info)+'/manifiestos/'+m.id);
+  const panel=carrier.getByRole('region',{name:'Aprobaciones de las partes'});
+  await expect(panel.getByLabel('Transporte: Pendiente',{exact:true})).toBeVisible();
+  const endpoint='**/api/manifiestos/'+m.id+'/aprobar-parte';let attempts=0;
+  await carrier.route(endpoint,async route=>{attempts++;await route.fulfill({status:503,contentType:'application/json',headers:{'Retry-After':'5'},body:JSON.stringify({success:false,status:503,code:'TRANSACTION_BUSY',retryAfterSeconds:5,message:'El sistema está ocupado. Esperá unos segundos y revisá el estado antes de volver a intentar.'})});});
+  await panel.getByRole('button',{name:'Aprobar como transporte',exact:true}).click();
+  await expect(panel.getByRole('alert').filter({hasText:'revisá el estado antes de volver a intentar'})).toBeVisible();
+  await proof(carrier,info,'approval-busy');
+  await panel.getByRole('button',{name:'Actualizar aprobaciones',exact:true}).click();
+  await expect(panel.getByLabel('Transporte: Pendiente',{exact:true})).toBeVisible();
+  expect(attempts).toBe(1);
+  const {PrismaClient}=backendRequire('@prisma/client'),db=new PrismaClient();
+  try{expect(await db.eventoManifiesto.count({where:{manifiestoId:m.id,tipo:'APROBACION_TRANSPORTISTA'}})).toBe(0);}finally{await db.$disconnect();}
+  await carrier.unroute(endpoint);
+  await post(carrier,'/'+m.id+'/aprobar-parte',()=>panel.getByRole('button',{name:'Aprobar como transporte',exact:true}).click());
+  await expect(panel.getByLabel('Transporte: Aprobado',{exact:true})).toBeVisible();
+  const verify=new PrismaClient();try{expect(await verify.eventoManifiesto.count({where:{manifiestoId:m.id,tipo:'APROBACION_TRANSPORTISTA'}})).toBe(1);}finally{await verify.$disconnect();}
+ }finally{await operatorContext.close();await carrierContext.close();}
 });

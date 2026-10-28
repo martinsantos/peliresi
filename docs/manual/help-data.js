@@ -865,11 +865,11 @@
 
   window.SITREP_HELP.guides.push({
     id: 'resolver-espera-reintento', profile: 'generador', audiences: ['transportista', 'operador', 'administrador', 'inspector', 'auditor'],
-    title: 'Continuar cuando aparece Esperá un momento', summary: 'Conservá lo cargado y reintentá la misma acción cuando termine la espera indicada.',
-    duration: '2 min', icon: 'hourglass_empty', keywords: ['espera', 'reintentar', '429', 'formulario', 'demasiados intentos', 'guardar'],
+    title: 'Continuar cuando aparece Esperá un momento', summary: 'Conservá lo cargado y revisá el estado antes de reintentar si el sistema está ocupado.',
+    duration: '2 min', icon: 'hourglass_empty', keywords: ['espera', 'reintentar', '429', '503', 'ocupado', 'formulario', 'demasiados intentos', 'guardar'],
     steps: [
       { title: 'Mantener la tarea abierta', body: [
-        'Si aparece Esperá un momento, leé el plazo indicado. Conservá el formulario y los datos en pantalla; no hace falta recargar la página ni cerrar sesión.',
+        'Si aparece Esperá un momento o El sistema está ocupado, leé el plazo indicado. Conservá el formulario y los datos en pantalla; no hace falta recargar la página ni cerrar sesión.',
         'No pulses varias veces Guardar, Aprobar o Enviar. El aviso de espera no confirma que esa acción se haya guardado.'
       ], expected: 'Sabés cuánto esperar y evitás abandonar el trabajo cargado.' },
       { title: 'Reintentar expresamente', body: [

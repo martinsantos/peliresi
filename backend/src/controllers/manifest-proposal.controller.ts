@@ -15,6 +15,11 @@ import { MANIFEST_PROPOSAL, APPROVAL_EVENTS, manifestProposalsEnabled, COORDINAT
 const LEGACY_IN_SITU_MESSAGE = 'Esta propuesta anterior no tiene transporte aprobador. Creá una nueva propuesta con las tres partes para iniciar.';
 import { agendaQuery } from '../domain/manifestAgenda';
 
+// Under a short burst the pool can be busy with GPS and Monitor requests.
+// Wait within the API's overall deadline rather than failing after Prisma's
+// two-second default; the per-proposal lock and idempotency rules still apply.
+const PROPOSAL_TRANSACTION_OPTIONS = { maxWait: 12_000 };
+
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 async function load(tx: Tx, id: string) {
   const marker = await tx.eventoManifiesto.findFirst({ where: { manifiestoId: id, tipo: MANIFEST_PROPOSAL } });
@@ -99,7 +104,7 @@ export async function approveManifestProposal(req: AuthRequest, firma?: { imagen
     }
     pushIds=await notifyManifestParties(tx,updated,complete?'aprobada':`aprobacion-${rol}`,req.user.id,req.user.rol);
     return updated;
-  });
+  }, PROPOSAL_TRANSACTION_OPTIONS);
   scheduleCommittedManifestPush(pushIds);
   if (genesisHash) { const hash=genesisHash; setImmediate(()=>{void registrarSello(id,'GENESIS',hash).catch(()=>{});}); }
   return result;
@@ -158,7 +163,7 @@ export async function startManifestCoordination(req: AuthRequest,res: Response,n
    if (!isTrainingSession()) await updateRollingHash(tx,req.params.id,value.manifest.estado,event.createdAt,event.descripcion,event.id);
    pushIds=await notifyManifestParties(tx,value.manifest,'iniciada',req.user.id,req.user.rol);
    return event;
-  });
+  }, PROPOSAL_TRANSACTION_OPTIONS);
   scheduleCommittedManifestPush(pushIds);
   res.json({success:true,data:{inicio:result.createdAt}});
  }catch(e){next(e);}

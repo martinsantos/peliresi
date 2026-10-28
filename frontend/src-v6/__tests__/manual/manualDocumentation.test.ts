@@ -136,6 +136,6 @@ it('describes explicit retry after waiting without reloading or claiming the act
   const guide = data.guides.find(item => item.id === 'resolver-espera-reintento');
   expect(guide).toBeDefined();
   const text = guide!.steps.flatMap(step => [...step.body, step.expected]).join(' ');
-  for (const phrase of ['datos en pantalla', 'no hace falta recargar', 'no confirma', 'no se reenvían automáticamente', 'mismo registro']) expect(text).toContain(phrase);
+  for (const phrase of ['El sistema está ocupado', 'datos en pantalla', 'no hace falta recargar', 'no confirma', 'no se reenvían automáticamente', 'mismo registro', 'revisá el estado']) expect(text).toContain(phrase);
   expect(text).not.toMatch(/CPU|Redis|rate.?limit|solicitudes por minuto/i);
 });

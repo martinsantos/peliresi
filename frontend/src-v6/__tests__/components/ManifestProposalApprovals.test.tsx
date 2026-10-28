@@ -35,6 +35,21 @@ it('does not present approval or a start action from status alone when a party i
  expect(screen.getByLabelText('Transporte: Pendiente')).toHaveClass('text-neutral-600');
  client.clear();
 });
+it('shows the busy response and lets the user refresh approvals without replaying the decision',async()=>{
+ vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
+ mock.get.mockResolvedValue({data:{data:{autorRol:'GENERADOR',estado:'PENDIENTE_APROBACION',inicio:null,puedeIniciar:false,puedeAprobar:'TRANSPORTISTA',partes:[{rol:'GENERADOR',aprobada:true},{rol:'TRANSPORTISTA',aprobada:false},{rol:'OPERADOR',aprobada:true}]}}});
+ mock.post.mockRejectedValueOnce({response:{status:503,data:{message:'El sistema está ocupado. Esperá unos segundos y revisá el estado antes de volver a intentar.'}}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={client}><ManifestProposalApprovals id="busy" onSign={()=>{}}/></QueryClientProvider>);
+ fireEvent.click(await screen.findByRole('button',{name:'Aprobar como transporte'}));
+ expect(await screen.findByRole('alert')).toHaveTextContent('revisá el estado antes de volver a intentar');
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Actualizar aprobaciones'})).toBeEnabled());
+ const reads=mock.get.mock.calls.length;
+ fireEvent.click(screen.getByRole('button',{name:'Actualizar aprobaciones'}));
+ await waitFor(()=>expect(mock.get.mock.calls.length).toBeGreaterThan(reads));
+ expect(mock.post).toHaveBeenCalledTimes(1);
+ expect(screen.getByLabelText('Transporte: Pendiente')).toBeVisible();client.clear();
+});
 it('shows only generator and operator for in-situ, with no transport approval or GPS step',async()=>{
  vi.stubEnv('VITE_MANIFEST_PROPOSALS_ENABLED','true');
  mock.get.mockResolvedValue({data:{data:{modalidad:'IN_SITU',autorRol:'GENERADOR',estado:'APROBADO',inicio:null,puedeIniciar:false,puedeAprobar:null,partes:[{rol:'GENERADOR',aprobada:true},{rol:'OPERADOR',aprobada:true}]}}});
