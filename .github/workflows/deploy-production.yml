@@ -1,4 +1,4 @@
-name: Deploy SITREP to Production
+name: SITREP CI (legacy publication retired)
 
 on:
   push:
@@ -27,9 +27,17 @@ env:
   DRY_RUN: false  # Real deployment activated
 
 jobs:
+  legacy-publication-retired:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Legacy SITREP publication is retired. Use hostinger-publication.yml with a reviewed immutable candidate." >&2
+          exit 1
   deploy-frontend:
     needs: validate-frontend
-    if: github.event_name == 'push' || github.event.inputs.deploy_target != 'backend-only'
+    # Retired after Hostinger migration. Pushes retain validation, never legacy SSH.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -145,7 +153,8 @@ jobs:
 
   deploy-backend:
     needs: [validate-backend, validate-blockchain]
-    if: github.event_name == 'push' || github.event.inputs.deploy_target != 'frontend-only'
+    # The separate Hostinger publisher requires an explicit reviewed manual release.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
