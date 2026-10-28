@@ -13,6 +13,7 @@ import { prepareTransportAssignment, readTransportAssignment } from '../domain/m
 import { declaredTransportLabel, gpsPointSchema, handoffSchema, isOriginalCarrier, TRANSPORT_GPS_PURPOSE, transportHandoffEnabled } from '../domain/transportHandoff';
 import { computeRollingHash } from '../services/blockchain.service';
 import { recordInspectionIntake } from '../services/inspectionIntake.service';
+import { domainEvents } from '../services/domainEvent.service';
 import type { TramoTransporte, Prisma } from '@prisma/client';
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -177,7 +178,7 @@ function trackingClaim(req:AuthRequest) {
   }catch{throw new AppError('El enlace de seguimiento no es válido o venció. Pedí uno nuevo a la transportista de origen.',401);}
 }
 async function liveLeg(tx:Tx,claim:jwt.JwtPayload) {
-  const leg=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},include:{manifiesto:{select:{id:true,numero:true,estado:true,transportistaId:true,operador:{select:{razonSocial:true,domicilio:true}}}}}});
+  const leg=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},include:{manifiesto:{select:{id:true,numero:true,estado:true,fechaRetiro:true,transportistaId:true,operador:{select:{razonSocial:true,domicilio:true}}}}}});
   if(!leg||leg.fin||leg.accesoVersion!==claim.jti||!leg.accesoHasta||leg.accesoHasta<=new Date()||leg.manifiesto.estado!=='EN_TRANSITO') throw new AppError('Este seguimiento ya no está activo',403);
   assertClassroomIssuerOpen(leg.creadoPorId);
   const author=await tx.usuario.findUnique({where:{id:leg.creadoPorId},select:{activo:true,transportista:{select:{id:true}}}});
@@ -202,14 +203,21 @@ export async function limitedTransportGps(req:AuthRequest,res:Response,next:Next
   try {
     const claim=trackingClaim(req);const parsed=gpsPointSchema.safeParse(req.body);
     if(!parsed.success) throw new AppError(parsed.error.issues[0].message,400);
-    const tracking=await prisma.$transaction(async tx=>{
+    const result=await prisma.$transaction(async tx=>{
       // Serialize GPS with delivery and handoff on the SAME parent row in all workers.
       const candidate=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},select:{manifiestoId:true}});
       if(!candidate) throw new AppError('Tramo no encontrado',404);
       await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${candidate.manifiestoId} FOR SHARE`;
       const leg=await liveLeg(tx,claim);
-      return tx.trackingGPS.create({data:{...parsed.data,manifiestoId:leg.manifiestoId,tramoId:leg.id,emisor:`acceso-relevo:${claim.jti}`},select:{id:true,timestamp:true,tramoId:true}});
+      const tracking=await tx.trackingGPS.create({data:{...parsed.data,manifiestoId:leg.manifiestoId,tramoId:leg.id,emisor:`acceso-relevo:${claim.jti}`},select:{id:true,timestamp:true,tramoId:true}});
+      return {tracking,manifest:leg.manifiesto};
     });
-    res.setHeader('Cache-Control','private, no-store');res.json({success:true,data:{tracking}});
+    res.setHeader('Cache-Control','private, no-store');res.json({success:true,data:{tracking:result.tracking}});
+    // El enlace de relevo no representa una cuenta usuaria: no se excluye al
+    // transportista original de los destinatarios de una regla configurada.
+    if(result.manifest.fechaRetiro) {
+      const hours=(Date.now()-result.manifest.fechaRetiro.getTime())/3_600_000;
+      if(Number.isFinite(hours)&&hours>=0) domainEvents.emit({type:'DURACION_TRANSITO_OBSERVADA',manifiestoId:result.manifest.id,numero:result.manifest.numero,horasTransito:hours});
+    }
   }catch(error){next(error);}
 }

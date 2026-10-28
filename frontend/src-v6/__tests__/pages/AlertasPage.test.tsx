@@ -31,6 +31,45 @@ it('inspection rule is initially inactive, has exact recipients, no invented day
   expect(within(dialog).queryByLabelText('Días desde la recepción')).toBeNull();
   expect(within(dialog).queryByText('Emails adicionales')).toBeNull();
 });
+it('asks for a duration threshold explicitly and preserves the form if the server rejects it', async () => {
+  service.createRegla.mockRejectedValueOnce({ response: { data: { message: 'Indicá un umbral mínimo de horas de tránsito para activar esta regla.' } } });
+  service.createRegla.mockResolvedValueOnce({ id: 'qa-duration', activa: true });
+  setup(); fireEvent.click(screen.getByRole('tab', { name: /Reglas/ })); fireEvent.click(screen.getByRole('button', { name: 'Nueva Regla', exact: true }));
+  const dialog = screen.getByRole('dialog', { name: 'Nueva Regla', exact: true });
+  fireEvent.change(within(dialog).getByLabelText('Nombre'), { target: { value: 'QA duración' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Evento', exact: true }));
+  fireEvent.click(screen.getByRole('option', { name: 'Duración del viaje', exact: true }));
+  const hours = within(dialog).getByLabelText('Avisar a partir de (horas)');
+  expect(hours).toHaveValue(null);
+  expect(within(dialog).getByText(/no un plazo obligatorio del viaje/i)).toBeVisible();
+  expect(within(dialog).getByText(/sin ubicaciones nuevas no se genera el aviso/i)).toBeVisible();
+  fireEvent.click(within(dialog).getByRole('checkbox', { name: /ADMIN Administración central/ }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Crear regla', exact: true }));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent('Indicá un umbral mínimo');
+  await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveFocus());
+  expect(within(dialog).getByLabelText('Nombre')).toHaveValue('QA duración');
+  fireEvent.change(hours, { target: { value: '36' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Crear regla', exact: true }));
+  await waitFor(() => expect(service.createRegla).toHaveBeenLastCalledWith(expect.objectContaining({ condicion: '{"horasTransito":{"gte":36}}' })));
+});
+it('identifies a historical duration rule that needs a threshold', async () => {
+  service.listReglas.mockResolvedValue([{ id: 'legacy', nombre: 'QA sin umbral', evento: 'TIEMPO_EXCESIVO', activa: true,
+    condicion: '{}', destinatarios: '["ADMIN"]', requiereUmbralTransito: true }]);
+  setup(); fireEvent.click(screen.getByRole('tab', { name: /Reglas/ }));
+  expect((await screen.findAllByText('Falta configurar un umbral de tránsito.')).length).toBeGreaterThan(0);
+});
+it('names rule families consistently without confusing inspection or treatment follow-up with travel duration', async () => {
+  service.listReglas.mockResolvedValue([
+    { id: 'duration', nombre: 'QA viaje', evento: 'TIEMPO_EXCESIVO', condicion: '{"horasTransito":{"gte":36}}', destinatarios: '[]' },
+    { id: 'followup', nombre: 'QA tratamiento', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"seguimiento_cierre","diasRecepcion":{"gte":7}}', destinatarios: '[]' },
+    { id: 'inspection', nombre: 'QA inspección', evento: 'TIEMPO_EXCESIVO', condicion: '{"tipo":"requerimiento_inspeccion"}', destinatarios: '[]' },
+  ]);
+  setup(); fireEvent.click(screen.getByRole('tab', { name: /Reglas/ }));
+  expect((await screen.findAllByText('Duración del viaje')).length).toBe(2);
+  expect(screen.getAllByText('Seguimiento de tratamiento')).toHaveLength(2);
+  expect(screen.getAllByText('Requerimiento de inspección')).toHaveLength(2);
+  expect(screen.queryByText('TIEMPO_EXCESIVO')).toBeNull();
+});
 beforeEach(() => {
   vi.clearAllMocks(); auth.isAdmin = true; auth.isAnyAdmin = true;
   notices.list.mockResolvedValue({ items: [], total: 0 });

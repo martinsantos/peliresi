@@ -51,6 +51,13 @@ export type DomainEvent =
       userId: string;
     }
   | {
+      type: 'DURACION_TRANSITO_OBSERVADA';
+      manifiestoId: string;
+      horasTransito: number;
+      numero: string;
+      userId?: string;
+    }
+  | {
       type: 'DESVIO_RUTA';
       manifiestoId: string;
       distanciaKm: number;

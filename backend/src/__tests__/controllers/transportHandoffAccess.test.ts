@@ -1,10 +1,11 @@
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import jwt from 'jsonwebtoken';
-const mocks=vi.hoisted(()=>({leg:vi.fn(),user:vi.fn(),latest:vi.fn()}));
+const mocks=vi.hoisted(()=>({leg:vi.fn(),user:vi.fn(),latest:vi.fn(),create:vi.fn(),query:vi.fn(),emit:vi.fn()}));
 vi.mock('../../config/config',()=>({config:{JWT_SECRET:'unit-handoff-secret'}}));
-vi.mock('../../lib/prisma',()=>({default:{$transaction:async(callback:any)=>callback({tramoTransporte:{findUnique:mocks.leg},usuario:{findUnique:mocks.user}}),trackingGPS:{findFirst:mocks.latest}}}));
+vi.mock('../../lib/prisma',()=>({default:{$transaction:async(callback:any)=>callback({tramoTransporte:{findUnique:mocks.leg},usuario:{findUnique:mocks.user},trackingGPS:{create:mocks.create},$queryRaw:mocks.query}),trackingGPS:{findFirst:mocks.latest}}}));
+vi.mock('../../services/domainEvent.service',()=>({domainEvents:{emit:mocks.emit}}));
 vi.mock('../../services/blockchain.service',()=>({computeRollingHash:vi.fn()}));
-import {limitedTransportState} from '../../controllers/transport-handoff.controller';
+import {limitedTransportGps,limitedTransportState} from '../../controllers/transport-handoff.controller';
 import {inTrainingSession,TRAINING_REALM} from '../../lib/trainingScope';
 const id='af1388bc-43f7-4c73-8e9c-c14c46695881';
 const token=(extra={})=>jwt.sign({purpose:'transport-leg-gps',jti:'version',...extra},'unit-handoff-secret',{subject:id,audience:'transport-leg-gps',expiresIn:'1h'});
@@ -13,6 +14,7 @@ const res=()=>({json:vi.fn(),setHeader:vi.fn()}) as any;
 beforeEach(()=>{
   vi.clearAllMocks();mocks.leg.mockResolvedValue({id,manifiestoId:'manifest',creadoPorId:'original-user',impersonadoPorId:null,fin:null,accesoVersion:'version',accesoHasta:new Date(Date.now()+3600000),datos:{},orden:1,tipo:'EXTERNO',inicio:new Date(),manifiesto:{id:'manifest',numero:'QA',estado:'EN_TRANSITO',transportistaId:'original',operador:{razonSocial:'QA destino',domicilio:'QA 100'}}});
   mocks.user.mockResolvedValue({activo:true,transportista:{id:'original'}});mocks.latest.mockResolvedValue(null);
+  mocks.create.mockResolvedValue({id:'point',timestamp:new Date(),tramoId:id});mocks.query.mockResolvedValue([]);
 });
 afterEach(()=>vi.unstubAllEnvs());
 it('refuses a classroom capability outside the classroom scope before querying a manifest',async()=>{
@@ -33,4 +35,13 @@ it('returns only the operational data of the authorized leg, without issuer or c
   const response=res(),next=vi.fn();await limitedTransportState(req(token()),response,next);expect(next).not.toHaveBeenCalled();
   const body=response.json.mock.calls[0][0];expect(body.data).toMatchObject({tramoId:id,numero:'QA',destino:'QA destino'});
   for(const key of ['creadoPorId','accesoVersion','accessToken','usuario','generador','residuos'])expect(body.data).not.toHaveProperty(key);
+});
+it('evaluates configured duration rules for an accepted handoff position, from the original pickup',async()=>{
+  const leg=await mocks.leg();mocks.leg.mockResolvedValue({...leg,manifiesto:{...leg.manifiesto,fechaRetiro:new Date(Date.now()-25*3_600_000)}});
+  const request={...req(token()),body:{latitud:-33,longitud:-69}};const response=res(),next=vi.fn();
+  await limitedTransportGps(request,response,next);
+  expect(next).not.toHaveBeenCalled();expect(response.json).toHaveBeenCalledWith(expect.objectContaining({success:true}));
+  expect(mocks.emit).toHaveBeenCalledWith(expect.objectContaining({type:'DURACION_TRANSITO_OBSERVADA',manifiestoId:'manifest',horasTransito:expect.any(Number)}));
+  expect(mocks.emit.mock.calls[0][0].horasTransito).toBeGreaterThanOrEqual(25);
+  expect(mocks.emit.mock.calls[0][0]).not.toHaveProperty('userId');
 });

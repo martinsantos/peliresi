@@ -6,6 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 const root = new URL('../../docs/manual/', import.meta.url);
+
+test('travel-duration monitoring documents explicit thresholds and the GPS-arrival limitation', () => {
+  const manual = readFileSync(new URL('help-data.js', root), 'utf8');
+  assert.match(manual, /Un viaje no tiene un plazo fijo automático/);
+  assert.match(manual, /regla de Duración del viaje con un umbral explícito en horas/);
+  assert.match(manual, /sin ubicaciones nuevas no se genera ese aviso/);
+});
 const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);

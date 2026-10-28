@@ -14,6 +14,7 @@ import { withCompanyNoticeContext } from '../services/companyNotice.service';
 import { maskFiscalCompanyNotice, withFiscalCompanyNoticeContext } from '../services/fiscalCompanyNotice.service';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
 import { createHash } from 'node:crypto';
+import { transitRuleNeedsThreshold } from '../services/transitDurationPolicy.service';
 
 const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'INSPECCIONADO', 'INSPECTOR_ASIGNADO']);
 function normalizeAlertRecipients(raw: unknown): string {
@@ -190,7 +191,9 @@ export const getReglasAlerta = async (req: Request, res: Response, next: NextFun
             }
         });
 
-        res.json({ success: true, data: reglas });
+        res.json({ success: true, data: reglas.map(regla => ({
+            ...regla, requiereUmbralTransito: transitRuleNeedsThreshold(regla.evento, regla.condicion),
+        })) });
     } catch (error) {
         next(error);
     }
@@ -209,6 +212,7 @@ export const crearReglaAlerta = async (req: Request, res: Response, next: NextFu
         const destinatariosStr = normalizeAlertRecipients(destinatarios);
         validateFollowupRule(evento, condicionStr, destinatariosStr);
         validateCatalogueRule(evento, condicionStr, destinatariosStr);
+        if (activa && transitRuleNeedsThreshold(evento, condicionStr)) throw new AppError('Indicá un umbral mínimo de horas de tránsito para activar esta regla.', 400);
 
         const regla = await prisma.reglaAlerta.create({
             data: {
@@ -247,6 +251,9 @@ export const actualizarReglaAlerta = async (req: Request, res: Response, next: N
         if (activa !== undefined && typeof activa !== 'boolean') throw new AppError('Estado de regla inválido', 400);
         validateFollowupRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
         validateCatalogueRule(evento ?? current.evento, condicionStr ?? current.condicion, destinatariosStr ?? current.destinatarios);
+        if ((activa ?? current.activa) && transitRuleNeedsThreshold(evento ?? current.evento, condicionStr ?? current.condicion)) {
+            throw new AppError('Indicá un umbral mínimo de horas de tránsito para activar esta regla.', 400);
+        }
         if (catalogueCondition(current.condicion)?.tipo !== catalogueCondition(condicionStr ?? current.condicion)?.tipo &&
             await prisma.alertaGenerada.count({ where: { reglaId: id } })) throw new AppError('Una regla con casos históricos no puede cambiar de familia; desactívela y cree otra', 409);
         if (id === FOLLOWUP_RULE_ID && followupDays(condicionStr ?? current.condicion) === null) throw new AppError('La regla de seguimiento existente sólo puede configurarse o desactivarse', 400);
@@ -523,48 +530,6 @@ class AnomaliaDetector {
         return anomaliasDetectadas;
     }
 
-    // Verificar tiempo excesivo de transito
-    async verificarTiempoTransito(manifiestoId: string): Promise<boolean> {
-        const manifiesto = await prisma.manifiesto.findUnique({
-            where: { id: manifiestoId }
-        });
-
-        if (!manifiesto || !manifiesto.fechaRetiro || manifiesto.estado !== 'EN_TRANSITO') {
-            return false;
-        }
-
-        const horasTransito = (Date.now() - manifiesto.fechaRetiro.getTime()) / (1000 * 60 * 60);
-        const LIMITE_HORAS = 24; // Maximo 24 horas de transito
-
-        if (horasTransito > LIMITE_HORAS) {
-            // Crear anomalia
-            await prisma.anomaliaTransporte.create({
-                data: {
-                    manifiestoId,
-                    tipo: 'TIEMPO_EXCESIVO',
-                    descripcion: `Tiempo de transito excede ${LIMITE_HORAS} horas: ${horasTransito.toFixed(1)} horas`,
-                    latitud: 0,
-                    longitud: 0,
-                    valorDetectado: horasTransito,
-                    valorEsperado: LIMITE_HORAS,
-                    severidad: 'ALTA'
-                }
-            });
-
-            // Emitir evento de dominio
-            domainEvents.emit({
-                type: 'TIEMPO_EXCESIVO',
-                manifiestoId,
-                horasTransito,
-                numero: manifiesto.numero,
-                userId: manifiestoId, // userId no disponible en este contexto
-            });
-
-            return true;
-        }
-
-        return false;
-    }
 }
 
 export const anomaliaDetector = new AnomaliaDetector();

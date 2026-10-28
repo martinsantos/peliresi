@@ -2,7 +2,7 @@
  * SITREP v6 - Alertas Page
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -208,7 +208,7 @@ const EVENTO_OPTIONS = [
   { value: 'INCIDENTE', label: 'Incidente en Tránsito' },
   { value: 'RECHAZO_CARGA', label: 'Rechazo de Carga' },
   { value: 'DIFERENCIA_PESO', label: 'Diferencia de Peso' },
-  { value: 'TIEMPO_EXCESIVO', label: 'Tiempo Excesivo' },
+  { value: 'TIEMPO_EXCESIVO', label: 'Duración del viaje' },
   { value: 'DESVIO_RUTA', label: 'Desvío de Ruta' },
   { value: 'VENCIMIENTO', label: 'Vencimiento Próximo' },
   { value: 'ANOMALIA_GPS', label: 'Anomalía GPS' },
@@ -217,6 +217,16 @@ const EVENTO_OPTIONS = [
 const EVENTO_LABELS: Record<string, string> = Object.fromEntries(
   EVENTO_OPTIONS.map(o => [o.value, o.label])
 );
+
+function reglaEventLabel(rule: { evento?: string; tipo?: string; condicion?: string }): string {
+  try {
+    const kind = JSON.parse(rule.condicion || '{}').tipo;
+    if (kind === 'seguimiento_cierre') return 'Seguimiento de tratamiento';
+    if (kind === 'requerimiento_inspeccion') return 'Requerimiento de inspección';
+    if (kind === 'vencimiento_documental') return 'Vigencia documental';
+  } catch { /* the server flags invalid historical conditions */ }
+  return EVENTO_LABELS[rule.evento || ''] || rule.evento || rule.tipo || 'Sin evento';
+}
 
 const ROLES_DESTINATARIOS = [
   { value: 'ADMIN', label: 'Administración central' },
@@ -318,6 +328,9 @@ export const AlertasPage: React.FC = () => {
   const [editingRegla, setEditingRegla] = useState<any | null>(null);
   const [deletingRegla, setDeletingRegla] = useState<any | null>(null);
   const [reglaForm, setReglaForm] = useState(defaultReglaForm);
+  const [reglaError, setReglaError] = useState('');
+  const reglaErrorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (reglaError) reglaErrorRef.current?.focus(); }, [reglaError]);
 
   const [caseToManage, setCaseToManage] = useState<AlertaLocal | null>(null);
   const [caseState, setCaseState] = useState(EstadoAlerta.EN_REVISION);
@@ -330,6 +343,18 @@ export const AlertasPage: React.FC = () => {
   let catalogue: { tipo: string; anticipacionDias?: number; entidades?: string[] } | null = null;
   try { const value = JSON.parse(reglaForm.condicion); if (['requerimiento_inspeccion', 'vencimiento_documental'].includes(value.tipo)) catalogue = value; } catch { /* validated on save */ }
   const ruleKind = catalogue?.tipo || (followupDays !== null ? 'seguimiento' : 'evento');
+  let basicTransitHours: string | null = null;
+  let basicTransitCondition = false;
+  if (ruleKind === 'evento' && reglaForm.evento === 'TIEMPO_EXCESIVO') {
+    try {
+      const condition = JSON.parse(reglaForm.condicion);
+      const threshold = condition?.horasTransito;
+      basicTransitCondition = Object.keys(condition).length === 0 || (Object.keys(condition).length === 1 && threshold &&
+        typeof threshold === 'object' && !Array.isArray(threshold) && Object.keys(threshold).length === 1 &&
+        typeof threshold.gte === 'number' && Number.isFinite(threshold.gte));
+      if (basicTransitCondition && typeof threshold?.gte === 'number') basicTransitHours = String(threshold.gte);
+    } catch { /* advanced condition remains editable and is validated on save */ }
+  }
   const recipientsAllowed = catalogue?.tipo === 'requerimiento_inspeccion' ? ['INSPECCIONADO', 'INSPECTOR_ASIGNADO', 'ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR']
     : catalogue ? ['TRANSPORTISTA', 'OPERADOR', 'ADMIN', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR'] : followupDays !== null ? ['OPERADOR', 'ADMIN', 'ADMIN_OPERADOR'] : ROLES_DESTINATARIOS.filter(role => !role.value.startsWith('INSPEC')).map(role => role.value);
 
@@ -433,12 +458,14 @@ export const AlertasPage: React.FC = () => {
     setEditingRegla(null);
     setReglaForm(defaultReglaForm);
     setPreview(null);
+    setReglaError('');
     setShowReglaModal(true);
   };
 
   const openEditRegla = (regla: any) => {
     setEditingRegla(regla);
     setPreview(null);
+    setReglaError('');
     let destList: string[] = [];
     try {
       const parsed = JSON.parse(regla.destinatarios || '[]');
@@ -459,6 +486,7 @@ export const AlertasPage: React.FC = () => {
   };
 
   const handleSaveRegla = () => {
+    setReglaError('');
     if (!reglaForm.nombre.trim() || !reglaForm.evento || !reglaForm.condicion.trim()) {
       toast.error('Campos requeridos', 'Nombre, evento y condición son obligatorios');
       return;
@@ -491,13 +519,13 @@ export const AlertasPage: React.FC = () => {
         { id: editingRegla.id, data: payload },
         {
           onSuccess: () => { toast.success('Regla actualizada'); setShowReglaModal(false); },
-          onError: () => toast.error('Error', 'No se pudo actualizar la regla'),
+          onError: (error) => setReglaError((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'No se pudo actualizar la regla. Conservamos lo ingresado; reintentá.'),
         }
       );
     } else {
       createRegla.mutate(payload, {
         onSuccess: () => { toast.success('Regla creada'); setShowReglaModal(false); },
-        onError: () => toast.error('Error', 'No se pudo crear la regla'),
+        onError: (error) => setReglaError((error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'No se pudo crear la regla. Conservamos lo ingresado; reintentá.'),
       });
     }
   };
@@ -522,11 +550,11 @@ export const AlertasPage: React.FC = () => {
   // ─── Reglas table ──────────────────────────────────────────────────────────
 
   const reglasColumns: Column<any>[] = [
-    { key: 'nombre', header: 'Nombre', sortable: true },
+    { key: 'nombre', header: 'Nombre', sortable: true, render: (r) => <div><span>{r.nombre}</span>{r.requiereUmbralTransito && <p className="text-xs text-warning-800">Falta configurar un umbral de tránsito.</p>}</div> },
     {
       key: 'evento',
       header: 'Evento',
-      render: (r) => <Badge variant="soft" color="info" size="sm">{EVENTO_LABELS[r.evento] || r.evento}</Badge>,
+      render: (r) => <Badge variant="soft" color="info" size="sm">{reglaEventLabel(r)}</Badge>,
     },
     {
       key: 'destinatarios',
@@ -806,7 +834,8 @@ export const AlertasPage: React.FC = () => {
                 {r.activa ? 'Activa' : 'Inactiva'}
               </span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">{r.evento || r.tipo}</p>
+            <p className="text-xs text-neutral-500 mt-1">{reglaEventLabel(r)}</p>
+            {r.requiereUmbralTransito && <p className="mt-1 text-xs text-warning-800">Falta configurar un umbral de tránsito.</p>}
             {isAdmin && <Button variant="outline" aria-label={`Editar regla: ${r.nombre}`} className="mt-2" onClick={() => openEditRegla(r)}>Editar regla</Button>}
           </div>
         ))}
@@ -939,9 +968,13 @@ export const AlertasPage: React.FC = () => {
             placeholder="Seleccionar evento…"
             options={EVENTO_OPTIONS}
             value={reglaForm.evento}
-            onChange={(val) => setReglaForm(prev => ({ ...prev, evento: val, condicion: CONDITION_PRESETS[val]?.[0]?.value || '{}' }))}
+            onChange={(val) => setReglaForm(prev => ({ ...prev, evento: val, condicion: val === 'TIEMPO_EXCESIVO' ? '{}' : CONDITION_PRESETS[val]?.[0]?.value || '{}' }))}
           />
-          <div>
+          {reglaForm.evento === 'TIEMPO_EXCESIVO' && basicTransitCondition ? <div className="space-y-2">
+            <Input label="Avisar a partir de (horas)" type="number" min={0} step="any" inputMode="decimal" value={basicTransitHours ?? ''}
+              onChange={event => { const value = event.target.value; setReglaForm(prev => ({ ...prev, condicion: value === '' ? '{}' : JSON.stringify({ horasTransito: { gte: Number(value) } }) })); }} />
+            <p className="text-sm text-neutral-600">Es un umbral operativo elegido por Ambiente, no un plazo obligatorio del viaje. Se evalúa cuando llega una ubicación GPS; sin ubicaciones nuevas no se genera el aviso.</p>
+          </div> : <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Cuándo se activa</label>
             <Select value={CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion) ? reglaForm.condicion : '__custom__'} onChange={value => value !== '__custom__' && setReglaForm(prev => ({ ...prev, condicion: value }))} options={[...(CONDITION_PRESETS[reglaForm.evento] || [{ label: 'Cualquier evento', value: '{}' }]), { value: '__custom__', label: 'Condición avanzada personalizada' }]} />
             <details open={!CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion)} className="rounded-lg border border-neutral-200 bg-neutral-50 p-3"><summary className="cursor-pointer text-xs font-bold text-neutral-700">JSON avanzado</summary><p className="mt-2 text-xs leading-relaxed text-neutral-500">Operadores admitidos: eq, neq, gt, gte, lt, lte, in y contains. Esta condición se valida y se evalúa en cada evento.</p>
@@ -953,7 +986,7 @@ export const AlertasPage: React.FC = () => {
               rows={2}
             />
             </details>
-          </div></> : <div className="space-y-3">
+          </div>}</> : <div className="space-y-3">
             {!catalogue ? <><Input label="Días desde la recepción" type="number" min={0} max={365} step={1} value={followupDays ?? 0} onChange={event => { setPreview(null); setReglaForm(prev => ({ ...prev, condicion: JSON.stringify({ tipo: 'seguimiento_cierre', diasRecepcion: { gte: Number(event.target.value) } }) })); }} />
             <p className="text-sm text-neutral-600">Umbral operativo, no vencimiento legal. Se revisa diariamente a las 08:00 de Mendoza. Cero incluye todos los recibidos o en tratamiento.</p></>
               : catalogue.tipo === 'requerimiento_inspeccion' ? <p className="text-sm text-neutral-700">Usa el plazo registrado de cada requerimiento. Leer, responder a otro pedido o una respuesta de la autoridad no lo contestan. Una respuesta vinculada detiene el aviso de ausencia, sin aceptar la subsanación.</p>
@@ -974,6 +1007,7 @@ export const AlertasPage: React.FC = () => {
             </div>}
           </div>}
 
+          {reglaError && <p ref={reglaErrorRef} tabIndex={-1} role="alert" className="rounded-lg bg-error-50 p-3 text-sm text-error-800 focus:outline focus:outline-2 focus:outline-error-600">{reglaError}</p>}
           <div>
             <label className="block text-sm font-medium text-neutral-700 mb-2">
               <Users size={13} className="inline mr-1 -mt-0.5 text-neutral-400" />

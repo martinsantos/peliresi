@@ -46,15 +46,6 @@ export async function eventoManifiestoSubscriber(event: DomainEvent): Promise<vo
       );
       break;
 
-    case 'TIEMPO_EXCESIVO':
-      await createIncidentOnce(
-        event.manifiestoId,
-        event.userId,
-        'Tiempo de tránsito excesivo:',
-        `Tiempo de tránsito excesivo: ${event.horasTransito.toFixed(1)} horas en tránsito`,
-      );
-      break;
-
     case 'DESVIO_RUTA':
       await createIncidentOnce(
         event.manifiestoId,

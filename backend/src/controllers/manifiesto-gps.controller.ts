@@ -149,12 +149,13 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
     // Replaying an acknowledged point must not generate another alert/event.
     if (result.repetido) return;
 
-    // Deteccion TIEMPO_EXCESIVO: >24h desde retiro
+    // El tiempo es informativo: sólo reglas con umbrales configurados pueden
+    // convertir esta observación en un aviso. No existe un plazo fijo.
     if (cacheEntry.fechaRetiro) {
       const horasTransito = (Date.now() - cacheEntry.fechaRetiro.getTime()) / 3_600_000;
-      if (horasTransito > 24) {
+      if (Number.isFinite(horasTransito) && horasTransito >= 0) {
         domainEvents.emit({
-          type: 'TIEMPO_EXCESIVO',
+          type: 'DURACION_TRANSITO_OBSERVADA',
           manifiestoId: id,
           horasTransito,
           numero: cacheEntry.numero,

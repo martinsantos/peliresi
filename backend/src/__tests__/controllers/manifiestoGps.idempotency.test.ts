@@ -42,6 +42,14 @@ describe('GPS retry idempotency', () => {
     expect(db.emit).toHaveBeenCalledTimes(1);
   });
 
+  it('does not automatically label a trip excessive solely because 24 hours elapsed', async () => {
+    db.manifest.mockResolvedValue({ ...trip, fechaRetiro: new Date(Date.now() - 25 * 3600_000) });
+    const next = vi.fn();
+    await actualizarUbicacionIdempotente(request(), response(), next);
+    expect(next).not.toHaveBeenCalled();
+    expect(db.emit).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'TIEMPO_EXCESIVO' }));
+  });
+
   it('rejects reuse of a reference with different coordinates', async () => {
     await actualizarUbicacionIdempotente(request(), response(), vi.fn());
     const next = vi.fn(), res = response();

@@ -5,7 +5,7 @@ import { emailService } from '../services/email.service';
 import { externalAlertRecipientAllowed } from '../services/email-policy';
 import { notificationService } from '../controllers/notification.controller';
 import { DomainEvent } from '../services/domainEvent.service';
-import { matchesAlertCondition } from '../services/alertRuleCondition.service';
+import { hasConfiguredTransitThreshold, matchesAlertCondition } from '../services/alertRuleCondition.service';
 import { followupDays } from '../services/alertFollowupPolicy.service';
 import { catalogueCondition } from '../services/alertCataloguePolicy.service';
 
@@ -17,6 +17,7 @@ const EVENTO_ALERTA_MAP: Partial<Record<DomainEvent['type'], EventoAlerta>> = {
   DIFERENCIA_PESO:            'DIFERENCIA_PESO',
   ANOMALIA_GPS:               'ANOMALIA_GPS',
   TIEMPO_EXCESIVO:            'TIEMPO_EXCESIVO',
+  DURACION_TRANSITO_OBSERVADA: 'TIEMPO_EXCESIVO',
   DESVIO_RUTA:                'DESVIO_RUTA',
   VENCIMIENTO_PROXIMO:        'VENCIMIENTO',
 };
@@ -49,6 +50,7 @@ async function dispararReglasAlerta(
   eventoAlerta: EventoAlerta,
   manifiestoId: string | undefined,
   datos: Record<string, any>,
+  transitDuration = false,
 ): Promise<void> {
   const reglas = await prisma.reglaAlerta.findMany({
     where: { evento: eventoAlerta, activa: true },
@@ -59,6 +61,7 @@ async function dispararReglasAlerta(
     try {
       if (followupDays(regla.condicion) !== null) continue;
       if (catalogueCondition(regla.condicion) !== null) continue;
+      if (transitDuration && !hasConfiguredTransitThreshold(regla.condicion)) continue;
       matches = matchesAlertCondition(regla.condicion, datos);
     }
     catch (error) {
@@ -74,21 +77,34 @@ async function dispararReglasAlerta(
     const expiryIdentity = eventoAlerta === 'VENCIMIENTO' && !manifiestoId
       ? ['entidad', 'entidadId', 'vencimiento'].map(key => ({ datos: { contains: JSON.stringify({ [key]: datos[key] }).slice(1, -1) } }))
       : [];
-    const duplicate = await prisma.alertaGenerada.findFirst({
-      where: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, createdAt: { gte: duplicateSince },
-        ...(expiryIdentity.length ? { AND: expiryIdentity } : {}) },
-      select: { id: true },
-    });
-    if (duplicate) continue;
-
-    await prisma.alertaGenerada.create({
-      data: {
-        reglaId: regla.id,
-        manifiestoId: manifiestoId ?? null,
-        datos: JSON.stringify(datos),
-        estado: 'PENDIENTE',
-      },
-    });
+    if (transitDuration) {
+      if (!manifiestoId) continue;
+      // Multiple GPS requests or API workers may cross a configured threshold
+      // together. Serialize only this rule/manifest and use the DB clock.
+      const created = await prisma.$transaction(async tx => {
+        const lockKey = JSON.stringify(['transit-duration-rule', regla.id, manifiestoId]);
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text`;
+        const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
+        const duplicate = await tx.alertaGenerada.findFirst({
+          where: { reglaId: regla.id, manifiestoId, createdAt: { gte: new Date(now.getTime() - 30 * 60 * 1000) } },
+          select: { id: true },
+        });
+        if (duplicate) return false;
+        await tx.alertaGenerada.create({ data: { reglaId: regla.id, manifiestoId, datos: JSON.stringify(datos), estado: 'PENDIENTE', createdAt: now } });
+        return true;
+      }, { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
+      if (!created) continue;
+    } else {
+      const duplicate = await prisma.alertaGenerada.findFirst({
+        where: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, createdAt: { gte: duplicateSince },
+          ...(expiryIdentity.length ? { AND: expiryIdentity } : {}) },
+        select: { id: true },
+      });
+      if (duplicate) continue;
+      await prisma.alertaGenerada.create({
+        data: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, datos: JSON.stringify(datos), estado: 'PENDIENTE' },
+      });
+    }
 
     let destList: string[] = [];
     try {
@@ -126,11 +142,14 @@ async function dispararReglasAlerta(
       users.forEach((user) => { if (user.id !== eventUserId) recipientIds.add(user.id); });
     }
     for (const usuarioId of recipientIds) {
+      const mensaje = transitDuration && typeof datos.horasTransito === 'number' && Number.isFinite(datos.horasTransito)
+        ? `El manifiesto ${datos.numero} lleva aproximadamente ${datos.horasTransito.toLocaleString('es-AR', { maximumFractionDigits: 1 })} horas en tránsito. Se alcanzó el umbral configurado por Ambiente.`
+        : `Regla activada: ${regla.nombre}`;
       await notificationService.crearNotificacion({
         usuarioId,
         tipo: 'ALERTA_SISTEMA' as TipoNotificacion,
         titulo: regla.nombre,
-        mensaje: `Regla activada: ${regla.nombre}`,
+        mensaje,
         manifiestoId,
         prioridad: 'ALTA' as PrioridadNotificacion,
         datos: { evento: eventoAlerta, reglaId: regla.id, ...datos },
@@ -245,16 +264,6 @@ export async function alertaSubscriber(event: DomainEvent): Promise<void> {
       );
       break;
 
-    case 'TIEMPO_EXCESIVO':
-      await notificarAdmins(
-        'ANOMALIA_DETECTADA',
-        '⏰ Tiempo de Tránsito Excesivo',
-        `El manifiesto ${event.numero} lleva ${event.horasTransito.toFixed(1)} horas en tránsito`,
-        event.manifiestoId,
-        'URGENTE',
-      );
-      break;
-
     case 'DESVIO_RUTA':
       await notificarAdmins(
         'ANOMALIA_DETECTADA',
@@ -284,7 +293,8 @@ export async function alertaSubscriber(event: DomainEvent): Promise<void> {
   if (eventoAlerta) {
     const manifiestoId = 'manifiestoId' in event ? event.manifiestoId : undefined;
     const { type: _type, ...datos } = event;
-    await dispararReglasAlerta(eventoAlerta, manifiestoId, datos);
+    await dispararReglasAlerta(eventoAlerta, manifiestoId, datos,
+      event.type === 'DURACION_TRANSITO_OBSERVADA' || event.type === 'TIEMPO_EXCESIVO');
   }
 
   logger.info({ eventType: event.type }, 'AlertaSubscriber processed event');
