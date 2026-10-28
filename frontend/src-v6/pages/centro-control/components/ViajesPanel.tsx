@@ -17,6 +17,7 @@ import { formatDateTime } from '../../../utils/formatters';
 import { hasInspectionCoordinates, operationSubject, type InspectionOperation } from '../../../services/inspectionOperations.service';
 import { INSPECTION_STATE_LABELS, inspectionDate } from '../../inspecciones/inspectionPresentation';
 import type { EnTransitoItem } from '../../../hooks/useCentroControl';
+import { MonitorPosition } from '../../monitor/components/MonitorPosition';
 
 interface ViajeRealizado {
   id: string;
@@ -140,6 +141,7 @@ export const ViajesPanel: React.FC<ViajesPanelProps> = ({
                         <span className="block text-xs text-neutral-600 truncate"><span className="font-semibold text-blue-700">OPERADOR:</span> {m.destino}</span>
                       </span>
                       </button>
+                      {isSelected && <div className="mt-2"><MonitorPosition position={m.ultimaPosicion} /></div>}
                       {isSelected&&!!m.tramos?.length&&<ol className="mt-2 space-y-1 border-l border-neutral-200 pl-2" aria-label="Historial de transporte">{m.tramos.map(leg=><li key={leg.id} className="text-xs text-neutral-600">{leg.orden===0?'Original':`Relevo ${leg.orden}`}: {leg.empresa} · {leg.fin?'finalizado':'actual'}</li>)}</ol>}
                       {isSelected && m.canViewDetail === true && (
                         <button

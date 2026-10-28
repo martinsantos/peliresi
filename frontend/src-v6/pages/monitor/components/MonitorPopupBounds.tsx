@@ -43,7 +43,9 @@ export function MonitorPopupBounds() {
       active.options.maxHeight = Math.min(220, Math.max(44, Math.floor(available)));
       active.options.autoPanPaddingTopLeft = [12, topPadding];
       active.options.autoPanPaddingBottomRight = [12, bottomPadding];
+      const scrollTop = nextContent.scrollTop;
       active.update();
+      nextContent.scrollTop = scrollTop;
     };
     const handlers = {
       popupopen: (event: PopupEvent) => { active = event.popup; constrain(); },

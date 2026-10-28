@@ -1,5 +1,3 @@
-import type { EnTransitoItem } from '../api/monitor-api';
-
 /** Age describes the last received measurement, never the device's connectivity. */
 export function positionAge(timestamp: string | undefined, now: number): string {
   if (!timestamp) return 'Sin posición recibida';
@@ -14,15 +12,15 @@ export function positionAge(timestamp: string | undefined, now: number): string 
 }
 
 export function MonitorPosition({ position, now = Date.now(), compact = false }: {
-  position: EnTransitoItem['ultimaPosicion']; now?: number; compact?: boolean;
+  position: { timestamp: string; velocidad?: number | null } | null; now?: number; compact?: boolean;
 }) {
   const valid = position && Number.isFinite(new Date(position.timestamp).getTime());
   return <div className="space-y-1 text-xs leading-5 text-neutral-700" aria-label="Última posición recibida">
-    <p>{positionAge(position?.timestamp, now)}</p>
+    <p style={{ margin: 0 }}>{positionAge(position?.timestamp, now)}</p>
     {!compact && valid && <time dateTime={position.timestamp} className="block">
       {new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Mendoza', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(position.timestamp))} · Mendoza
     </time>}
-    {!compact && valid && <p>El punto puede ser anterior si el dispositivo estuvo sin conexión.</p>}
-    {!compact && position?.velocidad != null && Number.isFinite(position.velocidad) && <p>Velocidad no disponible</p>}
+    {!compact && valid && <p style={{ margin: 0 }}>Hora de captura no disponible. El punto puede ser anterior a la recepción.</p>}
+    {!compact && position?.velocidad != null && Number.isFinite(position.velocidad) && <p style={{ margin: 0 }}>Velocidad no disponible</p>}
   </div>;
 }

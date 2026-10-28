@@ -67,7 +67,7 @@ it('age advances without a new API reading and preserves the full Mendoza timest
   const view = render(<MonitorPosition position={trip.ultimaPosicion} now={now} />);
   view.rerender(<MonitorPosition position={trip.ultimaPosicion} now={now + 60000} />);
   expect(screen.getByText('Última recepción hace 11 min')).toBeVisible();
-  expect(screen.getByText('El punto puede ser anterior si el dispositivo estuvo sin conexión.')).toBeVisible();
+  expect(screen.getByText('Hora de captura no disponible. El punto puede ser anterior a la recepción.')).toBeVisible();
   expect(view.container.querySelector('time')).toHaveAttribute('datetime', '2026-10-25T14:50:00Z');
   expect(view.container.querySelector('time')).toHaveTextContent('11:50:00');
 });

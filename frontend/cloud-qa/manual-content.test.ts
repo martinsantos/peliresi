@@ -46,6 +46,8 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /no puede comprobar desde aquí lo que siga pendiente en otro dispositivo o perfil de navegador/i);
   assert.match(recovery, /no se puede verificar el viaje o el servidor/i);
   const monitor = JSON.stringify(guides.find((g: any) => g.id === 'monitor-viaje-vigente'));
+  assert.match(monitor, /Monitor y Centro de Control/);
+  assert.match(monitor, /hora de captura no está disponible/i);
   assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
   assert.match(monitor, /alertas de velocidad, parada o pérdida de GPS usan el intervalo entre recepciones/i);
 });

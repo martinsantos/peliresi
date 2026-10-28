@@ -36,6 +36,15 @@ describe('Control map visual identity across desktop and mobile', () => {
     expect(screen.getByText('QA-TRIP')).toBeVisible();
     expect(screen.queryByText(/12\s*km\/h/i)).not.toBeInTheDocument();
   });
+  it('identifies when the point reached SITREP and does not imply that it was captured then', () => {
+    renderMap(false, null, {
+      enTransitoForMap: [{ manifiestoId: 'qa-trip', numero: 'QA-TRIP', origen: 'QA origen', destino: 'QA destino', transportista: 'QA transporte', origenLatLng: null, destinoLatLng: null, ultimaPosicion: { latitud: -32.85, longitud: -68.85, velocidad: null, direccion: null, timestamp: '2026-10-07T12:00:00Z' }, ruta: [] }],
+    });
+    const position = screen.getByLabelText('Última posición recibida');
+    expect(position).toHaveTextContent('Última recepción');
+    expect(position).toHaveTextContent('Hora de captura no disponible');
+    expect(position.querySelector('time')).toHaveAttribute('datetime', '2026-10-07T12:00:00Z');
+  });
   it('retains the selected trip data but hides all its map symbols when the transit layer is off', () => {
     renderMap(false, null, {
       layers: { generadores: true, transportistas: true, operadores: true, transito: false },

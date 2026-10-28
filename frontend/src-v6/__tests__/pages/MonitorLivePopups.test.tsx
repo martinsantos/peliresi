@@ -67,12 +67,15 @@ it('bounds the open popup to the actual short map and keeps keyboard scrolling a
   Object.defineProperty(element, 'offsetHeight', { value: 270 });
   Object.defineProperty(content, 'offsetHeight', { value: 220 });
   element.append(content);
-  const popup = { options: { maxHeight: 220 }, getElement: () => element, update: vi.fn() };
+  const popup = { options: { maxHeight: 220 }, getElement: () => element, update: vi.fn(() => { content.scrollTop = 0; }) };
   act(() => handlers.popupopen({ popup }));
   expect(popup.options.maxHeight).toBeLessThan(160);
   expect(popup.options.maxHeight).toBeGreaterThanOrEqual(44);
   expect(popup.update).toHaveBeenCalled();
   expect(content.tabIndex).toBe(0);
+  content.scrollTop = 42;
+  act(() => handlers.resize());
+  expect(content.scrollTop).toBe(42);
   const pan = vi.fn(); element.addEventListener('keydown', pan);
   content.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
   expect(pan).not.toHaveBeenCalled();

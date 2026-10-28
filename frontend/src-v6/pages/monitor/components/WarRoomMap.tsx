@@ -9,7 +9,7 @@ import type { InspectionOperation } from '../../../services/inspectionOperations
 import React, { useMemo, useEffect, useRef, memo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import type { MonitorMode } from '../WarRoomPage';
 import type { ActorPosition, EnTransitoItem } from '../api/monitor-api';
 import {
@@ -21,6 +21,7 @@ import { EVENT_COLORS } from '../utils/war-room-icons';
 import { ACTOR_ICONS } from '../../../utils/map-icons';
 import { MapCategorySymbol, type MapCategory } from '../../../components/ui/MapLayerToggle';
 import { MonitorPopupBounds } from './MonitorPopupBounds';
+import { MonitorPopup } from './MonitorPopup';
 import { MonitorPosition } from './MonitorPosition';
 
 // Keep the Monitor on the same keyless base map already used by SITREP's
@@ -294,7 +295,7 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
           {/* Generadores — low z */}
           {visibleGeneradores.map(g => (
             <Marker key={`gen-${g.id}`} position={[g.lat!, g.lng!]} icon={createGeneradorIcon()} zIndexOffset={-1000} title={`Generador: ${g.razonSocial}`} alt={`Generador: ${g.razonSocial}`}>
-              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+              <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                 <LivePopup category="generador" name={g.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{g.razonSocial}</div>
                   {g.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 6 }}>CUIT {g.cuit}</div>}
@@ -324,14 +325,14 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
                   </div>
                   {g.domicilio && <div style={ADDRESS_STYLE}>{g.domicilio}</div>}
                 </LivePopup>
-              </Popup>
+              </MonitorPopup>
             </Marker>
           ))}
 
           {/* Transportistas — low z */}
           {actores?.transportistas.filter(t => t.lat && t.lng).map(t => (
             <Marker key={`trans-${t.id}`} position={[t.lat!, t.lng!]} icon={createTransportistaIcon()} zIndexOffset={-800} title={`Transportista: ${t.razonSocial}`} alt={`Transportista: ${t.razonSocial}`}>
-              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+              <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                 <LivePopup category="transportista" name={t.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{t.razonSocial}</div>
                   {t.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 6 }}>CUIT {t.cuit}</div>}
@@ -361,14 +362,14 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
                     </div>
                   </div>
                 </LivePopup>
-              </Popup>
+              </MonitorPopup>
             </Marker>
           ))}
 
           {/* Operadores — low z */}
           {actores?.operadores.filter(o => o.lat && o.lng).map(o => (
             <Marker key={`oper-${o.id}`} position={[o.lat!, o.lng!]} icon={createOperadorIcon()} zIndexOffset={-900} title={`Operador: ${o.razonSocial}`} alt={`Operador: ${o.razonSocial}`}>
-              <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+              <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                 <LivePopup category="operador" name={o.razonSocial}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b', marginBottom: 2 }}>{o.razonSocial}</div>
                   {o.cuit && <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#6b7280', marginBottom: 4 }}>CUIT {o.cuit}</div>}
@@ -403,7 +404,7 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
                   </div>
                   {o.domicilio && <div style={ADDRESS_STYLE}>{o.domicilio}</div>}
                 </LivePopup>
-              </Popup>
+              </MonitorPopup>
             </Marker>
           ))}
         </>
@@ -420,7 +421,7 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
             )}
             {lastPos && (
               <Marker position={[lastPos.latitud, lastPos.longitud]} icon={prominentIcon} zIndexOffset={2000} title={`Viaje en tránsito: ${trip.numero}`} alt={`Viaje en tránsito: ${trip.numero}`}>
-                <Popup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
+                <MonitorPopup minWidth={0} maxWidth={280} maxHeight={220} autoPanPadding={[12, 12]}>
                   <LivePopup category="enTransito" name={trip.numero}>
                     <div style={{ fontSize: 13, fontWeight: 700 }}>{trip.numero}</div>
                     <div style={{ fontSize: 11, color: '#6b7280' }}>{trip.transportista}</div>
@@ -443,9 +444,9 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
                       </div>
                     )}
                     <MonitorPosition position={lastPos} now={now} />
-                    <p className="text-xs text-neutral-600">{trip.ruta.length} puntos incluidos en la consulta</p>
+                    <p className="text-xs text-neutral-600">{trip.ruta.length} {trip.ruta.length === 1 ? 'punto incluido' : 'puntos incluidos'} en la consulta</p>
                   </LivePopup>
-                </Popup>
+                </MonitorPopup>
               </Marker>
             )}
           </React.Fragment>
