@@ -32,7 +32,7 @@ async function markSynthetic(id:string,numero:string){
  }finally{await db.$disconnect();}
 }
 async function approve(page:Page,id:string,role:Role){
- const region=page.getByRole('region',{name:'Aprobaciones de las partes'});await expect(region).toBeVisible();
+ const region=page.getByRole('region',{name:'Aprobaciones de las partes'});await expect(region).toBeVisible({timeout:20000});
  if(role==='generador'){
   await region.getByRole('button',{name:'Firmar Manifiesto',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Firma del manifiesto',exact:true});
   const canvas=dialog.locator('canvas');await canvas.scrollIntoViewIfNeeded();const b=(await canvas.boundingBox())!;
@@ -172,25 +172,32 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
   }
   const certificates=[];
   for(const kind of ['PARCIAL','FINAL'] as const){
+   for(const role of ['generador','transportista'] as const)await pages[role].goto(prefix(info)+'/notificaciones');
    if(kind==='FINAL'){
     await op.getByRole('button',{name:'Cerrar Manifiesto',exact:true}).click();
     const closure=op.getByRole('dialog',{name:'Cerrar manifiesto',exact:true});
     await post(op,'/'+m.id+'/cerrar',()=>closure.getByRole('button',{name:'Confirmar cierre',exact:true}).click());
     await expect(closure).not.toBeVisible();
    }
-   for(const role of ['generador','transportista'] as const)await pages[role].goto(prefix(info)+'/notificaciones');
    const region=op.getByRole('region',{name:'Certificaciones',exact:true});
    await region.getByRole('button',{name:kind==='PARCIAL'?'Emitir certificación parcial':'Emitir certificación final total',exact:true}).click();
    const amount=region.getByLabel('Cantidad a certificar Y1 (kg)',{exact:true});await expect(amount).toHaveValue('22');
    if(kind==='PARCIAL')await amount.fill('7');else await expect(amount).toBeDisabled();
    await expect(region.getByLabel('Método de tratamiento certificado',{exact:true})).toHaveValue('QA ESTABILIZACION');
+   let checkNoticeDuringStroke=kind==='FINAL';
    async function signCertificate(){
-    // The success notice occupies space and expires after five seconds. Dismiss it
-    // before drawing so it cannot move the canvas in the middle of a stroke.
     const success=op.getByRole('status').filter({hasText:'Manifiesto cerrado exitosamente'});
-    if(await success.isVisible())await success.getByRole('button',{name:'Cerrar notificación'}).click();
     const signing=region.locator('canvas');await signing.scrollIntoViewIfNeeded();const box=(await signing.boundingBox())!;
+    if(checkNoticeDuringStroke)await expect(success).toBeVisible();
     await op.mouse.move(box.x+box.width*.1,box.y+box.height*.5);await op.mouse.down();
+    await op.mouse.move(box.x+box.width*.2,box.y+box.height*.2,{steps:5});
+    if(checkNoticeDuringStroke){
+     // Real time is intentional: this crosses the success notice's five-second expiry while the pen is down.
+     await op.waitForTimeout(5500);await expect(success).toBeVisible();
+     const after=(await signing.boundingBox())!;expect(Math.abs(after.y-box.y)).toBeLessThan(1);
+     writeFileSync(info.outputPath('signature-stability.json'),JSON.stringify({surface:info.project.name,beforeY:box.y,afterY:after.y,noticeHeld:true}));
+     checkNoticeDuringStroke=false;
+    }
     for(const [x,y]of[[.2,.2],[.4,.6],[.6,.2],[.8,.7]])await op.mouse.move(box.x+box.width*x,box.y+box.height*y,{steps:5});await op.mouse.up();
     const useSignature=region.getByRole('button',{name:'Usar firma',exact:true});
     await expect(useSignature).toBeEnabled({timeout:10_000});await useSignature.click();

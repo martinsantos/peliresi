@@ -40,11 +40,50 @@ interface ToastItemProps extends Toast {
 // ========================================
 let toastListeners: ((toasts: Toast[]) => void)[] = [];
 let toasts: Toast[] = [];
-const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+let visibleToasts: Toast[] = [];
+let layoutHolds = 0;
+let pendingNoticeChange = false;
+type Expiry = { remaining: number; deadline?: number; handle?: ReturnType<typeof setTimeout> };
+const expiryTimers = new Map<string, Expiry>();
 
 const notifyListeners = () => {
-  toastListeners.forEach((listener) => listener([...toasts]));
+  if (layoutHolds > 0) { pendingNoticeChange = true; return; }
+  pendingNoticeChange = false;
+  visibleToasts = [...toasts];
+  toastListeners.forEach((listener) => listener([...visibleToasts]));
 };
+
+function clearExpiry(id: string) {
+  const expiry = expiryTimers.get(id);
+  if (expiry?.handle !== undefined) clearTimeout(expiry.handle);
+  expiryTimers.delete(id);
+}
+
+function armExpiry(id: string, expiry: Expiry) {
+  expiry.deadline = Date.now() + expiry.remaining;
+  expiry.handle = setTimeout(() => toast.remove(id), expiry.remaining);
+}
+
+/** Keep in-flow notices from moving a canvas while a handwritten stroke is active. */
+export function holdNoticeLayout(): () => void {
+  if (layoutHolds++ === 0) {
+    for (const expiry of expiryTimers.values()) {
+      if (expiry.handle !== undefined) clearTimeout(expiry.handle);
+      expiry.handle = undefined;
+      expiry.remaining = Math.max(0, (expiry.deadline ?? Date.now()) - Date.now());
+      expiry.deadline = undefined;
+    }
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    layoutHolds -= 1;
+    if (layoutHolds !== 0) return;
+    if (pendingNoticeChange) notifyListeners();
+    for (const [id, expiry] of expiryTimers) armExpiry(id, expiry);
+  };
+}
 
 export const toast = {
   add: (t: Omit<Toast, 'id'>) => {
@@ -54,8 +93,7 @@ export const toast = {
       toasts = toasts.filter(item => {
         const superseded = item.type === 'success' && (item.duration ?? 5000) > 0;
         if (superseded) {
-          clearTimeout(expiryTimers.get(item.id));
-          expiryTimers.delete(item.id);
+          clearExpiry(item.id);
         }
         return !superseded;
       });
@@ -65,18 +103,20 @@ export const toast = {
     if (existing) toasts = toasts.map(item => item.id === id ? { ...t, id } : item);
     else toasts = [...toasts, { ...t, id }];
     notifyListeners();
-    clearTimeout(expiryTimers.get(id));
-    expiryTimers.delete(id);
+    clearExpiry(id);
     // An explicit zero keeps an actionable notice until the user dismisses it.
     const duration = t.duration ?? 5000;
-    if (duration > 0) expiryTimers.set(id, setTimeout(() => toast.remove(id), duration));
+    if (duration > 0) {
+      const expiry: Expiry = { remaining: duration };
+      expiryTimers.set(id, expiry);
+      if (layoutHolds === 0) armExpiry(id, expiry);
+    }
 
     return id;
   },
   
   remove: (id: string) => {
-    clearTimeout(expiryTimers.get(id));
-    expiryTimers.delete(id);
+    clearExpiry(id);
     toasts = toasts.filter((t) => t.id !== id);
     notifyListeners();
   },
@@ -99,7 +139,7 @@ export const toast = {
   
   subscribe: (listener: (toasts: Toast[]) => void) => {
     toastListeners.push(listener);
-    listener([...toasts]);
+    listener([...visibleToasts]);
     return () => {
       toastListeners = toastListeners.filter((l) => l !== listener);
     };

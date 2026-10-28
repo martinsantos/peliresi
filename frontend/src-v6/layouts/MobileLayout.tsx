@@ -111,7 +111,7 @@ export const MobileLayout: React.FC = () => {
   const isActorInspection = /^\/(?:(?:app|mobile)\/)?(?:mis-inspecciones|requerimientos)(?:\/|$)/.test(location.pathname);
   const isAddendaRoute = /\/manifiestos\/[^/]+\/adendas\/?$/.test(location.pathname);
   const boundedViewport = isInspectionCase || isAddendaRoute;
-  const inlineSupport = isNoticeWorkspace(location.pathname) || isActorWorkspace(location.pathname) || /^(?:\/(?:app|mobile))?\/dashboard\/?$/.test(location.pathname) || isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:admin\/(?:solicitudes(?:\/[^/]+)?|renovaciones)|mi-solicitud|empresas|inspecciones|manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
+  const inlineSupport = isNoticeWorkspace(location.pathname) || isActorWorkspace(location.pathname) || /^(?:\/(?:app|mobile))?\/dashboard\/?$/.test(location.pathname) || isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:admin\/(?:solicitudes(?:\/[^/]+)?|renovaciones)|mi-solicitud|empresas|inspecciones|ayuda|manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
   const inspectionShell = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const shell = inspectionShell.current, viewport = window.visualViewport;

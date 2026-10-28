@@ -71,6 +71,12 @@ describe('Sidebar: one visible current destination',()=>{
     expect(screen.getByRole('link',{name:'Solicitudes',exact:true})).toHaveAttribute('aria-current','page');
     expect(screen.queryByRole('link',{name:'Usuarios',exact:true})).not.toBeInTheDocument();
   });
+  it.each(['/ayuda','/app/ayuda','/mobile/ayuda'])('keeps support in the header without covering the help page on %s',path=>{
+    show(path);
+    const help=screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true});
+    expect(help.closest('header')).toBe(screen.getByRole('banner'));
+    expect(help.parentElement).not.toHaveClass('fixed');
+  });
   it('keeps help in the header on the inspection registry and agenda', () => {
     show('/inspecciones?vista=agenda');
     expect(screen.getByRole('button', { name: 'Ayuda y soporte técnico', exact: true }).closest('header')).toBe(screen.getByRole('banner'));

@@ -97,6 +97,9 @@ function renderMobileLayout(initialPath = '/dashboard') {
       <Routes>
         <Route path="/" element={<MobileLayout />}>
           <Route path="dashboard" element={<div data-testid="dashboard-content">Dashboard</div>} />
+          <Route path="ayuda" element={<div>Ayuda</div>} />
+          <Route path="app/ayuda" element={<div>Ayuda app</div>} />
+          <Route path="mobile/ayuda" element={<div>Ayuda móvil</div>} />
           <Route path="centro-control" element={<div>Centro de Control</div>} />
           <Route path="monitor" element={<div>Monitor</div>} />
           <Route path="actores" element={<div>Consulta de actores</div>} />
@@ -341,6 +344,12 @@ describe('MobileLayout Android shell', () => {
     expect(help.closest('header')).toBe(screen.getByRole('banner'));
     expect(help.parentElement).not.toHaveClass('fixed');
     expect(help).toHaveClass('h-11', 'w-11');
+  });
+  it.each(['/ayuda','/app/ayuda','/mobile/ayuda'])('keeps support in the header without covering the help page on %s', path => {
+    renderMobileLayout(path);
+    const help=screen.getByRole('button',{name:'Ayuda y soporte técnico',exact:true});
+    expect(help.closest('header')).toBe(screen.getByRole('banner'));
+    expect(help.parentElement).not.toHaveClass('fixed');
   });
   it.each(['/notificaciones', '/notificaciones/qa', '/app/notificaciones/qa'])('keeps notice help in the header and one screen title on %s', path => {
     renderMobileLayout(path);

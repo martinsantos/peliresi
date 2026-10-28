@@ -24,6 +24,15 @@ test('current manual explains three in-situ approvals and complete treatment bef
   assert.doesNotMatch(directory, /Si se elige modalidad IN SITU, el transportista no es requerido/);
   assert.match(directory, /el cierre del tratamiento no las emite automáticamente/i);
 });
+test('GPS guidance distinguishes device signal from server receipt and scopes the retry action', () => {
+  const start = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-retiro'));
+  const recovery = JSON.stringify(guides.find((g: any) => g.id === 'resolver-gps'));
+  assert.match(start, /la señal del dispositivo por sí sola no confirma/i);
+  assert.match(start, /no se garantiza el seguimiento al cerrar la app/i);
+  assert.match(recovery, /En GPS de mis viajes, usá Reintentar GPS si aparece/);
+  assert.match(recovery, /detalle de un viaje individual/);
+  assert.match(recovery, /Administración puede consultar el punto recibido desde Monitor/);
+});
 function jpegDimensions(bytes: Buffer): { width: number; height: number } {
   assert.equal(bytes.readUInt16BE(0), 0xffd8, 'JPEG signature');
   let index = 2;
