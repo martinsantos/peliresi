@@ -64,7 +64,7 @@ const faqs = [
       },
       {
         q: '¿Qué hago si el GPS falla durante el viaje?',
-        a: 'Revisá el indicador de ubicación y la conexión. Si se denegó el permiso, habilitalo en el navegador o teléfono. En GPS de mis viajes, usá Reintentar GPS si aparece. Los puntos pendientes se reenvían al recuperar conexión; en el detalle del viaje revisá la hora de la última sincronización. Administración puede consultar la posición en Monitor. Mantener la app abierta facilita el seguimiento: no se garantiza GPS con la app cerrada.'
+        a: 'Revisá el indicador de ubicación y la conexión. Si se denegó el permiso, habilitalo en el navegador o teléfono. En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece. Los puntos pendientes se reenvían al recuperar conexión; en el detalle del viaje revisá la hora de la última sincronización. Administración puede consultar la posición en Monitor. Mantener la app abierta facilita el seguimiento: no se garantiza GPS con la app cerrada.'
       },
       {
         q: '¿Cómo registro un incidente durante el transporte?',

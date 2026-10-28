@@ -6,9 +6,10 @@ describe('AndroidPermissionGuide', () => {
   it('renders GPS recovery steps for denied location permission', () => {
     render(<AndroidPermissionGuide permission="gps" state="denied" />);
 
-    expect(screen.getByText('Permiso de ubicacion bloqueado')).toBeInTheDocument();
-    expect(screen.getByText(/Ajustes de Android/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ubicacion/i)).toBeInTheDocument();
+    expect(screen.getByText('Permiso de ubicación bloqueado')).toBeInTheDocument();
+    expect(screen.getByText(/navegador o teléfono/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reintentar GPS/i)).toBeInTheDocument();
+    expect(screen.queryByText(/validar entregas/i)).not.toBeInTheDocument();
   });
 
   it('renders notification recovery copy', () => {

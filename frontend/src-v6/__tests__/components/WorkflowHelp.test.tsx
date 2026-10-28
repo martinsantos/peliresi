@@ -39,7 +39,7 @@ it.each(['GENERADOR','TRANSPORTISTA','OPERADOR'])('orients %s to a notified requ
  if(rol==='TRANSPORTISTA'){
   fireEvent.click(screen.getByRole('button',{name:'¿Qué hago si el GPS falla durante el viaje?'}));
   const answer=screen.getByText(/en el detalle del viaje revisá la hora de la última sincronización/);
-  expect(answer).toHaveTextContent('En GPS de mis viajes, usá Reintentar GPS si aparece.');
+  expect(answer).toHaveTextContent('En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece.');
   expect(answer).toHaveTextContent('Administración puede consultar la posición en Monitor.');
  }
 });

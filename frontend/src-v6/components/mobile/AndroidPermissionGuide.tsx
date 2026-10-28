@@ -13,15 +13,15 @@ interface AndroidPermissionGuideProps {
 const COPY: Record<PermissionKind, Record<PermissionState, { title: string; body: string; steps: string[]; icon: React.ReactNode }>> = {
   gps: {
     denied: {
-      title: 'Permiso de ubicacion bloqueado',
-      body: 'SITREP necesita GPS para registrar el viaje y validar entregas.',
-      steps: ['Abrir Ajustes de Android', 'Entrar en Apps > SITREP', 'Permitir GPS mientras se usa la app'],
+      title: 'Permiso de ubicación bloqueado',
+      body: 'Permití el acceso a la ubicación para compartir el recorrido durante el viaje.',
+      steps: ['Abrí los permisos de ubicación de SITREP en el navegador o teléfono', 'Permití la ubicación mientras usás SITREP', 'Volvé al viaje y, si aparece, tocá Reintentar GPS'],
       icon: <MapPin size={18} />,
     },
     unavailable: {
       title: 'GPS no disponible',
-      body: 'Activa la ubicacion del dispositivo antes de continuar el viaje.',
-      steps: ['Abrir ajustes rapidos', 'Activar Ubicacion', 'Volver a SITREP y esperar la senal GPS'],
+      body: 'El navegador o dispositivo no pueden obtener la ubicación para el seguimiento.',
+      steps: ['Revisá que la ubicación del dispositivo esté activada', 'Comprobá los permisos del navegador o teléfono', 'Volvé al viaje y, si aparece, tocá Reintentar GPS'],
       icon: <MapPin size={18} />,
     },
   },

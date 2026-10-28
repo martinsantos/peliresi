@@ -39,7 +39,7 @@ test('help follows the active role and links to real guidance', async ({ browser
       if(role==='transportista'){
         await page.getByRole('button',{name:'¿Qué hago si el GPS falla durante el viaje?',exact:true}).click();
         const answer=page.getByText(/en el detalle del viaje revisá la hora de la última sincronización/);
-        await expect(answer).toContainText('En GPS de mis viajes, usá Reintentar GPS si aparece');
+        await expect(answer).toContainText('En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece');
         await expect(answer).toContainText('Administración puede consultar la posición en Monitor');
       }
       const guide=page.getByRole('link',{name:staff?'Inspecciones, plazos y requerimientos':'Responder un requerimiento desde Avisos',exact:true});
@@ -51,8 +51,8 @@ test('help follows the active role and links to real guidance', async ({ browser
       if(role==='transportista'){
         await page.goto('/manual/tutorial.html?guide=resolver-gps');
         await expect(page.locator('#tutorialTitle')).toHaveText('Resolver problemas de GPS');
-        const recovery=page.locator('.guide-step').filter({hasText:'En GPS de mis viajes, usá Reintentar GPS si aparece'});
-        await expect(recovery).toContainText('En el detalle de un viaje individual');
+        const recovery=page.locator('.guide-step').filter({hasText:'En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece'});
+        await expect(recovery).toContainText('Revisá los permisos y la conexión');
         await expect(recovery).toContainText('Administración puede consultar el punto recibido desde Monitor');
       }
       checked.push(role);

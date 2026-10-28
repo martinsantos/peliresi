@@ -29,8 +29,7 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   const recovery = JSON.stringify(guides.find((g: any) => g.id === 'resolver-gps'));
   assert.match(start, /la señal del dispositivo por sí sola no confirma/i);
   assert.match(start, /no se garantiza el seguimiento al cerrar la app/i);
-  assert.match(recovery, /En GPS de mis viajes, usá Reintentar GPS si aparece/);
-  assert.match(recovery, /detalle de un viaje individual/);
+  assert.match(recovery, /En el detalle del viaje o en GPS de mis viajes, usá Reintentar GPS si aparece/);
   assert.match(recovery, /Administración puede consultar el punto recibido desde Monitor/);
 });
 function jpegDimensions(bytes: Buffer): { width: number; height: number } {

@@ -63,7 +63,7 @@ function RecenterMap({ position, onUserInteract, followUser }: {
   return null;
 }
 
-const ViajeEnCursoTransportista: React.FC = () => {
+const ViajeEnCursoTransportistaContent: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const mp = useMobilePrefix();
@@ -123,6 +123,8 @@ const ViajeEnCursoTransportista: React.FC = () => {
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
   const [isFinishingTrip, setIsFinishingTrip] = useState(false);
   const deliveryInFlightRef = useRef(false);
+  const gpsRetryInFlightRef = useRef(false);
+  const [retryingGps, setRetryingGps] = useState(false);
   const [showIncidenteModal, setShowIncidenteModal] = useState(false);
   const [incidenteTipo, setIncidenteTipo] = useState('');
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
@@ -170,6 +172,15 @@ const ViajeEnCursoTransportista: React.FC = () => {
     const min = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
     const s = (seconds % 60).toString().padStart(2, '0');
     return `${h}:${min}:${s}`;
+  };
+
+  const handleRetryGps = async () => {
+    if (gpsRetryInFlightRef.current || deliveryInFlightRef.current || isActionPending || hasHandoff || viajeStatus !== 'ACTIVO') return;
+    gpsRetryInFlightRef.current = true;
+    setRetryingGps(true);
+    try { await gps.retryGps(); }
+    catch { toast.error('No se pudo reintentar el GPS', 'Revisá el permiso de ubicación y la conexión.'); }
+    finally { gpsRetryInFlightRef.current = false; setRetryingGps(false); }
   };
 
   // Confirmar Retiro with GPS coordinates + offline queue
@@ -397,26 +408,26 @@ const ViajeEnCursoTransportista: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
       <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
-        <div className="flex items-center justify-between h-14 px-4">
-          <div className="flex items-center gap-3">
-            <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
-              <ArrowLeft size={20} />
-            </button>
-            <div>
-              <p className="text-xs text-neutral-500 font-medium">{m.numero || id}</p>
+        <div className="flex min-h-14 items-center gap-3 px-4 py-2">
+          <button aria-label="Volver" onClick={() => navigate(-1)} className="shrink-0 p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
+            <ArrowLeft size={20} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="break-words text-xs text-neutral-500 font-medium">{m.numero || id}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h2 className="text-lg font-bold text-neutral-900">
                 {m.estado === EstadoManifiesto.APROBADO ? 'Confirmar retiro' :
                  m.estado === EstadoManifiesto.EN_TRANSITO ? 'En tránsito' :
                  m.estado === EstadoManifiesto.ENTREGADO ? 'Entrega confirmada' : 'Estado del viaje'}
               </h2>
+              {m.estado === EstadoManifiesto.EN_TRANSITO && (
+                <div className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-full ${viajeStatus === 'ACTIVO' ? 'bg-success-50 text-success-700 border border-success-200' : 'bg-warning-50 text-warning-700 border border-warning-200'}`}>
+                  <Radio size={14} className={viajeStatus === 'ACTIVO' ? 'animate-pulse' : ''} />
+                  <span className="text-xs font-semibold">{hasHandoff?'Transporte relevado':viajeStatus === 'ACTIVO' ? 'Viaje activo' : 'Viaje pausado'}</span>
+                </div>
+              )}
             </div>
           </div>
-          {m.estado === EstadoManifiesto.EN_TRANSITO && (
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${viajeStatus === 'ACTIVO' ? 'bg-success-50 text-success-700 border border-success-200' : 'bg-warning-50 text-warning-700 border border-warning-200'}`}>
-              <Radio size={14} className={viajeStatus === 'ACTIVO' ? 'animate-pulse' : ''} />
-              <span className="text-xs font-semibold">{hasHandoff?'Relevado':viajeStatus === 'ACTIVO' ? 'Activo' : 'Pausado'}</span>
-            </div>
-          )}
         </div>
       </header>
 
@@ -471,6 +482,10 @@ const ViajeEnCursoTransportista: React.FC = () => {
               details={gpsDetails}
               pendingCount={gps.pendingCount}
               lastSyncAt={gps.lastSyncAt}
+              onRetry={viajeStatus === 'ACTIVO' ? handleRetryGps : undefined}
+              retrying={retryingGps}
+              retryDisabled={isActionPending}
+              paused={viajeStatus === 'PAUSADO'}
             />}
 
             {/* Timer */}
@@ -704,6 +719,12 @@ const ViajeEnCursoTransportista: React.FC = () => {
       )}
     </div>
   );
+};
+
+// Keep the pause state, dialogs and GPS view bound to the selected manifest.
+const ViajeEnCursoTransportista: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  return <ViajeEnCursoTransportistaContent key={id ?? 'sin-viaje'} />;
 };
 
 export default ViajeEnCursoTransportista;

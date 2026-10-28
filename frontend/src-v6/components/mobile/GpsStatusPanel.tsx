@@ -12,6 +12,10 @@ interface GpsStatusPanelProps {
   details: GpsDetails;
   pendingCount: number;
   lastSyncAt: Date | null;
+  onRetry?: () => void;
+  retrying?: boolean;
+  retryDisabled?: boolean;
+  paused?: boolean;
 }
 
 const STATUS_COPY: Record<GpsStatus, { label: string; tone: string; icon: React.ReactNode }> = {
@@ -35,20 +39,25 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
   details,
   pendingCount,
   lastSyncAt,
+  onRetry,
+  retrying = false,
+  retryDisabled = false,
+  paused = false,
 }) => {
+  if (paused) return <p role="status" className="rounded-xl bg-neutral-100 p-3 text-sm text-neutral-800">Seguimiento GPS pausado. Reanudá el viaje para compartir ubicación.</p>;
   const copy = STATUS_COPY[status];
 
   return (
     <div className="space-y-2">
       <Card className={`${copy.tone} border-none`}>
         <CardContent className="p-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               {copy.icon}
-              <span className="truncate text-sm font-bold">{copy.label}</span>
+              <span className="text-sm font-bold">{copy.label}</span>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {pendingCount > 0 && <Badge color="warning" variant="solid" size="sm">{pendingCount} pendientes</Badge>}
+            <div className="flex flex-wrap items-center gap-2">
+              {pendingCount > 0 && <Badge color="warning" variant="solid" size="sm">{pendingCount} {pendingCount === 1 ? 'pendiente' : 'pendientes'}</Badge>}
               {sendStatus === 'ok' && <Badge color="success" variant="soft" size="sm">{formatLastSync(lastSyncAt)}</Badge>}
               {sendStatus === 'error' && <Badge color="error" variant="soft" size="sm">Sin enviar</Badge>}
             </div>
@@ -83,6 +92,12 @@ export const GpsStatusPanel: React.FC<GpsStatusPanelProps> = ({
 
       {status === 'denied' && <AndroidPermissionGuide permission="gps" state="denied" />}
       {status === 'unavailable' && <AndroidPermissionGuide permission="gps" state="unavailable" />}
+      {onRetry && ['denied', 'unavailable', 'error'].includes(status) && (
+        <button type="button" onClick={onRetry} disabled={retrying || retryDisabled}
+          className="min-h-11 rounded-lg border border-primary-700 bg-white px-4 text-sm font-semibold text-primary-800 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700 disabled:opacity-60">
+          {retrying ? 'Reintentando GPS' : 'Reintentar GPS'}
+        </button>
+      )}
     </div>
   );
 };
