@@ -12,6 +12,8 @@ import { catalogueCondition, validateCatalogueRule, CATALOGUE_MARKER } from '../
 import { ejecutarCatalogo, simularCatalogo } from '../jobs/alertCatalogue.job';
 import { withCompanyNoticeContext } from '../services/companyNotice.service';
 import { maskFiscalCompanyNotice, withFiscalCompanyNoticeContext } from '../services/fiscalCompanyNotice.service';
+import { assertCanAccessManifiesto } from '../utils/roleFilter';
+import { createHash } from 'node:crypto';
 
 const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'INSPECCIONADO', 'INSPECTOR_ASIGNADO']);
 function normalizeAlertRecipients(raw: unknown): string {
@@ -422,7 +424,7 @@ class AnomaliaDetector {
         // Obtener tracking del manifiesto
         const tracking = await prisma.trackingGPS.findMany({
             where: { manifiestoId },
-            orderBy: { timestamp: 'asc' }
+            orderBy: [{ timestamp: 'asc' }, { id: 'asc' }]
         });
 
         if (tracking.length < 2) return anomaliasDetectadas;
@@ -439,6 +441,14 @@ class AnomaliaDetector {
         if (!manifiesto) return anomaliasDetectadas;
 
         // Analizar puntos
+        const keys: string[] = [];
+        const addAnomaly = (anomaly: any, previousId: string, currentId: string) => {
+            anomaliasDetectadas.push(anomaly);
+            // Pair and anomaly type identify the same observation across
+            // repeated analyses and separate workers, without a schema change.
+            keys.push('gpsan1_' + createHash('sha256')
+                .update(JSON.stringify([manifiestoId, anomaly.tipo, previousId, currentId])).digest('hex'));
+        };
         for (let i = 1; i < tracking.length; i++) {
             const puntoAnterior = tracking[i - 1];
             const puntoActual = tracking[i];
@@ -453,7 +463,7 @@ class AnomaliaDetector {
 
             // 1. Detectar velocidad anormal (> 120 km/h)
             if (velocidadCalculada > 120) {
-                anomaliasDetectadas.push({
+                addAnomaly({
                     tipo: 'VELOCIDAD_ANORMAL' as TipoAnomalia,
                     descripcion: `Velocidad anormalmente alta detectada: ${velocidadCalculada.toFixed(1)} km/h`,
                     latitud: puntoActual.latitud,
@@ -461,12 +471,12 @@ class AnomaliaDetector {
                     valorDetectado: velocidadCalculada,
                     valorEsperado: 100,
                     severidad: 'ALTA' as SeveridadAnomalia
-                });
+                }, puntoAnterior.id, puntoActual.id);
             }
 
             // 2. Detectar parada prolongada (> 2 horas sin movimiento significativo)
             if (distancia < 0.1 && tiempoHoras > 2) {
-                anomaliasDetectadas.push({
+                addAnomaly({
                     tipo: 'PARADA_PROLONGADA' as TipoAnomalia,
                     descripcion: `Parada prolongada de ${(tiempoHoras * 60).toFixed(0)} minutos`,
                     latitud: puntoActual.latitud,
@@ -474,12 +484,12 @@ class AnomaliaDetector {
                     valorDetectado: tiempoHoras * 60,
                     valorEsperado: 60,
                     severidad: tiempoHoras > 4 ? 'ALTA' as SeveridadAnomalia : 'MEDIA' as SeveridadAnomalia
-                });
+                }, puntoAnterior.id, puntoActual.id);
             }
 
             // 3. Detectar perdida de GPS (gap > 30 min sin datos)
             if (tiempoHoras > 0.5 && distancia > 10) {
-                anomaliasDetectadas.push({
+                addAnomaly({
                     tipo: 'GPS_PERDIDO' as TipoAnomalia,
                     descripcion: `Perdida de senal GPS por ${(tiempoHoras * 60).toFixed(0)} minutos`,
                     latitud: puntoActual.latitud,
@@ -487,18 +497,17 @@ class AnomaliaDetector {
                     valorDetectado: tiempoHoras * 60,
                     valorEsperado: 5,
                     severidad: 'MEDIA' as SeveridadAnomalia
-                });
+                }, puntoAnterior.id, puntoActual.id);
             }
         }
 
         // Guardar anomalias detectadas
-        for (const anomalia of anomaliasDetectadas) {
-            await prisma.anomaliaTransporte.create({
-                data: {
-                    manifiestoId,
-                    ...anomalia
-                }
+        for (const [index, anomalia] of anomaliasDetectadas.entries()) {
+            const created = await prisma.anomaliaTransporte.createMany({
+                data: [{ id: keys[index], manifiestoId, ...anomalia }],
+                skipDuplicates: true,
             });
+            if (created.count === 0) continue;
 
             // Emitir evento de dominio para que el alertaSubscriber maneje notificaciones y alertas
             domainEvents.emit({
@@ -564,7 +573,7 @@ export const anomaliaDetector = new AnomaliaDetector();
 export const detectarAnomalias = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { manifiestoId } = req.params;
-        const anomalias = await anomaliaDetector.detectarAnomalias(manifiestoId);
+        const anomalias = await anomaliaDetector.detectarAnomalias(manifiestoId, (req as AuthRequest).user.id);
         res.json({ success: true, data: anomalias });
     } catch (error) {
         next(error);
@@ -576,6 +585,9 @@ export const getAnomalias = async (req: Request, res: Response, next: NextFuncti
     try {
         const { manifiestoId } = req.params;
         const { resuelta } = req.query;
+        const user = (req as AuthRequest).user;
+        if (!user) throw new AppError('No autorizado', 401);
+        await assertCanAccessManifiesto(prisma, user, manifiestoId);
 
         const where: any = { manifiestoId };
         if (resuelta !== undefined) where.resuelta = resuelta === 'true';

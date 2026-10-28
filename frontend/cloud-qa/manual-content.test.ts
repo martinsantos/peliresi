@@ -38,6 +38,7 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /no se puede verificar el viaje o el servidor/i);
   const monitor = JSON.stringify(guides.find((g: any) => g.id === 'monitor-viaje-vigente'));
   assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
+  assert.match(monitor, /alertas de velocidad, parada o pérdida de GPS usan el intervalo entre recepciones/i);
 });
 function jpegDimensions(bytes: Buffer): { width: number; height: number } {
   assert.equal(bytes.readUInt16BE(0), 0xffd8, 'JPEG signature');
