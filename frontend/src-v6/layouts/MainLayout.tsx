@@ -34,7 +34,7 @@ import { ApplicantLayout } from './ApplicantLayout';
 import { AttentionBadge } from '../components/AttentionBadge';
 import { useAttentionCounts } from '../hooks/useAttentionCounts';
 import { useOfflineSync } from '../hooks/useOfflineSync';
-import { OfflineSyncNotice } from '../components/OfflineSyncNotice';
+import { OfflineSyncNotice, offlineSyncNoticeMessage } from '../components/OfflineSyncNotice';
 
 // ========================================
 // COMPONENT
@@ -401,7 +401,7 @@ export const MainLayout: React.FC = () => {
 
         <SWUpdateBanner />
         <CompanyContextBar />
-        <ToastContainer />
+        <ToastContainer syncNoticeMessage={offlineSyncNoticeMessage(offlineSync)} />
 
         {/* Keep absolutely positioned field controls inside this scroll container. */}
         <main className={'relative min-h-0 min-w-0 flex-1 bg-[#FAFAF8] ' + (isInspectionCase ? 'overflow-clip p-4 lg:px-8' : 'overflow-auto [scrollbar-gutter:stable] px-4 lg:px-8 lg:pb-8 ' + (inlineSupport ? 'pb-4' : 'pb-12')) + ' pt-4'}>

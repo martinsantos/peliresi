@@ -59,6 +59,8 @@ test('another tab waits until the original page saves its GPS after navigation',
   await delivery.getByRole('dialog', { name: 'Confirmar entrega', exact: true }).getByRole('button', { name: 'Confirmar entrega de esta carga', exact: true }).click();
   const retryNotice = delivery.getByRole('status').filter({ hasText: 'Hay cambios esperando reintento' });
   await expect(retryNotice).toContainText(/otra pestaña|otra ventana/i, { timeout: 30000 });
+  await expect(delivery.getByText('Entrega pendiente en este dispositivo. Revisá la sincronización.')).toBeVisible();
+  await expect(delivery.getByRole('region', { name: 'Avisos del sistema' }).getByText('Entrega pendiente', { exact: true })).toHaveCount(0);
   expect(deliveryRequests).toBe(0); expect(gpsRequests).toBe(0);
   await delivery.screenshot({ path: info.outputPath('delivery-blocked-storage.png'), animations: 'disabled', scale: 'css' });
   await tracking.evaluate(() => { (window as any).__storageTest.fail = false; });

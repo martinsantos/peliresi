@@ -29,7 +29,7 @@ import type { UserRole } from '../contexts/AuthContext';
 import { useMobilePrefix } from '../hooks/useMobilePrefix';
 import { useActiveTripRecovery } from '../hooks/useActiveTripRecovery';
 import { useOfflineSync } from '../hooks/useOfflineSync';
-import { OfflineSyncNotice } from '../components/OfflineSyncNotice';
+import { OfflineSyncNotice, offlineSyncNoticeMessage } from '../components/OfflineSyncNotice';
 import { NotificacionesPoller } from '../components/NotificacionesPoller';
 import { ToastContainer, toast } from '../components/ui/Toast';
 import { useNotificacionesNoLeidas } from '../hooks/useNotificaciones';
@@ -262,7 +262,7 @@ export const MobileLayout: React.FC = () => {
           </div>
         </div>
       </header>
-      <ToastContainer />
+      <ToastContainer syncNoticeMessage={offlineSyncNoticeMessage(offlineSync)} />
       {searchOpen && <GlobalSearchPanel onClose={() => { setSearchOpen(false); menuButtonRef.current?.focus(); }} />}
       <CompanyContextBar />
 

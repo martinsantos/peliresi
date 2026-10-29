@@ -1,11 +1,36 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { toast, ToastContainer } from '../../components/ui/Toast';
+import { OfflineSyncNotice, offlineSyncNoticeMessage } from '../../components/OfflineSyncNotice';
 
 const ids: string[] = [];
 afterEach(() => { act(() => ids.forEach(id => toast.remove(id))); ids.length = 0; vi.useRealTimers(); });
 
 describe('system notices', () => {
+  it('keeps one actionable sync explanation and never revives a duplicate delivery notice', () => {
+    const message = 'El GPS sigue abierto en otra pestaña. Volvé allí y sincronizá.';
+    const status = { processed:0, pending:1, retryable:1, terminal:0, auth:0, skipped:0, syncing:false, lastError:message, retry:vi.fn(async () => {}) };
+    const view = render(<><OfflineSyncNotice status={status}/><ToastContainer syncNoticeMessage={offlineSyncNoticeMessage(status)}/></>);
+    act(() => {
+      ids.push(toast.info('Entrega pendiente', message));
+      ids.push(toast.info('Entrega pendiente', 'Una entrega anterior requiere revisión.'));
+    });
+    expect(screen.getAllByText(message)).toHaveLength(1);
+    expect(screen.getByRole('button', { name:'Reintentar', exact:true })).toBeVisible();
+    expect(screen.getByText('Una entrega anterior requiere revisión.')).toBeVisible();
+    view.rerender(<ToastContainer />);
+    expect(screen.queryByText(message)).toBeNull();
+    expect(screen.getByText('Una entrega anterior requiere revisión.')).toBeVisible();
+  });
+  it('keeps the detailed delivery notice if the sync banner shows a different explanation', () => {
+    const message = 'Un cambio anterior no identifica su empresa.';
+    const status = { processed:0,pending:2,retryable:2,terminal:0,auth:0,skipped:2,contextBlocked:1,legacyBlocked:1,
+      syncing:false,lastError:message,retry:vi.fn(async()=>{}) };
+    render(<><OfflineSyncNotice status={status}/><ToastContainer syncNoticeMessage={offlineSyncNoticeMessage(status)}/></>);
+    act(() => { ids.push(toast.info('Entrega pendiente', message)); });
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.getByText(/Los anteriores sin contexto se conservan/)).toBeVisible();
+  });
   it('offers the unread count itself as the compact action, preserving dismissal and full errors', () => {
     const open = vi.fn(); render(<ToastContainer />);
     act(() => { ids.push(toast.add({ type: 'info', title: '1 aviso sin leer', compact: true, duration: 0, actionLabel: 'Ver avisos', onAction: open })); });

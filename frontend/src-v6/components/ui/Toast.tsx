@@ -223,7 +223,12 @@ const ToastItem: React.FC<ToastItemProps> = ({
 // ========================================
 // TOAST CONTAINER
 // ========================================
-export const ToastContainer: React.FC = () => {
+function duplicatesPendingDelivery(item: Toast, syncNoticeMessage?: string): boolean {
+  return Boolean(syncNoticeMessage && item.type === 'info' && item.title === 'Entrega pendiente'
+    && item.message === syncNoticeMessage && !item.onAction && (item.duration ?? 5000) > 0);
+}
+
+export const ToastContainer: React.FC<{ syncNoticeMessage?: string }> = ({ syncNoticeMessage }) => {
   const [activeToasts, setActiveToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
@@ -232,13 +237,20 @@ export const ToastContainer: React.FC = () => {
     });
   }, []);
 
-  if (activeToasts.length === 0) return null;
+  useEffect(() => {
+    // Remove the duplicate as well as hiding it, so it cannot reappear after
+    // synchronization succeeds or the person switches activity.
+    activeToasts.filter(item => duplicatesPendingDelivery(item, syncNoticeMessage)).forEach(item => toast.remove(item.id));
+  }, [activeToasts, syncNoticeMessage]);
+
+  const visible = activeToasts.filter(item => !duplicatesPendingDelivery(item, syncNoticeMessage));
+  if (visible.length === 0) return null;
 
   // Layouts provide an outlet outside the scrollable form. Notices occupy real
   // space instead of covering case identity, tabs, maps or fixed field actions.
   return (
     <div aria-label="Avisos del sistema" role="region" className="relative flex max-h-[30dvh] shrink-0 flex-col gap-2 overflow-y-auto border-b border-neutral-200 bg-neutral-50 px-3 py-2 sm:px-4">
-      {activeToasts.map((t) => (
+      {visible.map((t) => (
         <div key={t.id} className="pointer-events-auto">
           <ToastItem {...t} onRemove={toast.remove} />
         </div>
