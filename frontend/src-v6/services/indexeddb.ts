@@ -15,6 +15,7 @@ import {
 import api from './api';
 import { GPS_DELIVERY_CONFIRMED_EVENT, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
 import { withGpsTransitionLock } from './gpsCoordination';
+import { clearTripSnapshot } from './tripSnapshot';
 
 const DB_NAME = 'sitrep_offline_db';
 const DB_VERSION = 5;
@@ -46,6 +47,7 @@ export interface SyncQueueResult {
   lastError?: string;
   contextBlocked?: number;
   legacyBlocked?: number;
+  cleanupError?: boolean;
 }
 
 export interface SyncExecutionContext { owner: string; role: string; companyScoped: boolean }
@@ -430,7 +432,13 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
       if (action.id != null) {
         await removeOffline('sync_queue', action.id);
       }
-      cleanupAfterSuccessfulSync(action.endpoint);
+      try { cleanupAfterSuccessfulSync(action.endpoint, context.owner); }
+      catch {
+        // The server already confirmed this action and it was removed from the
+        // queue. A cache failure must never put it back and replay the delivery.
+        result.cleanupError = true;
+        result.lastError = 'La entrega se confirmó, pero no se pudo actualizar la copia local. Consultá el manifiesto al reconectar.';
+      }
       result.processed += 1;
       result.pending -= 1;
     } catch (error) {
@@ -470,12 +478,8 @@ async function flushGpsBeforeQueuedDelivery(api: ApiClient, endpoint: string, ow
   });
 }
 
-function cleanupAfterSuccessfulSync(endpoint: string): void {
+function cleanupAfterSuccessfulSync(endpoint: string, owner: string): void {
   const manifiestoId = queuedDeliveryManifestId(endpoint);
   if (!manifiestoId || typeof localStorage === 'undefined') return;
-  localStorage.removeItem(`viaje_snapshot_${manifiestoId}`);
-  localStorage.removeItem(`viaje_status_${manifiestoId}`);
-  if (localStorage.getItem('sitrep_active_trip_id') === manifiestoId) {
-    localStorage.removeItem('sitrep_active_trip_id');
-  }
+  clearTripSnapshot(owner, manifiestoId);
 }

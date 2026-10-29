@@ -398,7 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const keysToClean: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_'))) keysToClean.push(key);
+      if (key && (key.startsWith('viaje_snapshot_') || key.startsWith('viaje_status_') || key.startsWith('sitrep_active_trip_v2_'))) keysToClean.push(key);
     }
     keysToClean.forEach(key => localStorage.removeItem(key));
     // Pending actions stay owner-scoped; only re-downloadable snapshots go.

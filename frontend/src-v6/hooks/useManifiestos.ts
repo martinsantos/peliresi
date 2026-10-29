@@ -9,6 +9,7 @@ import { useQueryOwner } from './useQueryOwner';
 import { useQuery } from '@tanstack/react-query';
 import { manifiestoService } from '../services/manifiesto.service';
 import { getCachedManifiestos } from '../services/offline-sync';
+import { tripAccessDenied } from '../services/tripSnapshot';
 import { useAuth } from '../contexts/AuthContext';
 import type { ManifiestoFilters } from '../types/api';
 import type { Manifiesto } from '../types/models';
@@ -99,7 +100,7 @@ export function useManifiesto(id: string) {
       return navigator.onLine && data && !data.offline
         && !['TRATADO', 'CANCELADO', 'RECHAZADO'].includes(data.estado) ? 30_000 : false;
     },
-    retry: (count, error) => navigator.onLine && error.message !== 'No hay una copia descargada de este manifiesto.' && count < 3,
+    retry: (count, error) => navigator.onLine && !tripAccessDenied(error) && error.message !== 'No hay una copia descargada de este manifiesto.' && count < 3,
     queryFn: async (): Promise<Manifiesto & { offline?: true }> => {
       const readOffline = async () => {
         const cached = currentUser?.id ? await getCachedManifiestos(currentUser.id, owner) : [];

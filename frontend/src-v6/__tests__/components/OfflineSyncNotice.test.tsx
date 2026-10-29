@@ -37,4 +37,11 @@ describe('OfflineSyncNotice', () => {
     expect(screen.getByRole('status')).toHaveTextContent('consultá a soporte');
     expect(screen.queryByRole('button',{name:'Reintentar'})).not.toBeInTheDocument();
   });
+
+  it('reports a confirmed delivery when only the local copy could not be cleared', () => {
+    render(<OfflineSyncNotice status={{ processed:1,pending:0,retryable:0,terminal:0,auth:0,skipped:0,cleanupError:true,
+      syncing:false,lastError:'La entrega se confirmó, pero no se pudo actualizar la copia local.',retry:vi.fn(async()=>{}) }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Entrega confirmada');
+    expect(screen.queryByRole('button',{name:'Reintentar'})).not.toBeInTheDocument();
+  });
 });

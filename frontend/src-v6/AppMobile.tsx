@@ -54,24 +54,6 @@ const ViajeRedirectMobile: React.FC = () => {
 // Open the trip list when the PWA reopens. One saved trip cannot represent
 // several concurrent manifests, and each device must choose its GPS session.
 const ActiveTripGuard: React.FC = () => {
-  const activeTripId = localStorage.getItem('sitrep_active_trip_id');
-  if (activeTripId) {
-    // A3: Verify trip hasn't ended — if status is terminal, clean up and go to dashboard
-    const savedStatus = localStorage.getItem(`viaje_status_${activeTripId}`);
-    const snapshot = localStorage.getItem(`viaje_snapshot_${activeTripId}`);
-    let snapshotEstado: string | null = null;
-    if (snapshot) {
-      try { snapshotEstado = JSON.parse(snapshot)?.estado; } catch { /* ignore */ }
-    }
-    const terminalStates = ['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'CANCELADO', 'RECHAZADO'];
-    if ((snapshotEstado && terminalStates.includes(snapshotEstado)) || savedStatus === 'COMPLETED') {
-      localStorage.removeItem('sitrep_active_trip_id');
-      localStorage.removeItem(`viaje_snapshot_${activeTripId}`);
-      localStorage.removeItem(`viaje_status_${activeTripId}`);
-      return <Navigate to="/dashboard" replace />;
-    }
-    return <Navigate to="/dashboard" replace />;
-  }
   return <Navigate to="/dashboard" replace />;
 };
 

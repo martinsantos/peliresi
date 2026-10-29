@@ -13,12 +13,14 @@ const syncBaseline=process.env.SITREP_QA_RUN==='sync-baseline-20261029';
 const syncTab=process.env.SITREP_QA_RUN==='sync-crosstab-20261029';
 const roleBaseline=process.env.SITREP_QA_RUN==='sync-role-baseline-20261029';
 const roleFix=process.env.SITREP_QA_RUN==='sync-role-fix-20261029';
-assert.ok(!process.env.SITREP_QA_RUN||connectionAudit||crossTab||syncBaseline||syncTab||roleBaseline||roleFix,'Unknown QA run');
-const artifacts=connectionAudit?'/work/sitrep/.qa-gps-connection-20261029':crossTab?'/work/sitrep/.qa-gps-crosstab-20261029':syncBaseline?'/work/sitrep/.qa-sync-baseline-20261029':syncTab?'/work/sitrep/.qa-sync-crosstab-20261029':roleBaseline?'/work/sitrep/.qa-sync-role-baseline-20261029':roleFix?'/work/sitrep/.qa-sync-role-fix-20261029':'/work/sitrep/.qa-gps-lost-response-20261029';
+const tripBaseline=process.env.SITREP_QA_RUN==='trip-scope-baseline-20261029';
+const tripFix=process.env.SITREP_QA_RUN==='trip-scope-fix-20261029';
+assert.ok(!process.env.SITREP_QA_RUN||connectionAudit||crossTab||syncBaseline||syncTab||roleBaseline||roleFix||tripBaseline||tripFix,'Unknown QA run');
+const artifacts=connectionAudit?'/work/sitrep/.qa-gps-connection-20261029':crossTab?'/work/sitrep/.qa-gps-crosstab-20261029':syncBaseline?'/work/sitrep/.qa-sync-baseline-20261029':syncTab?'/work/sitrep/.qa-sync-crosstab-20261029':roleBaseline?'/work/sitrep/.qa-sync-role-baseline-20261029':roleFix?'/work/sitrep/.qa-sync-role-fix-20261029':tripBaseline?'/work/sitrep/.qa-trip-scope-baseline-20261029':tripFix?'/work/sitrep/.qa-trip-scope-fix-20261029':'/work/sitrep/.qa-gps-lost-response-20261029';
 const compiled=connectionAudit?'/work/sitrep/.qa-gps-lost-response-20261029':syncBaseline?'/work/sitrep/.qa-gps-crosstab-20261029':artifacts;
 Object.assign(process.env,{
   CI:'true',SITREP_QA_EXECUTOR:'preview-container',GITHUB_REPOSITORY:'martinsantos/peliresi',
-  GITHUB_REF:'refs/heads/codex/sitrep-training-20261018',GITHUB_SHA:connectionAudit?'e0b77d09-connection-audit':crossTab?'a8115926-with-gps-crosstab-uncommitted':syncBaseline?'eb0596a4-sync-baseline':syncTab?'eb0596a4-with-sync-crosstab-uncommitted':roleBaseline?'85858bf7-sync-role-baseline':roleFix?'85858bf7-with-sync-role-uncommitted':'f44cf957-with-gps-retry-uncommitted',
+  GITHUB_REF:'refs/heads/codex/sitrep-training-20261018',GITHUB_SHA:connectionAudit?'e0b77d09-connection-audit':crossTab?'a8115926-with-gps-crosstab-uncommitted':syncBaseline?'eb0596a4-sync-baseline':syncTab?'eb0596a4-with-sync-crosstab-uncommitted':roleBaseline?'85858bf7-sync-role-baseline':roleFix?'85858bf7-with-sync-role-uncommitted':tripBaseline?'2b2bfada-trip-scope-baseline':tripFix?'2b2bfada-with-trip-scope-uncommitted':'f44cf957-with-gps-retry-uncommitted',
   ALLOW_SYNTHETIC_QA:'1',DATABASE_URL:'postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=proposal_operations_20261021',
   PORT:'3037',NODE_ENV:'test',NODE_APP_INSTANCE:'qa',FRONTEND_URL:'http://127.0.0.1:4177',CORS_ORIGIN:'http://127.0.0.1:4177',VITE_API_URL:'/api',
   TRAINING_DATABASE_URL:'',TRAINING_DIRECT_LOGIN_UNTIL:'2000-01-01T00:00:00Z',
@@ -31,7 +33,8 @@ Object.assign(process.env,{
   QA_ARTIFACTS:artifacts,QA_WEB_BUILD:path.join(compiled,'web'),QA_APP_BUILD:path.join(compiled,'app'),
 });
 // The multi-role scenario is enabled only in these disposable preview processes.
-if(roleBaseline||roleFix)Object.assign(process.env,{ACTOR_MULTIROLE_ENABLED:'true',VITE_ACTOR_MULTIROLE_ENABLED:'true'});
+if(roleBaseline||roleFix||tripBaseline||tripFix)Object.assign(process.env,{ACTOR_MULTIROLE_ENABLED:'true',VITE_ACTOR_MULTIROLE_ENABLED:'true'});
+if(tripBaseline||tripFix)Object.assign(process.env,{ENTERPRISE_ENABLED:'true',VITE_ENTERPRISE_ENABLED:'true'});
 delete process.env.GITHUB_ACTIONS;
 assert.equal(path.resolve(root),'/work/sitrep');await assertCloudDatabase();
 mkdirSync(artifacts,{recursive:true,mode:0o700});
@@ -51,6 +54,7 @@ const commands:Record<string,{cwd:string;command:string;args:string[]}>= {
   frontendTests:{cwd:frontend,command:'./node_modules/.bin/vitest',args:['run','src-v6/__tests__/hooks/useFleetGps.test.ts','src-v6/__tests__/pages/RelevoGpsPage.test.tsx','src-v6/__tests__/pages/CargasEnCursoPage.test.tsx','src-v6/__tests__/services/limitedTransportGps.test.ts','src-v6/__tests__/services/fleetGps.test.ts','src-v6/__tests__/services/gpsQueue.test.ts','--maxWorkers=1','--no-file-parallelism']},
   crossTests:{cwd:frontend,command:'./node_modules/.bin/vitest',args:['run','src-v6/__tests__/services/gpsCoordination.test.ts','src-v6/__tests__/services/gpsTransition.test.ts','src-v6/__tests__/services/offlineSyncSessionBoundary.test.ts','src-v6/__tests__/hooks/useGPSTracking.test.tsx','src-v6/__tests__/hooks/useGPSTracking.safety.test.tsx','src-v6/__tests__/pages/CargasEnCursoPage.test.tsx','src-v6/__tests__/hooks/manifestWorkflowOffline.test.tsx','src-v6/__tests__/pages/TransportLegs.test.tsx','--maxWorkers=1','--no-file-parallelism']},
   syncTests:{cwd:frontend,command:'./node_modules/.bin/vitest',args:['run','src-v6/__tests__/services/offlineSyncSessionBoundary.test.ts','src-v6/__tests__/services/syncQueuePolicy.test.ts','src-v6/__tests__/services/syncFailureClassification.test.ts','src-v6/__tests__/services/gpsCoordination.test.ts','src-v6/__tests__/services/gpsTransition.test.ts','src-v6/__tests__/hooks/useGPSTracking.safety.test.tsx','src-v6/__tests__/hooks/useOfflineSync.context.test.tsx','src-v6/__tests__/hooks/restrictedBackground.test.tsx','src-v6/__tests__/components/OfflineSyncNotice.test.tsx','--maxWorkers=1','--no-file-parallelism']},
+  tripScopeTests:{cwd:frontend,command:'./node_modules/.bin/vitest',args:['run','src-v6/__tests__/services/tripSnapshot.test.ts','src-v6/__tests__/services/offlineSyncSessionBoundary.test.ts','src-v6/__tests__/services/gpsCoordination.test.ts','src-v6/__tests__/services/gpsTransition.test.ts','src-v6/__tests__/hooks/useGPSTracking.safety.test.tsx','src-v6/__tests__/hooks/restrictedBackground.test.tsx','src-v6/__tests__/hooks/useActiveTripRecovery.context.test.tsx','src-v6/__tests__/hooks/manifiestoListOffline.test.tsx','src-v6/__tests__/pages/mobile/MobileProposalContinuity.test.tsx','src-v6/__tests__/layouts/MobileLayout.test.tsx','src-v6/__tests__/components/OfflineSyncNotice.test.tsx','--maxWorkers=1','--no-file-parallelism']},
   types:{cwd:frontend,command:'./node_modules/.bin/tsc',args:['-b']},
   manualTests:{cwd:root,command:process.execPath,args:['--experimental-strip-types','--test','frontend/cloud-qa/manual-content.test.ts']},
   web:{cwd:frontend,command:'./node_modules/.bin/vite',args:['build','--outDir',path.join(artifacts,'web')]},
@@ -76,6 +80,9 @@ const commands:Record<string,{cwd:string;command:string;args:string[]}>= {
   roleFixture:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/sync-role-fixture.ts']},
   roleBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/sync-role.playwright.config.ts','--project=web-desktop','--project=app']},
   roleAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/sync-role-audit.ts']},
+  tripScopeFixture:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/trip-scope-fixture.ts']},
+  tripScopeBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/trip-scope.playwright.config.ts','--project=web-desktop','--project=app']},
+  tripScopeAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/trip-scope-audit.ts']},
   close:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/close.ts']},
 };
 assert.ok(phase&&commands[phase],'Unknown QA phase');

@@ -124,6 +124,19 @@ it('waits for the first tab to remove its action before the second reads the que
   expect(mock.post).toHaveBeenCalledOnce();expect(store.remaining()).toEqual([]);
 });
 
+it('does not requeue an acknowledged delivery when clearing its local snapshot fails', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]);mock.post.mockResolvedValue({});
+  const remove=vi.spyOn(Storage.prototype,'removeItem').mockImplementation(()=>{throw new Error('storage denied');});
+  try{
+    const {processSyncQueue}=await import('../../services/indexeddb');
+    const result=await processSyncQueue('account-a',transportContext);
+    expect(result).toMatchObject({processed:1,pending:0,cleanupError:true});
+    expect(result.lastError).toMatch(/entrega se confirmó.*copia local/i);
+    expect(mock.post).toHaveBeenCalledOnce();expect(store.remaining()).toEqual([]);
+  }finally{remove.mockRestore();}
+});
+
 it('does not inspect or send a waiting account after its active context changes', async () => {
   const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'};
   const store=mockQueue([action]);let acknowledge!:()=>void,current=true;

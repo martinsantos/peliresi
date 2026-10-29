@@ -23,13 +23,16 @@ import { useConnectivity } from '../../hooks/useConnectivity';
 import { useDashboardStats } from '../../hooks/useDashboard';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
 import { useManifiestos } from '../../hooks/useManifiestos';
-import { EstadoManifiesto } from '../../types/models';
+import { useQueryOwner } from '../../hooks/useQueryOwner';
+import { readActiveTrip, readTripSnapshot, tripAccessDenied } from '../../services/tripSnapshot';
+import { EstadoManifiesto, type Manifiesto } from '../../types/models';
 import { manifestFeatureVisible } from '../../utils/manifestFeatures';
 import { Button } from '../../components/ui/ButtonV2';
 
 export const MobileDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const owner = useQueryOwner();
   const { data: dashData, isLoading: dashLoading, isError: dashError } = useDashboardStats();
   const connectivity = useConnectivity({ pingInterval: 60_000 });
   const mp = useMobilePrefix();
@@ -38,11 +41,11 @@ export const MobileDashboardPage: React.FC = () => {
   const proposals = manifestProposalsVisible(currentUser);
 
   // FIX 2: Fetch assigned/active trips for TRANSPORTISTA
-  const { data: tripsEnTransito, isLoading: activeTripsLoading, isError: activeTripsError } = useManifiestos(
+  const { data: tripsEnTransito, isError: activeTripsError, error: activeTripsFailure, isFetching: activeTripsFetching, isFetchedAfterMount: activeTripsFetched } = useManifiestos(
     isTransportista ? { estado: EstadoManifiesto.EN_TRANSITO, modalidad: 'FIJO', limit: 50 } : undefined,
     { enabled: isTransportista && !proposals },
   );
-  const { data: tripsAprobados } = useManifiestos(
+  const { data: tripsAprobados, error: pendingTripsFailure, isFetching: pendingTripsFetching, isFetchedAfterMount: pendingTripsFetched } = useManifiestos(
     isTransportista ? { estado: EstadoManifiesto.APROBADO, modalidad: 'FIJO', limit: 50 } : undefined,
     { enabled: isTransportista && !proposals },
   );
@@ -59,8 +62,11 @@ export const MobileDashboardPage: React.FC = () => {
     { enabled: isOperador && !proposals },
   );
 
-  const activeTrips = tripsEnTransito?.items || [];
-  const pendingTrips = tripsAprobados?.items || [];
+  const activeAccessDenied = tripAccessDenied(activeTripsFailure);
+  const activeNeedsValidation = connectivity.isOnline && ((!activeTripsFetched && !!tripsEnTransito) || (activeTripsFetching && !!(tripsEnTransito && 'offline' in tripsEnTransito && tripsEnTransito.offline)));
+  const pendingNeedsValidation = connectivity.isOnline && ((!pendingTripsFetched && !!tripsAprobados) || (pendingTripsFetching && !!(tripsAprobados && 'offline' in tripsAprobados && tripsAprobados.offline)));
+  const activeTrips = activeAccessDenied || activeNeedsValidation ? [] : tripsEnTransito?.items || [];
+  const pendingTrips = tripAccessDenied(pendingTripsFailure) || pendingNeedsValidation ? [] : tripsAprobados?.items || [];
   const operatorQueue = [
     ...(isOperador ? entregadosOperador?.items || [] : []),
     ...(isOperador ? recibidosOperador?.items || [] : []),
@@ -68,16 +74,13 @@ export const MobileDashboardPage: React.FC = () => {
   ];
 
   // Fallback: read active trip from localStorage when API hasn't responded yet
-  const savedTripId = useMemo(() => localStorage.getItem('sitrep_active_trip_id'), []);
+  const savedTripId = useMemo(() => readActiveTrip(owner), [owner]);
   const savedTripSnapshot = useMemo(() => {
     if (!savedTripId) return null;
-    try {
-      const s = localStorage.getItem(`viaje_snapshot_${savedTripId}`);
-      return s ? JSON.parse(s) : null;
-    } catch { return null; }
-  }, [savedTripId]);
+    return readTripSnapshot<Partial<Manifiesto>>(owner, savedTripId);
+  }, [owner, savedTripId]);
 
-  const usingSavedTrip = activeTrips.length === 0 && (!connectivity.isOnline || activeTripsLoading || activeTripsError) && Boolean(savedTripSnapshot && savedTripId && savedTripSnapshot.estado === EstadoManifiesto.EN_TRANSITO);
+  const usingSavedTrip = !activeAccessDenied && activeTrips.length === 0 && (!connectivity.isOnline || activeTripsError) && Boolean(savedTripSnapshot && savedTripId && savedTripSnapshot.estado === EstadoManifiesto.EN_TRANSITO);
   const activeQueueTrips = useMemo(() => (
     activeTrips.length > 0
       ? activeTrips

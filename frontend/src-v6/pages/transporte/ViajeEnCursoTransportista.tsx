@@ -48,6 +48,7 @@ import { useGPSTracking } from '../../hooks/useGPSTracking';
 import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError } from '../../services/gpsQueue';
 import { addToSyncQueue, getSyncQueue } from '../../services/indexeddb';
 import { hasQueuedDelivery } from '../../services/syncQueuePolicy';
+import { clearTripSnapshot, readTripSnapshot, readInitialTripStatus, tripAccessDenied, tripStatusKey, writeTripSnapshot } from '../../services/tripSnapshot';
 import { useAuth } from '../../contexts/AuthContext';
 import { useQueryOwner } from '../../hooks/useQueryOwner';
 import { getApiErrorMessage } from '../../utils/api-error';
@@ -95,26 +96,27 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const handleMapInteract = useCallback(() => setFollowUser(false), []);
 
   // Real data from API
-  const { data: apiData, isLoading, isError } = useManifiesto(id || '');
+  const { data: apiData, isLoading, isFetching, isFetchedAfterMount, isError, error: apiError, refetch: reloadTrip } = useManifiesto(id || '');
 
   // Restore cached trip data while API is loading (stale-while-revalidate).
   // Keep the same nested shape as the API so the recovery view actually renders.
   const cachedSnapshot = useMemo<Partial<Manifiesto> | null>(() => {
     if (!id) return null;
-    try {
-      const saved = localStorage.getItem(`viaje_snapshot_${id}`);
-      return saved ? JSON.parse(saved) as Partial<Manifiesto> : null;
-    } catch { return null; }
-  }, [id]);
-  const m: Partial<Manifiesto> = apiData || cachedSnapshot || {};
+    return readTripSnapshot<Partial<Manifiesto>>(syncOwner, id);
+  }, [id, syncOwner]);
+  const denied = tripAccessDenied(apiError);
+  const waitingForValidation = navigator.onLine && (!isFetchedAfterMount || (isFetching && !!apiData?.offline));
+  const safeSnapshot = !denied && !waitingForValidation && (!navigator.onLine || isError) ? cachedSnapshot : null;
+  const visibleData = denied || waitingForValidation || (navigator.onLine && apiData?.offline) ? undefined : apiData;
+  const m: Partial<Manifiesto> = visibleData || safeSnapshot || {};
   const assignment = m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId
     ? m.asignacionTransporte : null;
 
   // Persist active trip snapshot to localStorage for recovery after app restart
   useEffect(() => {
-    if (id && m.id && m.estado === EstadoManifiesto.EN_TRANSITO) {
+    if (id && syncOwner && visibleData?.id === id && !visibleData.offline && m.estado === EstadoManifiesto.EN_TRANSITO) {
       const snapshot = {
-        id: m.id,
+        id,
         numero: m.numero,
         estado: m.estado,
         modalidad: m.modalidad,
@@ -129,14 +131,13 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         savedAt: new Date().toISOString(),
       };
       try {
-        localStorage.setItem(`viaje_snapshot_${id}`, JSON.stringify(snapshot));
-        localStorage.setItem('sitrep_active_trip_id', id);
+        writeTripSnapshot(syncOwner, id, snapshot);
         setSnapshotError(false);
       } catch {
         setSnapshotError(true);
       }
     }
-  }, [id, m.id, m.numero, m.estado, m.modalidad, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
+  }, [id, syncOwner, visibleData, m.id, m.numero, m.estado, m.modalidad, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -144,10 +145,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const registrarIncidente = useRegistrarIncidente();
 
   // UI state
-  const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>(() => {
-    try { return id && localStorage.getItem(`viaje_status_${id}`) === 'PAUSADO' ? 'PAUSADO' : 'ACTIVO'; }
-    catch { return 'ACTIVO'; }
-  });
+  const [viajeStatus, setViajeStatus] = useState<'ACTIVO' | 'PAUSADO'>(() => readInitialTripStatus(syncOwner, id || ''));
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
   const [deliveryError, setDeliveryError] = useState('');
   const deliveryErrorRef = useRef<HTMLParagraphElement>(null);
@@ -298,13 +296,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         setShowFinalizarModal(false);
         return;
       }
-      toast.success('Entrega confirmada exitosamente');
       cleanupGps();
-      if (id) {
-        localStorage.removeItem(`viaje_snapshot_${id}`);
-        localStorage.removeItem(`viaje_status_${id}`);
-        localStorage.removeItem('sitrep_active_trip_id');
-      }
+      try { if (id) clearTripSnapshot(syncOwner, id); toast.success('Entrega confirmada exitosamente'); }
+      catch { toast.info('Entrega confirmada', 'No se pudo actualizar la copia local. Consultá el manifiesto al reconectar.'); }
       setShowFinalizarModal(false);
     } catch (err: any) {
       gps.resumeGps();
@@ -364,8 +358,12 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         longitud: currentPosition?.[1],
       });
       setViajeStatus(newStatus);
-      localStorage.setItem(`viaje_status_${id}`, newStatus);
-      toast.info(newStatus === 'PAUSADO' ? 'Viaje pausado' : 'Viaje reanudado');
+      try {
+        if (id && syncOwner) localStorage.setItem(tripStatusKey(syncOwner, id), newStatus);
+        toast.info(newStatus === 'PAUSADO' ? 'Viaje pausado' : 'Viaje reanudado');
+      } catch {
+        toast.info('La acción se registró, pero no se pudo guardar en este dispositivo. Al reabrir, revisá el estado del viaje.');
+      }
     } catch {
       toast.error('No se pudo registrar la pausa');
     }
@@ -373,9 +371,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   const mapCenter = currentPosition || defaultCenter;
 
-  if (isLoading && !m.id) {
+  if ((isLoading || waitingForValidation) && !m.id) {
     // Show cached snapshot header while API loads (stale-while-revalidate)
-    if (cachedSnapshot) {
+    if (safeSnapshot) {
       return (
         <div className="min-h-screen bg-neutral-50 pb-24">
           <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
@@ -385,7 +383,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
                   <ArrowLeft size={20} />
                 </button>
                 <div>
-                  <p className="text-xs text-neutral-500 font-medium">{cachedSnapshot.numero || id}</p>
+                  <p className="text-xs text-neutral-500 font-medium">{safeSnapshot.numero || id}</p>
                   <h2 className="text-lg font-bold text-neutral-900">Último estado guardado</h2>
                 </div>
               </div>
@@ -395,9 +393,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
             <Card variant="elevated">
               <CardContent className="p-4">
                 <div className="space-y-2">
-                  {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador.razonSocial}</span></p>}
-                  {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista.razonSocial}</span></p>}
-                  {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador.razonSocial}</span></p>}
+                  {safeSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{safeSnapshot.generador.razonSocial}</span></p>}
+                  {safeSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{safeSnapshot.transportista.razonSocial}</span></p>}
+                  {safeSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{safeSnapshot.operador.razonSocial}</span></p>}
                 </div>
               </CardContent>
             </Card>
@@ -416,7 +414,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     );
   }
 
-  if ((!apiData || isError) && cachedSnapshot) {
+  if ((!visibleData || isError) && safeSnapshot) {
     return (
       <div className="min-h-screen bg-neutral-50 pb-24">
         <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
@@ -426,7 +424,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
                 <ArrowLeft size={20} />
               </button>
               <div>
-                <p className="text-xs text-neutral-500 font-medium">{cachedSnapshot.numero || id}</p>
+                <p className="text-xs text-neutral-500 font-medium">{safeSnapshot.numero || id}</p>
                 <h2 className="text-lg font-bold text-neutral-900">Último estado guardado</h2>
               </div>
             </div>
@@ -441,9 +439,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           <Card variant="elevated">
             <CardContent className="p-4">
               <div className="space-y-2">
-                {cachedSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{cachedSnapshot.generador.razonSocial}</span></p>}
-                {cachedSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{cachedSnapshot.transportista.razonSocial}</span></p>}
-                {cachedSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{cachedSnapshot.operador.razonSocial}</span></p>}
+                {safeSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{safeSnapshot.generador.razonSocial}</span></p>}
+                {safeSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{safeSnapshot.transportista.razonSocial}</span></p>}
+                {safeSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{safeSnapshot.operador.razonSocial}</span></p>}
               </div>
             </CardContent>
           </Card>
@@ -452,16 +450,19 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     );
   }
 
-  if (!apiData || isError) {
+  if (!visibleData || isError) {
     return (
       <div className="min-h-screen bg-neutral-50 p-4">
         <div className="flex items-center gap-3 mb-6">
           <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
             <ArrowLeft size={20} />
           </button>
-          <h2 className="text-lg font-bold">Manifiesto no encontrado</h2>
+          <h2 className="text-lg font-bold">{denied ? 'Viaje no disponible' : 'No pudimos cargar el viaje'}</h2>
         </div>
-        <Card><CardContent className="py-8 text-center text-neutral-500">No se pudo cargar el manifiesto</CardContent></Card>
+        <Card><CardContent className="space-y-3 py-8 text-center text-neutral-600">
+          <p>{denied ? 'La sesión o actividad actual no tiene acceso a este viaje, o ya no está disponible.' : 'Revisá la conexión y volvé a intentarlo.'}</p>
+          {!denied && <Button variant="outline" onClick={() => void reloadTrip()}>Reintentar</Button>}
+        </CardContent></Card>
       </div>
     );
   }
@@ -801,8 +802,8 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 // Keep the pause state, dialogs and GPS view bound to the selected manifest.
 const ViajeEnCursoTransportista: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { currentUser } = useAuth();
-  return <ViajeEnCursoTransportistaContent key={JSON.stringify([currentUser?.id ?? null, id ?? null])} />;
+  const owner = useQueryOwner();
+  return <ViajeEnCursoTransportistaContent key={JSON.stringify([owner, id ?? null])} />;
 };
 
 export default ViajeEnCursoTransportista;
