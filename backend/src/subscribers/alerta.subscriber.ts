@@ -10,6 +10,7 @@ import { followupDays } from '../services/alertFollowupPolicy.service';
 import { catalogueCondition } from '../services/alertCataloguePolicy.service';
 import { randomUUID } from 'node:crypto';
 import { manifestCompanyRecipients, type ManifestCompanyAccess } from '../services/manifestCompanyRecipients.service';
+import { defaultGpsAnomalyNotice, saveDefaultAdminNotices } from '../services/defaultAdminNotice.service';
 
 /** Mapeo DomainEvent.type → EventoAlerta (para búsqueda de ReglaAlerta) */
 const EVENTO_ALERTA_MAP: Partial<Record<DomainEvent['type'], EventoAlerta>> = {
@@ -32,25 +33,9 @@ async function notificarAdmins(
   prioridad: PrioridadNotificacion,
   excluirId?: string,
 ): Promise<void> {
-  const notices = await prisma.$transaction(async tx => {
-    // Serialize only observations with the same notice identity. Other trips
-    // and other GPS classes can still be evaluated independently.
-    const lockKey = JSON.stringify(['default-admin-notice', tipo, titulo, manifiestoId ?? null]);
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text`;
-    const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
-    const admins = await tx.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
-    const ids = admins.map(admin => admin.id).filter(id => id !== excluirId);
-    const existing = ids.length ? await tx.notificacion.findMany({
-      where: { usuarioId: { in: ids }, tipo, titulo, manifiestoId: manifiestoId ?? null,
-        createdAt: { gte: new Date(now.getTime() - 30 * 60 * 1000) } },
-      select: { usuarioId: true },
-    }) : [];
-    const alreadyNotified = new Set(existing.map(notice => notice.usuarioId));
-    const fresh = ids.filter(id => !alreadyNotified.has(id)).map(usuarioId => ({ id: randomUUID(), usuarioId,
-      tipo, titulo, mensaje, manifiestoId: manifiestoId ?? null, prioridad, createdAt: now }));
-    if (fresh.length) await tx.notificacion.createMany({ data: fresh });
-    return fresh;
-  }, { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
+  const notices = await prisma.$transaction(tx => saveDefaultAdminNotices(tx,
+    { tipo, titulo, mensaje, manifiestoId, prioridad, excluirId }),
+  { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
   for (const notice of notices) notificationService.programarCanalesDeNotificacion(notice);
 }
 
@@ -353,22 +338,10 @@ export async function alertaSubscriber(event: DomainEvent): Promise<void> {
     }
 
     case 'ANOMALIA_GPS': {
-      // These observations compare receipt times, not necessarily sensor
-      // times. Distinct titles also prevent one class hiding another in the
-      // existing per-title notification deduplication window.
-      const receiptTitles: Record<string, string> = {
-        VELOCIDAD_ANORMAL: 'GPS: posible velocidad elevada',
-        PARADA_PROLONGADA: 'GPS: posible parada',
-        GPS_PERDIDO: 'GPS: sin posiciones recibidas',
-      };
-      await notificarAdmins(
-        'ANOMALIA_DETECTADA',
-        receiptTitles[event.tipoAnomalia] || '⚠️ Anomalía GPS Detectada',
-        `${event.numero ? `${event.numero} · ` : ''}${event.descripcion}`,
-        event.manifiestoId,
-        event.severidad === 'ALTA' ? 'URGENTE' : 'ALTA',
-        event.userId,
-      );
+      if (event.avisosConfirmados) break;
+      // Geographic observations and older producers still use this path.
+      const notice = defaultGpsAnomalyNotice(event);
+      await notificarAdmins(notice.tipo, notice.titulo, notice.mensaje, notice.manifiestoId, notice.prioridad, notice.excluirId);
       break;
     }
 
@@ -401,6 +374,9 @@ export async function alertaSubscriber(event: DomainEvent): Promise<void> {
   if (eventoAlerta) {
     const manifiestoId = 'manifiestoId' in event ? event.manifiestoId : undefined;
     const { type: _type, ...datos } = event;
+    // This is delivery bookkeeping, not an observable GPS attribute or a
+    // new criterion for a user's configured rule.
+    if (event.type === 'ANOMALIA_GPS') delete (datos as Record<string, unknown>).avisosConfirmados;
     await dispararReglasAlerta(eventoAlerta, manifiestoId, datos,
       event.type === 'DURACION_TRANSITO_OBSERVADA' || event.type === 'TIEMPO_EXCESIVO');
   }

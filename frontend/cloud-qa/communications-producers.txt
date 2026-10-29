@@ -12,6 +12,7 @@ backend/src/controllers/auth.controller.ts
 backend/src/services/manifestCertificate.service.ts
 backend/src/services/manifestDeliveryNotice.service.ts
 backend/src/services/manifestOperationalNotice.service.ts
+backend/src/services/defaultAdminNotice.service.ts
 backend/src/services/inspectionIntake.service.ts
 backend/src/services/eventualNotice.service.ts
 backend/src/services/inspectionExchangeNotice.service.ts

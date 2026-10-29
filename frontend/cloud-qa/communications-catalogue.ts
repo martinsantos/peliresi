@@ -192,11 +192,25 @@ for(const [id,title,roles,event]of [
  ['rechazo','❌ Carga Rechazada',['GENERADOR','ADMIN'],{}],
  ['peso','⚖️ Diferencia de Peso Detectada',['GENERADOR','ADMIN'],{delta:'12%'}],
 ] as any)add('alerta-'+id,'Alertas operativas',roles,sub,{...inlineNotice(sub,title,{m:manifest,event}),manifiestoId:manifest.id});
-for(const [id,title,detail,priority] of [
-  ['gps-ALTA','GPS: posible velocidad elevada','La distancia y el intervalo entre dos recepciones superan el umbral de velocidad; esto no confirma la velocidad real.','URGENTE'],
-  ['gps-NORMAL','GPS: posible parada','Se recibieron dos posiciones próximas con 150 minutos de diferencia; esto no confirma una parada.','ALTA'],
-  ['gps-sin-recepcion','GPS: sin posiciones recibidas','Pasaron 35 minutos entre dos recepciones; esto no confirma pérdida de señal.','ALTA'],
-])add(id,'Alertas operativas',['ADMIN'],sub,{tipo:'ANOMALIA_DETECTADA',titulo:title,mensaje:manifest.numero+' · Hora de captura no disponible. Verificá el caso con transporte. '+detail,prioridad:priority,manifiestoId:manifest.id},undefined,'Observación basada en recepción; los tiempos y distancias son ejemplos, no hechos confirmados.');
+const gpsNoticeSource='backend/src/services/defaultAdminNotice.service.ts';
+const gpsNotice=moduleLoad(gpsNoticeSource);
+const gpsTx:any={
+ $queryRaw:async(parts:TemplateStringsArray)=>parts.join('').includes('clock_timestamp')?[{now:new Date('2026-10-29T12:00:00Z')}]:[],
+ usuario:{findMany:async()=>[{id:'ADMIN'}]},
+ notificacion:{findMany:async()=>[],createMany:async({data}:any)=>{capture.push(...data);return {count:data.length};}},
+};
+for(const [id,kind,detail,severity] of [
+  ['gps-ALTA','VELOCIDAD_ANORMAL','La distancia y el intervalo entre dos recepciones superan el umbral de velocidad; esto no confirma la velocidad real.','ALTA'],
+  ['gps-NORMAL','PARADA_PROLONGADA','Se recibieron dos posiciones próximas con 150 minutos de diferencia; esto no confirma una parada.','MEDIA'],
+  ['gps-sin-recepcion','GPS_PERDIDO','Pasaron 35 minutos entre dos recepciones; esto no confirma pérdida de señal.','MEDIA'],
+]){
+ capture=[];
+ const event={type:'ANOMALIA_GPS',manifiestoId:manifest.id,numero:manifest.numero,tipoAnomalia:kind,
+  descripcion:'Hora de captura no disponible. Verificá el caso con transporte. '+detail,severidad:severity,userId:'TRANSPORTISTA'};
+ await gpsNotice.saveDefaultAdminNotices(gpsTx,gpsNotice.defaultGpsAnomalyNotice(event));
+ if(capture.length!==1||capture[0].usuarioId!=='ADMIN')throw Error('Unexpected GPS default audience '+kind);
+ add(id,'Alertas operativas',['ADMIN'],gpsNoticeSource,capture[0],undefined,'Observación basada en recepción; los tiempos y distancias son ejemplos, no hechos confirmados.');
+}
 add('transito-tiempo','Alertas operativas',['ADMIN'],sub,{tipo:'ALERTA_SISTEMA',titulo:'Duración del viaje · regla de ejemplo',mensaje:'Al evaluar, el manifiesto '+manifest.numero+' llevaba aproximadamente 36 horas en tránsito. Se alcanzó el umbral configurado por Ambiente.',prioridad:'ALTA',manifiestoId:manifest.id,datos:{tipo:'duracion_transito_configurada',version:1,evento:'TIEMPO_EXCESIVO',horasTransito:36,reglaId:'REGLA-MUESTRA'}},undefined,'Sólo se genera con una regla activa y un umbral explícito; se revisa periódicamente aunque no lleguen posiciones. No es un plazo legal.');
 for(const role of parties){
  const access=[{empresaId:'EMPRESA-MUESTRA',actividadId:'ACTIVIDAD-'+role,rol:role,razonSocial:'Empresa · ejemplo'}];

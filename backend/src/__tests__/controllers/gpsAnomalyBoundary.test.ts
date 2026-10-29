@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const db = vi.hoisted(() => ({ manifest: vi.fn(), points: vi.fn(), list: vi.fn(), createMany: vi.fn(), emit: vi.fn(), inserted: new Set<string>() }));
+const db = vi.hoisted(() => ({ manifest: vi.fn(), points: vi.fn(), list: vi.fn(), createMany: vi.fn(), emit: vi.fn(),
+  transaction: vi.fn(), query: vi.fn(), admins: vi.fn(), existing: vi.fn(), notices: vi.fn(), channels: vi.fn(), inserted: new Set<string>() }));
 vi.mock('../../lib/prisma', () => ({ default: {
   manifiesto: { findUnique: db.manifest }, trackingGPS: { findMany: db.points },
-  anomaliaTransporte: { findMany: db.list, createMany: db.createMany },
+  anomaliaTransporte: { findMany: db.list, createMany: db.createMany }, $transaction: db.transaction,
 } }));
 vi.mock('../../services/domainEvent.service', () => ({ domainEvents: { emit: db.emit } }));
-vi.mock('../../services/notification-dispatcher.service', () => ({ notificationService: {} }));
+vi.mock('../../services/notification-dispatcher.service', () => ({ notificationService: { programarCanalesDeNotificacion: db.channels } }));
 vi.mock('../../jobs/seguimientoCierre.job', () => ({ simularSeguimientoCierre: vi.fn(), ejecutarSeguimientoCierre: vi.fn() }));
 import { anomaliaDetector, detectarAnomalias, getAnomalias } from '../../controllers/notification.controller';
 
@@ -69,6 +70,10 @@ describe('GPS anomaly repeated analysis', () => {
       if (db.inserted.has(id)) return { count: 0 };
       db.inserted.add(id); return { count: 1 };
     });
+    db.query.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('clock_timestamp') ? [{ now: new Date() }] : []);
+    db.admins.mockResolvedValue([]); db.existing.mockResolvedValue([]); db.notices.mockResolvedValue({ count: 1 });
+    db.transaction.mockImplementation(async work => work({ $queryRaw: db.query, anomaliaTransporte: { createMany: db.createMany },
+      usuario: { findMany: db.admins }, notificacion: { findMany: db.existing, createMany: db.notices } }));
   });
 
   it('does not create and notify the same anomaly again when the same history is analyzed twice', async () => {
@@ -94,6 +99,24 @@ describe('GPS anomaly repeated analysis', () => {
     expect(db.inserted.size).toBe(2);
     expect(db.emit).toHaveBeenCalledTimes(2);
     expect(db.points).toHaveBeenCalledWith(expect.objectContaining({ orderBy: [{ timestamp: 'asc' }, { id: 'asc' }] }));
+  });
+
+  it('commits default inbox notices with the observation before scheduling external channels', async () => {
+    db.admins.mockResolvedValue([{ id: 'qa-admin' }]);
+    const transaction = db.transaction.getMockImplementation()!; let committed = false;
+    db.transaction.mockImplementation(async (...args: any[]) => {
+      const result = await transaction(...args); expect(db.channels).not.toHaveBeenCalled(); committed = true; return result;
+    });
+    db.channels.mockImplementation(() => expect(committed).toBe(true));
+    await anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-carrier');
+    expect(db.notices).toHaveBeenCalledOnce(); expect(db.channels).toHaveBeenCalledOnce();
+    expect(db.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ANOMALIA_GPS', avisosConfirmados: true }));
+  });
+
+  it('does not emit an event or schedule channels if saving the inbox fails', async () => {
+    db.admins.mockResolvedValue([{ id: 'qa-admin' }]); db.notices.mockRejectedValueOnce(new Error('notice insert failed'));
+    await expect(anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-carrier')).rejects.toThrow('notice insert failed');
+    expect(db.emit).not.toHaveBeenCalled(); expect(db.channels).not.toHaveBeenCalled();
   });
 
   it('attributes a manual analysis to the authenticated administrator', async () => {

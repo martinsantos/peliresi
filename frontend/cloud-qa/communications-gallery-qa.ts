@@ -143,6 +143,16 @@ try{
    await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Certificación final total disponible');
    await page.locator('#role').selectOption('');await page.locator('#family').selectOption('');
  });
+ await check('default GPS notices use the current transactional producer',async()=>{
+   for(const [id,title] of [['gps-ALTA','GPS: posible velocidad elevada'],['gps-NORMAL','GPS: posible parada'],
+     ['gps-sin-recepcion','GPS: sin posiciones recibidas']]){
+     const item=data.cases.find((entry:any)=>entry.id===id);
+     assert.ok(item,id);assert.equal(item.notice.titulo,title,id);
+     assert.ok(item.source.endsWith('/defaultAdminNotice.service.ts'),id);
+     assert.match(item.notice.mensaje,/Hora de captura no disponible/);
+   }
+   assert.ok(data.coverage.discoveredProducers.some((file:string)=>file.endsWith('/defaultAdminNotice.service.ts')));
+ });
  await check('origin notices and email do not describe a pickup',async()=>{
    await select('propuesta-insitu-iniciada');await channel('email');
    await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('No hay retiro, viaje ni GPS');

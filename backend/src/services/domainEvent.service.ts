@@ -47,6 +47,7 @@ export type DomainEvent =
       descripcion: string;
       severidad: string;
       userId: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'TIEMPO_EXCESIVO';

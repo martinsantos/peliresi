@@ -16,6 +16,8 @@ import { maskManifestRuleCompanyNotice, withManifestRuleCompanyNoticeContext } f
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
 import { createHash } from 'node:crypto';
 import { transitRuleNeedsThreshold } from '../services/transitDurationPolicy.service';
+import { recordGpsAnomaly } from '../services/gpsAnomalyRecorder.service';
+import { notificationService } from '../services/notification-dispatcher.service';
 
 const ALERT_RECIPIENT_ROLES = new Set(['ADMIN', 'ADMIN_GENERADOR', 'ADMIN_TRANSPORTISTA', 'ADMIN_OPERADOR', 'GENERADOR', 'TRANSPORTISTA', 'OPERADOR', 'INSPECCIONADO', 'INSPECTOR_ASIGNADO']);
 function normalizeAlertRecipients(raw: unknown): string {
@@ -511,22 +513,23 @@ class AnomaliaDetector {
 
         // Guardar anomalias detectadas
         for (const [index, anomalia] of anomaliasDetectadas.entries()) {
-            const created = await prisma.anomaliaTransporte.createMany({
-                data: [{ id: keys[index], manifiestoId, ...anomalia }],
-                skipDuplicates: true,
-            });
-            if (created.count === 0) continue;
-
-            // Emitir evento de dominio para que el alertaSubscriber maneje notificaciones y alertas
-            domainEvents.emit({
-                type: 'ANOMALIA_GPS',
+            const event = {
+                type: 'ANOMALIA_GPS' as const,
                 manifiestoId,
                 numero: manifiesto.numero,
                 tipoAnomalia: anomalia.tipo,
                 descripcion: anomalia.descripcion,
                 severidad: anomalia.severidad,
                 userId: userId ?? manifiestoId,
-            });
+                avisosConfirmados: true,
+            };
+            const recorded = await recordGpsAnomaly(prisma, { id: keys[index], manifiestoId, ...anomalia }, event);
+            if (!recorded.created) continue;
+
+            // The inbox is committed first. Channels and configurable rules
+            // remain best-effort and must not run while locks are held.
+            for (const notice of recorded.notices) notificationService.programarCanalesDeNotificacion(notice);
+            domainEvents.emit(event);
         }
 
         return anomaliasDetectadas;

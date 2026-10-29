@@ -103,6 +103,10 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(monitor, /otro dispositivo o perfil no comparte esta copia/i);
   assert.match(monitor, /alertas de velocidad, parada o pérdida de GPS usan el intervalo entre recepciones/i);
   assert.match(monitor, /mensajes anteriores conservan su texto y muestran una aclaración/i);
+  const alerts = JSON.stringify(guides.find((g: any) => g.id === 'administrador-alertas-proactivas'));
+  assert.match(alerts, /cuentas ADMIN activas reciben un aviso en la campana/i);
+  assert.match(alerts, /no se repite el aviso de la misma clase y manifiesto/i);
+  assert.match(alerts, /avisos anteriores faltantes no se reconstruyen automáticamente/i);
 });
 function jpegDimensions(bytes: Buffer): { width: number; height: number } {
   assert.equal(bytes.readUInt16BE(0), 0xffd8, 'JPEG signature');
