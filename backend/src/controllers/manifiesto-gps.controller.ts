@@ -20,6 +20,9 @@ const actualizarUbicacionSchema = z.object({
 const ubicacionIdempotenteSchema = actualizarUbicacionSchema.extend({
   puntoId: z.string().uuid('La referencia de la ubicación no es válida'),
 });
+const gpsReferenceSchema = z.string().uuid('La referencia de la ubicación no es válida');
+const trackingIdFor = (id: string, userId: string | number, puntoId: string) =>
+  'gpsv1_' + createHash('sha256').update(JSON.stringify([id, String(userId), puntoId.toLowerCase()])).digest('hex');
 
 // GPS in-memory cache — optimized for high-frequency calls (30 clients x every 30s)
 type GpsCacheEntry = {
@@ -27,6 +30,7 @@ type GpsCacheEntry = {
   generadorId: string | null;
   transportistaId: string | null;
   operadorId: string | null;
+  contextoEmpresa: unknown;
   fechaRetiro: Date | null;
   numero: string;
   genLat: number | null;
@@ -61,7 +65,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
     const puntoId = 'puntoId' in parsed.data ? parsed.data.puntoId as string : undefined;
     // The point key is scoped to both the account and the manifest. The GPS
     // primary key already exists, so this adds no schema or data migration.
-    const trackingId = puntoId ? 'gpsv1_' + createHash('sha256').update(JSON.stringify([id, String(userId), puntoId.toLowerCase()])).digest('hex') : undefined;
+    const trackingId = puntoId ? trackingIdFor(id, userId, puntoId) : undefined;
 
     // Check cache — skip DB lookup if we verified EN_TRANSITO recently
     let cacheEntry = _enTransitoCache.get(cacheKey(id));
@@ -81,6 +85,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
           generadorId: true,
           transportistaId: true,
           operadorId: true,
+          contextoEmpresa: true,
           generador: { select: { latitud: true, longitud: true } },
           operador: { select: { latitud: true, longitud: true } },
         },
@@ -91,7 +96,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
         throw new AppError('Manifiesto no encontrado', 404);
       }
 
-      if (manifiesto.estado !== 'EN_TRANSITO') {
+      if (manifiesto.estado !== 'EN_TRANSITO' && !trackingId) {
         _enTransitoCache.delete(cacheKey(id));
         throw new AppError('Manifiesto no encontrado o no esta en transito', 404);
       }
@@ -100,6 +105,7 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
         generadorId: manifiesto.generadorId,
         transportistaId: manifiesto.transportistaId,
         operadorId: manifiesto.operadorId,
+        contextoEmpresa: manifiesto.contextoEmpresa,
         fechaRetiro: manifiesto.fechaRetiro,
         numero: manifiesto.numero,
         genLat: manifiesto.generador?.latitud ?? null,
@@ -107,24 +113,25 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
         opLat: manifiesto.operador?.latitud ?? null,
         opLon: manifiesto.operador?.longitud ?? null,
       };
-      _enTransitoCache.set(cacheKey(id), cacheEntry);
+      // A terminal manifest is read only to reconcile an existing reference;
+      // it must never be cached as an active trip.
+      if (manifiesto.estado === 'EN_TRANSITO') _enTransitoCache.set(cacheKey(id), cacheEntry);
+      else _enTransitoCache.delete(cacheKey(id));
     }
 
     // A PM2 worker cannot invalidate another worker's memory. Check live
     // ownership/state under a shared row lock before persisting every point;
     // delivery updates serialize with this short transaction across workers.
     const result = await prisma.$transaction(async tx => {
-      const rows = await tx.$queryRaw<Array<{ estado: string; generadorId: string | null; transportistaId: string | null; operadorId: string | null }>>`
-        SELECT estado, "generadorId", "transportistaId", "operadorId"
+      const rows = await tx.$queryRaw<Array<{ estado: string; generadorId: string | null; transportistaId: string | null; operadorId: string | null; contextoEmpresa: unknown }>>`
+        SELECT estado, "generadorId", "transportistaId", "operadorId", "contextoEmpresa"
         FROM manifiestos WHERE id = ${id} FOR SHARE
       `;
       const current = rows[0];
-      if (!current || current.estado !== 'EN_TRANSITO' || !canAccessManifiesto(req.user, current)) {
+      if (!current || !canAccessManifiesto(req.user, current)) {
         invalidateGpsCache(id);
         throw new AppError('Manifiesto no encontrado o no esta en transito', 404);
       }
-      const activeLeg = await tx.tramoTransporte.findFirst({ where:{manifiestoId:id,fin:null} });
-      if (activeLeg && activeLeg.tipo !== 'ORIGINAL') throw new AppError('El GPS de este manifiesto continúa desde el enlace del transporte de reemplazo',409);
       if (trackingId) {
         // A transaction-level lock serializes retries across API workers.
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${trackingId}, 0))::text`;
@@ -135,9 +142,18 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
             || (previous.velocidad ?? null) !== (velocidad ?? null) || (previous.direccion ?? null) !== (direccion ?? null)) {
             throw new AppError('La referencia de ubicación ya corresponde a otros datos. Revisá la sincronización.', 409);
           }
+          if (current.estado !== 'EN_TRANSITO') invalidateGpsCache(id);
           return { tracking: previous, repetido: true };
         }
       }
+      // An exact repeat is only a receipt for an existing point. State and
+      // handoff guards still apply before inserting any new observation.
+      if (current.estado !== 'EN_TRANSITO') {
+        invalidateGpsCache(id);
+        throw new AppError('Manifiesto no encontrado o no esta en transito', 404);
+      }
+      const activeLeg = await tx.tramoTransporte.findFirst({ where:{manifiestoId:id,fin:null} });
+      if (activeLeg && activeLeg.tipo !== 'ORIGINAL') throw new AppError('El GPS de este manifiesto continúa desde el enlace del transporte de reemplazo',409);
       const tracking = await tx.trackingGPS.create({ data: {
         ...(trackingId ? { id: trackingId } : {}), manifiestoId: id, latitud, longitud, velocidad, direccion, emisor:`usuario:${userId}`,
       } });
@@ -207,6 +223,33 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
 export const actualizarUbicacion = (req: AuthRequest, res: Response, next: NextFunction) => guardarUbicacion(req, res, next, false);
 export const actualizarUbicacionIdempotente = (req: AuthRequest, res: Response, next: NextFunction) => guardarUbicacion(req, res, next, true);
 
+/** Read only: never create a point if the trip has been restarted or reverted. */
+export const consultarConfirmacionUbicacion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const parsed = gpsReferenceSchema.safeParse(req.params.puntoId);
+    if (!parsed.success) throw new AppError('La referencia de la ubicación no es válida', 400);
+    const puntoId = parsed.data, userId = req.user.id;
+    const trackingId = trackingIdFor(id, userId, puntoId);
+    const tracking = await prisma.$transaction(async tx => {
+      const rows = await tx.$queryRaw<Array<{ estado: string; generadorId: string | null; transportistaId: string | null; operadorId: string | null; contextoEmpresa: unknown }>>`
+        SELECT estado, "generadorId", "transportistaId", "operadorId", "contextoEmpresa"
+        FROM manifiestos WHERE id = ${id} FOR SHARE
+      `;
+      if (!rows[0] || !canAccessManifiesto(req.user, rows[0])) throw new AppError('Ubicación no encontrada', 404);
+      const point = await tx.trackingGPS.findUnique({ where: { id: trackingId }, select: {
+        manifiestoId: true, emisor: true, tramoId: true, latitud: true, longitud: true, velocidad: true, direccion: true,
+      } });
+      if (!point || point.manifiestoId !== id || point.emisor !== `usuario:${userId}` || point.tramoId !== null) {
+        throw new AppError('Ubicación no encontrada', 404);
+      }
+      return { latitud: point.latitud, longitud: point.longitud, velocidad: point.velocidad ?? null, direccion: point.direccion ?? null };
+    });
+    res.set('Cache-Control', 'private, no-store');
+    res.json({ success: true, data: { idempotencia: { version: 1, puntoId, confirmado: true }, tracking } });
+  } catch (error) { next(error); }
+};
+
 // Obtener tracking GPS del viaje actual de un manifiesto
 export const getViajeActual = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -214,7 +257,7 @@ export const getViajeActual = async (req: AuthRequest, res: Response, next: Next
 
     const manifiesto = await prisma.manifiesto.findUnique({
       where: { id },
-      select: { id: true, estado: true, generadorId: true, transportistaId: true, operadorId: true },
+      select: { id: true, estado: true, generadorId: true, transportistaId: true, operadorId: true, contextoEmpresa: true },
     });
 
     if (!manifiesto || !canAccessManifiesto(req.user, manifiesto)) {

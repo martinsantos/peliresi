@@ -53,7 +53,7 @@ function TransportLegsContent({id,beforeHandoff,onHandoffError}:Props) {
   if(query.isError)return <Card><CardHeader title="Tramos de transporte" icon={<ArrowRightLeft size={20}/>}/><CardContent><p role="alert" className="text-sm text-error-700">No se pudieron cargar los tramos.</p><Button variant="outline" onClick={()=>query.refetch()}>Reintentar</Button></CardContent></Card>;
   if(!query.data)return null;
   return <Card role="region" aria-label="Tramos de transporte"><CardHeader title="Tramos de transporte" icon={<ArrowRightLeft size={20}/>}/><CardContent className="space-y-4">
-    {legs.length===0?<p className="text-sm text-neutral-600">Continúa el transporte original del manifiesto.</p>:<ol className="divide-y divide-neutral-100">{legs.map(leg=><li key={leg.id} className="flex gap-3 py-3">
+    {legs.length===0?<p className="text-sm text-neutral-600">No se registraron traspasos de transporte.</p>:<ol className="divide-y divide-neutral-100">{legs.map(leg=><li key={leg.id} className="flex gap-3 py-3">
       <Truck size={20} aria-hidden="true" className={leg.fin?'mt-0.5 shrink-0 text-neutral-400':'mt-0.5 shrink-0 text-primary-700'}/><div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2"><strong className="break-words text-sm text-neutral-900">{leg.datos.empresa||'Empresa sin nombre declarado'}</strong><span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${leg.fin?'bg-neutral-100 text-neutral-600':'bg-primary-50 text-primary-800'}`}>{leg.fin?'Finalizado':'En curso'}</span></div>
         <p className="mt-1 text-sm text-neutral-700">{leg.datos.patente||'Patente sin declarar'} · {leg.datos.chofer||'Chofer sin declarar'}</p>

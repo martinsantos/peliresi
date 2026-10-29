@@ -29,6 +29,7 @@ import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { toast } from '../../components/ui/Toast';
 import { GpsStatusPanel } from '../../components/mobile/GpsStatusPanel';
+import { PendingGpsReceipts } from '../../components/mobile/PendingGpsReceipts';
 import { TripActionBar } from '../../components/mobile/TripActionBar';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -502,6 +503,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
       <div className="p-4 space-y-4">
         {snapshotError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">No se pudo guardar una copia del viaje en el dispositivo. Si perdés conexión, sus datos podrían no estar disponibles; revisá el almacenamiento.</p>}
+        {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(currentUser.rol) && (m.estado !== EstadoManifiesto.EN_TRANSITO || hasHandoff) && <PendingGpsReceipts key={`${currentUser.id}:${currentUser.rol}:${id}`} ownerId={currentUser.id} manifestId={id} />}
         {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && deliveryQueue === 'none' && <GpsStatusPanel
           status={gpsStatus}
           sendStatus={gpsSendStatus}

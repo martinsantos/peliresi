@@ -65,6 +65,7 @@ import { EstadoManifiesto } from '../../types/models';
 import ManifiestoTimeline from './components/ManifiestoTimeline';
 import { companyGeneratorView } from '../../utils/enterprisePresentation';
 import ManifiestoActions from './components/ManifiestoActions';
+import { PendingGpsReceipts } from '../../components/mobile/PendingGpsReceipts';
 
 const ACTOR_SUMMARY = {
   GENERADOR: { label: 'Generador', Icon: Factory, icon: 'bg-purple-50 text-purple-600', interactive: 'hover:bg-purple-50/50' },
@@ -404,6 +405,8 @@ const ManifiestoDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(userRol) && !isInSitu && m.estado !== EstadoManifiesto.EN_TRANSITO && <PendingGpsReceipts key={`${currentUser.id}:${userRol}:${id}`} ownerId={currentUser.id} manifestId={id} />}
 
       {/* One action surface, before the long field context on every screen size. */}
       <ManifiestoActions

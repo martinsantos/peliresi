@@ -17,7 +17,7 @@ import { manifestCreationIntent, readManifestCreationReceipt, recordManifestCrea
 // Re-export split modules so existing imports (e.g. routes) continue to work
 export { getManifiestos, getManifiestoById, getDashboardStats, getSyncInicial, getManifiestosEsperados } from './manifiesto-query.controller';
 export { firmarManifiesto, confirmarRetiro, confirmarEntrega, confirmarRecepcion, confirmarRecepcionInSitu, registrarTratamiento, cerrarManifiesto, rechazarCarga, registrarIncidente, revertirEstado, registrarPesaje, cancelarManifiesto } from './manifiesto-workflow.controller';
-export { actualizarUbicacion, actualizarUbicacionIdempotente, getViajeActual } from './manifiesto-gps.controller';
+export { actualizarUbicacion, actualizarUbicacionIdempotente, consultarConfirmacionUbicacion, getViajeActual } from './manifiesto-gps.controller';
 
 // Zod schemas for input validation
 const createManifiestoSchema = z.object({

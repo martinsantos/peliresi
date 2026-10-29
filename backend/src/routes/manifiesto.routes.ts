@@ -18,6 +18,7 @@ import {
     confirmarRetiro,
     actualizarUbicacion,
     actualizarUbicacionIdempotente,
+    consultarConfirmacionUbicacion,
     confirmarEntrega,
     confirmarRecepcion,
     confirmarRecepcionInSitu,
@@ -483,6 +484,7 @@ router.post('/:id/ubicacion', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbica
 // A distinct endpoint makes old backends fail closed rather than silently
 // ignoring a retry key during a rolling deployment or rollback.
 router.post('/:id/ubicacion-idempotente', hasRole('TRANSPORTISTA', 'ADMIN'), actualizarUbicacionIdempotente);
+router.get('/:id/ubicaciones/:puntoId/confirmacion', hasRole('TRANSPORTISTA', 'ADMIN'), consultarConfirmacionUbicacion);
 
 /**
  * @openapi

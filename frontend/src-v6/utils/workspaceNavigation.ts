@@ -65,7 +65,7 @@ export function workspaceTitle(pathname: string): string {
     [/^\/manifiestos\/[^/]+\/adendas/, 'Adendas del manifiesto'],
     [/^\/manifiestos\/baja-intensidad/, 'Eventuales'],
     [/^\/transporte\/cargas/, 'GPS de mis viajes'],
-    [/^\/transporte\/viaje\//, 'Viaje en curso'],
+    [/^\/transporte\/viaje\//, 'Viaje'],
     [/^\/mi-perfil/, 'Mi perfil'],
     [/^\/mi-solicitud(?:\/|$)/, 'Mi solicitud'],
     [/^\/empresas/, 'Empresas y establecimientos'],

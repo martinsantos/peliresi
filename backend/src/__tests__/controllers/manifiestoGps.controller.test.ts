@@ -124,6 +124,17 @@ describe('GPS concurrency and recovery guards', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
     expect(mocks.list).not.toHaveBeenCalled();
   });
+  it('loads the company site when authorizing the GPS history', async () => {
+    const site = { empresaId: 'qa-company', establecimientoId: 'qa-site' };
+    mocks.find.mockResolvedValue({ ...trip, contextoEmpresa: site });
+    const own = request(); own.user.empresaContexto = { ...site, todasSedes: false };
+    const next = vi.fn(), res = response(); await getViajeActual(own, res, next);
+    expect(next).not.toHaveBeenCalled(); expect(res.json).toHaveBeenCalled();
+    expect(mocks.find.mock.calls[0][0].select.contextoEmpresa).toBe(true);
+    const other = request(); other.user.empresaContexto = { ...site, establecimientoId: 'other-site', todasSedes: false };
+    mocks.list.mockClear(); const denied = vi.fn(); await getViajeActual(other, response(), denied);
+    expect(denied).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 })); expect(mocks.list).not.toHaveBeenCalled();
+  });
   it('stops the original phone after a handoff even with a warm owner cache',async()=>{
     await actualizarUbicacion(request(),response(),vi.fn());mocks.create.mockClear();
     mocks.leg.mockResolvedValue({id:'replacement',tipo:'EXTERNO'});

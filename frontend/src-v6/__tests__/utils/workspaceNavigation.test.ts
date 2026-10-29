@@ -64,6 +64,7 @@ it('keeps the administrator identity at home and the inspection function inside 
 
 it.each(['','/app','/mobile'])('keeps each nested workflow in one section on %s',prefix=>{
  expect(workspaceSectionPath(prefix+'/transporte/viaje/qa')).toBe('/transporte/perfil');
+ expect(workspaceTitle(prefix+'/transporte/viaje/qa')).toBe('Viaje');
  expect(workspaceSectionPath(prefix+'/transporte/cargas')).toBe('/transporte/perfil');
  expect(workspaceSectionPath(prefix+'/requerimientos/qa')).toBe('/notificaciones');
  expect(workspaceSectionPath(prefix+'/empresas/qa')).toBe('/mi-perfil');
