@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushStoredGpsQueue, gpsPointPayload, gpsQueueKey, gpsTasksForTrip, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask } from '../../services/gpsQueue';
+import { flushStoredGpsQueue, gpsPointPayload, gpsQueueKey, gpsTasksForTrip, hasVolatileGpsQueue, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask } from '../../services/gpsQueue';
 
 const first = { lat: -33.1, lng: -68.1, speed: null, heading: null };
 const second = { lat: -33.2, lng: -68.2, speed: null, heading: null };
@@ -8,6 +8,18 @@ const key = gpsQueueKey('carrier-a', 'trip');
 describe('GPS queue before an offline delivery', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => localStorage.clear());
+
+  it('warns before closing while a point exists only in page memory', () => {
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+    expect(savePendingGpsQueue('carrier-a', 'volatile-test', [first])).toBe(false);
+    expect(hasVolatileGpsQueue('carrier-a', 'volatile-test')).toBe(true);
+    const closing = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(closing);
+    expect(closing.defaultPrevented).toBe(true);
+    set.mockRestore(); expect(savePendingGpsQueue('carrier-a', 'volatile-test', [first])).toBe(true);
+    expect(hasVolatileGpsQueue('carrier-a', 'volatile-test')).toBe(false);
+    const safe = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(safe);
+    expect(safe.defaultPrevented).toBe(false);
+  });
 
   it('omits unavailable optional measurements and preserves valid zero values', () => {
     expect(gpsPointPayload(first)).toEqual({ latitud:-33.1, longitud:-68.1 });

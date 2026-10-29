@@ -29,6 +29,7 @@ import { Card, CardContent } from '../../components/ui/CardV2';
 import { Button } from '../../components/ui/ButtonV2';
 import { toast } from '../../components/ui/Toast';
 import { GpsStatusPanel } from '../../components/mobile/GpsStatusPanel';
+import { hasParkedGpsLease } from '../../services/gpsCoordination';
 import { PendingGpsReceipts } from '../../components/mobile/PendingGpsReceipts';
 import { TripActionBar } from '../../components/mobile/TripActionBar';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
@@ -100,6 +101,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const deliveryConfirmed = useRef(false);
   const deliveryInitiatedHere = useRef(false);
   const gpsWasActive = useRef(false);
+  const parkedRecoveryKey = useRef<string | null>(null);
   // Map recenter control
   const [followUser, setFollowUser] = useState(true);
   const handleMapInteract = useCallback(() => setFollowUser(false), []);
@@ -215,14 +217,19 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   // GPS tracking via custom hook
   // A delivery queued in another tab must not silently stop an active GPS:
   // that screen owns its live observations until the user closes it safely.
-  const trackingDuringPending = (deliveryQueue === 'pending' || deliveryQueue === 'other' || deliveryQueue === 'error') && viajeStatus === 'ACTIVO' && gpsWasActive.current && !deliveryInitiatedHere.current;
+  const recoveryKey = JSON.stringify([String(currentUser?.id ?? ''), syncOwner, id]);
+  if (id && currentUser?.id != null && hasParkedGpsLease(id, syncOwner || String(currentUser.id))) parkedRecoveryKey.current = recoveryKey;
+  const trackingDuringPending = (deliveryQueue === 'pending' || deliveryQueue === 'other' || deliveryQueue === 'error') && viajeStatus === 'ACTIVO'
+    && (gpsWasActive.current || parkedRecoveryKey.current === recoveryKey) && !deliveryInitiatedHere.current;
   const gps = useGPSTracking({
     manifiestoId: id,
     ownerId: currentUser?.id,
+    leaseOwner: syncOwner || undefined,
     estado: hasHandoff||handoffUnknown||m.modalidad==='IN_SITU'||(deliveryQueue!=='none'&&!trackingDuringPending)?undefined:m.estado,
     viajeStatus,
   });
   useEffect(() => { if (deliveryQueue === 'none' && gps.status === 'active') gpsWasActive.current = true; }, [deliveryQueue, gps.status]);
+  useEffect(() => { if (deliveryQueue === 'none' || deliveryQueue === 'sent') parkedRecoveryKey.current = null; }, [deliveryQueue]);
 
   const currentPosition = gps.position;
   const trackPoints = gps.trackPoints;
@@ -268,6 +275,10 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     finally { gpsRetryInFlightRef.current = false; setRetryingGps(false); }
   };
 
+  useEffect(() => {
+    if (!gps.storageError && deliveryError.startsWith('Ubicaciones sin guardar.')) setDeliveryError('');
+  }, [gps.storageError, deliveryError]);
+
   // Confirmar Retiro with GPS coordinates + offline queue
   const handleConfirmarRetiro = async () => {
     if (!currentUser || !syncOwner) return toast.error('Sesión no disponible', 'Volvé a ingresar antes de continuar.');
@@ -302,7 +313,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     try {
       await gps.stopAndDrain();
       const offline = !navigator.onLine;
-      if (offline && gps.hasStorageError()) {
+      if (gps.hasStorageError()) {
         deliveryInitiatedHere.current = false;
         gps.resumeGps();
         setDeliveryError('Ubicaciones sin guardar. Mantené esta pantalla abierta y recuperá la conexión o el almacenamiento antes de confirmar.');
@@ -348,6 +359,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   const prepareHandoff = async () => {
     await gps.stopAndDrain();
+    if (gps.hasStorageError()) throw new GpsPendingError('No se pudo verificar o guardar el recorrido. Mantené esta pantalla abierta y revisá el almacenamiento antes de continuar.');
     if (!(await gps.flushPending())) throw new GpsPendingError(gps.deliveryWasConfirmed() ? 'La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.' : gps.lastSendError() || undefined);
   };
 
@@ -692,7 +704,10 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               )}
               {deliveryError && <p ref={deliveryErrorRef} role="alert" tabIndex={-1} className="mb-4 rounded-lg border border-error-200 bg-error-50 p-3 text-left text-sm text-error-900 focus:outline focus:outline-2 focus:outline-error-600">{deliveryError}</p>}
               <div className="space-y-3">
-                <Button fullWidth onClick={handleConfirmarEntrega} disabled={isActionPending}>
+                {deliveryError && gps.storageError && (!gps.storageIssue || gps.storageIssue === 'storage') && <Button variant="outline" fullWidth onClick={handleRetryGps} disabled={isActionPending || retryingGps}>
+                  {retryingGps ? 'Reintentando guardado' : 'Reintentar guardado'}
+                </Button>}
+                <Button fullWidth onClick={handleConfirmarEntrega} disabled={isActionPending || gps.storageError}>
                   {isActionPending ? 'Confirmando...' : 'Sí, Confirmar Entrega'}
                 </Button>
                 <Button variant="outline" fullWidth onClick={() => { setDeliveryError(''); setShowFinalizarModal(false); }} disabled={isActionPending}>

@@ -49,6 +49,15 @@ describe('GpsStatusPanel', () => {
     expect(screen.getByText('1 pendiente')).toBeInTheDocument();
   });
 
+  it('offers a direct retry when GPS is active but its storage failed', () => {
+    const retry = vi.fn();
+    render(<GpsStatusPanel status="active" sendStatus="error" position={[-33,-69]}
+      details={{accuracy:10,speed:null,heading:null,altitude:null,lastUpdate:null}}
+      pendingCount={1} lastSyncAt={null} storageError storageIssue="storage" onRetry={retry} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar guardado', exact: true }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it('offers a single retry after a GPS permission failure', () => {
     const retry=vi.fn();
     const props={status:'denied' as const,sendStatus:'idle' as const,position:null,details:{accuracy:null,speed:null,heading:null,altitude:null,lastUpdate:null},pendingCount:0,lastSyncAt:null,onRetry:retry};

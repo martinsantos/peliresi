@@ -4,10 +4,11 @@ import { useGPSTracking } from '../../hooks/useGPSTracking';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { toast } from '../../components/ui/Toast';
 import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError, gpsQueueKey } from '../../services/gpsQueue';
+import { withGpsTransitionLock } from '../../services/gpsCoordination';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { actualizarUbicacion: vi.fn() } }));
-vi.mock('../../components/ui/Toast', () => ({ toast: { error: vi.fn(), warning: vi.fn(), remove: vi.fn() } }));
+vi.mock('../../components/ui/Toast', () => ({ toast: { add: vi.fn().mockReturnValue('storage-notice'), error: vi.fn(), warning: vi.fn(), remove: vi.fn() } }));
 
 const position = (latitude = -33, longitude = -69): GeolocationPosition => ({
   coords: { latitude, longitude, accuracy: 10, speed: null, heading: null, altitude: null, altitudeAccuracy: null },
@@ -27,6 +28,7 @@ describe('GPS position provenance and cleanup', () => {
     restoreLocks = installMockGpsLocks();
     vi.useFakeTimers();
     vi.resetAllMocks();
+    vi.mocked(toast.add).mockReturnValue('storage-notice');
     localStorage.clear();
     watchSuccess = []; watchError = []; coarseSuccess = []; coarseError = [];
     vi.mocked(navigator.geolocation.watchPosition).mockImplementation((success, failure) => {
@@ -588,6 +590,8 @@ describe('GPS position provenance and cleanup', () => {
     expect(first.result.current.pendingCount).toBe(1);
     expect(localStorage.getItem(key)).toBeNull();
     first.unmount();
+    await act(async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); });
+    expect(toast.add).toHaveBeenCalledWith(expect.objectContaining({ title: 'Ubicaciones sin guardar', message: expect.stringMatching(/esta pestaña/), duration: 0 }));
     const reopened = renderHook(() => useGPSTracking(trip));
     await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
     expect(reopened.result.current.storageError).toBe(true);
@@ -596,9 +600,122 @@ describe('GPS position provenance and cleanup', () => {
     vi.mocked(manifiestoService.actualizarUbicacion).mockResolvedValue(undefined);
     await act(async () => { await reopened.result.current.retryGps(); await Promise.resolve(); });
     expect(reopened.result.current.storageError).toBe(false);
+    expect(toast.remove).toHaveBeenCalledWith('storage-notice');
     expect(reopened.result.current.pendingCount).toBe(0);
     expect(localStorage.getItem(key)).toBeNull();
     reopened.unmount();
+  });
+
+  it('keeps the transition locked after an unsaved point until the original page can persist it', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId), original = Storage.prototype.setItem;
+    const unavailable = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (name, value) {
+      if (name === key) throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, name, value);
+    });
+    const first = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await first.result.current.stopAndDrain(); });
+    expect(first.result.current.storageError).toBe(true);
+    let ready = true;
+    await act(async () => { ready = await first.result.current.flushPending(); });
+    expect(ready).toBe(false); expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    await expect(withGpsTransitionLock(trip.manifiestoId, async () => true)).rejects.toThrow(/otra pestaña/);
+    first.unmount();
+    const closing = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(closing);
+    expect(closing.defaultPrevented).toBe(true);
+    await expect(withGpsTransitionLock(trip.manifiestoId, async () => true)).rejects.toThrow(/otra pestaña/);
+    const reopened = renderHook(() => useGPSTracking(trip));
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+    expect(reopened.result.current.storageError).toBe(true);
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    unavailable.mockRestore();
+    await act(async () => { await reopened.result.current.retryGps(); for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledOnce();
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledWith(trip.manifiestoId, -34, -70, null, null, expect.any(String));
+    expect(reopened.result.current.storageError).toBe(false);
+    reopened.unmount(); await act(async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); });
+    await expect(withGpsTransitionLock(trip.manifiestoId, async () => true)).resolves.toBe(true);
+    const safe = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(safe);
+    expect(safe.defaultPrevented).toBe(false);
+  });
+
+  it('retains a newer unsampled fix when retrying a storage failure', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId), original = Storage.prototype.setItem;
+    const unavailable = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (name, value) {
+      if (name === key) throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, name, value);
+    });
+    const view = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(view.result.current.storageError).toBe(true);
+    act(() => watchSuccess[0](position(-35, -71)));
+    unavailable.mockRestore();
+    await act(async () => { await view.result.current.retryGps(); for (let i = 0; i < 40; i++) await Promise.resolve(); });
+    const calls = vi.mocked(manifiestoService.actualizarUbicacion).mock.calls;
+    expect(calls.map(call => [call[1], call[2]])).toEqual([[-34, -70], [-35, -71]]);
+    expect(calls[0][5]).not.toBe(calls[1][5]);
+    view.unmount();
+  });
+
+  it('warns on the very close attempt that first encounters a storage failure', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId), original = Storage.prototype.setItem;
+    const unavailable = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (name, value) {
+      if (name === key) throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, name, value);
+    });
+    const view = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position(-34, -70)));
+    const closing = new Event('beforeunload', { cancelable: true });
+    act(() => window.dispatchEvent(closing));
+    expect(closing.defaultPrevented).toBe(true); expect(view.result.current.storageError).toBe(true);
+    unavailable.mockRestore();
+    await act(async () => { await view.result.current.retryGps(); for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledOnce();
+    view.unmount();
+  });
+
+  it('keeps a shared recovery warning until both affected trips are saved', async () => {
+    const other = { ...trip, manifiestoId: 'gps-safety-other-trip' };
+    const keys = [gpsQueueKey(trip.ownerId, trip.manifiestoId), gpsQueueKey(other.ownerId, other.manifiestoId)];
+    const original = Storage.prototype.setItem;
+    const unavailable = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (name, value) {
+      if (keys.includes(name)) throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, name, value);
+    });
+    const first = renderHook(() => useGPSTracking(trip)), second = renderHook(() => useGPSTracking(other));
+    act(() => { watchSuccess[0](position(-34, -70)); watchSuccess[1](position(-35, -71)); });
+    first.unmount(); second.unmount();
+    await act(async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); });
+    expect(toast.add).toHaveBeenCalledTimes(2);
+    unavailable.mockRestore();
+    const recoveredFirst = renderHook(() => useGPSTracking(trip));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(toast.remove).not.toHaveBeenCalled();
+    const recoveredSecond = renderHook(() => useGPSTracking(other));
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+    expect(toast.remove).toHaveBeenCalledOnce();
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(2);
+    recoveredFirst.unmount(); recoveredSecond.unmount();
+  });
+
+  it('does not adopt a parked GPS queue under another company activity', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId), original = Storage.prototype.setItem;
+    const unavailable = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (name, value) {
+      if (name === key) throw new DOMException('Storage full', 'QuotaExceededError');
+      return original.call(this, name, value);
+    });
+    const first = renderHook(() => useGPSTracking({ ...trip, leaseOwner: 'company-a' }));
+    act(() => watchSuccess[0](position(-34, -70))); first.unmount();
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+    unavailable.mockRestore();
+    const other = renderHook(() => useGPSTracking({ ...trip, leaseOwner: 'company-b' }));
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
+    expect(other.result.current.sendError).toMatch(/otra pestaña/);
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled(); other.unmount();
+    const originalContext = renderHook(() => useGPSTracking({ ...trip, leaseOwner: 'company-a' }));
+    await act(async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); });
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledOnce(); originalContext.unmount();
   });
 
   it('preserves unreadable GPS data and blocks transitions until it can be reviewed', async () => {

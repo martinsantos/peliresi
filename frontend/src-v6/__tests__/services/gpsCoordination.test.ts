@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { startGpsLease, withGpsTransitionLock } from '../../services/gpsCoordination';
+import { adoptParkedGpsLease, hasParkedGpsLease, parkGpsLease, startGpsLease, withGpsTransitionLock } from '../../services/gpsCoordination';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 let restoreLocks: () => void;
@@ -7,6 +7,18 @@ beforeEach(() => { restoreLocks = installMockGpsLocks(); });
 afterEach(() => restoreLocks());
 
 describe('GPS coordination between pages', () => {
+  it('retains a parked lease until the original owner in this page resumes it', async () => {
+    const tracker = startGpsLease('trip-parked', vi.fn(), vi.fn());
+    parkGpsLease('trip-parked', 'carrier-a', tracker);
+    expect(hasParkedGpsLease('trip-parked', 'carrier-a')).toBe(true);
+    expect(hasParkedGpsLease('trip-parked', 'other-account')).toBe(false);
+    expect(adoptParkedGpsLease('trip-parked', 'other-account')).toBeUndefined();
+    await expect(withGpsTransitionLock('trip-parked', vi.fn())).rejects.toThrow(/otra pestaña/);
+    expect(adoptParkedGpsLease('trip-parked', 'carrier-a')).toBe(tracker);
+    expect(hasParkedGpsLease('trip-parked', 'carrier-a')).toBe(false);
+    await tracker.release();
+    await expect(withGpsTransitionLock('trip-parked', async () => true)).resolves.toBe(true);
+  });
   it('blocks delivery while another page can add points, then allows it after release', async () => {
     const granted = vi.fn(), problem = vi.fn(), delivery = vi.fn().mockResolvedValue('entregado');
     const tracker = startGpsLease('trip-a', granted, problem);

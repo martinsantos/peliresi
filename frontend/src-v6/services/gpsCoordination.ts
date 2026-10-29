@@ -3,7 +3,7 @@ import { GpsPendingError } from './gpsQueue';
 // The same origin may have several pages open for one manifest. localStorage
 // read/modify/write is not atomic, so every participating page uses one lock.
 export const gpsLockName = (id: string) => `sitrep:gps:${id}`;
-const busyMessage = 'El GPS de este manifiesto está activo en otra pestaña o ventana. Allí revisá y sincronizá sus ubicaciones, cerrá esa pantalla y reintentá.';
+const busyMessage = 'El GPS de este manifiesto está abierto o tiene ubicaciones sin guardar en otra pestaña o ventana. Volvé allí al viaje, sincronizá sus ubicaciones y después reintentá.';
 const unavailableMessage = 'Este navegador no puede coordinar el GPS entre ventanas. Actualizalo o usá un navegador compatible antes de continuar.';
 
 export interface GpsLease {
@@ -13,6 +13,26 @@ export interface GpsLease {
 // A React screen can unmount and reopen in the same page while an upload is
 // still draining. Let its successor await that local release before trying.
 const closingLeases = new Map<string, Promise<void>>();
+const parkedLeases = new Map<string, { owner: string; lease: GpsLease }>();
+
+/** Keep the cross-tab lock while this page alone owns unsaved observations. */
+export function parkGpsLease(id: string, owner: string, lease: GpsLease): void {
+  const parked = parkedLeases.get(id);
+  if (parked && parked.lease !== lease) throw new Error('A GPS lease is already parked');
+  parkedLeases.set(id, { owner, lease });
+}
+
+export function hasParkedGpsLease(id: string, owner: string): boolean {
+  return parkedLeases.get(id)?.owner === owner;
+}
+
+/** Only the original account in this same page can resume its parked lease. */
+export function adoptParkedGpsLease(id: string, owner: string): GpsLease | undefined {
+  const parked = parkedLeases.get(id);
+  if (!parked || parked.owner !== owner) return undefined;
+  parkedLeases.delete(id);
+  return parked.lease;
+}
 export function gpsLeaseClosing(id: string): Promise<void> | undefined { return closingLeases.get(id); }
 export function rememberGpsLeaseClosing(id: string, release: Promise<void>): void {
   const previous = closingLeases.get(id);

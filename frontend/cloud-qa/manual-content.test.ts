@@ -34,6 +34,7 @@ test('operational notices identify the target and recheck the representative act
 test('delivery guidance distinguishes the saved inbox from external channels and explains representative access', () => {
   const text = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-entrega'));
   assert.match(text, /entrega confirmada deja avisos internos/);
+  assert.match(text, /confirmación queda deshabilitada.*Reintentar guardado en el mismo diálogo/i);
   assert.match(text, /Reintentar la misma entrega no duplica esos avisos/);
   assert.match(text, /empresa, actividad y sede autorizadas/);
   assert.match(text, /aviso interno no confirma que se haya enviado correo o push/i);
@@ -72,6 +73,9 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /al reabrir, usá la misma cuenta y actividad/i);
   assert.match(recovery, /no confirmes una segunda entrega desde otro dispositivo/i);
   assert.match(recovery, /se intenta guardar la última lectura no enviada/i);
+  assert.match(recovery, /falla la escritura y queda una ubicación sólo en memoria/i);
+  assert.match(recovery, /volvé al mismo viaje, resolvé el almacenamiento y usá Reintentar guardado/i);
+  assert.match(recovery, /un cierre forzado o ignorar el aviso puede perder esa ubicación/i);
   assert.match(recovery, /no comprueba otros dispositivos ni perfiles de navegador/i);
   assert.match(recovery, /otra ventana está sincronizando esa misma cuenta/i);
   assert.match(recovery, /si la espera supera diez segundos/i);

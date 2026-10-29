@@ -3,6 +3,18 @@ const tasksByTrip = new Map<string, Set<Promise<void>>>();
 const volatileQueues = new Map<string, PendingGpsPoint[]>();
 export const GPS_DELIVERY_CONFIRMED_EVENT = 'sitrep:gps-delivery-confirmed';
 
+// A failed local write leaves data only in this page's memory. Warn on a
+// normal close even if the tracking component has already been unmounted.
+function warnAboutVolatileGps(event: BeforeUnloadEvent) {
+  if (![...volatileQueues.values()].some(points => points.length)) return;
+  event.preventDefault(); event.returnValue = '';
+}
+function updateVolatileGpsWarning() {
+  if (typeof window === 'undefined') return;
+  if ([...volatileQueues.values()].some(points => points.length)) window.addEventListener('beforeunload', warnAboutVolatileGps);
+  else window.removeEventListener('beforeunload', warnAboutVolatileGps);
+}
+
 export class GpsPendingError extends Error {
   constructor(message = 'No se pudieron enviar las ubicaciones pendientes. Revisá la conexión y volvé a intentar.', readonly issue?: GpsStorageIssue) {
     super(message);
@@ -79,6 +91,10 @@ export function gpsQueueKey(owner: string | number, id: string): string {
   return `sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(owner), id]))}`;
 }
 
+export function hasVolatileGpsQueue(owner: string | number, id: string): boolean {
+  return (volatileQueues.get(gpsQueueKey(owner, id))?.length ?? 0) > 0;
+}
+
 /** A different account's pending work must not be uploaded under this session
  * or silently stranded by finishing the same trip on this device. */
 export function assertNoOtherGpsQueue(owner: string | number, id: string): void {
@@ -110,9 +126,11 @@ export function savePendingGpsQueue(owner: string | number, id: string, points: 
     if (points.length) localStorage.setItem(key, JSON.stringify(points));
     else localStorage.removeItem(key);
     volatileQueues.delete(key);
+    updateVolatileGpsWarning();
     return true;
   } catch {
     volatileQueues.set(key, [...points]);
+    updateVolatileGpsWarning();
     return false;
   }
 }
