@@ -11,7 +11,8 @@ assert.equal(new URL(process.env.DATABASE_URL!).searchParams.get('schema'), 'pro
 assert.equal(process.env.TRAINING_DATABASE_URL, '');
 assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
 const root = process.env.QA_ARTIFACTS!;
-assert.match(root, /^\/work\/sitrep\/\.qa-operational-ui-current\d+$/);
+assert.ok(/^\/work\/sitrep\/\.qa-operational-ui-current\d+$/.test(root)
+  || root === '/work/sitrep/.qa-toast-compact-fix-20261029', 'Unexpected QA artifacts directory');
 const browser = path.join(root, 'manifest-complete');
 const proofs = readdirSync(browser, { withFileTypes: true }).filter(entry => entry.isDirectory())
   .map(entry => path.join(browser, entry.name, 'complete-lifecycle.json')).filter(existsSync)

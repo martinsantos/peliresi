@@ -8,7 +8,7 @@ const root=process.cwd(), out=path.join(process.env.QA_ARTIFACTS!,'gallery');fs.
 const req=createRequire(path.join(root,'frontend/package.json')), backendReq=createRequire(path.join(root,'backend/package.json')), ts=req('typescript'), React=req('react'), {renderToStaticMarkup}=req('react-dom/server');
 const sources=new Map<string,string>(), cache=new Map<string,any>();
 const env={FRONTEND_URL:'https://sitrep.example.invalid',DISABLE_EMAILS:'true',MANIFEST_EXCEPTIONAL_REVIEWERS:'admin',MANIFEST_PARTY_REVIEW_ENABLED:'true'};
-let capture:any[]=[], currentNotice:any, currentRole='GENERADOR';
+let capture:any[]=[], currentNotice:any, currentRole='GENERADOR', sampleCompanyRecipients:any[]=[];
 const actor=(role:string)=>({id:role.toLowerCase(),usuarioId:role,activo:true,razonSocial:role==='GENERADOR'?'Taller del Oeste · ejemplo':role==='OPERADOR'?'Planta Andina · ejemplo':'Transporte Cuyo · ejemplo',domicilio:'Calle de ejemplo 123',usuario:{id:role,activo:true}});
 let manifest:any={id:'MUESTRA-001',numero:'M-2026-000123',modalidad:'FIJO',generadorId:'generador',transportistaId:'transportista',operadorId:'operador',creadoPorId:'OPERADOR',fechaEstimadaRetiro:new Date('2026-10-23T15:00:00Z'),generador:actor('GENERADOR'),transportista:actor('TRANSPORTISTA'),operador:actor('OPERADOR')};
 const db:any={notificacion:{create:async({data}:any)=>{capture.push(data);return data;},createMany:async({data}:any)=>{capture.push(...data);return {count:data.length};}},usuario:{findMany:async()=>[{id:'ADMIN'}]},manifiesto:{findUnique:async()=>manifest}};
@@ -32,6 +32,8 @@ function moduleLoad(rel:string):any {
   if(id.includes('push.service'))return {enviarPushAlUsuario(){throw Error('External delivery forbidden');}};
   if(id.includes('manifestTraining'))return {manifestFeatureEnabled:()=>true};
   if(id.includes('trainingScope'))return {isTrainingSession:()=>false};
+  // The gallery uses declared synthetic accesses, never the real directory.
+  if(id.includes('manifestCompanyRecipients.service'))return {manifestCompanyRecipients:async()=>sampleCompanyRecipients};
   if(id.includes('inspectionExchange.service'))return {PARTICIPANT_VISIBLE_STATES:[]};
   if(id.includes('manifiestoExcepcional'))return {exceptionalApproval:()=>({estado:'PENDIENTE'})};
   if(id.includes('roleFilter'))return {isFullAccess:()=>false};
@@ -94,11 +96,47 @@ for(const phase of ['aprobada','iniciada']){
  add('propuesta-insitu-historica-'+phase,'Manifiestos · aprobaciones',['GENERADOR','OPERADOR'],'backend/src/services/manifestProposal.service.ts',historical,undefined,'Ejemplo histórico sin modalidad en los metadatos: el correo orienta de forma general y conserva el aviso.','Sujeto a la configuración del entorno');
 }
 capture=[];await proposal.notifyManifestParties(db,{...manifest,creadoPorId:'ADMIN'},'creada','ADMIN');add('propuesta-creador-administrador','Manifiestos · aprobaciones',['ADMIN'],'backend/src/services/manifestProposal.service.ts',capture.find(n=>n.usuarioId==='ADMIN'),undefined,'Variante del creador que no es una de las tres partes.','Sujeto a la configuración del entorno');
+// Exercise the current transactional producers with sample company access;
+// this is a rendering fixture, not a query or proof of a person's authority.
+read('backend/src/services/manifestCompanyRecipients.service.ts');
+sampleCompanyRecipients=parties.map(role=>({usuarioId:'REP-'+role,accesosEmpresa:[{empresaId:'EMPRESA-MUESTRA',actividadId:'ACTIVIDAD-'+role,rol:role,razonSocial:'Empresa · ejemplo'}]}));
+const deliverySource='backend/src/services/manifestDeliveryNotice.service.ts';
+const deliveryProducer=moduleLoad(deliverySource);
+capture=[];await deliveryProducer.notifyManifestDelivery(db,manifest,'EVENTO-ENTREGA-MUESTRA','TRANSPORTISTA');
+const expectedDelivery=['GENERADOR','OPERADOR','ADMIN',...parties.map(role=>'REP-'+role)].sort();
+if(JSON.stringify(capture.map(item=>item.usuarioId).sort())!==JSON.stringify(expectedDelivery))throw Error('Unexpected delivery audience');
+for(const role of ['GENERADOR','OPERADOR','ADMIN']){
+ const notice=capture.find(item=>item.usuarioId===role);if(!notice)throw Error('Missing current delivery recipient '+role);
+ add('entrega-actual-'+role,'Manifiestos · operación',[role],deliverySource,notice,undefined,'La entrega se confirma junto con el aviso; el transporte autor no recibe su propio aviso.');
+}
+for(const role of parties){
+ const notice=capture.find(item=>item.usuarioId==='REP-'+role);if(!notice)throw Error('Missing delivery representative '+role);
+ add('entrega-representante-'+role,'Manifiestos · operación',[role],deliverySource,notice,undefined,'Ejemplo de una persona representante con autorización para esta actividad. El acceso se comprueba nuevamente al abrir el aviso.','Sujeto a representación habilitada');
+}
+const operationsSource='backend/src/services/manifestOperationalNotice.service.ts';
+const operationsProducer=moduleLoad(operationsSource);
+for(const [sample,kind,recipient,author,extra] of [
+ ['INCIDENTE','INCIDENTE','OPERADOR','TRANSPORTISTA',{descripcion:'Rotura de ejemplo; vehículo detenido.'}],
+ ['INCIDENTE-SIN-DESCRIPCION','INCIDENTE','OPERADOR','TRANSPORTISTA',{descripcion:''}],
+ ['RECHAZO','RECHAZO','GENERADOR','OPERADOR',{}],
+ ['DIFERENCIA_PESO','DIFERENCIA_PESO','GENERADOR','OPERADOR',{delta:'12%'}],
+] as any){
+ capture=[];await operationsProducer.notifyManifestOperationalEvent(db,{tipo:kind,eventoId:'EVENTO-'+sample,manifiestoId:manifest.id,authorId:author,...extra});
+ const expected=[recipient,'ADMIN','REP-'+recipient].sort();
+ if(JSON.stringify(capture.map(item=>item.usuarioId).sort())!==JSON.stringify(expected))throw Error('Unexpected operational audience '+kind);
+ for(const role of [recipient,'ADMIN']){
+  const notice=capture.find(item=>item.usuarioId===role);if(!notice)throw Error('Missing operational recipient '+kind+' '+role);
+  add('operacion-actual-'+sample+'-'+role,'Alertas operativas',[role],operationsSource,notice,undefined,'Aviso ligado al evento registrado. Los datos del caso son artificiales.');
+ }
+ const notice=capture.find(item=>item.usuarioId==='REP-'+recipient);if(!notice)throw Error('Missing operational representative '+kind);
+ add('operacion-representante-'+sample,'Alertas operativas',[recipient],operationsSource,notice,undefined,'Ejemplo de representante de la actividad destinataria; la autorización se comprueba al abrir el aviso.','Sujeto a representación habilitada');
+}
+sampleCompanyRecipients=[];
 const dispatcher=moduleLoad('backend/src/services/notification-dispatcher.service.ts').notificationService;
 for(const state of ['APROBADO','EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','TRATADO','RECHAZADO','CANCELADO']){
  capture=[];await dispatcher.notificarCambioEstado(manifest.id,state);
  const groups=new Map<string,any>();for(const n of capture){const k=n.titulo+'|'+n.mensaje;if(!groups.has(k))groups.set(k,{n,roles:[]});groups.get(k).roles.push(n.usuarioId);}
- let index=0;for(const {n,roles} of groups.values())add('estado-'+state+'-'+index++,'Manifiestos · operación',roles,'backend/src/services/notification-dispatcher.service.ts',n,undefined,'El autor normalmente no recibe su propio aviso.');
+ let index=0;for(const {n,roles} of groups.values())add('estado-'+state+'-'+index++,'Manifiestos · operación',roles,'backend/src/services/notification-dispatcher.service.ts',n,undefined,state==='ENTREGADO'?'Aviso de la ruta anterior; la entrega actual registra su propio aviso en la transacción.':'El autor normalmente no recibe su propio aviso.');
 }
 manifest={...manifest,modalidad:'IN_SITU'};capture=[];await dispatcher.notificarCambioEstado(manifest.id,'APROBADO');
 for(const role of parties)add('estado-insitu-'+role,'Manifiestos · operación',[role],'backend/src/services/notification-dispatcher.service.ts',capture.find(n=>n.usuarioId===role),undefined,'Tratamiento en origen con transporte aprobador, sin traslado.');
@@ -108,7 +146,18 @@ const addenda=moduleLoad('backend/src/services/manifiestoAddendumNotice.service.
 for(const event of ['CREADA','APROBADA','OBSERVADA','RECHAZADA'])for(const author of [...parties,'Revisor designado']){capture=[];await addenda.notifyAddendumParties(db,manifest,'ADENDA-001',1,event,author);add('adenda-'+event+'-'+author.replaceAll(' ','-'),'Adendas',parties.filter(r=>r!==author),'backend/src/services/manifiestoAddendumNotice.service.ts',capture[0],undefined,'Autor variable: '+author+'. Aprobación individual, no unanimidad.','Sujeto a la configuración del entorno');}
 for(const [event,pair]of Object.entries(labels.eventual) as any)add('eventual-'+event,'Eventuales',event==='SOLICITAR_REVISION'?[...parties,'ADMIN']:parties,'backend/src/services/eventualNotice.service.ts',{titulo:pair[0],mensaje:'BI-MUESTRA-001 · '+pair[1],prioridad:['CREADO','SOLICITAR_REVISION','OBSERVADA_POST_FACTO'].includes(event)?'ALTA':'NORMAL',datos:{tipo:'manifiesto_eventual',version:1,correoVersion:1,registroId:'MUESTRA-001',eventoId:'evento-muestra',evento:event}},undefined,'Sólo participantes registrados con acceso. El externo sin cuenta no recibe este aviso; la autoridad debe estar designada.','Sujeto a la configuración del entorno');
 const cert=moduleLoad('backend/src/services/manifestCertificate.service.ts');
-for(const tipo of ['PARCIAL','FINAL']){capture=[];await cert.notifyCertificateParties(db,manifest,{id:'CERT-MUESTRA-001',tipo,numero:tipo==='PARCIAL'?'CP-2026-000123':'CF-2026-000123'},'OPERADOR');add('certificado-'+tipo,'Certificados',['GENERADOR','TRANSPORTISTA'],'backend/src/services/manifestCertificate.service.ts',capture[0],undefined,'El operador emite; las otras partes activas reciben. In situ: sólo generador.','Sujeto a la configuración del entorno');}
+for(const tipo of ['PARCIAL','FINAL']){
+ const record={id:'CERT-MUESTRA-'+tipo,tipo,numero:tipo==='PARCIAL'?'CP-2026-000123':'CF-2026-000123'};
+ for(const [variant,example,roles,note] of [
+  ['normal',manifest,['GENERADOR','TRANSPORTISTA'],'El operador emite; generador y transporte activos reciben el aviso.'],
+  ['insitu',{...manifest,modalidad:'IN_SITU'},['GENERADOR','TRANSPORTISTA'],'En origen, el transporte aprobador también recibe el aviso si está vinculado y activo.'],
+  ['insitu-historico',{...manifest,modalidad:'IN_SITU',transportistaId:null,transportista:null},['GENERADOR'],'Ejemplo histórico sin transporte vinculado: recibe el generador activo.'],
+ ] as any){
+  capture=[];await cert.notifyCertificateParties(db,example,record,'OPERADOR');
+  if(JSON.stringify(capture.map(item=>item.usuarioId).sort())!==JSON.stringify([...roles].sort()))throw Error('Unexpected certificate audience '+tipo+' '+variant);
+  add(variant==='normal'?'certificado-'+tipo:'certificado-'+variant+'-'+tipo,'Certificados',roles,'backend/src/services/manifestCertificate.service.ts',capture[0],undefined,note,'Sujeto a la configuración del entorno');
+ }
+}
 for(const role of parties)add('ambiental-'+role,'Certificados',[role],'backend/src/controllers/documento.controller.ts',{...inlineNotice('backend/src/controllers/documento.controller.ts','Certificado ambiental disponible'),datos:{tipo:'certificado_ambiental',documentoId:'DOC-MUESTRA',actorId:'ACTOR-MUESTRA',actorTipo:role.toLowerCase()}},undefined,'Certificado ambiental anual cargado por DGFA; distinto de los certificados del manifiesto.');
 for(const [event,pair]of Object.entries(labels.exchange) as any){const participant=['REQUERIMIENTO','PRONUNCIAMIENTO','CIERRE_CONFORME','DERIVACION_LEGALES'].includes(event);add('psip-'+event,'PSIP · intercambio',participant?parties:staff,'backend/src/services/inspectionExchangeNotice.service.ts',{titulo:'PSIP · '+pair[0],mensaje:'GRP-MUESTRA-001 · Actuación #2. '+pair[1],datos:{tipo:'intercambio_inspeccion',version:1,correoVersion:1,inspeccionId:'PSIP-MUESTRA-001',intercambioId:'INTERCAMBIO-001',secuencia:2,...(event==='REQUERIMIENTO'?{plazoRespuestaAt:'2026-10-29T21:00:00Z'}:{}),evento:event,parte:participant?'AUTORIDAD':'INSPECCIONADO',destino:participant?'participacion':'inspeccion'}},undefined,participant?'Destinatario: actor inspeccionado vinculado.':'Destinatarios: inspector asignado y administración competente, excluido autor.');}
 for(const [event,pair]of Object.entries(labels.agenda) as any)for(const audience of ['inspeccion',...(['NOTIFICADA','EN_TRAMITE_LEGAL','FINALIZADA'].includes(event)?['participacion']:[])])add('agenda-'+event+'-'+audience,'PSIP · agenda',audience==='inspeccion'?staff:parties,'backend/src/services/inspectionAgendaNotice.service.ts',{titulo:'PSIP · '+pair[0],mensaje:'GRP-MUESTRA-001 · '+pair[1],datos:{tipo:'agenda_inspeccion',version:1,correoVersion:1,inspeccionId:'PSIP-MUESTRA-001',eventoId:'EVENTO-001',evento:event,destino:audience}},undefined,audience==='inspeccion'?'Inspector asignado y administración del sector.':'Actor vinculado al expediente.');
@@ -149,6 +198,17 @@ for(const [id,title,detail,priority] of [
   ['gps-sin-recepcion','GPS: sin posiciones recibidas','Pasaron 35 minutos entre dos recepciones; esto no confirma pérdida de señal.','ALTA'],
 ])add(id,'Alertas operativas',['ADMIN'],sub,{tipo:'ANOMALIA_DETECTADA',titulo:title,mensaje:manifest.numero+' · Hora de captura no disponible. Verificá el caso con transporte. '+detail,prioridad:priority,manifiestoId:manifest.id},undefined,'Observación basada en recepción; los tiempos y distancias son ejemplos, no hechos confirmados.');
 add('transito-tiempo','Alertas operativas',['ADMIN'],sub,{tipo:'ALERTA_SISTEMA',titulo:'Duración del viaje · regla de ejemplo',mensaje:'Al evaluar, el manifiesto '+manifest.numero+' llevaba aproximadamente 36 horas en tránsito. Se alcanzó el umbral configurado por Ambiente.',prioridad:'ALTA',manifiestoId:manifest.id,datos:{tipo:'duracion_transito_configurada',version:1,evento:'TIEMPO_EXCESIVO',horasTransito:36,reglaId:'REGLA-MUESTRA'}},undefined,'Sólo se genera con una regla activa y un umbral explícito; se revisa periódicamente aunque no lleguen posiciones. No es un plazo legal.');
+for(const role of parties){
+ const access=[{empresaId:'EMPRESA-MUESTRA',actividadId:'ACTIVIDAD-'+role,rol:role,razonSocial:'Empresa · ejemplo'}];
+ add('transito-representante-'+role,'Alertas operativas',[role],sub,{tipo:'ALERTA_SISTEMA',titulo:'Duración del viaje · regla de ejemplo',
+  mensaje:'Al evaluar, el manifiesto '+manifest.numero+' llevaba aproximadamente 36 horas en tránsito. Se alcanzó el umbral configurado por Ambiente.',
+  prioridad:'ALTA',manifiestoId:manifest.id,datos:{tipo:'duracion_transito_configurada',version:1,evento:'TIEMPO_EXCESIVO',horasTransito:36,reglaId:'REGLA-MUESTRA',destino:'representante',accesosEmpresa:access}},
+  undefined,'Ejemplo de regla activa configurada por Ambiente y representante seleccionado. La regla y los accesos son artificiales; no determinan un plazo legal.','Sujeto a regla y representación habilitadas');
+ add('regla-representante-'+role,'Alertas operativas',[role],sub,{tipo:'ALERTA_SISTEMA',titulo:'Regla de ejemplo para revisar',
+  mensaje:'Hay una observación del manifiesto '+manifest.numero+' para revisar según una regla de ejemplo.',prioridad:'ALTA',manifiestoId:manifest.id,
+  datos:{tipo:'alerta_regla_manifiesto',version:1,evento:'INCIDENTE',reglaId:'REGLA-MUESTRA',destino:'representante',accesosEmpresa:access}},
+  undefined,'Ejemplo de regla configurable y representante seleccionado; el nombre y mensaje dependen de la regla.','Sujeto a regla y representación habilitadas');
+}
 add('desvio','Alertas operativas',['ADMIN'],sub,{tipo:'ANOMALIA_DETECTADA',titulo:'🗺️ Desvío de Ruta Detectado',mensaje:'El manifiesto '+manifest.numero+' está a 6.2 km fuera del corredor',prioridad:'ALTA',manifiestoId:manifest.id},undefined,'Variante histórica; el evento DESVIO_RUTA no tiene emisor operativo identificado en este corte. No acredita una ruta autorizada.');
 for(const entity of ['transportista','vehículo','conductor'])for(const days of [3,20])add('vencimiento-legado-'+entity+'-'+days,'Vencimientos',['ADMIN'],sub,{tipo:'ALERTA_SISTEMA',titulo:'📋 Vencimiento Próximo — '+entity+' de ejemplo',mensaje:'El '+entity+' "'+entity+' de ejemplo" vence en '+days+' días (24/10/2026)',prioridad:days<=7?'URGENTE':'ALTA'},undefined,'Variante del recordatorio histórico. El nombre y la fecha se reemplazan por los del documento.');
 for(const entity of ['TRANSPORTISTA','OPERADOR','VEHICULO','CHOFER'])for(const state of ['PROXIMO','VENCIDO']){
@@ -186,7 +246,7 @@ for(const c of cases){
  if(c.notice){c.inboxRefs={};c.inboxReadRefs={};c.paths={};for(const role of c.roles){currentRole=role==='INSPECTOR'?'GENERADOR':role;currentNotice={...c.notice};if(c.notice.datos.includes('catalogo_verificable')&&c.notice.datos.includes('"destino":"participacion"')&&(role.startsWith('ADMIN')||role==='INSPECTOR'))currentNotice.datos=c.notice.datos.replace('"destino":"participacion"','"destino":"inspeccion"');if(c.notice.datos.includes('vencimiento_documental')&&role.startsWith('ADMIN'))currentNotice.datos=c.notice.datos.replace('"destino":"perfil"','"destino":"actor"');
    c.inboxRefs[role]=blob(renderToStaticMarkup(React.createElement(Inbox)));currentNotice={...currentNotice,leida:true};c.inboxReadRefs[role]=blob(renderToStaticMarkup(React.createElement(Inbox)));c.paths[role]=navigation.resolveNotificationPath(currentNotice,'',currentRole);
   }
-  c.toastRef=blob(renderToStaticMarkup(React.createElement(Toast,{id:c.id,type:['ALTA','URGENTE'].includes(c.notice.prioridad)?'warning':'info',title:c.notice.titulo,message:c.notice.mensaje,onRemove(){},onAction(){},actionLabel:'Abrir'})));
+  c.toastRef=blob(renderToStaticMarkup(React.createElement(Toast,{id:c.id,type:['ALTA','URGENTE'].includes(c.notice.prioridad)?'warning':'info',title:c.notice.titulo,message:c.notice.mensaje,messagePreview:true,onRemove(){},onAction(){},actionLabel:'Abrir'})));
  }
  c.title=c.notice?.titulo||c.subject?.replace('[SITREP] ','')||Object.values(c.mailRefs||{})[0]?.subject?.replace('[SITREP] ','');
  if(!c.title)throw Error('Missing title '+c.id);

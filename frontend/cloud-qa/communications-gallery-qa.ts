@@ -100,6 +100,49 @@ try{
      await expect(page.locator('#review')).toContainText('Corregido:');
    }
  });
+ await check('current delivery and operational producers include their scoped representative notices',async()=>{
+   for(const [id,role] of [
+     ['entrega-representante-GENERADOR','GENERADOR'],['entrega-representante-TRANSPORTISTA','TRANSPORTISTA'],
+     ['entrega-representante-OPERADOR','OPERADOR'],['operacion-representante-INCIDENTE','OPERADOR'],
+     ['operacion-representante-INCIDENTE-SIN-DESCRIPCION','OPERADOR'],
+     ['operacion-representante-RECHAZO','GENERADOR'],['operacion-representante-DIFERENCIA_PESO','GENERADOR'],
+     ['transito-representante-GENERADOR','GENERADOR'],['transito-representante-TRANSPORTISTA','TRANSPORTISTA'],
+     ['transito-representante-OPERADOR','OPERADOR'],['regla-representante-GENERADOR','GENERADOR'],
+     ['regla-representante-TRANSPORTISTA','TRANSPORTISTA'],['regla-representante-OPERADOR','OPERADOR'],
+   ]){
+     const item=data.cases.find((entry:any)=>entry.id===id);
+     assert.ok(item,'missing '+id);
+     const metadata=JSON.parse(item.notice.datos);
+     assert.equal(metadata.destino,'representante',id);assert.equal(metadata.accesosEmpresa[0].rol,role,id);
+     assert.equal(item.paths[role],'/notificaciones/'+item.notice.id,id);
+     const mail=item.mailRefs[role];assert.ok(mail,id+' missing mail render');
+     const html=data.blobs[mail.ref];
+     const web=html.match(/data-mail-action="web" href="([^"]+)"/);
+     assert.ok(web,id+' missing web action');
+     assert.equal(new URL(web[1].replace(/&amp;/g,'&')).pathname,'/notificaciones/'+item.notice.id,id);
+   }
+   for(const name of ['manifestDeliveryNotice.service.ts','manifestOperationalNotice.service.ts'])
+     assert.ok(data.coverage.discoveredProducers.some((file:string)=>file.endsWith(name))&&data.cases.some((item:any)=>item.source.endsWith(name)),name);
+   await page.locator('#role').selectOption('GENERADOR');await page.locator('#family').selectOption('Manifiestos · operación');
+   await select('entrega-representante-GENERADOR');await channel('inbox');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Entrega confirmada');
+   await channel('email');await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('entrega fue registrada');
+   await page.locator('#role').selectOption('');await page.locator('#family').selectOption('');
+ });
+ await check('origin certificates include the approving carrier when one is linked',async()=>{
+   for(const kind of ['PARCIAL','FINAL']){
+     const current=data.cases.find((entry:any)=>entry.id==='certificado-insitu-'+kind);
+     const historical=data.cases.find((entry:any)=>entry.id==='certificado-insitu-historico-'+kind);
+     assert.ok(current&&historical,'missing origin certificate '+kind);
+     assert.deepEqual([...current.roles].sort(),['GENERADOR','TRANSPORTISTA']);
+     assert.deepEqual(historical.roles,['GENERADOR']);
+     assert.match(current.note,/transporte aprobador también recibe/i);
+   }
+   await page.locator('#role').selectOption('TRANSPORTISTA');await page.locator('#family').selectOption('Certificados');
+   await select('certificado-insitu-FINAL');await channel('email');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('Certificación final total disponible');
+   await page.locator('#role').selectOption('');await page.locator('#family').selectOption('');
+ });
  await check('origin notices and email do not describe a pickup',async()=>{
    await select('propuesta-insitu-iniciada');await channel('email');
    await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('No hay retiro, viaje ni GPS');

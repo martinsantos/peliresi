@@ -48,6 +48,27 @@ describe('system notices', () => {
     expect(open).toHaveBeenCalledOnce();
     expect(screen.queryByText('Nuevo ticket')).toBeNull();
   });
+  it('keeps each live notice and its full accessible context in one linked control', () => {
+    const first=vi.fn(),second=vi.fn();render(<ToastContainer />);
+    const message='2026-000300. Generador: QA Generador 1. Transporte: QA Transporte 1.';
+    act(()=>{
+      ids.push(toast.add({type:'warning',title:'Tres aprobaciones. Listos para iniciar',message,actionLabel:'Abrir manifiesto',messagePreview:true,onAction:first,duration:0}));
+      ids.push(toast.add({type:'info',title:'Generador aprobó',message:'2026-000300. Decisión registrada.',actionLabel:'Abrir manifiesto',messagePreview:true,onAction:second,duration:0}));
+    });
+    const firstAction=screen.getByRole('button',{name:'Tres aprobaciones. Listos para iniciar '+message+' Abrir manifiesto'});
+    expect(firstAction.closest('[data-linked-notice]')).toHaveAttribute('role','alert');
+    expect(screen.getByRole('button',{name:'Generador aprobó 2026-000300. Decisión registrada. Abrir manifiesto'})).toBeVisible();
+    fireEvent.click(firstAction);expect(first).toHaveBeenCalledOnce();expect(second).not.toHaveBeenCalled();
+    expect(screen.queryByText('Tres aprobaciones. Listos para iniciar')).toBeNull();
+    expect(screen.getByText('Generador aprobó')).toBeVisible();
+  });
+  it('never compresses an error explanation even if it has an action',()=>{
+    render(<ToastContainer />);const retry=vi.fn();
+    act(()=>{ids.push(toast.add({type:'error',title:'No se pudo guardar',message:'Mantené esta ventana abierta y reintentá.',messagePreview:true,onAction:retry,actionLabel:'Reintentar',duration:0}));});
+    expect(screen.getByRole('alert')).not.toHaveAttribute('data-linked-notice');
+    expect(screen.getByText('Mantené esta ventana abierta y reintentá.')).not.toHaveClass('line-clamp-2');
+    fireEvent.click(screen.getByRole('button',{name:'Reintentar'}));expect(retry).toHaveBeenCalledOnce();
+  });
   it('replaces superseded transient successes instead of consuming the field workspace', () => {
     render(<ToastContainer />);
     act(() => {

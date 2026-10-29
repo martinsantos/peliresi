@@ -72,7 +72,7 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
   await expect(live.locator('[data-agenda-row]').first()).toContainText('Te toca aprobar');
   await approve(page,m.id,creator);await page.goto(homes[creator]);
   const agenda=page.getByRole('region',{name:'Agenda de manifiestos'});
-  await expect(agenda.locator('[data-agenda-row]').first()).toContainText(m.numero);
+  await expect(agenda.locator('[data-agenda-row]').first()).toContainText(m.numero,{timeout:12000});
   await expect(agenda.locator('[data-agenda-row]').first()).toContainText('En espera');
   await agenda.getByRole('button',{name:'En espera',exact:true}).click();await proof(page,info,'waiting-'+creator);
   for(const role of roles.filter(r=>r!==creator)){

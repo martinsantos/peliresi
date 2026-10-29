@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, AlertCircle, Info, X, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Info, X, AlertTriangle, ArrowRight } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -188,6 +188,25 @@ const ToastItem: React.FC<ToastItemProps> = ({
     <button type="button" aria-label="Cerrar notificación" onClick={() => onRemove(id)}
       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline-primary-700"><X size={16} /></button>
   </div>;
+  // Inbox notices already retain their full content. Make the entire summary
+  // the action so concurrent notices do not each need a second 44px row.
+  // Local errors keep their complete, non-truncated explanation below.
+  if (messagePreview && onAction && type !== 'error') return <div
+    role={type === 'warning' ? 'alert' : 'status'} aria-atomic="true" data-linked-notice="true"
+    className={cn('flex w-full items-start gap-2 rounded-xl border px-2 py-1', toastStyles[type])}>
+    <span className="mt-3 shrink-0" aria-hidden="true">{toastIcons[type]}</span>
+    <button type="button" aria-label={[title,message,actionLabel || 'Abrir'].filter(Boolean).join(' ')}
+      className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"
+      onClick={() => { onAction(); onRemove(id); }}>
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 text-sm font-semibold text-primary-800 underline decoration-primary-300 underline-offset-2">{title}</span>
+        {message && <span className="line-clamp-2 mt-1 break-words text-sm leading-snug text-neutral-700">{message}</span>}
+      </span>
+      <ArrowRight size={18} className="shrink-0 text-primary-700" aria-hidden="true" />
+    </button>
+    <button type="button" aria-label="Cerrar notificación" onClick={() => onRemove(id)}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-neutral-600 hover:bg-white/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-700"><X size={16}/></button>
+  </div>;
   return (
     <div
       className={cn(
@@ -202,7 +221,7 @@ const ToastItem: React.FC<ToastItemProps> = ({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-neutral-900 sm:text-base">{title}</p>
           {message && (
-            <p className={cn('mt-1 break-words text-sm leading-relaxed text-neutral-700', messagePreview && onAction && 'line-clamp-2')}>{message}</p>
+            <p className="mt-1 break-words text-sm leading-relaxed text-neutral-700">{message}</p>
           )}
           {onAction && <button type="button" className="mt-1 min-h-11 rounded-lg px-2 text-sm font-semibold text-primary-800 underline focus-visible:outline-primary-700"
             onClick={() => { onAction(); onRemove(id); }}>{actionLabel || 'Abrir'}</button>}
