@@ -801,7 +801,8 @@
       { title: 'Reconocer una aprobación, adenda o relevo', body: [
         'El aviso indica si hay una propuesta por aprobar, una aprobación de otra parte, unanimidad, coordinación iniciada o rechazo. Las tres aprobaciones siguen visibles como iconos en la agenda.',
         'En tratamiento en origen, el transporte también aprueba, pero no hay retiro, viaje ni GPS. La coordinación indica que el operador debe confirmar la recepción en el domicilio del generador. Un correo antiguo sin esa modalidad puede ser más general: abrí el manifiesto para conocer el paso de tu rol.',
-        'Una adenda nueva o su resolución avisa a las otras partes vinculadas. Un relevo avisa a las partes y al C3; la transportista registrada de reemplazo lo consulta en su propio perfil.'
+        'Una adenda nueva o su resolución avisa a las otras partes vinculadas. Un relevo avisa a las partes y al C3; la transportista registrada de reemplazo lo consulta en su propio perfil.',
+        'Un incidente en tránsito avisa a la cuenta del operador, sus representantes autorizados y Administración. Un rechazo de carga o una diferencia de pesaje mayor al 5 % avisa a la cuenta del generador, sus representantes autorizados y Administración. No se avisa a quien registró la acción. Al abrir el aviso de representante, SITREP vuelve a comprobar la actividad y la sede autorizadas; un aviso no reemplaza el informe de hallazgo ni la adenda. Esto se aplica a avisos nuevos y no reconstruye los anteriores.'
       ], expected: 'El aviso abre el registro que tu cuenta puede consultar; no otorga permisos adicionales.' },
       { title: 'Distinguir aviso dentro de SITREP, push y correo', body: [
         'Cuando el canal esté habilitado, abrí Avisos → Opciones → Activar avisos del teléfono y aceptá el permiso para recibir notificaciones del sistema. El correo requiere una dirección verificada y la preferencia de email activa. El equipo debe comprobar cada canal en el dispositivo de uso.',

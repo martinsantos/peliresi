@@ -8,9 +8,12 @@ const parse = (raw: string | null): Data | null => {
  try { const d = JSON.parse(raw || 'null'); return d && typeof d === 'object' && !Array.isArray(d) ? d : null; }
  catch { return null; }
 };
-export const isManifestRuleCompanyNotice = (notice: Pick<Notice, 'tipo'>, data: Data | null): boolean =>
- notice.tipo === 'ALERTA_SISTEMA' && data?.destino === 'representante'
- && ['duracion_transito_configurada', 'alerta_regla_manifiesto'].includes(String(data.tipo));
+export const isManifestRuleCompanyNotice = (notice: Pick<Notice, 'tipo'>, data: Data | null): boolean => {
+ if (data?.destino !== 'representante') return false;
+ if (notice.tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto'].includes(String(data.tipo))) return true;
+ const eventTypes: Record<string, string> = { INCIDENTE: 'INCIDENTE_REPORTADO', RECHAZO: 'MANIFIESTO_RECHAZADO', DIFERENCIA_PESO: 'ALERTA_SISTEMA' };
+ return data.tipo === 'alerta_evento_manifiesto' && eventTypes[String(data.evento)] === notice.tipo;
+};
 
 /** The original activity and site are part of the audience, not an authority. */
 export function matchingManifestRuleAccesses(data: Data, current: ManifestCompanyAccess[]): ManifestCompanyAccess[] {

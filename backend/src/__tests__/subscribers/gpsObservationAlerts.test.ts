@@ -2,14 +2,15 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { DomainEvent } from '../../services/domainEvent.service';
 
 const mocks = vi.hoisted(() => ({ rules: vi.fn(), users: vi.fn(), manifest: vi.fn(), existing: vi.fn(),
-  find: vi.fn(), create: vi.fn(), notice: vi.fn(), email: vi.fn(), company: vi.fn(), saved: [] as any[] }));
+  find: vi.fn(), create: vi.fn(), notice: vi.fn(), email: vi.fn(), company: vi.fn(), transaction: vi.fn(),
+  query: vi.fn(), insert: vi.fn(), channels: vi.fn(), saved: [] as any[] }));
 vi.mock('../../services/manifestCompanyRecipients.service', () => ({ manifestCompanyRecipients: mocks.company }));
 vi.mock('../../lib/prisma', () => ({ default: {
   reglaAlerta: { findMany: mocks.rules }, usuario: { findMany: mocks.users }, manifiesto: { findUnique: mocks.manifest },
-  notificacion: { findMany: mocks.existing }, alertaGenerada: { findFirst: mocks.find, create: mocks.create },
+  notificacion: { findMany: mocks.existing }, alertaGenerada: { findFirst: mocks.find, create: mocks.create }, $transaction: mocks.transaction,
 } }));
 vi.mock('../../utils/logger', () => ({ default: { info: vi.fn(), error: vi.fn() } }));
-vi.mock('../../controllers/notification.controller', () => ({ notificationService: { crearNotificacion: mocks.notice } }));
+vi.mock('../../controllers/notification.controller', () => ({ notificationService: { crearNotificacion: mocks.notice, programarCanalesDeNotificacion: mocks.channels } }));
 vi.mock('../../services/email.service', () => ({ emailService: { sendAlertEmail: mocks.email } }));
 import { alertaSubscriber } from '../../subscribers/alerta.subscriber';
 
@@ -26,6 +27,14 @@ beforeEach(() => {
   mocks.notice.mockImplementation(async notice => { mocks.saved.push(notice); return notice; });
   mocks.find.mockResolvedValue(null); mocks.create.mockResolvedValue({});
   mocks.manifest.mockResolvedValue({ generador: { usuario: { id: 'qa-generator' } }, transportista: null, operador: null });
+  mocks.query.mockImplementation(async (sql: TemplateStringsArray) => {
+    if (sql.join('').includes('clock_timestamp')) return [{ now: new Date() }];
+    if (sql.join('').includes('FROM reglas_alertas')) return (await mocks.rules.mock.results.at(-1)?.value) || [];
+    return [];
+  });
+  mocks.insert.mockImplementation(async ({ data }) => { mocks.saved.push(...data.map((n: any) => ({ ...n, datos: JSON.parse(n.datos) }))); return { count: data.length }; });
+  mocks.transaction.mockImplementation(async work => work({ $queryRaw: mocks.query, alertaGenerada: { findFirst: mocks.find, create: mocks.create },
+    manifiesto: { findUnique: mocks.manifest }, usuario: { findMany: mocks.users }, notificacion: { createMany: mocks.insert } }));
 });
 
 it('keeps different GPS observations visible while suppressing a repeated class', async () => {
@@ -58,4 +67,36 @@ it('notifies the selected transport even if its GPS position triggered the autom
   mocks.manifest.mockResolvedValue({ generador: null, transportista: { usuario: { id: 'qa-carrier' } }, operador: null });
   await alertaSubscriber(observation('VELOCIDAD_ANORMAL'));
   expect(mocks.saved.filter(item => item.usuarioId === 'qa-carrier' && item.titulo === 'QA GPS')).toHaveLength(1);
+});
+
+it('commits the case and notices together before scheduling channels', async () => {
+  mocks.rules.mockResolvedValue([{ id: 'qa-rule', nombre: 'QA GPS', evento: 'ANOMALIA_GPS', activa: true,
+    condicion: '{}', destinatarios: '["GENERADOR"]' }]);
+  const transaction = mocks.transaction.getMockImplementation()!;
+  let committed = false;
+  mocks.transaction.mockImplementation(async (...args: any[]) => {
+    const result = await transaction(...args);
+    expect(mocks.channels).not.toHaveBeenCalled(); committed = true; return result;
+  });
+  mocks.channels.mockImplementation(() => expect(committed).toBe(true));
+  await alertaSubscriber(observation('GPS_PERDIDO'));
+  expect(mocks.create).toHaveBeenCalledOnce(); expect(mocks.insert).toHaveBeenCalledOnce(); expect(mocks.channels).toHaveBeenCalledOnce();
+  expect(mocks.query.mock.calls.some(([sql]) => sql.join('').includes('pg_advisory_xact_lock'))).toBe(true);
+});
+
+it('does not schedule any channel when inserting the rule notices fails', async () => {
+  mocks.rules.mockResolvedValue([{ id: 'qa-rule', nombre: 'QA GPS', evento: 'ANOMALIA_GPS', activa: true,
+    condicion: '{}', destinatarios: '["GENERADOR"]' }]);
+  mocks.insert.mockRejectedValueOnce(new Error('recipient removed'));
+  await expect(alertaSubscriber(observation('GPS_PERDIDO'))).rejects.toThrow('recipient removed');
+  expect(mocks.channels).not.toHaveBeenCalled(); expect(mocks.email).not.toHaveBeenCalled();
+});
+
+it('skips a rule changed or disabled after the initial read', async () => {
+  mocks.rules.mockResolvedValue([{ id: 'qa-rule', nombre: 'QA GPS', evento: 'ANOMALIA_GPS', activa: true,
+    condicion: '{}', destinatarios: '["GENERADOR"]' }]);
+  mocks.query.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('FROM reglas_alertas')
+    ? [{ id: 'qa-rule', nombre: 'QA GPS', evento: 'ANOMALIA_GPS', activa: false, condicion: '{}', destinatarios: '["GENERADOR"]' }] : []);
+  await alertaSubscriber(observation('GPS_PERDIDO'));
+  expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.insert).not.toHaveBeenCalled(); expect(mocks.channels).not.toHaveBeenCalled();
 });

@@ -16,6 +16,7 @@ export type DomainEvent =
       tipoIncidente: string;
       descripcion: string;
       userId: string;
+      avisosConfirmados?: boolean;
       latitud?: number;
       longitud?: number;
     }
@@ -25,6 +26,7 @@ export type DomainEvent =
       motivo: string;
       numero: string;
       userId: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'DIFERENCIA_PESO';
@@ -34,6 +36,7 @@ export type DomainEvent =
       delta: string;
       deltaPorcentaje: number;
       userId: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'ANOMALIA_GPS';

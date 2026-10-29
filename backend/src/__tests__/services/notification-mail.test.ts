@@ -18,6 +18,20 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each([
+    ['INCIDENTE', 'INCIDENTE_REPORTADO', 'alertas'], ['RECHAZO', 'MANIFIESTO_RECHAZADO', 'manifiestos'],
+    ['DIFERENCIA_PESO', 'ALERTA_SISTEMA', 'alertas'],
+  ])('rechecks representative access for operational event %s without sending', async (evento, tipo, family) => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
+    const n = { ...notice, id: 'operational-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo, manifiestoId: 'm',
+      datos: JSON.stringify({ tipo: 'alerta_evento_manifiesto', version: 1, destino: 'representante', evento, accesosEmpresa: [access] }) };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, generador: { usuarioId: 'owner' }, operador: { usuarioId: 'operator' } });
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [access] }]);
+    expect(await notificationSourceEligible(n, family)).toBe(true);
+    const content = notificationMailContent(n)!; expect(content.html).toContain('/notificaciones/operational-notice'); expect(content.html).not.toContain('PRIVATE');
+    mocks.companyRecipients.mockResolvedValue([]); expect(await notificationSourceEligible(n, family)).toBe(false);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each(['duracion_transito_configurada', 'alerta_regla_manifiesto'])('rechecks the exact representative activity and site for %s without sending', async tipo => {
     const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
     const n = { ...notice, id: 'rule-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo: 'ALERTA_SISTEMA', manifiestoId: 'm',

@@ -6,13 +6,21 @@ vi.mock('../../lib/prisma', () => ({ default: {
   reglaAlerta: { findMany: vi.fn().mockResolvedValue([{ id: 'qa-expiry', nombre: 'QA vencimiento', evento: 'VENCIMIENTO', activa: true, condicion: '{"diasRestantes":{"lte":7}}', destinatarios: '["ADMIN"]' }]) },
   alertaGenerada: {
     findFirst: vi.fn(async ({ where }) => state.rows.find(row => row.reglaId === where.reglaId && row.manifiestoId === where.manifiestoId
-      && (where.AND || []).every((condition: { datos: { contains: string } }) => row.datos.includes(condition.datos.contains))) ?? null),
+      && (where.AND || []).every((condition: { datos: { contains: string } }) => row.datos.includes(condition.datos.contains.replace(/\\([\\%_])/g, '$1')))) ?? null),
     create: vi.fn(async ({ data }) => { const row = { id: String(state.rows.length + 1), ...data }; state.rows.push(row); return row; }),
   },
+  $transaction: vi.fn(async work => work({
+    $queryRaw: async (sql: TemplateStringsArray) => {
+      if (sql.join('').includes('clock_timestamp')) return [{ now: new Date() }];
+      if (sql.join('').includes('FROM reglas_alertas')) return (await vi.mocked(prisma.reglaAlerta.findMany).mock.results.at(-1)?.value) || [];
+      return [];
+    },
+    alertaGenerada: prisma.alertaGenerada, usuario: prisma.usuario, notificacion: { createMany: vi.fn() },
+  })),
 } }));
 vi.mock('../../utils/logger', () => ({ default: { info: vi.fn(), error: vi.fn() } }));
 vi.mock('../../services/email.service', () => ({ emailService: { sendAlertEmail: state.email } }));
-vi.mock('../../controllers/notification.controller', () => ({ notificationService: { crearNotificacion: state.notification } }));
+vi.mock('../../controllers/notification.controller', () => ({ notificationService: { crearNotificacion: state.notification, programarCanalesDeNotificacion: vi.fn() } }));
 import { alertaSubscriber } from '../../subscribers/alerta.subscriber';
 import prisma from '../../lib/prisma';
 const event = (entidadId: string, date = '2026-10-10T12:00:00Z', entidad: 'VEHICULO' | 'CHOFER' = 'VEHICULO') => ({
@@ -32,6 +40,10 @@ it('deduplicates a repeated subject/date but preserves a changed date, entity ty
   await alertaSubscriber(event(id, '2026-10-10T12:00:00Z', 'CHOFER'));
   expect(state.rows).toHaveLength(3);
   expect(state.email).not.toHaveBeenCalled();
+});
+it('treats SQL LIKE wildcards and backslashes in a subject as literal data', async () => {
+  for (const id of ['qa-AB', 'qa-%', 'qa-_', 'qa-\\x']) await alertaSubscriber(event(id));
+  expect(state.rows).toHaveLength(4);
 });
 it.each(['', 'false', 'true'])('external rule addresses require their separate explicit switch: %s', async enabled => {
   vi.stubEnv('DISABLE_EMAILS', 'false');

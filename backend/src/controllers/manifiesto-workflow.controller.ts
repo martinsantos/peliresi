@@ -9,6 +9,8 @@ import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import prisma from '../lib/prisma';
 import { domainEvents } from '../services/domainEvent.service';
+import { notificationService } from '../services/notification-dispatcher.service';
+import { notifyManifestOperationalEvent } from '../services/manifestOperationalNotice.service';
 import { computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
@@ -605,7 +607,7 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
     }
 
     // Atomic conditional update: prevents double-tap race condition
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       let updated;
       try {
         updated = await tx.manifiesto.update({
@@ -638,20 +640,23 @@ export const rechazarCarga = async (req: AuthRequest, res: Response, next: NextF
 
       await updateRollingHash(tx, id, 'RECHAZADO', new Date(), updated.observaciones, evento.id);
 
-      return updated;
+      const notices = await notifyManifestOperationalEvent(tx, { tipo: 'RECHAZO', eventoId: evento.id, manifiestoId: id, authorId: userId });
+      return { updated, notices };
     });
 
+    result.notices.forEach(notice => notificationService.programarCanalesDeNotificacion(notice));
     res.json({
       success: true,
-      data: { manifiesto: manifiestoActualizado }
+      data: { manifiesto: result.updated }
     });
 
     domainEvents.emit({
       type: 'RECHAZO_CARGA',
-      manifiestoId: manifiestoActualizado.id,
+      manifiestoId: result.updated.id,
       motivo,
-      numero: manifiestoActualizado.numero,
+      numero: result.updated.numero,
       userId,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);
@@ -675,7 +680,7 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
       throw new AppError('Solo los transportistas pueden registrar incidentes', 403);
     }
 
-    const evento = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const locked = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE
       `;
@@ -701,12 +706,15 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
       const observaciones = `${manifiesto.observaciones || ''} [INCIDENTE: ${tipoFinal}]`.trim();
       await tx.manifiesto.update({ where: { id }, data: { observaciones } });
       await updateRollingHash(tx, id, manifiesto.estado, new Date(), observaciones, created.id);
-      return created;
+      const notices = await notifyManifestOperationalEvent(tx, { tipo: 'INCIDENTE', eventoId: created.id,
+        manifiestoId: id, authorId: userId, descripcion });
+      return { evento: created, notices };
     });
 
+    result.notices.forEach(notice => notificationService.programarCanalesDeNotificacion(notice));
     res.json({
       success: true,
-      data: { evento }
+      data: { evento: result.evento }
     });
 
     domainEvents.emit({
@@ -715,6 +723,7 @@ export const registrarIncidente = async (req: AuthRequest, res: Response, next: 
       tipoIncidente: tipoFinal,
       descripcion,
       userId,
+      avisosConfirmados: true,
       latitud,
       longitud,
     });
@@ -944,6 +953,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
       await updateRollingHash(tx, id, manifiesto.estado, new Date(), manifiesto.observaciones, evento.id);
 
       const hasSignificantDifference = Math.abs(porcentajeDif) > 5;
+      let notices: Awaited<ReturnType<typeof notifyManifestOperationalEvent>> = [];
       if (hasSignificantDifference) {
         const anomaly = await tx.eventoManifiesto.create({
           data: {
@@ -954,11 +964,14 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
           },
         });
         await updateRollingHash(tx, id, manifiesto.estado, new Date(), manifiesto.observaciones, anomaly.id);
+        notices = await notifyManifestOperationalEvent(tx, { tipo: 'DIFERENCIA_PESO', eventoId: anomaly.id,
+          manifiestoId: id, authorId: userId, delta: `${porcentajeDif.toFixed(2)}%` });
       }
 
-      return { pesoDeclaradoTotal, pesoRealTotal, diferencia, porcentajeDif, hasSignificantDifference };
+      return { pesoDeclaradoTotal, pesoRealTotal, diferencia, porcentajeDif, hasSignificantDifference, notices };
     });
 
+    result.notices.forEach(notice => notificationService.programarCanalesDeNotificacion(notice));
     if (result.hasSignificantDifference) {
       domainEvents.emit({
         type: 'DIFERENCIA_PESO',
@@ -968,6 +981,7 @@ export const registrarPesaje = async (req: AuthRequest, res: Response, next: Nex
         delta: `${result.porcentajeDif.toFixed(2)}%`,
         deltaPorcentaje: result.porcentajeDif,
         userId,
+        avisosConfirmados: true,
       });
     }
 

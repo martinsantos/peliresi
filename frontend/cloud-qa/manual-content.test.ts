@@ -24,6 +24,13 @@ const read = (name: string) => readFileSync(new URL(name, root), 'utf8');
 const context = { window: {} as any };
 runInNewContext(read('help-data.js'), context);
 const { profiles, guides } = context.window.SITREP_HELP;
+test('operational notices identify the target and recheck the representative activity and site', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-avisos'));
+  assert.match(text, /incidente en tránsito avisa a la cuenta del operador/i);
+  assert.match(text, /diferencia de pesaje mayor al 5 % avisa a la cuenta del generador/i);
+  assert.match(text, /vuelve a comprobar la actividad y la sede autorizadas/i);
+  assert.match(text, /no reemplaza el informe de hallazgo ni la adenda/i);
+});
 test('current manual explains three in-situ approvals and complete treatment before a final certificate', () => {
   const proposals = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-tres-partes'));
   const certificates = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));

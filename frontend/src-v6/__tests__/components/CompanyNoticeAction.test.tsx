@@ -68,6 +68,17 @@ it.each(['duracion_transito_configurada', 'alerta_regla_manifiesto'])('opens a c
  expect(notificationCompanyAccesses({ ...n, tipo: 'INFO_GENERAL' })).toEqual([]);
 });
 
+it.each([
+ ['INCIDENTE', 'INCIDENTE_REPORTADO'], ['RECHAZO', 'MANIFIESTO_RECHAZADO'], ['DIFERENCIA_PESO', 'ALERTA_SISTEMA'],
+])('opens a representative operational event %s through the owned notice', (evento, tipo) => {
+ const n = { ...notice, tipo, datos: JSON.stringify({ tipo: 'alerta_evento_manifiesto', version: 1, destino: 'representante', evento, accesosEmpresa: [access] }) };
+ for (const prefix of ['', '/app']) {
+  expect(resolveNotificationPath(n, prefix)).toBe(prefix + '/notificaciones/n');
+  expect(resolveNotificationPath(n, prefix, undefined, true)).toBe(prefix + '/manifiestos/m');
+ }
+ expect(notificationCompanyAccesses({ ...n, tipo: 'INFO_GENERAL' })).toEqual([]);
+});
+
 const fiscalNotice:any = { id:'fiscal-n', datos:JSON.stringify({ tipo:'recordatorio_fiscal', version:1, destino:'representante',
  generadorId:'g-1', fiscalYear:2026, accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',razonSocial:'QA Entidad'}] }) };
 const fiscalTarget='/admin/actores/generadores/g-1?tab=fiscal&ejercicio=2026';
