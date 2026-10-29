@@ -1,9 +1,10 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {getApiErrorMessage} from '../utils/api-error';
 import {createGpsFixOrder,gpsFixFingerprint} from '../utils/gpsFixOrder';
+import {newGpsPointId} from '../services/gpsQueue';
 
 export interface FleetGpsPoint {latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number}
-export interface FleetGpsTarget {key:string;send:(point:FleetGpsPoint)=>Promise<unknown>}
+export interface FleetGpsTarget {key:string;send:(point:FleetGpsPoint,puntoId:string)=>Promise<unknown>}
 export interface FleetGpsDelivery {state:'sending'|'received'|'error';receivedAt?:Date;message?:string;terminal?:boolean;statusCode?:number}
 type Status='idle'|'acquiring'|'active'|'denied'|'unavailable';
 function responseStatus(error:unknown):number|undefined {
@@ -21,7 +22,7 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
   const [deliveries,setDeliveries]=useState<Record<string,FleetGpsDelivery>>({});
   const [locationAttempt,setLocationAttempt]=useState(0);
   const targetsRef=useRef(targets);
-  const currentRef=useRef<{point:FleetGpsPoint;observedAt:number;fingerprint:string|null}|null>(null);
+  const currentRef=useRef<{point:FleetGpsPoint;observedAt:number;fingerprint:string|null;references:Map<string,string>}|null>(null);
   const activeRef=useRef(false),generation=useRef(0),cycleRef=useRef(false);
   const heldRef=useRef(new Set<string>()),attemptRef=useRef(new Map<string,number>());
   const receivedRef=useRef(new Map<string,string>());
@@ -46,7 +47,11 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
         if(Date.now()-observation.observedAt>60000)break;
         attemptRef.current.set(key,Date.now());
         setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'sending'}}));
-        const upload=Promise.resolve().then(()=>target.send(observation.point));requestsRef.current.set(key,upload);
+        const upload=Promise.resolve().then(()=>{
+          let reference=observation.references.get(key);
+          if(!reference){reference=newGpsPointId();observation.references.set(key,reference);}
+          return target.send(observation.point,reference);
+        });requestsRef.current.set(key,upload);
         try{
           await upload;
           if(activeRef.current&&generation.current===run){
@@ -80,8 +85,12 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
       const c=result.coords;
       const point={latitud:c.latitude,longitud:c.longitude,precision:c.accuracy,
         ...(c.speed!==null&&c.speed>=0?{velocidad:c.speed}:{}),...(c.heading!==null&&c.heading>=0?{direccion:c.heading}:{})};
-      const fingerprint=gpsFixFingerprint(result.timestamp,point);
-      currentRef.current={point,observedAt:result.timestamp,fingerprint:fingerprint===null?null:`${acceptFix.epoch()}:${fingerprint}`};setPosition({...point,observedAt:result.timestamp});setStatus('active');void send();
+      const rawFingerprint=gpsFixFingerprint(result.timestamp,point);
+      const fingerprint=rawFingerprint===null?null:`${acceptFix.epoch()}:${rawFingerprint}`;
+      const previous=currentRef.current;
+      currentRef.current=fingerprint!==null&&previous?.fingerprint===fingerprint?previous:
+        {point,observedAt:result.timestamp,fingerprint,references:new Map()};
+      setPosition({...point,observedAt:result.timestamp});setStatus('active');void send();
     },error=>{if(mounted){currentRef.current=null;if(error.code===1)activeRef.current=false;setStatus(error.code===1?'denied':'acquiring');}},
       {enableHighAccuracy:true,maximumAge:0,timeout:20000});
     const timer=window.setInterval(()=>void send(),30000);

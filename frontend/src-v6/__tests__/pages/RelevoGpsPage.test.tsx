@@ -6,7 +6,7 @@ let success:PositionCallback;const clearWatch=vi.fn();
 const info={tramoId:'leg-qa',numero:'QA-001',empresa:'Auxilio artificial',destino:'Planta QA',domicilioDestino:'QA 100',orden:1,training:true,ultimaPosicion:null,vence:'2099-01-01'};
 beforeEach(()=>{
   sessionStorage.clear();history.replaceState({},'','/relevo/leg-qa#qa-limited-token');
-  vi.stubGlobal('fetch',vi.fn(async(_url:string,options:RequestInit)=>({ok:true,status:200,json:async()=>({data:options.method==='POST'?{tracking:{timestamp:new Date().toISOString()}}:info})})));
+  vi.stubGlobal('fetch',vi.fn(async(_url:string,options:RequestInit)=>({ok:true,status:200,json:async()=>({success:true,data:options.method==='POST'?{tracking:{timestamp:new Date().toISOString()},idempotencia:{version:1,puntoId:JSON.parse(options.body as string).puntoId,repetido:false}}:info})})));
   vi.stubGlobal('navigator',{geolocation:{watchPosition:vi.fn((ok:PositionCallback)=>{success=ok;return 17;}),clearWatch}});clearWatch.mockClear();
 });
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
@@ -70,6 +70,25 @@ it('retries a failed replacement upload for the same fix',async()=>{
   now+=30_000;await act(async()=>success(point));
   expect(await screen.findByRole('status')).toHaveTextContent('Ubicación recibida por SITREP');
   expect(fetchMock.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(2);
+  view.unmount();
+});
+it('reuses the same reference after the server accepts a point and its response is lost',async()=>{
+  let now=Date.now();vi.spyOn(Date,'now').mockImplementation(()=>now);
+  const fetchMock=vi.mocked(fetch);
+  fetchMock.mockImplementationOnce(async()=>({ok:true,status:200,json:async()=>({data:info})} as Response))
+    .mockRejectedValueOnce(new Error('Respuesta perdida'));
+  const view=render(<RelevoGpsPage/>);await screen.findByText('Auxilio artificial');
+  fireEvent.click(screen.getByRole('button',{name:'Compartir ubicación'}));
+  await waitFor(()=>expect(navigator.geolocation.watchPosition).toHaveBeenCalledOnce());
+  const point={coords:{latitude:-32.8,longitude:-68.8,accuracy:10,speed:0,heading:null},timestamp:now} as GeolocationPosition;
+  await act(async()=>success(point));expect(await screen.findByRole('alert')).toHaveTextContent('Respuesta perdida');
+  now+=30_000;await act(async()=>success(point));
+  const calls=fetchMock.mock.calls.filter(([,init])=>init?.method==='POST');
+  expect(calls).toHaveLength(2);
+  const first=JSON.parse(calls[0][1]!.body as string),retry=JSON.parse(calls[1][1]!.body as string);
+  expect(String(calls[0][0])).toContain('/ubicacion-idempotente');
+  expect(first.puntoId).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(retry.puntoId).toBe(first.puntoId);
   view.unmount();
 });
 it('continues sending after the device clock is corrected backwards',async()=>{

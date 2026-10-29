@@ -63,6 +63,9 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(monitor, /Monitor y Centro de Control/);
   assert.match(monitor, /hora de captura no está disponible/i);
   assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
+  assert.match(monitor, /misma lectura conserva su referencia durante ese seguimiento/i);
+  assert.match(monitor, /no conserva la referencia al cerrar la pantalla/i);
+  assert.match(monitor, /no se garantiza recuperar o identificar aquella ubicación/i);
   assert.match(monitor, /alertas de velocidad, parada o pérdida de GPS usan el intervalo entre recepciones/i);
   assert.match(monitor, /mensajes anteriores conservan su texto y muestran una aclaración/i);
 });

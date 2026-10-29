@@ -86,7 +86,7 @@ it('does not replace a newer observation with a late older GPS callback', async 
   await act(async () => { locate(fix(-34, now - 1_000)); await flush(); });
   expect(hook.result.current.position?.latitud).toBe(-33);
   expect(send).toHaveBeenCalledTimes(1);
-  expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ latitud: -34 }));
+  expect(send.mock.calls.some(([point]) => point.latitud === -34)).toBe(false);
   hook.unmount();
 });
 
@@ -110,6 +110,21 @@ it('retries a failed fix instead of treating it as received', async () => {
   await act(async () => { await vi.advanceTimersByTimeAsync(30_000); await flush(); });
   expect(send).toHaveBeenCalledTimes(2);
   expect(hook.result.current.deliveries.a.state).toBe('received');
+  hook.unmount();
+});
+
+it('reuses a stable reference when an acknowledged fleet upload loses its response', async () => {
+  const a = vi.fn((..._args: any[]) => Promise.resolve()).mockRejectedValueOnce(new Error('Respuesta perdida'));
+  const b = vi.fn((..._args: any[]) => Promise.resolve());
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send: a }, { key: 'b', send: b }], true));
+  await act(async () => { locate(position()); await flush(); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); await flush(); });
+  expect(a).toHaveBeenCalledTimes(2);
+  const first = a.mock.calls[0][1], retry = a.mock.calls[1][1], other = b.mock.calls[0][1];
+  expect(first).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(retry).toBe(first);
+  expect(other).toMatch(/^[0-9a-f-]{36}$/i);
+  expect(other).not.toBe(first);
   hook.unmount();
 });
 

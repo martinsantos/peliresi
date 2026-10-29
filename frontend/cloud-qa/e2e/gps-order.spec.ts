@@ -77,7 +77,7 @@ test('fleet does not send an older callback to either selected load', async ({ b
   const page = await context.newPage(), errors: string[] = [], payloads: Array<{ id: string; latitud: number }> = [];
   page.on('pageerror', error => errors.push(error.message)); await installGps(page);
   page.on('request', request => {
-    const match = request.url().match(/\/api\/manifiestos\/([^/]+)\/ubicacion$/);
+    const match = request.url().match(/\/api\/manifiestos\/([^/]+)\/ubicacion-idempotente$/);
     if (request.method() === 'POST' && match) payloads.push({ id: match[1], latitud: request.postDataJSON().latitud });
   });
   try {
@@ -92,7 +92,7 @@ test('fleet does not send an older callback to either selected load', async ({ b
     await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
     const now = await page.evaluate(() => Date.now());
     const received = Promise.all([cases.fleetA, cases.fleetB].map((load: { id: string }) => page.waitForResponse(response =>
-      response.url().endsWith(`/manifiestos/${load.id}/ubicacion`) && response.request().method() === 'POST' && response.status() === 200)));
+      response.url().endsWith(`/manifiestos/${load.id}/ubicacion-idempotente`) && response.request().method() === 'POST' && response.status() === 200)));
     await emit(page, 'watch', -33.22, -68.22, now - 1_000);
     await received;
     await expect.poll(() => payloads.length, { timeout: 15000 }).toBe(2);
@@ -104,7 +104,7 @@ test('fleet does not send an older callback to either selected load', async ({ b
     await page.waitForTimeout(500);
     expect(payloads).toHaveLength(2); expect(payloads.every(point => point.latitud === -33.22)).toBe(true);
     const updated = Promise.all([cases.fleetA, cases.fleetB].map((load: { id: string }) => page.waitForResponse(response =>
-      response.url().endsWith(`/manifiestos/${load.id}/ubicacion`) && response.request().method() === 'POST' && response.status() === 200)));
+      response.url().endsWith(`/manifiestos/${load.id}/ubicacion-idempotente`) && response.request().method() === 'POST' && response.status() === 200)));
     await emit(page, 'watch', -33.23, -68.23, now + 30_000);
     await updated; await expect.poll(() => payloads.length, { timeout: 15000 }).toBe(4);
     expect(payloads.filter(point => point.latitud === -33.23)).toHaveLength(2);
@@ -130,7 +130,7 @@ test('a replacement driver does not send an older callback', async ({ browser },
     } });
     expect(handoff.status()).toBe(201);
     const { tramo, acceso } = (await handoff.json()).data;
-    relay.on('request', request => { if (request.method() === 'POST' && request.url().endsWith(`/seguimiento-relevo/${tramo.id}/ubicacion`)) payloads.push(request.postDataJSON()); });
+    relay.on('request', request => { if (request.method() === 'POST' && request.url().endsWith(`/seguimiento-relevo/${tramo.id}/ubicacion-idempotente`)) payloads.push(request.postDataJSON()); });
     if (info.project.name === 'app') await relay.setViewportSize({ width: 320, height: 800 });
     await relay.goto(`${mp}/relevo/${tramo.id}#${acceso}`);
     await relay.getByRole('button', { name: 'Compartir ubicación', exact: true }).click();
@@ -146,7 +146,7 @@ test('a replacement driver does not send an older callback', async ({ browser },
     await emit(relay, 'watch', -34.33, -69.33, now - 2_000);
     await relay.waitForTimeout(500);
     expect(payloads).toHaveLength(1); expect(payloads[0]).toMatchObject({ latitud: -33.33, longitud: -68.33 });
-    const updated = relay.waitForResponse(response => response.url().endsWith(`/seguimiento-relevo/${tramo.id}/ubicacion`)
+    const updated = relay.waitForResponse(response => response.url().endsWith(`/seguimiento-relevo/${tramo.id}/ubicacion-idempotente`)
       && response.request().method() === 'POST' && response.status() === 200);
     await emit(relay, 'watch', -33.34, -68.34, now + 30_000);
     await updated; await expect.poll(() => payloads.length, { timeout: 15000 }).toBe(2);

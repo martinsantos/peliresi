@@ -8,6 +8,7 @@ import { LoadingIndicator } from '../../components/ui/LoadingState';
 
 import { limitedLegRequest,type LimitedTransportInfo as LegInfo,type LimitedTransportUpload,type TransportGpsPoint as GpsPoint } from '../../services/limited-transport-gps';
 import { createGpsFixOrder, gpsFixFingerprint } from '../../utils/gpsFixOrder';
+import { newGpsPointId } from '../../services/gpsQueue';
 
 export default function RelevoGpsPage() {
   const {tramoId=''}=useParams();
@@ -32,7 +33,7 @@ export default function RelevoGpsPage() {
   useEffect(()=>{
     if(!sharing||!info||blocked)return;
     if(!navigator.geolocation){setError('Este dispositivo no dispone de ubicación.');setSharing(false);return;}
-    let alive=true,inFlight=false;let latest:{point:GpsPoint;timestamp:number;fingerprint:string|null}|null=null;let lastAttempt=0,lastReceived:string|null=null;
+    let alive=true,inFlight=false;let latest:{point:GpsPoint;timestamp:number;fingerprint:string|null;puntoId?:string}|null=null;let lastAttempt=0,lastReceived:string|null=null;
     const acceptFix=createGpsFixOrder();
     stopRef.current=false;setStatus('Buscando ubicación…');setError('');
     const send=async()=>{
@@ -43,7 +44,8 @@ export default function RelevoGpsPage() {
       const observation=latest;
       lastAttempt=Date.now();inFlight=true;setStatus('Enviando ubicación…');
       try{
-        const data=await limitedLegRequest<LimitedTransportUpload>(tramoId,token,observation.point);
+        observation.puntoId??=newGpsPointId();
+        const data=await limitedLegRequest<LimitedTransportUpload>(tramoId,token,observation.point,observation.puntoId);
         if(alive&&!stopRef.current){lastReceived=observation.fingerprint;setLastSent(data.tracking.timestamp);setStatus('Ubicación recibida por SITREP');setError('');}
       }catch(err:any){if(alive){setError(err.message);setStatus('Ubicación sin enviar');if([401,403,404].includes(err.status)){setBlocked(true);stop();}}}
       finally{inFlight=false;}
@@ -55,8 +57,9 @@ export default function RelevoGpsPage() {
       const c=position.coords;
       const point={latitud:c.latitude,longitud:c.longitude,precision:c.accuracy,
         ...(c.speed!==null&&c.speed>=0?{velocidad:c.speed}:{}),...(c.heading!==null&&c.heading>=0?{direccion:c.heading}:{})};
-      const fingerprint=gpsFixFingerprint(position.timestamp,point);
-      latest={point,timestamp:position.timestamp,fingerprint:fingerprint===null?null:`${acceptFix.epoch()}:${fingerprint}`};
+      const rawFingerprint=gpsFixFingerprint(position.timestamp,point);
+      const fingerprint=rawFingerprint===null?null:`${acceptFix.epoch()}:${rawFingerprint}`;
+      if(fingerprint===null||latest?.fingerprint!==fingerprint)latest={point,timestamp:position.timestamp,fingerprint};
       void send();
     },err=>{if(alive){setError(err.code===1?'Permití la ubicación en el navegador para compartir el GPS.':'No se obtuvo ubicación. Revisá la señal del teléfono.');setStatus('GPS sin ubicación');if(err.code===1)stop();}},
       {enableHighAccuracy:true,maximumAge:0,timeout:20000});

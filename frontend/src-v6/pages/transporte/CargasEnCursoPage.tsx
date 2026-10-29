@@ -40,7 +40,7 @@ export default function CargasEnCursoPage() {
   useEffect(()=>{if(query.data&&ownsSession)setKnown(previous=>({...previous,...Object.fromEntries(query.data.targets.map(load=>[load.key,load]))}));},[query.data,ownsSession]);
   useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),15000);return()=>window.clearInterval(timer);},[]);
   const chosen=ownsSession?selected.map(key=>known[key]).filter((load):load is FleetGpsLoad=>!!load):[];
-  const gps=useFleetGps(chosen.filter(load=>load.gpsDisponible).map(load=>({key:load.key,send:point=>fleetGpsService.send(load,point,credentials.current)})),allowed&&ownsSession&&started);
+  const gps=useFleetGps(chosen.filter(load=>load.gpsDisponible).map(load=>({key:load.key,send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId)})),allowed&&ownsSession&&started);
   const rows=query.data?.targets??[];
   const refresh=async()=>{await qc.invalidateQueries({queryKey:['fleet-gps-targets',scope]});await qc.invalidateQueries({queryKey:['manifiestos']});};
   const toggle=(load:FleetGpsLoad)=>{

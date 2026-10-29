@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import type { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { config } from '../config/config';
 import prisma from '../lib/prisma';
 import { isTrainingSession, TRAINING_REALM } from '../lib/trainingScope';
@@ -199,20 +200,40 @@ export async function limitedTransportState(req:AuthRequest,res:Response,next:Ne
       destino:leg.manifiesto.operador.razonSocial,domicilioDestino:leg.manifiesto.operador.domicilio,inicio:leg.inicio,ultimaPosicion:latest?.timestamp??null,vence:leg.accesoHasta,training:isTrainingSession()}});
   }catch(error){next(error);}
 }
-export async function limitedTransportGps(req:AuthRequest,res:Response,next:NextFunction) {
+const idempotentLegPointSchema = gpsPointSchema.extend({puntoId:z.string().uuid('La referencia de la ubicación no es válida')});
+
+async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFunction,idempotent:boolean) {
   try {
-    const claim=trackingClaim(req);const parsed=gpsPointSchema.safeParse(req.body);
+    const claim=trackingClaim(req);const parsed=(idempotent?idempotentLegPointSchema:gpsPointSchema).safeParse(req.body);
     if(!parsed.success) throw new AppError(parsed.error.issues[0].message,400);
+    const {latitud,longitud,velocidad,direccion,precision}=parsed.data;
+    const puntoId='puntoId' in parsed.data&&typeof parsed.data.puntoId==='string'?parsed.data.puntoId:undefined;
+    const trackingId=puntoId?'gpslegv1_'+createHash('sha256').update(JSON.stringify([claim.sub,claim.jti,puntoId.toLowerCase()])).digest('hex'):undefined;
     const result=await prisma.$transaction(async tx=>{
       // Serialize GPS with delivery and handoff on the SAME parent row in all workers.
       const candidate=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},select:{manifiestoId:true}});
       if(!candidate) throw new AppError('Tramo no encontrado',404);
       await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${candidate.manifiestoId} FOR SHARE`;
       const leg=await liveLeg(tx,claim);
-      const tracking=await tx.trackingGPS.create({data:{...parsed.data,manifiestoId:leg.manifiestoId,tramoId:leg.id,emisor:`acceso-relevo:${claim.jti}`},select:{id:true,timestamp:true,tramoId:true}});
-      return {tracking,manifest:leg.manifiesto};
+      const emisor=`acceso-relevo:${claim.jti}`;
+      if(trackingId){
+        // Serialize retries for this specific point across all API workers.
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${trackingId}, 0))::text`;
+        const previous=await tx.trackingGPS.findUnique({where:{id:trackingId}});
+        if(previous){
+          if(previous.manifiestoId!==leg.manifiestoId||previous.tramoId!==leg.id||previous.emisor!==emisor
+            ||previous.latitud!==latitud||previous.longitud!==longitud||(previous.precision??null)!==(precision??null)
+            ||(previous.velocidad??null)!==(velocidad??null)||(previous.direccion??null)!==(direccion??null))
+            throw new AppError('La referencia de ubicación ya corresponde a otros datos. Revisá la sincronización.',409);
+          return {tracking:{id:previous.id,timestamp:previous.timestamp,tramoId:previous.tramoId},manifest:leg.manifiesto,repetido:true};
+        }
+      }
+      const tracking=await tx.trackingGPS.create({data:{...(trackingId?{id:trackingId}:{}),latitud,longitud,velocidad,direccion,precision,manifiestoId:leg.manifiestoId,tramoId:leg.id,emisor},select:{id:true,timestamp:true,tramoId:true}});
+      return {tracking,manifest:leg.manifiesto,repetido:false};
     });
-    res.setHeader('Cache-Control','private, no-store');res.json({success:true,data:{tracking:result.tracking}});
+    res.setHeader('Cache-Control','private, no-store');res.json({success:true,data:{tracking:result.tracking,
+      ...(puntoId?{idempotencia:{version:1,puntoId,repetido:result.repetido}}:{})}});
+    if(result.repetido)return;
     // El enlace de relevo no representa una cuenta usuaria: no se excluye al
     // transportista original de los destinatarios de una regla configurada.
     if(result.manifest.fechaRetiro) {
@@ -221,3 +242,5 @@ export async function limitedTransportGps(req:AuthRequest,res:Response,next:Next
     }
   }catch(error){next(error);}
 }
+export const limitedTransportGps=(req:AuthRequest,res:Response,next:NextFunction)=>saveLimitedTransportGps(req,res,next,false);
+export const limitedTransportGpsIdempotent=(req:AuthRequest,res:Response,next:NextFunction)=>saveLimitedTransportGps(req,res,next,true);
