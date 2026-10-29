@@ -7,10 +7,13 @@ import {assertCloudDatabase,root} from './safety.ts';
 import {synchronizeManual} from './manual-build.ts';
 
 // Loopback-only, synthetic preview. No secrets, production hosts or workflows.
-const artifacts='/work/sitrep/.qa-gps-lost-response-20261029';
+const connectionAudit=process.env.SITREP_QA_RUN==='connection-20261029';
+assert.ok(!process.env.SITREP_QA_RUN||connectionAudit,'Unknown QA run');
+const artifacts=connectionAudit?'/work/sitrep/.qa-gps-connection-20261029':'/work/sitrep/.qa-gps-lost-response-20261029';
+const compiled=connectionAudit?'/work/sitrep/.qa-gps-lost-response-20261029':artifacts;
 Object.assign(process.env,{
   CI:'true',SITREP_QA_EXECUTOR:'preview-container',GITHUB_REPOSITORY:'martinsantos/peliresi',
-  GITHUB_REF:'refs/heads/codex/sitrep-training-20261018',GITHUB_SHA:'f44cf957-with-gps-retry-uncommitted',
+  GITHUB_REF:'refs/heads/codex/sitrep-training-20261018',GITHUB_SHA:connectionAudit?'e0b77d09-connection-audit':'f44cf957-with-gps-retry-uncommitted',
   ALLOW_SYNTHETIC_QA:'1',DATABASE_URL:'postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=proposal_operations_20261021',
   PORT:'3037',NODE_ENV:'test',NODE_APP_INSTANCE:'qa',FRONTEND_URL:'http://127.0.0.1:4177',CORS_ORIGIN:'http://127.0.0.1:4177',VITE_API_URL:'/api',
   TRAINING_DATABASE_URL:'',TRAINING_DIRECT_LOGIN_UNTIL:'2000-01-01T00:00:00Z',
@@ -19,7 +22,8 @@ Object.assign(process.env,{
   BLOCKCHAIN_ENABLED:'false',BLOCKCHAIN_RPC_URL:'',BLOCKCHAIN_CONTRACT_ADDRESS:'',ENABLE_ANALYTICS:'false',
   MANIFEST_PROPOSALS_ENABLED:'true',MANIFEST_REVIEW_AUTHORITY_BY_ROLE:'true',MANIFEST_TRANSPORT_HANDOFF_ENABLED:'true',TRANSPORT_MULTI_GPS_ENABLED:'true',
   VITE_MANIFEST_PROPOSALS_ENABLED:'true',VITE_TRANSPORT_MULTI_GPS_ENABLED:'true',
-  QA_ARTIFACTS:artifacts,QA_WEB_BUILD:path.join(artifacts,'web'),QA_APP_BUILD:path.join(artifacts,'app'),
+  QA_TRACE_CONNECTIONS:connectionAudit?'true':'false',
+  QA_ARTIFACTS:artifacts,QA_WEB_BUILD:path.join(compiled,'web'),QA_APP_BUILD:path.join(compiled,'app'),
 });
 delete process.env.GITHUB_ACTIONS;
 assert.equal(path.resolve(root),'/work/sitrep');await assertCloudDatabase();
@@ -48,6 +52,10 @@ const commands:Record<string,{cwd:string;command:string;args:string[]}>= {
   order:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/gps-order.playwright.config.ts','--project=web-desktop','--project=app']},
   orderAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-order-audit.ts']},
   compare:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-source-compare.ts']},
+  forensics:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-connection-forensics.ts']},
+  connectionProbe:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-connection-probe.ts']},
+  connectionAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-connection-audit.ts']},
+  connectionTraceAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-connection-trace-audit.ts']},
   close:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/close.ts']},
 };
 assert.ok(phase&&commands[phase],'Unknown QA phase');
