@@ -12,6 +12,7 @@ test('travel-duration monitoring documents explicit thresholds, periodic checks 
   assert.match(manual, /Un viaje no tiene un plazo fijo automático/);
   assert.match(manual, /regla de Duración del viaje con un umbral explícito en horas/);
   assert.match(manual, /cada cinco minutos mientras el servicio funciona, incluso si no llegan puntos/);
+  assert.match(manual, /transporte vinculado recibe el aviso si fue seleccionado, incluso si su dispositivo envió la ubicación/);
   assert.match(manual, /puede generar otro aviso después de 30 minutos/);
   assert.match(manual, /seguimiento GPS actual no activa las reglas históricas de Desvío de ruta/i);
   assert.match(manual, /no con una ruta vial autorizada/i);

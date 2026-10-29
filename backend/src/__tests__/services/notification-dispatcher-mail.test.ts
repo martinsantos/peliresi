@@ -8,7 +8,8 @@ import { notificationService } from '../../services/notification-dispatcher.serv
 afterEach(() => { vi.useRealTimers(); vi.resetAllMocks(); });
 it('persists the notice without a second direct email path, leaving push independent', async () => {
   vi.useFakeTimers();
-  state.create.mockResolvedValue({ id: 'committed-notice' });
+  state.create.mockResolvedValue({ id: 'committed-notice', usuarioId: 'qa', tipo: 'MANIFIESTO_FIRMADO', titulo: 'QA',
+    mensaje: 'QA', manifiestoId: 'manifest', prioridad: 'NORMAL' });
   state.user.mockResolvedValue({ notifEmail: true, email: 'qa@example.invalid' });
   state.push.mockResolvedValue(undefined);
   const result = await notificationService.crearNotificacion({ usuarioId: 'qa', tipo: 'MANIFIESTO_FIRMADO', titulo: 'QA', mensaje: 'QA', manifiestoId: 'manifest' });
@@ -16,7 +17,18 @@ it('persists the notice without a second direct email path, leaving push indepen
   expect(result.id).toBe('committed-notice');
   expect(state.create).toHaveBeenCalledOnce();
   expect(state.send).not.toHaveBeenCalled();
-  expect(state.push).toHaveBeenCalledOnce();
+  expect(state.push).toHaveBeenCalledWith('qa', expect.objectContaining({ url: '/notificaciones/committed-notice', title: 'QA' }));
+});
+
+it('dispatches channels for an already committed notice without inserting another one', async () => {
+  vi.useFakeTimers();
+  state.user.mockResolvedValue({ notifEmail: true, email: 'qa@example.invalid' });
+  state.push.mockResolvedValue(undefined);
+  notificationService.programarCanalesDeNotificacion({ id: 'saved', usuarioId: 'qa', tipo: 'ALERTA_SISTEMA', titulo: 'Umbral',
+    mensaje: 'Referencia operativa', manifiestoId: 'manifest', prioridad: 'ALTA' });
+  await vi.runAllTimersAsync();
+  expect(state.create).not.toHaveBeenCalled(); expect(state.send).not.toHaveBeenCalled();
+  expect(state.push).toHaveBeenCalledWith('qa', expect.objectContaining({ url: '/notificaciones/saved', title: 'Umbral' }));
 });
 
 it('bulk notices keep a distinct private destination per recipient', async () => {

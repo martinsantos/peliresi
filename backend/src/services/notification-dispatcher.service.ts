@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Rol, TipoNotificacion, PrioridadNotificacion } from '@prisma/client';
+import { Rol, TipoNotificacion, PrioridadNotificacion, type Notificacion } from '@prisma/client';
 import prisma from '../lib/prisma';
 import logger from '../utils/logger';
 import { enviarPushAlUsuario } from './push.service';
@@ -36,11 +36,17 @@ class NotificationService {
             }
         });
 
-        // Send via configured channels (fire-and-forget, never blocks)
+        this.programarCanalesDeNotificacion(notif);
+        return notif;
+    }
+
+    /** Only call after the inbox notice has committed. Email has its own
+     * durable relay; push and placeholder channels remain best effort. */
+    programarCanalesDeNotificacion(notif: Pick<Notificacion, 'id' | 'usuarioId' | 'tipo' | 'titulo' | 'mensaje' | 'manifiestoId' | 'prioridad'>): void {
         setImmediate(async () => {
             try {
                 const user = await prisma.usuario.findUnique({
-                    where: { id: data.usuarioId },
+                    where: { id: notif.usuarioId },
                     select: { email: true, nombre: true, notifEmail: true, notifWhatsapp: true, notifTelegram: true, whatsappPhone: true, telegramChatId: true },
                 });
                 if (!user) return;
@@ -51,30 +57,28 @@ class NotificationService {
 
                 // WhatsApp channel (placeholder — requires integration with WhatsApp Business API)
                 if (user.notifWhatsapp && user.whatsappPhone) {
-                    logger.info({ channel: 'WhatsApp', to: user.whatsappPhone }, `${data.titulo}: ${data.mensaje}`);
+                    logger.info({ channel: 'WhatsApp', to: user.whatsappPhone }, `${notif.titulo}: ${notif.mensaje}`);
                     // TODO: Integrate with WhatsApp Business API or Twilio
-                    // await whatsappService.send(user.whatsappPhone, `*${data.titulo}*\n${data.mensaje}`);
                 }
 
                 // Telegram channel (placeholder — requires Telegram Bot API)
                 if (user.notifTelegram && user.telegramChatId) {
-                    logger.info({ channel: 'Telegram', chatId: user.telegramChatId }, `${data.titulo}: ${data.mensaje}`);
+                    logger.info({ channel: 'Telegram', chatId: user.telegramChatId }, `${notif.titulo}: ${notif.mensaje}`);
                 }
 
                 // Push channel — enviar a todos los dispositivos suscritos del usuario
-                await enviarPushAlUsuario(data.usuarioId, {
-                    title:     data.titulo,
-                    body:      data.mensaje,
+                await enviarPushAlUsuario(notif.usuarioId, {
+                    title:     notif.titulo,
+                    body:      notif.mensaje,
                     url:       `/notificaciones/${notif.id}`,
-                    tag:       data.manifiestoId ?? data.tipo,
-                    prioridad: (data.prioridad ?? 'NORMAL') as any,
+                    tag:       notif.manifiestoId ?? notif.tipo,
+                    prioridad: notif.prioridad as any,
                 }).catch(() => {});
             } catch (err) {
                 logger.error({ err }, 'Error sending notification via channels');
             }
         });
 
-        return notif;
     }
 
     // Notificar a usuarios por rol (DB + push a cada uno)

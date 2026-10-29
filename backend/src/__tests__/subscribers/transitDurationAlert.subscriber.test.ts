@@ -1,12 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DomainEvent } from '../../services/domainEvent.service';
 
 const mocks = vi.hoisted(() => ({ rules: vi.fn(), users: vi.fn(), manifest: vi.fn(), transaction: vi.fn(),
-  query: vi.fn(), find: vi.fn(), create: vi.fn(), notice: vi.fn(), email: vi.fn() }));
+  query: vi.fn(), find: vi.fn(), create: vi.fn(), notice: vi.fn(), insertNotices: vi.fn(), channels: vi.fn(), email: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { reglaAlerta: { findMany: mocks.rules }, usuario: { findMany: mocks.users },
   manifiesto: { findUnique: mocks.manifest }, $transaction: mocks.transaction } }));
 vi.mock('../../utils/logger', () => ({ default: { info: vi.fn(), error: vi.fn() } }));
-vi.mock('../../controllers/notification.controller', () => ({ notificationService: { crearNotificacion: mocks.notice } }));
+vi.mock('../../controllers/notification.controller', () => ({ notificationService: { crearNotificacion: mocks.notice, programarCanalesDeNotificacion: mocks.channels } }));
 vi.mock('../../services/email.service', () => ({ emailService: { sendAlertEmail: mocks.email } }));
 import { alertaSubscriber } from '../../subscribers/alerta.subscriber';
 
@@ -35,9 +35,13 @@ beforeEach(() => {
   });
   mocks.find.mockImplementation(async ({ where }) => rows.find(row => row.reglaId === where.reglaId && row.manifiestoId === where.manifiestoId && row.createdAt >= where.createdAt.gte) ?? null);
   mocks.create.mockImplementation(async ({ data }) => { rows.push(data); return data; });
-  mocks.transaction.mockImplementation(async work => work({ $queryRaw: mocks.query, alertaGenerada: { findFirst: mocks.find, create: mocks.create } }));
+  mocks.manifest.mockResolvedValue({ generador: null, transportista: { usuario: { id: 'carrier-a' } }, operador: null });
+  mocks.insertNotices.mockResolvedValue({ count: 1 });
+  mocks.transaction.mockImplementation(async work => work({ $queryRaw: mocks.query, alertaGenerada: { findFirst: mocks.find, create: mocks.create },
+    manifiesto: { findUnique: mocks.manifest }, usuario: { findMany: mocks.users }, notificacion: { createMany: mocks.insertNotices } }));
   mocks.notice.mockResolvedValue({});
 });
+afterEach(() => vi.unstubAllEnvs());
 
 describe('transit duration is informational unless Ambiente configures a threshold', () => {
   it.each(['DURACION_TRANSITO_OBSERVADA', 'TIEMPO_EXCESIVO'] as const)('does not create a default notice or incident for %s', async type => {
@@ -58,10 +62,12 @@ describe('transit duration is informational unless Ambiente configures a thresho
     expect(mocks.transaction).not.toHaveBeenCalled();
     await alertaSubscriber(observed(25));
     await alertaSubscriber(observed(26));
-    expect(rows).toHaveLength(1); expect(mocks.notice).toHaveBeenCalledTimes(1);
-    expect(mocks.notice).toHaveBeenCalledWith(expect.objectContaining({ usuarioId: 'admin-a', titulo: 'Avisar desde 24 horas', manifiestoId: 'synthetic-trip',
-      mensaje: expect.stringContaining('el manifiesto QA-1 llevaba aproximadamente 25 horas en tránsito'),
-      datos: expect.objectContaining({ tipo: 'duracion_transito_configurada', version: 1 }) }));
+    expect(rows).toHaveLength(1); expect(mocks.insertNotices).toHaveBeenCalledTimes(1); expect(mocks.channels).toHaveBeenCalledTimes(1);
+    const written = mocks.insertNotices.mock.calls[0][0].data[0];
+    expect(written).toMatchObject({ usuarioId: 'admin-a', titulo: 'Avisar desde 24 horas', manifiestoId: 'synthetic-trip',
+      mensaje: expect.stringContaining('el manifiesto QA-1 llevaba aproximadamente 25 horas en tránsito') });
+    expect(JSON.parse(written.datos)).toMatchObject({ tipo: 'duracion_transito_configurada', version: 1 });
+    expect(mocks.channels).toHaveBeenCalledWith(written);
     expect(mocks.transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
     expect(mocks.query.mock.calls.some(([sql]) => sql.join('').includes('pg_advisory_xact_lock'))).toBe(true);
   });
@@ -72,6 +78,45 @@ describe('transit duration is informational unless Ambiente configures a thresho
     await alertaSubscriber(observed(25));
     currentManifest.estado = 'EN_TRANSITO'; currentRule.activa = false;
     await alertaSubscriber(observed(25));
-    expect(rows).toHaveLength(0); expect(mocks.notice).not.toHaveBeenCalled();
+    expect(rows).toHaveLength(0); expect(mocks.insertNotices).not.toHaveBeenCalled(); expect(mocks.channels).not.toHaveBeenCalled();
+  });
+
+  it('includes the configured carrier even when that carrier sent the GPS point', async () => {
+    const selected = { ...rule({ horasTransito: { gte: 24 } }), destinatarios: '["TRANSPORTISTA"]' };
+    currentRule = selected; mocks.rules.mockResolvedValue([selected]);
+    await alertaSubscriber(observed(25));
+    expect(mocks.insertNotices.mock.calls[0][0].data.map((notice: any) => notice.usuarioId)).toEqual(['carrier-a']);
+    expect(mocks.channels).toHaveBeenCalledOnce();
+  });
+
+  it('does not schedule channels if saving notices inside the transaction fails', async () => {
+    mocks.rules.mockResolvedValue([rule({ horasTransito: { gte: 24 } })]);
+    mocks.insertNotices.mockRejectedValueOnce(new Error('recipient removed'));
+    await expect(alertaSubscriber(observed(25))).rejects.toThrow('recipient removed');
+    expect(mocks.channels).not.toHaveBeenCalled(); expect(mocks.email).not.toHaveBeenCalled();
+  });
+
+  it('schedules channels only after the transaction commits', async () => {
+    mocks.rules.mockResolvedValue([rule({ horasTransito: { gte: 24 } })]);
+    const transaction = mocks.transaction.getMockImplementation()!;
+    let committed = false;
+    mocks.transaction.mockImplementation(async (...args: any[]) => {
+      const result = await transaction(...args);
+      expect(mocks.channels).not.toHaveBeenCalled();
+      committed = true;
+      return result;
+    });
+    mocks.channels.mockImplementation(() => expect(committed).toBe(true));
+    await alertaSubscriber(observed(25));
+    expect(mocks.channels).toHaveBeenCalledOnce();
+  });
+
+  it('keeps explicitly allowed legacy email recipients behind the existing policy', async () => {
+    vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ENABLED', 'true');
+    vi.stubEnv('EMAIL_EXTERNAL_ALERTS_ALLOWLIST', 'external@night-qa.invalid');
+    const selected = { ...rule({ horasTransito: { gte: 24 } }), destinatarios: '["ADMIN","email:external@night-qa.invalid","email:other@night-qa.invalid"]' };
+    currentRule = selected; mocks.rules.mockResolvedValue([selected]);
+    await alertaSubscriber(observed(25));
+    expect(mocks.email).toHaveBeenCalledWith(['external@night-qa.invalid'], selected, 'synthetic-trip', expect.objectContaining({ horasTransito: 25 }));
   });
 });

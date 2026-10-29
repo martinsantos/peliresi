@@ -86,6 +86,8 @@ try {
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id, manifiestoId: early.id } }), 0);
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id, manifiestoId: original.id } }), 1);
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id, manifiestoId: relay.id } }), 1);
+  assert.equal(await db.notificacion.count({ where: { usuarioId: carrier.id, manifiestoId: original.id, titulo: rule.nombre } }), 1,
+    'El transportista configurado debe recibir el aviso aunque su propio GPS haya cruzado el umbral');
   const relayNotice = await db.notificacion.findFirstOrThrow({ where: { usuarioId: carrier.id, manifiestoId: relay.id, titulo: rule.nombre } });
   assert.match(relayNotice.mensaje, new RegExp(`manifiesto ${relay.numero} llevaba aproximadamente 25`));
   assert.match(relayNotice.mensaje, /umbral configurado por Ambiente/);
@@ -95,7 +97,7 @@ try {
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   const proof = { synthetic: true, thresholdHours: 24, beforeThreshold: 0, afterThreshold: 1,
-    concurrentGpsRequests: responses.length, relayThresholdAlerts: 1, relayCarrierNotified: true,
+    concurrentGpsRequests: responses.length, originalCarrierNotified: true, relayThresholdAlerts: 1, relayCarrierNotified: true,
     legacyUnboundedAlerts: 0, automaticDefaultAlerts: 0, emailAttempts: 0, emailSent: 0, push: false, capClosed: true };
   await writeFile(path.join(process.env.QA_ARTIFACTS!, 'transit-duration-http-proof.json'), JSON.stringify(proof, null, 2));
   console.log(JSON.stringify(proof));

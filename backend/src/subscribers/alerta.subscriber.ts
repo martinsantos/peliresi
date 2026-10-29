@@ -8,6 +8,7 @@ import { DomainEvent } from '../services/domainEvent.service';
 import { hasConfiguredTransitThreshold, matchesAlertCondition } from '../services/alertRuleCondition.service';
 import { followupDays } from '../services/alertFollowupPolicy.service';
 import { catalogueCondition } from '../services/alertCataloguePolicy.service';
+import { randomUUID } from 'node:crypto';
 
 /** Mapeo DomainEvent.type → EventoAlerta (para búsqueda de ReglaAlerta) */
 const EVENTO_ALERTA_MAP: Partial<Record<DomainEvent['type'], EventoAlerta>> = {
@@ -71,7 +72,6 @@ async function dispararReglasAlerta(
     if (!matches) continue;
 
     const duplicateSince = new Date(Date.now() - 30 * 60 * 1000);
-    let alertData = datos;
     // Expirations have no manifest. Rule/null alone collapses different subjects.
     // Existing event snapshots are JSON.stringify output: include the complete
     // escaped key/value tokens, not an ID substring, and preserve the old window.
@@ -80,6 +80,15 @@ async function dispararReglasAlerta(
       : [];
     if (transitDuration) {
       if (!manifiestoId) continue;
+      const manifestId = manifiestoId;
+      let recipients: string[] = [];
+      try {
+        const parsed = JSON.parse(regla.destinatarios || '[]');
+        const entries = Array.isArray(parsed) ? parsed : parsed?.roles;
+        if (Array.isArray(entries)) recipients = entries.filter((entry): entry is string => typeof entry === 'string');
+      } catch { /* A malformed historical recipient list cannot address anyone. */ }
+      const roles = recipients.filter(recipient => !recipient.startsWith('email:'));
+      const emails = recipients.filter(recipient => recipient.startsWith('email:')).map(recipient => recipient.slice(6));
       // Multiple GPS requests or API workers may cross a configured threshold
       // together. Serialize only this rule/manifest and use the DB clock.
       const verified = await prisma.$transaction(async tx => {
@@ -87,7 +96,7 @@ async function dispararReglasAlerta(
         // periodic scan. Hold shared locks until the case is recorded and
         // calculate elapsed time from the current trip and database clock.
         const [trip] = await tx.$queryRaw<Array<{ estado: string; numero: string; fechaRetiro: Date | null }>>`
-          SELECT estado, numero, "fechaRetiro" FROM manifiestos WHERE id = ${manifiestoId} FOR SHARE
+          SELECT estado, numero, "fechaRetiro" FROM manifiestos WHERE id = ${manifestId} FOR SHARE
         `;
         const [currentRule] = await tx.$queryRaw<Array<{ activa: boolean; evento: string; nombre: string; condicion: string; destinatarios: string }>>`
           SELECT activa, evento, nombre, condicion, destinatarios FROM reglas_alertas WHERE id = ${regla.id} FOR SHARE
@@ -95,22 +104,54 @@ async function dispararReglasAlerta(
         if (!trip || trip.estado !== 'EN_TRANSITO' || !trip.fechaRetiro || !currentRule?.activa
           || currentRule.evento !== regla.evento || currentRule.nombre !== regla.nombre
           || currentRule.condicion !== regla.condicion || currentRule.destinatarios !== regla.destinatarios) return null;
-        const lockKey = JSON.stringify(['transit-duration-rule', regla.id, manifiestoId]);
+        const lockKey = JSON.stringify(['transit-duration-rule', regla.id, manifestId]);
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text`;
         const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
         const horasTransito = (now.getTime() - trip.fechaRetiro.getTime()) / 3_600_000;
         const currentData = { ...datos, numero: trip.numero, horasTransito };
         if (!Number.isFinite(horasTransito) || horasTransito < 0 || !matchesAlertCondition(regla.condicion, currentData)) return null;
         const duplicate = await tx.alertaGenerada.findFirst({
-          where: { reglaId: regla.id, manifiestoId, createdAt: { gte: new Date(now.getTime() - 30 * 60 * 1000) } },
+          where: { reglaId: regla.id, manifiestoId: manifestId, createdAt: { gte: new Date(now.getTime() - 30 * 60 * 1000) } },
           select: { id: true },
         });
         if (duplicate) return null;
-        await tx.alertaGenerada.create({ data: { reglaId: regla.id, manifiestoId, datos: JSON.stringify(currentData), estado: 'PENDIENTE', createdAt: now } });
-        return currentData;
+        const recipientIds = new Set<string>();
+        if (roles.some(role => ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(role))) {
+          const manifest = await tx.manifiesto.findUnique({ where: { id: manifestId }, select: {
+            generador: { select: { usuario: { select: { id: true } } } },
+            transportista: { select: { usuario: { select: { id: true } } } },
+            operador: { select: { usuario: { select: { id: true } } } },
+          } });
+          const partyByRole: Record<string, string | undefined> = {
+            GENERADOR: manifest?.generador?.usuario?.id,
+            TRANSPORTISTA: manifest?.transportista?.usuario?.id,
+            OPERADOR: manifest?.operador?.usuario?.id,
+          };
+          // A GPS observation is automatic, not a decision by its sender: a
+          // configured recipient must also see an alert for their own device.
+          roles.forEach(role => { const id = partyByRole[role]; if (id) recipientIds.add(id); });
+        }
+        const administrativeRoles = roles.filter(role => role === 'ADMIN' || role.startsWith('ADMIN_'));
+        if (administrativeRoles.length) {
+          const admins = await tx.usuario.findMany({ where: { rol: { in: administrativeRoles as any }, activo: true }, select: { id: true } });
+          admins.forEach(user => recipientIds.add(user.id));
+        }
+        const message = `Al evaluar, el manifiesto ${currentData.numero} llevaba aproximadamente ${horasTransito.toLocaleString('es-AR', { maximumFractionDigits: 1 })} horas en tránsito. Se alcanzó el umbral configurado por Ambiente.`;
+        const notices = [...recipientIds].map(usuarioId => ({ id: randomUUID(), usuarioId,
+          tipo: 'ALERTA_SISTEMA' as TipoNotificacion, titulo: regla.nombre, mensaje: message,
+          manifiestoId: manifestId, prioridad: 'ALTA' as PrioridadNotificacion,
+          datos: JSON.stringify({ evento: eventoAlerta, reglaId: regla.id, ...currentData,
+            tipo: 'duracion_transito_configurada', version: 1 }) }));
+        await tx.alertaGenerada.create({ data: { reglaId: regla.id, manifiestoId: manifestId, datos: JSON.stringify(currentData), estado: 'PENDIENTE', createdAt: now } });
+        if (notices.length) await tx.notificacion.createMany({ data: notices });
+        return { currentData, notices };
       }, { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
       if (!verified) continue;
-      alertData = verified;
+      // The inbox records and case are committed before any best-effort channel.
+      for (const notice of verified.notices) notificationService.programarCanalesDeNotificacion(notice);
+      const authorizedEmails = [...new Set(emails.map(email => email.trim().toLowerCase()))].filter(email => externalAlertRecipientAllowed(email));
+      if (authorizedEmails.length) await emailService.sendAlertEmail(authorizedEmails, regla, manifestId, verified.currentData);
+      continue;
     } else {
       const duplicate = await prisma.alertaGenerada.findFirst({
         where: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, createdAt: { gte: duplicateSince },
@@ -136,7 +177,7 @@ async function dispararReglasAlerta(
       .map((d: string) => d.replace('email:', ''));
 
     const recipientIds = new Set<string>();
-    const eventUserId = typeof alertData.userId === 'string' ? alertData.userId : undefined;
+    const eventUserId = typeof datos.userId === 'string' ? datos.userId : undefined;
     if (manifiestoId && roles.some((role) => ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(role))) {
       const manifiesto = await prisma.manifiesto.findUnique({
         where: { id: manifiestoId },
@@ -159,10 +200,8 @@ async function dispararReglasAlerta(
       users.forEach((user) => { if (user.id !== eventUserId) recipientIds.add(user.id); });
     }
     for (const usuarioId of recipientIds) {
-      const mensaje = transitDuration && typeof alertData.horasTransito === 'number' && Number.isFinite(alertData.horasTransito)
-        ? `Al evaluar, el manifiesto ${alertData.numero} llevaba aproximadamente ${alertData.horasTransito.toLocaleString('es-AR', { maximumFractionDigits: 1 })} horas en tránsito. Se alcanzó el umbral configurado por Ambiente.`
-        : eventoAlerta === 'ANOMALIA_GPS' && typeof alertData.descripcion === 'string' && alertData.descripcion.trim()
-          ? `${typeof alertData.numero === 'string' && alertData.numero.trim() ? `${alertData.numero} · ` : ''}${alertData.descripcion}`
+      const mensaje = eventoAlerta === 'ANOMALIA_GPS' && typeof datos.descripcion === 'string' && datos.descripcion.trim()
+          ? `${typeof datos.numero === 'string' && datos.numero.trim() ? `${datos.numero} · ` : ''}${datos.descripcion}`
         : `Regla activada: ${regla.nombre}`;
       await notificationService.crearNotificacion({
         usuarioId,
@@ -171,8 +210,7 @@ async function dispararReglasAlerta(
         mensaje,
         manifiestoId,
         prioridad: 'ALTA' as PrioridadNotificacion,
-        datos: { evento: eventoAlerta, reglaId: regla.id, ...alertData,
-          ...(transitDuration ? { tipo: 'duracion_transito_configurada', version: 1 } : {}) },
+        datos: { evento: eventoAlerta, reglaId: regla.id, ...datos },
       });
     }
 
@@ -180,7 +218,7 @@ async function dispararReglasAlerta(
     // subscriptions. Never activate it as a side effect of enabling other mail.
     const authorizedEmails = [...new Set(emails.map(email => email.trim().toLowerCase()))].filter(email => externalAlertRecipientAllowed(email));
     if (authorizedEmails.length > 0) {
-      await emailService.sendAlertEmail(authorizedEmails, regla, manifiestoId ?? '', alertData);
+      await emailService.sendAlertEmail(authorizedEmails, regla, manifiestoId ?? '', datos);
     }
   }
 }
