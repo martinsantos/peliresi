@@ -495,6 +495,11 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           {isOnline && legs.isError && <button type="button" className="ml-2 min-h-11 font-semibold underline" onClick={() => void legs.refetch()}>Reintentar</button>}
         </div>}
         {snapshotError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">No se pudo guardar una copia del viaje en el dispositivo. Si perdés conexión, sus datos podrían no estar disponibles; revisá el almacenamiento.</p>}
+        {m.estado === EstadoManifiesto.APROBADO && !hasProposal && <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+          <p className="font-semibold">Este manifiesto necesita una nueva propuesta</p>
+          <p className="mt-1">{manifestProposalsVisible(currentUser) ? 'Creá una nueva propuesta con las tres partes.' : 'Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.'} El registro anterior se conserva.</p>
+          <Link to={mp(`/manifiestos/${id}`)} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">Ver manifiesto</Link>
+        </div>}
         {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(currentUser.rol) && (m.estado !== EstadoManifiesto.EN_TRANSITO || hasHandoff) && <PendingGpsReceipts key={`${currentUser.id}:${currentUser.rol}:${id}`} ownerId={currentUser.id} manifestId={id} />}
         {trackingDuringPending && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">El seguimiento sigue abierto en esta pantalla para conservar las ubicaciones. Sincronizalas y cerrá esta pantalla antes de continuar con la entrega.</p>}
         {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && !handoffUnknown && (deliveryQueue === 'none' || trackingDuringPending) && <GpsStatusPanel
@@ -513,7 +518,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           storageIssue={gps.storageIssue}
         />}
         <Link to={mp('/transporte/perfil')} className="flex w-fit min-h-11 items-center gap-2 text-sm font-semibold text-primary-800 underline"><Truck size={17} aria-hidden="true" />Ver todos mis viajes</Link>
-        {deliveryQueue === 'none' && !showingSavedCopy && <TransportLegs id={id!} beforeHandoff={prepareHandoff} onHandoffError={gps.resumeGps}/>}
+        {m.estado !== EstadoManifiesto.APROBADO && deliveryQueue === 'none' && !showingSavedCopy && <TransportLegs id={id!} beforeHandoff={prepareHandoff} onHandoffError={gps.resumeGps}/>}
         {hasHandoff&&<p role="status" className="rounded-xl bg-primary-50 p-3 text-sm text-primary-900">El GPS continúa desde el enlace del reemplazo. Como transportista de origen, seguís registrando la entrega del manifiesto.</p>}
         {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="flex w-fit min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
         {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
@@ -521,11 +526,6 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>
         </dl>}
         {eventos.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && m.estado === EstadoManifiesto.APROBADO && <ManifestProposalApprovals id={id!} estado={m.estado} onSign={()=>{}}/>}
-        {m.estado === EstadoManifiesto.APROBADO && !hasProposal && <div role="alert" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
-          <p className="font-semibold">Este manifiesto necesita una nueva propuesta</p>
-          <p className="mt-1">{manifestProposalsVisible(currentUser) ? 'Creá una nueva propuesta con las tres partes.' : 'Contactá a Ambiente para habilitar una nueva propuesta con las tres partes.'} El registro anterior se conserva.</p>
-          <Link to={mp(`/manifiestos/${id}`)} className="mt-2 inline-flex min-h-11 items-center font-semibold underline">Ver manifiesto</Link>
-        </div>}
         {/* APROBADO state: Show confirm pickup */}
         {m.estado === EstadoManifiesto.APROBADO && canConfirmPickup && (
           <>

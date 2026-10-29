@@ -197,6 +197,7 @@ const commands:Record<string,{cwd:string;command:string;args:string[]}>= {
   reversionHttp:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/reversion-notices-integration.ts']},
   reversionAtomic:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/reversion-notices-atomic.ts']},
   reversionAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/reversion-final-audit.ts']},
+  reversionVisualAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/reversion-visual-audit.ts']},
   reversionBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/reversion-notices.playwright.config.ts','--project=web-desktop','--project=app']},
   stateNoticeBackendTests:{cwd:backend,command:'./node_modules/.bin/vitest',args:['run','src/__tests__/services/manifestRuleCompanyNotice.test.ts','src/__tests__/services/manifestStateNotice.test.ts','src/__tests__/services/notification-mail.test.ts','src/__tests__/services/committed-manifest-push.test.ts','src/__tests__/subscribers/manifestOperationalNotice.test.ts','--maxWorkers=1','--no-file-parallelism']},
   stateNoticeLegacyProposalTests:{cwd:backend,command:'env',args:['MANIFEST_PROPOSALS_ENABLED=false','./node_modules/.bin/vitest','run','src/__tests__/manifestProposal.test.ts','--maxWorkers=1','--no-file-parallelism']},

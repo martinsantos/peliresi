@@ -68,6 +68,8 @@ test('transport sees why an older trip is blocked in the detail and direct trip 
  await expect(page.getByRole('button', { name: 'Confirmar Retiro' })).toBeDisabled();
  await page.goto(prefix(info) + '/transporte/viaje/' + id);
  await expect(page.getByRole('alert')).toContainText('Este manifiesto necesita una nueva propuesta');
+ await expect(page.getByText('Tramos de transporte')).toHaveCount(0);
+ const alert = await page.getByRole('alert').boundingBox(); expect(alert).not.toBeNull(); expect(alert!.y).toBeLessThan(320);
  await expect(page.getByRole('button', { name: /Confirmar retiro/i })).toHaveCount(0);
  await page.screenshot({ path: info.outputPath('historical-trip.png'), animations: 'disabled', scale: 'css' });
 });
