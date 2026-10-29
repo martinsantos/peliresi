@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gpsQueueKey } from '../../services/gpsQueue';
+import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 const mocks = vi.hoisted(() => ({ post: vi.fn(), owner: 'carrier-a', context: 'carrier-a:transportista' }));
 vi.mock('../../services/api', () => ({ default: { post: mocks.post } }));
@@ -12,11 +13,13 @@ import { withStoredGpsBeforeTransition } from '../../services/gpsTransition';
 const id = 'trip-a';
 const point = { lat: -33.1, lng: -68.9, speed: null, heading: null, puntoId: '2d65f4f5-6892-42e1-958d-bd23b6d54a76' };
 const ownKey = gpsQueueKey('carrier-a', id);
+let restoreLocks: () => void;
 beforeEach(() => {
+  restoreLocks = installMockGpsLocks();
   localStorage.clear(); vi.clearAllMocks(); mocks.owner = 'carrier-a'; mocks.context = 'carrier-a:transportista';
   mocks.post.mockResolvedValue({ data: { success: true, data: { idempotencia: { version: 1, puntoId: point.puntoId } } } });
 });
-afterEach(() => localStorage.clear());
+afterEach(() => { localStorage.clear(); restoreLocks(); });
 
 describe('GPS safety before a trip transition', () => {
   it('retains pending points and blocks delivery when GPS cannot be sent, then retries before the action', async () => {

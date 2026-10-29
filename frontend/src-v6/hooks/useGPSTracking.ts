@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from '../components/ui/Toast';
 import { manifiestoService } from '../services/manifiesto.service';
 import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError, acknowledgeGpsPoint, gpsTasksForTrip, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
+import { gpsLeaseClosing, rememberGpsLeaseClosing, startGpsLease, withGpsTransitionLock, type GpsLease } from '../services/gpsCoordination';
 import { EstadoManifiesto } from '../types/models';
 import { createGpsFixOrder } from '../utils/gpsFixOrder';
 
@@ -34,6 +35,15 @@ interface UseGPSTrackingOptions {
   ownerId: string | number | undefined;
   estado: string | undefined;
   viajeStatus: 'ACTIVO' | 'PAUSADO';
+}
+
+interface GpsLeaseAttempt {
+  key: string;
+  id: string;
+  cancelled: boolean;
+  lease?: GpsLease;
+  ready: Promise<void>;
+  released?: Promise<void>;
 }
 
 interface UseGPSTrackingReturn {
@@ -102,6 +112,9 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
   const gpsDetailsRef = useRef<GpsDetails>(gpsDetails);
   const observationRef = useRef<{ key: string; puntoId: string | null } | null>(null);
   const lastQueuedObservationRef = useRef<string | null>(null);
+  const leaseHeldRef = useRef(false);
+  const coordinationErrorRef = useRef(false);
+  const restartingSensorRef = useRef(false);
   const unidentifiedObservationSequence = useRef(0);
   const referenceErrorRef = useRef(false);
 
@@ -155,8 +168,8 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
     return result;
   }, [context, id, owner]);
 
-  // Stop the watcher. Points were persisted before sending, so do not replace
-  // a newer queue written by another tab with this page's stale snapshot.
+  // Persist the latest unsent observation before stopping. The usual timer
+  // samples at 30-second intervals, so the last fix may still be in memory.
   const cleanupGps = useCallback(() => {
     // getCurrentPosition cannot be cancelled; invalidate its pending callbacks.
     trackingGenerationRef.current++;
@@ -173,19 +186,94 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
       clearInterval(acquisitionRetryIntervalRef.current);
       acquisitionRetryIntervalRef.current = null;
     }
+    const observation = observationRef.current, position = currentPositionRef.current, details = gpsDetailsRef.current;
+    if (restartingSensorRef.current || !leaseHeldRef.current || !id || !owner || deliveryConfirmedRef.current || !observation || !position
+      || observation.key === lastQueuedObservationRef.current) return;
+    const saved = readPendingGpsQueue(owner, id);
+    if (!saved.ok) { storageErrorRef.current = true; setStorageError(true); setStorageIssue(saved.reason); return; }
+    try {
+      if (!observation.puntoId) observation.puntoId = newGpsPointId();
+      const pending = prepareGpsPoints(owner, id, saved.points);
+      pending.push({ lat: position[0], lng: position[1], speed: details.speed, heading: details.heading, puntoId: observation.puntoId });
+      setPendingUpdates(pending);
+      lastQueuedObservationRef.current = observation.key;
+    } catch (error) {
+      storageErrorRef.current = true; setStorageError(true);
+      setStorageIssue(error instanceof GpsPendingError ? error.issue ?? 'storage' : 'storage');
+    }
+  }, [id, owner, setPendingUpdates]);
+
+  const leaseKey = context && estado === EstadoManifiesto.EN_TRANSITO && viajeStatus === 'ACTIVO'
+    ? JSON.stringify([context, restart]) : null;
+  const [heldLeaseKey, setHeldLeaseKey] = useState<string | null>(null);
+  const leaseAttemptRef = useRef<GpsLeaseAttempt | null>(null);
+  const stopSequenceRef = useRef(0);
+  const mountedRef = useRef(true);
+  const activeConditionsRef = useRef({ estado, viajeStatus });
+  activeConditionsRef.current = { estado, viajeStatus };
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; stopSequenceRef.current++; };
   }, []);
+
+  // A watcher and its replay retain the lease until all HTTP writes drain.
+  // This prevents a second tab from delivering after its queue check while
+  // this tab is still able to append a location.
+  const releaseLease = useCallback((attempt: GpsLeaseAttempt, stopWatcher: boolean) => {
+    if (attempt.released) return attempt.released;
+    attempt.cancelled = true;
+    if (stopWatcher) cleanupGps();
+    leaseHeldRef.current = false;
+    setHeldLeaseKey(current => current === attempt.key ? null : current);
+    const released = (async () => {
+      await attempt.ready;
+      await Promise.allSettled(gpsTasksForTrip(attempt.id));
+      await attempt.lease?.release();
+    })();
+    attempt.released = released;
+    rememberGpsLeaseClosing(attempt.id, released);
+    return released;
+  }, [cleanupGps]);
+
+  useEffect(() => {
+    if (!leaseKey || !id) return;
+    const attempt: GpsLeaseAttempt = { key: leaseKey, id, cancelled: false, ready: Promise.resolve() };
+    leaseAttemptRef.current = attempt;
+    const start = () => {
+      if (attempt.cancelled) return;
+      attempt.lease = startGpsLease(id, () => {
+        if (!attempt.cancelled) {
+          if (coordinationErrorRef.current) clearSendError();
+          coordinationErrorRef.current = false; leaseHeldRef.current = true; setHeldLeaseKey(attempt.key);
+        }
+      }, error => {
+        if (!attempt.cancelled) { coordinationErrorRef.current = true; setGpsStatus('error'); reportSendError(error); }
+      });
+    };
+    const earlier = gpsLeaseClosing(id);
+    if (earlier) attempt.ready = earlier.then(start);
+    else start();
+    return () => {
+      if (leaseAttemptRef.current === attempt) leaseAttemptRef.current = null;
+      void releaseLease(attempt, true);
+    };
+  }, [id, leaseKey, releaseLease, reportSendError, clearSendError]);
+  const ownsGpsLease = Boolean(leaseKey && heldLeaseKey === leaseKey);
 
   // Finish in-flight HTTP writes before changing the server trip state.
   const stopAndDrain = useCallback(async () => {
+    stopSequenceRef.current++;
     cleanupGps();
-    if (id) await Promise.allSettled(gpsTasksForTrip(id));
-  }, [cleanupGps, id]);
+    const attempt = leaseAttemptRef.current;
+    if (attempt) await releaseLease(attempt, false);
+    else if (id) await Promise.allSettled(gpsTasksForTrip(id));
+  }, [cleanupGps, id, releaseLease]);
   // Called after stopAndDrain, before a state change that would reject older GPS points.
   const flushPending = useCallback(async (): Promise<boolean> => {
     if (!id || !owner || !uploadsStoppedRef.current || deliveryConfirmedRef.current) return false;
     const generation = trackingGenerationRef.current;
     let completed = false;
-    await runExclusiveGpsTask(id, async () => {
+    try { await runExclusiveGpsTask(id, () => withGpsTransitionLock(id, async () => {
       if (activeContextRef.current !== context || trackingGenerationRef.current !== generation || deliveryConfirmedRef.current) return;
       const saved = readPendingGpsQueue(owner, id);
       if (!saved.ok) {
@@ -211,7 +299,7 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
       clearSendError();
       if (sent) { setLastSyncAt(new Date()); setGpsSendStatus('ok'); }
       completed = true;
-    });
+    })); } catch (error) { reportSendError(error); return false; }
     return completed;
   }, [context, id, owner, sendPoint, setPendingUpdates, acknowledgePendingUpdate, reportSendError, clearSendError]);
   const resumeGps = useCallback(() => { if (!deliveryConfirmedRef.current) setRestart(value => value + 1); }, []);
@@ -219,9 +307,16 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
   // stopped it while an outstanding GPS upload was being drained.
   const retryGps = useCallback(async () => {
     if (!id || !owner || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus !== 'ACTIVO') return;
-    const expectedGeneration = trackingGenerationRef.current + 1;
-    await stopAndDrain();
-    if (trackingGenerationRef.current !== expectedGeneration || activeContextRef.current !== context) return;
+    // A sensor retry must acquire a fresh fix; do not publish its previous
+    // unsampled location as if it were current after permission was denied.
+    restartingSensorRef.current = true;
+    const stopping = stopAndDrain();
+    restartingSensorRef.current = false;
+    const expectedStop = stopSequenceRef.current;
+    await stopping;
+    if (!mountedRef.current || stopSequenceRef.current !== expectedStop || activeContextRef.current !== context
+      || deliveryConfirmedRef.current || activeConditionsRef.current.estado !== EstadoManifiesto.EN_TRANSITO
+      || activeConditionsRef.current.viajeStatus !== 'ACTIVO') return;
     const emptyDetails: GpsDetails = { accuracy: null, speed: null, heading: null, altitude: null, lastUpdate: null };
     currentPositionRef.current = null;
     observationRef.current = null;
@@ -258,19 +353,21 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
 
   // Check GPS permission on mount
   useEffect(() => {
+    if (coordinationErrorRef.current) return;
     if (!('geolocation' in navigator)) {
       setGpsStatus('unavailable');
       return;
     }
     if (navigator.permissions?.query) {
       navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(result => {
+        if (coordinationErrorRef.current) return;
         if (result.state === 'denied') {
           setGpsStatus('denied');
         } else {
           setGpsStatus('checking');
         }
       }).catch(() => {
-        setGpsStatus('checking');
+        if (!coordinationErrorRef.current) setGpsStatus('checking');
       });
     } else {
       setGpsStatus('checking');
@@ -279,7 +376,7 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
 
   // Restore pending GPS updates from localStorage on mount and flush in order
   useEffect(() => {
-    if (!id || !owner || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
+    if (!id || !owner || !ownsGpsLease || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
     uploadsStoppedRef.current = false;
     let isMounted = true;
     const earlierTasks = gpsTasksForTrip(id);
@@ -327,11 +424,11 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
     return () => {
       isMounted = false;
     };
-  }, [context, id, owner, estado, viajeStatus, restart, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
+  }, [context, id, owner, estado, viajeStatus, restart, ownsGpsLease, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
 
   // Start GPS tracking when EN_TRANSITO and ACTIVO
   useEffect(() => {
-    if (!id || !owner || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
+    if (!id || !owner || !ownsGpsLease || deliveryConfirmedRef.current || estado !== EstadoManifiesto.EN_TRANSITO || viajeStatus === 'PAUSADO') return;
     if (!('geolocation' in navigator)) {
       setGpsStatus('unavailable');
       return;
@@ -484,7 +581,7 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
       cleanupGps();
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [context, estado, viajeStatus, id, owner, restart, cleanupGps, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
+  }, [context, estado, viajeStatus, id, owner, restart, ownsGpsLease, cleanupGps, setPendingUpdates, sendPoint, acknowledgePendingUpdate, reportSendError, clearSendError]);
 
   useEffect(() => {
     const onDelivery = (event: Event) => {

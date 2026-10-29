@@ -1,5 +1,6 @@
 import api from './api';
 import { GpsPendingError, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
+import { withGpsTransitionLock } from './gpsCoordination';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 
 /** Flush this device's owned queue before a delivery or handoff. This does not
@@ -14,7 +15,7 @@ export async function withStoredGpsBeforeTransition<T>(ownerId: string | number 
   };
   ensureSession();
   let result!: T;
-  await runExclusiveGpsTask(manifestId, async () => {
+  await runExclusiveGpsTask(manifestId, () => withGpsTransitionLock(manifestId, async () => {
     ensureSession();
     try {
       await flushStoredGpsQueue(owner, manifestId, async point => {
@@ -33,6 +34,6 @@ export async function withStoredGpsBeforeTransition<T>(ownerId: string | number 
     }
     ensureSession();
     result = await transition();
-  });
+  }));
   return result;
 }

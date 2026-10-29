@@ -13,6 +13,7 @@ import {
 } from './syncQueuePolicy';
 import api from './api';
 import { GPS_DELIVERY_CONFIRMED_EVENT, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
+import { withGpsTransitionLock } from './gpsCoordination';
 
 const DB_NAME = 'sitrep_offline_db';
 const DB_VERSION = 5;
@@ -323,13 +324,13 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
           {
             const deliveryId = queuedDeliveryManifestId(action.endpoint);
             if (deliveryId) {
-              await runExclusiveGpsTask(deliveryId, async () => {
+              await runExclusiveGpsTask(deliveryId, () => withGpsTransitionLock(deliveryId, async () => {
                 if (!isCurrent()) throw new SyncContextChangedError();
                 await flushGpsBeforeQueuedDelivery(api, action.endpoint, currentUserId, isCurrent);
                 if (!isCurrent()) throw new SyncContextChangedError();
                 await api.post(action.endpoint, action.data);
                 if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(GPS_DELIVERY_CONFIRMED_EVENT, { detail: { id: deliveryId, owner: String(currentUserId) } }));
-              });
+              }));
             } else {
               if (!isCurrent()) throw new SyncContextChangedError();
               await api.post(action.endpoint, action.data);

@@ -49,6 +49,7 @@ import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError } from '../../services/gp
 import { addToSyncQueue, getSyncQueue } from '../../services/indexeddb';
 import { hasQueuedDelivery } from '../../services/syncQueuePolicy';
 import { useAuth } from '../../contexts/AuthContext';
+import { getApiErrorMessage } from '../../utils/api-error';
 
 // Recenter map when position changes (respects user pan/zoom)
 function RecenterMap({ position, onUserInteract, followUser }: {
@@ -305,7 +306,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       setShowFinalizarModal(false);
     } catch (err: any) {
       gps.resumeGps();
-      setDeliveryError(err?.response?.data?.message || 'No se pudo confirmar la entrega. Revisá la conexión y volvé a intentar.');
+      setDeliveryError(getApiErrorMessage(err, 'No se pudo confirmar la entrega. Revisá la conexión y volvé a intentar.'));
     } finally {
       deliveryInFlightRef.current = false;
       setIsFinishingTrip(false);

@@ -1,9 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { headingToCompass, useGPSTracking } from '../../hooks/useGPSTracking';
 import { EstadoManifiesto } from '../../types/models';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { gpsQueueKey } from '../../services/gpsQueue';
+import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 vi.mock('../../services/manifiesto.service', () => ({
   manifiestoService: {
@@ -28,10 +29,13 @@ describe('headingToCompass', () => {
 });
 
 describe('useGPSTracking', () => {
+  let restoreLocks: () => void;
   beforeEach(() => {
+    restoreLocks = installMockGpsLocks();
     localStorage.clear();
     vi.clearAllMocks();
   });
+  afterEach(() => restoreLocks());
 
   it('keeps tracking while Android has GPS enabled but no location fix yet', async () => {
     let errorCallback: PositionErrorCallback | null = null;

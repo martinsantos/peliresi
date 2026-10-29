@@ -4,6 +4,7 @@ import { useGPSTracking } from '../../hooks/useGPSTracking';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { toast } from '../../components/ui/Toast';
 import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError, gpsQueueKey } from '../../services/gpsQueue';
+import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { actualizarUbicacion: vi.fn() } }));
 vi.mock('../../components/ui/Toast', () => ({ toast: { error: vi.fn(), warning: vi.fn(), remove: vi.fn() } }));
@@ -19,9 +20,11 @@ let watchSuccess: PositionCallback[];
 let watchError: PositionErrorCallback[];
 let coarseSuccess: PositionCallback[];
 let coarseError: PositionErrorCallback[];
+let restoreLocks: () => void;
 
 describe('GPS position provenance and cleanup', () => {
   beforeEach(() => {
+    restoreLocks = installMockGpsLocks();
     vi.useFakeTimers();
     vi.resetAllMocks();
     localStorage.clear();
@@ -34,13 +37,22 @@ describe('GPS position provenance and cleanup', () => {
     });
     vi.mocked(manifiestoService.actualizarUbicacion).mockResolvedValue(undefined);
   });
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); restoreLocks(); });
 
   it('reports a denied GPS permission as state without repeating it in a toast', () => {
     const { result, unmount } = renderHook(() => useGPSTracking(trip));
     act(() => watchError[0](error(1)));
     expect(result.current.status).toBe('denied');
     expect(toast.error).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('does not start the watcher if this browser cannot coordinate other pages', () => {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined });
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    expect(navigator.geolocation.watchPosition).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('error');
+    expect(result.current.sendError).toMatch(/navegador.*coordinar/i);
     unmount();
   });
 
@@ -92,6 +104,7 @@ describe('GPS position provenance and cleanup', () => {
     );
     rerender({ viajeStatus: 'PAUSADO' });
     rerender({ viajeStatus: 'ACTIVO' });
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
     act(() => watchSuccess[1](position(-34, -70)));
     act(() => coarseSuccess[0](position(-31, -67)));
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
@@ -201,6 +214,22 @@ describe('GPS position provenance and cleanup', () => {
     await act(async () => { reject(new Error('offline')); await stop; });
     expect(result.current.pendingCount).toBe(1);
     expect(JSON.parse(localStorage.getItem(gpsQueueKey(trip.ownerId, trip.manifiestoId))!)).toEqual([withReference({ lat:-34, lng:-70, speed:null, heading:null })]);
+    unmount();
+  });
+
+  it('preserves the latest fix when tracking stops before its next timed send', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    act(() => watchSuccess[0](position(-34, -70)));
+    await act(async () => { await result.current.stopAndDrain(); });
+    const pending = JSON.parse(localStorage.getItem(key)!);
+    expect(pending).toEqual([withReference({ lat:-34, lng:-70, speed:null, heading:null })]);
+    expect(manifiestoService.actualizarUbicacion).not.toHaveBeenCalled();
+    let flushed = false;
+    await act(async () => { flushed = await result.current.flushPending(); });
+    expect(flushed).toBe(true);
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledExactlyOnceWith(trip.manifiestoId, -34, -70, null, null, pending[0].puntoId);
+    expect(localStorage.getItem(key)).toBeNull();
     unmount();
   });
 
@@ -339,6 +368,7 @@ describe('GPS position provenance and cleanup', () => {
     act(() => watchSuccess[0](position(-32, -68)));
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     rerender({ owner:'carrier-b' });
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
     expect(result.current.position).toBeNull();
     expect(result.current.pendingCount).toBe(0);
     expect(localStorage.getItem(gpsQueueKey('carrier-a', trip.manifiestoId))).not.toBeNull();
@@ -366,7 +396,7 @@ describe('GPS position provenance and cleanup', () => {
 
     const reopened = renderHook(() => useGPSTracking(trip));
     expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(3);
-    await act(async () => { acknowledge(); await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { acknowledge(); for (let i = 0; i < 20; i++) await Promise.resolve(); });
     expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledTimes(4);
     expect(manifiestoService.actualizarUbicacion).toHaveBeenLastCalledWith(trip.manifiestoId, -33, -69, null, null, expect.any(String));
     const calls = vi.mocked(manifiestoService.actualizarUbicacion).mock.calls;
@@ -484,7 +514,7 @@ describe('GPS position provenance and cleanup', () => {
     localStorage.setItem(key, JSON.stringify(pending));
     vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValue(new Error('offline'));
     const { result, unmount } = renderHook(() => useGPSTracking(trip));
-    await act(async () => {});
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
     act(() => watchSuccess[0](position(-34, -70)));
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(result.current.pendingCount).toBe(501);
@@ -546,7 +576,7 @@ describe('GPS position provenance and cleanup', () => {
     expect(localStorage.getItem(key)).toBeNull();
     first.unmount();
     const reopened = renderHook(() => useGPSTracking(trip));
-    await act(async () => {});
+    await act(async () => { for (let i = 0; i < 15; i++) await Promise.resolve(); });
     expect(reopened.result.current.storageError).toBe(true);
     expect(reopened.result.current.pendingCount).toBe(1);
     unavailable.mockRestore();

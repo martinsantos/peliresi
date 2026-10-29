@@ -1,11 +1,16 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as hooks from '../../hooks/useManifiestoWorkflow';
+import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 const calls = vi.hoisted(() => Object.fromEntries(['create', 'update', 'firmar', 'confirmarRetiro', 'confirmarEntrega', 'pesaje', 'confirmarRecepcion', 'confirmarRecepcionInSitu', 'registrarTratamiento', 'rechazar', 'registrarIncidente', 'cerrar', 'cancelar', 'revertirEstado', 'validarQR'].map(name => [name, vi.fn()])));
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: calls }));
-afterEach(() => { onlineManager.setOnline(true); vi.clearAllMocks(); });
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'carrier-a' } }) }));
+vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => 'carrier-a:transportista', supportSessionMatches: () => true }));
+let restoreLocks: () => void;
+beforeEach(() => { restoreLocks = installMockGpsLocks(); });
+afterEach(() => { onlineManager.setOnline(true); vi.clearAllMocks(); restoreLocks(); });
 
 describe('explicit workflow submissions do not wait in an invisible offline queue', () => {
   for (const [name, hook] of Object.entries(hooks)) {
