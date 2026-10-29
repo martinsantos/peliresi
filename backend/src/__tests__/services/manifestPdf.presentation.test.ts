@@ -45,6 +45,20 @@ it.each(['PARCIAL','FINAL'] as const)('certificate retains snapshot and integrit
  expect(pdf.text).toContain(tipo==='FINAL'?'Adendas resueltas':'Adendas vinculadas');
  expect(pdf.text).toMatch(/Adenda 1\s*·\s*versión 1/);expect(pdf.text).not.toContain('qa-adenda');
 });
+it('keeps a short final with a prior partial and an approved finding together',async()=>{
+ const data={version:1 as const,tipo:'FINAL' as const,numero:'2026-000269-F',manifiestoNumero:'2026-000269',
+  generador:'QA Generador 1',transportista:'QA Transporte 1',operador:'QA Operador 1',autor:'QA operador',
+  fecha:'2026-10-29T02:18:53.000Z',metodo:'QA ESTABILIZACION',nota:'',
+  cantidades:[{residuoId:'qa-y1',corriente:'Y1',cantidad:22,unidad:'kg'},
+   {residuoId:'qa-y12',corriente:'Y12',cantidad:1,unidad:'kg',origen:'HALLAZGO' as const,adendas:[{id:'qa-rectificacion',version:1}]}],
+  parcialesPrevios:['2026-000269-P01'],adendas:[{id:'qa-original',version:1},{id:'qa-rectificacion',version:1}],
+  firmaSha256:'b'.repeat(64),artificial:true};
+ const before=JSON.stringify(data);
+ const pdf=inspect(await renderManifestCertificate(data,'290428d0-4557-420d-8ff0-ec77aca526e6',sig),'certificado-rectificacion-compacto');
+ expect(pdf.pages).toHaveLength(1);
+ expect(pdf.pages[0]).toContain('Firma manuscrita del operador');
+ expect(pdf.text).toContain('Y12'); expect(pdf.text).toContain('adenda 2'); expect(JSON.stringify(data)).toBe(before);
+});
 it('renders 200 certified quantities across pages without clipping',async()=>{
  const data={version:1 as const,tipo:'FINAL' as const,numero:'QA-CERT-200',manifiestoNumero:'QA-1',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método QA',nota:'',cantidades:Array.from({length:200},(_,i)=>({residuoId:`r${i}`,corriente:`Y${i+1}`,cantidad:1,unidad:'kg'})),parcialesPrevios:[],adendas:[],firmaSha256:'b'.repeat(64),artificial:true};
  const pdf=inspect(await renderManifestCertificate(data,'qa-200',sig),'certificado-200');
@@ -52,6 +66,8 @@ it('renders 200 certified quantities across pages without clipping',async()=>{
  expect(pdf.text).toMatch(/Y1\s+1\s+kg/);
  expect(pdf.text).toMatch(/Y200\s+1\s+kg/);
  expect(pdf.text).toContain('Firma manuscrita del operador');
+ const signaturePage=pdf.pages.find(page=>page.includes('Firma manuscrita del operador'));
+ expect(signaturePage).toContain('Huella de la firma');
 },15000);
 it('distinguishes treated findings from findings declared not treated in the final PDF',async()=>{
  const data={version:1 as const,tipo:'FINAL' as const,numero:'QA-CERT-F',manifiestoNumero:'QA-1',generador:'QA Generador',transportista:'QA Transporte',operador:'QA Operador',autor:'QA Emisor',fecha:'2026-10-23T13:00:00Z',metodo:'Método QA',nota:'',cantidades:[{residuoId:'hallazgo:Y12:kg',corriente:'Y12',cantidad:1,unidad:'kg',origen:'HALLAZGO' as const,adendas:[{id:'a',version:1}]}],parcialesPrevios:[],adendas:[{id:'a',version:1}],hallazgosNoTratados:[{id:'hallazgo:Y13:kg',corriente:'Y13',unidad:'kg',observado:2,adendas:[{id:'a',version:1}]}],firmaSha256:'b'.repeat(64),artificial:true};

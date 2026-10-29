@@ -56,7 +56,7 @@ test('one phone tracks three selected loads, delivers one and isolates a subsequ
     await selected.screenshot({ path: info.outputPath('fleet-gps-received.png') });
     if(info.project.name==='app'){
       const last=selected.getByText('Entrega a cargo de la transportista de origen.',{exact:true});await last.scrollIntoViewIfNeeded();
-      const clearance=await last.evaluate(element=>({text:element.getBoundingClientRect().bottom,nav:document.querySelector('nav.fixed.bottom-0')!.getBoundingClientRect().top}));
+      const clearance=await last.evaluate(element=>({text:element.getBoundingClientRect().bottom,nav:document.querySelector('nav[aria-label="Navegación principal"]')!.getBoundingClientRect().top}));
       expect(clearance.text).toBeLessThanOrEqual(clearance.nav);
       expect(await page.locator('header').getByRole('button',{name:/Ayuda|soporte/i}).count()).toBeGreaterThan(0);
     }

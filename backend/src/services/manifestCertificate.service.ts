@@ -1,6 +1,7 @@
 import { manifestCompanyRecipients } from './manifestCompanyRecipients.service';
 import { createHash } from 'node:crypto';
 import { institutionalPdf, PDF_STYLE } from './institutionalPdf.service';
+import { measureInspectionPdfBlocks } from './inspectionPdfLayout.service';
 import type { Prisma } from '@prisma/client';
 import { isTrainingSession } from '../lib/trainingScope';
 import { AppError } from '../middlewares/errorHandler';
@@ -74,7 +75,17 @@ export function renderManifestCertificate(data: CertificateSnapshot, id: string,
   if(data.hallazgosNoTratados?.length) {
    layout.text('No tratadas en esta certificación: '+data.hallazgosNoTratados.map(row=>row.corriente+' · observado: '+row.observado+' '+row.unidad).join(', '),false,9);
   }
-  layout.section('03  FIRMA E INTEGRIDAD', 185);
+  // Keep the signature and its integrity information together when they
+  // actually fit. The previous fixed reserve added a nearly empty page for
+  // short certificates with a partial and an approved finding.
+  const signatureLabel = { text: 'Firma manuscrita del operador', font: 'Helvetica-Bold', size: 10, color: PDF_STYLE.ink, gap: 7 };
+  const integrity = [
+   { text: 'Registro: ' + id, font: 'Helvetica', size: 8, color: PDF_STYLE.ink, gap: 7 },
+   { text: 'Huella de la firma: ' + data.firmaSha256, font: 'Helvetica', size: 8, color: PDF_STYLE.muted, gap: 7 },
+  ];
+  const signatureHeight = 40 + measureInspectionPdfBlocks(doc, [signatureLabel], 507) + 70
+   + measureInspectionPdfBlocks(doc, integrity, 507) + 2;
+  layout.section('03  FIRMA E INTEGRIDAD', signatureHeight);
   layout.text('Firma manuscrita del operador',true,10);
   const y=doc.y;doc.image(Buffer.from(signature.split(',')[1],'base64'),44,y,{fit:[220,60]});doc.y=y+70;
   layout.text('Registro: '+id,false,8);layout.text('Huella de la firma: '+data.firmaSha256,false,8,PDF_STYLE.muted);
