@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gpsQueueKey } from '../../services/gpsQueue';
+import { saveFleetGpsPoint } from '../../services/fleetGpsStorage';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 const mocks = vi.hoisted(() => ({ post: vi.fn(), owner: 'carrier-a', context: 'carrier-a:transportista' }));
@@ -22,6 +23,24 @@ beforeEach(() => {
 afterEach(() => { localStorage.clear(); restoreLocks(); });
 
 describe('GPS safety before a trip transition', () => {
+  it('blocks a transition from another screen when this browser has a fleet point pending', async () => {
+    const item={targetKey:JSON.stringify(['other-account:transportista','MANIFIESTO:'+id]),puntoId:point.puntoId,
+      observedAt:Date.now(),point:{latitud:-33,longitud:-69,precision:10}};
+    saveFleetGpsPoint(item); const action=vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a',id,action)).rejects.toThrow('GPS de varias cargas sin confirmar');
+    expect(action).not.toHaveBeenCalled();expect(mocks.post).not.toHaveBeenCalled();
+  });
+
+  it('checks fleet points again after synchronizing the individual queue', async () => {
+    localStorage.setItem(ownKey,JSON.stringify([point]));
+    mocks.post.mockImplementationOnce(async()=>{saveFleetGpsPoint({targetKey:JSON.stringify(['carrier-a','MANIFIESTO:'+id]),puntoId:point.puntoId,
+      observedAt:Date.now(),point:{latitud:-33,longitud:-69,precision:10}});
+      return {data:{success:true,data:{idempotencia:{version:1,puntoId:point.puntoId}}}};});
+    const action=vi.fn();
+    await expect(withStoredGpsBeforeTransition('carrier-a',id,action)).rejects.toThrow('GPS de varias cargas sin confirmar');
+    expect(action).not.toHaveBeenCalled();
+  });
+
   it('retains pending points and blocks delivery when GPS cannot be sent, then retries before the action', async () => {
     localStorage.setItem(ownKey, JSON.stringify([point]));
     const action = vi.fn().mockResolvedValue('delivered');

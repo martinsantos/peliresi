@@ -1,6 +1,7 @@
 import { enqueueDeliveryOnce, getSyncQueue, processSyncQueue } from './indexeddb';
 import { OFFLINE_QUEUE_WAKE_EVENT } from './offlineSyncEvents';
 import { newGpsPointId } from './gpsQueue';
+import { assertNoStoredFleetGpsForManifest } from './fleetGpsStorage';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import type { ConfirmarEntregaRequest } from '../types/api';
 
@@ -16,6 +17,10 @@ export async function submitDelivery(id: string, data: ConfirmarEntregaRequest, 
   if (!id || !context.owner || !['TRANSPORTISTA', 'ADMIN'].includes(context.role) || !isCurrent()) {
     throw new Error('La cuenta o actividad cambió. Volvé a abrir el viaje antes de confirmar la entrega.');
   }
+  // Do not enqueue a delivery which would disable the fleet screen needed to
+  // recover this browser's pending point. The transition checks again under
+  // the GPS lock because another tab may write after this first check.
+  assertNoStoredFleetGpsForManifest(id);
   let referencia: string;
   try { referencia = newGpsPointId(); }
   catch { throw new Error('No se pudo preparar una referencia segura para la entrega. Consultá a soporte.'); }

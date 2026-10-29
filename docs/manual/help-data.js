@@ -779,7 +779,7 @@
       { title: 'Sumar una carga sin perder las otras', body: [
         'Tocá Elegir otras cargas. Podés buscar otro número y marcarlo: las cargas ya elegidas siguen arriba y continúan con su GPS.',
         'El tiempo transcurrido es informativo, desde el retiro o el relevo. Si falta señal o una carga cambió de tramo, se muestra el problema de esa carga sin detener las demás.',
-        'Si una ubicación intentada no se confirmó, mantené esta pantalla abierta y usá Reintentar envío. La entrega de esa carga espera la confirmación; las demás continúan. El punto todavía no se recupera al salir de la pantalla o cerrar la app. Si ya no es reciente, no se reenvía como ubicación actual: conservá la pantalla y consultá a soporte.'
+        'Si una ubicación intentada no se confirmó, usá Reintentar envío. La entrega de esa carga espera la confirmación; las demás continúan. Para cargas propias, cuando aparece Ubicación guardada, podés volver desde el mismo dispositivo con la misma cuenta y actividad para revisarla. En relevos, o si no pudo guardarse, mantené la pantalla abierta. Si la ubicación ya no es reciente, SITREP comprueba si la recibió sin enviarla como actual; si no puede confirmarla, conservá el dispositivo y consultá a soporte.'
       ], expected: 'La lista Cargas marcadas conserva las seleccionadas aunque la búsqueda no las incluya.' },
       { title: 'Entregar sólo la carga que llegó', body: [
         'Buscá el número dentro de Cargas marcadas y tocá Entregar. Revisá número y destino en la confirmación. Las otras cargas siguen viajando y enviando su GPS.',

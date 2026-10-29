@@ -2,6 +2,7 @@ import api from './api';
 import { GpsPendingError, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
 import { withGpsTransitionLock } from './gpsCoordination';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
+import { assertNoStoredFleetGpsForManifest } from './fleetGpsStorage';
 
 /** Flush this device's owned queue before a delivery or handoff. This does not
  * guarantee that another device has no unsent points. */
@@ -17,6 +18,7 @@ export async function withStoredGpsBeforeTransition<T>(ownerId: string | number 
   let result!: T;
   await runExclusiveGpsTask(manifestId, () => withGpsTransitionLock(manifestId, async () => {
     ensureSession();
+    assertNoStoredFleetGpsForManifest(manifestId);
     try {
       await flushStoredGpsQueue(owner, manifestId, async point => {
         ensureSession();
@@ -33,6 +35,7 @@ export async function withStoredGpsBeforeTransition<T>(ownerId: string | number 
       throw new GpsPendingError('Ubicaciones pendientes. No se pudieron sincronizar. Revisá la conexión y volvé a intentar.');
     }
     ensureSession();
+    assertNoStoredFleetGpsForManifest(manifestId);
     result = await transition();
   }));
   return result;

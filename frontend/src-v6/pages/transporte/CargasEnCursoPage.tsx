@@ -11,6 +11,7 @@ import {subscribeDeliveryConfirmed} from '../../services/offlineSyncEvents';
 import {fleetGpsService,type FleetGpsLoad} from '../../services/fleet-gps.service';
 import {companyCacheScope} from '../../services/companyContext';
 import {getApiErrorMessage} from '../../utils/api-error';
+import {supportRequestContext} from '../../utils/supportSession';
 import {manifestFeatureVisible} from '../../utils/manifestFeatures';
 import {Card,CardContent,CardHeader} from '../../components/ui/CardV2';
 import {Button} from '../../components/ui/ButtonV2';
@@ -27,7 +28,9 @@ function elapsed(start:string|null,now:number) {
 export default function CargasEnCursoPage() {
   const {currentUser}=useAuth(),mp=useMobilePrefix(),qc=useQueryClient();
   const pending=usePendingDeliveryIds(),confirmDelivery=useConfirmarEntrega();
-  const scope=`${currentUser?.training?'cap':'op'}:${currentUser?.id}:${currentUser?.rol}:${currentUser?.actorId}:${companyCacheScope(currentUser?.empresaContexto??null)}`;
+  const sessionContext=supportRequestContext();
+  const scope=`${currentUser?.training?'cap':'op'}:${currentUser?.id}:${currentUser?.rol}:${currentUser?.actorId}:${companyCacheScope(currentUser?.empresaContexto??null)}:${sessionContext}`;
+  const currentScope=useRef(scope);currentScope.current=scope;
   const allowed=currentUser?.rol==='TRANSPORTISTA'&&manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser);
   const [owner,setOwner]=useState(scope),[known,setKnown]=useState<Record<string,FleetGpsLoad>>({}),[selected,setSelected]=useState<string[]>([]),[started,setStarted]=useState(false);
   const [search,setSearch]=useState(''),[term,setTerm]=useState(''),[now,setNow]=useState(()=>Date.now());
@@ -56,7 +59,8 @@ export default function CargasEnCursoPage() {
   // Keep pending observations isolated when the same person changes account,
   // role or company without unmounting this screen.
   const gpsKey=(key:string)=>JSON.stringify([scope,key]);
-  const gps=useFleetGps(chosen.filter(canTrack).map(load=>({key:gpsKey(load.key),send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId)})),allowed&&ownsSession&&started);
+  const currentSession=()=>!!sessionContext&&supportRequestContext()===sessionContext&&currentScope.current===scope;
+  const gps=useFleetGps(chosen.filter(canTrack).map(load=>({key:gpsKey(load.key),...(load.kind==='MANIFIESTO'?{lockId:load.id,verify:(point,puntoId)=>fleetGpsService.verify(load,point,puntoId,currentSession)}:{persist:false}),send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId,currentSession)})),allowed&&ownsSession&&started);
   const rows=query.data?.targets??[];
   const refresh=async()=>{await qc.invalidateQueries({queryKey:['fleet-gps-targets',scope]});await qc.invalidateQueries({queryKey:['manifiestos']});};
   const toggle=(load:FleetGpsLoad)=>{
@@ -68,7 +72,8 @@ export default function CargasEnCursoPage() {
     const selectedDelivery=delivery;
     try{
       await gps.holdAndDrain(gpsKey(selectedDelivery.key));
-      const point=gps.status==='active'&&gps.position&&Date.now()-gps.position.observedAt<60000?gps.position:null;
+      const pointAge=gps.position?Date.now()-gps.position.observedAt:NaN;
+      const point=gps.status==='active'&&gps.position&&pointAge>=0&&pointAge<60000?gps.position:null;
       const result=await confirmDelivery.mutateAsync({id:selectedDelivery.id,observaciones:'Entrega confirmada desde las cargas de este móvil',...(point?{latitud:point.latitud,longitud:point.longitud}:{})});
       setDelivery(null);
       if(result.status==='confirmed') {
@@ -88,15 +93,16 @@ export default function CargasEnCursoPage() {
       <p role="status" aria-live="polite" className={`flex items-center gap-2 rounded-lg p-3 text-sm font-semibold ${started&&gps.status==='active'?'bg-primary-50 text-primary-800':'bg-neutral-100 text-neutral-700'}`}><Radio size={18} aria-hidden="true"/>{label}</p>
       <Button fullWidth disabled={!started&&chosen.filter(canTrack).length===0} leftIcon={retryLocation?<RefreshCw size={18}/>:started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(retryLocation){gps.retryLocation();return;}if(!started)setChoosing(false);setStarted(value=>!value);}}>{retryLocation?'Reintentar GPS':started?'Detener GPS':'Iniciar GPS'}</Button>
       {chosen.length>0&&<button type="button" onClick={()=>setChoosing(value=>!value)} className="min-h-11 text-sm font-semibold text-primary-800 underline">{choosing?'Cerrar selección':'Elegir otras cargas'}</button>}
-      <p className="text-sm text-neutral-600">Mantené esta pantalla abierta. Las nuevas ubicaciones se comparten con cada carga marcada, hasta una cada 30 segundos. Al entregar una, las demás continúan. Si falla un envío, reintentalo antes de salir: todavía no se recupera al salir de esta pantalla o cerrar la app.</p>
+      <p className="text-sm text-neutral-600">Mantené esta pantalla abierta para compartir ubicaciones con cada carga marcada, hasta una cada 30 segundos. Al entregar una, las demás continúan.</p>
       {pending.error&&<p role="alert" className="text-sm text-error-800">No pudimos revisar las entregas guardadas. <button type="button" className="font-semibold underline" onClick={pending.retry}>Reintentar</button></p>}
     </CardContent></Card>
     {chosen.length>0&&<Card role="region" aria-label="Cargas marcadas"><CardHeader title={`Cargas marcadas · ${chosen.length}`} icon={<Truck size={20}/>}/><CardContent className="divide-y divide-neutral-100">
       {chosen.map(load=>{
         const sent=gps.deliveries[gpsKey(load.key)],duration=elapsed(load.fechaInicio,now),fresh=sent?.receivedAt&&now-sent.receivedAt.getTime()<60000;
-        const state=pending.ids.has(load.id)?'Entrega pendiente en este dispositivo. Revisá la sincronización.':pending.checking?'Comprobando entregas guardadas…':!load.gpsDisponible?'Pedí un nuevo enlace GPS a la transportista de origen.':sent?.state==='error'?sent.message:sent?.state==='sending'?'Enviando ubicación…':sent?.state==='received'&&fresh?'GPS recibido':sent?.receivedAt?'GPS sin actualización reciente':'Todavía sin envío GPS';
+        const state=pending.ids.has(load.id)?'Entrega pendiente en este dispositivo. Revisá la sincronización.':pending.checking?'Comprobando entregas guardadas…':!load.gpsDisponible?'Pedí un nuevo enlace GPS a la transportista de origen.':sent?.state==='error'?sent.message:sent?.state==='sending'?'Enviando ubicación…':sent?.state==='verified'?'SITREP confirmó una ubicación anterior':sent?.state==='received'&&fresh?'GPS recibido':sent?.receivedAt?'GPS sin actualización reciente':'Todavía sin envío GPS';
         return <div key={load.key} className="space-y-2 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><strong className="block break-words text-sm text-neutral-900">{load.numero}</strong><p className="text-xs text-neutral-600">{load.destino}</p></div><button type="button" disabled={busy&&delivery?.key===load.key} onClick={()=>toggle(load)} className="min-h-11 px-2 text-xs font-semibold text-primary-800 underline" aria-label={`Quitar ${load.numero} del GPS`}>Quitar</button></div>
           <p role="status" className={`text-sm ${sent?.state==='error'?'text-error-800':sent?.state==='received'&&fresh?'text-primary-800':'text-neutral-600'}`}>{state}{sent?.state==='received'&&sent.receivedAt&&<span className="ml-1 text-xs">· {sent.receivedAt.toLocaleTimeString('es-AR')}</span>}</p>
+          {sent?.state==='error'&&sent.saved&&<p className="text-xs text-neutral-600">Ubicación guardada en este dispositivo. Volvé con la misma cuenta y actividad para revisarla.</p>}
           {sent?.state!=='received'&&sent?.receivedAt&&<p className="text-xs text-neutral-500">Última recepción: {sent.receivedAt.toLocaleTimeString('es-AR')}</p>}
           {duration&&<p className="flex items-center gap-1 text-xs text-neutral-600"><Clock3 size={13}/>{load.referenciaTiempo}: {duration}</p>}
           <div className="flex flex-wrap gap-2">{sent?.state==='error'&&sent.statusCode!==409&&canTrack(load)&&<Button size="sm" variant="outline" aria-label={`Reintentar envío GPS de ${load.numero}`} onClick={()=>gps.resume(gpsKey(load.key))}>Reintentar envío</Button>}{load.puedeEntregar?<Button size="sm" variant="outline" aria-label={`Entregar ${load.numero}`} disabled={pending.checking||pending.error||pending.ids.has(load.id)} leftIcon={<CheckCircle2 size={16}/>} onClick={()=>{setError('');setDelivery(load);}}>Entregar</Button>:<p className="text-xs text-neutral-600">Entrega a cargo de la transportista de origen.</p>}</div>

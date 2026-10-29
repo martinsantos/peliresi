@@ -1,6 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useFleetGps, type FleetGpsTarget } from '../../hooks/useFleetGps';
+import { withGpsTransitionLock } from '../../services/gpsCoordination';
+import { assertNoStoredFleetGpsForManifest,saveFleetGpsPoint } from '../../services/fleetGpsStorage';
+import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 let locate: PositionCallback;
 let fail: PositionErrorCallback;
@@ -12,12 +15,12 @@ const position = (age = 0) => ({
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
 beforeEach(() => {
-  vi.useFakeTimers(); clearWatch.mockClear();
+  vi.useFakeTimers(); clearWatch.mockClear(); localStorage.clear();
   vi.stubGlobal('navigator', { geolocation: {
     watchPosition: vi.fn((ok: PositionCallback, error: PositionErrorCallback) => { locate = ok; fail = error; return 17; }), clearWatch,
   } });
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); localStorage.clear(); });
 
 it('uses one watcher for explicitly chosen loads and preserves it when the selection changes', async () => {
   const a = vi.fn().mockResolvedValue({}), b = vi.fn().mockResolvedValue({}), c = vi.fn().mockResolvedValue({});
@@ -158,16 +161,163 @@ it('does not deliver after a failed upload or replay an expired fix as current',
   hook.unmount();
 });
 
-it('waits for an in-flight failure and warns before closing with an unconfirmed point', async () => {
+it('waits for an in-flight failure while preserving the attempted point in storage', async () => {
   let reject!: (error: Error) => void;
   const send=vi.fn(()=>new Promise<void>((_, fail)=>{reject=fail;}));
   const hook=renderHook(()=>useFleetGps([{key:'a',send}],true));
   await act(async()=>{locate(position());await flush();});
   const closing=new Event('beforeunload',{cancelable:true});
-  window.dispatchEvent(closing); expect(closing.defaultPrevented).toBe(true);
+  window.dispatchEvent(closing); expect(closing.defaultPrevented).toBe(false);
   const held=hook.result.current.holdAndDrain('a');
   const rejected=expect(held).rejects.toThrow(/ubicación pendiente/i);
   await act(async()=>{reject(new Error('Respuesta perdida'));await rejected;await flush();});
+  hook.unmount();
+});
+
+it('warns and does not send when the attempted point cannot be saved', async () => {
+  vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new Error('quota');});
+  const send=vi.fn().mockResolvedValue({});
+  const hook=renderHook(()=>useFleetGps([{key:'a',send}],true));
+  await act(async()=>{locate(position());await flush();});
+  expect(send).not.toHaveBeenCalled();
+  expect(hook.result.current.deliveries.a.message).toMatch(/almacenamiento/i);
+  const closing=new Event('beforeunload',{cancelable:true});
+  window.dispatchEvent(closing); expect(closing.defaultPrevented).toBe(true);
+  await expect(hook.result.current.holdAndDrain('a')).rejects.toThrow(/ubicación pendiente/i);
+  hook.unmount();
+});
+
+it('keeps a confirmed point recoverable if its saved record cannot yet be removed', async () => {
+  vi.spyOn(Storage.prototype,'removeItem').mockImplementationOnce(()=>{throw new Error('storage unavailable');});
+  const send=vi.fn().mockResolvedValue({});
+  const hook=renderHook(()=>useFleetGps([{key:'a',send}],true));
+  await act(async()=>{locate(position());await flush();});
+  expect(send).toHaveBeenCalledOnce();expect(hook.result.current.deliveries.a.saved).toBe(true);expect(localStorage.length).toBe(1);
+  const closing=new Event('beforeunload',{cancelable:true});window.dispatchEvent(closing);expect(closing.defaultPrevented).toBe(false);
+  await act(async()=>{hook.result.current.resume('a');await flush();});
+  expect(send).toHaveBeenCalledTimes(2);expect(send.mock.calls[0][1]).toEqual(send.mock.calls[1][1]);expect(localStorage.length).toBe(0);
+  hook.unmount();
+});
+
+it('recovers a failed attempted point after the screen is reopened, with the same reference', async () => {
+  const failed=vi.fn().mockRejectedValue(new Error('Sin conexión'));
+  const first=renderHook(()=>useFleetGps([{key:'account-a:trip',send:failed}],true));
+  await act(async()=>{locate(position());await flush();});
+  const [point,reference]=failed.mock.calls[0]; first.unmount();
+  const send=vi.fn().mockResolvedValue({});
+  const reopened=renderHook(()=>useFleetGps([{key:'account-a:trip',send}],true));
+  await act(flush);
+  expect(send).toHaveBeenCalledWith(point,reference);
+  expect(reopened.result.current.deliveries['account-a:trip'].state).toBe('received');
+  await expect(reopened.result.current.holdAndDrain('account-a:trip')).resolves.toBeUndefined();
+  reopened.unmount();
+});
+
+it('does not send the same sensor observation again after recovering it', async () => {
+  const fix=position(),failed=vi.fn().mockRejectedValue(new Error('Sin conexión'));
+  const first=renderHook(()=>useFleetGps([{key:'a',send:failed}],true));
+  await act(async()=>{locate(fix);await flush();});first.unmount();
+  const send=vi.fn().mockResolvedValue({});
+  const reopened=renderHook(()=>useFleetGps([{key:'a',send}],true));await act(flush);
+  expect(send).toHaveBeenCalledOnce();
+  await act(async()=>{locate(fix);await vi.advanceTimersByTimeAsync(30_000);await flush();});
+  expect(send).toHaveBeenCalledOnce();
+  reopened.unmount();
+});
+
+it('can synchronize a saved point even if this device no longer exposes a GPS sensor', async () => {
+  const failed=vi.fn().mockRejectedValue(new Error('Sin conexión'));
+  const first=renderHook(()=>useFleetGps([{key:'a',send:failed}],true));
+  await act(async()=>{locate(position());await flush();});
+  const [point,reference]=failed.mock.calls[0];first.unmount();
+  vi.stubGlobal('navigator',{});
+  const send=vi.fn().mockResolvedValue({});
+  const reopened=renderHook(()=>useFleetGps([{key:'a',send}],true));await act(flush);
+  expect(send).toHaveBeenCalledWith(point,reference);expect(reopened.result.current.status).toBe('unavailable');
+  expect(localStorage.length).toBe(0);reopened.unmount();
+});
+
+it('preserves an old point on reopen without replaying it as a current location', async () => {
+  const first=renderHook(()=>useFleetGps([{key:'a',send:vi.fn().mockRejectedValue(new Error('Sin conexión'))}],true));
+  await act(async()=>{locate(position());await flush();}); first.unmount();
+  vi.setSystemTime(Date.now()+70_000);
+  const send=vi.fn().mockResolvedValue({});
+  const reopened=renderHook(()=>useFleetGps([{key:'a',send}],true));
+  await act(flush);
+  expect(send).not.toHaveBeenCalled();
+  expect(reopened.result.current.deliveries.a.message).toMatch(/no se reenviará como ubicación actual/i);
+  await expect(reopened.result.current.holdAndDrain('a')).rejects.toThrow(/contactá a soporte/i);
+  expect(localStorage.length).toBeGreaterThan(0); reopened.unmount();
+});
+
+it('reconciles an older point that the server already received without sending it again', async () => {
+  const failed=vi.fn().mockRejectedValue(new Error('Respuesta perdida'));
+  const first=renderHook(()=>useFleetGps([{key:'a',send:failed}],true));
+  await act(async()=>{locate(position());await flush();});
+  const [point,reference]=failed.mock.calls[0];first.unmount();vi.setSystemTime(Date.now()+70_000);
+  const send=vi.fn().mockResolvedValue({}),verify=vi.fn().mockResolvedValue(true);
+  const reopened=renderHook(()=>useFleetGps([{key:'a',send,verify}],true));
+  await act(flush);
+  expect(verify).toHaveBeenCalledWith(point,reference);expect(send).not.toHaveBeenCalled();
+  expect(reopened.result.current.deliveries.a.state).toBe('verified');
+  expect(localStorage.length).toBe(0);await expect(reopened.result.current.holdAndDrain('a')).resolves.toBeUndefined();
+  reopened.unmount();
+});
+
+it('retains an old point when receipt is not confirmed', async () => {
+  const first=renderHook(()=>useFleetGps([{key:'a',send:vi.fn().mockRejectedValue(new Error('Sin conexión'))}],true));
+  await act(async()=>{locate(position());await flush();});first.unmount();vi.setSystemTime(Date.now()+70_000);
+  const send=vi.fn(),verify=vi.fn().mockResolvedValue(false);
+  const reopened=renderHook(()=>useFleetGps([{key:'a',send,verify}],true));await act(flush);
+  expect(verify).toHaveBeenCalledOnce();expect(send).not.toHaveBeenCalled();expect(localStorage.length).toBeGreaterThan(0);
+  await expect(reopened.result.current.holdAndDrain('a')).rejects.toThrow(/contactá a soporte/i);reopened.unmount();
+});
+
+it('keeps warning about a second unsaved point after verifying a different saved point', async () => {
+  vi.spyOn(Storage.prototype,'setItem').mockImplementationOnce(()=>{throw new Error('quota');});
+  const send=vi.fn(),verify=vi.fn().mockResolvedValue(true),now=Date.now();
+  const hook=renderHook(()=>useFleetGps([{key:'a',send,verify}],true));
+  await act(async()=>{locate(position());await flush();});
+  saveFleetGpsPoint({targetKey:'a',puntoId:'1949916e-22df-4dc1-9d1e-98f98a3eab26',observedAt:now-1000,point:{latitud:-34,longitud:-69,precision:10}});
+  vi.setSystemTime(now+70_000);
+  await act(async()=>{hook.result.current.resume('a');await flush();});
+  expect(verify).toHaveBeenCalledOnce();expect(send).not.toHaveBeenCalled();
+  expect(hook.result.current.deliveries.a).toMatchObject({state:'error',saved:false});
+  expect(hook.result.current.deliveries.a.message).toMatch(/otra sin guardar/i);
+  const closing=new Event('beforeunload',{cancelable:true});window.dispatchEvent(closing);expect(closing.defaultPrevented).toBe(true);
+  hook.unmount();
+});
+
+it('does not resend an unresolved point as current after the device clock moves backwards', async () => {
+  const send=vi.fn().mockRejectedValue(new Error('Sin conexión')),now=Date.now();
+  const hook=renderHook(()=>useFleetGps([{key:'a',send}],true));
+  await act(async()=>{locate(position());await flush();});
+  vi.setSystemTime(now-70_000);
+  await act(async()=>{locate(position());await flush();});
+  expect(send).toHaveBeenCalledOnce();
+  await expect(hook.result.current.holdAndDrain('a')).rejects.toThrow(/contactá a soporte/i);
+  hook.unmount();
+});
+
+it('coordinates an in-flight fleet write with another transition in the same browser', async () => {
+  const restoreLocks=installMockGpsLocks(); let reject!:(error:Error)=>void;
+  const send=vi.fn(()=>new Promise<void>((_,fail)=>{reject=fail;}));
+  const key=JSON.stringify(['carrier-a','MANIFIESTO:trip']);
+  const hook=renderHook(()=>useFleetGps([{key,lockId:'trip',send}],true));
+  await act(async()=>{locate(position());await flush();});
+  await expect(withGpsTransitionLock('trip',async()=>{})).rejects.toThrow(/otra pestaña/i);
+  await act(async()=>{reject(new Error('Sin conexión'));await flush();});
+  await expect(withGpsTransitionLock('trip',async()=>assertNoStoredFleetGpsForManifest('trip'))).rejects.toThrow(/GPS de varias cargas sin confirmar/i);
+  hook.unmount();restoreLocks();
+});
+
+it('keeps relay failures in memory until its capability version can be recovered safely', async () => {
+  const send=vi.fn().mockRejectedValue(new Error('Sin conexión'));
+  const hook=renderHook(()=>useFleetGps([{key:'relevo',persist:false,send}],true));
+  await act(async()=>{locate(position());await flush();});
+  expect(localStorage.length).toBe(0);
+  expect(hook.result.current.deliveries.relevo.saved).toBe(false);
+  const closing=new Event('beforeunload',{cancelable:true});window.dispatchEvent(closing);expect(closing.defaultPrevented).toBe(true);
   hook.unmount();
 });
 

@@ -4,7 +4,7 @@ import { supportRequestContext, supportSessionMatches } from '../utils/supportSe
 
 export type GpsReceiptSummary = { checked: number; confirmed: number; unconfirmed: number };
 
-function matchesReceipt(response: unknown, point: PendingGpsPoint): boolean {
+export function matchesGpsReceipt(response: unknown, point: PendingGpsPoint): boolean {
   const body = (response as { data?: { success?: unknown; data?: { idempotencia?: { version?: unknown; puntoId?: unknown; confirmado?: unknown }; tracking?: { latitud?: unknown; longitud?: unknown; velocidad?: unknown; direccion?: unknown } } } } | undefined)?.data;
   const receipt = body?.data?.idempotencia, saved = body?.data?.tracking;
   return body?.success === true && receipt?.version === 1 && receipt.confirmado === true && receipt.puntoId === point.puntoId
@@ -42,7 +42,7 @@ export async function verifyStoredGpsReceipts(ownerId: string | number, id: stri
       try { response = await api.get(`/manifiestos/${encodeURIComponent(id)}/ubicaciones/${encodeURIComponent(point.puntoId)}/confirmacion`); }
       catch { ensureSession(); unconfirmed++; continue; }
       ensureSession();
-      if (matchesReceipt(response, point)) confirmed++; else unconfirmed++;
+      if (matchesGpsReceipt(response, point)) confirmed++; else unconfirmed++;
     }
   };
   await Promise.all(Array.from({ length: Math.min(points.length, 4) }, () => worker()));

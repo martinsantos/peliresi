@@ -2,9 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn(), pending: new Set<string>(), user: { id: 'qa-carrier', rol: 'TRANSPORTISTA', training: false, actorId: 'qa-actor' } }));
+import { installMockGpsLocks } from '../utils/mockGpsLocks';
+const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn(), pending: new Set<string>(), impersonator:'admin-a', user: { id: 'qa-carrier', rol: 'TRANSPORTISTA', training: false, actorId: 'qa-actor' } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mocks.user }) }));
 vi.mock('../../services/fleet-gps.service', () => ({ fleetGpsService: { list: mocks.list, send: mocks.send } }));
+vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => mocks.user.id+':transportista:'+mocks.impersonator }));
 vi.mock('../../hooks/useManifiestoWorkflow', () => ({ useConfirmarEntrega: () => ({ mutateAsync: ({id,...data}: {id:string}) => mocks.deliver(id, data) }) }));
 vi.mock('../../hooks/usePendingDeliveryIds', () => ({ usePendingDeliveryIds: () => ({ ids: mocks.pending, checking: false, error: false, retry: vi.fn() }) }));
 import CargasEnCursoPage from '../../pages/transporte/CargasEnCursoPage';
@@ -13,11 +15,13 @@ const loads = ['A', 'B'].map(id => ({ key: 'MANIFIESTO:' + id, kind: 'MANIFIESTO
 let locate: PositionCallback;
 let fail: PositionErrorCallback;
 const clearWatch = vi.fn();
+let restoreLocks:()=>void;
 beforeEach(() => {
-  vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'true'); mocks.user.id = 'qa-carrier'; clearWatch.mockClear();
+  vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'true'); mocks.user.id = 'qa-carrier'; mocks.impersonator='admin-a'; clearWatch.mockClear(); localStorage.clear();
   mocks.list.mockReset().mockImplementation(async search => ({ targets: search ? [] : loads, total: search ? 0 : 2, limit: 100 }));
   mocks.pending.clear(); mocks.send.mockReset().mockResolvedValue({}); mocks.deliver.mockReset().mockResolvedValue({status:'confirmed'});
   vi.stubGlobal('navigator', { geolocation: { watchPosition: vi.fn((ok: PositionCallback, error: PositionErrorCallback) => { locate = ok; fail = error; return 12; }), clearWatch } });
+  restoreLocks=installMockGpsLocks();
 });
 it('keeps an uncertain delivery marked and excludes that load from GPS while the other remains selected', async () => {
   mocks.deliver.mockImplementationOnce(async () => { mocks.pending.add('A'); return {status:'pending',message:'No recibimos confirmación.'}; });
@@ -41,7 +45,7 @@ it('stops tracking a load confirmed by another account in this browser and keeps
   expect(selected).toHaveTextContent('QA-B');
   view.unmount();
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => { restoreLocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 function setup() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const tree = () => <QueryClientProvider client={client}><MemoryRouter><CargasEnCursoPage/></MemoryRouter></QueryClientProvider>;
@@ -111,6 +115,13 @@ it('does not retry the previous account’s unconfirmed point under another acco
   expect(mocks.send.mock.calls[2][1].latitud).toBe(-34);
   expect(mocks.send.mock.calls[2][3]).not.toBe(firstReference);
   view.unmount();
+});
+it('clears GPS selection when the impersonating administrator changes', async () => {
+  const view=setup();await chooseAndStart();
+  mocks.impersonator='admin-b';view.rerenderSession();
+  await waitFor(()=>expect(screen.queryByRole('region',{name:'Cargas marcadas'})).toBeNull());
+  expect(clearWatch).toHaveBeenCalledWith(12);
+  expect(screen.getByRole('button',{name:'Iniciar GPS'})).toBeDisabled();view.unmount();
 });
 it('does not query loads or acquire location when the operational feature is disabled', () => {
   vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'false'); const view = setup();
