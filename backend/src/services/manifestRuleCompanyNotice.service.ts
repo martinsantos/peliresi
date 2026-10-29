@@ -11,7 +11,7 @@ const parse = (raw: string | null): Data | null => {
 export const isManifestRuleCompanyNotice = (notice: Pick<Notice, 'tipo'>, data: Data | null): boolean => {
  if (data?.destino !== 'representante') return false;
  if (notice.tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto'].includes(String(data.tipo))) return true;
- const eventTypes: Record<string, string> = { INCIDENTE: 'INCIDENTE_REPORTADO', RECHAZO: 'MANIFIESTO_RECHAZADO', DIFERENCIA_PESO: 'ALERTA_SISTEMA' };
+ const eventTypes: Record<string, string> = { INCIDENTE: 'INCIDENTE_REPORTADO', RECHAZO: 'MANIFIESTO_RECHAZADO', DIFERENCIA_PESO: 'ALERTA_SISTEMA', ENTREGA: 'MANIFIESTO_ENTREGADO' };
  return data.tipo === 'alerta_evento_manifiesto' && eventTypes[String(data.evento)] === notice.tipo;
 };
 

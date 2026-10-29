@@ -39,7 +39,7 @@ it('does not alter direct-owner notices', async () => {
  expect(await withManifestRuleCompanyNoticeContext({} as any, [direct])).toEqual([direct]); expect(recipients).not.toHaveBeenCalled();
 });
 it.each([
- ['INCIDENTE', 'INCIDENTE_REPORTADO'], ['RECHAZO', 'MANIFIESTO_RECHAZADO'], ['DIFERENCIA_PESO', 'ALERTA_SISTEMA'],
+ ['INCIDENTE', 'INCIDENTE_REPORTADO'], ['RECHAZO', 'MANIFIESTO_RECHAZADO'], ['DIFERENCIA_PESO', 'ALERTA_SISTEMA'], ['ENTREGA', 'MANIFIESTO_ENTREGADO'],
 ])('masks a revoked operational event %s', async (event, tipo) => {
  const operational = { ...notice, tipo, datos: JSON.stringify({ ...data, tipo: 'alerta_evento_manifiesto', evento: event }) };
  recipients.mockResolvedValue(new Map([['manifest', []]]));

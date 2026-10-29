@@ -69,7 +69,7 @@ it.each(['duracion_transito_configurada', 'alerta_regla_manifiesto'])('opens a c
 });
 
 it.each([
- ['INCIDENTE', 'INCIDENTE_REPORTADO'], ['RECHAZO', 'MANIFIESTO_RECHAZADO'], ['DIFERENCIA_PESO', 'ALERTA_SISTEMA'],
+ ['INCIDENTE', 'INCIDENTE_REPORTADO'], ['RECHAZO', 'MANIFIESTO_RECHAZADO'], ['DIFERENCIA_PESO', 'ALERTA_SISTEMA'], ['ENTREGA', 'MANIFIESTO_ENTREGADO'],
 ])('opens a representative operational event %s through the owned notice', (evento, tipo) => {
  const n = { ...notice, tipo, datos: JSON.stringify({ tipo: 'alerta_evento_manifiesto', version: 1, destino: 'representante', evento, accesosEmpresa: [access] }) };
  for (const prefix of ['', '/app']) {

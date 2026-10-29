@@ -7,6 +7,8 @@ import { AppError } from '../middlewares/errorHandler';
 import { canAccessManifiesto } from '../utils/roleFilter';
 import { updateRollingHash } from '../services/manifestIntegrity.service';
 import { domainEvents } from '../services/domainEvent.service';
+import { notifyManifestDelivery } from '../services/manifestDeliveryNotice.service';
+import { notificationService } from './notification.controller';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
 
 const deliverySchema = z.object({
@@ -70,7 +72,7 @@ export async function confirmarEntregaIdempotente(req: AuthRequest, res: Respons
         }
         const manifiesto = await tx.manifiesto.findUnique({ where: { id }, include: includeActors });
         if (!manifiesto) throw new AppError('Manifiesto no encontrado', 404);
-        return { manifiesto, repetido: true };
+        return { manifiesto, repetido: true, notices: [] };
       }
       if (current.modalidad === 'IN_SITU') throw new AppError('Los manifiestos in situ no requieren entrega por transportista', 400);
       if (current.estado !== 'EN_TRANSITO') throw new AppError('El manifiesto debe estar en transito', 400);
@@ -82,16 +84,18 @@ export async function confirmarEntregaIdempotente(req: AuthRequest, res: Respons
       await tx.tramoTransporte.updateMany({ where: { manifiestoId: id, fin: null },
         data: { fin: fechaEntrega, accesoVersion: null, accesoHasta: null } });
       await updateRollingHash(tx, id, 'ENTREGADO', fechaEntrega, manifiesto.observaciones, evento.id);
+      const notices = await notifyManifestDelivery(tx, manifiesto, evento.id, user.id);
       const receipt: Receipt = { version: 1, requestHash, fechaEntrega: fechaEntrega.toISOString(), eventoId: evento.id };
       await tx.auditoria.create({ data: { id: receiptId, usuarioId: user.id, manifiestoId: id,
         modulo: 'MANIFIESTOS', accion: 'CONFIRMAR_ENTREGA_V1', datosDespues: JSON.stringify(receipt) } });
-      return { manifiesto, repetido: false };
+      return { manifiesto, repetido: false, notices };
     });
 
     invalidateGpsCache(id);
+    result.notices.forEach(notice => notificationService.programarCanalesDeNotificacion(notice));
     res.json({ success: true, data: { manifiesto: result.manifiesto,
       idempotencia: { version: 1, referencia, repetido: result.repetido } } });
     if (!result.repetido) domainEvents.emit({ type: 'MANIFIESTO_ESTADO_CAMBIADO', manifiestoId: result.manifiesto.id,
-      estadoAnterior: 'EN_TRANSITO', estadoNuevo: 'ENTREGADO', numero: result.manifiesto.numero, userId: user.id });
+      estadoAnterior: 'EN_TRANSITO', estadoNuevo: 'ENTREGADO', numero: result.manifiesto.numero, userId: user.id, avisosConfirmados: true });
   } catch (error) { next(error); }
 }

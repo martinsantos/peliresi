@@ -9,6 +9,7 @@ export type DomainEvent =
       estadoNuevo: string;
       numero: string;
       userId: string;
+      avisosConfirmados?: boolean;
     }
   | {
       type: 'INCIDENTE_REGISTRADO';

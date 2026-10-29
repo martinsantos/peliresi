@@ -31,6 +31,13 @@ test('operational notices identify the target and recheck the representative act
   assert.match(text, /vuelve a comprobar la actividad y la sede autorizadas/i);
   assert.match(text, /no reemplaza el informe de hallazgo ni la adenda/i);
 });
+test('delivery guidance distinguishes the saved inbox from external channels and explains representative access', () => {
+  const text = JSON.stringify(guides.find((g: any) => g.id === 'transportista-confirmar-entrega'));
+  assert.match(text, /entrega confirmada deja avisos internos/);
+  assert.match(text, /Reintentar la misma entrega no duplica esos avisos/);
+  assert.match(text, /empresa, actividad y sede autorizadas/);
+  assert.match(text, /aviso interno no confirma que se haya enviado correo o push/i);
+});
 test('current manual explains three in-situ approvals and complete treatment before a final certificate', () => {
   const proposals = JSON.stringify(guides.find((g: any) => g.id === 'manifiestos-tres-partes'));
   const certificates = JSON.stringify(guides.find((g: any) => g.id === 'certificados-operador-partes'));

@@ -266,6 +266,7 @@ export async function alertaSubscriber(event: DomainEvent): Promise<void> {
   // 1. Notificaciones in-app por tipo de evento
   switch (event.type) {
     case 'MANIFIESTO_ESTADO_CAMBIADO':
+      if (event.avisosConfirmados) break;
       await notificationService.notificarCambioEstado(
         event.manifiestoId,
         event.estadoNuevo,

@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mock = vi.hoisted(() => ({ transaction: vi.fn(), query: vi.fn(), findReceipt: vi.fn(), createReceipt: vi.fn(),
-  findManifest: vi.fn(), updateManifest: vi.fn(), createEvent: vi.fn(), findEvent: vi.fn(), closeLegs: vi.fn(), hash: vi.fn(), emit: vi.fn(), invalidate: vi.fn() }));
+  findManifest: vi.fn(), updateManifest: vi.fn(), createEvent: vi.fn(), findEvent: vi.fn(), closeLegs: vi.fn(), hash: vi.fn(), emit: vi.fn(), invalidate: vi.fn(), notices: vi.fn(), schedule: vi.fn() }));
 vi.mock('../../lib/prisma', () => ({ default: { $transaction: mock.transaction } }));
 vi.mock('../../services/manifestIntegrity.service', () => ({ updateRollingHash: mock.hash }));
 vi.mock('../../services/domainEvent.service', () => ({ domainEvents: { emit: mock.emit } }));
 vi.mock('../../controllers/manifiesto-gps.controller', () => ({ invalidateGpsCache: mock.invalidate }));
+vi.mock('../../services/manifestDeliveryNotice.service', () => ({ notifyManifestDelivery: mock.notices }));
+vi.mock('../../controllers/notification.controller', () => ({ notificationService: { programarCanalesDeNotificacion: mock.schedule } }));
 import { confirmarEntregaIdempotente } from '../../controllers/manifiesto-delivery.controller';
 
 const referencia = 'c8256c28-2e6a-4fd0-9127-777a7db7af3e';
@@ -30,6 +32,7 @@ describe('delivery receipt', () => {
     mock.findEvent.mockResolvedValue({manifiestoId:'qa-delivery',tipo:'ENTREGA',usuarioId:'carrier-user',descripcion:'Entrega artificial',latitud:-32.88,longitud:-68.84});
     mock.closeLegs.mockResolvedValue({ count: 0 });
     mock.hash.mockResolvedValue(undefined);
+    mock.notices.mockResolvedValue([{ id: 'notice-1', usuarioId: 'generator' }]);
     mock.transaction.mockImplementation(async fn => fn({ $queryRaw: mock.query, auditoria: { findUnique: mock.findReceipt, create: mock.createReceipt },
       manifiesto: { update: mock.updateManifest, findUnique: mock.findManifest }, eventoManifiesto: { create: mock.createEvent, findUnique: mock.findEvent }, tramoTransporte: { updateMany: mock.closeLegs } }));
   });
@@ -40,8 +43,18 @@ describe('delivery receipt', () => {
     expect(next).not.toHaveBeenCalled(); expect(mock.updateManifest).toHaveBeenCalledTimes(1);
     expect(mock.createEvent).toHaveBeenCalledTimes(1); expect(mock.createReceipt).toHaveBeenCalledTimes(1);
     expect(mock.hash).toHaveBeenCalledTimes(1); expect(mock.closeLegs).toHaveBeenCalledTimes(1); expect(mock.emit).toHaveBeenCalledTimes(1);
+    expect(mock.notices).toHaveBeenCalledTimes(1); expect(mock.schedule).toHaveBeenCalledTimes(1);
+    expect(mock.emit).toHaveBeenCalledWith(expect.objectContaining({ avisosConfirmados: true }));
     expect(first.json.mock.calls[0][0].data.idempotencia).toEqual({ version: 1, referencia, repetido: false });
     expect(retry.json.mock.calls[0][0].data.idempotencia).toEqual({ version: 1, referencia, repetido: true });
+  });
+
+  it('does not acknowledge or dispatch a delivery if its inbox insert fails', async () => {
+    mock.notices.mockRejectedValueOnce(new Error('notice insert failed'));
+    const response = res(), next = vi.fn(); await confirmarEntregaIdempotente(req(), response, next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'notice insert failed' }));
+    expect(response.json).not.toHaveBeenCalled(); expect(mock.createReceipt).not.toHaveBeenCalled();
+    expect(mock.emit).not.toHaveBeenCalled(); expect(mock.schedule).not.toHaveBeenCalled();
   });
 
   it('acknowledges the original delivery after later authorized processing', async () => {

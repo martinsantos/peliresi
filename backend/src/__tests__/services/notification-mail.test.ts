@@ -20,7 +20,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
   it.each([
     ['INCIDENTE', 'INCIDENTE_REPORTADO', 'alertas'], ['RECHAZO', 'MANIFIESTO_RECHAZADO', 'manifiestos'],
-    ['DIFERENCIA_PESO', 'ALERTA_SISTEMA', 'alertas'],
+    ['DIFERENCIA_PESO', 'ALERTA_SISTEMA', 'alertas'], ['ENTREGA', 'MANIFIESTO_ENTREGADO', 'manifiestos'],
   ])('rechecks representative access for operational event %s without sending', async (evento, tipo, family) => {
     const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
     const n = { ...notice, id: 'operational-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo, manifiestoId: 'm',
