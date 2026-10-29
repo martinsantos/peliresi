@@ -84,18 +84,58 @@ const MAX_TEXT_BYTES = 96 * 1024;
 const MAX_ANALYSIS_MS = 15_000;
 let receiptInFlight = false;
 
+/** Open the existing shared inode without O_CREAT, which Linux can reject for
+ * another owner in a sticky directory even when the file is readable. */
+function openReceiptLock(): number {
+  const lockPath = path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock');
+  const readFlags = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW;
+  let fd: number;
+  try {
+    fd = fs.openSync(lockPath, readFlags);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    try {
+      fd = fs.openSync(lockPath, readFlags | fs.constants.O_CREAT | fs.constants.O_EXCL, 0o644);
+    } catch (createError) {
+      if ((createError as NodeJS.ErrnoException).code !== 'EEXIST') throw createError;
+      return openExistingReceiptLock(lockPath, readFlags);
+    }
+    try { fs.fchmodSync(fd, 0o644); }
+    catch (permissionError) { fs.closeSync(fd); throw permissionError; }
+  }
+  return validateReceiptLock(fd);
+}
+
+function validateReceiptLock(fd: number): number {
+  try {
+    if (!fs.fstatSync(fd).isFile()) throw new Error('OCR_LOCK_INVALID');
+    return fd;
+  } catch (error) { fs.closeSync(fd); throw error; }
+}
+
+function openExistingReceiptLock(lockPath: string, flags: number): number {
+  return validateReceiptLock(fs.openSync(lockPath, flags));
+}
+
 function runLocked(command: string, args: string[], deadline: number): Promise<string> {
-  const remaining = deadline - Date.now();
-  if (remaining <= 0) return Promise.reject(new Error('OCR_DEADLINE'));
-  // flock shares ONE native analysis slot across the two PM2 workers. No shell,
-  // user-defined command, network provider, or unbounded wait is involved.
+  if (deadline <= Date.now()) return Promise.reject(new Error('OCR_DEADLINE'));
+  // Keep the descriptor open until the engine exits: flock opens this same
+  // inode through procfs, so old and new workers still share ONE native slot.
+  // No shell, user-defined command, network provider or unbounded wait.
   return new Promise((resolve, reject) => {
-    execFile('flock', ['-F', '-n', '-E', '75', path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock'), command, ...args], {
-      timeout: remaining, maxBuffer: MAX_TEXT_BYTES, encoding: 'utf8',
-      // --no-fork keeps the engine on the tracked PID, so a timeout kills it
-      // rather than leaving a detached OCR process consuming resources.
-      env: { PATH: process.env.PATH, LANG: process.env.LANG, OMP_THREAD_LIMIT: '1' },
-    }, (error, stdout) => error ? reject(error) : resolve(stdout));
+    let fd: number | undefined;
+    const release = () => { if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* already closed */ } fd = undefined; } };
+    try {
+      fd = openReceiptLock();
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw new Error('OCR_DEADLINE');
+      execFile('flock', ['-F', '-n', '-E', '75', `/proc/${process.pid}/fd/${fd}`, command, ...args], {
+        timeout: remaining, maxBuffer: MAX_TEXT_BYTES, encoding: 'utf8',
+        // --no-fork keeps the engine on the tracked PID, so a timeout kills it
+        // rather than leaving a detached OCR process consuming resources.
+        env: { PATH: process.env.PATH, LANG: process.env.LANG, OMP_THREAD_LIMIT: '1' },
+      }, (error, stdout) => { release(); error ? reject(error) : resolve(stdout); });
+    } catch (error) { release(); reject(error); }
   });
 }
 

@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const mock = vi.hoisted(() => ({ read: vi.fn(), exec: vi.fn(), image: vi.fn(), toFile: vi.fn(), toBuffer: vi.fn() }));
-vi.mock('node:fs', () => ({ default: { readFileSync: mock.read } }));
+const mock = vi.hoisted(() => ({ read: vi.fn(), open: vi.fn(), close: vi.fn(), chmod: vi.fn(), stat: vi.fn(), exec: vi.fn(), image: vi.fn(), toFile: vi.fn(), toBuffer: vi.fn() }));
+vi.mock('node:fs', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { default: { ...actual.default, readFileSync: mock.read, openSync: mock.open, closeSync: mock.close, fchmodSync: mock.chmod, fstatSync: mock.stat } };
+});
 vi.mock('node:child_process', () => ({ execFile: mock.exec }));
 vi.mock('sharp', () => ({ default: mock.image }));
 import { describeDocument, readReceipt, receiptDuplicate, retainReceiptDigest, receiptNotice } from '../../services/documentAnalysis.service';
@@ -12,6 +18,7 @@ beforeEach(() => {
     flatten: vi.fn().mockReturnThis(), toColourspace: vi.fn().mockReturnThis(), extractChannel: vi.fn().mockReturnThis(),
     median: vi.fn().mockReturnThis(), extract: vi.fn().mockReturnThis(), normalize: vi.fn().mockReturnThis(), raw: vi.fn().mockReturnThis(), png: vi.fn().mockReturnThis(), toFile: mock.toFile, toBuffer: mock.toBuffer };
   mock.image.mockReturnValue(pipeline); mock.toFile.mockResolvedValue(undefined);
+  mock.open.mockReturnValue(42); mock.stat.mockReturnValue({ isFile: () => true });
   mock.toBuffer.mockResolvedValue({ data: Buffer.from([255]), info: { width: 1, height: 1, channels: 1 } });
   mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, 'RECIBO QA 2026 pago para revisar', ''));
 });
@@ -33,6 +40,35 @@ describe('document bytes are evidence, not a filename or a payment decision', ()
 });
 
 describe('free OCR has bounded resources and reports real states', () => {
+  it('opens the existing lock read-only without O_CREAT and keeps the same inode for flock', async () => {
+    expect((await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' })).lectura).toBe('LEIDO');
+    expect(mock.open).toHaveBeenCalledWith(path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock'), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    expect(mock.exec.mock.calls[0][1]).toContain(`/proc/${process.pid}/fd/42`);
+    expect(mock.close).toHaveBeenCalledWith(42);
+    expect(mock.chmod).not.toHaveBeenCalled();
+  });
+  it('creates a readable lock atomically if none exists', async () => {
+    mock.open.mockImplementationOnce(() => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); }).mockReturnValueOnce(43);
+    expect((await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' })).lectura).toBe('LEIDO');
+    expect(mock.open.mock.calls[1][1]).toBe(fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_CREAT | fs.constants.O_EXCL);
+    expect(mock.chmod).toHaveBeenCalledWith(43, 0o644);
+    expect(mock.exec.mock.calls[0][1]).toContain(`/proc/${process.pid}/fd/43`);
+    expect(mock.close).toHaveBeenCalledWith(43);
+  });
+  it('reopens a competing newly created lock without changing its permissions', async () => {
+    mock.open.mockImplementationOnce(() => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); })
+      .mockImplementationOnce(() => { throw Object.assign(new Error('created'), { code: 'EEXIST' }); }).mockReturnValueOnce(44);
+    expect((await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' })).lectura).toBe('LEIDO');
+    expect(mock.chmod).not.toHaveBeenCalled(); expect(mock.close).toHaveBeenCalledWith(44);
+  });
+  it('fails closed when the existing lock is inaccessible or is not a regular file', async () => {
+    mock.open.mockImplementationOnce(() => { throw Object.assign(new Error('denied'), { code: 'EACCES' }); });
+    expect((await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' })).lectura).toBe('NO_DISPONIBLE');
+    expect(mock.exec).not.toHaveBeenCalled();
+    mock.stat.mockReturnValueOnce({ isFile: () => false });
+    expect((await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' })).lectura).toBe('NO_DISPONIBLE');
+    expect(mock.close).toHaveBeenCalledWith(42); expect(mock.exec).not.toHaveBeenCalled();
+  });
   it('uses extracted PDF text without running an OCR image or a network provider', async () => {
     const result = await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' });
     expect(result).toMatchObject({ lectura: 'LEIDO', motor: 'PDF_TEXT', duplicado: false, texto: 'RECIBO QA 2026 pago para revisar' });
@@ -59,6 +95,18 @@ describe('free OCR has bounded resources and reports real states', () => {
   it('does not turn missing engines, timeout or unreadable documents into success', async () => {
     mock.exec.mockImplementation((_command, _args, _options, callback) => callback(new Error('Engine unavailable'), '', ''));
     expect(await readReceipt({ path: '/virtual/receipt.pdf', mimeType: 'application/pdf' })).toMatchObject({ lectura: 'NO_DISPONIBLE', texto: '', motor: null, duplicado: false });
+    expect(mock.close).toHaveBeenCalledWith(42);
+  });
+  it('closes the descriptor if the native process cannot be started', async () => {
+    mock.exec.mockImplementationOnce(() => { throw new Error('spawn failed'); });
+    expect(await readReceipt({ path: '/virtual/receipt.pdf', mimeType: 'application/pdf' })).toMatchObject({ lectura: 'NO_DISPONIBLE', texto: '' });
+    expect(mock.close).toHaveBeenCalledWith(42);
+  });
+  it('closes a newly created descriptor if its readable mode cannot be established', async () => {
+    mock.open.mockImplementationOnce(() => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); }).mockReturnValueOnce(43);
+    mock.chmod.mockImplementationOnce(() => { throw new Error('chmod failed'); });
+    expect(await readReceipt({ path: '/virtual/receipt.pdf', mimeType: 'application/pdf' })).toMatchObject({ lectura: 'NO_DISPONIBLE', texto: '' });
+    expect(mock.close).toHaveBeenCalledWith(43); expect(mock.exec).not.toHaveBeenCalled();
   });
   it('uses real PDF electricity fields without rendering a complete textual invoice', async () => {
     mock.exec.mockImplementation((_command, _args, _options, callback) => callback(null, 'EDEMSA\nTarifa: T2 R BT\nConsumo: 1200 kWh', ''));
