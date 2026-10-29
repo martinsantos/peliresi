@@ -47,3 +47,37 @@ it.each([
  expect(masked.titulo).toBe('Aviso no disponible'); expect(JSON.stringify(masked)).not.toContain('QA-PRIVATE');
  expect(JSON.stringify(maskManifestRuleCompanyNotice(operational))).not.toContain('QA-PRIVATE');
 });
+
+it.each([
+ ['EN_TRANSITO', 'MANIFIESTO_EN_TRANSITO'], ['ENTREGADO', 'MANIFIESTO_ENTREGADO'],
+ ['RECIBIDO', 'MANIFIESTO_RECIBIDO'], ['EN_TRATAMIENTO', 'INFO_GENERAL'],
+ ['TRATADO', 'MANIFIESTO_TRATADO'], ['CANCELADO', 'INFO_GENERAL'],
+])('masks a revoked representative state notice %s', async (estado, tipo) => {
+ const state = { ...notice, tipo, datos: JSON.stringify({ ...data, tipo: 'estado_manifiesto', estado }) };
+ recipients.mockResolvedValue(new Map([['manifest', []]]));
+ const masked = (await withManifestRuleCompanyNoticeContext({} as any, [state]))[0];
+ expect(masked.titulo).toBe('Aviso no disponible'); expect(masked.manifiestoId).toBeNull();
+ expect(JSON.stringify(masked)).not.toContain('QA-PRIVATE');
+ expect(JSON.stringify(maskManifestRuleCompanyNotice(state))).not.toContain('QA-PRIVATE');
+});
+
+it.each(['propuesta_partes', 'adenda_manifiesto', 'certificado_manifiesto'])(
+ 'masks a legacy representative %s notice after the original company access is revoked', async tipo => {
+  const legacy = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ ...data, tipo, destino: undefined }) };
+  recipients.mockResolvedValue(new Map([['manifest', []]]));
+  const db = { manifiesto: { findMany: vi.fn().mockResolvedValue([]) } };
+  const masked = (await withManifestRuleCompanyNoticeContext(db as any, [legacy]))[0];
+  expect(masked.titulo).toBe('Aviso no disponible'); expect(masked.manifiestoId).toBeNull();
+  expect(JSON.stringify(masked)).not.toContain('QA-PRIVATE');
+  expect(JSON.stringify(maskManifestRuleCompanyNotice(legacy))).not.toContain('QA-PRIVATE');
+ });
+
+it('retains a legacy notice for its active direct owner after company access is revoked', async () => {
+ const legacy = { ...notice, tipo: 'INFO_GENERAL', datos: JSON.stringify({ ...data, tipo: 'propuesta_partes', destino: undefined }) };
+ recipients.mockResolvedValue(new Map([['manifest', []]]));
+ const db = { manifiesto: { findMany: vi.fn().mockResolvedValue([{ id: 'manifest',
+  generador: { usuarioId: 'rep', activo: true }, transportista: null, operador: { usuarioId: 'other', activo: true } }]) } };
+ const visible = (await withManifestRuleCompanyNoticeContext(db as any, [legacy]))[0];
+ expect(visible.titulo).toBe('QA-PRIVATE'); expect(visible.manifiestoId).toBe('manifest');
+ expect(JSON.parse(visible.datos!).accesosEmpresa).toBeUndefined();
+});

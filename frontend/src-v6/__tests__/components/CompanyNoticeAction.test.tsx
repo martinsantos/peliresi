@@ -79,6 +79,19 @@ it.each([
  expect(notificationCompanyAccesses({ ...n, tipo: 'INFO_GENERAL' })).toEqual([]);
 });
 
+it.each([
+ ['EN_TRANSITO', 'MANIFIESTO_EN_TRANSITO'], ['ENTREGADO', 'MANIFIESTO_ENTREGADO'],
+ ['RECIBIDO', 'MANIFIESTO_RECIBIDO'], ['EN_TRATAMIENTO', 'INFO_GENERAL'],
+ ['TRATADO', 'MANIFIESTO_TRATADO'], ['CANCELADO', 'INFO_GENERAL'],
+])('requires the authorized company context for state notice %s', (estado, tipo) => {
+ const n = { ...notice, tipo, datos: JSON.stringify({ tipo: 'estado_manifiesto', version: 1, destino: 'representante', estado, accesosEmpresa: [access] }) };
+ for (const prefix of ['', '/app']) {
+  expect(resolveNotificationPath(n, prefix)).toBe(prefix + '/notificaciones/n');
+  expect(resolveNotificationPath(n, prefix, undefined, true)).toBe(prefix + '/manifiestos/m');
+ }
+ expect(notificationCompanyAccesses(n)).toEqual([access]);
+});
+
 const fiscalNotice:any = { id:'fiscal-n', datos:JSON.stringify({ tipo:'recordatorio_fiscal', version:1, destino:'representante',
  generadorId:'g-1', fiscalYear:2026, accesosEmpresa:[{empresaId:'co',actividadId:'a',rol:'GENERADOR',razonSocial:'QA Entidad'}] }) };
 const fiscalTarget='/admin/actores/generadores/g-1?tab=fiscal&ejercicio=2026';

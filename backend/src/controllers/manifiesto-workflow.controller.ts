@@ -11,6 +11,8 @@ import prisma from '../lib/prisma';
 import { domainEvents } from '../services/domainEvent.service';
 import { notificationService } from '../services/notification-dispatcher.service';
 import { notifyManifestOperationalEvent } from '../services/manifestOperationalNotice.service';
+import { notifyManifestState } from '../services/manifestStateNotice.service';
+import { scheduleCommittedManifestPush } from '../services/committed-manifest-push.service';
 import { computeClosureHash, hashManifiesto, registrarSello } from '../services/blockchain.service';
 import { invalidateGpsCache } from './manifiesto-gps.controller';
 import { assertCanAccessManifiesto } from '../utils/roleFilter';
@@ -168,7 +170,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
     }
 
     // Atomic conditional update: prevents double-tap race condition
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+    const { manifiesto: manifiestoActualizado, noticeIds } = await prisma.$transaction(async (tx) => {
       await assertManifestProposalApproved(tx, id);
       let updated;
       try {
@@ -219,8 +221,10 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
 
       await updateRollingHash(tx, id, 'EN_TRANSITO', updated.fechaRetiro!, updated.observaciones, evento.id);
 
-      return updated;
+      return { manifiesto: updated, noticeIds: await notifyManifestState(tx, updated, 'EN_TRANSITO', evento.id, userId) };
     });
+
+    scheduleCommittedManifestPush(noticeIds);
 
     res.json({
       success: true,
@@ -234,6 +238,7 @@ export const confirmarRetiro = async (req: AuthRequest, res: Response, next: Nex
       estadoNuevo: 'EN_TRANSITO',
       numero: manifiestoActualizado.numero,
       userId,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);
@@ -259,7 +264,7 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
     }
 
     // Atomic conditional update: prevents double-tap race condition
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+    const { manifiesto: manifiestoActualizado, noticeIds } = await prisma.$transaction(async (tx) => {
       let updated;
       try {
         updated = await tx.manifiesto.update({
@@ -295,11 +300,12 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
       await tx.tramoTransporte.updateMany({where:{manifiestoId:id,fin:null},data:{fin:updated.fechaEntrega!,accesoVersion:null,accesoHasta:null}});
       await updateRollingHash(tx, id, 'ENTREGADO', updated.fechaEntrega!, updated.observaciones, evento.id);
 
-      return updated;
+      return { manifiesto: updated, noticeIds: await notifyManifestState(tx, updated, 'ENTREGADO', evento.id, userId) };
     });
 
     // Invalidate GPS cache — trip is no longer EN_TRANSITO
     invalidateGpsCache(id);
+    scheduleCommittedManifestPush(noticeIds);
 
     res.json({
       success: true,
@@ -313,6 +319,7 @@ export const confirmarEntrega = async (req: AuthRequest, res: Response, next: Ne
       estadoNuevo: 'ENTREGADO',
       numero: manifiestoActualizado.numero,
       userId,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);
@@ -334,7 +341,7 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
     }
 
     // Atomic conditional update: prevents double-tap race condition
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+    const { manifiesto: manifiestoActualizado, noticeIds } = await prisma.$transaction(async (tx) => {
       let updated;
       try {
         updated = await tx.manifiesto.update({
@@ -367,8 +374,10 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
 
       await updateRollingHash(tx, id, 'RECIBIDO', updated.fechaRecepcion!, updated.observaciones, evento.id);
 
-      return updated;
+      return { manifiesto: updated, noticeIds: await notifyManifestState(tx, updated, 'RECIBIDO', evento.id, userId) };
     });
+
+    scheduleCommittedManifestPush(noticeIds);
 
     res.json({
       success: true,
@@ -382,6 +391,7 @@ export const confirmarRecepcion = async (req: AuthRequest, res: Response, next: 
       estadoNuevo: 'RECIBIDO',
       numero: manifiestoActualizado.numero,
       userId,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);
@@ -400,7 +410,7 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
       throw new AppError('Solo los operadores pueden confirmar recepciones in situ', 403);
     }
 
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+    const { manifiesto: manifiestoActualizado, noticeIds } = await prisma.$transaction(async (tx) => {
       // Validate manifiesto exists, is APROBADO, and is IN_SITU
       await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${id} FOR UPDATE`;
       // New in-situ proposals need all three decisions and an explicit start.
@@ -451,8 +461,10 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
 
       await updateRollingHash(tx, id, 'RECIBIDO', updated.fechaRecepcion!, updated.observaciones, evento.id);
 
-      return updated;
+      return { manifiesto: updated, noticeIds: await notifyManifestState(tx, updated, 'RECIBIDO', evento.id, userId) };
     });
+
+    scheduleCommittedManifestPush(noticeIds);
 
     res.json({
       success: true,
@@ -466,6 +478,7 @@ export const confirmarRecepcionInSitu = async (req: AuthRequest, res: Response, 
       estadoNuevo: 'RECIBIDO',
       numero: manifiestoActualizado.numero,
       userId,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);
@@ -489,7 +502,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
     }
 
     // Atomic conditional update: accepts RECIBIDO or EN_TRATAMIENTO as valid source states
-    const { manifiesto: manifiestoActualizado, estadoAnterior } = await prisma.$transaction(async (tx) => {
+    const { manifiesto: manifiestoActualizado, estadoAnterior, noticeIds } = await prisma.$transaction(async (tx) => {
       // First verify it exists and is in a valid state
       const current = await tx.manifiesto.findUnique({ where: { id }, select: { estado: true } });
       if (!current) throw new AppError('Manifiesto no encontrado', 404);
@@ -534,8 +547,11 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
 
       await updateRollingHash(tx, id, 'TRATADO', updated.fechaCierre!, updated.observaciones, evento.id);
 
-      return { manifiesto: updated, estadoAnterior: current.estado };
+      return { manifiesto: updated, estadoAnterior: current.estado,
+        noticeIds: await notifyManifestState(tx, updated, 'TRATADO', evento.id, userId) };
     });
+
+    scheduleCommittedManifestPush(noticeIds);
 
     res.json({
       success: true,
@@ -549,6 +565,7 @@ export const cerrarManifiesto = async (req: AuthRequest, res: Response, next: Ne
       estadoNuevo: 'TRATADO',
       numero: manifiestoActualizado.numero,
       userId,
+      avisosConfirmados: true,
     });
 
     // Sello CIERRE — fire-and-forget
@@ -776,7 +793,7 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
       : undefined;
 
     // Atomic conditional update: prevents double-tap race condition
-    const manifiestoActualizado = await prisma.$transaction(async (tx) => {
+    const { manifiesto: manifiestoActualizado, noticeIds } = await prisma.$transaction(async (tx) => {
       let updated;
       try {
         updated = await tx.manifiesto.update({
@@ -810,8 +827,10 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
 
       await updateRollingHash(tx, id, 'EN_TRATAMIENTO', new Date(), updated.observaciones, evento.id);
 
-      return updated;
+      return { manifiesto: updated, noticeIds: await notifyManifestState(tx, updated, 'EN_TRATAMIENTO', evento.id, userId) };
     });
+
+    scheduleCommittedManifestPush(noticeIds);
 
     res.json({
       success: true,
@@ -825,6 +844,7 @@ export const registrarTratamiento = async (req: AuthRequest, res: Response, next
       estadoNuevo: 'EN_TRATAMIENTO',
       numero: manifiestoActualizado.numero,
       userId,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);
@@ -1049,20 +1069,22 @@ export const cancelarManifiesto = async (req: AuthRequest, res: Response, next: 
       await tx.tramoTransporte.updateMany({where:{manifiestoId:id,fin:null},data:{fin:new Date(),accesoVersion:null,accesoHasta:null}});
       await updateRollingHash(tx, id, 'CANCELADO', new Date(), motivo || null, evento.id);
 
-      return updated;
+      return { manifiesto: updated, noticeIds: await notifyManifestState(tx, updated, 'CANCELADO', evento.id, userId) };
     });
 
     invalidateGpsCache(id);
+    scheduleCommittedManifestPush(result.noticeIds);
 
-    res.json({ success: true, data: { manifiesto: result } });
+    res.json({ success: true, data: { manifiesto: result.manifiesto } });
 
     domainEvents.emit({
       type: 'MANIFIESTO_ESTADO_CAMBIADO',
-      manifiestoId: result.id,
+      manifiestoId: result.manifiesto.id,
       estadoAnterior,
       estadoNuevo: 'CANCELADO',
-      numero: result.numero,
+      numero: result.manifiesto.numero,
       userId,
+      avisosConfirmados: true,
     });
   } catch (error) {
     next(error);

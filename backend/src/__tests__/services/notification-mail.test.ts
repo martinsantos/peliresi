@@ -18,6 +18,45 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each(['propuesta_partes', 'adenda_manifiesto', 'certificado_manifiesto'])(
+    'suppresses %s mail if only a different company activity is now authorized', async tipo => {
+      const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa', establecimientoId: 'site' };
+      const extra = tipo === 'certificado_manifiesto' ? { documentoId: 'doc', tipoCertificado: 'PARCIAL' } : {};
+      const n = { ...notice, id: 'old-company-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
+        datos: JSON.stringify({ tipo, version: 1, accesosEmpresa: [access], ...extra }) };
+      mocks.manifest.mockResolvedValue({ isDemoData: false, generador: { usuarioId: 'owner' }, operador: { usuarioId: 'operator' } });
+      mocks.certificate.mockResolvedValue({ id: 'doc' });
+      mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [access] }]);
+      expect(await notificationSourceEligible(n, 'manifiestos')).toBe(true);
+      mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [{ ...access, actividadId: 'other' }] }]);
+      expect(await notificationSourceEligible(n, 'manifiestos')).toBe(false);
+      expect(mocks.insert).not.toHaveBeenCalled();
+    });
+  it('retains delivery eligibility for a direct owner after a separate company grant is removed', async () => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa', establecimientoId: 'site' };
+    const n = { ...notice, id: 'owner-notice', usuarioId: 'owner', rol: 'GENERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
+      datos: JSON.stringify({ tipo: 'propuesta_partes', version: 1, accesosEmpresa: [access] }) };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, generador: { usuarioId: 'owner' }, operador: { usuarioId: 'operator' } });
+    mocks.companyRecipients.mockResolvedValue([]);
+    expect(await notificationSourceEligible(n, 'manifiestos')).toBe(true);
+  });
+  it.each([
+    ['EN_TRANSITO', 'MANIFIESTO_EN_TRANSITO'], ['ENTREGADO', 'MANIFIESTO_ENTREGADO'],
+    ['RECIBIDO', 'MANIFIESTO_RECIBIDO'], ['EN_TRATAMIENTO', 'INFO_GENERAL'],
+    ['TRATADO', 'MANIFIESTO_TRATADO'], ['CANCELADO', 'INFO_GENERAL'],
+  ])('renders the representative state notice %s via the owned notice and rechecks access', async (estado, tipo) => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
+    const n = { ...notice, id: 'state-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo, manifiestoId: 'm',
+      datos: JSON.stringify({ tipo: 'estado_manifiesto', version: 1, estado, destino: 'representante', accesosEmpresa: [access] }) };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, generador: { usuarioId: 'owner' }, operador: { usuarioId: 'operator' } });
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [access] }]);
+    expect(await notificationSourceEligible(n, 'manifiestos')).toBe(true);
+    const content = notificationMailContent(n)!;
+    expect(content.html).toContain('/notificaciones/state-notice'); expect(content.html).not.toContain('PRIVATE');
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [{ ...access, establecimientoId: 'other' }] }]);
+    expect(await notificationSourceEligible(n, 'manifiestos')).toBe(false);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it.each([
     ['INCIDENTE', 'INCIDENTE_REPORTADO', 'alertas'], ['RECHAZO', 'MANIFIESTO_RECHAZADO', 'manifiestos'],
     ['DIFERENCIA_PESO', 'ALERTA_SISTEMA', 'alertas'], ['ENTREGA', 'MANIFIESTO_ENTREGADO', 'manifiestos'],
@@ -89,11 +128,12 @@ describe('committed notice mail relay', () => {
     expect(mocks.insert).not.toHaveBeenCalled();
   });
   it.each(['certificado_manifiesto','propuesta_partes','adenda_manifiesto'])('revalidates representative %s access before any future delivery, including revocation', async tipo => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'QA Empresa' };
     const n = { ...notice, id: 'company-cert', usuarioId: 'representative', rol: 'OPERADOR', tipo: 'INFO_GENERAL', manifiestoId: 'm',
-      datos: JSON.stringify({ tipo, version: 1, documentoId: 'doc', tipoCertificado: 'PARCIAL', accesosEmpresa: [{empresaId:'co',actividadId:'a'}] }) };
+      datos: JSON.stringify({ tipo, version: 1, documentoId: 'doc', tipoCertificado: 'PARCIAL', accesosEmpresa: [access] }) };
     mocks.manifest.mockResolvedValue({isDemoData:false,generador:{usuarioId:'original'},operador:{usuarioId:'signer'}});
     mocks.certificate.mockResolvedValue({id:'doc'});
-    mocks.companyRecipients.mockResolvedValue([{usuarioId:'representative',accesosEmpresa:[]}]);
+    mocks.companyRecipients.mockResolvedValue([{usuarioId:'representative',accesosEmpresa:[access]}]);
     expect(await notificationSourceEligible(n,'manifiestos')).toBe(true);
     mocks.companyRecipients.mockResolvedValue([]);
     expect(await notificationSourceEligible(n,'manifiestos')).toBe(false);

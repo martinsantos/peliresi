@@ -32,6 +32,9 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
 function representativeManifestAlert(tipo: string, data: Record<string, unknown>): boolean {
  if (data.destino !== 'representante' || data.version !== 1) return false;
  if (tipo === 'ALERTA_SISTEMA' && ['duracion_transito_configurada', 'alerta_regla_manifiesto'].includes(String(data.tipo))) return true;
+ const stateTypes: Record<string, string> = { EN_TRANSITO: 'MANIFIESTO_EN_TRANSITO', ENTREGADO: 'MANIFIESTO_ENTREGADO',
+  RECIBIDO: 'MANIFIESTO_RECIBIDO', EN_TRATAMIENTO: 'INFO_GENERAL', TRATADO: 'MANIFIESTO_TRATADO', CANCELADO: 'INFO_GENERAL' };
+ if (data.tipo === 'estado_manifiesto' && stateTypes[String(data.estado)] === tipo) return true;
  const eventTypes: Record<string, string> = { INCIDENTE: 'INCIDENTE_REPORTADO', RECHAZO: 'MANIFIESTO_RECHAZADO', DIFERENCIA_PESO: 'ALERTA_SISTEMA', ENTREGA: 'MANIFIESTO_ENTREGADO' };
  return data.tipo === 'alerta_evento_manifiesto' && eventTypes[String(data.evento)] === tipo;
 }
@@ -99,6 +102,9 @@ export function refreshInspectionNotification(notificacion: Notificacion, queryC
   }
   if(data.tipo === 'certificado_manifiesto' && data.version === 1) {
     for(const key of ['manifest-certificates','manifiestos']) void queryClient.invalidateQueries({queryKey:[key]});
+  }
+  if (data.tipo === 'estado_manifiesto' && data.version === 1) {
+    for (const key of ['manifiestos', 'manifest-agenda', 'manifest-proposal']) void queryClient.invalidateQueries({ queryKey: [key] });
   }
   if (data.tipo === 'adenda_manifiesto') void queryClient.invalidateQueries({ queryKey: ['manifiesto-adendas'] });
   if (data.tipo === 'propuesta_partes') {

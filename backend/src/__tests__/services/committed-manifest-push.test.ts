@@ -46,3 +46,18 @@ it('recognizes approval events without trusting arbitrary links or event labels'
   expect(manifestPushContent({ ...notice, rol: 'TRANSPORTISTA', datos: '{"tipo":"propuesta_partes","fase":"__proto__"}' })).toBeNull();
   expect(manifestPushContent({ ...notice, rol: 'TRANSPORTISTA', datos: 'null' })).toBeNull();
 });
+it.each([
+ ['EN_TRANSITO', 'MANIFIESTO_EN_TRANSITO'], ['ENTREGADO', 'MANIFIESTO_ENTREGADO'],
+ ['RECIBIDO', 'MANIFIESTO_RECIBIDO'], ['EN_TRATAMIENTO', 'INFO_GENERAL'],
+ ['TRATADO', 'MANIFIESTO_TRATADO'], ['CANCELADO', 'INFO_GENERAL'],
+])('routes state push %s through the representative owned notice', (estado, tipo) => {
+ const data = { tipo: 'estado_manifiesto', version: 1, estado, destino: 'representante',
+  accesosEmpresa: [{ empresaId: 'co', actividadId: 'activity' }], nota: 'PRIVATE' };
+ const content = manifestPushContent({ ...notice, rol: 'GENERADOR', tipo, datos: JSON.stringify(data) });
+ expect(content?.url).toBe('/notificaciones/notice'); expect(JSON.stringify(content)).not.toContain('PRIVATE');
+ expect(manifestPushContent({ ...notice, id: undefined, rol: 'GENERADOR', tipo, datos: JSON.stringify(data) })).toBeNull();
+});
+it.each(['propuesta_partes', 'adenda_manifiesto'])('routes representative %s push through the owned notice', tipo => {
+ const data = { tipo, version: 1, fase: 'creada', evento: 'CREADA', accesosEmpresa: [{ empresaId: 'co', actividadId: 'a' }] };
+ expect(manifestPushContent({ ...notice, rol: 'GENERADOR', datos: JSON.stringify(data) })?.url).toBe('/notificaciones/notice');
+});
