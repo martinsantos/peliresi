@@ -856,6 +856,7 @@
         'La posición del tramo anterior no se usa como ubicación actual del reemplazo. Los tramos previos siguen registrados; no se unen como si fueran un único recorrido del mismo teléfono.'
       ], expected: 'Cuando llega el primer envío, el punto visible corresponde al tramo vigente.' },
       { title: 'Leer un recorrido largo', body: [
+        'En el detalle del manifiesto se muestran como máximo las últimas 100 posiciones recibidas. La primera mostrada no necesariamente indica el inicio del viaje y la última no indica que haya terminado. Las horas se expresan en Mendoza y no muestran cuándo capturó el teléfono cada punto.',
         'El recorrido del viaje actual muestra hasta los últimos 500 puntos, en orden del más antiguo al más reciente dentro de esa ventana. Así incluye la última ubicación recibida aunque el viaje sea largo.',
         'Los puntos anteriores permanecen guardados. Que no aparezcan todos en esta vista no significa que se hayan borrado ni que el viaje haya empezado en el primer punto visible.'
       ], expected: 'El mapa reciente y el historial se interpretan sin confundir una ventana de consulta con todo el viaje.' },

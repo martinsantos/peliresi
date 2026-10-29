@@ -31,6 +31,7 @@ import {
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './components/manifest-gps-map.css';
 import { ACTOR_ICONS, ACTOR_COLORS } from '../../utils/map-icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardHeader, CardContent } from '../../components/ui/CardV2';
@@ -74,6 +75,30 @@ const ACTOR_SUMMARY = {
   TRANSPORTISTA: { label: 'Transportista', Icon: Truck, icon: 'bg-orange-50 text-orange-600', interactive: 'hover:bg-orange-50/50' },
   OPERADOR: { label: 'Operador', Icon: FlaskConical, icon: 'bg-blue-50 text-blue-600', interactive: 'hover:bg-blue-50/50' },
 };
+
+const gpsReceptionFormatter = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Mendoza', day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+const gpsReceptionDay = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Argentina/Mendoza', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+const gpsReceptionTime = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Mendoza', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+function formatGpsReception(value: string, timeOnly = false): string {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? (timeOnly ? gpsReceptionTime : gpsReceptionFormatter).format(date) : 'Fecha no disponible';
+}
+function sameGpsReceptionDay(a: string, b: string): boolean {
+  const first = new Date(a), last = new Date(b);
+  return Number.isFinite(first.getTime()) && Number.isFinite(last.getTime()) && gpsReceptionDay.format(first) === gpsReceptionDay.format(last);
+}
+const gpsWindowIcon = (latest: boolean) => L.divIcon({ className: '', iconSize: [44, 44], iconAnchor: [22, 22], popupAnchor: [0, -12],
+  html: `<span style="display:flex;width:44px;height:44px;align-items:center;justify-content:center"><span style="display:block;width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:${latest ? '4px solid white;background:#08623b' : '3px solid #08623b;background:white'};box-shadow:0 1px 4px #0005"></span></span>`,
+});
+const gpsFirstShownIcon = gpsWindowIcon(false);
+const gpsLatestIcon = gpsWindowIcon(true);
 
 function ActorSummary({ type, actorId, user, name, detail, to, returnTo, roleLabel }: {
   type: ActorReadType; actorId?: string; user: User | null; name: string; detail: string; to: string; returnTo: string; roleLabel?: string;
@@ -164,7 +189,7 @@ const ManifiestoDetailPage: React.FC = () => {
     const points = m?.tracking || [];
     if (!points.length) return null;
     const sorted = [...points].sort((a, b) =>
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime() || a.id.localeCompare(b.id)
     );
     return {
       segments:transportTrackSegments(sorted),
@@ -184,7 +209,7 @@ const ManifiestoDetailPage: React.FC = () => {
   }, [m]);
   const operadorPos = useMemo(() => {
     const o = m.operador;
-    return o?.latitud && o?.longitud ? [o.latitud, o.longitud] as [number, number] : null;
+    return o?.latitud != null && o?.longitud != null ? [o.latitud, o.longitud] as [number, number] : null;
   }, [m]);
 
   // Combined bounds: tracking points + generador/operador positions
@@ -555,29 +580,36 @@ const ManifiestoDetailPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Ruta del Viaje */}
+          {/* Posiciones recibidas, limitadas por la consulta de detalle */}
           {showMap && (
             <Card>
               <div className="p-4 border-b border-neutral-100">
-                <div className="flex items-center gap-2">
-                  <MapPin size={18} className="text-primary-600" />
-                  <h3 className="font-semibold text-neutral-900">
-                    {trackingRoute ? 'Ruta del Viaje' : 'Origen y destino'}
+                <div className="flex flex-wrap items-center gap-2">
+                  <MapPin size={18} className="shrink-0 text-primary-600" aria-hidden="true" />
+                  <h3 className="min-w-0 font-semibold text-neutral-900">
+                    {trackingRoute ? 'Ubicaciones GPS recibidas' : 'Ubicaciones de establecimientos'}
                   </h3>
                   {trackingRoute && (
-                    <Badge variant="soft" color="info">{trackingRoute.count} puntos GPS</Badge>
+                    <Badge variant="soft" color="info">{trackingRoute.count >= 100 ? 'Últimos 100 puntos' : `${trackingRoute.count} ${trackingRoute.count === 1 ? 'punto mostrado' : 'puntos mostrados'}`}</Badge>
                   )}
                   {!trackingRoute && m.estado === EstadoManifiesto.EN_TRANSITO && (
                     <Badge variant="soft" color="warning">En tránsito — esperando GPS</Badge>
                   )}
                 </div>
-                {trackingRoute && (
-                  <p className="text-xs text-neutral-500 mt-1">
-                    {formatDateTime(trackingRoute.startTime)} → {formatDateTime(trackingRoute.endTime)}
+                {trackingRoute ? <div className="mt-2 space-y-1 text-sm leading-5 text-neutral-700">
+                  <p>
+                    {trackingRoute.count === 1 ? 'Recepción · ' : 'Recepciones · '}
+                    <time dateTime={trackingRoute.startTime}>{formatGpsReception(trackingRoute.startTime)}</time>
+                    {trackingRoute.count > 1 && <> → <time dateTime={trackingRoute.endTime}>{formatGpsReception(trackingRoute.endTime, sameGpsReceptionDay(trackingRoute.startTime, trackingRoute.endTime))}</time></>}
+                    {' '}· Mendoza
                   </p>
-                )}
+                  <p>La hora de captura no está disponible.
+                    {trackingRoute.segments.some(segment => segment.length > 1) && ' Las líneas no confirman el recorrido.'}</p>
+                </div> : <p className="mt-2 text-sm leading-5 text-neutral-700">
+                  Datos actuales de los establecimientos.{generadorPos && operadorPos && ' La referencia no es una ruta confirmada.'}
+                </p>}
               </div>
-              <div style={{ height: 400 }} className="relative isolate">
+              <div style={{ height: 400 }} className="manifest-gps-map relative isolate" role="region" aria-label="Mapa de ubicaciones recibidas y establecimientos">
                 <MapContainer
                   bounds={mapBounds!}
                   boundsOptions={{ padding: [40, 40] }}
@@ -586,7 +618,7 @@ const ManifiestoDetailPage: React.FC = () => {
                 >
                   <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
 
-                  {/* Ruta planificada (generador → operador) */}
+                  {/* Referencia entre ubicaciones actuales, no ruta vial */}
                   {generadorPos && operadorPos && (
                     <Polyline
                       positions={[generadorPos, operadorPos]}
@@ -597,21 +629,24 @@ const ManifiestoDetailPage: React.FC = () => {
                     />
                   )}
 
-                  {/* Ruta GPS realizada */}
+                  {/* Conexiones visuales entre puntos de un mismo tramo */}
                   {trackingRoute && (
-                    <>{trackingRoute.segments.map((segment,index)=><Polyline key={index} positions={segment} color="#0D8A4F" weight={4} opacity={0.8} />)}</>
+                    <>{trackingRoute.segments.map((segment,index)=>segment.length > 1 && <Polyline key={index} positions={segment} color="#0D8A4F" weight={4} opacity={0.8} />)}</>
                   )}
 
-                  {/* Marcadores inicio/fin GPS */}
+                  {/* Primera y última posiciones de la ventana mostrada */}
                   {trackingRoute && (
-                    <>
-                      <Marker position={trackingRoute.start} icon={ACTOR_ICONS.gpsStart}>
-                        <Popup>Inicio del viaje GPS</Popup>
-                      </Marker>
-                      <Marker position={trackingRoute.end} icon={ACTOR_ICONS.gpsEnd}>
-                        <Popup>Fin del viaje GPS</Popup>
-                      </Marker>
-                    </>
+                    trackingRoute.count === 1 ?
+                      <Marker position={trackingRoute.start} icon={gpsLatestIcon} title="Única posición recibida">
+                        <Popup>Única posición recibida</Popup>
+                      </Marker> : <>
+                        <Marker position={trackingRoute.start} icon={gpsFirstShownIcon} title="Primera posición mostrada">
+                          <Popup>Primera posición mostrada</Popup>
+                        </Marker>
+                        <Marker position={trackingRoute.end} icon={gpsLatestIcon} title="Última posición recibida">
+                          <Popup>Última posición recibida</Popup>
+                        </Marker>
+                      </>
                   )}
 
                   {/* Generador (origen) */}
@@ -638,11 +673,11 @@ const ManifiestoDetailPage: React.FC = () => {
                 </MapContainer>
               </div>
               {/* Leyenda */}
-              <div className="px-4 py-2.5 border-t border-neutral-100 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-600">
-                {trackingRoute && (
+              <div className="px-4 py-2.5 border-t border-neutral-100 flex flex-wrap gap-x-5 gap-y-1 text-sm text-neutral-700">
+                {trackingRoute && trackingRoute.segments.some(segment => segment.length > 1) && (
                   <span className="flex items-center gap-1.5">
                     <span style={{ width: 20, height: 3, background: '#0D8A4F', display: 'inline-block', borderRadius: 2 }} />
-                    Ruta realizada
+                    Posiciones conectadas
                   </span>
                 )}
                 {generadorPos && operadorPos && (
@@ -663,17 +698,23 @@ const ManifiestoDetailPage: React.FC = () => {
                     Operador
                   </span>
                 )}
-                {trackingRoute && (
+                {trackingRoute && trackingRoute.count > 1 && (
                   <>
                     <span className="flex items-center gap-1.5">
-                      <span style={{ width: 8, height: 8, background: ACTOR_COLORS.gpsStart, borderRadius: '50%', display: 'inline-block' }} />
-                      Inicio GPS
+                      <span style={{ width: 12, height: 12, background: 'white', border: '2px solid #08623b', borderRadius: '50%', display: 'inline-block' }} />
+                      Primera posición mostrada
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span style={{ width: 8, height: 8, background: ACTOR_COLORS.gpsEnd, borderRadius: '50%', display: 'inline-block' }} />
-                      Fin GPS
+                      <span style={{ width: 12, height: 12, background: '#08623b', border: '2px solid white', outline: '1px solid #08623b', borderRadius: '50%', display: 'inline-block' }} />
+                      Última posición recibida
                     </span>
                   </>
+                )}
+                {trackingRoute && trackingRoute.count === 1 && (
+                  <span className="flex items-center gap-1.5">
+                    <span style={{ width: 12, height: 12, background: '#08623b', border: '2px solid white', outline: '1px solid #08623b', borderRadius: '50%', display: 'inline-block' }} />
+                    Única posición recibida
+                  </span>
                 )}
               </div>
             </Card>

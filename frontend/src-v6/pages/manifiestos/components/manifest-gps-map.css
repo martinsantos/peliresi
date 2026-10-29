@@ -1,0 +1,25 @@
+.manifest-gps-map .leaflet-container .leaflet-control-zoom a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+}
+
+.manifest-gps-map .leaflet-container a.leaflet-popup-close-button {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.manifest-gps-map .leaflet-popup-content {
+  margin: 14px 52px 14px 18px;
+  line-height: 1.4;
+}
+
+.manifest-gps-map .leaflet-container .leaflet-control-zoom a:focus-visible,
+.manifest-gps-map .leaflet-container a.leaflet-popup-close-button:focus-visible {
+  outline: 3px solid #08623b;
+  outline-offset: -3px;
+}
