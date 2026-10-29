@@ -113,6 +113,13 @@ describe('GPS anomaly repeated analysis', () => {
     expect(db.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ANOMALIA_GPS', avisosConfirmados: true }));
   });
 
+  it('alerts administrators for a relay observation without fabricating an author', async () => {
+    db.admins.mockResolvedValue([{ id: 'qa-admin-a' }, { id: 'qa-admin-b' }]);
+    await anomaliaDetector.detectarAnomalias(manifest.id);
+    expect(db.notices.mock.calls[0][0].data.map((notice: { usuarioId: string }) => notice.usuarioId)).toEqual(['qa-admin-a', 'qa-admin-b']);
+    expect(db.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'ANOMALIA_GPS', userId: undefined, avisosConfirmados: true }));
+  });
+
   it('does not emit an event or schedule channels if saving the inbox fails', async () => {
     db.admins.mockResolvedValue([{ id: 'qa-admin' }]); db.notices.mockRejectedValueOnce(new Error('notice insert failed'));
     await expect(anomaliaDetector.detectarAnomalias(manifest.id, 'synthetic-carrier')).rejects.toThrow('notice insert failed');

@@ -520,7 +520,7 @@ class AnomaliaDetector {
                 tipoAnomalia: anomalia.tipo,
                 descripcion: anomalia.descripcion,
                 severidad: anomalia.severidad,
-                userId: userId ?? manifiestoId,
+                userId,
                 avisosConfirmados: true,
             };
             const recorded = await recordGpsAnomaly(prisma, { id: keys[index], manifiestoId, ...anomalia }, event);

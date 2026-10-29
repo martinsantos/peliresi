@@ -15,6 +15,8 @@ import { declaredTransportLabel, gpsPointSchema, handoffSchema, isOriginalCarrie
 import { computeRollingHash } from '../services/blockchain.service';
 import { recordInspectionIntake } from '../services/inspectionIntake.service';
 import { domainEvents } from '../services/domainEvent.service';
+import { sampleGpsAnomalies } from '../services/gpsAnomalySampling.service';
+import { anomaliaDetector } from './notification.controller';
 import type { TramoTransporte, Prisma } from '@prisma/client';
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -269,6 +271,9 @@ async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFun
       const hours=(Date.now()-result.manifest.fechaRetiro.getTime())/3_600_000;
       if(Number.isFinite(hours)&&hours>=0) domainEvents.emit({type:'DURACION_TRANSITO_OBSERVADA',manifiestoId:result.manifest.id,numero:result.manifest.numero,horasTransito:hours});
     }
+    // The limited capability is not an authenticated SITREP user. A system
+    // analysis must not falsely attribute the relay's positions to its issuer.
+    sampleGpsAnomalies(result.manifest.id,undefined,(manifestId,userId)=>anomaliaDetector.detectarAnomalias(manifestId,userId));
   }catch(error){next(error);}
 }
 export const limitedTransportGps=(req:AuthRequest,res:Response,next:NextFunction)=>saveLimitedTransportGps(req,res,next,false);

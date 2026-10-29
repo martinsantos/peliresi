@@ -46,7 +46,7 @@ export type DomainEvent =
       tipoAnomalia: string;
       descripcion: string;
       severidad: string;
-      userId: string;
+      userId?: string;
       avisosConfirmados?: boolean;
     }
   | {

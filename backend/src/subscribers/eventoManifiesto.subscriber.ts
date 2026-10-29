@@ -38,6 +38,9 @@ async function createIncidentOnce(manifiestoId: string, usuarioId: string, prefi
 export async function eventoManifiestoSubscriber(event: DomainEvent): Promise<void> {
   switch (event.type) {
     case 'ANOMALIA_GPS':
+      // A relay capability does not identify a user. EventoManifiesto requires
+      // one, so keep the observation and notice without fabricating an author.
+      if (!event.userId) break;
       await createIncidentOnce(
         event.manifiestoId,
         event.userId,

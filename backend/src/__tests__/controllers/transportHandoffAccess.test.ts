@@ -1,19 +1,21 @@
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import jwt from 'jsonwebtoken';
 import {createHash} from 'node:crypto';
-const mocks=vi.hoisted(()=>({leg:vi.fn(),user:vi.fn(),latest:vi.fn(),find:vi.fn(),create:vi.fn(),query:vi.fn(),emit:vi.fn()}));
+const mocks=vi.hoisted(()=>({leg:vi.fn(),user:vi.fn(),latest:vi.fn(),find:vi.fn(),create:vi.fn(),query:vi.fn(),emit:vi.fn(),detect:vi.fn()}));
 vi.mock('../../config/config',()=>({config:{JWT_SECRET:'unit-handoff-secret'}}));
 vi.mock('../../lib/prisma',()=>({default:{$transaction:async(callback:any)=>callback({tramoTransporte:{findUnique:mocks.leg},usuario:{findUnique:mocks.user},trackingGPS:{findUnique:mocks.find,create:mocks.create},$queryRaw:mocks.query}),trackingGPS:{findFirst:mocks.latest}}}));
 vi.mock('../../services/domainEvent.service',()=>({domainEvents:{emit:mocks.emit}}));
+vi.mock('../../controllers/notification.controller',()=>({anomaliaDetector:{detectarAnomalias:mocks.detect}}));
 vi.mock('../../services/blockchain.service',()=>({computeRollingHash:vi.fn()}));
 import {limitedTransportGps,limitedTransportGpsIdempotent,limitedTransportGpsReceipt,limitedTransportState} from '../../controllers/transport-handoff.controller';
 import {inTrainingSession,TRAINING_REALM} from '../../lib/trainingScope';
+import {clearGpsAnomalySampling} from '../../services/gpsAnomalySampling.service';
 const id='af1388bc-43f7-4c73-8e9c-c14c46695881';
 const token=(extra={})=>jwt.sign({purpose:'transport-leg-gps',jti:'version',...extra},'unit-handoff-secret',{subject:id,audience:'transport-leg-gps',expiresIn:'1h'});
 const req=(value:string)=>({params:{tramoId:id},headers:{authorization:'Bearer '+value}}) as any;
 const res=()=>({json:vi.fn(),setHeader:vi.fn()}) as any;
 beforeEach(()=>{
-  vi.clearAllMocks();mocks.leg.mockResolvedValue({id,manifiestoId:'manifest',creadoPorId:'original-user',impersonadoPorId:null,fin:null,accesoVersion:'version',accesoHasta:new Date(Date.now()+3600000),datos:{},orden:1,tipo:'EXTERNO',inicio:new Date(),manifiesto:{id:'manifest',numero:'QA',estado:'EN_TRANSITO',transportistaId:'original',operador:{razonSocial:'QA destino',domicilio:'QA 100'}}});
+  vi.clearAllMocks();clearGpsAnomalySampling('manifest');mocks.leg.mockResolvedValue({id,manifiestoId:'manifest',creadoPorId:'original-user',impersonadoPorId:null,fin:null,accesoVersion:'version',accesoHasta:new Date(Date.now()+3600000),datos:{},orden:1,tipo:'EXTERNO',inicio:new Date(),manifiesto:{id:'manifest',numero:'QA',estado:'EN_TRANSITO',transportistaId:'original',operador:{razonSocial:'QA destino',domicilio:'QA 100'}}});
   mocks.user.mockResolvedValue({activo:true,transportista:{id:'original'}});mocks.latest.mockResolvedValue(null);
   mocks.create.mockResolvedValue({id:'point',timestamp:new Date(),tramoId:id});mocks.find.mockResolvedValue(null);mocks.query.mockResolvedValue([]);
 });
@@ -45,6 +47,23 @@ it('evaluates configured duration rules for an accepted handoff position, from t
   expect(mocks.emit).toHaveBeenCalledWith(expect.objectContaining({type:'DURACION_TRANSITO_OBSERVADA',manifiestoId:'manifest',horasTransito:expect.any(Number)}));
   expect(mocks.emit.mock.calls[0][0].horasTransito).toBeGreaterThanOrEqual(25);
   expect(mocks.emit.mock.calls[0][0]).not.toHaveProperty('userId');
+});
+it('samples GPS observations from an authorized relay without inventing a user identity',async()=>{
+  mocks.detect.mockResolvedValue([]);
+  const request={...req(token()),body:{latitud:-33,longitud:-69}};const next=vi.fn();
+  for(let i=0;i<10;i++)await limitedTransportGps(request,res(),next);
+  await new Promise(resolve=>setImmediate(resolve));
+  expect(next).not.toHaveBeenCalled();
+  expect(mocks.detect).toHaveBeenCalledWith('manifest',undefined);
+});
+it('does not count retries of the same relay GPS point as fresh samples',async()=>{
+  const saved=new Map<string,any>();mocks.detect.mockResolvedValue([]);
+  mocks.find.mockImplementation(async({where}:any)=>saved.get(where.id)??null);
+  mocks.create.mockImplementation(async({data}:any)=>{const point={...data,timestamp:new Date()};saved.set(data.id,point);return point;});
+  const request={...req(token()),body:{latitud:-33,longitud:-69,puntoId:'1949916e-22df-4dc1-9d1e-98f98a3eab26'}};
+  const next=vi.fn();for(let i=0;i<12;i++)await limitedTransportGpsIdempotent(request,res(),next);
+  await new Promise(resolve=>setImmediate(resolve));
+  expect(next).not.toHaveBeenCalled();expect(mocks.create).toHaveBeenCalledOnce();expect(mocks.detect).not.toHaveBeenCalled();
 });
 it('acknowledges the same handoff point once, rejects changed data and respects revocation',async()=>{
   const saved=new Map<string,any>();

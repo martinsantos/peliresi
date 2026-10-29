@@ -8,6 +8,7 @@ import { anomaliaDetector } from './notification.controller';
 import { domainEvents } from '../services/domainEvent.service';
 import { canAccessManifiesto } from '../utils/roleFilter';
 import { assessGeographicCorridor } from '../services/gpsCorridor.service';
+import { clearGpsAnomalySampling, sampleGpsAnomalies } from '../services/gpsAnomalySampling.service';
 import { createHash } from 'node:crypto';
 
 // Zod schema for GPS update validation
@@ -40,13 +41,12 @@ type GpsCacheEntry = {
 };
 const _enTransitoCache = new Map<string, GpsCacheEntry>(); // manifiestoId -> entry
 const EN_TRANSITO_CACHE_TTL = 30_000; // 30s — matches GPS send interval
-const _gpsUpdateCounter = new Map<string, number>(); // manifiestoId -> GPS update count for anomaly sampling
 const cacheKey = (id: string) => (isTrainingSession() ? 'training:' : 'operational:') + id;
 
 /** Invalidate GPS cache for a given manifiesto (called when trip ends). */
 export function invalidateGpsCache(manifiestoId: string): void {
   _enTransitoCache.delete(cacheKey(manifiestoId));
-  _gpsUpdateCounter.delete(cacheKey(manifiestoId));
+  clearGpsAnomalySampling(manifiestoId);
 }
 
 // Actualizar ubicacion GPS — optimized for high-frequency calls (30 clients x every 30s)
@@ -209,12 +209,8 @@ const guardarUbicacion = async (req: AuthRequest, res: Response, next: NextFunct
       }
     }
 
-    // Sample every 10 GPS updates for anomaly detection (avoids overhead on every update)
-    const gpsCount = (_gpsUpdateCounter.get(cacheKey(id)) ?? 0) + 1;
-    _gpsUpdateCounter.set(cacheKey(id), gpsCount);
-    if (gpsCount % 10 === 0) {
-      setImmediate(() => anomaliaDetector.detectarAnomalias(id, userId).catch(() => {}));
-    }
+    // Sampling remains best-effort and per worker; it is not a durable queue.
+    sampleGpsAnomalies(id, userId, (manifestId, authorId) => anomaliaDetector.detectarAnomalias(manifestId, authorId));
   } catch (error) {
     next(error);
   }

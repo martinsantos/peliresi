@@ -49,6 +49,12 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('GPS incident deduplication transaction', () => {
+  it('does not attribute an anonymous relay observation to an unrelated user', async () => {
+    await eventoManifiestoSubscriber({ type: 'ANOMALIA_GPS', manifiestoId: 'manifest-1',
+      tipoAnomalia: 'GPS_PERDIDO', descripcion: 'Verificar recepción', severidad: 'MEDIA' });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(rows).toHaveLength(0);
+  });
   it.each([
     [anomaly('FUERA_CORREDOR_GEOGRAFICO'), 'Anomalía GPS detectada (FUERA_CORREDOR_GEOGRAFICO): Misma observación'],
     [{ type: 'DESVIO_RUTA', manifiestoId: 'manifest-1', userId: 'carrier-1', numero: 'QA-1', distanciaKm: 3.26, latActual: -32.9, lonActual: -68.8 } as DomainEvent,

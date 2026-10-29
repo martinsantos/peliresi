@@ -32,6 +32,8 @@ test('the committed GPS observation is visible from the bell and opens its manif
   const guidance = page.locator('.guide-step').filter({ has: page.getByRole('heading', { name: 'Revisar observaciones del recorrido' }) });
   await expect(guidance).toContainText('Las cuentas ADMIN activas reciben un aviso', { ignoreCase: true });
   await expect(guidance).toContainText('Los avisos anteriores faltantes no se reconstruyen automáticamente.');
+  await expect(guidance).toContainText('Los puntos del transporte de origen y del relevo pueden entrar al análisis por muestreo.');
+  await expect(guidance).toContainText('no se garantiza que se analicen los puntos ya recibidos');
   await guidance.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath('manual-gps.png'), animations: 'disabled', scale: 'css' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
