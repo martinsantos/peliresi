@@ -14,6 +14,9 @@ test('travel-duration monitoring documents explicit thresholds, periodic checks 
   assert.match(manual, /cada cinco minutos mientras el servicio funciona, incluso si no llegan puntos/);
   assert.match(manual, /transporte vinculado recibe el aviso si fue seleccionado, incluso si su dispositivo envió la ubicación/);
   assert.match(manual, /puede generar otro aviso después de 30 minutos/);
+  assert.match(manual, /sus representantes autorizados reciben un aviso por persona/);
+  assert.match(manual, /si se revoca o ya no incluye esa sede, oculta el contenido/);
+  assert.match(manual, /no reconstruye avisos anteriores/);
   assert.match(manual, /seguimiento GPS actual no activa las reglas históricas de Desvío de ruta/i);
   assert.match(manual, /no con una ruta vial autorizada/i);
 });

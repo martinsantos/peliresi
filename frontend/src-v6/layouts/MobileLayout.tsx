@@ -277,7 +277,7 @@ export const MobileLayout: React.FC = () => {
       {floatingSupport && <SupportBubble mobile hidden={isMenuOpen || searchOpen} />}
 
       {/* Bottom Navigation */}
-      {!isInspectionCase && <nav aria-label="Navegación principal" className="fixed bottom-0 left-0 right-0 bottom-nav-polished safe-area-bottom z-40">
+      {!isInspectionCase && <nav aria-label="Navegación principal" className="relative shrink-0 bottom-nav-polished safe-area-bottom z-40">
         <div className="flex items-center justify-around safe-bottom">
           {bottomNavItems.map((item) => (
             <NavItem 

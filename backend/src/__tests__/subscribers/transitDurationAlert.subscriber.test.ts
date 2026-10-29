@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DomainEvent } from '../../services/domainEvent.service';
 
 const mocks = vi.hoisted(() => ({ rules: vi.fn(), users: vi.fn(), manifest: vi.fn(), transaction: vi.fn(),
-  query: vi.fn(), find: vi.fn(), create: vi.fn(), notice: vi.fn(), insertNotices: vi.fn(), channels: vi.fn(), email: vi.fn() }));
+  query: vi.fn(), find: vi.fn(), create: vi.fn(), notice: vi.fn(), insertNotices: vi.fn(), channels: vi.fn(), email: vi.fn(), company: vi.fn() }));
+vi.mock('../../services/manifestCompanyRecipients.service', () => ({ manifestCompanyRecipients: mocks.company }));
 vi.mock('../../lib/prisma', () => ({ default: { reglaAlerta: { findMany: mocks.rules }, usuario: { findMany: mocks.users },
   manifiesto: { findUnique: mocks.manifest }, $transaction: mocks.transaction } }));
 vi.mock('../../utils/logger', () => ({ default: { info: vi.fn(), error: vi.fn() } }));
@@ -25,6 +26,7 @@ beforeEach(() => {
   currentManifest = { estado: 'EN_TRANSITO', numero: 'QA-1', fechaRetiro: new Date(now.getTime() - 25 * 3600000) };
   currentRule = rule({ horasTransito: { gte: 24 } });
   mocks.rules.mockResolvedValue([]);
+  mocks.company.mockResolvedValue([]);
   mocks.users.mockResolvedValue([{ id: 'admin-a' }]);
   mocks.query.mockImplementation(async (sql: TemplateStringsArray) => {
     const query = sql.join('');
@@ -87,6 +89,21 @@ describe('transit duration is informational unless Ambiente configures a thresho
     await alertaSubscriber(observed(25));
     expect(mocks.insertNotices.mock.calls[0][0].data.map((notice: any) => notice.usuarioId)).toEqual(['carrier-a']);
     expect(mocks.channels).toHaveBeenCalledOnce();
+  });
+
+  it('notifies authorized representatives only for the configured activities, once per person', async () => {
+    const selected = { ...rule({ horasTransito: { gte: 24 } }), destinatarios: '["GENERADOR","TRANSPORTISTA"]' };
+    currentRule = selected; mocks.rules.mockResolvedValue([selected]);
+    const generator = { empresaId: 'co', actividadId: 'g', rol: 'GENERADOR', razonSocial: 'QA' };
+    const transporter = { empresaId: 'co', actividadId: 't', rol: 'TRANSPORTISTA', razonSocial: 'QA' };
+    const operator = { empresaId: 'co', actividadId: 'o', rol: 'OPERADOR', razonSocial: 'QA' };
+    mocks.company.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [generator, transporter, operator] },
+      { usuarioId: 'carrier-a', accesosEmpresa: [generator] }, { usuarioId: 'other', accesosEmpresa: [operator] }]);
+    await alertaSubscriber(observed(25));
+    const notices = mocks.insertNotices.mock.calls[0][0].data;
+    expect(notices.map((n: any) => n.usuarioId).sort()).toEqual(['carrier-a', 'rep']);
+    expect(JSON.parse(notices.find((n: any) => n.usuarioId === 'rep').datos)).toMatchObject({ destino: 'representante', accesosEmpresa: [generator, transporter] });
+    expect(JSON.parse(notices.find((n: any) => n.usuarioId === 'carrier-a').datos).destino).toBeUndefined();
   });
 
   it('does not schedule channels if saving notices inside the transaction fails', async () => {

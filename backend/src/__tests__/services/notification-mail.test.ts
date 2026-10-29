@@ -18,6 +18,20 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it.each(['duracion_transito_configurada', 'alerta_regla_manifiesto'])('rechecks the exact representative activity and site for %s without sending', async tipo => {
+    const access = { empresaId: 'co', actividadId: 'a', rol: 'GENERADOR', razonSocial: 'PRIVATE', establecimientoId: 'site' };
+    const n = { ...notice, id: 'rule-notice', usuarioId: 'rep', rol: 'OPERADOR', tipo: 'ALERTA_SISTEMA', manifiestoId: 'm',
+      datos: JSON.stringify({ tipo, version: 1, destino: 'representante', accesosEmpresa: [access] }) };
+    mocks.manifest.mockResolvedValue({ isDemoData: false, generador: { usuarioId: 'owner' }, operador: { usuarioId: 'operator' } });
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [access] }]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(true);
+    const content = notificationMailContent(n)!;
+    expect(content.html).toContain('/notificaciones/rule-notice'); expect(content.html).not.toContain('PRIVATE');
+    mocks.companyRecipients.mockResolvedValue([{ usuarioId: 'rep', accesosEmpresa: [{ ...access, actividadId: 'other' }] }]);
+    expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    mocks.companyRecipients.mockResolvedValue([]); expect(await notificationSourceEligible(n, 'alertas')).toBe(false);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
   it('renders a configured transit threshold without implying a legal deadline or exposing free text', () => {
     const configured = notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', manifiestoId: 'manifest', datos: JSON.stringify({
       tipo: 'duracion_transito_configurada', version: 1, evento: 'TIEMPO_EXCESIVO', horasTransito: 25, descripcion: 'PRIVATE',

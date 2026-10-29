@@ -6,7 +6,7 @@ vi.mock('../../services/api',()=>({api:{get:mocks.get}}));
 vi.mock('../../services/companyContext',async orig=>({...await orig<typeof import('../../services/companyContext')>(),saveCompanyContext:mocks.save}));
 vi.mock('../../services/offlineSession',()=>({clearOfflineSession:mocks.clear}));
 import CompanyNoticeAction from '../../components/CompanyNoticeAction';
-import { resolveNotificationPath } from '../../utils/notificationNavigation';
+import { notificationCompanyAccesses, resolveNotificationPath } from '../../utils/notificationNavigation';
 const access={empresaId:'co',actividadId:'a',rol:'GENERADOR',razonSocial:'QA Entidad',establecimientoId:'site',establecimiento:'Norte'};
 const notice:any={id:'n',datos:JSON.stringify({tipo:'certificado_manifiesto',version:1,documentoId:'cert',tipoCertificado:'FINAL',accesosEmpresa:[access]}),manifiestoId:'m'};
 beforeEach(()=>vi.clearAllMocks());afterEach(cleanup);
@@ -54,6 +54,18 @@ it.each(['propuesta_partes','adenda_manifiesto'])('uses a specific action and pr
  expect(screen.getByRole('button',{name:'Usar Generador y abrir '+subject})).toBeVisible();
  expect(screen.queryByRole('button',{name:/certificado/})).toBeNull();
  expect(mocks.get).not.toHaveBeenCalled();
+});
+
+it.each(['duracion_transito_configurada', 'alerta_regla_manifiesto'])('opens a configured rule through the verified company context in web and app: %s', tipo => {
+ const n = { ...notice, tipo: 'ALERTA_SISTEMA', datos: JSON.stringify({ tipo, version: 1, destino: 'representante', accesosEmpresa: [access], url: '/wrong' }) };
+ for (const prefix of ['', '/app']) {
+  expect(resolveNotificationPath(n, prefix)).toBe(prefix + '/notificaciones/n');
+  expect(resolveNotificationPath(n, prefix, undefined, true)).toBe(prefix + '/manifiestos/m');
+ }
+ render(<MemoryRouter><CompanyNoticeAction notice={n} target="/manifiestos/m" userId="rep" /></MemoryRouter>);
+ expect(screen.getByRole('button', { name: 'Usar Generador y abrir manifiesto' })).toBeVisible();
+ expect(mocks.get).not.toHaveBeenCalled();
+ expect(notificationCompanyAccesses({ ...n, tipo: 'INFO_GENERAL' })).toEqual([]);
 });
 
 const fiscalNotice:any = { id:'fiscal-n', datos:JSON.stringify({ tipo:'recordatorio_fiscal', version:1, destino:'representante',

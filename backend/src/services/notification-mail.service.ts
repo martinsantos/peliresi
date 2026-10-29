@@ -1,5 +1,6 @@
 import { renewalCompanyRecipients } from './renewalCompanyRecipients.service';
 import { manifestCompanyRecipients } from './manifestCompanyRecipients.service';
+import { isManifestRuleCompanyNotice, matchingManifestRuleAccesses } from './manifestRuleCompanyNotice.service';
 import { applicationNoticeMessage, withApplicationNoticeContext } from './applicationNotice.service';
 import { ADDENDUM_AUTHORITY_ROLES } from '../domain/addendumAuthority';
 import { designatedReviewAccount } from '../domain/manifestReviewAuthority';
@@ -71,6 +72,12 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
       transportista: { select: { usuarioId: true } }, operador: { select: { usuarioId: true } },
     } });
     if (!manifest || manifest.isDemoData) return false;
+    const representativeRule = isManifestRuleCompanyNotice(notice, data);
+    if (representativeRule) {
+      if (!notice.usuarioId) return false;
+      const recipient = (await manifestCompanyRecipients(prisma, notice.manifiestoId)).find(p => p.usuarioId === notice.usuarioId);
+      if (!recipient || !matchingManifestRuleAccesses(data, recipient.accesosEmpresa).length) return false;
+    }
     if (data.tipo === 'recordatorio_firma') {
       const days = manifest.fechaFirma ? (Date.now() - manifest.fechaFirma.getTime()) / 86400000 : -1;
       const currentPhase = days >= 30 ? 'TREINTA_DIAS' : days >= 23 ? 'SEMANA' : null;
@@ -78,7 +85,7 @@ export async function notificationSourceEligible(notice: NoticeForMail, family: 
         || !['APROBADO', 'EN_TRANSITO', 'ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO'].includes(manifest.estado)) return false;
     }
     const owner = notice.rol === 'GENERADOR' ? manifest.generador : notice.rol === 'TRANSPORTISTA' ? manifest.transportista : notice.rol === 'OPERADOR' ? manifest.operador : null;
-    if (!isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) {
+    if (!representativeRule && !isFullAccess(notice) && (!notice.usuarioId || owner?.usuarioId !== notice.usuarioId)) {
       // A registered replacement can see its own leg history in the carrier
       // profile. This never grants it the private original manifest dossier.
       if (['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo)) && data.version === 1 && Array.isArray(data.accesosEmpresa)) {
@@ -287,6 +294,7 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
     if (participant && ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(String(data.tipoActor))) path = '/notificaciones/' + encodeURIComponent(notice.id);
   } else return null;
   if (['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo)) && data.version === 1 && Array.isArray(data.accesosEmpresa) && data.accesosEmpresa.length) path = '/notificaciones/' + encodeURIComponent(notice.id);
+  if (isManifestRuleCompanyNotice(notice, data) && data.version === 1 && Array.isArray(data.accesosEmpresa) && data.accesosEmpresa.length) path = '/notificaciones/' + encodeURIComponent(notice.id);
   // Only controlled event labels. Never copy free text, notes, attachments or amounts.
   const labels: Record<string, [string, string]> = {
     SOLICITUD_ENVIADA: ['Inscripción presentada para revisar', 'Hay una inscripción presentada. Revisá sus datos y documentación en SITREP.'],

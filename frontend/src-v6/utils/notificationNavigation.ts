@@ -29,10 +29,11 @@ function parseNotificationData(raw: string | null): Record<string, unknown> {
   }
 }
 
-export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos'>): Array<{empresaId:string;actividadId:string;rol:string;razonSocial:string;establecimientoId?:string;establecimiento?:string}> {
+export function notificationCompanyAccesses(notice: Pick<Notificacion, 'datos' | 'tipo'>): Array<{empresaId:string;actividadId:string;rol:string;razonSocial:string;establecimientoId?:string;establecimiento?:string}> {
  const data = parseNotificationData(notice.datos), id = (v: unknown) => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
  const fiscal = data.tipo === 'recordatorio_fiscal' && data.destino === 'representante' && !!notificationFiscalReminder(notice);
- if ((!fiscal && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
+ const alertRule = notice.tipo === 'ALERTA_SISTEMA' && data.destino === 'representante' && ['duracion_transito_configurada','alerta_regla_manifiesto'].includes(String(data.tipo));
+ if ((!fiscal && !alertRule && !['certificado_manifiesto','propuesta_partes','adenda_manifiesto'].includes(String(data.tipo))) || data.version !== 1 || !Array.isArray(data.accesosEmpresa)) return [];
  return data.accesosEmpresa.filter(a => a && id(a.empresaId) && id(a.actividadId) && ['GENERADOR','TRANSPORTISTA','OPERADOR'].includes(a.rol)
   && typeof a.razonSocial === 'string' && (!a.establecimientoId || id(a.establecimientoId)) && (!a.establecimiento || typeof a.establecimiento === 'string')
   && (!fiscal || (a.rol === 'GENERADOR' && !a.establecimientoId && !a.establecimiento)));
@@ -142,6 +143,10 @@ export function resolveNotificationPath(notificacion: Notificacion, basePath = '
   const data = parseNotificationData(notificacion.datos);
   if (!companyTarget && notificationCompanyAccesses(notificacion).length) return withBasePath('/notificaciones/' + encodeURIComponent(notificacion.id), basePath);
   const safeId = (v: unknown): v is string => typeof v === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(v);
+  if (companyTarget && notificacion.tipo === 'ALERTA_SISTEMA' && data.destino === 'representante' && data.version === 1
+    && ['duracion_transito_configurada','alerta_regla_manifiesto'].includes(String(data.tipo))) {
+    return withBasePath(safeId(notificacion.manifiestoId) ? '/manifiestos/' + notificacion.manifiestoId : '/notificaciones', basePath);
+  }
   if (data.tipo === 'recordatorio_fiscal') {
     const reminder = notificationFiscalReminder(notificacion);
     if (!reminder || !safeId(notificacion.id)) return withBasePath('/notificaciones', basePath);

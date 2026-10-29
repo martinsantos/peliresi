@@ -160,6 +160,12 @@ it.each(['', '/app', '/mobile'])('explicit sign-out replaces the old private loc
 });
 
 describe('MobileLayout Android shell', () => {
+  it('keeps the bottom navigation in the shell flow so it does not cover the scrolling content', () => {
+    renderMobileLayout('/notificaciones/notice');
+    const main = screen.getByRole('main'), nav = screen.getByRole('navigation', { name: 'Navegación principal' });
+    expect(main.parentElement).toBe(nav.parentElement);
+    expect(nav).toHaveClass('shrink-0'); expect(nav).not.toHaveClass('fixed');
+  });
   it.each(['generadores','transportistas','operadores'])('keeps %s creation help above the form',kind=>{
     authState.currentUser.rol='ADMIN';
     renderMobileLayout('/admin/actores/'+kind+'/nuevo');

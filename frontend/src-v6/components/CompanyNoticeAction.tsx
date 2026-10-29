@@ -45,9 +45,9 @@ export default function CompanyNoticeAction({ notice, target, userId, context, r
    <p className="text-sm">{labels[a.rol]}{a.establecimiento ? ' · ' + a.establecimiento : ''}</p>
    {fiscal && context?.empresaId === a.empresaId && context.actividadId === a.actividadId && context.rol === 'GENERADOR'
     && context.actorId === fiscal.actorId && context.todasSedes
-    ? <Link className="inline-flex min-h-11 items-center rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}
+    ? <Link className="inline-flex min-h-11 scroll-mb-28 scroll-mt-20 items-center rounded-lg bg-primary-700 px-4 py-3 font-semibold text-white" to={mp(target)}
       state={{ actorReturn: mp('/notificaciones/' + encodeURIComponent(notice.id)), ...(returnState ? { notificationInboxReturn: returnState } : {}) }} onClick={onOpenFiscal}>Ver situación fiscal →</Link>
-    : <Button disabled={busy} onClick={() => void open(a)}>{fiscal ? 'Usar ' + labels[a.rol] + ' para continuar' : context?.actividadId === a.actividadId ? 'Abrir ' + subject : 'Usar ' + labels[a.rol] + ' y abrir ' + subject}</Button>}
+    : <Button className="scroll-mb-28 scroll-mt-20" disabled={busy} onClick={() => void open(a)}>{fiscal ? 'Usar ' + labels[a.rol] + ' para continuar' : context?.actividadId === a.actividadId ? 'Abrir ' + subject : 'Usar ' + labels[a.rol] + ' y abrir ' + subject}</Button>}
   </div>)}
   {error && <div role="alert" className="space-y-2 text-sm text-error-700"><p>{error}</p><Link className="inline-flex min-h-11 items-center underline" to={mp('/empresas?origen=avisos')}>Revisar mis autorizaciones</Link></div>}
  </div>;
