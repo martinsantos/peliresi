@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { isolatedMapTiles, login, prefix, readablePageHeading } from './helpers';
+import { syntheticCuit } from '../synthetic-cuit';
 test.beforeEach(async ({ page }, info) => { await isolatedMapTiles(page, info); });
 const fixture = () => JSON.parse(readFileSync(path.join(process.env.QA_ARTIFACTS!, 'payment-electricity-fixture.json'), 'utf8'));
 const labels = { idComprobante: 'ID Comprobante ATM', cuit: 'CUIT del obligado', codigoTasa: 'Código de tasa', fechaPago: 'Fecha de pago', importe: 'Importe pagado (ARS)', periodo: 'Período / concepto', referenciaLiquidacion: 'Referencia de liquidación o trámite', transaccion: 'Transacción (si figura)', control: 'Control (si figura)' };
@@ -13,6 +14,11 @@ async function fillIdentity(page: Page, data: any) {
   await form.getByRole('checkbox').check(); return form;
 }
 function health(page: Page) { const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); return () => expect(errors).toEqual([]); }
+async function registrationStage(page: Page, number: number, label: string) {
+  const select = page.getByRole('combobox', { name: 'Etapa de la inscripción', exact: true });
+  if (await select.isVisible()) await select.selectOption(String(number));
+  else await page.getByRole('navigation', { name: 'Etapas de la inscripción' }).getByRole('button', { name: new RegExp(`^Paso ${number} de .*: ${label}$`) }).click();
+}
 
 test('reviewer identifies the original and completes the registration with visible reservation', async ({ page }, info) => {
   const healthy = health(page), data = fixture().cases[info.project.name].clean;
@@ -52,14 +58,14 @@ test('applicant uploads an electrical invoice, sees tariff evidence after reload
   const healthy = health(page), id = randomUUID(), issuer = info.project.name === 'app' ? 'Cooperativa Empresa Electrica de Godoy Cruz' : 'EDEMSA';
   await page.goto(`${prefix(info)}/inscripcion/generador`);
   await page.getByLabel('Nombre completo *', { exact: true }).fill('QA Electricidad ' + id);
-  await page.getByLabel('Email *', { exact: true }).fill(id + '@night-qa.invalid'); await page.getByLabel('CUIT *', { exact: true }).fill(`30-${String(Date.now()).slice(-8)}-1`);
+  await page.getByLabel('Email *', { exact: true }).fill(id + '@night-qa.invalid'); await page.getByLabel('CUIT *', { exact: true }).fill(syntheticCuit(Date.now()));
   await page.getByLabel('Contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!'); await page.getByLabel('Confirmar contraseña *', { exact: true }).fill('OnlyLocal-NightQA-2026!');
-  const created = page.waitForResponse(response => response.url().endsWith('/solicitudes/iniciar') && response.request().method() === 'POST');
+  const created = page.waitForResponse(response => response.url().endsWith('/solicitudes/iniciar') && response.request().method() === 'POST', { timeout: 20000 });
   await page.getByRole('button', { name: 'Crear cuenta y continuar', exact: true }).click(); const response = await created; expect(response.status()).toBe(201); const candidate = (await response.json()).data.solicitudId;
   await page.getByPlaceholder('Empresa S.A.', { exact: true }).fill('Establecimiento artificial ' + id); await page.getByPlaceholder('Calle 123, Ciudad', { exact: true }).fill('Planta artificial Mendoza 123');
-  const stages = page.getByRole('navigation', { name: 'Etapas de la inscripción' }); await stages.getByRole('button', { name: /^Paso 5 de .*: Actividad$/ }).click();
+  await registrationStage(page, 5, 'Actividad');
   await page.getByLabel('Personal en planta', { exact: true }).fill('32'); await page.getByLabel('Potencia instalada (HP)', { exact: true }).fill('120'); await page.getByLabel('Superficie cubierta (m²)', { exact: true }).fill('1250'); await page.getByLabel('Zona del establecimiento', { exact: true }).selectOption('zona_industrial');
-  await stages.getByRole('button', { name: /^Paso 6 de .*: Documentos$/ }).click();
+  await registrationStage(page, 6, 'Documentos');
   const row = page.getByTestId('registration-document-FACTURA_ELECTRICA'); await expect(row).toBeVisible();
   const backendRequire = createRequire(new URL('../../../backend/package.json', import.meta.url)), sharp = backendRequire('sharp');
   const lines = [issuer, 'FACTURA ARTIFICIAL - SIN VALIDEZ', 'Tarifa: T2 R BT', 'Consumo facturado: 1250 kWh', 'Potencia contratada: 45 kW', 'NIC: 900000001', 'Periodo: 2026/10'];
@@ -72,7 +78,7 @@ test('applicant uploads an electrical invoice, sees tariff evidence after reload
   const evidence = page.getByLabel('Lectura de factura eléctrica', { exact: true }); await expect(evidence).toContainText('T2RBT'); await expect(evidence).toContainText('1250 kWh'); await expect(evidence).toContainText('45 kW');
   await evidence.scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath('electricity-evidence.png'), animations: 'disabled' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-  await page.getByRole('navigation', { name: 'Etapas de la inscripción' }).getByRole('button', { name: /^Paso 5 de .*: Actividad$/ }).click();
+  await registrationStage(page, 5, 'Actividad');
   await expect(page.getByLabel('Potencia instalada (HP)', { exact: true })).toHaveValue('120'); healthy();
 });
 
