@@ -100,6 +100,17 @@ describe('GPS position provenance and cleanup', () => {
     unmount();
   });
 
+  it('does not replace a newer watch fix with an older coarse response from the same watcher', async () => {
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    const now = Date.now();
+    act(() => watchSuccess[0]({ ...position(-34, -70), timestamp: now }));
+    act(() => coarseSuccess[0]({ ...position(-31, -67), timestamp: now - 1_000 }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(result.current.position).toEqual([-34, -70]);
+    expect(manifiestoService.actualizarUbicacion).toHaveBeenCalledExactlyOnceWith(trip.manifiestoId, -34, -70, null, null, expect.any(String));
+    unmount();
+  });
+
   it('drains an in-flight GPS write before delivery and can resume after a failed delivery', async () => {
     let finish!: () => void;
     vi.mocked(manifiestoService.actualizarUbicacion).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));

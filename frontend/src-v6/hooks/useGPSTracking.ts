@@ -14,6 +14,7 @@ import { toast } from '../components/ui/Toast';
 import { manifiestoService } from '../services/manifiesto.service';
 import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError, acknowledgeGpsPoint, gpsTasksForTrip, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
 import { EstadoManifiesto } from '../types/models';
+import { createGpsFixOrder } from '../utils/gpsFixOrder';
 
 // Bound the rendered route independently from the persisted upload queue.
 const MAX_LOCAL_TRACK_POINTS = 500;
@@ -341,10 +342,11 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
     const isActive = () => trackingGenerationRef.current === generation && activeContextRef.current === context;
     let fallbackPositionInFlight = false;
     let permissionDenied = false;
+    const acceptFix = createGpsFixOrder();
     setGpsStatus('acquiring');
 
     const applyPosition = (pos: GeolocationPosition) => {
-      if (!isActive() || permissionDenied) return;
+      if (!isActive() || permissionDenied || !acceptFix(pos.timestamp)) return;
       const { latitude, longitude, accuracy, speed, heading, altitude } = pos.coords;
       const point: [number, number] = [latitude, longitude];
       const measuredAt = Number.isFinite(pos.timestamp) && pos.timestamp > 0 ? pos.timestamp : null;

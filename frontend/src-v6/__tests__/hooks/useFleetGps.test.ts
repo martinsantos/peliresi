@@ -77,6 +77,52 @@ it('never replays stale coordinates or acknowledges a failed upload as received'
   hook.unmount();
 });
 
+it('does not replace a newer observation with a late older GPS callback', async () => {
+  const send = vi.fn().mockResolvedValue({}), now = Date.now();
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send }], true));
+  const fix = (lat: number, timestamp: number) => ({ ...position(), coords: { ...position().coords, latitude: lat }, timestamp } as GeolocationPosition);
+  await act(async () => { locate(fix(-33, now)); await flush(); });
+  vi.setSystemTime(now + 30_000);
+  await act(async () => { locate(fix(-34, now - 1_000)); await flush(); });
+  expect(hook.result.current.position?.latitud).toBe(-33);
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(send).not.toHaveBeenCalledWith(expect.objectContaining({ latitud: -34 }));
+  hook.unmount();
+});
+
+it('does not resend an already received fix without a new sensor observation', async () => {
+  const send = vi.fn().mockResolvedValue({});
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send }], true));
+  await act(async () => { locate(position()); await flush(); });
+  expect(send).toHaveBeenCalledTimes(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); await flush(); });
+  expect(send).toHaveBeenCalledTimes(1);
+  await act(async () => { locate(position()); await flush(); });
+  expect(send).toHaveBeenCalledTimes(2);
+  hook.unmount();
+});
+
+it('retries a failed fix instead of treating it as received', async () => {
+  const send = vi.fn().mockRejectedValueOnce(new Error('Sin conexión')).mockResolvedValue({});
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send }], true));
+  await act(async () => { locate(position()); await flush(); });
+  expect(hook.result.current.deliveries.a.state).toBe('error');
+  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); await flush(); });
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(hook.result.current.deliveries.a.state).toBe('received');
+  hook.unmount();
+});
+
+it('continues sending new observations after the device clock is corrected backwards', async () => {
+  const send = vi.fn().mockResolvedValue({}), now = Date.now();
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send }], true));
+  await act(async () => { locate(position()); await flush(); });
+  vi.setSystemTime(now - 60_000);
+  await act(async () => { locate(position()); await flush(); });
+  expect(send).toHaveBeenCalledTimes(2);
+  hook.unmount();
+});
+
 it('starts only when enabled and stops on disabled sessions or denied permission', async () => {
   const send = vi.fn().mockResolvedValue({});
   const hook = renderHook(({ enabled }) => useFleetGps([{ key: 'a', send }], enabled), { initialProps: { enabled: false } });

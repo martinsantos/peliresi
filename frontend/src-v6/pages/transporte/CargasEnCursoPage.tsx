@@ -69,7 +69,7 @@ export default function CargasEnCursoPage() {
       <p role="status" aria-live="polite" className={`flex items-center gap-2 rounded-lg p-3 text-sm font-semibold ${started&&gps.status==='active'?'bg-primary-50 text-primary-800':'bg-neutral-100 text-neutral-700'}`}><Radio size={18} aria-hidden="true"/>{label}</p>
       <Button fullWidth disabled={!started&&chosen.filter(load=>load.gpsDisponible).length===0} leftIcon={retryLocation?<RefreshCw size={18}/>:started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(retryLocation){gps.retryLocation();return;}if(!started)setChoosing(false);setStarted(value=>!value);}}>{retryLocation?'Reintentar GPS':started?'Detener GPS':'Iniciar GPS'}</Button>
       {chosen.length>0&&<button type="button" onClick={()=>setChoosing(value=>!value)} className="min-h-11 text-sm font-semibold text-primary-800 underline">{choosing?'Cerrar selección':'Elegir otras cargas'}</button>}
-      <p className="text-sm text-neutral-600">Mantené esta pantalla abierta. Una sola ubicación se envía a cada carga marcada cada 30 segundos. Al entregar una, las demás continúan.</p>
+      <p className="text-sm text-neutral-600">Mantené esta pantalla abierta. Las nuevas ubicaciones se comparten con cada carga marcada, hasta una cada 30 segundos. Al entregar una, las demás continúan.</p>
     </CardContent></Card>
     {chosen.length>0&&<Card role="region" aria-label="Cargas marcadas"><CardHeader title={`Cargas marcadas · ${chosen.length}`} icon={<Truck size={20}/>}/><CardContent className="divide-y divide-neutral-100">
       {chosen.map(load=>{

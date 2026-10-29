@@ -7,6 +7,7 @@ import { SitrepMark, SitrepWordmark } from '../../components/SitrepMark';
 import { LoadingIndicator } from '../../components/ui/LoadingState';
 
 import { limitedLegRequest,type LimitedTransportInfo as LegInfo,type LimitedTransportUpload,type TransportGpsPoint as GpsPoint } from '../../services/limited-transport-gps';
+import { createGpsFixOrder, gpsFixFingerprint } from '../../utils/gpsFixOrder';
 
 export default function RelevoGpsPage() {
   const {tramoId=''}=useParams();
@@ -31,24 +32,31 @@ export default function RelevoGpsPage() {
   useEffect(()=>{
     if(!sharing||!info||blocked)return;
     if(!navigator.geolocation){setError('Este dispositivo no dispone de ubicación.');setSharing(false);return;}
-    let alive=true,inFlight=false;let latest:{point:GpsPoint;timestamp:number}|null=null;let lastAttempt=0;
+    let alive=true,inFlight=false;let latest:{point:GpsPoint;timestamp:number;fingerprint:string|null}|null=null;let lastAttempt=0,lastReceived:string|null=null;
+    const acceptFix=createGpsFixOrder();
     stopRef.current=false;setStatus('Buscando ubicación…');setError('');
     const send=async()=>{
       if(!alive||stopRef.current||inFlight||!latest)return;
       if(Date.now()-latest.timestamp>60000){setStatus('Esperando una ubicación reciente…');return;}
+      if(latest.fingerprint!==null&&latest.fingerprint===lastReceived)return;
       if(Date.now()-lastAttempt<29000)return;
+      const observation=latest;
       lastAttempt=Date.now();inFlight=true;setStatus('Enviando ubicación…');
       try{
-        const data=await limitedLegRequest<LimitedTransportUpload>(tramoId,token,latest.point);
-        if(alive&&!stopRef.current){setLastSent(data.tracking.timestamp);setStatus('Ubicación recibida por SITREP');setError('');}
+        const data=await limitedLegRequest<LimitedTransportUpload>(tramoId,token,observation.point);
+        if(alive&&!stopRef.current){lastReceived=observation.fingerprint;setLastSent(data.tracking.timestamp);setStatus('Ubicación recibida por SITREP');setError('');}
       }catch(err:any){if(alive){setError(err.message);setStatus('Ubicación sin enviar');if([401,403,404].includes(err.status)){setBlocked(true);stop();}}}
       finally{inFlight=false;}
     };
     const watch=navigator.geolocation.watchPosition(position=>{
       if(!alive||stopRef.current)return;
+      const epoch=acceptFix.epoch();if(!acceptFix(position.timestamp))return;
+      if(acceptFix.epoch()!==epoch){lastAttempt=0;lastReceived=null;}
       const c=position.coords;
-      latest={point:{latitud:c.latitude,longitud:c.longitude,precision:c.accuracy,
-        ...(c.speed!==null&&c.speed>=0?{velocidad:c.speed}:{}),...(c.heading!==null&&c.heading>=0?{direccion:c.heading}:{})},timestamp:position.timestamp};
+      const point={latitud:c.latitude,longitud:c.longitude,precision:c.accuracy,
+        ...(c.speed!==null&&c.speed>=0?{velocidad:c.speed}:{}),...(c.heading!==null&&c.heading>=0?{direccion:c.heading}:{})};
+      const fingerprint=gpsFixFingerprint(position.timestamp,point);
+      latest={point,timestamp:position.timestamp,fingerprint:fingerprint===null?null:`${acceptFix.epoch()}:${fingerprint}`};
       void send();
     },err=>{if(alive){setError(err.code===1?'Permití la ubicación en el navegador para compartir el GPS.':'No se obtuvo ubicación. Revisá la señal del teléfono.');setStatus('GPS sin ubicación');if(err.code===1)stop();}},
       {enableHighAccuracy:true,maximumAge:0,timeout:20000});
@@ -67,7 +75,7 @@ export default function RelevoGpsPage() {
       <p role="status" aria-live="polite" className={`rounded-lg p-3 text-sm font-semibold ${lastSent&&sharing?'bg-primary-50 text-primary-800':'bg-neutral-100 text-neutral-700'}`}>{status}</p>
       {lastSent&&<p className="text-sm text-neutral-600">Última recepción: {new Date(lastSent).toLocaleTimeString('es-AR')}</p>}
       <Button fullWidth disabled={blocked} leftIcon={sharing?<Square size={20}/>:<Navigation size={20}/>} onClick={()=>sharing?stop():setSharing(true)}>{sharing?'Detener GPS':'Compartir ubicación'}</Button>
-      <p className="text-sm text-neutral-600">Mantené esta pantalla abierta y permití la ubicación. Se envía cada 30 segundos mientras haya señal y una posición reciente.</p>
+      <p className="text-sm text-neutral-600">Mantené esta pantalla abierta y permití la ubicación. Se comparten nuevas posiciones, hasta una cada 30 segundos, mientras haya señal.</p>
       <p className="text-sm text-neutral-600">La transportista de origen registra la entrega. Este enlace sólo comparte el GPS de este tramo.</p>
     </CardContent></Card></>}
     {!info&&!error&&<LoadingIndicator label="Comprobando enlace…" />}

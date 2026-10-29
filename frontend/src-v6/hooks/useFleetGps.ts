@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {getApiErrorMessage} from '../utils/api-error';
+import {createGpsFixOrder,gpsFixFingerprint} from '../utils/gpsFixOrder';
 
 export interface FleetGpsPoint {latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number}
 export interface FleetGpsTarget {key:string;send:(point:FleetGpsPoint)=>Promise<unknown>}
@@ -20,9 +21,10 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
   const [deliveries,setDeliveries]=useState<Record<string,FleetGpsDelivery>>({});
   const [locationAttempt,setLocationAttempt]=useState(0);
   const targetsRef=useRef(targets);
-  const currentRef=useRef<{point:FleetGpsPoint;observedAt:number}|null>(null);
+  const currentRef=useRef<{point:FleetGpsPoint;observedAt:number;fingerprint:string|null}|null>(null);
   const activeRef=useRef(false),generation=useRef(0),cycleRef=useRef(false);
   const heldRef=useRef(new Set<string>()),attemptRef=useRef(new Map<string,number>());
+  const receivedRef=useRef(new Map<string,string>());
   const requestsRef=useRef(new Map<string,Promise<unknown>>());
   const selected=targets.map(target=>target.key).sort().join('|');
   const activeCount=targets.filter(target=>!deliveries[target.key]?.terminal).length;
@@ -40,14 +42,17 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
         if(!activeRef.current||generation.current!==run)break;
         const target=targetsRef.current.find(item=>item.key===key);
         const previousAttempt=attemptRef.current.get(key);
-        if(!target||heldRef.current.has(key)||(previousAttempt!==undefined&&Date.now()-previousAttempt<29000))continue;
+        if(!target||heldRef.current.has(key)||(observation.fingerprint!==null&&receivedRef.current.get(key)===observation.fingerprint)||(previousAttempt!==undefined&&Date.now()-previousAttempt<29000))continue;
         if(Date.now()-observation.observedAt>60000)break;
         attemptRef.current.set(key,Date.now());
         setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'sending'}}));
         const upload=Promise.resolve().then(()=>target.send(observation.point));requestsRef.current.set(key,upload);
         try{
           await upload;
-          if(activeRef.current&&generation.current===run&&targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{state:'received',receivedAt:new Date()}}));
+          if(activeRef.current&&generation.current===run){
+            if(observation.fingerprint!==null)receivedRef.current.set(key,observation.fingerprint);
+            if(targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{state:'received',receivedAt:new Date()}}));
+          }
         }catch(error){
           const statusCode=responseStatus(error),terminal=[401,403,404,409].includes(statusCode??0);if(terminal)heldRef.current.add(key);
           if(activeRef.current&&generation.current===run&&targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'error',terminal,statusCode,message:getApiErrorMessage(error,'No se pudo enviar esta ubicación. Revisá la conexión o actualizá las cargas.')}}));
@@ -65,14 +70,18 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
   useEffect(()=>{
     if(!trackingEnabled){setStatus('idle');return;}
     if(!navigator.geolocation){setStatus('unavailable');return;}
-    let mounted=true;const run=++generation.current;activeRef.current=true;attemptRef.current.clear();currentRef.current=null;
+    let mounted=true;const run=++generation.current;activeRef.current=true;attemptRef.current.clear();receivedRef.current.clear();currentRef.current=null;
+    const acceptFix=createGpsFixOrder();
     setStatus('acquiring');
     const watch=navigator.geolocation.watchPosition(result=>{
       if(!mounted||generation.current!==run||!activeRef.current)return;
+      const epoch=acceptFix.epoch();if(!acceptFix(result.timestamp))return;
+      if(acceptFix.epoch()!==epoch){attemptRef.current.clear();receivedRef.current.clear();}
       const c=result.coords;
       const point={latitud:c.latitude,longitud:c.longitude,precision:c.accuracy,
         ...(c.speed!==null&&c.speed>=0?{velocidad:c.speed}:{}),...(c.heading!==null&&c.heading>=0?{direccion:c.heading}:{})};
-      currentRef.current={point,observedAt:result.timestamp};setPosition({...point,observedAt:result.timestamp});setStatus('active');void send();
+      const fingerprint=gpsFixFingerprint(result.timestamp,point);
+      currentRef.current={point,observedAt:result.timestamp,fingerprint:fingerprint===null?null:`${acceptFix.epoch()}:${fingerprint}`};setPosition({...point,observedAt:result.timestamp});setStatus('active');void send();
     },error=>{if(mounted){currentRef.current=null;if(error.code===1)activeRef.current=false;setStatus(error.code===1?'denied':'acquiring');}},
       {enableHighAccuracy:true,maximumAge:0,timeout:20000});
     const timer=window.setInterval(()=>void send(),30000);
