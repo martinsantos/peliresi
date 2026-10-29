@@ -20,7 +20,9 @@ test('an administrator must enter the travel threshold and can save a draft', as
   await page.getByRole('option', { name: 'Duración del viaje', exact: true }).click();
   const hours = dialog.getByLabel('Avisar a partir de (horas)');
   await expect(hours).toHaveValue('');
-  await expect(dialog.getByText(/sin ubicaciones nuevas no se genera el aviso/i)).toBeVisible();
+  await expect(dialog.getByText(/aproximadamente cada cinco minutos mientras el servicio funciona/i)).toBeVisible();
+  await expect(dialog.getByText(/puede generar otro aviso después de 30 minutos/i)).toBeVisible();
+  await page.screenshot({ path: info.outputPath('duration-threshold-modal.png'), animations: 'disabled', scale: 'css' });
   await dialog.getByRole('checkbox', { name: /ADMIN Administración central/ }).check();
   const rejected = page.waitForResponse(response => response.url().endsWith('/api/alertas/reglas') && response.request().method() === 'POST');
   await dialog.getByRole('button', { name: 'Crear regla', exact: true }).click();

@@ -1,4 +1,5 @@
 import { iniciarRecordatorioFirmaJob } from './jobs/manifestSignatureReminder.job';
+import { iniciarDuracionTransitoJob } from './jobs/transitDuration.job';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -257,6 +258,7 @@ iniciarRecordatorioJob();
 iniciarSeguimientoCierreJob();
 iniciarRecordatorioFirmaJob();
 iniciarAlertCatalogueJob();
+iniciarDuracionTransitoJob();
 
 // Iniciar el servidor
 const PORT = config.PORT;

@@ -352,8 +352,12 @@ export function notificationMailContent(notice: NoticeForMail): { family: string
   const proposalPhase = typeof data.fase === 'string' ? data.fase : '';
   const renewalMessage = family === 'padron' && validRenewalNotice(data) ? RENEWAL_NOTICE_LABELS[notice.tipo] : undefined;
   const gpsObservation = notice.tipo === 'ANOMALIA_DETECTADA' || (notice.tipo === 'ALERTA_SISTEMA' && data.evento === 'ANOMALIA_GPS');
+  const configuredTransit = notice.tipo === 'ALERTA_SISTEMA' && Boolean(notice.manifiestoId)
+    && data.tipo === 'duracion_transito_configurada' && data.version === 1 && data.evento === 'TIEMPO_EXCESIVO'
+    && typeof data.horasTransito === 'number' && Number.isFinite(data.horasTransito) && data.horasTransito >= 0;
   const message = applicationNoticeMessage(notice.tipo, data) || renewalMessage || (gpsObservation
     ? ['Observación GPS para verificar', 'La hora de captura puede ser anterior a la recepción. Verificá el caso con transporte antes de tomar una decisión.']
+    : configuredTransit ? ['Duración del viaje para revisar', 'Se alcanzó un umbral de duración configurado por Ambiente. Es una referencia operativa y no implica un plazo obligatorio. Consultá el estado actual del manifiesto.']
     : validCompanyNotice(data) ? companyNoticeMessage(data) || fallback
     : data.tipo === 'antecedente_fiscalizacion' && validIntakeMail(data) ? ['Nuevo antecedente para evaluar en PSIP', 'Administración debe evaluar el antecedente y decidir su seguimiento. El registro no acredita una infracción.']
     : data.tipo === 'recordatorio_firma' && data.version === 1 ? [data.fase === 'SEMANA' ? 'Se acercan los 30 días desde la firma' : '30 días desde la firma del manifiesto', 'Revisá el estado actual y coordiná las acciones pendientes con las partes. El aviso conserva la fecha de firma; no determina una infracción.']

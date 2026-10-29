@@ -981,7 +981,7 @@ export const AlertasPage: React.FC = () => {
           {reglaForm.evento === 'TIEMPO_EXCESIVO' && basicTransitCondition ? <div className="space-y-2">
             <Input label="Avisar a partir de (horas)" type="number" min={0} step="any" inputMode="decimal" value={basicTransitHours ?? ''}
               onChange={event => { const value = event.target.value; setReglaForm(prev => ({ ...prev, condicion: value === '' ? '{}' : JSON.stringify({ horasTransito: { gte: Number(value) } }) })); }} />
-            <p className="text-sm text-neutral-600">Es un umbral operativo elegido por Ambiente, no un plazo obligatorio del viaje. Se evalúa cuando llega una ubicación GPS; sin ubicaciones nuevas no se genera el aviso.</p>
+            <p className="text-sm text-neutral-600">Es un umbral operativo elegido por Ambiente, no un plazo obligatorio del viaje. Se revisa al recibir GPS y aproximadamente cada cinco minutos mientras el servicio funciona. Una regla que sigue cumplida puede generar otro aviso después de 30 minutos.</p>
           </div> : <div>
             <label className="block text-sm font-medium text-neutral-700 mb-1">Cuándo se activa</label>
             <Select value={CONDITION_PRESETS[reglaForm.evento]?.some((preset) => preset.value === reglaForm.condicion) ? reglaForm.condicion : '__custom__'} onChange={value => value !== '__custom__' && setReglaForm(prev => ({ ...prev, condicion: value }))} options={[...(CONDITION_PRESETS[reglaForm.evento] || [{ label: 'Cualquier evento', value: '{}' }]), { value: '__custom__', label: 'Condición avanzada personalizada' }]} />

@@ -18,6 +18,18 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('committed notice mail relay', () => {
+  it('renders a configured transit threshold without implying a legal deadline or exposing free text', () => {
+    const configured = notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', manifiestoId: 'manifest', datos: JSON.stringify({
+      tipo: 'duracion_transito_configurada', version: 1, evento: 'TIEMPO_EXCESIVO', horasTransito: 25, descripcion: 'PRIVATE',
+    }) })!;
+    expect(mailText(configured.html)).toMatch(/umbral de duración configurado por Ambiente/i);
+    expect(mailText(configured.html)).toMatch(/no implica un plazo obligatorio/i);
+    expect(configured.html).not.toContain('PRIVATE'); expect(mocks.insert).not.toHaveBeenCalled();
+    const historical = notificationMailContent({ ...notice, tipo: 'ALERTA_SISTEMA', manifiestoId: 'manifest', datos: JSON.stringify({
+      evento: 'TIEMPO_EXCESIVO', horasTransito: 25,
+    }) })!;
+    expect(mailText(historical.html)).not.toMatch(/umbral de duración configurado por Ambiente/i);
+  });
   it.each([
     { tipo: 'ANOMALIA_DETECTADA', datos: '{}' },
     { tipo: 'ALERTA_SISTEMA', datos: JSON.stringify({ evento: 'ANOMALIA_GPS', tipoAnomalia: 'VELOCIDAD_ANORMAL', descripcion: 'PRIVATE' }) },

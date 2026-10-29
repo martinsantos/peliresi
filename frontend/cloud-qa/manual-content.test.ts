@@ -7,11 +7,12 @@ import { createHash } from 'node:crypto';
 
 const root = new URL('../../docs/manual/', import.meta.url);
 
-test('travel-duration monitoring documents explicit thresholds and the GPS-arrival limitation', () => {
+test('travel-duration monitoring documents explicit thresholds, periodic checks and their limits', () => {
   const manual = readFileSync(new URL('help-data.js', root), 'utf8');
   assert.match(manual, /Un viaje no tiene un plazo fijo automático/);
   assert.match(manual, /regla de Duración del viaje con un umbral explícito en horas/);
-  assert.match(manual, /sin ubicaciones nuevas no se genera ese aviso/);
+  assert.match(manual, /cada cinco minutos mientras el servicio funciona, incluso si no llegan puntos/);
+  assert.match(manual, /puede generar otro aviso después de 30 minutos/);
   assert.match(manual, /seguimiento GPS actual no activa las reglas históricas de Desvío de ruta/i);
   assert.match(manual, /no con una ruta vial autorizada/i);
 });

@@ -42,7 +42,7 @@ it('asks for a duration threshold explicitly and preserves the form if the serve
   const hours = within(dialog).getByLabelText('Avisar a partir de (horas)');
   expect(hours).toHaveValue(null);
   expect(within(dialog).getByText(/no un plazo obligatorio del viaje/i)).toBeVisible();
-  expect(within(dialog).getByText(/sin ubicaciones nuevas no se genera el aviso/i)).toBeVisible();
+  expect(within(dialog).getByText(/aproximadamente cada cinco minutos mientras el servicio funciona/i)).toBeVisible();
   fireEvent.click(within(dialog).getByRole('checkbox', { name: /ADMIN Administración central/ }));
   fireEvent.click(within(dialog).getByRole('button', { name: 'Crear regla', exact: true }));
   expect(await within(dialog).findByRole('alert')).toHaveTextContent('Indicá un umbral mínimo');

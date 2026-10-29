@@ -17,12 +17,22 @@ const rule = (condition: unknown) => ({ id: 'rule-a', nombre: 'Avisar desde 24 h
   condicion: JSON.stringify(condition), destinatarios: '["ADMIN"]', activa: true });
 const now = new Date('2026-10-28T12:00:00.000Z');
 const rows: Array<{ reglaId: string; manifiestoId: string; createdAt: Date }> = [];
+let currentManifest: { estado: string; numero: string; fechaRetiro: Date | null };
+let currentRule: { activa: boolean; evento: string; nombre: string; condicion: string; destinatarios: string };
 
 beforeEach(() => {
   vi.resetAllMocks(); rows.length = 0;
+  currentManifest = { estado: 'EN_TRANSITO', numero: 'QA-1', fechaRetiro: new Date(now.getTime() - 25 * 3600000) };
+  currentRule = rule({ horasTransito: { gte: 24 } });
   mocks.rules.mockResolvedValue([]);
   mocks.users.mockResolvedValue([{ id: 'admin-a' }]);
-  mocks.query.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('clock_timestamp') ? [{ now }] : []);
+  mocks.query.mockImplementation(async (sql: TemplateStringsArray) => {
+    const query = sql.join('');
+    if (query.includes('clock_timestamp')) return [{ now }];
+    if (query.includes('FROM manifiestos')) return [currentManifest];
+    if (query.includes('FROM reglas_alertas')) return [currentRule];
+    return [];
+  });
   mocks.find.mockImplementation(async ({ where }) => rows.find(row => row.reglaId === where.reglaId && row.manifiestoId === where.manifiestoId && row.createdAt >= where.createdAt.gte) ?? null);
   mocks.create.mockImplementation(async ({ data }) => { rows.push(data); return data; });
   mocks.transaction.mockImplementation(async work => work({ $queryRaw: mocks.query, alertaGenerada: { findFirst: mocks.find, create: mocks.create } }));
@@ -50,8 +60,18 @@ describe('transit duration is informational unless Ambiente configures a thresho
     await alertaSubscriber(observed(26));
     expect(rows).toHaveLength(1); expect(mocks.notice).toHaveBeenCalledTimes(1);
     expect(mocks.notice).toHaveBeenCalledWith(expect.objectContaining({ usuarioId: 'admin-a', titulo: 'Avisar desde 24 horas', manifiestoId: 'synthetic-trip',
-      mensaje: expect.stringContaining('El manifiesto QA-1 lleva aproximadamente 25 horas en tránsito') }));
+      mensaje: expect.stringContaining('el manifiesto QA-1 llevaba aproximadamente 25 horas en tránsito'),
+      datos: expect.objectContaining({ tipo: 'duracion_transito_configurada', version: 1 }) }));
     expect(mocks.transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
-    expect(mocks.query.mock.calls[0][0].join('')).toContain('pg_advisory_xact_lock');
+    expect(mocks.query.mock.calls.some(([sql]) => sql.join('').includes('pg_advisory_xact_lock'))).toBe(true);
+  });
+
+  it('does not alert after the trip has been delivered or the rule was disabled', async () => {
+    mocks.rules.mockResolvedValue([rule({ horasTransito: { gte: 24 } })]);
+    currentManifest.estado = 'ENTREGADO';
+    await alertaSubscriber(observed(25));
+    currentManifest.estado = 'EN_TRANSITO'; currentRule.activa = false;
+    await alertaSubscriber(observed(25));
+    expect(rows).toHaveLength(0); expect(mocks.notice).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@ assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
 assert.equal(process.env.MANIFEST_TRANSPORT_HANDOFF_ENABLED, 'true');
 const { PrismaClient } = backendRequire('@prisma/client');
 const db = new PrismaClient();
+const ruleIds: string[] = [];
 const base = 'http://127.0.0.1:3037/api';
 const run = randomUUID().replaceAll('-', '').slice(0, 12);
 async function request(method: string, url: string, token?: string, body?: unknown) {
@@ -51,15 +52,18 @@ try {
   const adminToken = await login('admin@night-qa.invalid'), carrierToken = await login('transportista@night-qa.invalid');
   const invalid = await request('POST', '/alertas/reglas', adminToken, { nombre: `QA sin umbral ${run}`,
     evento: 'TIEMPO_EXCESIVO', condicion: '{}', destinatarios: '["ADMIN"]', activa: true });
+  if (invalid.status === 201 && invalid.body.data?.id) ruleIds.push(invalid.body.data.id);
   assert.equal(invalid.status, 400); assert.match(invalid.body.message, /umbral/i);
   const configured = await request('POST', '/alertas/reglas', adminToken, { nombre: `QA duración ${run}`,
     evento: 'TIEMPO_EXCESIVO', condicion: JSON.stringify({ all: [{ horasTransito: { gte: 24 } }, { numero: { contains: run } }] }),
     destinatarios: '["ADMIN","TRANSPORTISTA"]', activa: true });
   assert.equal(configured.status, 201, JSON.stringify(configured.body));
   const rule = configured.body.data;
+  ruleIds.push(rule.id);
   // Emulate an old active rule only in the synthetic database; it must not fire.
   const legacy = await db.reglaAlerta.create({ data: { nombre: `QA anterior ${run}`, evento: 'TIEMPO_EXCESIVO',
     condicion: JSON.stringify({ numero: { contains: run } }), destinatarios: '["ADMIN"]', activa: true, creadoPorId: admin.id } });
+  ruleIds.push(legacy.id);
   const listed = await request('GET', '/alertas/reglas', adminToken);
   assert.equal(listed.status, 200);
   assert.equal(listed.body.data.find((r: any) => r.id === legacy.id).requiereUmbralTransito, true);
@@ -83,7 +87,7 @@ try {
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id, manifiestoId: original.id } }), 1);
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: rule.id, manifiestoId: relay.id } }), 1);
   const relayNotice = await db.notificacion.findFirstOrThrow({ where: { usuarioId: carrier.id, manifiestoId: relay.id, titulo: rule.nombre } });
-  assert.match(relayNotice.mensaje, new RegExp(`manifiesto ${relay.numero} lleva aproximadamente 25`));
+  assert.match(relayNotice.mensaje, new RegExp(`manifiesto ${relay.numero} llevaba aproximadamente 25`));
   assert.match(relayNotice.mensaje, /umbral configurado por Ambiente/);
   assert.equal(await db.alertaGenerada.count({ where: { reglaId: legacy.id } }), 0);
   assert.equal(await db.notificacion.count({ where: { manifiestoId: { in: [early.id, original.id, relay.id] }, titulo: '⏰ Tiempo de Tránsito Excesivo' } }), 0);
@@ -95,4 +99,7 @@ try {
     legacyUnboundedAlerts: 0, automaticDefaultAlerts: 0, emailAttempts: 0, emailSent: 0, push: false, capClosed: true };
   await writeFile(path.join(process.env.QA_ARTIFACTS!, 'transit-duration-http-proof.json'), JSON.stringify(proof, null, 2));
   console.log(JSON.stringify(proof));
-} finally { await db.$disconnect(); }
+} finally {
+  if (ruleIds.length) await db.reglaAlerta.updateMany({ where: { id: { in: ruleIds } }, data: { activa: false } });
+  await db.$disconnect();
+}

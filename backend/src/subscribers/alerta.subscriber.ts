@@ -71,6 +71,7 @@ async function dispararReglasAlerta(
     if (!matches) continue;
 
     const duplicateSince = new Date(Date.now() - 30 * 60 * 1000);
+    let alertData = datos;
     // Expirations have no manifest. Rule/null alone collapses different subjects.
     // Existing event snapshots are JSON.stringify output: include the complete
     // escaped key/value tokens, not an ID substring, and preserve the old window.
@@ -81,19 +82,35 @@ async function dispararReglasAlerta(
       if (!manifiestoId) continue;
       // Multiple GPS requests or API workers may cross a configured threshold
       // together. Serialize only this rule/manifest and use the DB clock.
-      const created = await prisma.$transaction(async tx => {
+      const verified = await prisma.$transaction(async tx => {
+        // Delivery and rule edits can race with either the GPS event or the
+        // periodic scan. Hold shared locks until the case is recorded and
+        // calculate elapsed time from the current trip and database clock.
+        const [trip] = await tx.$queryRaw<Array<{ estado: string; numero: string; fechaRetiro: Date | null }>>`
+          SELECT estado, numero, "fechaRetiro" FROM manifiestos WHERE id = ${manifiestoId} FOR SHARE
+        `;
+        const [currentRule] = await tx.$queryRaw<Array<{ activa: boolean; evento: string; nombre: string; condicion: string; destinatarios: string }>>`
+          SELECT activa, evento, nombre, condicion, destinatarios FROM reglas_alertas WHERE id = ${regla.id} FOR SHARE
+        `;
+        if (!trip || trip.estado !== 'EN_TRANSITO' || !trip.fechaRetiro || !currentRule?.activa
+          || currentRule.evento !== regla.evento || currentRule.nombre !== regla.nombre
+          || currentRule.condicion !== regla.condicion || currentRule.destinatarios !== regla.destinatarios) return null;
         const lockKey = JSON.stringify(['transit-duration-rule', regla.id, manifiestoId]);
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text`;
         const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
+        const horasTransito = (now.getTime() - trip.fechaRetiro.getTime()) / 3_600_000;
+        const currentData = { ...datos, numero: trip.numero, horasTransito };
+        if (!Number.isFinite(horasTransito) || horasTransito < 0 || !matchesAlertCondition(regla.condicion, currentData)) return null;
         const duplicate = await tx.alertaGenerada.findFirst({
           where: { reglaId: regla.id, manifiestoId, createdAt: { gte: new Date(now.getTime() - 30 * 60 * 1000) } },
           select: { id: true },
         });
-        if (duplicate) return false;
-        await tx.alertaGenerada.create({ data: { reglaId: regla.id, manifiestoId, datos: JSON.stringify(datos), estado: 'PENDIENTE', createdAt: now } });
-        return true;
+        if (duplicate) return null;
+        await tx.alertaGenerada.create({ data: { reglaId: regla.id, manifiestoId, datos: JSON.stringify(currentData), estado: 'PENDIENTE', createdAt: now } });
+        return currentData;
       }, { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
-      if (!created) continue;
+      if (!verified) continue;
+      alertData = verified;
     } else {
       const duplicate = await prisma.alertaGenerada.findFirst({
         where: { reglaId: regla.id, manifiestoId: manifiestoId ?? null, createdAt: { gte: duplicateSince },
@@ -119,7 +136,7 @@ async function dispararReglasAlerta(
       .map((d: string) => d.replace('email:', ''));
 
     const recipientIds = new Set<string>();
-    const eventUserId = typeof datos.userId === 'string' ? datos.userId : undefined;
+    const eventUserId = typeof alertData.userId === 'string' ? alertData.userId : undefined;
     if (manifiestoId && roles.some((role) => ['GENERADOR', 'TRANSPORTISTA', 'OPERADOR'].includes(role))) {
       const manifiesto = await prisma.manifiesto.findUnique({
         where: { id: manifiestoId },
@@ -142,10 +159,10 @@ async function dispararReglasAlerta(
       users.forEach((user) => { if (user.id !== eventUserId) recipientIds.add(user.id); });
     }
     for (const usuarioId of recipientIds) {
-      const mensaje = transitDuration && typeof datos.horasTransito === 'number' && Number.isFinite(datos.horasTransito)
-        ? `El manifiesto ${datos.numero} lleva aproximadamente ${datos.horasTransito.toLocaleString('es-AR', { maximumFractionDigits: 1 })} horas en tránsito. Se alcanzó el umbral configurado por Ambiente.`
-        : eventoAlerta === 'ANOMALIA_GPS' && typeof datos.descripcion === 'string' && datos.descripcion.trim()
-          ? `${typeof datos.numero === 'string' && datos.numero.trim() ? `${datos.numero} · ` : ''}${datos.descripcion}`
+      const mensaje = transitDuration && typeof alertData.horasTransito === 'number' && Number.isFinite(alertData.horasTransito)
+        ? `Al evaluar, el manifiesto ${alertData.numero} llevaba aproximadamente ${alertData.horasTransito.toLocaleString('es-AR', { maximumFractionDigits: 1 })} horas en tránsito. Se alcanzó el umbral configurado por Ambiente.`
+        : eventoAlerta === 'ANOMALIA_GPS' && typeof alertData.descripcion === 'string' && alertData.descripcion.trim()
+          ? `${typeof alertData.numero === 'string' && alertData.numero.trim() ? `${alertData.numero} · ` : ''}${alertData.descripcion}`
         : `Regla activada: ${regla.nombre}`;
       await notificationService.crearNotificacion({
         usuarioId,
@@ -154,7 +171,8 @@ async function dispararReglasAlerta(
         mensaje,
         manifiestoId,
         prioridad: 'ALTA' as PrioridadNotificacion,
-        datos: { evento: eventoAlerta, reglaId: regla.id, ...datos },
+        datos: { evento: eventoAlerta, reglaId: regla.id, ...alertData,
+          ...(transitDuration ? { tipo: 'duracion_transito_configurada', version: 1 } : {}) },
       });
     }
 
@@ -162,7 +180,7 @@ async function dispararReglasAlerta(
     // subscriptions. Never activate it as a side effect of enabling other mail.
     const authorizedEmails = [...new Set(emails.map(email => email.trim().toLowerCase()))].filter(email => externalAlertRecipientAllowed(email));
     if (authorizedEmails.length > 0) {
-      await emailService.sendAlertEmail(authorizedEmails, regla, manifiestoId ?? '', datos);
+      await emailService.sendAlertEmail(authorizedEmails, regla, manifiestoId ?? '', alertData);
     }
   }
 }

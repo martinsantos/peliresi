@@ -123,6 +123,9 @@ try{
    await select('transito-tiempo');await channel('inbox');
    await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('umbral configurado por Ambiente');
    await expect(page.locator('iframe').contentFrame().locator('body')).not.toContainText('Tiempo de Tránsito Excesivo');
+   await channel('email');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('umbral de duración configurado por Ambiente');
+   await expect(page.locator('iframe').contentFrame().locator('body')).toContainText('no implica un plazo obligatorio');
  });
  await page.locator('[data-width="mobile"]').click();
  await check('all scenarios, email and inbox, at phone preview width',async()=>{
