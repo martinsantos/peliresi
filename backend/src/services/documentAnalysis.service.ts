@@ -88,7 +88,8 @@ let receiptInFlight = false;
  * another owner in a sticky directory even when the file is readable. */
 function openReceiptLock(): number {
   const lockPath = path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock');
-  const readFlags = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW;
+  // A FIFO at this path must not block the event loop before fstat rejects it.
+  const readFlags = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
   let fd: number;
   try {
     fd = fs.openSync(lockPath, readFlags);

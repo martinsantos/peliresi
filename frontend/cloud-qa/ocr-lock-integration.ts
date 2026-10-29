@@ -12,7 +12,7 @@ assert.equal(process.env.SITREP_QA_EXECUTOR, 'preview-container');
 assert.equal(process.env.DISABLE_EMAILS, 'true');
 assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
 const out = process.env.QA_ARTIFACTS!;
-assert.equal(out, '/work/sitrep/.qa-ocr-lock-20261029');
+assert(['/work/sitrep/.qa-ocr-lock-20261029', '/work/sitrep/.qa-ocr-fifo-20261029'].includes(out));
 const fixture = path.join(out, 'factura-artificial.png');
 const mode = process.env.QA_OCR_CASE || '';
 assert.match(mode, /^(prepare|prepare-root|existing-root|existing-node|created-root|created-node|unreadable-node|symlink-node|contention)$/);

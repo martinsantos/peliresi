@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { assertCloudDatabase, backendRequire } from './safety.ts';
+
+await assertCloudDatabase();
+assert.equal(process.env.SITREP_QA_EXECUTOR, 'preview-container');
+assert.equal(process.env.DISABLE_EMAILS, 'true');
+assert.equal(process.env.PUSH_MANIFEST_NOTICES_ENABLED, 'false');
+assert.equal(process.getuid!(), 1000);
+const out = '/work/sitrep/.qa-ocr-fifo-20261029';
+assert.equal(process.env.QA_ARTIFACTS, out);
+assert.equal(process.env.TMPDIR, path.join(out, 'tmp'));
+assert(fs.lstatSync(path.join(out, 'tmp', 'sitrep-receipt-ocr.lock')).isFIFO());
+const image = path.join(out, 'factura-artificial.png');
+const hash = () => createHash('sha256').update(fs.readFileSync(image)).digest('hex');
+const before = hash(), start = Date.now();
+const { readReceipt } = backendRequire('./dist/services/documentAnalysis.service.js');
+const result = await readReceipt({ path: image, mimeType: 'image/png' }, 'FACTURA_ELECTRICA');
+const elapsed = Date.now() - start;
+assert.equal(result.lectura, 'NO_DISPONIBLE');
+assert.match(result.aviso, /archivo se conserva/);
+assert.equal(hash(), before);
+assert(elapsed < 5000, 'The invalid lock must not hang the event loop');
+fs.writeFileSync(path.join(out, 'fifo-fixed.json'), JSON.stringify({ synthetic: true, status: result.lectura, filePreserved: true, elapsedMs: elapsed }, null, 2) + '\n');
+console.log('FIFO no bloquea el OCR y el archivo se conserva.');

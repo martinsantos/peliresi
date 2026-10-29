@@ -42,7 +42,7 @@ describe('document bytes are evidence, not a filename or a payment decision', ()
 describe('free OCR has bounded resources and reports real states', () => {
   it('opens the existing lock read-only without O_CREAT and keeps the same inode for flock', async () => {
     expect((await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' })).lectura).toBe('LEIDO');
-    expect(mock.open).toHaveBeenCalledWith(path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock'), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    expect(mock.open).toHaveBeenCalledWith(path.join(os.tmpdir(), 'sitrep-receipt-ocr.lock'), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
     expect(mock.exec.mock.calls[0][1]).toContain(`/proc/${process.pid}/fd/42`);
     expect(mock.close).toHaveBeenCalledWith(42);
     expect(mock.chmod).not.toHaveBeenCalled();
@@ -50,7 +50,7 @@ describe('free OCR has bounded resources and reports real states', () => {
   it('creates a readable lock atomically if none exists', async () => {
     mock.open.mockImplementationOnce(() => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); }).mockReturnValueOnce(43);
     expect((await readReceipt({ path: '/virtual/original.pdf', mimeType: 'application/pdf' })).lectura).toBe('LEIDO');
-    expect(mock.open.mock.calls[1][1]).toBe(fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_CREAT | fs.constants.O_EXCL);
+    expect(mock.open.mock.calls[1][1]).toBe(fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK | fs.constants.O_CREAT | fs.constants.O_EXCL);
     expect(mock.chmod).toHaveBeenCalledWith(43, 0o644);
     expect(mock.exec.mock.calls[0][1]).toContain(`/proc/${process.pid}/fd/43`);
     expect(mock.close).toHaveBeenCalledWith(43);
