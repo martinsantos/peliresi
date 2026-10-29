@@ -29,6 +29,33 @@ async function markSynthetic(id:string,numero:string){
   await db.manifiesto.update({where:{id},data:{isDemoData:true}});
  }finally{await db.$disconnect();}
 }
+// Independently derive scoped company representatives from the synthetic
+// registry, rather than assuming exactly one account per participating actor.
+async function expectedProposalRecipients(db:any,id:string):Promise<string[]> {
+ const manifest=await db.manifiesto.findUniqueOrThrow({where:{id},include:{
+  generador:{select:{usuarioId:true}},transportista:{select:{usuarioId:true}},operador:{select:{usuarioId:true}},
+ }});
+ const representatives=await db.$queryRawUnsafe(`
+  SELECT DISTINCT grant_row."usuarioId" FROM manifiestos m
+  JOIN empresas_actividades activity ON activity.activa AND (
+   (activity.rol='GENERADOR' AND activity."actorId"=m."generadorId") OR
+   (activity.rol='TRANSPORTISTA' AND activity."actorId"=m."transportistaId") OR
+   (activity.rol='OPERADOR' AND activity."actorId"=m."operadorId"))
+  JOIN empresas company ON company.id=activity."empresaId" AND company.activa
+  JOIN empresas_autorizaciones grant_row ON grant_row."actividadId"=activity.id AND grant_row."empresaId"=company.id AND grant_row.activa
+  JOIN usuarios person ON person.id=grant_row."usuarioId" AND person.activo AND person."emailVerified"
+   AND person.rol::text IN ('GENERADOR','TRANSPORTISTA','OPERADOR')
+  LEFT JOIN generadores gen ON activity.rol='GENERADOR' AND gen.id=activity."actorId"
+  LEFT JOIN transportistas carrier ON activity.rol='TRANSPORTISTA' AND carrier.id=activity."actorId"
+  LEFT JOIN operadores op ON activity.rol='OPERADOR' AND op.id=activity."actorId"
+  WHERE m.id=$1 AND CASE activity.rol WHEN 'GENERADOR' THEN gen.activo WHEN 'TRANSPORTISTA' THEN carrier.activo ELSE op.activo END
+   AND regexp_replace(CASE activity.rol WHEN 'GENERADOR' THEN gen.cuit WHEN 'TRANSPORTISTA' THEN carrier.cuit ELSE op.cuit END,'[^0-9]','','g')=company.cuit
+   AND (grant_row."todosEstablecimientos" OR EXISTS (SELECT 1 FROM empresas_establecimientos site
+    WHERE site.activo AND site."empresaId"=company.id AND site.id=m."contextoEmpresa"->>'establecimientoId'
+     AND m."contextoEmpresa"->>'empresaId'=company.id AND site.id=ANY(grant_row."establecimientoIds")))`,id) as Array<{usuarioId:string}>;
+ return [...new Set([manifest.creadoPorId,manifest.generador.usuarioId,manifest.transportista?.usuarioId,manifest.operador.usuarioId,
+  ...representatives.map(row=>row.usuarioId)].filter((value):value is string=>Boolean(value)))].sort();
+}
 async function approve(page:Page,id:string,role:Role){
  const region=page.getByRole('region',{name:'Aprobaciones de las partes'});await expect(region).toBeVisible();
  if(role==='generador'){
@@ -133,14 +160,17 @@ for(const creator of roles)test('in-situ proposal: '+creator+' creates; three pa
   try{
    expect(await db.trackingGPS.count({where:{manifiestoId:m.id}})).toBe(0);
    expect(await db.tramoTransporte.count({where:{manifiestoId:m.id}})).toBe(0);
-   const notices=await db.notificacion.findMany({where:{manifiestoId:m.id,titulo:'Coordinación iniciada: tratamiento en origen'},include:{usuario:true}});
-   expect(notices).toHaveLength(3);
+   const notices=await db.notificacion.findMany({where:{manifiestoId:m.id,titulo:'Coordinación iniciada: tratamiento en origen'},
+    select:{id:true,datos:true,tipo:true,usuarioId:true,manifiestoId:true,usuario:{select:{id:true,email:true,nombre:true,apellido:true,rol:true,activo:true}}}});
+   expect(notices.map((notice:{usuarioId:string})=>notice.usuarioId).sort()).toEqual(await expectedProposalRecipients(db,m.id));
    const {notificationMailContent}=backendRequire('./dist/services/notification-mail.service.js');
    for(const notice of notices){
-    expect(JSON.parse(notice.datos)).toMatchObject({fase:'iniciada',modalidad:'IN_SITU',partesRequeridas:3});
+    const data=JSON.parse(notice.datos);
+    expect(data).toMatchObject({fase:'iniciada',modalidad:'IN_SITU',partesRequeridas:3});
     const mail=notificationMailContent({...notice.usuario,...notice});
     expect(mail.subject).toContain('Coordinación en origen iniciada');expect(mail.html).toContain('No hay retiro, viaje ni GPS');
-    expect(mail.html).toContain('/manifiestos/'+m.id);
+    const destination=Array.isArray(data.accesosEmpresa)&&data.accesosEmpresa.length ? '/notificaciones/'+notice.id : '/manifiestos/'+m.id;
+    expect(mail.html).toContain(destination);
    }
   }finally{await db.$disconnect();}
   for(const role of roles){

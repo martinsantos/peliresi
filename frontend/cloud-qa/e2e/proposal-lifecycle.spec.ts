@@ -105,7 +105,8 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
   await transport.getByRole('button',{name:'Confirmar entrega',exact:true}).click();
   const delivery=transport.getByRole('dialog',{name:'Confirmar Entrega?',exact:true});
   await expect(delivery).toBeVisible();
-  await post(transport,'/'+m.id+'/confirmar-entrega',()=>delivery.getByRole('button',{name:'Sí, Confirmar Entrega',exact:true}).click());
+  const delivered=await post(transport,'/'+m.id+'/confirmar-entrega-idempotente',()=>delivery.getByRole('button',{name:'Sí, Confirmar Entrega',exact:true}).click());
+  expect(delivered.idempotencia).toMatchObject({version:1,repetido:false});
   await expect(delivery).not.toBeVisible();
   const op=pages.operador;
   await op.reload();
@@ -153,6 +154,8 @@ for(const creator of ['operador'] as const)test('complete ordinary lifecycle: '+
   await post(gen,'/'+rectification.id+'/revisiones',()=>card(gen,rectification.id).getByRole('button',{name:'Aprobar post facto',exact:true}).click());
   await openAdendaNotice(op,'Adenda aprobada',rectification.id);
   await expect(card(op,rectification.id).getByRole('status',{name:'Estado de revisión'})).toHaveText('Aprobada post facto',{timeout:12000});
+  await expect(card(op,rectification.id)).toContainText('La última revisión aprobó esta adenda; no implica unanimidad.');
+  await expect(card(op,rectification.id)).not.toContainText('Las otras partes pueden revisarlo');
   await expect(card(op,finding.id).getByRole('status',{name:'Estado de revisión'})).toHaveText('Observada');
   await expect(op.getByRole('region',{name:'Control documental'})).toContainText('Adendas revisadas');
   await proof(op,info,'finding-rectification-approved');

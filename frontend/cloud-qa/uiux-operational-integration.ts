@@ -79,7 +79,11 @@ try{
   const monitored=(await request('admin','/centro-control/actividad?capas=transito')).data.enTransito.find((v:any)=>v.manifiestoId===first.id);assert.equal(monitored.tramoActual.id,leg.tramo.id);assert.ok(monitored.ultimaPosicion);
   checks.push('Relevo eventual: origen deja de transmitir, nuevo tramo recibe GPS y Monitor distingue el tramo');checkpoint();
   for(const m of created){
-    await request('transportista',`/manifiestos/${m.id}/confirmar-entrega`,'POST',{});
+    const reference=randomUUID();
+    const delivery=(await request('transportista',`/manifiestos/${m.id}/confirmar-entrega-idempotente`,'POST',{referencia:reference})).data;
+    assert.deepEqual(delivery.idempotencia,{version:1,referencia:reference,repetido:false});
+    const replay=(await request('transportista',`/manifiestos/${m.id}/confirmar-entrega-idempotente`,'POST',{referencia:reference})).data;
+    assert.deepEqual(replay.idempotencia,{version:1,referencia:reference,repetido:true});
     await request('operador',`/manifiestos/${m.id}/confirmar-recepcion`,'POST',{});
     const loaded=(await request('operador',`/manifiestos/${m.id}`)).data.manifiesto;
     const residue=loaded.residuos[0];

@@ -24,6 +24,7 @@ async function api(route: string, token?: string, body?: unknown, role?: string,
 }
 const login = async (email: string) => (await api('/auth/login', undefined, { email, password: 'OnlyLocal-NightQA-2026!' })).tokens.accessToken;
 try {
+  const manifestsBeforeVerification = await db.manifiesto.count();
   const user = await db.usuario.findUniqueOrThrow({ where: { id: fixture.userId } });
   assert.equal(user.email, fixture.email);
   const admin = await db.usuario.findUniqueOrThrow({ where: { email: 'admin@night-qa.invalid' } });
@@ -90,9 +91,10 @@ try {
     const notice = await api('/notificaciones/' + item.noticeId, token, undefined, 'GENERADOR');
     assert.equal(JSON.parse(notice.datos).tipoActor, item.role);
   }
-  assert.equal(await db.manifiesto.count(), recorded.manifests);
+  const expectedManifests = process.env.QA_PSIP_CONTEXT_VERIFY === 'true' ? manifestsBeforeVerification : recorded.manifests;
+  assert.equal(await db.manifiesto.count(), expectedManifests);
   assert.equal(await db.emailQueue.count({ where: { intentos: { gt: 0 } } }), 0);
   assert.equal(await db.emailQueue.count({ where: { sentAt: { not: null } } }), 0);
-  writeFileSync(out + '/psip-context-http.json', JSON.stringify({ at: new Date().toISOString(), checks, manifests: recorded.manifests, responsesSubmitted: 0, emailAttempts: 0, emailSent: 0 }, null, 2));
+  writeFileSync(out + '/psip-context-http.json', JSON.stringify({ at: new Date().toISOString(), checks, manifests: expectedManifests, responsesSubmitted: 0, emailAttempts: 0, emailSent: 0 }, null, 2));
   console.log('Same account: three authorized requirements, six cross-role denials; no responses submitted.');
 } finally { await db.$disconnect(); }

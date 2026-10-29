@@ -29,6 +29,22 @@ type Adenda = { id: string; motivo: string; rectificaId: string | null; version:
 type Data = { finalLiberado?: boolean; puedeInformarHallazgo?: boolean; adendas: Adenda[]; total: number; puedeRegistrar: boolean; manifiesto: { numero: string; estado: EstadoManifiesto; residuos?: Waste[] };
   documental?: { pendientes: number; observadas: number; rechazadas: number; estado: string; cierreAcreditado: boolean } };
 const labels: Record<string, string> = { PENDIENTE: 'Pendiente de revisión', APROBADA: 'Aprobada post facto', OBSERVADA: 'Observada', RECHAZADA: 'Conformidad rechazada' };
+function reviewGuidance(item: Adenda, userId: string | number | undefined, canRegister: boolean): string {
+  if (item.observacionResueltaPorRectificacion) return 'Una rectificación aprobada resolvió esta observación. El antecedente conserva su estado.';
+  if (item.puedeResolver) return item.estadoRevision === 'PENDIENTE'
+    ? 'Podés revisar la evidencia y registrar tu decisión.'
+    : 'La última decisión está registrada. Podés revisarla y registrar otra decisión.';
+  if (item.estadoRevision === 'APROBADA') return 'La última revisión aprobó esta adenda; no implica unanimidad.';
+  if (item.estadoRevision === 'OBSERVADA') return canRegister
+    ? 'La última revisión observó esta adenda. Revisá el motivo y, si corresponde, agregá una rectificación.'
+    : 'La última revisión observó esta adenda. Revisá el motivo.';
+  if (item.estadoRevision === 'RECHAZADA') return canRegister
+    ? 'La conformidad fue rechazada. Revisá el motivo y, si corresponde, agregá una rectificación.'
+    : 'La conformidad fue rechazada. Revisá el motivo.';
+  return item.creadoPorId === userId && canRegister
+    ? 'Informe registrado. Las otras partes pueden revisarlo; vos podés agregar una rectificación.'
+    : 'Consultá las decisiones y el anexo conservado.';
+}
 const emptyWaste = (): Waste => ({ corriente: '', cantidad: 0, unidad: 'kg' });
 const observedUnits = ['kg', 'lt', 'tn', 'un', 'l', 't', 'm3'];
 type AddendumDraft = { creating: boolean; rectificaId?: string; wastes: Waste[]; motivo: string; notes: Record<string,string>; noteVersions: Record<string,number>; pending?: { signature: string; id: string } };
@@ -162,7 +178,7 @@ function AddendumContext({scope}:{scope:string}) {
           <p className="font-semibold">{authorLabel(item.revisiones.at(-1)?.autor, item.revisiones.at(-1)!.autorId)}</p>
           <p>{item.revisiones.at(-1)!.nota}</p>
         </div>}
-        <p className="text-sm font-medium text-primary-800">{item.observacionResueltaPorRectificacion ? 'Una rectificación aprobada resolvió esta observación. El antecedente conserva su estado.' : item.puedeResolver ? 'Podés revisar la evidencia y registrar tu decisión.' : item.creadoPorId === currentUser?.id && data.puedeRegistrar ? 'Informe registrado. Las otras partes pueden revisarlo; vos podés agregar una rectificación.' : 'Consultá las decisiones y el anexo conservado.'}</p>
+        <p className="text-sm font-medium text-primary-800">{reviewGuidance(item, currentUser?.id, data.puedeRegistrar)}</p>
         <div className="grid gap-4 sm:grid-cols-2"><div><h3 className="font-medium">Declaración conservada</h3><Load rows={item.declaracion.residuos} /></div><div><h3 className="font-medium">Carga observada</h3><Load rows={item.residuos} /></div></div>
         {item.informeHallazgo && <OperatorFindingSummary finding={item.informeHallazgo} />}
         {item.rectificaId && <p className="text-sm break-all">Rectifica adenda {item.rectificaId}; el antecedente se conserva.</p>}

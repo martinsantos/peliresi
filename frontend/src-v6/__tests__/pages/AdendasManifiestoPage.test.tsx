@@ -66,6 +66,36 @@ it('explains that an approved rectification resolves an observation without chan
   expect(screen.getByText('Una rectificación aprobada resolvió esta observación. El antecedente conserva su estado.')).toBeVisible();
   expect(screen.getByText('Adendas revisadas. No acredita el cierre documental del expediente.')).toBeVisible();
 });
+it('does not present an approved addendum as awaiting review to its author', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: true,
+    adendas: [{ ...record, creadoPorId: 'qa-user', estadoRevision: 'APROBADA' }] } } });
+  view();
+  expect(await screen.findByText('Aprobada post facto')).toBeVisible();
+  expect(screen.getByText('La última revisión aprobó esta adenda; no implica unanimidad.')).toBeVisible();
+  expect(screen.queryByText(/Las otras partes pueden revisarlo/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Agregar rectificación' })).toBeEnabled();
+});
+it('explains an observed addendum and keeps rectification available when authorized', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: true,
+    adendas: [{ ...record, creadoPorId: 'qa-user', estadoRevision: 'OBSERVADA' }] } } });
+  view();
+  expect(await screen.findByText('La última revisión observó esta adenda. Revisá el motivo y, si corresponde, agregá una rectificación.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Agregar rectificación' })).toBeEnabled();
+});
+it('tells an authorized counterpart that an existing decision can be reviewed', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data,
+    adendas: [{ ...record, estadoRevision: 'APROBADA', puedeResolver: true }] } } });
+  view();
+  expect(await screen.findByText('La última decisión está registrada. Podés revisarla y registrar otra decisión.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Observar' })).toBeVisible();
+});
+it('does not suggest rectification to a person without permission when conformity was rejected', async () => {
+  mock.get.mockResolvedValue({ data: { data: { ...data, puedeRegistrar: false,
+    adendas: [{ ...record, estadoRevision: 'RECHAZADA' }] } } });
+  view();
+  expect(await screen.findByText('La conformidad fue rechazada. Revisá el motivo.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Agregar rectificación' })).not.toBeInTheDocument();
+});
 it('explains an invalid rectification lineage instead of presenting the certificate as ready', async () => {
   mock.get.mockResolvedValue({ data: { data: { ...data, adendas: [{ ...record, estadoRevision: 'APROBADA', relacionRectificacionInvalida: true }],
     documental: { pendientes: 1, observadas: 0, rechazadas: 0, estado: 'PENDIENTE', cierreAcreditado: false } } } });

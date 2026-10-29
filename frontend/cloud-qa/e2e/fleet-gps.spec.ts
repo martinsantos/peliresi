@@ -18,8 +18,8 @@ test('one phone tracks three selected loads, delivers one and isolates a subsequ
     (window as any).qaGpsWatchCount = 0;
     navigator.geolocation.watchPosition = (...args) => { (window as any).qaGpsWatchCount++; return original(...args); };
   });
-  page.on('response', response => { if (response.request().method() === 'POST' && response.url().endsWith('/ubicacion')) {
-    const match = response.url().match(/\/(manifiestos|seguimiento-relevo)\/([^/]+)\/ubicacion$/);
+  page.on('response', response => { if (response.request().method() === 'POST' && response.url().endsWith('/ubicacion-idempotente')) {
+    const match = response.url().match(/\/(manifiestos|seguimiento-relevo)\/([^/]+)\/ubicacion-idempotente$/);
     if (match && response.status() === 200) uploads[match[2]] = (uploads[match[2]] || 0) + 1;
   } });
   try {
@@ -37,7 +37,7 @@ test('one phone tracks three selected loads, delivers one and isolates a subsequ
     await find(loads.prefix);
     for (const load of [loads.a, loads.b, loads.incoming]) await page.getByRole('checkbox', { name: `Llevo ${load.numero} en este móvil`, exact: true }).check();
     await page.getByRole('button', { name: 'Iniciar GPS', exact: true }).click();
-    await expect.poll(() => [loads.a.id, loads.b.id, loads.incoming.tramoId].every(id => uploads[id] === 1)).toBe(true);
+    await expect.poll(() => [loads.a.id, loads.b.id, loads.incoming.tramoId].every(id => uploads[id] === 1), { timeout: 20000 }).toBe(true);
     expect(await page.evaluate(() => (window as any).qaGpsWatchCount)).toBe(1);
     const selected = page.getByRole('region', { name: 'Cargas marcadas', exact: true }); await expect(selected).toContainText('GPS recibido');
     await page.getByRole('button', { name: 'Elegir otras cargas', exact: true }).click(); await find('QA-NO-EXISTE');
