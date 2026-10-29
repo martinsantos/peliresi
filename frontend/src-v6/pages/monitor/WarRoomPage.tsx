@@ -18,6 +18,7 @@ import { useWarRoomData } from './hooks/useWarRoomData';
 import { useMonitorTimeline } from './hooks/useMonitorTimeline';
 import { useForecast } from './hooks/useForecast';
 import { useTimeline } from './hooks/useTimeline';
+import { playbackTripList } from './utils/playback-trips';
 import { WarRoomMap } from './components/WarRoomMap';
 import { WarRoomHeader } from './components/WarRoomHeader';
 import { DashboardPanels } from './components/DashboardPanels';
@@ -239,26 +240,8 @@ const WarRoomPage: React.FC = () => {
 
   // Build enTransito from playback activeTrips for the map
   const enTransitoFromPlayback = useMemo((): EnTransitoItem[] => {
-    if (mode !== 'PLAYBACK' || !playback.activeTrips.size) return [];
-    const items: EnTransitoItem[] = [];
-    playback.activeTrips.forEach((trip, manifiestoId) => {
-      items.push({
-        manifiestoId,
-        numero: manifiestoId.slice(0, 8),
-        transportista: '',
-        origen: { razonSocial: '', lat: null, lng: null },
-        destino: { razonSocial: '', lat: null, lng: null },
-        fechaRetiro: null,
-        ultimaPosicion: {
-          latitud: trip.lat,
-          longitud: trip.lng,
-          timestamp: new Date(playback.currentTime).toISOString(),
-        },
-        ruta: trip.trail.map(([lat, lng]) => ({ lat, lng, timestamp: '' })),
-      });
-    });
-    return items;
-  }, [mode, playback.activeTrips, playback.currentTime]);
+    return mode === 'PLAYBACK' ? playbackTripList(playback.activeTrips) : [];
+  }, [mode, playback.activeTrips]);
 
   const enTransito = mode === 'LIVE' ? (liveData.data?.enTransito || []) : enTransitoFromPlayback;
 

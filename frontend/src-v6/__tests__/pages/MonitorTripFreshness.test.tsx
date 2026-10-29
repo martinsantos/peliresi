@@ -71,3 +71,20 @@ it('age advances without a new API reading and preserves the full Mendoza timest
   expect(view.container.querySelector('time')).toHaveAttribute('datetime', '2026-10-25T14:50:00Z');
   expect(view.container.querySelector('time')).toHaveTextContent('11:50:00');
 });
+
+it('el detalle histórico no inventa una recepción al mostrar el retiro', () => {
+  const historicPanel = { ...panel, data: { ...trip, esHistorial: true, ultimaPosicion: null, ruta: [] } };
+  const view = render(<FloatingPanelLayer panels={[historicPanel]} now={now} {...callbacks} />);
+  expect(screen.getByText('Historial · detalle al abrir')).toBeVisible();
+  expect(screen.getByText('Sin GPS recibido en el historial cargado')).toBeVisible();
+  expect(screen.queryByText(/Última recepción hace/)).not.toBeInTheDocument();
+  view.rerender(<FloatingPanelLayer panels={[{ ...historicPanel, data: { ...trip, esHistorial: true } }]} now={now} {...callbacks} />);
+  expect(screen.getByText('Última recepción en el historial cargado')).toBeVisible();
+  expect(view.container.querySelector('time')).toHaveAttribute('datetime', trip.ultimaPosicion!.timestamp);
+});
+
+it('no confunde una fecha GPS inválida con ausencia de puntos históricos', () => {
+  render(<MonitorPosition position={{ timestamp: 'invalid' }} historic now={now} />);
+  expect(screen.getByText('Fecha de recepción no válida')).toBeVisible();
+  expect(screen.queryByText('Sin GPS recibido en el historial cargado')).not.toBeInTheDocument();
+});

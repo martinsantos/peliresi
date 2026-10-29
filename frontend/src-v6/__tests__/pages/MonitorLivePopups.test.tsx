@@ -87,3 +87,22 @@ it('bounds the open popup to the actual short map and keeps keyboard scrolling a
   content.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
   expect(pan).toHaveBeenCalledOnce();
 });
+
+it('reserva espacio para el evento actual sobre el mapa histórico', () => {
+  const layout = document.createElement('div'); layout.className = 'wr-layout-map';
+  const container = document.createElement('div');
+  container.getBoundingClientRect = () => ({ left: 0, right: 360, top: 100, bottom: 340, width: 360, height: 240, x: 0, y: 100, toJSON: () => ({}) });
+  const overlay = document.createElement('button'); overlay.className = 'wr-current-event';
+  overlay.getBoundingClientRect = () => ({ left: 12, right: 220, top: 112, bottom: 168, width: 208, height: 56, x: 12, y: 112, toJSON: () => ({}) });
+  layout.append(container, overlay); runtime.map.getContainer.mockReturnValue(container);
+  const { unmount } = render(<View />);
+  const handlers = runtime.map.on.mock.calls.find(([events]) => events.popupopen)?.[0];
+  const element = document.createElement('div');
+  const content = document.createElement('div'); content.className = 'leaflet-popup-content';
+  Object.defineProperty(element, 'offsetHeight', { value: 170 }); Object.defineProperty(content, 'offsetHeight', { value: 120 });
+  element.append(content);
+  const popup = { options: { maxHeight: 220, autoPanPaddingTopLeft: [0, 0] }, getElement: () => element, update: vi.fn() };
+  act(() => handlers.popupopen({ popup }));
+  expect(popup.options.autoPanPaddingTopLeft[1]).toBeGreaterThanOrEqual(80);
+  unmount();
+});

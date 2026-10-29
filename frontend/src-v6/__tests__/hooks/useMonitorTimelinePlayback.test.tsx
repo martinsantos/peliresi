@@ -74,4 +74,50 @@ describe('Historial: velocidad indicada y motor real',()=>{
     act(()=>result.current.reset());act(()=>result.current.play());
     expect(result.current.counters.totalCreated).toBe(1);expect(result.current.counters.borrador).toBe(1);
   });
+  it('distingue el lugar de retiro de las posiciones GPS recibidas en la secuencia',()=>{
+    const timeline=history([{kind:'RETIRO',id:'QA-A'},{kind:'INCIDENTE',id:'QA-A'},{kind:'INCIDENTE',id:'QA-A'}]);
+    timeline[0].manifiestoNumero='QA-MANIFIESTO-1';
+    timeline.splice(2,0,{timestamp:new Date(1700000001500).toISOString(),type:'GPS',manifiestoId:'QA-A',manifiestoNumero:'QA-MANIFIESTO-1',descripcion:'GPS',latitud:-32.8,longitud:-68.7});
+    const {result}=renderHook(()=>useTimeline(timeline));
+    act(()=>result.current.skipToNextEvent());
+    expect(result.current.activeTrips.get('QA-A')).toMatchObject({numero:'QA-MANIFIESTO-1',gpsCount:0,lastGpsReceivedAt:null,positionSource:'retiro',trail:[]});
+    act(()=>result.current.skipToNextEvent());act(()=>result.current.skipToNextEvent());
+    expect(result.current.activeTrips.get('QA-A')).toMatchObject({numero:'QA-MANIFIESTO-1',gpsCount:1,lastGpsReceivedAt:timeline[2].timestamp,positionSource:'gps',trail:[[-32.8,-68.7]]});
+  });
+  it('usa el par completo de coordenadas del generador si falta una coordenada del retiro',()=>{
+    const timeline=history([{kind:'RETIRO',id:'QA-A'}]);
+    timeline[0].latitud=-32.7; timeline[0].longitud=undefined;
+    timeline[0].generador={razonSocial:'QA',lat:-32.9,lng:-68.8};
+    const {result}=renderHook(()=>useTimeline(timeline));
+    act(()=>result.current.skipToNextEvent());
+    expect(result.current.activeTrips.get('QA-A')).toMatchObject({lat:-32.9,lng:-68.8,positionSource:'generador',gpsCount:0});
+  });
+  it('no inventa un marcador si ninguna fuente tiene un par de coordenadas completo',()=>{
+    const timeline=history([{kind:'RETIRO',id:'QA-A'}]);
+    timeline[0].latitud=-32.7; timeline[0].longitud=undefined;
+    const {result}=renderHook(()=>useTimeline(timeline));
+    act(()=>result.current.skipToNextEvent());
+    expect(result.current.activeTrips.has('QA-A')).toBe(false);
+  });
+  it('al avanzar y retroceder cuenta sólo las posiciones GPS recibidas hasta ese evento',()=>{
+    const timeline=history([{kind:'RETIRO',id:'QA-A'},{kind:'INCIDENTE',id:'QA-A'},{kind:'INCIDENTE',id:'QA-A'}]);
+    timeline.splice(1,0,{timestamp:new Date(1700000000500).toISOString(),type:'GPS',manifiestoId:'QA-A',manifiestoNumero:'QA-A',descripcion:'GPS 1',latitud:-32.8,longitud:-68.7});
+    timeline.splice(3,0,{timestamp:new Date(1700000001500).toISOString(),type:'GPS',manifiestoId:'QA-A',manifiestoNumero:'QA-A',descripcion:'GPS 2',latitud:-32.7,longitud:-68.6});
+    const {result}=renderHook(()=>useTimeline(timeline));
+    act(()=>result.current.seek(1));
+    expect(result.current.activeTrips.get('QA-A')).toMatchObject({gpsCount:2,lastGpsReceivedAt:timeline[3].timestamp});
+    act(()=>result.current.skipToPrevEvent());
+    expect(result.current.activeTrips.get('QA-A')).toMatchObject({gpsCount:1,lastGpsReceivedAt:timeline[1].timestamp});
+  });
+  it.each([
+    ['2026-10-29T15:21:00.000Z',12],
+    ['2026-10-29T03:00:00.000Z',0],
+    ['2026-10-29T02:59:00.000Z',23],
+  ])('muestra la hora %s en Mendoza aunque el navegador use otra zona',(timestamp,hour)=>{
+    const timeline=history([{kind:'RETIRO',id:'QA-A'}]);
+    timeline[0].timestamp=timestamp;
+    const {result}=renderHook(()=>useTimeline(timeline));
+    act(()=>result.current.skipToNextEvent());
+    expect(result.current.currentHour).toBe(hour);
+  });
 });

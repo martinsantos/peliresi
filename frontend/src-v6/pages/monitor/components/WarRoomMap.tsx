@@ -12,6 +12,7 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import type { MonitorMode } from '../WarRoomPage';
 import type { ActorPosition, EnTransitoItem } from '../api/monitor-api';
+import type { TripState } from '../hooks/useTimeline';
 import {
   createGeneradorIcon,
   createTransportistaIcon,
@@ -47,15 +48,29 @@ function LivePopup({ category, name, children }: { category: Exclude<MapCategory
 
 const ADDRESS_STYLE: React.CSSProperties = { fontSize: 12, color: '#4b5563', marginTop: 6, whiteSpace: 'normal', overflowWrap: 'anywhere' };
 
-function tripPopup(id: string, points: number): HTMLElement {
+function tripPopup(trip: TripState): HTMLElement {
   const content = document.createElement('div');
-  content.style.cssText = 'color:#262626;font:13px/1.5 Inter,system-ui,sans-serif;overflow-wrap:anywhere';
+  content.style.cssText = 'color:#262626;font:13px/1.5 Inter,system-ui,sans-serif;overflow-wrap:anywhere;padding-right:20px';
   const heading = document.createElement('strong');
-  heading.textContent = 'EN TRÁNSITO';
+  heading.textContent = `Manifiesto ${trip.numero || 'sin número'}`;
   heading.style.cssText = 'display:block;color:#b91c1c';
   const detail = document.createElement('div');
-  detail.textContent = `${id.slice(0, 10).toUpperCase()} · ${points} puntos GPS`;
+  detail.textContent = trip.positionSource === 'retiro'
+    ? 'Retiro registrado · sin GPS recibido en la secuencia cargada.'
+    : trip.positionSource === 'generador'
+      ? 'Retiro registrado · marcador según datos actuales del generador; sin GPS recibido en la secuencia cargada.'
+      : `${trip.gpsCount} ${trip.gpsCount === 1 ? 'punto GPS recibido' : 'puntos GPS recibidos'}.`;
   content.append(heading, detail);
+  if (trip.lastGpsReceivedAt) {
+    const received = document.createElement('div');
+    const date = new Date(trip.lastGpsReceivedAt);
+    received.textContent = Number.isFinite(date.getTime())
+      ? `Recepción: ${new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Mendoza', dateStyle: 'short', timeStyle: 'medium' }).format(date)} · Mendoza`
+      : 'Hora de recepción no disponible.';
+    const note = document.createElement('div');
+    note.textContent = 'Hora de captura no disponible. Las líneas no prueban el recorrido.';
+    content.append(received, note);
+  }
   return content;
 }
 
@@ -83,7 +98,7 @@ function PlaybackCamera({ currentEvent }: { currentEvent: { lat: number; lng: nu
 
 // One selectable marker per trip; details open on demand, never competing labels.
 function PlaybackLayer({ trips }: {
-  trips: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
+  trips: Map<string, TripState>;
 }) {
   const map = useMap();
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
@@ -106,12 +121,12 @@ function PlaybackLayer({ trips }: {
       let marker = markersRef.current.get(id);
       if (marker) {
         marker.setLatLng(pos);
-        marker.setPopupContent(tripPopup(id, trip.trail.length));
+        marker.setPopupContent(tripPopup(trip));
       } else {
         marker = L.marker(pos, { icon: ACTOR_ICONS.enTransitoSelected, zIndexOffset: 3000,
-          keyboard: true, title: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase(),
-          alt: 'Viaje en tránsito ' + id.slice(0, 10).toUpperCase() })
-          .bindPopup(tripPopup(id, trip.trail.length), { minWidth: 160, maxWidth: 240, autoPan: true }).addTo(map);
+          keyboard: true, title: 'Viaje en historial: ' + (trip.numero || 'sin número'),
+          alt: 'Viaje en historial: ' + (trip.numero || 'sin número') })
+          .bindPopup(tripPopup(trip), { minWidth: 0, maxWidth: 240, maxHeight: 180, autoPan: true }).addTo(map);
         markersRef.current.set(id, marker);
       }
 
@@ -243,7 +258,7 @@ interface Props {
   mode: MonitorMode;
   currentHour?: number; // 0–23 — para overlay día/noche en PLAYBACK
   // Playback-specific
-  playbackTrips?: Map<string, { lat: number; lng: number; trail: [number, number][] }>;
+  playbackTrips?: Map<string, TripState>;
   currentEvent?: { lat: number; lng: number; tipo: string; manifiestoNumero: string } | null;
   playbackEvents?: Array<{ id: string; tipo: string; lat: number; lng: number; numero?: string }>;
 }
@@ -276,7 +291,7 @@ export const WarRoomMap: React.FC<Props> = ({ now, inspections = [], cinemaMode,
   return (
     <div className="relative w-full h-full">
     <MapContainer center={MENDOZA_CENTER} zoom={10} className="w-full h-full" zoomControl={false}>
-      {mode === 'LIVE' && <MonitorPopupBounds />}
+      {(mode === 'LIVE' || mode === 'PLAYBACK') && <MonitorPopupBounds />}
       {mode === 'LIVE' && <InspectionMapLayer items={inspections} />}
       <TileLayer url={MAP_TILES} attribution={ATTRIBUTION} />
 

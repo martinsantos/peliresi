@@ -14,10 +14,14 @@ import { buildTimeline } from '../utils/timeline-engine';
 
 type PlaybackSpeed = 'fast' | 'normal' | 'slow';
 
-interface TripState {
+export interface TripState {
+  numero: string;
   lat: number;
   lng: number;
   trail: [number, number][];
+  gpsCount: number;
+  lastGpsReceivedAt: string | null;
+  positionSource: 'retiro' | 'generador' | 'gps';
 }
 
 interface Counters {
@@ -79,6 +83,10 @@ const SPEED_TO_INTERVAL: Record<PlaybackSpeed, number> = {
   normal: 1500,
   slow: 3000,
 };
+
+const MENDOZA_HOUR = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/Argentina/Mendoza', hour: '2-digit', hourCycle: 'h23',
+});
 
 /** Map eventoTipo → new counter key */
 const EVENTO_TO_COUNTER: Record<string, keyof Counters | null> = {
@@ -155,11 +163,19 @@ export function useTimeline(events: TimelineEvent[] | null) {
           existing.lat = ev.latitud;
           existing.lng = ev.longitud;
           existing.trail.push(pos);
+          existing.gpsCount++;
+          existing.lastGpsReceivedAt = ev.timestamp;
+          existing.positionSource = 'gps';
+          if (ev.manifiestoNumero) existing.numero = ev.manifiestoNumero;
         } else {
           activeTripsRef.current.set(key, {
+            numero: ev.manifiestoNumero,
             lat: ev.latitud,
             lng: ev.longitud,
             trail: [pos],
+            gpsCount: 1,
+            lastGpsReceivedAt: ev.timestamp,
+            positionSource: 'gps',
           });
         }
       }
@@ -186,14 +202,21 @@ export function useTimeline(events: TimelineEvent[] | null) {
 
       // ── Trip management ────────────────────────────────────────────────
       if (tipo === 'RETIRO') {
-        const originLat = ev.latitud ?? ev.generador?.lat;
-        const originLng = ev.longitud ?? ev.generador?.lng;
+        // Never combine one event coordinate with another from the current
+        // generator record, or imply that fallback is a GPS observation.
+        const eventCoordinates = Number.isFinite(ev.latitud) && Number.isFinite(ev.longitud);
+        const generatorCoordinates = Number.isFinite(ev.generador?.lat) && Number.isFinite(ev.generador?.lng);
+        const originLat = eventCoordinates ? ev.latitud : generatorCoordinates ? ev.generador?.lat : undefined;
+        const originLng = eventCoordinates ? ev.longitud : generatorCoordinates ? ev.generador?.lng : undefined;
         if (originLat != null && originLng != null) {
-          const pos: [number, number] = [originLat, originLng];
           activeTripsRef.current.set(ev.manifiestoId, {
+            numero: ev.manifiestoNumero,
             lat: originLat,
             lng: originLng,
-            trail: [pos],
+            trail: [],
+            gpsCount: 0,
+            lastGpsReceivedAt: null,
+            positionSource: eventCoordinates ? 'retiro' : 'generador',
           });
         }
       }
@@ -285,7 +308,7 @@ export function useTimeline(events: TimelineEvent[] | null) {
       : startTimeRef.current;
 
     const currentHour = idx >= 0 && idx < eventoListRef.current.length
-      ? new Date(eventoListRef.current[idx].unixMs).getHours()
+      ? Number(MENDOZA_HOUR.format(new Date(eventoListRef.current[idx].unixMs)))
       : 12;
 
     setState({

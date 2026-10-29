@@ -21,11 +21,12 @@ const deliveryNoticeBaseline=process.env.SITREP_QA_RUN==='delivery-notice-baseli
 const deliveryNotice=process.env.SITREP_QA_RUN==='delivery-notice-atomic-20261029';
 const gpsStorageBaseline=process.env.SITREP_QA_RUN==='gps-storage-baseline-20261029';
 const gpsNoticeUi=process.env.SITREP_QA_RUN==='gps-notice-ui-20261029';
+const monitorHistory=process.env.SITREP_QA_RUN==='monitor-history-20261029';
 const operationalFix=process.env.SITREP_QA_RUN==='operational-guidance-20261029';
-const operationalCurrent=process.env.SITREP_QA_RUN==='operational-current-20261029'||operationalFix;
+const operationalCurrent=process.env.SITREP_QA_RUN==='operational-current-20261029'||operationalFix||monitorHistory;
 const gpsStorageFix=process.env.SITREP_QA_RUN==='gps-storage-fix-20261029'||gpsNoticeUi||operationalCurrent;
 assert.ok(!process.env.SITREP_QA_RUN||connectionAudit||crossTab||syncBaseline||syncTab||roleBaseline||roleFix||tripBaseline||tripFix||deliveryBaseline||deliveryFix||deliveryNoticeBaseline||deliveryNotice||gpsStorageBaseline||gpsStorageFix,'Unknown QA run');
-const artifacts=connectionAudit?'/work/sitrep/.qa-gps-connection-20261029':crossTab?'/work/sitrep/.qa-gps-crosstab-20261029':syncBaseline?'/work/sitrep/.qa-sync-baseline-20261029':syncTab?'/work/sitrep/.qa-sync-crosstab-20261029':roleBaseline?'/work/sitrep/.qa-sync-role-baseline-20261029':roleFix?'/work/sitrep/.qa-sync-role-fix-20261029':tripBaseline?'/work/sitrep/.qa-trip-scope-baseline-20261029':tripFix?'/work/sitrep/.qa-trip-scope-fix-20261029':deliveryBaseline?'/work/sitrep/.qa-delivery-lost-baseline-20261029':deliveryFix?'/work/sitrep/.qa-delivery-lost-fix-20261029':deliveryNoticeBaseline?'/work/sitrep/.qa-delivery-notice-baseline-20261029':deliveryNotice?'/work/sitrep/.qa-delivery-notice-atomic-20261029':gpsStorageBaseline?'/work/sitrep/.qa-gps-storage-baseline-20261029':gpsNoticeUi?'/work/sitrep/.qa-gps-notice-ui-20261029':operationalFix?'/work/sitrep/.qa-operational-ui-current2026102913':operationalCurrent?'/work/sitrep/.qa-operational-ui-current2026102912':gpsStorageFix?'/work/sitrep/.qa-gps-storage-fix-20261029':'/work/sitrep/.qa-gps-lost-response-20261029';
+const artifacts=monitorHistory?'/work/sitrep/.qa-monitor-history-20261029':connectionAudit?'/work/sitrep/.qa-gps-connection-20261029':crossTab?'/work/sitrep/.qa-gps-crosstab-20261029':syncBaseline?'/work/sitrep/.qa-sync-baseline-20261029':syncTab?'/work/sitrep/.qa-sync-crosstab-20261029':roleBaseline?'/work/sitrep/.qa-sync-role-baseline-20261029':roleFix?'/work/sitrep/.qa-sync-role-fix-20261029':tripBaseline?'/work/sitrep/.qa-trip-scope-baseline-20261029':tripFix?'/work/sitrep/.qa-trip-scope-fix-20261029':deliveryBaseline?'/work/sitrep/.qa-delivery-lost-baseline-20261029':deliveryFix?'/work/sitrep/.qa-delivery-lost-fix-20261029':deliveryNoticeBaseline?'/work/sitrep/.qa-delivery-notice-baseline-20261029':deliveryNotice?'/work/sitrep/.qa-delivery-notice-atomic-20261029':gpsStorageBaseline?'/work/sitrep/.qa-gps-storage-baseline-20261029':gpsNoticeUi?'/work/sitrep/.qa-gps-notice-ui-20261029':operationalFix?'/work/sitrep/.qa-operational-ui-current2026102913':operationalCurrent?'/work/sitrep/.qa-operational-ui-current2026102912':gpsStorageFix?'/work/sitrep/.qa-gps-storage-fix-20261029':'/work/sitrep/.qa-gps-lost-response-20261029';
 const compiled=connectionAudit?'/work/sitrep/.qa-gps-lost-response-20261029':syncBaseline?'/work/sitrep/.qa-gps-crosstab-20261029':deliveryBaseline?'/work/sitrep/.qa-trip-scope-fix-20261029':deliveryNoticeBaseline?'/work/sitrep/.qa-delivery-lost-fix-20261029':gpsStorageBaseline?'/work/sitrep/.qa-delivery-notice-atomic-20261029':artifacts;
 Object.assign(process.env,{
   CI:'true',SITREP_QA_EXECUTOR:'preview-container',GITHUB_REPOSITORY:'martinsantos/peliresi',
@@ -45,7 +46,7 @@ Object.assign(process.env,{
 if(deliveryFix||deliveryNoticeBaseline||deliveryNotice||gpsStorageBaseline||gpsStorageFix)Object.assign(process.env,{VITE_MANIFEST_TRANSPORT_HANDOFF_ENABLED:'true'});
 if(roleBaseline||roleFix||tripBaseline||tripFix||deliveryFix||deliveryNoticeBaseline||deliveryNotice||gpsStorageBaseline||gpsStorageFix)Object.assign(process.env,{ACTOR_MULTIROLE_ENABLED:'true',VITE_ACTOR_MULTIROLE_ENABLED:'true'});
 if(tripBaseline||tripFix||deliveryFix||deliveryNoticeBaseline||deliveryNotice||gpsStorageBaseline||gpsStorageFix)Object.assign(process.env,{ENTERPRISE_ENABLED:'true',VITE_ENTERPRISE_ENABLED:'true'});
-if(operationalCurrent)Object.assign(process.env,{GITHUB_SHA:operationalFix?'2a5cc1e0-with-addendum-guidance-uncommitted':'2a5cc1e0bd7961a8fdcc25ecce0f43b22e8c11ee',
+if(operationalCurrent)Object.assign(process.env,{GITHUB_SHA:monitorHistory?'73a57b5f-with-monitor-history-uncommitted':operationalFix?'2a5cc1e0-with-addendum-guidance-uncommitted':'2a5cc1e0bd7961a8fdcc25ecce0f43b22e8c11ee',
   MANIFEST_EXCEPTIONAL_ENABLED:'true',MANIFEST_ADDENDA_ENABLED:'true',MANIFEST_PARTY_REVIEW_ENABLED:'true',MANIFEST_CERTIFICATES_ENABLED:'true',
   VITE_MANIFEST_EXCEPTIONAL_ENABLED:'true',VITE_MANIFEST_ADDENDA_ENABLED:'true',VITE_MANIFEST_PARTY_REVIEW_ENABLED:'true',VITE_MANIFEST_CERTIFICATES_ENABLED:'true',
   QA_PSIP_CONTEXT_VERIFY:'true',QA_MANUAL_ROOT:path.join(artifacts,'manual')});
@@ -131,6 +132,13 @@ const commands:Record<string,{cwd:string;command:string;args:string[]}>= {
   lifecycleReceipts:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/operational-lifecycle-receipts.ts']},
   inSituBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/proposal.playwright.config.ts','--project=web-desktop','--project=app','--grep','in-situ proposal:']},
   operationalAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/operational-current-audit.ts']},
+  historyFixture:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/monitor-history-fixture.ts']},
+  historyBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/monitor-history.playwright.config.ts','--project=web-desktop','--project=app']},
+  historyAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/monitor-history-audit.ts']},
+  liveHistoryFixture:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/monitor-live-history-fixture.ts']},
+  liveHistoryBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/control-gps-reception.playwright.config.ts','--project=web-desktop','--project=app','--grep','live map details retain']},
+  durationApi:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/transit-duration-integration.ts']},
+  durationBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/transit-duration.playwright.config.ts','--project=web-desktop','--project=app']},
   deliveryGpsFixture:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-delivery-fixture.ts']},
   deliveryGpsBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/gps-delivery.playwright.config.ts','--project=web-desktop','--project=app']},
   deliveryGpsAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/gps-delivery-audit.ts']},

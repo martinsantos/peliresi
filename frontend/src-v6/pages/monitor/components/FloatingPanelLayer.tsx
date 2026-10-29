@@ -175,6 +175,7 @@ const ViajeContent: React.FC<{ data: ViajeFPData; now?: number }> = ({ data, now
 
   return (
     <div className="space-y-2.5">
+      {data.esHistorial && <p className="text-xs text-neutral-700">Historial · detalle al abrir</p>}
       {/* Manifest number */}
       <p className="text-2xl font-black font-mono text-neutral-900 tracking-tight leading-none pl-2"
          style={{ borderLeft: '3px solid #f97316' }}>
@@ -212,8 +213,8 @@ const ViajeContent: React.FC<{ data: ViajeFPData; now?: number }> = ({ data, now
         <span className="text-[10px] text-neutral-600 truncate flex-1">{data.destino.razonSocial || '—'}</span>
       </div>
 
-      <MonitorPosition position={data.ultimaPosicion} now={now} />
-      <p className="text-xs text-neutral-600">{data.ruta.length} puntos incluidos en la consulta</p>
+      <MonitorPosition position={data.ultimaPosicion} now={now} historic={data.esHistorial} />
+      <p className="text-xs text-neutral-600">{data.ruta.length} {data.ruta.length === 1 ? 'punto GPS incluido' : 'puntos GPS incluidos'} en la consulta</p>
 
       {/* Residuos */}
       {data.residuos && data.residuos.length > 0 && (

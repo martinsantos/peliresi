@@ -84,6 +84,8 @@ export interface EnTransitoItem {
   fechaRetiro: string | null;
   ultimaPosicion: { latitud: number; longitud: number; velocidad?: number; direccion?: number; timestamp: string } | null;
   ruta: { lat: number; lng: number; velocidad?: number; timestamp: string }[];
+  /** Snapshot reconstructed from the loaded history, not a live observation. */
+  esHistorial?: boolean;
 }
 
 export interface MonitorLiveResponse {

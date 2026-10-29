@@ -384,7 +384,7 @@ export const DashboardPanels: React.FC<Props> = ({
           <WidgetShell title="Viajes" icon={Truck}
             state={ws.viajes} onMin={() => minimize('viajes')} onClose={() => close('viajes')}>
             {enTransito.length === 0 ? (
-              <p className="text-[11px] text-neutral-400 text-center py-2">Sin viajes activos</p>
+              <p className="text-[11px] text-neutral-400 text-center py-2">{mode === 'PLAYBACK' ? 'Sin viajes en este momento del historial' : 'Sin viajes activos'}</p>
             ) : (
               <div className="space-y-1">
                 {enTransito.map(v => (

@@ -89,6 +89,11 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   const monitor = JSON.stringify(guides.find((g: any) => g.id === 'monitor-viaje-vigente'));
   assert.match(monitor, /Monitor y Centro de Control/);
   assert.match(monitor, /hora de captura no está disponible/i);
+  assert.match(monitor, /retiro no se cuenta como ubicación GPS/i);
+  assert.match(monitor, /datos actuales del generador, que pueden haber cambiado/i);
+  assert.match(monitor, /horas del historial usan la zona de Mendoza/i);
+  assert.match(monitor, /líneas entre puntos no demuestran el trayecto/i);
+  assert.match(monitor, /detalle de viaje es una instantánea del momento en que lo abriste/i);
   assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
   assert.match(monitor, /misma lectura conserva su referencia durante ese seguimiento/i);
   assert.match(monitor, /no conserva la referencia al cerrar la pantalla/i);
