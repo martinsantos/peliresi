@@ -6,6 +6,7 @@ import {newGpsPointId} from '../services/gpsQueue';
 export interface FleetGpsPoint {latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number}
 export interface FleetGpsTarget {key:string;send:(point:FleetGpsPoint,puntoId:string)=>Promise<unknown>}
 export interface FleetGpsDelivery {state:'sending'|'received'|'error';receivedAt?:Date;message?:string;terminal?:boolean;statusCode?:number}
+type Observation={point:FleetGpsPoint;observedAt:number;fingerprint:string|null;references:Map<string,string>};
 type Status='idle'|'acquiring'|'active'|'denied'|'unavailable';
 function responseStatus(error:unknown):number|undefined {
   if(!error||typeof error!=='object')return;
@@ -22,7 +23,11 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
   const [deliveries,setDeliveries]=useState<Record<string,FleetGpsDelivery>>({});
   const [locationAttempt,setLocationAttempt]=useState(0);
   const targetsRef=useRef(targets);
-  const currentRef=useRef<{point:FleetGpsPoint;observedAt:number;fingerprint:string|null;references:Map<string,string>}|null>(null);
+  const currentRef=useRef<Observation|null>(null);
+  // Keep a failed attempt and its id until SITREP acknowledges it. A newer
+  // sensor fix must not silently replace an observation with an unknown result.
+  // This is still in memory: the durable fleet/relevo queue remains pending.
+  const unconfirmedRef=useRef(new Map<string,Observation>());
   const activeRef=useRef(false),generation=useRef(0),cycleRef=useRef(false);
   const heldRef=useRef(new Set<string>()),attemptRef=useRef(new Map<string,number>());
   const receivedRef=useRef(new Map<string,string>());
@@ -31,10 +36,15 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
   const activeCount=targets.filter(target=>!deliveries[target.key]?.terminal).length;
   const trackingEnabled=enabled&&activeCount>0;
   useEffect(()=>{targetsRef.current=targets;},[targets]);
+  useEffect(()=>{
+    const warn=(event:BeforeUnloadEvent)=>{if(unconfirmedRef.current.size){event.preventDefault();event.returnValue='';}};
+    window.addEventListener('beforeunload',warn);
+    return()=>window.removeEventListener('beforeunload',warn);
+  },[]);
   const send=useCallback(async()=>{
-    const observation=currentRef.current;
     if(!activeRef.current||cycleRef.current)return;
-    if(!observation||Date.now()-observation.observedAt>60000){setStatus('acquiring');return;}
+    if(!currentRef.current||Date.now()-currentRef.current.observedAt>60000)setStatus('acquiring');
+    if(!currentRef.current&&unconfirmedRef.current.size===0){setStatus('acquiring');return;}
     cycleRef.current=true;const run=generation.current;
     try{
       // Serialize network writes on a mobile connection; the single watcher
@@ -43,17 +53,24 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
         if(!activeRef.current||generation.current!==run)break;
         const target=targetsRef.current.find(item=>item.key===key);
         const previousAttempt=attemptRef.current.get(key);
-        if(!target||heldRef.current.has(key)||(observation.fingerprint!==null&&receivedRef.current.get(key)===observation.fingerprint)||(previousAttempt!==undefined&&Date.now()-previousAttempt<29000))continue;
-        if(Date.now()-observation.observedAt>60000)break;
+        const observation=unconfirmedRef.current.get(key)??currentRef.current;
+        if(!target||!observation||heldRef.current.has(key)||(observation.fingerprint!==null&&receivedRef.current.get(key)===observation.fingerprint)||(previousAttempt!==undefined&&Date.now()-previousAttempt<29000))continue;
+        if(Date.now()-observation.observedAt>60000){
+          if(unconfirmedRef.current.has(key))setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'error',message:'Hay una ubicación pendiente sin confirmar. Conservá esta pantalla y contactá a soporte; no se reenviará como ubicación actual.'}}));
+          else setStatus('acquiring');
+          continue;
+        }
         attemptRef.current.set(key,Date.now());
         setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'sending'}}));
         const upload=Promise.resolve().then(()=>{
+          unconfirmedRef.current.set(key,observation);
           let reference=observation.references.get(key);
           if(!reference){reference=newGpsPointId();observation.references.set(key,reference);}
           return target.send(observation.point,reference);
         });requestsRef.current.set(key,upload);
         try{
           await upload;
+          if(unconfirmedRef.current.get(key)===observation)unconfirmedRef.current.delete(key);
           if(activeRef.current&&generation.current===run){
             if(observation.fingerprint!==null)receivedRef.current.set(key,observation.fingerprint);
             if(targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{state:'received',receivedAt:new Date()}}));
@@ -67,6 +84,10 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
   },[]);
   const holdAndDrain=useCallback(async(key:string)=>{
     heldRef.current.add(key);const pending=requestsRef.current.get(key);if(pending)await Promise.allSettled([pending]);
+    const unconfirmed=unconfirmedRef.current.get(key);
+    if(unconfirmed)throw new Error(Date.now()-unconfirmed.observedAt>60000
+      ?'Hay una ubicación pendiente sin confirmar que ya no es reciente. Conservá esta pantalla y contactá a soporte antes de confirmar la entrega.'
+      :'Hay una ubicación pendiente sin confirmar. Revisá la conexión y reintentá el envío antes de confirmar la entrega.');
   },[]);
   const resume=useCallback((key:string)=>{heldRef.current.delete(key);attemptRef.current.delete(key);setDeliveries(previous=>{const next={...previous};delete next[key];return next;});void send();},[send]);
   // Restart only the device watcher. Keep selected loads, acknowledgements and

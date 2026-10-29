@@ -86,6 +86,32 @@ it('keeps the delivery dialog and selected loads when a delivery cannot be compl
   expect(selected).toHaveTextContent('QA-A'); expect(selected).toHaveTextContent('QA-B');
   view.unmount();
 });
+it('does not confirm a delivery while an attempted GPS upload for that load is unconfirmed', async () => {
+  mocks.send.mockRejectedValueOnce(new Error('Sin conexión'));
+  const view = setup(); await chooseAndStart();
+  await screen.findByRole('button', { name: 'Reintentar envío GPS de QA-A' });
+  fireEvent.click(screen.getByRole('button', { name: 'Entregar QA-A', exact: true }));
+  const dialog = screen.getByRole('dialog', { name: 'Confirmar entrega' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar entrega de esta carga' }));
+  await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent(/ubicación.*pendiente/i));
+  expect(mocks.deliver).not.toHaveBeenCalled();
+  expect(screen.getByRole('region', { name: 'Cargas marcadas' })).toHaveTextContent('QA-B');
+  view.unmount();
+});
+it('does not retry the previous account’s unconfirmed point under another account', async () => {
+  mocks.send.mockRejectedValueOnce(new Error('Sin conexión'));
+  const view=setup(); await chooseAndStart();
+  const firstReference=mocks.send.mock.calls[0][3];
+  mocks.user.id='another-account'; view.rerenderSession();
+  await waitFor(()=>expect(screen.queryByRole('region',{name:'Cargas marcadas'})).toBeNull());
+  for(const load of loads)fireEvent.click(await screen.findByRole('checkbox',{name:`Llevo ${load.numero} en este móvil`}));
+  fireEvent.click(screen.getByRole('button',{name:'Iniciar GPS'}));
+  await act(async()=>{locate({coords:{latitude:-34,longitude:-69,accuracy:10,speed:null,heading:null},timestamp:Date.now()} as GeolocationPosition);});
+  await waitFor(()=>expect(mocks.send).toHaveBeenCalledTimes(4));
+  expect(mocks.send.mock.calls[2][1].latitud).toBe(-34);
+  expect(mocks.send.mock.calls[2][3]).not.toBe(firstReference);
+  view.unmount();
+});
 it('does not query loads or acquire location when the operational feature is disabled', () => {
   vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'false'); const view = setup();
   expect(screen.getByText('El GPS de varias cargas no está habilitado para esta sesión.')).toBeVisible();

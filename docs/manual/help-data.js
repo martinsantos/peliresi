@@ -778,7 +778,8 @@
       ], image:S+'desktop/fleet-gps-20261019.png',alt:'Dos cargas restantes con GPS recibido después de entregar una tercera',caption:'Datos sintéticos · preview aislado · GPS emulado · 19/10/2026.',expected: 'Cada carga marcada confirma GPS recibido después de su propio envío.', resources: [{label:'GPS de mis viajes',path:'/transporte/cargas'}] },
       { title: 'Sumar una carga sin perder las otras', body: [
         'Tocá Elegir otras cargas. Podés buscar otro número y marcarlo: las cargas ya elegidas siguen arriba y continúan con su GPS.',
-        'El tiempo transcurrido es informativo, desde el retiro o el relevo. Si falta señal o una carga cambió de tramo, se muestra el problema de esa carga sin detener las demás.'
+        'El tiempo transcurrido es informativo, desde el retiro o el relevo. Si falta señal o una carga cambió de tramo, se muestra el problema de esa carga sin detener las demás.',
+        'Si una ubicación intentada no se confirmó, mantené esta pantalla abierta y usá Reintentar envío. La entrega de esa carga espera la confirmación; las demás continúan. El punto todavía no se recupera al salir de la pantalla o cerrar la app. Si ya no es reciente, no se reenvía como ubicación actual: conservá la pantalla y consultá a soporte.'
       ], expected: 'La lista Cargas marcadas conserva las seleccionadas aunque la búsqueda no las incluya.' },
       { title: 'Entregar sólo la carga que llegó', body: [
         'Buscá el número dentro de Cargas marcadas y tocá Entregar. Revisá número y destino en la confirmación. Las otras cargas siguen viajando y enviando su GPS.',

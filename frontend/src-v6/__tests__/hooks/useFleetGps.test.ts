@@ -128,6 +128,49 @@ it('reuses a stable reference when an acknowledged fleet upload loses its respon
   hook.unmount();
 });
 
+it('retains a failed observation through a newer fix and blocks delivery until it is confirmed', async () => {
+  const a = vi.fn((..._args: any[]) => Promise.resolve()).mockRejectedValueOnce(new Error('Sin conexión'));
+  const b = vi.fn((..._args: any[]) => Promise.resolve());
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send: a }, { key: 'b', send: b }], true));
+  await act(async () => { locate(position()); await flush(); });
+  const [original, reference] = a.mock.calls[0];
+  await act(async () => { vi.setSystemTime(Date.now() + 30_000); locate({ ...position(), coords: { ...position().coords, latitude: -34 } } as GeolocationPosition); await flush(); });
+  expect(a).toHaveBeenCalledTimes(2);
+  expect(a.mock.calls[1]).toEqual([original, reference]);
+  expect(b).toHaveBeenCalledTimes(2);
+  await expect(hook.result.current.holdAndDrain('a')).resolves.toBeUndefined();
+  hook.unmount();
+});
+
+it('does not deliver after a failed upload or replay an expired fix as current', async () => {
+  const a = vi.fn().mockRejectedValue(new Error('Sin conexión'));
+  const b = vi.fn().mockResolvedValue({});
+  const hook = renderHook(() => useFleetGps([{ key: 'a', send: a }, { key: 'b', send: b }], true));
+  await act(async () => { locate(position()); await flush(); });
+  await expect(hook.result.current.holdAndDrain('a')).rejects.toThrow(/ubicación pendiente sin confirmar/i);
+  await act(async () => { hook.result.current.resume('a'); await flush(); });
+  vi.setSystemTime(Date.now() + 70_000);
+  await act(async () => { locate(position()); await flush(); });
+  expect(a).toHaveBeenCalledTimes(2); // The immediate retry was still fresh.
+  expect(b).toHaveBeenCalledTimes(2);
+  expect(hook.result.current.deliveries.a.message).toMatch(/no se reenviará como ubicación actual/i);
+  await expect(hook.result.current.holdAndDrain('a')).rejects.toThrow(/ubicación pendiente/i);
+  hook.unmount();
+});
+
+it('waits for an in-flight failure and warns before closing with an unconfirmed point', async () => {
+  let reject!: (error: Error) => void;
+  const send=vi.fn(()=>new Promise<void>((_, fail)=>{reject=fail;}));
+  const hook=renderHook(()=>useFleetGps([{key:'a',send}],true));
+  await act(async()=>{locate(position());await flush();});
+  const closing=new Event('beforeunload',{cancelable:true});
+  window.dispatchEvent(closing); expect(closing.defaultPrevented).toBe(true);
+  const held=hook.result.current.holdAndDrain('a');
+  const rejected=expect(held).rejects.toThrow(/ubicación pendiente/i);
+  await act(async()=>{reject(new Error('Respuesta perdida'));await rejected;await flush();});
+  hook.unmount();
+});
+
 it('continues sending new observations after the device clock is corrected backwards', async () => {
   const send = vi.fn().mockResolvedValue({}), now = Date.now();
   const hook = renderHook(() => useFleetGps([{ key: 'a', send }], true));
