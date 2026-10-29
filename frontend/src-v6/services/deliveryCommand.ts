@@ -2,6 +2,7 @@ import { enqueueDeliveryOnce, getSyncQueue, processSyncQueue } from './indexeddb
 import { OFFLINE_QUEUE_WAKE_EVENT } from './offlineSyncEvents';
 import { newGpsPointId } from './gpsQueue';
 import { assertNoStoredFleetGpsForManifest } from './fleetGpsStorage';
+import { withGpsTransitionLock } from './gpsCoordination';
 import { supportRequestContext, supportSessionMatches } from '../utils/supportSession';
 import type { ConfirmarEntregaRequest } from '../types/api';
 
@@ -17,15 +18,18 @@ export async function submitDelivery(id: string, data: ConfirmarEntregaRequest, 
   if (!id || !context.owner || !['TRANSPORTISTA', 'ADMIN'].includes(context.role) || !isCurrent()) {
     throw new Error('La cuenta o actividad cambió. Volvé a abrir el viaje antes de confirmar la entrega.');
   }
-  // Do not enqueue a delivery which would disable the fleet screen needed to
-  // recover this browser's pending point. The transition checks again under
-  // the GPS lock because another tab may write after this first check.
-  assertNoStoredFleetGpsForManifest(id);
+  // Do not enqueue a delivery while another tab owns unsaved fleet GPS.
+  // Enqueue while holding the same lock as GPS writes; the transition checks
+  // again after reacquiring it. A blocked delivery must not disable recovery.
   let referencia: string;
   try { referencia = newGpsPointId(); }
   catch { throw new Error('No se pudo preparar una referencia segura para la entrega. Consultá a soporte.'); }
-  const saved = await enqueueDeliveryOnce({ type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega-idempotente`,
-    data: { ...data, referencia }, userId: context.userId, contextOwner: context.owner });
+  const saved = await withGpsTransitionLock(id, async () => {
+    if (!isCurrent()) throw new Error('La cuenta o actividad cambió. Volvé a abrir el viaje antes de confirmar la entrega.');
+    assertNoStoredFleetGpsForManifest(id);
+    return enqueueDeliveryOnce({ type: 'POST', endpoint: `/manifiestos/${id}/confirmar-entrega-idempotente`,
+      data: { ...data, referencia }, userId: context.userId, contextOwner: context.owner });
+  });
   if (saved.legacy) return { status: 'pending', message: 'Hay una entrega anterior pendiente en este dispositivo. Revisá el manifiesto antes de reintentarla.' };
   const pending = (message: string): DeliveryOutcome => ({ status: 'pending', message });
   if (saved.reused) {

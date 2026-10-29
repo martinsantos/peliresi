@@ -8,6 +8,8 @@ import {useFleetGps} from '../../hooks/useFleetGps';
 import {useConfirmarEntrega} from '../../hooks/useManifiestoWorkflow';
 import {usePendingDeliveryIds} from '../../hooks/usePendingDeliveryIds';
 import {subscribeDeliveryConfirmed} from '../../services/offlineSyncEvents';
+import {getSyncQueue} from '../../services/indexeddb';
+import {queuedDeliveryManifestId} from '../../services/syncQueuePolicy';
 import {fleetGpsService,type FleetGpsLoad} from '../../services/fleet-gps.service';
 import {companyCacheScope} from '../../services/companyContext';
 import {getApiErrorMessage} from '../../utils/api-error';
@@ -60,7 +62,14 @@ export default function CargasEnCursoPage() {
   // role or company without unmounting this screen.
   const gpsKey=(key:string)=>JSON.stringify([scope,key]);
   const currentSession=()=>!!sessionContext&&supportRequestContext()===sessionContext&&currentScope.current===scope;
-  const gps=useFleetGps(chosen.filter(canTrack).map(load=>({key:gpsKey(load.key),...(load.kind==='MANIFIESTO'?{lockId:load.id,verify:(point,puntoId)=>fleetGpsService.verify(load,point,puntoId,currentSession)}:{persist:false}),send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId,currentSession)})),allowed&&ownsSession&&started);
+  const checkDelivery=async(id:string)=>{
+    if(!currentSession())throw new Error('La cuenta o actividad cambió. Volvé a abrir tus viajes.');
+    let actions:Awaited<ReturnType<typeof getSyncQueue>>;
+    try{actions=await getSyncQueue();}catch{throw new Error('No pudimos revisar las entregas guardadas. Reintentá antes de enviar GPS.');}
+    if(!currentSession())throw new Error('La cuenta o actividad cambió. Volvé a abrir tus viajes.');
+    if(actions.some(action=>action.type==='POST'&&queuedDeliveryManifestId(action.endpoint)===id))throw new Error('Hay una entrega pendiente en este dispositivo. Revisá la sincronización antes de enviar GPS.');
+  };
+  const gps=useFleetGps(chosen.filter(canTrack).map(load=>({key:gpsKey(load.key),...(load.kind==='MANIFIESTO'?{lockId:load.id,beforeSend:()=>checkDelivery(load.id),verify:(point,puntoId)=>fleetGpsService.verify(load,point,puntoId,currentSession)}:{persist:false}),send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId,currentSession)})),allowed&&ownsSession&&started);
   const rows=query.data?.targets??[];
   const refresh=async()=>{await qc.invalidateQueries({queryKey:['fleet-gps-targets',scope]});await qc.invalidateQueries({queryKey:['manifiestos']});};
   const toggle=(load:FleetGpsLoad)=>{

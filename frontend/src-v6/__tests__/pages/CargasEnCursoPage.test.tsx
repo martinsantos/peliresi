@@ -3,12 +3,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
-const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn(), pending: new Set<string>(), impersonator:'admin-a', user: { id: 'qa-carrier', rol: 'TRANSPORTISTA', training: false, actorId: 'qa-actor' } }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn(), queue:vi.fn(), pending: new Set<string>(), impersonator:'admin-a', user: { id: 'qa-carrier', rol: 'TRANSPORTISTA', training: false, actorId: 'qa-actor' } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mocks.user }) }));
 vi.mock('../../services/fleet-gps.service', () => ({ fleetGpsService: { list: mocks.list, send: mocks.send } }));
 vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => mocks.user.id+':transportista:'+mocks.impersonator }));
 vi.mock('../../hooks/useManifiestoWorkflow', () => ({ useConfirmarEntrega: () => ({ mutateAsync: ({id,...data}: {id:string}) => mocks.deliver(id, data) }) }));
 vi.mock('../../hooks/usePendingDeliveryIds', () => ({ usePendingDeliveryIds: () => ({ ids: mocks.pending, checking: false, error: false, retry: vi.fn() }) }));
+vi.mock('../../services/indexeddb',()=>({getSyncQueue:mocks.queue}));
 import CargasEnCursoPage from '../../pages/transporte/CargasEnCursoPage';
 const loads = ['A', 'B'].map(id => ({ key: 'MANIFIESTO:' + id, kind: 'MANIFIESTO', id, numero: 'QA-' + id,
   origen: 'Origen artificial', destino: 'Planta QA', fechaInicio: new Date().toISOString(), referenciaTiempo: 'Desde el retiro', patente: null, puedeEntregar: true, gpsDisponible: true }));
@@ -19,7 +20,7 @@ let restoreLocks:()=>void;
 beforeEach(() => {
   vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'true'); mocks.user.id = 'qa-carrier'; mocks.impersonator='admin-a'; clearWatch.mockClear(); localStorage.clear();
   mocks.list.mockReset().mockImplementation(async search => ({ targets: search ? [] : loads, total: search ? 0 : 2, limit: 100 }));
-  mocks.pending.clear(); mocks.send.mockReset().mockResolvedValue({}); mocks.deliver.mockReset().mockResolvedValue({status:'confirmed'});
+  mocks.pending.clear(); mocks.send.mockReset().mockResolvedValue({}); mocks.deliver.mockReset().mockResolvedValue({status:'confirmed'});mocks.queue.mockReset().mockResolvedValue([]);
   vi.stubGlobal('navigator', { geolocation: { watchPosition: vi.fn((ok: PositionCallback, error: PositionErrorCallback) => { locate = ok; fail = error; return 12; }), clearWatch } });
   restoreLocks=installMockGpsLocks();
 });
@@ -57,6 +58,18 @@ async function chooseAndStart() {
   await act(async () => { locate({ coords: { latitude: -33, longitude: -69, accuracy: 10, speed: null, heading: null }, timestamp: Date.now() } as GeolocationPosition); });
   await waitFor(() => expect(mocks.send).toHaveBeenCalledTimes(2));
 }
+it('does not create a GPS obligation after another tab queues delivery', async () => {
+  mocks.queue.mockResolvedValue([{type:'POST',endpoint:'/manifiestos/A/confirmar-entrega-idempotente'}]);
+  const view=setup();
+  for(const load of loads)fireEvent.click(await screen.findByRole('checkbox',{name:`Llevo ${load.numero} en este móvil`}));
+  fireEvent.click(screen.getByRole('button',{name:'Iniciar GPS'}));
+  await act(async()=>{locate({coords:{latitude:-33,longitude:-69,accuracy:10,speed:null,heading:null},timestamp:Date.now()} as GeolocationPosition);});
+  await waitFor(()=>expect(mocks.send).toHaveBeenCalledTimes(1));
+  expect(mocks.send.mock.calls[0][0].id).toBe('B');
+  expect(screen.getByRole('region',{name:'Cargas marcadas'})).toHaveTextContent(/entrega pendiente.*revisá la sincronización/i);
+  expect(Object.keys(localStorage).some(key=>key.includes(encodeURIComponent('MANIFIESTO:A')))).toBe(false);
+  view.unmount();
+});
 it('retains explicit GPS selections through a search with no matches and keeps one watcher', async () => {
   const view = setup(); await chooseAndStart(); fireEvent.click(screen.getByRole('button', { name: 'Elegir otras cargas' }));
   fireEvent.change(screen.getByRole('searchbox', { name: 'Número de manifiesto' }), { target: { value: 'no-match' } });

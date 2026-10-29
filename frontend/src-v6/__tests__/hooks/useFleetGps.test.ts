@@ -1,8 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useFleetGps, type FleetGpsTarget } from '../../hooks/useFleetGps';
-import { withGpsTransitionLock } from '../../services/gpsCoordination';
+import { adoptParkedGpsLease,hasParkedGpsLease,withGpsTransitionLock } from '../../services/gpsCoordination';
 import { assertNoStoredFleetGpsForManifest,saveFleetGpsPoint } from '../../services/fleetGpsStorage';
+import { clearVolatileFleetObservation,getVolatileFleetObservation } from '../../services/fleetGpsVolatile';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 let locate: PositionCallback;
@@ -309,6 +310,94 @@ it('coordinates an in-flight fleet write with another transition in the same bro
   await act(async()=>{reject(new Error('Sin conexión'));await flush();});
   await expect(withGpsTransitionLock('trip',async()=>assertNoStoredFleetGpsForManifest('trip'))).rejects.toThrow(/GPS de varias cargas sin confirmar/i);
   hook.unmount();restoreLocks();
+});
+
+it('protects an unsaved fleet point across navigation and recovers only in its original activity', async () => {
+  const restoreLocks=installMockGpsLocks(),key=JSON.stringify(['carrier-a','MANIFIESTO:volatile-trip']);
+  const storage=Storage.prototype.setItem;let blocked=true;
+  vi.spyOn(Storage.prototype,'setItem').mockImplementation(function(this:Storage,k,v){
+    if(blocked&&k.startsWith('sitrep_fleet_gps_v1:')&&k.includes(encodeURIComponent('MANIFIESTO:volatile-trip')))throw new Error('quota');
+    return storage.call(this,k,v);
+  });
+  const send=vi.fn().mockResolvedValue({}),other=vi.fn().mockResolvedValue({});
+  const first=renderHook(()=>useFleetGps([{key,lockId:'volatile-trip',send},{key:'other',lockId:'other-trip',send:other}],true));
+  try{
+    await act(async()=>{locate(position());await flush();await flush();});
+    expect(send).not.toHaveBeenCalled();expect(other).toHaveBeenCalledOnce();
+    expect(first.result.current.deliveries[key]).toMatchObject({state:'error',saved:false});
+    expect(hasParkedGpsLease('volatile-trip',key)).toBe(true);
+    expect(adoptParkedGpsLease('volatile-trip','other-activity')).toBeUndefined();
+    await expect(withGpsTransitionLock('volatile-trip',async()=>{})).rejects.toThrow(/otra pestaña/i);
+    const original=getVolatileFleetObservation(key)!;
+    const reference=original.references.get(key);expect(reference).toBeTruthy();
+    first.unmount();
+    const closing=new Event('beforeunload',{cancelable:true});window.dispatchEvent(closing);expect(closing.defaultPrevented).toBe(true);
+    blocked=false;
+    const reopened=renderHook(()=>useFleetGps([{key,lockId:'volatile-trip',send}],true));
+    await act(async()=>{await flush();await flush();});
+    expect(send).toHaveBeenCalledWith(original.point,reference);
+    expect(getVolatileFleetObservation(key)).toBeUndefined();
+    await expect(withGpsTransitionLock('volatile-trip',async()=>true)).resolves.toBe(true);
+    const safeClose=new Event('beforeunload',{cancelable:true});window.dispatchEvent(safeClose);expect(safeClose.defaultPrevented).toBe(false);
+    reopened.unmount();
+  }finally{
+    const lease=adoptParkedGpsLease('volatile-trip',key);if(lease)await lease.release();
+    clearVolatileFleetObservation(key);restoreLocks();
+  }
+});
+
+it('does not claim an unsaved observation when a delivery already owns the lock', async () => {
+  const restoreLocks=installMockGpsLocks(),key=JSON.stringify(['carrier-a','MANIFIESTO:race-trip']);
+  let finish!:()=>void;
+  const transition=withGpsTransitionLock('race-trip',()=>new Promise<void>(resolve=>{finish=resolve;}));
+  const send=vi.fn().mockResolvedValue({}),hook=renderHook(()=>useFleetGps([{key,lockId:'race-trip',send}],true));
+  try{
+    await act(async()=>{locate(position());await flush();await flush();});
+    expect(send).not.toHaveBeenCalled();expect(getVolatileFleetObservation(key)).toBeUndefined();
+    expect(hook.result.current.deliveries[key].message).toMatch(/otra pestaña/i);
+    const closing=new Event('beforeunload',{cancelable:true});window.dispatchEvent(closing);expect(closing.defaultPrevented).toBe(false);
+  }finally{hook.unmount();finish();await transition;restoreLocks();}
+});
+
+it('does not park a new observation when storage is unreadable and delivery is already queued', async () => {
+  const restoreLocks=installMockGpsLocks(),key=JSON.stringify(['carrier-a','MANIFIESTO:read-error']);
+  saveFleetGpsPoint({targetKey:key,puntoId:'1949916e-22df-4dc1-9d1e-98f98a3eab26',observedAt:Date.now()-1000,point:{latitud:-34,longitud:-69,precision:10}});
+  const getItem=Storage.prototype.getItem;
+  vi.spyOn(Storage.prototype,'getItem').mockImplementation(function(this:Storage,k){
+    if(k.startsWith('sitrep_fleet_gps_v1:'))throw new Error('storage unavailable');return getItem.call(this,k);
+  });
+  const send=vi.fn(),beforeSend=vi.fn().mockRejectedValue(new Error('Entrega pendiente'));
+  const hook=renderHook(()=>useFleetGps([{key,lockId:'read-error',beforeSend,send}],true));
+  try{
+    await act(async()=>{locate(position());await flush();await flush();});
+    expect(send).not.toHaveBeenCalled();expect(getVolatileFleetObservation(key)).toBeUndefined();
+    expect(hook.result.current.deliveries[key].message).toMatch(/entrega pendiente/i);
+    await expect(withGpsTransitionLock('read-error',async()=>true)).resolves.toBe(true);
+  }finally{hook.unmount();restoreLocks();}
+});
+
+it('preserves an expired volatile observation without sending it as a current location', async () => {
+  const restoreLocks=installMockGpsLocks(),key=JSON.stringify(['carrier-a','MANIFIESTO:old-volatile']);
+  const storage=Storage.prototype.setItem;let blocked=true;
+  vi.spyOn(Storage.prototype,'setItem').mockImplementation(function(this:Storage,k,v){
+    if(blocked&&k.startsWith('sitrep_fleet_gps_v1:'))throw new Error('quota');return storage.call(this,k,v);
+  });
+  const send=vi.fn().mockResolvedValue({});
+  const first=renderHook(()=>useFleetGps([{key,lockId:'old-volatile',send}],true));
+  try{
+    await act(async()=>{locate(position());await flush();await flush();});first.unmount();
+    vi.setSystemTime(Date.now()+70_000);blocked=false;
+    const reopened=renderHook(()=>useFleetGps([{key,lockId:'old-volatile',send}],true));
+    await act(async()=>{await flush();await flush();});
+    expect(send).not.toHaveBeenCalled();expect(getVolatileFleetObservation(key)).toBeUndefined();
+    expect(reopened.result.current.deliveries[key]).toMatchObject({state:'error',saved:true});
+    expect(reopened.result.current.deliveries[key].message).toMatch(/no se reenviará como ubicación actual/i);
+    await expect(withGpsTransitionLock('old-volatile',async()=>assertNoStoredFleetGpsForManifest('old-volatile'))).rejects.toThrow(/GPS de varias cargas sin confirmar/i);
+    reopened.unmount();
+  }finally{
+    const lease=adoptParkedGpsLease('old-volatile',key);if(lease)await lease.release();
+    clearVolatileFleetObservation(key);restoreLocks();
+  }
 });
 
 it('keeps relay failures in memory until its capability version can be recovered safely', async () => {
