@@ -49,6 +49,7 @@ import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError } from '../../services/gp
 import { addToSyncQueue, getSyncQueue } from '../../services/indexeddb';
 import { hasQueuedDelivery } from '../../services/syncQueuePolicy';
 import { useAuth } from '../../contexts/AuthContext';
+import { useQueryOwner } from '../../hooks/useQueryOwner';
 import { getApiErrorMessage } from '../../utils/api-error';
 
 // Recenter map when position changes (respects user pan/zoom)
@@ -83,6 +84,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
+  const syncOwner = useQueryOwner();
   const queryClient = useQueryClient();
   const [snapshotError, setSnapshotError] = useState(false);
   const [deliveryQueue, setDeliveryQueue] = useState<DeliveryQueueState>('checking');
@@ -239,7 +241,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   // Confirmar Retiro with GPS coordinates + offline queue
   const handleConfirmarRetiro = async () => {
-    if (!currentUser) return toast.error('Sesión no disponible', 'Vuelva a iniciar sesión.');
+    if (!currentUser || !syncOwner) return toast.error('Sesión no disponible', 'Volvé a ingresar antes de continuar.');
     try {
       const result = await offlineSafeMutation(
         () => confirmarRetiro.mutateAsync({
@@ -248,7 +250,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           longitud: currentPosition?.[1],
           observaciones: 'Retiro confirmado desde app móvil',
         }),
-        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' }, userId: currentUser.id }
+        { type: 'POST', endpoint: `/manifiestos/${id}/confirmar-retiro`, data: { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Retiro confirmado desde app móvil' }, userId: currentUser.id, contextOwner: syncOwner }
       );
       if (result === 'QUEUED') {
         toast.info('Sin conexión — El retiro se confirmará al reconectar');
@@ -262,7 +264,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   // Confirmar Entrega with GPS coordinates + offline queue
   const handleConfirmarEntrega = async () => {
-    if (!currentUser) { setDeliveryError('Sesión no disponible. Volvé a iniciar sesión.'); return; }
+    if (!currentUser || !syncOwner) { setDeliveryError('Sesión no disponible. Volvé a iniciar sesión.'); return; }
     if (deliveryInFlightRef.current) return;
     deliveryInFlightRef.current = true;
     setDeliveryError('');
@@ -284,7 +286,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         return;
       }
       const delivery = { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' };
-      const queuedDelivery = { type: 'POST' as const, endpoint: `/manifiestos/${id}/confirmar-entrega`, data: delivery, userId: currentUser.id };
+      const queuedDelivery = { type: 'POST' as const, endpoint: `/manifiestos/${id}/confirmar-entrega`, data: delivery, userId: currentUser.id, contextOwner: syncOwner };
       const result = offline
         ? (await addToSyncQueue(queuedDelivery), 'QUEUED' as const)
         : await offlineSafeMutation(() => confirmarEntrega.mutateAsync({ id: id!, ...delivery }), queuedDelivery);

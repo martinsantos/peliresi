@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mock = vi.hoisted(() => ({ id:'account-a', owner:'context-a', token:'token-a', process:vi.fn() }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser:{ id:mock.id }, isRestricted:false }) }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser:{ id:mock.id, rol:'TRANSPORTISTA' }, isRestricted:false }) }));
 vi.mock('../../hooks/useQueryOwner', () => ({ useQueryOwner: () => mock.owner }));
 vi.mock('../../hooks/useConnectivity', () => ({ useConnectivity: () => ({ isOnline:true }) }));
 vi.mock('../../services/indexeddb', () => ({ processSyncQueue: mock.process }));
@@ -18,10 +18,10 @@ it('retries for the new account after a previous account finishes without displa
   mock.process.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   mock.process.mockResolvedValue({ processed:0, pending:0, retryable:0, terminal:0, auth:0, skipped:0 });
   const hook = renderHook(() => useOfflineSync({ downloadManifests:false }));
-  await waitFor(() => expect(mock.process).toHaveBeenCalledWith('account-a', false, expect.any(Function)));
+  await waitFor(() => expect(mock.process).toHaveBeenCalledWith('account-a', {owner:'context-a',role:'TRANSPORTISTA',companyScoped:false}, false, expect.any(Function)));
   mock.id='account-b'; mock.owner='context-b'; hook.rerender();
   await act(async () => { finish({ processed:0, pending:1, retryable:1, terminal:0, auth:0, skipped:0 }); });
-  await waitFor(() => expect(mock.process).toHaveBeenCalledWith('account-b', false, expect.any(Function)));
+  await waitFor(() => expect(mock.process).toHaveBeenCalledWith('account-b', {owner:'context-b',role:'TRANSPORTISTA',companyScoped:false}, false, expect.any(Function)));
   expect(hook.result.current.pending).toBe(0);
   hook.unmount();
 });

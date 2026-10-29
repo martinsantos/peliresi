@@ -26,6 +26,7 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
   const { currentUser, isRestricted } = useAuth();
   const { isOnline } = useConnectivity({ enablePing: false });
   const owner = useQueryOwner();
+  const companyScoped = !!currentUser?.empresaContexto;
   const activeOwner = useRef(owner);
   activeOwner.current = owner;
   const syncingRef = useRef(false);
@@ -61,7 +62,7 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
         catch { return false; }
       };
       try {
-        const next = await processSyncQueue(currentUser.id, manual, matches);
+        const next = await processSyncQueue(currentUser.id, { owner, role: currentUser.rol, companyScoped }, manual, matches);
         if (!matches()) return;
         setResult(next);
         if (downloadManifests && document.visibilityState !== 'hidden') await syncOfflineData(currentUser.id, owner);
@@ -77,7 +78,7 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
           setSyncRequest(value => value + 1);
         }
       }
-  }, [currentUser?.id, owner, isOnline, isRestricted, downloadManifests, enabled]);
+  }, [currentUser?.id, currentUser?.rol, companyScoped, owner, isOnline, isRestricted, downloadManifests, enabled]);
 
   useEffect(() => {
     if (!enabled || !currentUser?.id || !owner || !isOnline || isRestricted) return;

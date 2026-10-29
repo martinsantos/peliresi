@@ -8,6 +8,7 @@
 import {
   isSupportedSyncMethod,
   isSyncActionOwnedBy,
+  isTransportQueueAction,
   queuedDeliveryManifestId,
   type SyncMethod,
 } from './syncQueuePolicy';
@@ -28,6 +29,7 @@ export interface SyncAction {
   data: unknown;
   createdAt: string;
   userId: string | number;
+  contextOwner?: string;
   attempts?: number;
   lastError?: string;
   failureKind?: 'retryable' | 'terminal' | 'auth';
@@ -42,7 +44,11 @@ export interface SyncQueueResult {
   auth: number;
   skipped: number;
   lastError?: string;
+  contextBlocked?: number;
+  legacyBlocked?: number;
 }
+
+export interface SyncExecutionContext { owner: string; role: string; companyScoped: boolean }
 
 export function classifySyncFailure(error: unknown): { failureKind: NonNullable<SyncAction['failureKind']>; lastError: string } {
   const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
@@ -279,7 +285,7 @@ export async function clearSyncQueue(): Promise<void> {
  */
 class SyncContextChangedError extends Error {}
 
-export async function processSyncQueue(currentUserId: string | number, manual = false, isCurrent: () => boolean = () => true): Promise<SyncQueueResult> {
+export async function processSyncQueue(currentUserId: string | number, context: SyncExecutionContext, manual = false, isCurrent: () => boolean = () => true): Promise<SyncQueueResult> {
   const empty = (): SyncQueueResult => ({ processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0 });
   const cannotSync = async (message: string): Promise<SyncQueueResult> => {
     if (!isCurrent()) return empty();
@@ -292,6 +298,7 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
   };
   const unavailable = () => cannotSync('Este navegador no puede coordinar la sincronización entre ventanas. Actualizalo o usá un navegador compatible.');
   const busy = () => cannotSync('Otra ventana está sincronizando esta cuenta. Esperá a que termine y reintentá.');
+  if (!context?.owner || !context.role) return cannotSync('No se pudo identificar la actividad. Volvé a ingresar antes de sincronizar.');
   if (typeof navigator === 'undefined' || typeof navigator.locks?.request !== 'function') return unavailable();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
@@ -306,7 +313,7 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
         clearTimeout(timer);
         if (!lock) return unavailable();
         if (!isCurrent()) return empty();
-        return processSyncQueueLocked(currentUserId, manual, isCurrent);
+        return processSyncQueueLocked(currentUserId, context, manual, isCurrent);
       });
   } catch (error) {
     if (entered) throw error;
@@ -314,7 +321,7 @@ export async function processSyncQueue(currentUserId: string | number, manual = 
   } finally { clearTimeout(timer); }
 }
 
-async function processSyncQueueLocked(currentUserId: string | number, manual: boolean, isCurrent: () => boolean): Promise<SyncQueueResult> {
+async function processSyncQueueLocked(currentUserId: string | number, context: SyncExecutionContext, manual: boolean, isCurrent: () => boolean): Promise<SyncQueueResult> {
   const queue = await getSyncQueue();
   const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId));
   const result: SyncQueueResult = { processed: 0, pending: owned.length, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
@@ -325,6 +332,31 @@ async function processSyncQueueLocked(currentUserId: string | number, manual: bo
     // Skip actions from other users (prevents cross-user data leakage)
     if (!isSyncActionOwnedBy(action.userId, currentUserId)) {
       continue;
+    }
+
+    if (action.contextOwner && action.contextOwner !== context.owner) {
+      result.retryable += 1; result.skipped += 1;
+      result.contextBlocked = (result.contextBlocked || 0) + 1;
+      result.lastError = isTransportQueueAction(action)
+        ? 'Volvé a Transporte y, si corresponde, a la empresa o establecimiento donde guardaste los cambios.'
+        : 'Hay cambios guardados en otra actividad o establecimiento. Volvé a ese contexto para sincronizarlos.';
+      continue;
+    }
+    if (!action.contextOwner) {
+      if (isTransportQueueAction(action) && !context.companyScoped && ['TRANSPORTISTA', 'ADMIN'].includes(context.role)) {
+        // Legacy personal transport actions have no stored context. The server
+        // still validates the actor and manifest before applying them.
+      } else {
+        result.retryable += 1; result.skipped += 1;
+        if (isTransportQueueAction(action) && !context.companyScoped) {
+          result.contextBlocked = (result.contextBlocked || 0) + 1;
+          result.lastError = 'Hay cambios anteriores de Transporte. Volvé a Transporte para sincronizarlos.';
+        } else {
+          result.legacyBlocked = (result.legacyBlocked || 0) + 1;
+          result.lastError = 'Un cambio anterior no identifica su actividad o empresa. Se conservó: consultá a soporte antes de sincronizarlo.';
+        }
+        continue;
+      }
     }
 
     if (!isSupportedSyncMethod(action.type)) {
@@ -341,9 +373,12 @@ async function processSyncQueueLocked(currentUserId: string | number, manual: bo
       continue;
     }
     if (!manual && action.failureKind === 'auth') {
-      result.auth += 1;
+      const legacyTransport = !action.contextOwner && isTransportQueueAction(action);
+      if (legacyTransport) result.retryable += 1; else result.auth += 1;
       result.skipped += 1;
-      result.lastError = action.lastError || result.lastError;
+      result.lastError = legacyTransport
+        ? 'El intento anterior no se pudo autorizar. Revisá tu sesión y usá Reintentar.'
+        : action.lastError || result.lastError;
       continue;
     }
     if (!manual && action.nextRetryAt && Date.parse(action.nextRetryAt) > Date.now()) {

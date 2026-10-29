@@ -62,6 +62,10 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /no comprueba otros dispositivos ni perfiles de navegador/i);
   assert.match(recovery, /otra ventana está sincronizando esa misma cuenta/i);
   assert.match(recovery, /si la espera supera diez segundos/i);
+  assert.match(recovery, /misma cuenta, actividad y establecimiento/i);
+  assert.match(recovery, /volvé al contexto en que la guardaste/i);
+  assert.match(recovery, /entrega anterior de Transporte ya registró un error de autorización/i);
+  assert.match(recovery, /cambios anteriores que no identifiquen su empresa/i);
   assert.match(recovery, /no se puede leer la copia local, aparece un error/i);
   assert.match(recovery, /no puede comprobar desde aquí lo que siga pendiente en otro dispositivo o perfil de navegador/i);
   assert.match(recovery, /no se puede verificar el viaje o el servidor/i);

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   restricted: true, unread: vi.fn(), notices: vi.fn(), list: vi.fn(), sync: vi.fn(), process: vi.fn(), get: vi.fn(), push: vi.fn(),
 }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
-  currentUser: { id: 'pending-carrier' }, isTransportista: true, isRestricted: mocks.restricted,
+  currentUser: { id: 'pending-carrier', rol: 'TRANSPORTISTA' }, isTransportista: true, isRestricted: mocks.restricted,
 }) }));
 vi.mock('../../services/api', () => ({ getAccessToken: () => 'synthetic-unit-token', default: { get: mocks.get } }));
 vi.mock('../../services/notificacion.service', () => ({ notificacionService: { getNoLeidas: mocks.unread, list: mocks.notices } }));
@@ -57,7 +57,7 @@ describe('restricted applicants do not start full-access background services', (
     await act(async () => { await hook.result.current.retry(); });
     expect(mocks.process).not.toHaveBeenCalled();
     hook.rerender({ enabled: true });
-    await waitFor(() => expect(mocks.process).toHaveBeenCalledWith('pending-carrier', false, expect.any(Function)));
+    await waitFor(() => expect(mocks.process).toHaveBeenCalledWith('pending-carrier', expect.objectContaining({role:'TRANSPORTISTA',companyScoped:false}), false, expect.any(Function)));
     hook.unmount();
   });
   it('does not subscribe push or mount the notice poller for a restricted applicant', () => {

@@ -72,10 +72,10 @@ export const MainLayout: React.FC = () => {
   const isActorInspection = /^\/(?:(?:app|mobile)\/)?(?:mis-inspecciones|requerimientos)(?:\/|$)/.test(location.pathname);
   const inlineSupport = isNoticeWorkspace(location.pathname) || isActorWorkspace(location.pathname) || /^(?:\/(?:app|mobile))?\/dashboard\/?$/.test(location.pathname) || isInspectionCase || isActorInspection || /^\/(?:(?:app|mobile)\/)?(?:admin\/(?:solicitudes(?:\/[^/]+)?|renovaciones)|mi-solicitud|empresas|inspecciones|ayuda|manifiestos(?:\/[^/]+(?:\/adendas)?)?|transporte\/(?:viaje\/[^/]+|cargas|perfil))\/?$/.test(location.pathname);
   const navigate = useNavigate();
-  const { currentUser, logout, isAdmin, isGenerador, isTransportista, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
+  const { currentUser, logout, isAdmin, isGenerador, isOperador, isAdminTransportista, isAdminGenerador, isAdminOperador, canAccess, isLoading, isRestricted } = useAuth();
   const { impersonationData, exitImpersonation } = useImpersonation();
   const attention = useAttentionCounts();
-  const offlineSync = useOfflineSync({ downloadManifests: false, enabled: isTransportista });
+  const offlineSync = useOfflineSync({ downloadManifests: false });
 
   const navigation = useMemo(() => workspaceNavigation(currentUser), [currentUser]);
   const adminItems = navigation.filter(item => item.section === 'admin');

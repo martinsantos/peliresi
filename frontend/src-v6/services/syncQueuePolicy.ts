@@ -17,6 +17,11 @@ export function queuedDeliveryManifestId(endpoint: string): string | null {
   return match?.[1] ?? null;
 }
 
+/** Offline actions created by the transport trip screen. */
+export function isTransportQueueAction(action: {type: string; endpoint: string}): boolean {
+  return action.type === 'POST' && /^\/manifiestos\/[^/]+\/confirmar-(?:retiro|entrega)$/.test(action.endpoint);
+}
+
 export function hasQueuedDelivery(actions: Array<{ type: string; endpoint: string; userId?: string | number }>, owner: string | number, manifestId: string): boolean {
   return actions.some(action => action.type === 'POST' && isSyncActionOwnedBy(action.userId, owner)
     && queuedDeliveryManifestId(action.endpoint) === manifestId);

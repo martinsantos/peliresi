@@ -11,12 +11,14 @@ const connectionAudit=process.env.SITREP_QA_RUN==='connection-20261029';
 const crossTab=process.env.SITREP_QA_RUN==='crosstab-20261029';
 const syncBaseline=process.env.SITREP_QA_RUN==='sync-baseline-20261029';
 const syncTab=process.env.SITREP_QA_RUN==='sync-crosstab-20261029';
-assert.ok(!process.env.SITREP_QA_RUN||connectionAudit||crossTab||syncBaseline||syncTab,'Unknown QA run');
-const artifacts=connectionAudit?'/work/sitrep/.qa-gps-connection-20261029':crossTab?'/work/sitrep/.qa-gps-crosstab-20261029':syncBaseline?'/work/sitrep/.qa-sync-baseline-20261029':syncTab?'/work/sitrep/.qa-sync-crosstab-20261029':'/work/sitrep/.qa-gps-lost-response-20261029';
+const roleBaseline=process.env.SITREP_QA_RUN==='sync-role-baseline-20261029';
+const roleFix=process.env.SITREP_QA_RUN==='sync-role-fix-20261029';
+assert.ok(!process.env.SITREP_QA_RUN||connectionAudit||crossTab||syncBaseline||syncTab||roleBaseline||roleFix,'Unknown QA run');
+const artifacts=connectionAudit?'/work/sitrep/.qa-gps-connection-20261029':crossTab?'/work/sitrep/.qa-gps-crosstab-20261029':syncBaseline?'/work/sitrep/.qa-sync-baseline-20261029':syncTab?'/work/sitrep/.qa-sync-crosstab-20261029':roleBaseline?'/work/sitrep/.qa-sync-role-baseline-20261029':roleFix?'/work/sitrep/.qa-sync-role-fix-20261029':'/work/sitrep/.qa-gps-lost-response-20261029';
 const compiled=connectionAudit?'/work/sitrep/.qa-gps-lost-response-20261029':syncBaseline?'/work/sitrep/.qa-gps-crosstab-20261029':artifacts;
 Object.assign(process.env,{
   CI:'true',SITREP_QA_EXECUTOR:'preview-container',GITHUB_REPOSITORY:'martinsantos/peliresi',
-  GITHUB_REF:'refs/heads/codex/sitrep-training-20261018',GITHUB_SHA:connectionAudit?'e0b77d09-connection-audit':crossTab?'a8115926-with-gps-crosstab-uncommitted':syncBaseline?'eb0596a4-sync-baseline':syncTab?'eb0596a4-with-sync-crosstab-uncommitted':'f44cf957-with-gps-retry-uncommitted',
+  GITHUB_REF:'refs/heads/codex/sitrep-training-20261018',GITHUB_SHA:connectionAudit?'e0b77d09-connection-audit':crossTab?'a8115926-with-gps-crosstab-uncommitted':syncBaseline?'eb0596a4-sync-baseline':syncTab?'eb0596a4-with-sync-crosstab-uncommitted':roleBaseline?'85858bf7-sync-role-baseline':roleFix?'85858bf7-with-sync-role-uncommitted':'f44cf957-with-gps-retry-uncommitted',
   ALLOW_SYNTHETIC_QA:'1',DATABASE_URL:'postgresql://qa@127.0.0.1:55440/sitrep_night_qa_20260926?schema=proposal_operations_20261021',
   PORT:'3037',NODE_ENV:'test',NODE_APP_INSTANCE:'qa',FRONTEND_URL:'http://127.0.0.1:4177',CORS_ORIGIN:'http://127.0.0.1:4177',VITE_API_URL:'/api',
   TRAINING_DATABASE_URL:'',TRAINING_DIRECT_LOGIN_UNTIL:'2000-01-01T00:00:00Z',
@@ -28,6 +30,8 @@ Object.assign(process.env,{
   QA_TRACE_CONNECTIONS:connectionAudit?'true':'false',
   QA_ARTIFACTS:artifacts,QA_WEB_BUILD:path.join(compiled,'web'),QA_APP_BUILD:path.join(compiled,'app'),
 });
+// The multi-role scenario is enabled only in these disposable preview processes.
+if(roleBaseline||roleFix)Object.assign(process.env,{ACTOR_MULTIROLE_ENABLED:'true',VITE_ACTOR_MULTIROLE_ENABLED:'true'});
 delete process.env.GITHUB_ACTIONS;
 assert.equal(path.resolve(root),'/work/sitrep');await assertCloudDatabase();
 mkdirSync(artifacts,{recursive:true,mode:0o700});
@@ -69,6 +73,9 @@ const commands:Record<string,{cwd:string;command:string;args:string[]}>= {
   syncBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/sync-cross-tab.playwright.config.ts','--project=web-desktop','--project=app']},
   syncApp:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/sync-cross-tab.playwright.config.ts','--project=app']},
   syncAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/sync-cross-tab-audit.ts']},
+  roleFixture:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/sync-role-fixture.ts']},
+  roleBrowser:{cwd:frontend,command:'./node_modules/.bin/playwright',args:['test','--config','cloud-qa/sync-role.playwright.config.ts','--project=web-desktop','--project=app']},
+  roleAudit:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/sync-role-audit.ts']},
   close:{cwd:root,command:process.execPath,args:['--experimental-strip-types','frontend/cloud-qa/close.ts']},
 };
 assert.ok(phase&&commands[phase],'Unknown QA phase');
