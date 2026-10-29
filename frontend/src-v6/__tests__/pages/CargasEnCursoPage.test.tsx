@@ -2,11 +2,11 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn(), user: { id: 'qa-carrier', rol: 'TRANSPORTISTA', training: false, actorId: 'qa-actor' } }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), send: vi.fn(), deliver: vi.fn(), pending: new Set<string>(), user: { id: 'qa-carrier', rol: 'TRANSPORTISTA', training: false, actorId: 'qa-actor' } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: mocks.user }) }));
 vi.mock('../../services/fleet-gps.service', () => ({ fleetGpsService: { list: mocks.list, send: mocks.send } }));
-vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: { confirmarEntrega: mocks.deliver } }));
-vi.mock('../../services/gpsTransition', () => ({ withStoredGpsBeforeTransition: (_owner: unknown, _id: string, action: () => Promise<unknown>) => action() }));
+vi.mock('../../hooks/useManifiestoWorkflow', () => ({ useConfirmarEntrega: () => ({ mutateAsync: ({id,...data}: {id:string}) => mocks.deliver(id, data) }) }));
+vi.mock('../../hooks/usePendingDeliveryIds', () => ({ usePendingDeliveryIds: () => ({ ids: mocks.pending, checking: false, error: false, retry: vi.fn() }) }));
 import CargasEnCursoPage from '../../pages/transporte/CargasEnCursoPage';
 const loads = ['A', 'B'].map(id => ({ key: 'MANIFIESTO:' + id, kind: 'MANIFIESTO', id, numero: 'QA-' + id,
   origen: 'Origen artificial', destino: 'Planta QA', fechaInicio: new Date().toISOString(), referenciaTiempo: 'Desde el retiro', patente: null, puedeEntregar: true, gpsDisponible: true }));
@@ -16,8 +16,30 @@ const clearWatch = vi.fn();
 beforeEach(() => {
   vi.stubEnv('VITE_TRANSPORT_MULTI_GPS_ENABLED', 'true'); mocks.user.id = 'qa-carrier'; clearWatch.mockClear();
   mocks.list.mockReset().mockImplementation(async search => ({ targets: search ? [] : loads, total: search ? 0 : 2, limit: 100 }));
-  mocks.send.mockReset().mockResolvedValue({}); mocks.deliver.mockReset().mockResolvedValue({});
+  mocks.pending.clear(); mocks.send.mockReset().mockResolvedValue({}); mocks.deliver.mockReset().mockResolvedValue({status:'confirmed'});
   vi.stubGlobal('navigator', { geolocation: { watchPosition: vi.fn((ok: PositionCallback, error: PositionErrorCallback) => { locate = ok; fail = error; return 12; }), clearWatch } });
+});
+it('keeps an uncertain delivery marked and excludes that load from GPS while the other remains selected', async () => {
+  mocks.deliver.mockImplementationOnce(async () => { mocks.pending.add('A'); return {status:'pending',message:'No recibimos confirmación.'}; });
+  const view=setup(); await chooseAndStart();
+  fireEvent.click(screen.getByRole('button',{name:'Entregar QA-A',exact:true}));
+  fireEvent.click(within(screen.getByRole('dialog',{name:'Confirmar entrega'})).getByRole('button',{name:'Confirmar entrega de esta carga'}));
+  await waitFor(()=>expect(screen.getByText('Entrega pendiente en este dispositivo. Revisá la sincronización.')).toBeVisible());
+  expect(screen.getByRole('button',{name:'Entregar QA-A',exact:true})).toBeDisabled();
+  expect(screen.getByRole('button',{name:'Entregar QA-B',exact:true})).toBeEnabled();
+  expect(screen.getByRole('region',{name:'Cargas marcadas'})).toHaveTextContent('QA-B');
+  act(()=>window.dispatchEvent(new CustomEvent('sitrep:gps-delivery-confirmed',{detail:{id:'A',owner:'qa-carrier'}})));
+  await waitFor(()=>expect(within(screen.getByRole('region',{name:'Cargas marcadas'})).queryByText('QA-A')).toBeNull());
+  expect(screen.getByRole('region',{name:'Cargas marcadas'})).toHaveTextContent('QA-B');
+  view.unmount();
+});
+it('stops tracking a load confirmed by another account in this browser and keeps the other load', async () => {
+  const view=setup(); await chooseAndStart();
+  act(()=>window.dispatchEvent(new CustomEvent('sitrep:gps-delivery-confirmed',{detail:{id:'A',owner:'other-account'}})));
+  const selected=screen.getByRole('region',{name:'Cargas marcadas'});
+  await waitFor(()=>expect(within(selected).queryByText('QA-A')).toBeNull());
+  expect(selected).toHaveTextContent('QA-B');
+  view.unmount();
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 function setup() {

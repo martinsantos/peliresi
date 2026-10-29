@@ -56,6 +56,7 @@ import {
 } from '../../hooks/useManifiestos';
 import { useAuth, type User } from '../../contexts/AuthContext';
 import { useMobilePrefix } from '../../hooks/useMobilePrefix';
+import { usePendingDeliveryIds } from '../../hooks/usePendingDeliveryIds';
 import { canReadActorDetail, type ActorReadType } from '../../utils/actorReadAccess';
 import { manifiestoService } from '../../services/manifiesto.service';
 import { formatDateTime, formatEstado, formatCuit } from '../../utils/formatters';
@@ -66,6 +67,7 @@ import ManifiestoTimeline from './components/ManifiestoTimeline';
 import { companyGeneratorView } from '../../utils/enterprisePresentation';
 import ManifiestoActions from './components/ManifiestoActions';
 import { PendingGpsReceipts } from '../../components/mobile/PendingGpsReceipts';
+import { subscribeDeliveryConfirmed } from '../../services/offlineSyncEvents';
 
 const ACTOR_SUMMARY = {
   GENERADOR: { label: 'Generador', Icon: Factory, icon: 'bg-purple-50 text-purple-600', interactive: 'hover:bg-purple-50/50' },
@@ -117,12 +119,17 @@ const ManifiestoDetailPage: React.FC = () => {
   const returnContext = manifestWorkspaceReturn(location.state, mp('/manifiestos'));
   const returnToList = returnContext.path;
   const isApp = location.pathname.startsWith('/app');
-  const { data: apiData, isLoading, isError } = useManifiesto(id || '');
+  const { data: apiData, isLoading, isError, refetch: reloadManifest } = useManifiesto(id || '');
   const [qrCopied, setQrCopied] = React.useState(false);
 
   // Auth context for role-based visibility
   const { currentUser, isAdmin } = useAuth();
   const userRol = currentUser?.rol || '';
+  const pendingDeliveries = usePendingDeliveryIds(['TRANSPORTISTA', 'ADMIN'].includes(userRol));
+  React.useEffect(() => subscribeDeliveryConfirmed(event => {
+    const detail = (event as CustomEvent<{ id: string; owner: string }>).detail;
+    if (detail?.id === id) void reloadManifest();
+  }), [id, reloadManifest]);
 
   // Action mutations
   const firmar = useFirmarManifiesto();
@@ -227,10 +234,17 @@ const ManifiestoDetailPage: React.FC = () => {
     'Retiro confirmado exitosamente',
   );
 
-  const handleConfirmarEntrega = () => handleAction(
-    () => confirmarEntrega.mutateAsync({ id: id! }),
-    'Entrega confirmada exitosamente',
-  );
+  const handleConfirmarEntrega = async () => {
+    if (actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
+    try {
+      const result = await confirmarEntrega.mutateAsync({ id: id! });
+      if (result.status === 'confirmed') toast.success('Entrega confirmada exitosamente');
+      else toast.info('Entrega pendiente', result.message);
+    } catch (err: any) {
+      toast.error('No se pudo preparar la entrega', err?.response?.data?.message || err?.message || 'Revisá el almacenamiento y la sesión.');
+    } finally { actionInFlightRef.current = false; }
+  };
 
   const handleConfirmarRecepcion = () => handleAction(
     () => confirmarRecepcion.mutateAsync({ id: id! }),
@@ -415,6 +429,10 @@ const ManifiestoDetailPage: React.FC = () => {
         isAdmin={isAdmin}
         userRol={userRol}
         isActionPending={isActionPending}
+        deliveryPending={!!id && pendingDeliveries.ids.has(id)}
+        deliveryChecking={m.estado === EstadoManifiesto.EN_TRANSITO && pendingDeliveries.checking}
+        deliveryCheckError={m.estado === EstadoManifiesto.EN_TRANSITO && pendingDeliveries.error}
+        onRetryDeliveryCheck={pendingDeliveries.retry}
         isInSitu={isInSitu}
         mutations={{
           firmar, confirmarRetiro, confirmarEntrega, confirmarRecepcion,

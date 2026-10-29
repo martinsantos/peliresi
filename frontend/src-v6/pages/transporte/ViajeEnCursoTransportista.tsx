@@ -45,11 +45,13 @@ import { formatDateTime } from '../../utils/formatters';
 import { declaredQuantities, formatDeclaredQuantity } from '../../utils/declaredQuantities';
 import { offlineSafeMutation } from '../../utils/offline-mutation';
 import { useGPSTracking } from '../../hooks/useGPSTracking';
-import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError } from '../../services/gpsQueue';
-import { addToSyncQueue, getSyncQueue } from '../../services/indexeddb';
-import { hasQueuedDelivery } from '../../services/syncQueuePolicy';
-import { clearTripSnapshot, readTripSnapshot, readInitialTripStatus, tripAccessDenied, tripStatusKey, writeTripSnapshot } from '../../services/tripSnapshot';
+import { GpsPendingError } from '../../services/gpsQueue';
+import { getSyncQueue } from '../../services/indexeddb';
+import { subscribeDeliveryConfirmed, subscribeOfflineQueueChanged } from '../../services/offlineSyncEvents';
+import { queuedDeliveryContext } from '../../services/syncQueuePolicy';
+import { clearTripSnapshot, readTripSnapshot, readInitialTripStatus, tripAccessDenied, tripHandoffState, tripStatusKey, writeTripSnapshot } from '../../services/tripSnapshot';
 import { useAuth } from '../../contexts/AuthContext';
+import { useConnectivity } from '../../hooks/useConnectivity';
 import { useQueryOwner } from '../../hooks/useQueryOwner';
 import { getApiErrorMessage } from '../../utils/api-error';
 
@@ -71,12 +73,13 @@ function RecenterMap({ position, onUserInteract, followUser }: {
   return null;
 }
 
-type DeliveryQueueState = 'checking' | 'pending' | 'sent' | 'none' | 'error';
+type DeliveryQueueState = 'checking' | 'pending' | 'other' | 'sent' | 'none' | 'error';
+type SavedTrip = Partial<Manifiesto> & { handoffActive?: boolean };
 function DeliveryQueueNotice({ status, onRetry }: { status: DeliveryQueueState; onRetry: () => void }) {
   if (status === 'none') return null;
   return <div role="status" className="rounded-xl border border-primary-200 bg-primary-50 p-4 text-sm text-primary-900">
-    {status === 'checking' ? 'Comprobando entregas pendientes…' : status === 'pending' ? 'Entrega guardada. Se enviará al reconectar, después de las ubicaciones pendientes.' : status === 'sent' ? 'Entrega enviada. Actualizando el manifiesto…' : 'No se pudo comprobar si hay una entrega guardada en este dispositivo.'}
-    {status === 'error' && <button type="button" className="ml-2 min-h-11 font-semibold underline" onClick={onRetry}>Reintentar</button>}
+    {status === 'checking' ? 'Comprobando entregas pendientes…' : status === 'pending' ? 'Entrega guardada. Se intentará enviar o comprobar al sincronizar, después de las ubicaciones pendientes.' : status === 'other' ? 'Hay una entrega guardada en otra cuenta o actividad de este dispositivo. Volvé al contexto original para revisarla.' : status === 'sent' ? 'Entrega confirmada. Actualizando el manifiesto…' : 'No se pudo comprobar si hay una entrega guardada en este dispositivo.'}
+    {(status === 'error' || status === 'pending' || status === 'other') && <button type="button" className="ml-2 min-h-11 font-semibold underline" onClick={onRetry}>{status === 'error' ? 'Reintentar' : 'Actualizar estado'}</button>}
   </div>;
 }
 
@@ -85,12 +88,18 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const navigate = useNavigate();
   const mp = useMobilePrefix();
   const { currentUser } = useAuth();
+  const { isOnline } = useConnectivity({ enablePing: false, debounceMs: 0 });
   const syncOwner = useQueryOwner();
   const queryClient = useQueryClient();
   const [snapshotError, setSnapshotError] = useState(false);
+  const [snapshotRevision, setSnapshotRevision] = useState(0);
   const [deliveryQueue, setDeliveryQueue] = useState<DeliveryQueueState>('checking');
   const [queueCheck, setQueueCheck] = useState(0);
   const queueCheckVersion = useRef(0);
+  const queueContext = useRef('');
+  const deliveryConfirmed = useRef(false);
+  const deliveryInitiatedHere = useRef(false);
+  const gpsWasActive = useRef(false);
   // Map recenter control
   const [followUser, setFollowUser] = useState(true);
   const handleMapInteract = useCallback(() => setFollowUser(false), []);
@@ -100,21 +109,29 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
 
   // Restore cached trip data while API is loading (stale-while-revalidate).
   // Keep the same nested shape as the API so the recovery view actually renders.
-  const cachedSnapshot = useMemo<Partial<Manifiesto> | null>(() => {
+  const cachedSnapshot = useMemo<SavedTrip | null>(() => {
     if (!id) return null;
-    return readTripSnapshot<Partial<Manifiesto>>(syncOwner, id);
-  }, [id, syncOwner]);
+    return readTripSnapshot<SavedTrip>(syncOwner, id);
+  }, [id, syncOwner, snapshotRevision, isError, isFetching]);
   const denied = tripAccessDenied(apiError);
-  const waitingForValidation = navigator.onLine && (!isFetchedAfterMount || (isFetching && !!apiData?.offline));
-  const safeSnapshot = !denied && !waitingForValidation && (!navigator.onLine || isError) ? cachedSnapshot : null;
-  const visibleData = denied || waitingForValidation || (navigator.onLine && apiData?.offline) ? undefined : apiData;
-  const m: Partial<Manifiesto> = visibleData || safeSnapshot || {};
+  const waitingForValidation = isOnline && (!isFetchedAfterMount || (isFetching && !!apiData?.offline));
+  const safeSnapshot = !denied && !waitingForValidation && (!isOnline || isError) ? cachedSnapshot : null;
+  const visibleData = denied || waitingForValidation || (isOnline && apiData?.offline) ? undefined : apiData;
+  const showingSavedCopy = !!safeSnapshot && (!isOnline || !visibleData || isError);
+  const m: Partial<Manifiesto> = (showingSavedCopy ? safeSnapshot : visibleData) || {};
   const assignment = m.asignacionTransporte?.version === 1 && m.asignacionTransporte.transportistaId === m.transportistaId
     ? m.asignacionTransporte : null;
+  const handoffEnabled = manifestFeatureVisible(import.meta.env.VITE_MANIFEST_TRANSPORT_HANDOFF_ENABLED, currentUser);
+  const legs = useTransportLegs(m.modalidad === 'IN_SITU' ? '' : id || '', syncOwner);
+  const verifiedHandoff = legs.isFetchedAfterMount && legs.isSuccess && !legs.isError
+    ? legs.data.tramos.some(leg => !leg.fin && leg.tipo !== 'ORIGINAL') : null;
+  const handoffState = tripHandoffState(handoffEnabled, showingSavedCopy, safeSnapshot?.handoffActive, verifiedHandoff);
+  const hasHandoff = handoffState === true;
+  const handoffUnknown = handoffState === null;
 
   // Persist active trip snapshot to localStorage for recovery after app restart
   useEffect(() => {
-    if (id && syncOwner && visibleData?.id === id && !visibleData.offline && m.estado === EstadoManifiesto.EN_TRANSITO) {
+    if (isOnline && id && syncOwner && visibleData?.id === id && !visibleData.offline && !isError && m.estado === EstadoManifiesto.EN_TRANSITO) {
       const snapshot = {
         id,
         numero: m.numero,
@@ -128,16 +145,20 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
         residuos: m.residuos,
         eventos: m.eventos,
         fechaRetiro: m.fechaRetiro,
+        handoffActive: handoffEnabled ? verifiedHandoff ?? undefined : false,
         savedAt: new Date().toISOString(),
       };
       try {
         writeTripSnapshot(syncOwner, id, snapshot);
         setSnapshotError(false);
+        // The first render reads before this effect writes. Re-read the new
+        // copy so a loss of connectivity in the same open page can use it.
+        setSnapshotRevision(value => value + 1);
       } catch {
         setSnapshotError(true);
       }
     }
-  }, [id, syncOwner, visibleData, m.id, m.numero, m.estado, m.modalidad, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
+  }, [id, syncOwner, isOnline, isError, handoffEnabled, verifiedHandoff, visibleData, m.id, m.numero, m.estado, m.modalidad, m.generador, m.operador, m.transportista, m.transportistaId, m.asignacionTransporte, m.residuos, m.eventos, m.fechaRetiro]);
 
   // Mutations
   const confirmarRetiro = useConfirmarRetiro();
@@ -158,40 +179,50 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const [incidenteDescripcion, setIncidenteDescripcion] = useState('');
   const [vistaMapa, setVistaMapa] = useState(true);
   useEffect(() => { if (deliveryError) deliveryErrorRef.current?.focus(); }, [deliveryError]);
-  const legs=useTransportLegs(m.modalidad==='IN_SITU'?'':id||'');
-  const hasHandoff=legs.data?.tramos.some(leg=>!leg.fin&&leg.tipo!=='ORIGINAL')||false;
 
   useEffect(() => {
     if (!id || currentUser?.id == null) return;
     const owner = currentUser.id;
     const version = ++queueCheckVersion.current;
     let active = true;
-    setDeliveryQueue('checking');
+    const context = JSON.stringify([String(owner), syncOwner, id]);
+    if (queueContext.current !== context) { queueContext.current = context; setDeliveryQueue('checking'); }
     void getSyncQueue().then(actions => {
-      if (active && queueCheckVersion.current === version) setDeliveryQueue(hasQueuedDelivery(actions, owner, id) ? 'pending' : 'none');
+      if (active && queueCheckVersion.current === version) setDeliveryQueue(queuedDeliveryContext(actions, owner, syncOwner, id));
     }).catch(() => { if (active && queueCheckVersion.current === version) setDeliveryQueue('error'); });
     return () => { active = false; };
-  }, [currentUser?.id, id, queueCheck]);
+  }, [currentUser?.id, syncOwner, id, queueCheck]);
+
+  useEffect(() => { deliveryConfirmed.current = false; deliveryInitiatedHere.current = false; gpsWasActive.current = false; }, [id, syncOwner]);
 
   useEffect(() => {
     const onDelivery = (event: Event) => {
       const detail = (event as CustomEvent<{ id: string; owner: string }>).detail;
-      if (detail?.id !== id || detail.owner !== String(currentUser?.id)) return;
+      if (detail?.id !== id) return;
+      deliveryConfirmed.current = true;
       ++queueCheckVersion.current;
       setDeliveryQueue('sent');
       void queryClient.invalidateQueries({ queryKey:['manifiestos', 'detail', id] });
     };
-    window.addEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
-    return () => window.removeEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
-  }, [currentUser?.id, id, queryClient]);
+    return subscribeDeliveryConfirmed(onDelivery);
+  }, [id, queryClient]);
+
+  useEffect(() => {
+    const onQueueChanged = () => { if (!deliveryConfirmed.current) setQueueCheck(value => value + 1); };
+    return subscribeOfflineQueueChanged(onQueueChanged);
+  }, []);
 
   // GPS tracking via custom hook
+  // A delivery queued in another tab must not silently stop an active GPS:
+  // that screen owns its live observations until the user closes it safely.
+  const trackingDuringPending = (deliveryQueue === 'pending' || deliveryQueue === 'other' || deliveryQueue === 'error') && viajeStatus === 'ACTIVO' && gpsWasActive.current && !deliveryInitiatedHere.current;
   const gps = useGPSTracking({
     manifiestoId: id,
     ownerId: currentUser?.id,
-    estado: hasHandoff||m.modalidad==='IN_SITU'||deliveryQueue!=='none'?undefined:m.estado,
+    estado: hasHandoff||handoffUnknown||m.modalidad==='IN_SITU'||(deliveryQueue!=='none'&&!trackingDuringPending)?undefined:m.estado,
     viajeStatus,
   });
+  useEffect(() => { if (deliveryQueue === 'none' && gps.status === 'active') gpsWasActive.current = true; }, [deliveryQueue, gps.status]);
 
   const currentPosition = gps.position;
   const trackPoints = gps.trackPoints;
@@ -229,7 +260,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   };
 
   const handleRetryGps = async () => {
-    if (gpsRetryInFlightRef.current || deliveryInFlightRef.current || isActionPending || hasHandoff || viajeStatus !== 'ACTIVO') return;
+    if (gpsRetryInFlightRef.current || deliveryInFlightRef.current || isActionPending || hasHandoff || handoffUnknown || viajeStatus !== 'ACTIVO') return;
     gpsRetryInFlightRef.current = true;
     setRetryingGps(true);
     try { await gps.retryGps(); }
@@ -265,12 +296,14 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     if (!currentUser || !syncOwner) { setDeliveryError('Sesión no disponible. Volvé a iniciar sesión.'); return; }
     if (deliveryInFlightRef.current) return;
     deliveryInFlightRef.current = true;
+    deliveryInitiatedHere.current = true;
     setDeliveryError('');
     setIsFinishingTrip(true);
     try {
       await gps.stopAndDrain();
       const offline = !navigator.onLine;
       if (offline && gps.hasStorageError()) {
+        deliveryInitiatedHere.current = false;
         gps.resumeGps();
         setDeliveryError('Ubicaciones sin guardar. Mantené esta pantalla abierta y recuperá la conexión o el almacenamiento antes de confirmar.');
         return;
@@ -278,20 +311,23 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       if (!offline && !(await gps.flushPending())) {
         if (gps.deliveryWasConfirmed()) setDeliveryError('La entrega ya fue confirmada. Actualizá el manifiesto para ver su estado.');
         else {
+          deliveryInitiatedHere.current = false;
           gps.resumeGps();
           setDeliveryError('Ubicaciones pendientes. ' + (gps.lastSendError() || 'No se pudieron enviar las ubicaciones. Revisá la conexión y volvé a intentar.'));
         }
         return;
       }
       const delivery = { latitud: currentPosition?.[0], longitud: currentPosition?.[1], observaciones: 'Entrega confirmada desde app móvil' };
-      const queuedDelivery = { type: 'POST' as const, endpoint: `/manifiestos/${id}/confirmar-entrega`, data: delivery, userId: currentUser.id, contextOwner: syncOwner };
-      const result = offline
-        ? (await addToSyncQueue(queuedDelivery), 'QUEUED' as const)
-        : await offlineSafeMutation(() => confirmarEntrega.mutateAsync({ id: id!, ...delivery }), queuedDelivery);
-      if (result === 'QUEUED') {
+      const result = await confirmarEntrega.mutateAsync({ id: id!, ...delivery });
+      if (result.status === 'pending') {
         ++queueCheckVersion.current;
-        setDeliveryQueue('pending');
-        toast.info('Sin conexión — La entrega se confirmará al reconectar');
+        if (deliveryConfirmed.current) {
+          setDeliveryQueue('sent');
+          toast.info('Entrega confirmada', 'Actualizando el manifiesto y la copia local.');
+        } else {
+          setDeliveryQueue('pending');
+          toast.info('Entrega pendiente', result.message);
+        }
         cleanupGps();
         setShowFinalizarModal(false);
         return;
@@ -301,6 +337,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       catch { toast.info('Entrega confirmada', 'No se pudo actualizar la copia local. Consultá el manifiesto al reconectar.'); }
       setShowFinalizarModal(false);
     } catch (err: any) {
+      deliveryInitiatedHere.current = false;
       gps.resumeGps();
       setDeliveryError(getApiErrorMessage(err, 'No se pudo confirmar la entrega. Revisá la conexión y volvé a intentar.'));
     } finally {
@@ -372,41 +409,6 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
   const mapCenter = currentPosition || defaultCenter;
 
   if ((isLoading || waitingForValidation) && !m.id) {
-    // Show cached snapshot header while API loads (stale-while-revalidate)
-    if (safeSnapshot) {
-      return (
-        <div className="min-h-screen bg-neutral-50 pb-24">
-          <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
-            <div className="flex items-center justify-between h-14 px-4">
-              <div className="flex items-center gap-3">
-                <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
-                  <ArrowLeft size={20} />
-                </button>
-                <div>
-                  <p className="text-xs text-neutral-500 font-medium">{safeSnapshot.numero || id}</p>
-                  <h2 className="text-lg font-bold text-neutral-900">Último estado guardado</h2>
-                </div>
-              </div>
-            </div>
-          </header>
-          <div className="p-4 space-y-4">
-            <Card variant="elevated">
-              <CardContent className="p-4">
-                <div className="space-y-2">
-                  {safeSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{safeSnapshot.generador.razonSocial}</span></p>}
-                  {safeSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{safeSnapshot.transportista.razonSocial}</span></p>}
-                  {safeSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{safeSnapshot.operador.razonSocial}</span></p>}
-                </div>
-              </CardContent>
-            </Card>
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={32} className="animate-spin text-primary-600" />
-              <span className="ml-3 text-neutral-500">Cargando datos del viaje...</span>
-            </div>
-          </div>
-        </div>
-      );
-    }
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <Loader2 size={32} className="animate-spin text-primary-600" />
@@ -414,43 +416,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
     );
   }
 
-  if ((!visibleData || isError) && safeSnapshot) {
-    return (
-      <div className="min-h-screen bg-neutral-50 pb-24">
-        <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
-          <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center gap-3">
-              <button aria-label="Volver" onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-600 hover:bg-neutral-100 rounded-lg">
-                <ArrowLeft size={20} />
-              </button>
-              <div>
-                <p className="text-xs text-neutral-500 font-medium">{safeSnapshot.numero || id}</p>
-                <h2 className="text-lg font-bold text-neutral-900">Último estado guardado</h2>
-              </div>
-            </div>
-          </div>
-        </header>
-        <div className="p-4 space-y-4">
-          <div className="flex items-center gap-2 px-3 py-2 bg-warning-50 border border-warning-200 rounded-lg">
-            <WifiOff size={16} className="text-warning-600 flex-shrink-0" />
-            <p className="text-xs text-warning-700">Datos de la última sesión — reconectando...</p>
-          </div>
-          <DeliveryQueueNotice status={deliveryQueue} onRetry={() => setQueueCheck(value => value + 1)} />
-          <Card variant="elevated">
-            <CardContent className="p-4">
-              <div className="space-y-2">
-                {safeSnapshot.generador && <p className="text-sm text-neutral-600">Generador: <span className="font-semibold">{safeSnapshot.generador.razonSocial}</span></p>}
-                {safeSnapshot.transportista && <p className="text-sm text-neutral-600">Transportista: <span className="font-semibold">{safeSnapshot.transportista.razonSocial}</span></p>}
-                {safeSnapshot.operador && <p className="text-sm text-neutral-600">Destino: <span className="font-semibold">{safeSnapshot.operador.razonSocial}</span></p>}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  if (!visibleData || isError) {
+  if ((!visibleData || isError) && !showingSavedCopy) {
     return (
       <div className="min-h-screen bg-neutral-50 p-4">
         <div className="flex items-center gap-3 mb-6">
@@ -495,9 +461,9 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
                  m.estado === EstadoManifiesto.ENTREGADO ? 'Entrega confirmada' : 'Estado del viaje'}
               </h2>
               {m.estado === EstadoManifiesto.EN_TRANSITO && (
-                <div className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-full ${viajeStatus === 'ACTIVO' ? 'bg-success-50 text-success-700 border border-success-200' : 'bg-warning-50 text-warning-700 border border-warning-200'}`}>
-                  <Radio size={14} className={viajeStatus === 'ACTIVO' ? 'animate-pulse' : ''} />
-                  <span className="text-xs font-semibold">{hasHandoff?'Transporte relevado':viajeStatus === 'ACTIVO' ? 'Viaje activo' : 'Viaje pausado'}</span>
+                <div className={`flex shrink-0 items-center gap-1.5 px-3 py-1.5 rounded-full ${deliveryQueue === 'none' && viajeStatus === 'ACTIVO' && !hasHandoff && !handoffUnknown ? 'bg-success-50 text-success-700 border border-success-200' : 'bg-warning-50 text-warning-700 border border-warning-200'}`}>
+                  <Radio size={14} className={deliveryQueue === 'none' && viajeStatus === 'ACTIVO' && !hasHandoff && !handoffUnknown ? 'animate-pulse' : ''} />
+                  <span className="text-xs font-semibold">{trackingDuringPending ? (deliveryQueue === 'error' ? 'Entrega sin verificar · seguimiento abierto' : 'Entrega pendiente · seguimiento abierto') : deliveryQueue === 'pending' || deliveryQueue === 'other' ? 'Entrega pendiente' : deliveryQueue === 'sent' ? 'Actualizando entrega' : deliveryQueue === 'error' ? 'Verificar entrega' : deliveryQueue === 'checking' ? 'Comprobando entrega' : handoffUnknown ? 'Comprobando relevo' : hasHandoff ? 'Transporte relevado' : viajeStatus === 'ACTIVO' ? 'Viaje activo' : 'Viaje pausado'}</span>
                 </div>
               )}
             </div>
@@ -506,9 +472,17 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
       </header>
 
       <div className="p-4 space-y-4">
+        {showingSavedCopy && <div role="status" className="flex items-start gap-2 rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">
+          <WifiOff size={16} className="mt-0.5 shrink-0" />
+          <p><strong>Último estado guardado.</strong> Una entrega confirmada sin conexión queda en este dispositivo. SITREP verificará el estado y los permisos al reconectar. La pausa y los incidentes requieren conexión.</p>
+        </div>}
+        {handoffUnknown && m.estado === EstadoManifiesto.EN_TRANSITO && <div role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">Comprobando si hay un relevo. Si no se recupera, revisá la conexión antes de continuar con el GPS o la entrega.
+          {isOnline && legs.isError && <button type="button" className="ml-2 min-h-11 font-semibold underline" onClick={() => void legs.refetch()}>Reintentar</button>}
+        </div>}
         {snapshotError && <p role="alert" className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-900">No se pudo guardar una copia del viaje en el dispositivo. Si perdés conexión, sus datos podrían no estar disponibles; revisá el almacenamiento.</p>}
         {id && currentUser?.id != null && ['TRANSPORTISTA', 'ADMIN'].includes(currentUser.rol) && (m.estado !== EstadoManifiesto.EN_TRANSITO || hasHandoff) && <PendingGpsReceipts key={`${currentUser.id}:${currentUser.rol}:${id}`} ownerId={currentUser.id} manifestId={id} />}
-        {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && deliveryQueue === 'none' && <GpsStatusPanel
+        {trackingDuringPending && <p role="status" className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-900">El seguimiento sigue abierto en esta pantalla para conservar las ubicaciones. Sincronizalas y cerrá esta pantalla antes de continuar con la entrega.</p>}
+        {m.estado === EstadoManifiesto.EN_TRANSITO && !hasHandoff && !handoffUnknown && (deliveryQueue === 'none' || trackingDuringPending) && <GpsStatusPanel
           status={gpsStatus}
           sendStatus={gpsSendStatus}
           sendError={gps.sendError}
@@ -523,10 +497,10 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
           storageError={gps.storageError}
           storageIssue={gps.storageIssue}
         />}
-        <Link to={mp('/transporte/perfil')} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-800 underline"><Truck size={17} aria-hidden="true" />Ver todos mis viajes</Link>
-        {deliveryQueue === 'none' && <TransportLegs id={id!} beforeHandoff={prepareHandoff} onHandoffError={gps.resumeGps}/>}
+        <Link to={mp('/transporte/perfil')} className="flex w-fit min-h-11 items-center gap-2 text-sm font-semibold text-primary-800 underline"><Truck size={17} aria-hidden="true" />Ver todos mis viajes</Link>
+        {deliveryQueue === 'none' && !showingSavedCopy && <TransportLegs id={id!} beforeHandoff={prepareHandoff} onHandoffError={gps.resumeGps}/>}
         {hasHandoff&&<p role="status" className="rounded-xl bg-primary-50 p-3 text-sm text-primary-900">El GPS continúa desde el enlace del reemplazo. Como transportista de origen, seguís registrando la entrega del manifiesto.</p>}
-        {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="inline-flex min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
+        {manifestFeatureVisible(import.meta.env.VITE_MANIFEST_ADDENDA_ENABLED, currentUser) && <Link to={mp(`/manifiestos/${id}/adendas`)} className="flex w-fit min-h-11 items-center text-primary-700 underline">Adendas y revisión posterior</Link>}
         {assignment && <dl aria-label="Transporte asignado" className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 sm:grid-cols-2">
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Vehículo</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.vehiculo?.patente || 'Sin asignación registrada'}</dd></div>
           <div className="min-w-0"><dt className="text-xs text-neutral-600">Chofer</dt><dd className="break-words text-sm font-semibold text-neutral-900">{assignment.chofer ? `${assignment.chofer.nombre} ${assignment.chofer.apellido}` : 'Sin asignación registrada'}</dd></div>
@@ -553,6 +527,7 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               viajeStatus={viajeStatus}
               delegated={hasHandoff}
               isPending={isActionPending}
+              connectionLimited={showingSavedCopy}
               hasPendingSync={gps.hasPending}
               onConfirmPickup={handleConfirmarRetiro}
               onTogglePause={handlePausar}
@@ -598,12 +573,14 @@ const ViajeEnCursoTransportistaContent: React.FC = () => {
               viajeStatus={viajeStatus}
               delegated={hasHandoff}
               isPending={isActionPending}
+              disabled={m.estado === EstadoManifiesto.EN_TRANSITO && handoffUnknown}
+              connectionLimited={showingSavedCopy}
               hasPendingSync={gps.hasPending}
               onConfirmPickup={handleConfirmarRetiro}
               onTogglePause={handlePausar}
               onReportIncident={() => setShowIncidenteModal(true)}
               onConfirmDelivery={() => { setDeliveryError(''); setShowFinalizarModal(true); }}
-            /> : <DeliveryQueueNotice status={deliveryQueue} onRetry={() => setQueueCheck(value => value + 1)} />}
+            /> : <DeliveryQueueNotice status={deliveryQueue} onRetry={() => { setQueueCheck(value => value + 1); void reloadTrip(); }} />}
 
             {/* Toggle map/events */}
             {!hasHandoff&&<div className="flex bg-neutral-100 rounded-xl p-1">

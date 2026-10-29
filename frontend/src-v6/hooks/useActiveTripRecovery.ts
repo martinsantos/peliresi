@@ -10,7 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { manifiestoService } from '../services/manifiesto.service';
 import { EstadoManifiesto } from '../types/models';
 import { useQueryOwner } from './useQueryOwner';
-import { readActiveTrip, writeTripSnapshot } from '../services/tripSnapshot';
+import { readActiveTrip, readTripSnapshot, writeTripSnapshot } from '../services/tripSnapshot';
 
 export function useActiveTripRecovery() {
   const { currentUser, isTransportista, isRestricted } = useAuth();
@@ -34,6 +34,9 @@ export function useActiveTripRecovery() {
         if (manifiestos.length === 1 && res.total === 1) {
           const trip = manifiestos[0];
           const tripId = String(trip.id);
+          // The open trip page may have saved a more complete, verified copy
+          // while this background list request was in flight.
+          if (readActiveTrip(owner) || readTripSnapshot(owner, tripId)) return;
           writeTripSnapshot(owner, tripId, {
             id: trip.id,
             numero: trip.numero,

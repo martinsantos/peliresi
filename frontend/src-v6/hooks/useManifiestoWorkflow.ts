@@ -8,7 +8,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { manifiestoService } from '../services/manifiesto.service';
 import { useAuth } from '../contexts/AuthContext';
-import { withStoredGpsBeforeTransition } from '../services/gpsTransition';
+import { submitDelivery } from '../services/deliveryCommand';
+import { useQueryOwner } from './useQueryOwner';
 import type {
   CreateManifiestoRequest, FirmarManifiestoRequest,
   ConfirmarRetiroRequest, ConfirmarEntregaRequest, PesajeRequest,
@@ -91,10 +92,14 @@ export function useConfirmarRetiro() {
 export function useConfirmarEntrega() {
   const qc = useQueryClient();
   const { currentUser } = useAuth();
+  const owner = useQueryOwner();
   return useMutation({
     ...WORKFLOW_OPTIONS,
-    mutationFn: ({ id, ...req }: { id: string } & ConfirmarEntregaRequest) =>
-      withStoredGpsBeforeTransition(currentUser?.id, id, () => manifiestoService.confirmarEntrega(id, req)),
+    mutationFn: ({ id, ...req }: { id: string } & ConfirmarEntregaRequest) => {
+      if (!currentUser?.id) throw new Error('Sesión no disponible. Volvé a ingresar.');
+      return submitDelivery(id, req, { userId: currentUser.id, owner, role: currentUser.rol,
+        companyScoped: !!currentUser.empresaContexto });
+    },
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: KEYS.detail(id) });
       qc.invalidateQueries({ queryKey: ['manifest-proposal'] });

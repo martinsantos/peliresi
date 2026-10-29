@@ -11,9 +11,10 @@ export interface TransportLeg {
 }
 export interface TransportLegState {tramos:TransportLeg[];puedeRegistrar:boolean}
 export const transportLegKey=(id:string,userId?:string|number)=>['tramos-transporte',id,userId];
-export function useTransportLegs(id:string) {
+export function useTransportLegs(id:string, contextKey?:string) {
   const {currentUser}=useAuth();
-  return useQuery({queryKey:transportLegKey(id,currentUser?.id),enabled:!!id&&manifestFeatureVisible(import.meta.env.VITE_MANIFEST_TRANSPORT_HANDOFF_ENABLED,currentUser),
+  const key=transportLegKey(id,currentUser?.id);
+  return useQuery({queryKey:contextKey ? [...key,contextKey] : key,enabled:!!id&&manifestFeatureVisible(import.meta.env.VITE_MANIFEST_TRANSPORT_HANDOFF_ENABLED,currentUser),
     queryFn:async()=> (await api.get<{data:TransportLegState}>(`/manifiestos/${id}/tramos`)).data.data,
     retry:false,refetchInterval:15000});
 }

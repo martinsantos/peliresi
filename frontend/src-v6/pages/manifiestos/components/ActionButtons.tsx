@@ -30,6 +30,7 @@ export interface ActionButtonsProps {
   isAdmin: boolean;
   userRol: string;
   isActionPending: boolean;
+  deliveryUnavailable?: boolean;
   isInSitu?: boolean;
   training?: boolean;
   operatorCertificates?: boolean;
@@ -68,6 +69,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
   isAdmin,
   userRol,
   isActionPending,
+  deliveryUnavailable,
   isInSitu,
   training,
   operatorCertificates,
@@ -137,7 +139,7 @@ export const ActionButtons: React.FC<ActionButtonsProps> = ({
           fullWidth
           leftIcon={mutations.confirmarEntrega.isPending ? <Loader2 size={16} className="animate-spin" /> : <Truck size={16} />}
           onClick={onConfirmarEntrega}
-          disabled={isActionPending}
+          disabled={isActionPending || deliveryUnavailable}
         >
           Confirmar Entrega
         </Button>

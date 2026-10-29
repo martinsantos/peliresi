@@ -5,8 +5,10 @@ import * as hooks from '../../hooks/useManifiestoWorkflow';
 import { installMockGpsLocks } from '../utils/mockGpsLocks';
 
 const calls = vi.hoisted(() => Object.fromEntries(['create', 'update', 'firmar', 'confirmarRetiro', 'confirmarEntrega', 'pesaje', 'confirmarRecepcion', 'confirmarRecepcionInSitu', 'registrarTratamiento', 'rechazar', 'registrarIncidente', 'cerrar', 'cancelar', 'revertirEstado', 'validarQR'].map(name => [name, vi.fn()])));
+const delivery = vi.hoisted(() => vi.fn());
 vi.mock('../../services/manifiesto.service', () => ({ manifiestoService: calls }));
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'carrier-a' } }) }));
+vi.mock('../../services/deliveryCommand', () => ({ submitDelivery: delivery }));
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ currentUser: { id: 'carrier-a', rol: 'TRANSPORTISTA', actorId: 'carrier' } }) }));
 vi.mock('../../utils/supportSession', () => ({ supportRequestContext: () => 'carrier-a:transportista', supportSessionMatches: () => true }));
 let restoreLocks: () => void;
 beforeEach(() => { restoreLocks = installMockGpsLocks(); });
@@ -14,6 +16,7 @@ afterEach(() => { onlineManager.setOnline(true); vi.clearAllMocks(); restoreLock
 
 describe('explicit workflow submissions do not wait in an invisible offline queue', () => {
   for (const [name, hook] of Object.entries(hooks)) {
+    if (name === 'useConfirmarEntrega') continue;
     it(`${name} returns a failure without pausing or retrying`, async () => {
       for (const callback of Object.values(calls)) callback.mockRejectedValue(new Error('Network Error'));
       onlineManager.setOnline(false);
@@ -27,4 +30,14 @@ describe('explicit workflow submissions do not wait in an invisible offline queu
       client.clear();
     });
   }
+});
+
+it('returns an explicit pending result for an offline delivery saved by the delivery command', async () => {
+  delivery.mockResolvedValueOnce({status:'pending',message:'Entrega guardada'}); onlineManager.setOnline(false);
+  const client = new QueryClient();
+  const wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const {result} = renderHook(() => hooks.useConfirmarEntrega(), {wrapper});
+  let answer: unknown;
+  await act(async () => { answer = await result.current.mutateAsync({id:'qa'}); });
+  expect(answer).toEqual({status:'pending',message:'Entrega guardada'});expect(delivery).toHaveBeenCalledOnce();client.clear();
 });

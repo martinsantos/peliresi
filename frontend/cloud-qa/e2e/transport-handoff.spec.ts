@@ -59,7 +59,7 @@ test('external then registered handoffs keep custody, GPS, C3 and own history co
     await replacement.getByRole('button',{name:'Compartir GPS',exact:true}).click();await expect(replacement.getByRole('heading',{name:fixture.carriers.replacement.razonSocial,exact:true})).toBeVisible();
     const registeredGps=replacement.waitForResponse(r=>r.url().endsWith(`/api/seguimiento-relevo/${registeredLeg.id}/ubicacion`)&&r.request().method()==='POST');
     await replacement.getByRole('button',{name:'Compartir ubicación',exact:true}).click();expect((await registeredGps).status()).toBe(200);
-    const delivery=source.waitForResponse(r=>r.url().endsWith(`/api/manifiestos/${manifest.id}/confirmar-entrega`)&&r.request().method()==='POST');
+    const delivery=source.waitForResponse(r=>r.url().endsWith(`/api/manifiestos/${manifest.id}/confirmar-entrega-idempotente`)&&r.request().method()==='POST');
     await source.getByRole('button',{name:'Confirmar entrega',exact:true}).click();await source.getByRole('dialog',{name:'Confirmar Entrega?',exact:true}).getByRole('button',{name:'Sí, Confirmar Entrega',exact:true}).click();expect((await delivery).status()).toBe(200);
     await replacement.reload();await expect(replacement.getByRole('alert')).toContainText('ya no está activo');
     await replacement.goto(mp+'/transporte/perfil');const ownHistory=replacement.getByRole('region',{name:'Relevos a mi cargo',exact:true});await ownHistory.getByRole('button',{name:'Historial',exact:true}).click();const ownNumber=ownHistory.getByText(manifest.numero,{exact:true});await expect(ownNumber).toBeVisible();await expect(ownNumber.locator('xpath=../..').getByText(/Finalizado ·/)).toBeVisible();

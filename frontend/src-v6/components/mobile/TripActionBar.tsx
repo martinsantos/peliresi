@@ -8,6 +8,8 @@ interface TripActionBarProps {
   estado: EstadoManifiesto;
   viajeStatus: 'ACTIVO' | 'PAUSADO';
   isPending: boolean;
+  disabled?: boolean;
+  connectionLimited?: boolean;
   hasPendingSync: boolean;
   delegated?: boolean;
   onConfirmPickup: () => void;
@@ -20,6 +22,8 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
   estado,
   viajeStatus,
   isPending,
+  disabled = false,
+  connectionLimited = false,
   hasPendingSync,
   delegated = false,
   onConfirmPickup,
@@ -34,7 +38,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
           fullWidth
           size="lg"
           onClick={onConfirmPickup}
-          disabled={isPending}
+          disabled={isPending || disabled}
           leftIcon={isPending ? <Loader2 size={20} className="animate-spin" /> : <Truck size={20} />}
         >
           Confirmar retiro
@@ -55,7 +59,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
         <button
           type="button"
           onClick={onTogglePause}
-          disabled={isPending}
+          disabled={isPending || disabled || connectionLimited}
           className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-warning-200 bg-warning-50 px-3 text-sm font-bold text-warning-800 disabled:opacity-50"
         >
           {viajeStatus === 'ACTIVO' ? <Pause size={18} /> : <Play size={18} />}
@@ -64,7 +68,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
         <button
           type="button"
           onClick={onReportIncident}
-          disabled={isPending}
+          disabled={isPending || disabled || connectionLimited}
           className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border-2 border-error-200 bg-error-50 px-3 text-sm font-bold text-error-800 disabled:opacity-50"
         >
           <AlertTriangle size={18} />
@@ -75,7 +79,7 @@ export const TripActionBar: React.FC<TripActionBarProps> = ({
         fullWidth
         size="lg"
         onClick={onConfirmDelivery}
-        disabled={isPending}
+        disabled={isPending || disabled}
         leftIcon={isPending ? <Loader2 size={20} className="animate-spin" /> : hasPendingSync ? <RotateCcw size={20} /> : <CheckCircle2 size={20} />}
       >
         Confirmar entrega

@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useConnectivity } from './useConnectivity';
 import { syncOfflineData } from '../services/offline-sync';
 import { processSyncQueue, type SyncQueueResult } from '../services/indexeddb';
+import { OFFLINE_QUEUE_WAKE_EVENT } from '../services/offlineSyncEvents';
 import { getAccessToken } from '../services/api';
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -90,6 +91,12 @@ export function useOfflineSync({ downloadManifests = true, enabled = true }: { d
     const interval = setInterval(() => void doSync(), SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [currentUser?.id, owner, isOnline, isRestricted, doSync, enabled, syncRequest]);
+
+  useEffect(() => {
+    const wake = () => { void doSync(); };
+    window.addEventListener(OFFLINE_QUEUE_WAKE_EVENT, wake);
+    return () => window.removeEventListener(OFFLINE_QUEUE_WAKE_EVENT, wake);
+  }, [doSync]);
 
   return { ...result, syncing, retry: async () => { await doSync(true); } };
 }

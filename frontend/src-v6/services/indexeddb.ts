@@ -13,9 +13,10 @@ import {
   type SyncMethod,
 } from './syncQueuePolicy';
 import api from './api';
-import { GPS_DELIVERY_CONFIRMED_EVENT, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
+import { GpsPendingError, flushStoredGpsQueue, runExclusiveGpsTask, sendIdempotentGps } from './gpsQueue';
 import { withGpsTransitionLock } from './gpsCoordination';
 import { clearTripSnapshot } from './tripSnapshot';
+import { notifyDeliveryConfirmed, notifyOfflineQueueChanged } from './offlineSyncEvents';
 
 const DB_NAME = 'sitrep_offline_db';
 const DB_VERSION = 5;
@@ -34,6 +35,7 @@ export interface SyncAction {
   attempts?: number;
   lastError?: string;
   failureKind?: 'retryable' | 'terminal' | 'auth';
+  lastFailureUncertain?: boolean;
   nextRetryAt?: string;
 }
 
@@ -256,6 +258,50 @@ export async function addToSyncQueue(action: Omit<SyncAction, 'id' | 'createdAt'
   });
 }
 
+/** Serialize lookup and insertion in one IndexedDB transaction across tabs.
+ * A previous delivery is never replaced with a new reference or other data. */
+export async function enqueueDeliveryOnce(action: Omit<SyncAction, 'id' | 'createdAt'>): Promise<{ action: SyncAction; legacy: boolean; reused: boolean }> {
+  const manifestId = queuedDeliveryManifestId(action.endpoint);
+  const reference = (action.data as { referencia?: unknown } | null)?.referencia;
+  if (action.type !== 'POST' || !manifestId || !action.endpoint.endsWith('/confirmar-entrega-idempotente')
+    || action.userId == null || !action.contextOwner || typeof reference !== 'string') {
+    throw new Error('No se pudo identificar la entrega y su actividad.');
+  }
+  const db = await getDB();
+  const result = await new Promise<{ action: SyncAction; legacy: boolean; reused: boolean }>((resolve, reject) => {
+    const tx = db.transaction('sync_queue', 'readwrite'), records = tx.objectStore('sync_queue');
+    let value: { action: SyncAction; legacy: boolean; reused: boolean } | undefined, failure: Error | undefined;
+    const all = records.getAll();
+    all.onsuccess = () => {
+      const entries = all.result as SyncAction[];
+      const existing = entries.find(item => item.type === 'POST' && queuedDeliveryManifestId(item.endpoint) === manifestId);
+      if (existing) {
+        if (!isSyncActionOwnedBy(existing.userId, action.userId) || (existing.contextOwner && existing.contextOwner !== action.contextOwner) || existing.id == null) {
+          failure = new Error('Este dispositivo conserva una entrega pendiente de otra cuenta o actividad. Volvé a ese contexto para revisarla.');
+          tx.abort(); return;
+        }
+        value = { action: existing, legacy: !existing.contextOwner || !existing.endpoint.endsWith('/confirmar-entrega-idempotente'), reused: true };
+        return;
+      }
+      if (entries.length >= MAX_SYNC_QUEUE_SIZE) {
+        failure = new Error('La cola local está llena. Los cambios pendientes se conservaron; sincronizá antes de agregar otro.');
+        tx.abort(); return;
+      }
+      const created: SyncAction = { ...action, createdAt: new Date().toISOString(), attempts: 0 };
+      const write = records.add(created);
+      write.onsuccess = () => {
+        if (typeof write.result !== 'number') { failure = new Error('No se pudo identificar el envío guardado.'); tx.abort(); return; }
+        value = { action: { ...created, id: write.result }, legacy: false, reused: false };
+      };
+    };
+    tx.oncomplete = () => value ? resolve(value) : reject(new Error('No se confirmó el guardado local.'));
+    tx.onerror = () => reject(failure || tx.error || new Error('No se confirmó el guardado local.'));
+    tx.onabort = () => reject(failure || tx.error || new Error('No se confirmó el guardado local.'));
+  });
+  notifyOfflineQueueChanged();
+  return result;
+}
+
 /**
  * Retorna todas las acciones pendientes en la cola.
  */
@@ -287,11 +333,11 @@ export async function clearSyncQueue(): Promise<void> {
  */
 class SyncContextChangedError extends Error {}
 
-export async function processSyncQueue(currentUserId: string | number, context: SyncExecutionContext, manual = false, isCurrent: () => boolean = () => true): Promise<SyncQueueResult> {
+export async function processSyncQueue(currentUserId: string | number, context: SyncExecutionContext, manual = false, isCurrent: () => boolean = () => true, onlyId?: number): Promise<SyncQueueResult> {
   const empty = (): SyncQueueResult => ({ processed: 0, pending: 0, retryable: 0, terminal: 0, auth: 0, skipped: 0 });
   const cannotSync = async (message: string): Promise<SyncQueueResult> => {
     if (!isCurrent()) return empty();
-    const owned = (await getSyncQueue()).filter(action => isSyncActionOwnedBy(action.userId, currentUserId));
+    const owned = (await getSyncQueue()).filter(action => isSyncActionOwnedBy(action.userId, currentUserId) && (onlyId === undefined || action.id === onlyId));
     if (!isCurrent()) return empty();
     const terminal = owned.filter(action => action.failureKind === 'terminal').length;
     const auth = owned.filter(action => action.failureKind === 'auth').length;
@@ -315,7 +361,7 @@ export async function processSyncQueue(currentUserId: string | number, context: 
         clearTimeout(timer);
         if (!lock) return unavailable();
         if (!isCurrent()) return empty();
-        return processSyncQueueLocked(currentUserId, context, manual, isCurrent);
+        return processSyncQueueLocked(currentUserId, context, manual, isCurrent, onlyId);
       });
   } catch (error) {
     if (entered) throw error;
@@ -323,9 +369,9 @@ export async function processSyncQueue(currentUserId: string | number, context: 
   } finally { clearTimeout(timer); }
 }
 
-async function processSyncQueueLocked(currentUserId: string | number, context: SyncExecutionContext, manual: boolean, isCurrent: () => boolean): Promise<SyncQueueResult> {
+async function processSyncQueueLocked(currentUserId: string | number, context: SyncExecutionContext, manual: boolean, isCurrent: () => boolean, onlyId?: number): Promise<SyncQueueResult> {
   const queue = await getSyncQueue();
-  const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId));
+  const owned = queue.filter((action) => isSyncActionOwnedBy(action.userId, currentUserId) && (onlyId === undefined || action.id === onlyId));
   const result: SyncQueueResult = { processed: 0, pending: owned.length, retryable: 0, terminal: 0, auth: 0, skipped: 0 };
   if (owned.length === 0) return result;
 
@@ -390,6 +436,7 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
       continue;
     }
 
+    let deliveryAttempted = false, checkingGps = false;
     try {
       switch (action.type) {
         case 'POST':
@@ -398,10 +445,24 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
             if (deliveryId) {
               await runExclusiveGpsTask(deliveryId, () => withGpsTransitionLock(deliveryId, async () => {
                 if (!isCurrent()) throw new SyncContextChangedError();
+                checkingGps = true;
                 await flushGpsBeforeQueuedDelivery(api, action.endpoint, currentUserId, isCurrent);
+                checkingGps = false;
                 if (!isCurrent()) throw new SyncContextChangedError();
-                await api.post(action.endpoint, action.data);
-                if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(GPS_DELIVERY_CONFIRMED_EVENT, { detail: { id: deliveryId, owner: String(currentUserId) } }));
+                deliveryAttempted = true;
+                const response = await api.post(action.endpoint, action.data);
+                if (action.endpoint.endsWith('/confirmar-entrega-idempotente')) {
+                  const answer = response?.data?.data;
+                  const reference = (action.data as { referencia?: unknown } | null)?.referencia;
+                  if (response?.data?.success !== true || typeof reference !== 'string' || answer?.idempotencia?.version !== 1
+                    || String(answer.idempotencia.referencia).toLowerCase() !== reference.toLowerCase()
+                    || typeof answer.idempotencia.repetido !== 'boolean' || answer?.manifiesto?.id !== deliveryId
+                    || !['ENTREGADO', 'RECIBIDO', 'EN_TRATAMIENTO', 'TRATADO', 'RECHAZADO', 'CANCELADO'].includes(answer?.manifiesto?.estado)
+                    || !answer.manifiesto.fechaEntrega) {
+                    throw new Error('No se recibió una confirmación verificable de la entrega. La copia se conservó.');
+                  }
+                }
+                notifyDeliveryConfirmed(deliveryId, String(currentUserId));
               }));
             } else {
               if (!isCurrent()) throw new SyncContextChangedError();
@@ -432,6 +493,7 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
       if (action.id != null) {
         await removeOffline('sync_queue', action.id);
       }
+      notifyOfflineQueueChanged();
       try { cleanupAfterSuccessfulSync(action.endpoint, context.owner); }
       catch {
         // The server already confirmed this action and it was removed from the
@@ -444,7 +506,13 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
     } catch (error) {
       if (error instanceof SyncContextChangedError) break;
       const response = (error as { response?: { status?: number; data?: { message?: string } }; message?: string } | null)?.response;
-      const { failureKind, lastError } = classifySyncFailure(error);
+      const classified = classifySyncFailure(error);
+      const uncertain = deliveryAttempted && !response
+        && (error as { isAxiosError?: boolean } | null)?.isAxiosError === true;
+      const failureKind = classified.failureKind;
+      const lastError = uncertain ? 'No recibimos confirmación de la entrega. Se conservó para comprobarla al reintentar.'
+        : checkingGps && failureKind === 'retryable' && !(error instanceof GpsPendingError)
+          ? 'Hay ubicaciones pendientes. Revisá la conexión y volvé a sincronizarlas antes de entregar.' : classified.lastError;
       const attempts = (action.attempts || 0) + 1;
       if (action.id != null) {
         await saveOffline('sync_queue', {
@@ -452,8 +520,10 @@ async function processSyncQueueLocked(currentUserId: string | number, context: S
           attempts,
           failureKind,
           lastError,
+          lastFailureUncertain: uncertain,
           nextRetryAt: failureKind === 'retryable' ? new Date(Date.now() + 30_000 * 2 ** Math.min(attempts, 6)).toISOString() : undefined,
         });
+        notifyOfflineQueueChanged();
       }
       result[failureKind] += 1;
       result.lastError = lastError;

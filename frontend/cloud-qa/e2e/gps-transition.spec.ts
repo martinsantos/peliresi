@@ -66,7 +66,7 @@ test('the multiple-load screen waits for stored GPS before delivering one load',
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await dialog.screenshot({ path: info.outputPath('gps-pendiente.png'), animations: 'disabled' });
   data.unblock();
-  const response = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/manifiestos/${data.manifest.id}/confirmar-entrega`));
+  const response = page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith(`/manifiestos/${data.manifest.id}/confirmar-entrega-idempotente`));
   await dialog.getByRole('button', { name: 'Confirmar entrega de esta carga', exact: true }).click(); expect((await response).status()).toBe(200);
   expect(data.events).toEqual(['gps-accepted', 'transition-request']);
   expect(await page.evaluate(key => localStorage.getItem(key), data.queueKey)).toBeNull();

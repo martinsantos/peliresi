@@ -27,6 +27,10 @@ interface ManifiestoActionsProps {
   isAdmin: boolean;
   userRol: string;
   isActionPending: boolean;
+  deliveryPending?: boolean;
+  deliveryChecking?: boolean;
+  deliveryCheckError?: boolean;
+  onRetryDeliveryCheck?: () => void;
   isInSitu?: boolean;
   training?: boolean;
   mutations: {
@@ -65,6 +69,10 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
   isAdmin,
   userRol,
   isActionPending,
+  deliveryPending,
+  deliveryChecking,
+  deliveryCheckError,
+  onRetryDeliveryCheck,
   isInSitu,
   training,
   mutations,
@@ -107,12 +115,15 @@ const ManifiestoActions: React.FC<ManifiestoActionsProps> = ({
           </section>}
           {m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && <ManifestProposalApprovals id={manifiestoId} estado={m.estado} onSign={() => setShowFirmaModal(true)} />}
           {['EN_TRANSITO','ENTREGADO','RECIBIDO','EN_TRATAMIENTO','CANCELADO','RECHAZADO'].includes(m.estado || '') && <div className="mb-4"><ManifestNextStep work={{estado:m.estado,modalidad:m.modalidad,pesajePendiente:m.residuos?.some(r=>!r.cantidadRecibida)}} role={userRol}/></div>}
+          {deliveryPending && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-950">Hay una entrega guardada en este dispositivo. Revisá la sincronización antes de continuar.</p>}
+          {deliveryCheckError && <p role="alert" className="mb-4 rounded-lg bg-error-50 p-3 text-sm text-error-800">No pudimos revisar las entregas guardadas. <button type="button" className="font-semibold underline" onClick={onRetryDeliveryCheck}>Reintentar</button></p>}
           <ActionButtons
             pesajePendiente={m.residuos?.some(r=>!r.cantidadRecibida) ?? true}
             estado={m.estado}
             isAdmin={isAdmin}
             userRol={userRol}
             isActionPending={isActionPending}
+            deliveryUnavailable={deliveryPending || deliveryChecking || deliveryCheckError}
             legacyDraftBlocked={legacyDraftBlocked}
             pickupBlocked={!!(m.estado === 'APROBADO' && m.eventos?.some(e=>e.tipo==='PROPUESTA_PARTES_V1') && !m.eventos?.some(e=>['INICIO_COORDINACION','INICIO_COORDINACION_CAP'].includes(e.tipo)))}
             isInSitu={isInSitu}

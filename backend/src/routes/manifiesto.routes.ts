@@ -1,4 +1,5 @@
 import { listManifestCertificates, releaseManifestCertificate, downloadManifestCertificate, recoverManifestCertificate } from '../controllers/manifest-certificate.controller';
+import { confirmarEntregaIdempotente } from '../controllers/manifiesto-delivery.controller';
 import { listTrainingCertificates, releaseTrainingCertificate, downloadTrainingCertificate } from '../controllers/training-certificate.controller';
 import { canCreateManifestProposal } from '../domain/manifestProposal';
 import { handoffEnabled, listTransportLegs, createTransportHandoff, rotateTransportAccess, assignedTransportHandoffs, assignedTransportAccess } from '../controllers/transport-handoff.controller';
@@ -507,6 +508,8 @@ router.get('/:id/ubicaciones/:puntoId/confirmacion', hasRole('TRANSPORTISTA', 'A
  *         description: Rol no autorizado
  */
 router.post('/:id/confirmar-entrega', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarEntrega);
+// Separate contract: a client must not silently fall back to an older server.
+router.post('/:id/confirmar-entrega-idempotente', hasRole('TRANSPORTISTA', 'ADMIN'), confirmarEntregaIdempotente);
 
 /**
  * @openapi

@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
-import {activeTripKey,clearTripSnapshot,readActiveTrip,readInitialTripStatus,readTripSnapshot,readTripStatus,tripAccessDenied,tripSnapshotKey,tripStatusKey,writeTripSnapshot} from '../../services/tripSnapshot';
+import {activeTripKey,clearTripSnapshot,readActiveTrip,readInitialTripStatus,readTripSnapshot,readTripStatus,tripAccessDenied,tripHandoffState,tripSnapshotKey,tripStatusKey,writeTripSnapshot} from '../../services/tripSnapshot';
 
 beforeEach(()=>localStorage.clear());
 afterEach(()=>{vi.restoreAllMocks();localStorage.clear();});
@@ -43,4 +43,14 @@ it('clears only the delivered trip in its own context',()=>{
 it('treats explicit authorization and missing-record responses as unavailable',()=>{
  for(const status of [401,403,404])expect(tripAccessDenied({response:{status}})).toBe(true);
  for(const error of [new Error('offline'),{response:{status:500}},null])expect(tripAccessDenied(error)).toBe(false);
+});
+
+it('never treats an unknown saved handoff as no handoff',()=>{
+ expect(tripHandoffState(true,true,undefined,false)).toBeNull();
+ expect(tripHandoffState(true,true,'false',false)).toBeNull();
+ expect(tripHandoffState(true,true,true,false)).toBe(true);
+ expect(tripHandoffState(true,true,false,true)).toBe(false);
+ expect(tripHandoffState(true,false,true,null)).toBeNull();
+ expect(tripHandoffState(true,false,false,true)).toBe(true);
+ expect(tripHandoffState(false,true,undefined,null)).toBe(false);
 });

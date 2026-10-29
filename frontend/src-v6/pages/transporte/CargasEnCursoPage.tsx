@@ -5,9 +5,10 @@ import {ArrowLeft,CheckCircle2,Clock3,MapPin,Navigation,Radio,RefreshCw,Search,S
 import {useAuth} from '../../contexts/AuthContext';
 import {useMobilePrefix} from '../../hooks/useMobilePrefix';
 import {useFleetGps} from '../../hooks/useFleetGps';
+import {useConfirmarEntrega} from '../../hooks/useManifiestoWorkflow';
+import {usePendingDeliveryIds} from '../../hooks/usePendingDeliveryIds';
+import {subscribeDeliveryConfirmed} from '../../services/offlineSyncEvents';
 import {fleetGpsService,type FleetGpsLoad} from '../../services/fleet-gps.service';
-import {manifiestoService} from '../../services/manifiesto.service';
-import {withStoredGpsBeforeTransition} from '../../services/gpsTransition';
 import {companyCacheScope} from '../../services/companyContext';
 import {getApiErrorMessage} from '../../utils/api-error';
 import {manifestFeatureVisible} from '../../utils/manifestFeatures';
@@ -25,6 +26,7 @@ function elapsed(start:string|null,now:number) {
 
 export default function CargasEnCursoPage() {
   const {currentUser}=useAuth(),mp=useMobilePrefix(),qc=useQueryClient();
+  const pending=usePendingDeliveryIds(),confirmDelivery=useConfirmarEntrega();
   const scope=`${currentUser?.training?'cap':'op'}:${currentUser?.id}:${currentUser?.rol}:${currentUser?.actorId}:${companyCacheScope(currentUser?.empresaContexto??null)}`;
   const allowed=currentUser?.rol==='TRANSPORTISTA'&&manifestFeatureVisible(import.meta.env.VITE_TRANSPORT_MULTI_GPS_ENABLED,currentUser);
   const [owner,setOwner]=useState(scope),[known,setKnown]=useState<Record<string,FleetGpsLoad>>({}),[selected,setSelected]=useState<string[]>([]),[started,setStarted]=useState(false);
@@ -39,8 +41,19 @@ export default function CargasEnCursoPage() {
   useEffect(()=>{setOwner(scope);setKnown({});setSelected([]);setStarted(false);credentials.current.clear();setDelivery(null);setError('');},[scope]);
   useEffect(()=>{if(query.data&&ownsSession)setKnown(previous=>({...previous,...Object.fromEntries(query.data.targets.map(load=>[load.key,load]))}));},[query.data,ownsSession]);
   useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),15000);return()=>window.clearInterval(timer);},[]);
+  useEffect(()=>{
+    const confirmed=(event:Event)=>{
+      const detail=(event as CustomEvent<{id:string;owner:string}>).detail;
+      if(!detail?.id||!Object.values(known).some(load=>load.id===detail.id))return;
+      setSelected(previous=>previous.filter(key=>known[key]?.id!==detail.id));
+      setDelivery(previous=>previous?.id===detail.id?null:previous);
+      void qc.invalidateQueries({queryKey:['fleet-gps-targets',scope]});
+    };
+    return subscribeDeliveryConfirmed(confirmed);
+  },[known,qc,scope]);
   const chosen=ownsSession?selected.map(key=>known[key]).filter((load):load is FleetGpsLoad=>!!load):[];
-  const gps=useFleetGps(chosen.filter(load=>load.gpsDisponible).map(load=>({key:load.key,send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId)})),allowed&&ownsSession&&started);
+  const canTrack=(load:FleetGpsLoad)=>load.gpsDisponible&&!pending.ids.has(load.id)&&!pending.checking&&!pending.error;
+  const gps=useFleetGps(chosen.filter(canTrack).map(load=>({key:load.key,send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId)})),allowed&&ownsSession&&started);
   const rows=query.data?.targets??[];
   const refresh=async()=>{await qc.invalidateQueries({queryKey:['fleet-gps-targets',scope]});await qc.invalidateQueries({queryKey:['manifiestos']});};
   const toggle=(load:FleetGpsLoad)=>{
@@ -53,9 +66,12 @@ export default function CargasEnCursoPage() {
     try{
       await gps.holdAndDrain(selectedDelivery.key);
       const point=gps.status==='active'&&gps.position&&Date.now()-gps.position.observedAt<60000?gps.position:null;
-      await withStoredGpsBeforeTransition(currentUser?.id,selectedDelivery.id,()=>manifiestoService.confirmarEntrega(selectedDelivery.id,{observaciones:'Entrega confirmada desde las cargas de este móvil',...(point?{latitud:point.latitud,longitud:point.longitud}:{})}));
-      setSelected(previous=>previous.filter(key=>key!==selectedDelivery.key));setDelivery(null);await refresh();
-      toast.success(started&&chosen.length>1?'Entrega registrada. Las demás cargas conservan su seguimiento actual.':'Entrega registrada.');
+      const result=await confirmDelivery.mutateAsync({id:selectedDelivery.id,observaciones:'Entrega confirmada desde las cargas de este móvil',...(point?{latitud:point.latitud,longitud:point.longitud}:{})});
+      setDelivery(null);
+      if(result.status==='confirmed') {
+        setSelected(previous=>previous.filter(key=>key!==selectedDelivery.key));await refresh();
+        toast.success(started&&chosen.length>1?'Entrega registrada. Las demás cargas conservan su seguimiento actual.':'Entrega registrada.');
+      } else toast.info('Entrega pendiente',result.message);
     }catch(cause){gps.resume(selectedDelivery.key);setError(getApiErrorMessage(cause,'No se pudo confirmar la entrega. Revisá la conexión y el estado del manifiesto.'));await query.refetch();}
     finally{deliveryGuard.current=false;setBusy(false);}
   };
@@ -67,19 +83,20 @@ export default function CargasEnCursoPage() {
     <p className="text-sm text-neutral-600">Marcá sólo los manifiestos que llevás en este vehículo.</p>
     <Card><CardContent className="space-y-3">
       <p role="status" aria-live="polite" className={`flex items-center gap-2 rounded-lg p-3 text-sm font-semibold ${started&&gps.status==='active'?'bg-primary-50 text-primary-800':'bg-neutral-100 text-neutral-700'}`}><Radio size={18} aria-hidden="true"/>{label}</p>
-      <Button fullWidth disabled={!started&&chosen.filter(load=>load.gpsDisponible).length===0} leftIcon={retryLocation?<RefreshCw size={18}/>:started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(retryLocation){gps.retryLocation();return;}if(!started)setChoosing(false);setStarted(value=>!value);}}>{retryLocation?'Reintentar GPS':started?'Detener GPS':'Iniciar GPS'}</Button>
+      <Button fullWidth disabled={!started&&chosen.filter(canTrack).length===0} leftIcon={retryLocation?<RefreshCw size={18}/>:started?<Square size={18}/>:<Navigation size={18}/>} onClick={()=>{if(retryLocation){gps.retryLocation();return;}if(!started)setChoosing(false);setStarted(value=>!value);}}>{retryLocation?'Reintentar GPS':started?'Detener GPS':'Iniciar GPS'}</Button>
       {chosen.length>0&&<button type="button" onClick={()=>setChoosing(value=>!value)} className="min-h-11 text-sm font-semibold text-primary-800 underline">{choosing?'Cerrar selección':'Elegir otras cargas'}</button>}
       <p className="text-sm text-neutral-600">Mantené esta pantalla abierta. Las nuevas ubicaciones se comparten con cada carga marcada, hasta una cada 30 segundos. Al entregar una, las demás continúan.</p>
+      {pending.error&&<p role="alert" className="text-sm text-error-800">No pudimos revisar las entregas guardadas. <button type="button" className="font-semibold underline" onClick={pending.retry}>Reintentar</button></p>}
     </CardContent></Card>
     {chosen.length>0&&<Card role="region" aria-label="Cargas marcadas"><CardHeader title={`Cargas marcadas · ${chosen.length}`} icon={<Truck size={20}/>}/><CardContent className="divide-y divide-neutral-100">
       {chosen.map(load=>{
         const sent=gps.deliveries[load.key],duration=elapsed(load.fechaInicio,now),fresh=sent?.receivedAt&&now-sent.receivedAt.getTime()<60000;
-        const state=!load.gpsDisponible?'Pedí un nuevo enlace GPS a la transportista de origen.':sent?.state==='error'?sent.message:sent?.state==='sending'?'Enviando ubicación…':sent?.state==='received'&&fresh?'GPS recibido':sent?.receivedAt?'GPS sin actualización reciente':'Todavía sin envío GPS';
+        const state=pending.ids.has(load.id)?'Entrega pendiente en este dispositivo. Revisá la sincronización.':pending.checking?'Comprobando entregas guardadas…':!load.gpsDisponible?'Pedí un nuevo enlace GPS a la transportista de origen.':sent?.state==='error'?sent.message:sent?.state==='sending'?'Enviando ubicación…':sent?.state==='received'&&fresh?'GPS recibido':sent?.receivedAt?'GPS sin actualización reciente':'Todavía sin envío GPS';
         return <div key={load.key} className="space-y-2 py-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><strong className="block break-words text-sm text-neutral-900">{load.numero}</strong><p className="text-xs text-neutral-600">{load.destino}</p></div><button type="button" disabled={busy&&delivery?.key===load.key} onClick={()=>toggle(load)} className="min-h-11 px-2 text-xs font-semibold text-primary-800 underline" aria-label={`Quitar ${load.numero} del GPS`}>Quitar</button></div>
           <p role="status" className={`text-sm ${sent?.state==='error'?'text-error-800':sent?.state==='received'&&fresh?'text-primary-800':'text-neutral-600'}`}>{state}{sent?.state==='received'&&sent.receivedAt&&<span className="ml-1 text-xs">· {sent.receivedAt.toLocaleTimeString('es-AR')}</span>}</p>
           {sent?.state!=='received'&&sent?.receivedAt&&<p className="text-xs text-neutral-500">Última recepción: {sent.receivedAt.toLocaleTimeString('es-AR')}</p>}
           {duration&&<p className="flex items-center gap-1 text-xs text-neutral-600"><Clock3 size={13}/>{load.referenciaTiempo}: {duration}</p>}
-          <div className="flex flex-wrap gap-2">{sent?.state==='error'&&sent.statusCode!==409&&<Button size="sm" variant="outline" aria-label={`Reintentar envío GPS de ${load.numero}`} onClick={()=>gps.resume(load.key)}>Reintentar envío</Button>}{load.puedeEntregar?<Button size="sm" variant="outline" aria-label={`Entregar ${load.numero}`} leftIcon={<CheckCircle2 size={16}/>} onClick={()=>{setError('');setDelivery(load);}}>Entregar</Button>:<p className="text-xs text-neutral-600">Entrega a cargo de la transportista de origen.</p>}</div>
+          <div className="flex flex-wrap gap-2">{sent?.state==='error'&&sent.statusCode!==409&&canTrack(load)&&<Button size="sm" variant="outline" aria-label={`Reintentar envío GPS de ${load.numero}`} onClick={()=>gps.resume(load.key)}>Reintentar envío</Button>}{load.puedeEntregar?<Button size="sm" variant="outline" aria-label={`Entregar ${load.numero}`} disabled={pending.checking||pending.error||pending.ids.has(load.id)} leftIcon={<CheckCircle2 size={16}/>} onClick={()=>{setError('');setDelivery(load);}}>Entregar</Button>:<p className="text-xs text-neutral-600">Entrega a cargo de la transportista de origen.</p>}</div>
         </div>;
       })}
     </CardContent></Card>}
@@ -89,7 +106,7 @@ export default function CargasEnCursoPage() {
       {query.isLoading&&<p role="status" className="text-sm text-neutral-600">Cargando manifiestos en tránsito…</p>}
       {query.isError&&<div role="alert" className="rounded-lg bg-error-50 p-3 text-sm text-error-800">No se pudo actualizar la lista. Los envíos de las cargas ya marcadas muestran su resultado arriba. <button type="button" onClick={()=>query.refetch()} className="font-semibold underline">Reintentar</button></div>}
       {!query.isLoading&&!query.isError&&rows.length===0&&<p className="text-sm text-neutral-600">{term?'No hay cargas en tránsito con ese número.':'No tenés cargas en tránsito para este GPS.'}</p>}
-      <ul className="divide-y divide-neutral-100">{rows.map(load=><li key={load.key}><label className={`flex min-h-16 items-center gap-3 rounded-lg py-3 ${load.gpsDisponible?'cursor-pointer':'opacity-60'}`}><input type="checkbox" aria-label={`Llevo ${load.numero} en este móvil`} checked={selected.includes(load.key)} disabled={!load.gpsDisponible} onChange={()=>toggle(load)} className="h-5 w-5 shrink-0 accent-primary-700"/><span className="min-w-0"><strong className="block break-words text-sm text-neutral-900">{load.numero}</strong><span className="block text-xs text-neutral-600">{load.destino}</span><span className="block text-xs text-neutral-500">{load.patente||'Sin patente declarada'}{load.kind==='RELEVO'?' · relevo':''}{!load.gpsDisponible?' · enlace GPS no disponible':''}</span></span></label></li>)}</ul>
+      <ul className="divide-y divide-neutral-100">{rows.map(load=><li key={load.key}><label className={`flex min-h-16 items-center gap-3 rounded-lg py-3 ${load.gpsDisponible?'cursor-pointer':'opacity-60'}`}><input type="checkbox" aria-label={`Llevo ${load.numero} en este móvil`} checked={selected.includes(load.key)} disabled={!load.gpsDisponible||(!selected.includes(load.key)&&!canTrack(load))} onChange={()=>toggle(load)} className="h-5 w-5 shrink-0 accent-primary-700"/><span className="min-w-0"><strong className="block break-words text-sm text-neutral-900">{load.numero}</strong><span className="block text-xs text-neutral-600">{load.destino}</span><span className="block text-xs text-neutral-500">{load.patente||'Sin patente declarada'}{load.kind==='RELEVO'?' · relevo':''}{!load.gpsDisponible?' · enlace GPS no disponible':''}{pending.ids.has(load.id)?' · entrega pendiente':''}</span></span></label></li>)}</ul>
       {query.data&&query.data.total>rows.length&&<p className="text-xs text-neutral-600">Se muestran {rows.length} de {query.data.total}. Buscá un número para encontrar otra carga; las ya marcadas siguen enviando GPS.</p>}
     </CardContent></Card>}
     <Modal isOpen={!!delivery} onClose={()=>{if(!busy){setDelivery(null);setError('');}}} title="Confirmar entrega" description={delivery?.numero} size="sm" isBusy={busy}

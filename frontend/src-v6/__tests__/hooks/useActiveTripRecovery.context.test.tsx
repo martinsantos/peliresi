@@ -31,3 +31,14 @@ it('does not let a saved trip in another company prevent recovery for this one',
  await waitFor(()=>expect(readActiveTrip('company-b')).toBe('trip-b'));
  expect(readActiveTrip('company-a')).toBe('trip-a');hook.unmount();
 });
+
+it('does not replace a trip saved while the background recovery request was pending',async()=>{
+ let finish!: (value:unknown)=>void;
+ mock.list.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+ const hook=renderHook(()=>useActiveTripRecovery());
+ await waitFor(()=>expect(mock.list).toHaveBeenCalledTimes(1));
+ writeTripSnapshot('company-a','trip-a',{id:'trip-a',estado:'EN_TRANSITO',handoffActive:true,numero:'QA-VERIFIED'});
+ await act(async()=>{finish({items:[{id:'trip-a',numero:'QA-PARTIAL',estado:'EN_TRANSITO'}],total:1});});
+ expect(readTripSnapshot('company-a','trip-a')).toMatchObject({numero:'QA-VERIFIED',handoffActive:true});
+ hook.unmount();
+});

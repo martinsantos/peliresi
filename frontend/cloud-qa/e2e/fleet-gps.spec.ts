@@ -44,7 +44,7 @@ test('one phone tracks three selected loads, delivers one and isolates a subsequ
     await expect(page.getByText('No hay cargas en tránsito con ese número.', { exact: true })).toBeVisible();
     for (const load of [loads.a, loads.b, loads.incoming]) await expect(selected).toContainText(load.numero);
     await page.getByRole('button', { name: `Entregar ${loads.a.numero}`, exact: true }).click();
-    const delivered = page.waitForResponse(r => r.url().endsWith(`/manifiestos/${loads.a.id}/confirmar-entrega`) && r.request().method() === 'POST');
+    const delivered = page.waitForResponse(r => r.url().endsWith(`/manifiestos/${loads.a.id}/confirmar-entrega-idempotente`) && r.request().method() === 'POST');
     await page.getByRole('dialog', { name: 'Confirmar entrega', exact: true }).getByRole('button', { name: 'Confirmar entrega de esta carga', exact: true }).click();
     expect((await delivered).status()).toBe(200); await expect(selected.getByText(loads.a.numero, { exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Cerrar selección', exact: true }).click();

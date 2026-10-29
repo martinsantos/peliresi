@@ -30,25 +30,29 @@ test('another tab cannot deliver while an active GPS screen can create an unsent
   const errors:string[]=[];tracking.on('pageerror',error=>errors.push(error.message));delivery.on('pageerror',error=>errors.push(error.message));
   await installGps(tracking);
   await tracking.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`,async route=>{gpsAttempts++;await route.abort('failed');});
-  await delivery.route(`**/api/manifiestos/${manifest.id}/confirmar-entrega`,async route=>{transitions++;await gate;await route.continue();});
+  await delivery.route(`**/api/manifiestos/${manifest.id}/confirmar-entrega-idempotente`,async route=>{transitions++;await gate;await route.continue();});
   try{
     await login(tracking,info,'transportista');
     if(info.project.name==='app'){await tracking.setViewportSize({width:320,height:800});await delivery.setViewportSize({width:320,height:800});}
     await tracking.goto(`${mp}/transporte/viaje/${manifest.id}`);
     await expect.poll(()=>tracking.evaluate(()=>(window as any).__crossGps.ready())).toBe(true);
+    await tracking.evaluate(()=>(window as any).__crossGps.emit());
+    await expect(tracking.getByText('Viaje activo',{exact:true})).toBeVisible();
     await delivery.goto(mp+'/transporte/cargas');
     await delivery.getByRole('searchbox',{name:'Número de manifiesto'}).fill(manifest.numero);
     await delivery.getByRole('button',{name:'Buscar',exact:true}).click();
     await delivery.getByRole('checkbox',{name:`Llevo ${manifest.numero} en este móvil`,exact:true}).check();
     await delivery.getByRole('button',{name:`Entregar ${manifest.numero}`,exact:true}).click();
     const dialog=delivery.getByRole('dialog',{name:'Confirmar entrega',exact:true});
-    const response=delivery.waitForResponse(item=>item.request().method()==='POST'&&item.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega`),{timeout:90_000}).catch(()=>null);
+    const response=delivery.waitForResponse(item=>item.request().method()==='POST'&&item.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega-idempotente`),{timeout:90_000}).catch(()=>null);
     await dialog.getByRole('button',{name:'Confirmar entrega de esta carga',exact:true}).click();
-    await expect.poll(async()=>transitions>0||await dialog.getByRole('alert').isVisible()).toBe(true);
+    const retryNotice=delivery.getByRole('status').filter({hasText:'Hay cambios esperando reintento'});
+    await expect.poll(async()=>transitions>0||await retryNotice.isVisible(),{timeout:30_000}).toBe(true);
     const blocked=transitions===0;
-    if(blocked)await expect(dialog.getByRole('alert')).toContainText(/otra pestaña|otra ventana/i);
+    if(blocked)await expect(retryNotice).toContainText(/otra pestaña|otra ventana/i);
+    await expect(tracking.getByText(/El seguimiento sigue abierto en esta pantalla/)).toBeVisible();
+    expect(await tracking.evaluate(()=>(window as any).__crossGps.ready())).toBe(true);
 
-    await tracking.evaluate(()=>(window as any).__crossGps.emit());
     // Use the real 30-second sender: a fake clock also freezes the other tab.
     await expect.poll(()=>gpsAttempts,{timeout:45_000}).toBe(1);
     await expect.poll(()=>tracking.evaluate(key=>localStorage.getItem(key),queueKey)).not.toBeNull();
@@ -60,7 +64,8 @@ test('another tab cannot deliver while an active GPS screen can create an unsent
         const state=await navigator.locks.query();return !state.held.some(lock=>lock.name===`sitrep:gps:${id}`);
       },manifest.id)).toBe(true);
       releaseGate();
-      await dialog.getByRole('button',{name:'Confirmar entrega de esta carga',exact:true}).click();
+      const retry=retryNotice.getByRole('button',{name:'Reintentar',exact:true});
+      if(await retry.isVisible() && await retry.isEnabled())await retry.click();
     }else releaseGate();
     expect((await response)?.status()).toBe(200);
     const left=await delivery.evaluate(key=>localStorage.getItem(key),queueKey);
@@ -77,15 +82,19 @@ test('closing a GPS screen preserves its latest fix before the timed send',async
   const queueKey=`sitrep_gps_v2_${encodeURIComponent(JSON.stringify([String(fixture.owner),manifest.id]))}`;
   const context=await browser.newContext({baseURL:'http://127.0.0.1:4177',viewport:info.project.use.viewport,
     isMobile:info.project.name==='app',hasTouch:info.project.name==='app',serviceWorkers:'block'});
-  const tracking=await context.newPage(),delivery=await context.newPage();let trackingRequests=0;
+  const tracking=await context.newPage(),delivery=await context.newPage();let trackingRequests=0,releaseGps=()=>{};
+  const gpsGate=new Promise<void>(resolve=>{releaseGps=resolve;});
   const errors:string[]=[];tracking.on('pageerror',error=>errors.push(error.message));delivery.on('pageerror',error=>errors.push(error.message));
   await installGps(tracking);
   await tracking.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`,async route=>{trackingRequests++;await route.abort('failed');});
+  await delivery.route(`**/api/manifiestos/${manifest.id}/ubicacion-idempotente`,async route=>{await gpsGate;await route.continue();});
   try{
     await login(tracking,info,'transportista');
     if(info.project.name==='app'){await tracking.setViewportSize({width:320,height:800});await delivery.setViewportSize({width:320,height:800});}
     await tracking.goto(`${mp}/transporte/viaje/${manifest.id}`);
     await expect.poll(()=>tracking.evaluate(()=>(window as any).__crossGps.ready())).toBe(true);
+    await tracking.evaluate(()=>(window as any).__crossGps.emit());
+    await expect(tracking.getByText('Viaje activo',{exact:true})).toBeVisible();
     await delivery.goto(mp+'/transporte/cargas');
     await delivery.getByRole('searchbox',{name:'Número de manifiesto'}).fill(manifest.numero);
     await delivery.getByRole('button',{name:'Buscar',exact:true}).click();
@@ -93,23 +102,24 @@ test('closing a GPS screen preserves its latest fix before the timed send',async
     await delivery.getByRole('button',{name:`Entregar ${manifest.numero}`,exact:true}).click();
     const dialog=delivery.getByRole('dialog',{name:'Confirmar entrega',exact:true});
     await dialog.getByRole('button',{name:'Confirmar entrega de esta carga',exact:true}).click();
-    await expect(dialog.getByRole('alert')).toContainText(/otra pestaña|otra ventana/i);
+    const retryNotice=delivery.getByRole('status').filter({hasText:'Hay cambios esperando reintento'});
+    await expect(retryNotice).toContainText(/otra pestaña|otra ventana/i,{timeout:30_000});
+    await expect(tracking.getByText(/El seguimiento sigue abierto en esta pantalla/)).toBeVisible();
+    expect(await tracking.evaluate(()=>(window as any).__crossGps.ready())).toBe(true);
     await delivery.screenshot({path:info.outputPath('gps-bloqueo-otra-pestana.png'),animations:'disabled'});
-    await tracking.evaluate(()=>(window as any).__crossGps.emit());
     expect(trackingRequests).toBe(0);
     expect(await tracking.evaluate(key=>localStorage.getItem(key),queueKey)).toBeNull();
     await tracking.close({runBeforeUnload:true});
     await expect.poll(()=>delivery.evaluate(key=>localStorage.getItem(key),queueKey)).not.toBeNull();
     const pending=await delivery.evaluate(key=>JSON.parse(localStorage.getItem(key)!),queueKey);
     expect(pending).toHaveLength(1); expect(pending[0]).toMatchObject({lat:-33.61,lng:-68.61,puntoId:expect.any(String)});
-    await expect.poll(async()=>delivery.evaluate(async id=>{
-      const state=await navigator.locks.query();return !state.held.some(lock=>lock.name===`sitrep:gps:${id}`);
-    },manifest.id)).toBe(true);
-    const response=delivery.waitForResponse(item=>item.request().method()==='POST'&&item.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega`));
-    await dialog.getByRole('button',{name:'Confirmar entrega de esta carga',exact:true}).click();
+    const response=delivery.waitForResponse(item=>item.request().method()==='POST'&&item.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega-idempotente`));
+    releaseGps();
+    const retry=retryNotice.getByRole('button',{name:'Reintentar',exact:true});
+    if(await retry.isVisible() && await retry.isEnabled())await retry.click();
     expect((await response).status()).toBe(200);
     expect(await delivery.evaluate(key=>localStorage.getItem(key),queueKey)).toBeNull();
     expect(errors).toEqual([]);
     writeFileSync(info.outputPath('close-before-send-proof.json'),JSON.stringify({surface:info.project.name,synthetic:true,trackingRequestsBeforeClose:trackingRequests,pendingAfterDelivery:false}));
-  }finally{await context.close();}
+  }finally{releaseGps();await context.close();}
 });

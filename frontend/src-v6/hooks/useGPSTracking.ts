@@ -12,7 +12,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from '../components/ui/Toast';
 import { manifiestoService } from '../services/manifiesto.service';
-import { GPS_DELIVERY_CONFIRMED_EVENT, GpsPendingError, acknowledgeGpsPoint, gpsTasksForTrip, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
+import { GpsPendingError, acknowledgeGpsPoint, gpsTasksForTrip, newGpsPointId, prepareGpsPoints, readPendingGpsQueue, runExclusiveGpsTask, savePendingGpsQueue, trackGpsTask, type GpsStorageIssue, type PendingGpsPoint } from '../services/gpsQueue';
+import { subscribeDeliveryConfirmed } from '../services/offlineSyncEvents';
 import { gpsLeaseClosing, rememberGpsLeaseClosing, startGpsLease, withGpsTransitionLock, type GpsLease } from '../services/gpsCoordination';
 import { EstadoManifiesto } from '../types/models';
 import { createGpsFixOrder } from '../utils/gpsFixOrder';
@@ -597,8 +598,7 @@ export function useGPSTracking({ manifiestoId, ownerId, estado, viajeStatus }: U
       setGpsSendStatus('idle');
       cleanupGps();
     };
-    window.addEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
-    return () => window.removeEventListener(GPS_DELIVERY_CONFIRMED_EVENT, onDelivery);
+    return subscribeDeliveryConfirmed(onDelivery);
   }, [cleanupGps, id, owner, clearSendError]);
 
   return {

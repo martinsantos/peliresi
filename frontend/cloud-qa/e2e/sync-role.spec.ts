@@ -27,8 +27,8 @@ test('an offline delivery waits for its original role after the same account cha
   const page=await context.newPage(),holder=await context.newPage();
   const errors:string[]=[],statuses:number[]=[];let attempts=0;
   page.on('pageerror',error=>errors.push(error.message));
-  page.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega`))attempts++;});
-  page.on('response',response=>{if(response.request().method()==='POST'&&response.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega`))statuses.push(response.status());});
+  page.on('request',request=>{if(request.method()==='POST'&&request.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega-idempotente`))attempts++;});
+  page.on('response',response=>{if(response.request().method()==='POST'&&response.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega-idempotente`))statuses.push(response.status());});
   await page.addInitScript(()=>Object.defineProperty(navigator,'geolocation',{configurable:true,value:{
     watchPosition(){return 1;},getCurrentPosition(){},clearWatch(){},
   }}));
@@ -72,7 +72,7 @@ test('an offline delivery waits for its original role after the same account cha
     const contextNotice=page.getByRole('status').filter({hasText:'Volvé a Transporte y, si corresponde'});
     await expect(contextNotice).toBeVisible();
     await expect(contextNotice.getByRole('button',{name:'Reintentar',exact:true})).toHaveCount(0);
-    const confirmed=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega`),{timeout:30_000});
+    const confirmed=page.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith(`/manifiestos/${manifest.id}/confirmar-entrega-idempotente`),{timeout:30_000});
     await page.getByRole('button',{name:'Usar Transportista',exact:true}).click();
     expect((await confirmed).status()).toBe(200);
     await expect.poll(()=>queue(page)).toEqual([]);

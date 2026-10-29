@@ -51,8 +51,21 @@ test('a saved trip from one company is not shown after switching to another comp
   const route=`**/api/manifiestos/${manifest.id}`;
   await page.route(route,handler=>handler.abort('failed'));
   await page.goto(`${mp}/transporte/viaje/${manifest.id}`);
-  await expect(page.getByText('Último estado guardado',{exact:true})).toBeVisible({timeout:30_000});
+  await expect(page.getByText('Último estado guardado.',{exact:true})).toBeVisible({timeout:30_000});
   await expect(page.getByText(manifest.numero,{exact:true})).toBeVisible();
+  // An older scoped copy with no verified handoff state is not evidence that
+  // the original transporter still has custody. Do not start GPS or deliver.
+  const savedHandoff=await page.evaluate(id=>{
+    const key=Object.keys(localStorage).find(k=>k.startsWith('viaje_snapshot_v2_')&&JSON.parse(localStorage.getItem(k)||'{}').id===id);
+    if(!key)throw new Error('Falta la copia del viaje de prueba');
+    const value=JSON.parse(localStorage.getItem(key)!);const handoff=value.handoffActive;
+    delete value.handoffActive;localStorage.setItem(key,JSON.stringify(value));return {key,handoff};
+  },manifest.id);
+  await page.reload();
+  await expect(page.getByText(/Comprobando si hay un relevo/)).toBeVisible({timeout:30_000});
+  await expect(page.getByRole('button',{name:'Confirmar entrega',exact:true})).toBeDisabled();
+  expect(await page.evaluate(()=>(window as any).__qaGpsWatches),'Un relevo desconocido no debe iniciar el GPS').toBe(0);
+  await page.evaluate(({key,handoff})=>{const value=JSON.parse(localStorage.getItem(key)!);value.handoffActive=handoff;localStorage.setItem(key,JSON.stringify(value));},savedHandoff);
   await page.unroute(route);
   // Even a matching old copy cannot override an explicit denial in the current context.
   let requested=0;const gate=new Promise<void>(resolve=>{releaseDenial=resolve;});
@@ -64,7 +77,7 @@ test('a saved trip from one company is not shown after switching to another comp
   await expect(page.getByRole('heading',{name:'Viaje no disponible',exact:true})).toBeVisible({timeout:30_000});
   expect(await page.getByText(manifest.numero,{exact:true}).count()).toBe(0);
   expect(requested,'Una denegación explícita no debe reintentarse automáticamente').toBe(1);
-  writeFileSync(info.outputPath('trip-scope-proof.json'),JSON.stringify({surface:info.project.name,synthetic:true,deniedStatus:status,staleTripShown:false,ownOfflineCopy:true,explicitDenialHidden:true,legacyPausePreserved:true}));
+  writeFileSync(info.outputPath('trip-scope-proof.json'),JSON.stringify({surface:info.project.name,synthetic:true,deniedStatus:status,staleTripShown:false,ownOfflineCopy:true,unknownHandoffBlocked:true,explicitDenialHidden:true,legacyPausePreserved:true}));
   expect(errors).toEqual([]);
  }finally{releaseDenial();await context.close();}
 });

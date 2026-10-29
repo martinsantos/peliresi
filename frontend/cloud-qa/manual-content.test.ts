@@ -55,11 +55,15 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(recovery, /Administración puede consultar el punto recibido desde Monitor/);
   assert.match(recovery, /la hora indica cuándo llegó a SITREP y el punto puede ser anterior/i);
   assert.match(recovery, /una entrega puede quedar guardada para enviarse al reconectar con la misma cuenta/i);
+  assert.match(recovery, /no pudo comprobar si existe un relevo, reconectate/i);
   assert.match(recovery, /ubicaciones anteriores sin titular identificado se conservan para revisión/i);
   assert.match(recovery, /ubicaciones de otra cuenta en este navegador o app/i);
   assert.match(recovery, /otra pestaña mantiene abierto el seguimiento individual/i);
   assert.match(recovery, /copia del último viaje se guarda para la cuenta, actividad y empresa o establecimiento/i);
   assert.match(recovery, /si SITREP deniega el acceso, no se muestra la copia guardada/i);
+  assert.match(recovery, /conserva el envío en este dispositivo hasta recibir una confirmación verificable/i);
+  assert.match(recovery, /al reabrir, usá la misma cuenta y actividad/i);
+  assert.match(recovery, /no confirmes una segunda entrega desde otro dispositivo/i);
   assert.match(recovery, /se intenta guardar la última lectura no enviada/i);
   assert.match(recovery, /no comprueba otros dispositivos ni perfiles de navegador/i);
   assert.match(recovery, /otra ventana está sincronizando esa misma cuenta/i);

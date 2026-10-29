@@ -137,6 +137,50 @@ it('does not requeue an acknowledged delivery when clearing its local snapshot f
   }finally{remove.mockRestore();}
 });
 
+it('only removes a referenced delivery after a matching server acknowledgement', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega-idempotente',data:{referencia:'ref-1'},userId:'account-a',contextOwner:'transport-context',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]); mock.post.mockResolvedValueOnce({ data:{ success:true, data:{ manifiesto:{id:'trip',estado:'ENTREGADO',fechaEntrega:'2026-10-29T00:00:00Z'}, idempotencia:{version:1,referencia:'other',repetido:false} } } });
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const first=await processSyncQueue('account-a',transportContext,true);
+  expect(first.pending).toBe(1); expect(first.retryable).toBe(1); expect(store.remaining()).toHaveLength(1);
+  mock.post.mockResolvedValueOnce({ data:{ success:true, data:{ manifiesto:{id:'trip',estado:'ENTREGADO',fechaEntrega:'2026-10-29T00:00:00Z'}, idempotencia:{version:1,referencia:'ref-1',repetido:true} } } });
+  expect((await processSyncQueue('account-a',transportContext,true)).processed).toBe(1);
+  expect(store.remaining()).toEqual([]);
+});
+
+it('marks a lost delivery response as uncertain and keeps the same reference', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega-idempotente',data:{referencia:'ref-1'},userId:'account-a',contextOwner:'transport-context',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]); mock.post.mockRejectedValueOnce(Object.assign(new Error('Network Error'),{isAxiosError:true}));
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const result=await processSyncQueue('account-a',transportContext,true);
+  expect(result).toMatchObject({pending:1,retryable:1});
+  expect(result.lastError).toMatch(/no recibimos confirmación/i);
+  expect(store.remaining()[0]).toMatchObject({lastFailureUncertain:true,data:{referencia:'ref-1'}});
+});
+
+it('reports a GPS synchronization failure before delivery without claiming the delivery was sent', async () => {
+  const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega-idempotente',data:{referencia:'ref-1'},userId:'account-a',contextOwner:'transport-context',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([action]);
+  localStorage.setItem(gpsQueueKey('account-a','trip'),JSON.stringify([{lat:-33,lng:-68,speed:null,heading:null}]));
+  mock.post.mockRejectedValueOnce(Object.assign(new Error('Network Error'),{isAxiosError:true}));
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  const result=await processSyncQueue('account-a',transportContext,true);
+  expect(result).toMatchObject({pending:1,retryable:1});expect(result.lastError).toMatch(/ubicaciones pendientes/i);
+  expect(store.remaining()[0]).toMatchObject({lastFailureUncertain:false});
+  expect(mock.post.mock.calls[0][0]).toContain('/ubicacion-idempotente');
+  expect(mock.post).toHaveBeenCalledOnce();
+});
+
+it('a targeted delivery retry does not send other queued actions', async () => {
+  const first={id:1,type:'POST',endpoint:'/other-action',data:{},userId:'account-a',contextOwner:'transport-context',createdAt:'2026-10-28T00:00:00Z'};
+  const second={id:2,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega-idempotente',data:{referencia:'ref-1'},userId:'account-a',contextOwner:'transport-context',createdAt:'2026-10-28T00:00:00Z'};
+  const store=mockQueue([first,second]);
+  mock.post.mockResolvedValueOnce({data:{success:true,data:{manifiesto:{id:'trip',estado:'ENTREGADO',fechaEntrega:'2026-10-29T00:00:00Z'},idempotencia:{version:1,referencia:'ref-1',repetido:false}}}});
+  const {processSyncQueue}=await import('../../services/indexeddb');
+  expect((await processSyncQueue('account-a',transportContext,true,()=>true,2)).processed).toBe(1);
+  expect(mock.post).toHaveBeenCalledOnce();expect(store.remaining()).toEqual([first]);
+});
+
 it('does not inspect or send a waiting account after its active context changes', async () => {
   const action={id:1,type:'POST',endpoint:'/manifiestos/trip/confirmar-entrega',data:{},userId:'account-a',createdAt:'2026-10-28T00:00:00Z'};
   const store=mockQueue([action]);let acknowledge!:()=>void,current=true;

@@ -560,6 +560,19 @@ describe('GPS position provenance and cleanup', () => {
     unmount();
   });
 
+  it('does not discard this account’s saved GPS on a confirmation from another account', async () => {
+    const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
+    const point = { lat:-32, lng:-68, speed:null, heading:null };
+    localStorage.setItem(key, JSON.stringify([point]));
+    vi.mocked(manifiestoService.actualizarUbicacion).mockRejectedValue(new Error('offline'));
+    const { result, unmount } = renderHook(() => useGPSTracking(trip));
+    await act(async () => {});
+    act(() => window.dispatchEvent(new CustomEvent(GPS_DELIVERY_CONFIRMED_EVENT, { detail: { id:trip.manifiestoId, owner:'another-account' } })));
+    expect(result.current.deliveryWasConfirmed()).toBe(false);
+    expect(JSON.parse(localStorage.getItem(key)!)).toEqual([expect.objectContaining({ ...point, puntoId: expect.any(String) })]);
+    unmount();
+  });
+
   it('warns when GPS cannot be stored and retains it in memory across reopening in the same page', async () => {
     const key = gpsQueueKey(trip.ownerId, trip.manifiestoId);
     const original = Storage.prototype.setItem;

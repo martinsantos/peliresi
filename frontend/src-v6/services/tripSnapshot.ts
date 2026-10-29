@@ -9,6 +9,14 @@ export function tripAccessDenied(error: unknown): boolean {
   return status === 401 || status === 403 || status === 404;
 }
 
+/** Unknown is distinct from "no handoff": never restart the original GPS
+ * from a saved trip until the latest locally verified handoff state is known. */
+export function tripHandoffState(enabled: boolean, usingSavedCopy: boolean, saved: unknown, verified: boolean | null): boolean | null {
+  if (!enabled) return false;
+  if (usingSavedCopy) return typeof saved === 'boolean' ? saved : null;
+  return verified;
+}
+
 export function readTripSnapshot<T extends { id?: string }>(owner: string, id: string): T | null {
   if (!owner || !id) return null;
   try {
