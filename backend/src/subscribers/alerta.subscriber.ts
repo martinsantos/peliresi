@@ -32,20 +32,26 @@ async function notificarAdmins(
   prioridad: PrioridadNotificacion,
   excluirId?: string,
 ): Promise<void> {
-  const admins = await prisma.usuario.findMany({
-    where: { rol: 'ADMIN', activo: true },
-    select: { id: true },
-  });
-  const ids = admins.map(a => a.id).filter(id => id !== excluirId);
-  const existing = ids.length ? await prisma.notificacion.findMany({
-    where: { usuarioId: { in: ids }, tipo, titulo, manifiestoId: manifiestoId ?? null, createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) } },
-    select: { usuarioId: true },
-  }) : [];
-  const alreadyNotified = new Set(existing.map((notification) => notification.usuarioId));
-  for (const usuarioId of ids) {
-    if (alreadyNotified.has(usuarioId)) continue;
-    await notificationService.crearNotificacion({ usuarioId, tipo, titulo, mensaje, manifiestoId, prioridad });
-  }
+  const notices = await prisma.$transaction(async tx => {
+    // Serialize only observations with the same notice identity. Other trips
+    // and other GPS classes can still be evaluated independently.
+    const lockKey = JSON.stringify(['default-admin-notice', tipo, titulo, manifiestoId ?? null]);
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text`;
+    const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`;
+    const admins = await tx.usuario.findMany({ where: { rol: 'ADMIN', activo: true }, select: { id: true } });
+    const ids = admins.map(admin => admin.id).filter(id => id !== excluirId);
+    const existing = ids.length ? await tx.notificacion.findMany({
+      where: { usuarioId: { in: ids }, tipo, titulo, manifiestoId: manifiestoId ?? null,
+        createdAt: { gte: new Date(now.getTime() - 30 * 60 * 1000) } },
+      select: { usuarioId: true },
+    }) : [];
+    const alreadyNotified = new Set(existing.map(notice => notice.usuarioId));
+    const fresh = ids.filter(id => !alreadyNotified.has(id)).map(usuarioId => ({ id: randomUUID(), usuarioId,
+      tipo, titulo, mensaje, manifiestoId: manifiestoId ?? null, prioridad, createdAt: now }));
+    if (fresh.length) await tx.notificacion.createMany({ data: fresh });
+    return fresh;
+  }, { isolationLevel: 'ReadCommitted', maxWait: 10_000, timeout: 10_000 });
+  for (const notice of notices) notificationService.programarCanalesDeNotificacion(notice);
 }
 
 export async function dispararReglasAlerta(
