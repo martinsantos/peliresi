@@ -1,24 +1,21 @@
 import {api} from './api';
 import {manifiestoService} from './manifiesto.service';
-import {limitedLegRequest,type TransportGpsPoint,type LimitedTransportUpload} from './limited-transport-gps';
+import {limitedLegReceipt,limitedLegRequest,relayCapabilityVersion,type TransportGpsPoint,type LimitedTransportUpload} from './limited-transport-gps';
 import {matchesGpsReceipt} from './gpsReceipts';
 export interface FleetGpsLoad {
   key:string;kind:'MANIFIESTO'|'RELEVO';id:string;numero:string;origen:string;destino:string;
   fechaInicio:string|null;referenciaTiempo:string;patente:string|null;puedeEntregar:boolean;gpsDisponible:boolean;
 }
 export interface FleetGpsLoads {targets:FleetGpsLoad[];total:number;limit:number}
-// Idempotence for a relay is scoped by the capability version on the server.
-// Keep the non-secret version in memory with an uncertain point; a rotated
-// capability must not silently turn a retry into a second location.
+// Additional in-page protection for clients with no durable record.
 const relayPointVersions=new Map<string,string>();
-function relayVersion(token:string):string {
-  try{
-    const part=token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
-    const claim=JSON.parse(atob(part.padEnd(Math.ceil(part.length/4)*4,'='))) as {jti?:unknown};
-    if(typeof claim.jti==='string'&&claim.jti.length>0)return claim.jti;
-  }catch{/* A capability whose version cannot be read must not be retried. */}
-  throw new Error('No se pudo verificar la autorización del relevo. Pedí un nuevo enlace y consultá a soporte.');
+async function relayAccess(load:FleetGpsLoad,credentials:Map<string,string>,isCurrent:()=>boolean) {
+  const ensure=()=>{if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');};
+  ensure();let token=credentials.get(load.key);
+  if(!token){token=(await api.post<{data:{acceso:string}}>(`/manifiestos/relevos-asignados/${load.id}/acceso`,{})).data.data.acceso;ensure();credentials.set(load.key,token);}
+  ensure();return {token,version:relayCapabilityVersion(token)};
 }
+const changedRelay=()=>Object.assign(new Error('La autorización del relevo cambió con una ubicación sin confirmar. Conservá este dispositivo y consultá a soporte.'),{status:409});
 export const fleetGpsService={
   list:async(search=''):Promise<FleetGpsLoads>=>(await api.get<{data:FleetGpsLoads}>('/manifiestos/cargas-en-curso',{params:search?{search}:undefined})).data.data,
   async verify(load:FleetGpsLoad,point:TransportGpsPoint,puntoId:string,isCurrent:()=>boolean):Promise<boolean> {
@@ -29,17 +26,29 @@ export const fleetGpsService={
     if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');
     return matchesGpsReceipt(response,{lat:point.latitud,lng:point.longitud,speed:point.velocidad??null,heading:point.direccion??null,puntoId});
   },
-  async send(load:FleetGpsLoad,point:TransportGpsPoint,credentials:Map<string,string>,puntoId:string,isCurrent:()=>boolean=()=>true) {
+  async prepareRelay(load:FleetGpsLoad,credentials:Map<string,string>,isCurrent:()=>boolean):Promise<string>{
+    if(load.kind!=='RELEVO')throw new Error('No se pudo identificar el relevo.');
+    return (await relayAccess(load,credentials,isCurrent)).version;
+  },
+  async verifyRelay(load:FleetGpsLoad,point:TransportGpsPoint,puntoId:string,expectedVersion:string|null|undefined,credentials:Map<string,string>,isCurrent:()=>boolean):Promise<boolean>{
+    if(load.kind!=='RELEVO'||!expectedVersion)return false;
+    const {token}=await relayAccess(load,credentials,isCurrent);
+    try{const result=await limitedLegReceipt(load.id,token,point,puntoId,expectedVersion);if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');return result;}
+    catch(error){if(error&&typeof error==='object'&&'status'in error&&[401,403].includes(Number(error.status)))credentials.delete(load.key);throw error;}
+  },
+  async send(load:FleetGpsLoad,point:TransportGpsPoint,credentials:Map<string,string>,puntoId:string,isCurrent:()=>boolean=()=>true,expectedVersion?:string) {
     const ensureSession=()=>{if(!isCurrent())throw new Error('La cuenta o actividad cambió. Volvé a abrir GPS de mis viajes con la cuenta original.');};
     ensureSession();
     if(load.kind==='MANIFIESTO'){await manifiestoService.actualizarUbicacion(load.id,point.latitud,point.longitud,point.velocidad,point.direccion,puntoId);ensureSession();return;}
-    let token=credentials.get(load.key);
-    if(!token){token=(await api.post<{data:{acceso:string}}>(`/manifiestos/relevos-asignados/${load.id}/acceso`,{})).data.data.acceso;ensureSession();credentials.set(load.key,token);}
+    const {token,version}=await relayAccess(load,credentials,isCurrent);
     try{
       ensureSession();
-      const pointKey=JSON.stringify([load.id,puntoId]),version=relayVersion(token),previous=relayPointVersions.get(pointKey);
-      if(previous&&previous!==version)throw new Error('La autorización del relevo cambió con una ubicación sin confirmar. Conservá esta pantalla y consultá a soporte.');
-      relayPointVersions.set(pointKey,version);
+      const pointKey=JSON.stringify([load.id,puntoId]),previous=relayPointVersions.get(pointKey);
+      // With a durable point, the caller has bound this version in storage;
+      // changing it is allowed only after an exact negative server receipt.
+      // Keep the in-memory guard for older callers without that proof.
+      if(expectedVersion?expectedVersion!==version:previous&&previous!==version)throw changedRelay();
+      if(!expectedVersion)relayPointVersions.set(pointKey,version);
       const result=await limitedLegRequest<LimitedTransportUpload>(load.id,token,point,puntoId);
       ensureSession();relayPointVersions.delete(pointKey);return result;
     }

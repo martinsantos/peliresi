@@ -73,5 +73,11 @@ it('scopes a dedicated school GPS capability only to its narrow endpoint',()=>{
   const token=sign({realm:TRAINING_REALM,purpose:TRANSPORT_GPS_PURPOSE,aud:TRANSPORT_GPS_PURPOSE,sub:'af1388bc-43f7-4c73-8e9c-c14c46695881'});
   expect(run('/api/seguimiento-relevo/af1388bc-43f7-4c73-8e9c-c14c46695881',token).next.mock.results[0].value).toBe(true);
   expect(run('/api/seguimiento-relevo/af1388bc-43f7-4c73-8e9c-c14c46695881/ubicacion',token,{},'POST').next.mock.results[0].value).toBe(true);
+  const base='/api/seguimiento-relevo/af1388bc-43f7-4c73-8e9c-c14c46695881';
+  const receipt=base+'/ubicaciones/1949916e-22df-4dc1-9d1e-98f98a3eab26/confirmacion';
+  expect(run(base+'/ubicacion-idempotente',token,{},'POST').next.mock.results[0].value).toBe(true);
+  expect(run(receipt,token).next.mock.results[0].value).toBe(true);
+  expect(run(receipt,token,{},'POST').next).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
+  expect(run(base+'/ubicacion-idempotente',token).next).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
   for(const path of ['/api/manifiestos','/api/auth/profile','/api/seguimiento-relevo/af1388bc-43f7-4c73-8e9c-c14c46695881/entregar'])expect(run(path,token).next).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));
 });

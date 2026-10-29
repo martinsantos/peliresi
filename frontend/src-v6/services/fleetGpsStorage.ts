@@ -9,6 +9,8 @@ export interface FleetStoredPoint {
   targetKey: string;
   puntoId: string;
   observedAt: number;
+  /** null means the point has not been sent and is not yet bound to a relay authorization. */
+  capabilityVersion?: string | null;
   point: { latitud: number; longitud: number; precision: number; velocidad?: number; direccion?: number };
 }
 const prefixFor = (targetKey: string) => PREFIX + encodeURIComponent(targetKey) + ':';
@@ -24,7 +26,32 @@ function valid(item: unknown, targetKey: string, storageKey: string): item is Fl
     && Number.isFinite(p.longitud) && p.longitud >= -180 && p.longitud <= 180
     && Number.isFinite(p.precision) && p.precision >= 0
     && (p.velocidad === undefined || (Number.isFinite(p.velocidad) && p.velocidad >= 0))
-    && (p.direccion === undefined || Number.isFinite(p.direccion));
+    && (p.direccion === undefined || Number.isFinite(p.direccion))
+    && (value.capabilityVersion === undefined || value.capabilityVersion === null || (typeof value.capabilityVersion === 'string' && UUID.test(value.capabilityVersion)));
+}
+
+/** Bind an unsent point before its first network request. A single localStorage
+ * write replaces only the exact unbound record, under the caller's leg lock. */
+function writeFleetGpsCapability(item: FleetStoredPoint, version: string): FleetStoredPoint {
+  if(!UUID.test(version))throw new GpsPendingError('No se pudo verificar la autorización del relevo.','invalid');
+  const key=keyFor(item),bound={...item,capabilityVersion:version};
+  if(!valid(bound,item.targetKey,key))throw failure();
+  try{
+    if(localStorage.getItem(key)!==JSON.stringify(item))throw failure();
+    const raw=JSON.stringify(bound);localStorage.setItem(key,raw);
+    if(localStorage.getItem(key)!==raw)throw failure();
+    return bound;
+  }catch(error){if(error instanceof GpsPendingError)throw error;throw failure();}
+}
+export function bindFleetGpsCapability(item: FleetStoredPoint, version: string): FleetStoredPoint {
+  if(item.capabilityVersion!==null)throw new GpsPendingError('No se pudo verificar la autorización del relevo.','invalid');
+  return writeFleetGpsCapability(item,version);
+}
+/** The caller may rebind only after the server confirmed that the exact point
+ * did not arrive under the old version and invalidated that version. */
+export function rebindFleetGpsCapabilityAfterAbsence(item: FleetStoredPoint, version: string): FleetStoredPoint {
+  if(typeof item.capabilityVersion!=='string'||item.capabilityVersion===version)throw new GpsPendingError('No se pudo verificar la autorización anterior del relevo.','invalid');
+  return writeFleetGpsCapability(item,version);
 }
 
 /** Invalid or inaccessible data is retained and blocks the corresponding

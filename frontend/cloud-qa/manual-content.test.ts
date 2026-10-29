@@ -95,9 +95,12 @@ test('GPS guidance distinguishes device signal from server receipt and scopes th
   assert.match(monitor, /líneas entre puntos no demuestran el trayecto/i);
   assert.match(monitor, /detalle de viaje es una instantánea del momento en que lo abriste/i);
   assert.match(monitor, /velocidad no se muestra hasta verificar la unidad/i);
-  assert.match(monitor, /misma lectura conserva su referencia durante ese seguimiento/i);
-  assert.match(monitor, /no conserva la referencia al cerrar la pantalla/i);
-  assert.match(monitor, /no se garantiza recuperar o identificar aquella ubicación/i);
+  assert.match(monitor, /primer intento se guarda en este dispositivo con su referencia, sin guardar el enlace de acceso/i);
+  assert.match(monitor, /se conserva sólo el primer intento pendiente por carga/i);
+  assert.match(monitor, /si se renovó la autorización, abrí el enlace vigente/i);
+  assert.match(monitor, /si no llegó y aún es reciente/i);
+  assert.match(monitor, /el enlace revocado no funciona/i);
+  assert.match(monitor, /otro dispositivo o perfil no comparte esta copia/i);
   assert.match(monitor, /alertas de velocidad, parada o pérdida de GPS usan el intervalo entre recepciones/i);
   assert.match(monitor, /mensajes anteriores conservan su texto y muestran una aclaración/i);
 });

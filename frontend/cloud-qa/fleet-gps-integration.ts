@@ -62,7 +62,9 @@ try {
     assert.equal(JSON.stringify(replacement).includes(incoming.id), false);
     assert.equal((await request('GET', '/manifiestos/cargas-en-curso?search=' + encodeURIComponent(prefix), tokens.foreign)).body.data.total, 0);
     assert.equal((await request('POST', `/manifiestos/${a.id}/ubicacion`, tokens.foreign, { latitud: -33, longitud: -69 })).status, 404);
-    cases[project] = { prefix, a, b, incoming: { ...incoming, tramoId: handoff.body.data.tramo.id } };
+    const stale = process.env.QA_EXTRA_RELAY_CASES==='true' ? await create('STALE') : undefined;
+    const missing = process.env.QA_EXTRA_RELAY_CASES==='true' ? await create('MISSING') : undefined;
+    cases[project] = { prefix, a, b, incoming: { ...incoming, tramoId: handoff.body.data.tramo.id }, ...(stale?{stale}:{}), ...(missing?{missing}:{}) };
     checks.push(project + ':only-own-original-and-assigned-limited-loads', project + ':handed-off-origin-excluded', project + ':unrelated-gps-denied');
   }
   for (const role of ['generator', 'operator', 'admin']) assert.equal((await request('GET', '/manifiestos/cargas-en-curso', tokens[role])).status, 403);

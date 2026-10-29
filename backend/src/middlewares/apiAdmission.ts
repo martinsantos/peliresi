@@ -16,7 +16,7 @@ export const API_ADMISSION_LIMIT = 600;
 export function admissionFamily(req: Pick<Request, 'method' | 'originalUrl'>): AdmissionFamily {
   let path = req.originalUrl.split('?')[0];
   try { path = decodeURIComponent(path).toLowerCase().replace(/\/+$/, ''); } catch { /* route validation handles malformed paths */ }
-  if (req.method === 'POST' && /^\/api\/(?:manifiestos|seguimiento-relevo)\/[^/]+\/ubicacion$/.test(path)) return 'gps';
+  if (req.method === 'POST' && /^\/api\/(?:manifiestos|seguimiento-relevo)\/[^/]+\/ubicacion(?:-idempotente)?$/.test(path)) return 'gps';
   if (/^\/api\/pdf(?:\/|$)/.test(path) || /(?:\/pdf|\.pdf)$/.test(path)
     || /^\/api\/manifiestos\/[^/]+\/(?:certificados|documentos-cap)\/[^/]+\/archivo$/.test(path)) return 'documents';
   return ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? 'reads' : 'writes';

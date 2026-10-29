@@ -7,6 +7,7 @@ export interface FleetGpsObservation {
   observedAt: number;
   fingerprint: string | null;
   references: Map<string, string>;
+  capabilityVersions?: Map<string, string>;
 }
 const volatile = new Map<string, FleetGpsObservation>();
 const notices = new Map<string, string>();
@@ -22,10 +23,10 @@ export function rememberVolatileFleetObservation(key: string, observation: Fleet
   if (!volatile.has(key)) volatile.set(key, observation);
   updateWarning();
 }
-export function showVolatileFleetWarning(key: string): void {
+export function showVolatileFleetWarning(key: string, recoveryMessage?: string): void {
   if (notices.has(key)) return;
   notices.set(key, toast.add({ type: 'error', title: 'Ubicación GPS sin guardar',
-    message: 'No cierres ni recargues SITREP. Volvé en esta ventana a GPS de mis viajes con la misma cuenta y actividad y reintentá.', duration: 0 }));
+    message: recoveryMessage || 'No cierres ni recargues SITREP. Volvé en esta ventana a GPS de mis viajes con la misma cuenta y actividad y reintentá.', duration: 0 }));
 }
 export function clearVolatileFleetObservation(key: string): void {
   volatile.delete(key);

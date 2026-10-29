@@ -201,6 +201,35 @@ export async function limitedTransportState(req:AuthRequest,res:Response,next:Ne
   }catch(error){next(error);}
 }
 const idempotentLegPointSchema = gpsPointSchema.extend({puntoId:z.string().uuid('La referencia de la ubicación no es válida')});
+const legTrackingId=(legId:string,version:string,puntoId:string)=>'gpslegv1_'+createHash('sha256').update(JSON.stringify([legId,version,puntoId.toLowerCase()])).digest('hex');
+
+/** A current leg capability may check one exact point from an earlier version.
+ * Rotation takes the same parent lock exclusively, so an earlier version can
+ * no longer commit after this check. No list or other positions are exposed. */
+export async function limitedTransportGpsReceipt(req:AuthRequest,res:Response,next:NextFunction) {
+  try {
+    const claim=trackingClaim(req);
+    const parsed=z.string().uuid('La referencia de la ubicación no es válida').safeParse(req.params.puntoId);
+    if(!parsed.success)throw new AppError(parsed.error.issues[0].message,400);
+    const puntoId=parsed.data;
+    const versionParam=req.query?.version;
+    const parsedVersion=versionParam===undefined?null:z.string().uuid('La versión del seguimiento no es válida').safeParse(versionParam);
+    if(parsedVersion&&!parsedVersion.success)throw new AppError('La versión del seguimiento no es válida',400);
+    const requestedVersion=parsedVersion?.success?parsedVersion.data.toLowerCase():claim.jti!;
+    const tracking=await prisma.$transaction(async tx=>{
+      const candidate=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},select:{manifiestoId:true}});
+      if(!candidate)throw new AppError('Tramo no encontrado',404);
+      await tx.$queryRaw`SELECT id FROM manifiestos WHERE id = ${candidate.manifiestoId} FOR SHARE`;
+      const leg=await liveLeg(tx,claim);
+      const found=await tx.trackingGPS.findUnique({where:{id:legTrackingId(claim.sub!,requestedVersion,puntoId)}});
+      if(!found)return null;
+      if(found.manifiestoId!==leg.manifiestoId||found.tramoId!==leg.id||found.emisor!==`acceso-relevo:${requestedVersion}`)throw new AppError('No se pudo verificar la ubicación',409);
+      return {latitud:found.latitud,longitud:found.longitud,precision:found.precision,velocidad:found.velocidad,direccion:found.direccion};
+    });
+    res.setHeader('Cache-Control','private, no-store');res.setHeader('Referrer-Policy','no-referrer');
+    res.json({success:true,data:{idempotencia:{version:1,puntoId,confirmado:!!tracking},tracking}});
+  }catch(error){next(error);}
+}
 
 async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFunction,idempotent:boolean) {
   try {
@@ -208,7 +237,7 @@ async function saveLimitedTransportGps(req:AuthRequest,res:Response,next:NextFun
     if(!parsed.success) throw new AppError(parsed.error.issues[0].message,400);
     const {latitud,longitud,velocidad,direccion,precision}=parsed.data;
     const puntoId='puntoId' in parsed.data&&typeof parsed.data.puntoId==='string'?parsed.data.puntoId:undefined;
-    const trackingId=puntoId?'gpslegv1_'+createHash('sha256').update(JSON.stringify([claim.sub,claim.jti,puntoId.toLowerCase()])).digest('hex'):undefined;
+    const trackingId=puntoId?legTrackingId(claim.sub!,claim.jti!,puntoId):undefined;
     const result=await prisma.$transaction(async tx=>{
       // Serialize GPS with delivery and handoff on the SAME parent row in all workers.
       const candidate=await tx.tramoTransporte.findUnique({where:{id:claim.sub!},select:{manifiestoId:true}});

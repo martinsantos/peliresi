@@ -1,11 +1,12 @@
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import jwt from 'jsonwebtoken';
+import {createHash} from 'node:crypto';
 const mocks=vi.hoisted(()=>({leg:vi.fn(),user:vi.fn(),latest:vi.fn(),find:vi.fn(),create:vi.fn(),query:vi.fn(),emit:vi.fn()}));
 vi.mock('../../config/config',()=>({config:{JWT_SECRET:'unit-handoff-secret'}}));
 vi.mock('../../lib/prisma',()=>({default:{$transaction:async(callback:any)=>callback({tramoTransporte:{findUnique:mocks.leg},usuario:{findUnique:mocks.user},trackingGPS:{findUnique:mocks.find,create:mocks.create},$queryRaw:mocks.query}),trackingGPS:{findFirst:mocks.latest}}}));
 vi.mock('../../services/domainEvent.service',()=>({domainEvents:{emit:mocks.emit}}));
 vi.mock('../../services/blockchain.service',()=>({computeRollingHash:vi.fn()}));
-import {limitedTransportGps,limitedTransportGpsIdempotent,limitedTransportState} from '../../controllers/transport-handoff.controller';
+import {limitedTransportGps,limitedTransportGpsIdempotent,limitedTransportGpsReceipt,limitedTransportState} from '../../controllers/transport-handoff.controller';
 import {inTrainingSession,TRAINING_REALM} from '../../lib/trainingScope';
 const id='af1388bc-43f7-4c73-8e9c-c14c46695881';
 const token=(extra={})=>jwt.sign({purpose:'transport-leg-gps',jti:'version',...extra},'unit-handoff-secret',{subject:id,audience:'transport-leg-gps',expiresIn:'1h'});
@@ -71,4 +72,50 @@ it('requires a reference on the new endpoint while leaving the legacy contract u
   expect(next).toHaveBeenCalledWith(expect.objectContaining({statusCode:400}));
   const legacy=res(),legacyNext=vi.fn();await limitedTransportGps(request,legacy,legacyNext);
   expect(legacyNext).not.toHaveBeenCalled();expect(legacy.json.mock.calls[0][0].data.idempotencia).toBeUndefined();
+});
+
+it('returns only the matching relay receipt under its still-active capability',async()=>{
+  const puntoId='1949916e-22df-4dc1-9d1e-98f98a3eab26';
+  mocks.find.mockResolvedValue({id:'private-id',manifiestoId:'manifest',tramoId:id,emisor:'acceso-relevo:version',latitud:-33,longitud:-69,precision:8,velocidad:null,direccion:null});
+  const response=res(),next=vi.fn();
+  await limitedTransportGpsReceipt({...req(token()),params:{tramoId:id,puntoId}},response,next);
+  expect(next).not.toHaveBeenCalled();
+  expect(response.json).toHaveBeenCalledWith({success:true,data:{idempotencia:{version:1,puntoId,confirmado:true},tracking:{latitud:-33,longitud:-69,precision:8,velocidad:null,direccion:null}}});
+  expect(response.setHeader).toHaveBeenCalledWith('Cache-Control','private, no-store');
+  expect(response.setHeader).toHaveBeenCalledWith('Referrer-Policy','no-referrer');
+  expect(JSON.stringify(response.json.mock.calls)).not.toContain('private-id');
+});
+it('keeps a missing, forged, revoked or mismatched relay receipt inaccessible',async()=>{
+  const puntoId='1949916e-22df-4dc1-9d1e-98f98a3eab26',request={...req(token()),params:{tramoId:id,puntoId}};
+  const missing=res(),next=vi.fn();await limitedTransportGpsReceipt(request,missing,next);
+  expect(missing.json.mock.calls[0][0].data).toEqual({idempotencia:{version:1,puntoId,confirmado:false},tracking:null});
+  mocks.find.mockResolvedValueOnce({manifiestoId:'other',tramoId:id,emisor:'acceso-relevo:version'});
+  const mismatch=vi.fn();await limitedTransportGpsReceipt(request,res(),mismatch);
+  expect(mismatch).toHaveBeenCalledWith(expect.objectContaining({statusCode:409}));
+  mocks.find.mockClear();const leg=await mocks.leg();mocks.leg.mockResolvedValue({...leg,accesoVersion:'rotated'});
+  const revoked=vi.fn();await limitedTransportGpsReceipt(request,res(),revoked);
+  expect(revoked).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));expect(mocks.find).not.toHaveBeenCalled();
+  const forged=vi.fn();await limitedTransportGpsReceipt({...req('forged'),params:{tramoId:id,puntoId}},res(),forged);
+  expect(forged).toHaveBeenCalledWith(expect.objectContaining({statusCode:401}));
+  const invalid=vi.fn();await limitedTransportGpsReceipt({...req(token()),params:{tramoId:id,puntoId:'not-a-uuid'}},res(),invalid);
+  expect(invalid).toHaveBeenCalledWith(expect.objectContaining({statusCode:400}));
+});
+it('allows only the current leg capability to check one exact earlier-version receipt',async()=>{
+  const old='1949916e-22df-4dc1-9d1e-98f98a3eab26',current='3a999c28-2e6a-4fd0-9127-777a7db7af3e';
+  const puntoId='491d2c6e-803c-48d3-a021-23eac2d75a62',leg=await mocks.leg();
+  mocks.leg.mockResolvedValue({...leg,accesoVersion:current});
+  mocks.find.mockResolvedValue({manifiestoId:'manifest',tramoId:id,emisor:`acceso-relevo:${old}`,latitud:-33,longitud:-69,precision:8,velocidad:null,direccion:null});
+  const response=res(),next=vi.fn();
+  await limitedTransportGpsReceipt({...req(token({jti:current})),params:{tramoId:id,puntoId},query:{version:old}},response,next);
+  expect(next).not.toHaveBeenCalled();
+  const key='gpslegv1_'+createHash('sha256').update(JSON.stringify([id,old,puntoId])).digest('hex');
+  expect(mocks.find).toHaveBeenCalledWith({where:{id:key}});
+  expect(response.json.mock.calls[0][0].data.idempotencia).toEqual({version:1,puntoId,confirmado:true});
+  mocks.find.mockClear();const revoked=vi.fn();
+  await limitedTransportGpsReceipt({...req(token({jti:old})),params:{tramoId:id,puntoId},query:{version:old}},res(),revoked);
+  expect(revoked).toHaveBeenCalledWith(expect.objectContaining({statusCode:403}));expect(mocks.find).not.toHaveBeenCalled();
+  const bad=vi.fn();await limitedTransportGpsReceipt({...req(token({jti:current})),params:{tramoId:id,puntoId},query:{version:'bad'}},res(),bad);
+  expect(bad).toHaveBeenCalledWith(expect.objectContaining({statusCode:400}));expect(mocks.find).not.toHaveBeenCalled();
+  const other=vi.fn();await limitedTransportGpsReceipt({...req(token({jti:current})),params:{tramoId:'other-leg',puntoId},query:{version:old}},res(),other);
+  expect(other).toHaveBeenCalledWith(expect.objectContaining({statusCode:401}));expect(mocks.find).not.toHaveBeenCalled();
 });

@@ -53,6 +53,13 @@ describe('identity and work-family admission', () => {
     expect((await send(session, '/api/manifiestos/id/aprobar', 'POST', {})).status).toBe(200);
     expect((await send(session, '/api/pdf/manifiesto/id')).status).toBe(200);
   });
+  it('keeps idempotent GPS and manifest decisions in independent signed-user budgets', async () => {
+    const {send}=await fixture(),session=token('carrier');
+    for(let i=0;i<3;i++)expect((await send(session,'/api/manifiestos/id/ubicacion-idempotente','POST',{})).status).toBe(200);
+    expect((await send(session,'/api/manifiestos/id/ubicacion-idempotente','POST',{})).status).toBe(429);
+    for(let i=0;i<3;i++)expect((await send(session,'/api/manifiestos/id/aprobar','POST',{})).status).toBe(200);
+    expect((await send(session,'/api/manifiestos/id/aprobar','POST',{})).status).toBe(429);
+  });
   it('shares the same human quota across tokens, tabs, roles and impersonation', async () => {
     const { send } = await fixture();
     expect((await send(token('admin'))).status).toBe(200);
@@ -113,6 +120,8 @@ describe('signed quota identities and route classification', () => {
   });
   it('recognizes actual route families without arbitrary client-selected headers', () => {
     expect(admissionFamily({ method: 'POST', originalUrl: '/api/manifiestos/abc/ubicacion?x=1' })).toBe('gps');
+    expect(admissionFamily({ method: 'POST', originalUrl: '/api/manifiestos/abc/ubicacion-idempotente?x=1' })).toBe('gps');
+    expect(admissionFamily({ method: 'POST', originalUrl: '/api/seguimiento-relevo/abc/ubicacion-idempotente' })).toBe('gps');
     expect(admissionFamily({ method: 'POST', originalUrl: '/api/manifiestos/abc/aprobar' })).toBe('writes');
     expect(admissionFamily({ method: 'GET', originalUrl: '/api/pdf/manifiesto/abc' })).toBe('documents');
     expect(admissionFamily({ method: 'GET', originalUrl: '/api/manifiestos/abc/certificados/id.pdf' })).toBe('documents');

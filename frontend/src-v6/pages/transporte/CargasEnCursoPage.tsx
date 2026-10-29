@@ -69,7 +69,7 @@ export default function CargasEnCursoPage() {
     if(!currentSession())throw new Error('La cuenta o actividad cambió. Volvé a abrir tus viajes.');
     if(actions.some(action=>action.type==='POST'&&queuedDeliveryManifestId(action.endpoint)===id))throw new Error('Hay una entrega pendiente en este dispositivo. Revisá la sincronización antes de enviar GPS.');
   };
-  const gps=useFleetGps(chosen.filter(canTrack).map(load=>({key:gpsKey(load.key),...(load.kind==='MANIFIESTO'?{lockId:load.id,beforeSend:()=>checkDelivery(load.id),verify:(point,puntoId)=>fleetGpsService.verify(load,point,puntoId,currentSession)}:{persist:false}),send:(point,puntoId)=>fleetGpsService.send(load,point,credentials.current,puntoId,currentSession)})),allowed&&ownsSession&&started);
+  const gps=useFleetGps(chosen.filter(canTrack).map(load=>({key:gpsKey(load.key),...(load.kind==='MANIFIESTO'?{lockId:load.id,beforeSend:()=>checkDelivery(load.id),verify:(point,puntoId)=>fleetGpsService.verify(load,point,puntoId,currentSession)}:{lockId:`relevo:${load.id}`,prepareCapability:()=>fleetGpsService.prepareRelay(load,credentials.current,currentSession),verify:(point,puntoId,version)=>fleetGpsService.verifyRelay(load,point,puntoId,version,credentials.current,currentSession)}),send:(point,puntoId,version)=>fleetGpsService.send(load,point,credentials.current,puntoId,currentSession,version)})),allowed&&ownsSession&&started);
   const rows=query.data?.targets??[];
   const refresh=async()=>{await qc.invalidateQueries({queryKey:['fleet-gps-targets',scope]});await qc.invalidateQueries({queryKey:['manifiestos']});};
   const toggle=(load:FleetGpsLoad)=>{

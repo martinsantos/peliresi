@@ -2,12 +2,12 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {getApiErrorMessage} from '../utils/api-error';
 import {createGpsFixOrder,gpsFixFingerprint} from '../utils/gpsFixOrder';
 import {newGpsPointId} from '../services/gpsQueue';
-import {acknowledgeFleetGpsPoint,readFleetGpsPoints,saveFleetGpsPoint,type FleetStoredPoint} from '../services/fleetGpsStorage';
+import {acknowledgeFleetGpsPoint,bindFleetGpsCapability,rebindFleetGpsCapabilityAfterAbsence,readFleetGpsPoints,saveFleetGpsPoint,type FleetStoredPoint} from '../services/fleetGpsStorage';
 import {adoptParkedGpsLease,gpsLeaseClosing,parkGpsLease,startGpsLease,type GpsLease} from '../services/gpsCoordination';
 import {clearVolatileFleetObservation,getVolatileFleetObservation,rememberVolatileFleetObservation,showVolatileFleetWarning,type FleetGpsObservation} from '../services/fleetGpsVolatile';
 
 export interface FleetGpsPoint {latitud:number;longitud:number;precision:number;velocidad?:number;direccion?:number}
-export interface FleetGpsTarget {key:string;lockId?:string;persist?:boolean;beforeSend?:()=>Promise<void>;send:(point:FleetGpsPoint,puntoId:string)=>Promise<unknown>;verify?:(point:FleetGpsPoint,puntoId:string)=>Promise<boolean>}
+export interface FleetGpsTarget {key:string;lockId?:string;persist?:boolean;beforeSend?:()=>Promise<void>;prepareCapability?:()=>Promise<string>;recoveryMessage?:string;send:(point:FleetGpsPoint,puntoId:string,version?:string)=>Promise<unknown>;verify?:(point:FleetGpsPoint,puntoId:string,version?:string|null)=>Promise<boolean>}
 export interface FleetGpsDelivery {state:'sending'|'received'|'verified'|'error';receivedAt?:Date;message?:string;terminal?:boolean;statusCode?:number;saved?:boolean}
 type Observation=FleetGpsObservation;
 type Status='idle'|'acquiring'|'active'|'denied'|'unavailable';
@@ -99,21 +99,23 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
             });requestsRef.current.set(key,parking);
             try{await parking;}catch(cause){problem=cause;}
             finally{if(requestsRef.current.get(key)===parking)requestsRef.current.delete(key);}
-            if(getVolatileFleetObservation(key))showVolatileFleetWarning(key);
+            if(getVolatileFleetObservation(key))showVolatileFleetWarning(key,target.recoveryMessage);
           }else if(target&&current&&!unconfirmedRef.current.has(key)){unconfirmedRef.current.set(key,current);markVolatile(current);}
           if(target)setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'error',saved:false,message:getApiErrorMessage(problem,'No se pudo revisar el almacenamiento de ubicaciones.')}}));
           continue;
         }
         const saved=stored[0],savedFingerprint=saved?gpsFixFingerprint(saved.observedAt,saved.point):null;
-        const observation=unconfirmedRef.current.get(key)??(saved?{point:saved.point,observedAt:saved.observedAt,fingerprint:savedFingerprint===null?null:`${sensorEpochRef.current}:${savedFingerprint}`,references:new Map([[key,saved.puntoId]])}:currentRef.current);
+        const observation=unconfirmedRef.current.get(key)??(saved?{point:saved.point,observedAt:saved.observedAt,fingerprint:savedFingerprint===null?null:`${sensorEpochRef.current}:${savedFingerprint}`,references:new Map([[key,saved.puntoId]]),...(saved.capabilityVersion?{capabilityVersions:new Map([[key,saved.capabilityVersion]])}:{})}:currentRef.current);
         const sinceAttempt=previousAttempt===undefined?undefined:Date.now()-previousAttempt;
         if(!target||!observation||heldRef.current.has(key)||(!saved&&!unconfirmedRef.current.has(key)&&observation.fingerprint!==null&&receivedRef.current.get(key)===observation.fingerprint)||(sinceAttempt!==undefined&&sinceAttempt>=0&&sinceAttempt<29000))continue;
         if(!recent(observation.observedAt)){
+          let checkError:unknown;
           if(saved&&target.verify){
             attemptRef.current.set(key,Date.now());
             const check=Promise.resolve().then(async()=>{
               const operation=async()=>{
-                if(!(await target.verify!(saved.point,saved.puntoId)))return false;
+                const confirmed=target.prepareCapability?await target.verify!(saved.point,saved.puntoId,saved.capabilityVersion):await target.verify!(saved.point,saved.puntoId);
+                if(!confirmed)return false;
                 acknowledgeFleetGpsPoint(saved);
                 if(unconfirmedRef.current.get(key)?.references.get(key)===saved.puntoId){unconfirmedRef.current.delete(key);clearVolatile();}
                 return true;
@@ -129,7 +131,7 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
                 }
                 continue;
               }
-            }catch{/* A failed lookup is not evidence that the point was received. */}
+            }catch(error){checkError=error;/* A failed lookup is not evidence that the point was received. */}
             finally{if(requestsRef.current.get(key)===check)requestsRef.current.delete(key);}
           }
           // An old unsaved observation may be preserved for review, but must
@@ -139,13 +141,15 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
             const preserve=withFleetLease(target.lockId,key,async()=>{
               let reference=observation.references.get(key);
               if(!reference){reference=newGpsPointId();observation.references.set(key,reference);}
-              saveFleetGpsPoint({targetKey:key,puntoId:reference,observedAt:observation.observedAt,point:observation.point});
+              saveFleetGpsPoint({targetKey:key,puntoId:reference,observedAt:observation.observedAt,point:observation.point,...(target.prepareCapability?{capabilityVersion:observation.capabilityVersions?.get(key)??null}:{})});
               clearVolatile();
             });requestsRef.current.set(key,preserve);
-            try{await preserve;preserved=true;}catch{showVolatileFleetWarning(key);}
+            try{await preserve;preserved=true;}catch{showVolatileFleetWarning(key,target.recoveryMessage);}
             finally{if(requestsRef.current.get(key)===preserve)requestsRef.current.delete(key);}
           }
-          if((saved||unconfirmedRef.current.has(key))&&activeRef.current&&generation.current===run&&targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'error',saved:(!!saved||preserved)&&!volatileRef.current.has(key),message:`Hay una ubicación pendiente sin confirmar. ${volatileRef.current.has(key)?'Mantené esta pantalla abierta':'Conservá este dispositivo'} y contactá a soporte; no se reenviará como ubicación actual.`}}));
+          const checkStatus=responseStatus(checkError),terminal=[401,403,404,409].includes(checkStatus??0);
+          if(terminal)heldRef.current.add(key);
+          if((saved||unconfirmedRef.current.has(key))&&activeRef.current&&generation.current===run&&targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'error',terminal,statusCode:checkStatus,saved:(!!saved||preserved)&&!volatileRef.current.has(key),message:terminal?getApiErrorMessage(checkError,'No se pudo comprobar la autorización. Conservá este dispositivo y consultá a soporte.'):`Hay una ubicación pendiente sin confirmar. ${volatileRef.current.has(key)?'Mantené esta pantalla abierta':'Conservá este dispositivo'} y contactá a soporte; no se reenviará como ubicación actual.`}}));
           else setStatus('acquiring');
           continue;
         }
@@ -161,11 +165,30 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
             try{
               let reference=observation.references.get(key);
               if(!reference){reference=newGpsPointId();observation.references.set(key,reference);}
-              const item:FleetStoredPoint={targetKey:key,puntoId:reference,observedAt:observation.observedAt,point:observation.point};
+              let item:FleetStoredPoint=saved?.puntoId===reference?saved:{targetKey:key,puntoId:reference,observedAt:observation.observedAt,point:observation.point,...(target.prepareCapability?{capabilityVersion:observation.capabilityVersions?.get(key)??null}:{})};
+              if(item.observedAt!==observation.observedAt||JSON.stringify(item.point)!==JSON.stringify(observation.point))throw new Error('La ubicación guardada no coincide. Conservá este dispositivo y consultá a soporte.');
               if(target.persist!==false){saveFleetGpsPoint(item);clearVolatile();}
-              await target.send(observation.point,reference);
+              let version:string|undefined;
+              if(target.prepareCapability){
+                if(target.persist===false||item.capabilityVersion===undefined)throw new Error('No se pudo identificar la autorización de esta ubicación. Conservá este dispositivo y consultá a soporte.');
+                version=await target.prepareCapability();
+                if(item.capabilityVersion!==null&&item.capabilityVersion!==version){
+                  if(!target.verify)throw Object.assign(new Error('No se pudo comprobar la autorización anterior. Conservá este dispositivo y consultá a soporte.'),{status:409});
+                  const received=await target.verify(item.point,reference,item.capabilityVersion);
+                  if(received){
+                    try{acknowledgeFleetGpsPoint(item);}catch(error){markVolatile(observation);throw error;}
+                    clearVolatile();return 'verified' as const;
+                  }
+                  item=rebindFleetGpsCapabilityAfterAbsence(item,version);
+                }
+                if(item.capabilityVersion===null)item=bindFleetGpsCapability(item,version);
+                (observation.capabilityVersions??=new Map()).set(key,version);
+              }
+              if(target.prepareCapability)await target.send(observation.point,reference,version);
+              else await target.send(observation.point,reference);
               if(target.persist!==false){try{acknowledgeFleetGpsPoint(item);}catch(error){markVolatile(observation);throw error;}}
               clearVolatile();
+              return 'received' as const;
             }catch(error){
               // Prove the exact point is durable before releasing the lease.
               if(target.persist!==false&&volatileRef.current.has(key)){
@@ -175,17 +198,17 @@ export function useFleetGps(targets:FleetGpsTarget[],enabled:boolean) {
               throw error;
             }
           };
-          if(target.lockId)await withFleetLease(target.lockId,key,operation);else await operation();
+          return target.lockId?withFleetLease(target.lockId,key,operation):operation();
         });requestsRef.current.set(key,upload);
         try{
-          await upload;
+          const outcome=await upload;
           if(unconfirmedRef.current.get(key)===observation)unconfirmedRef.current.delete(key);
           if(activeRef.current&&generation.current===run){
             if(observation.fingerprint!==null)receivedRef.current.set(key,observation.fingerprint);
-            if(targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{state:'received',receivedAt:new Date()}}));
+            if(targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:outcome==='verified'?{state:'verified'}:{state:'received',receivedAt:new Date()}}));
           }
         }catch(error){
-          if(target.lockId&&getVolatileFleetObservation(key))showVolatileFleetWarning(key);
+          if(target.lockId&&getVolatileFleetObservation(key))showVolatileFleetWarning(key,target.recoveryMessage);
           const statusCode=responseStatus(error),terminal=[401,403,404,409].includes(statusCode??0);if(terminal)heldRef.current.add(key);
           if(activeRef.current&&generation.current===run&&targetsRef.current.some(item=>item.key===key))setDeliveries(previous=>({...previous,[key]:{...previous[key],state:'error',terminal,statusCode,saved:!!(saved||unconfirmedRef.current.has(key))&&!volatileRef.current.has(key),message:getApiErrorMessage(error,'No se pudo enviar esta ubicación. Revisá la conexión o actualizá las cargas.')+(volatileRef.current.has(key)?' La ubicación no pudo guardarse; mantené esta pantalla abierta.':'')}}));
         }finally{if(requestsRef.current.get(key)===upload)requestsRef.current.delete(key);}
